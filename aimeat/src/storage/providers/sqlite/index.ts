@@ -61,6 +61,8 @@ import type {
   SharingGroupRecord,
   AgentActivityRecord,
   AgentMessageRecord,
+  DirectMessageRecord,
+  ContactConsentRecord,
   TelemetryEvent,
   WebhookDeliveryLog,
   AgentOnboardingRecord,
@@ -76,6 +78,7 @@ import * as sharingGroupRepo from './repos/sharing-group.js';
 import * as agentDirectivesRepo from './repos/agent-directives.js';
 import * as agentActivityRepo from './repos/agent-activity.js';
 import * as agentMessageRepo from './repos/agent-message.js';
+import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
 
 export class SqliteStorage implements Storage {
@@ -6349,6 +6352,66 @@ export class SqliteStorage implements Storage {
 
   async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {
     return agentMessageRepo.listThreads(this.db, agentGaii);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Direct Messages (human↔human) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createDirectMessage(record: DirectMessageRecord): Promise<DirectMessageRecord> {
+    return directMessageRepo.createDirectMessage(this.db, record);
+  }
+
+  async getDirectMessage(id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
+    return directMessageRepo.getDirectMessage(this.db, id, ownerGhii);
+  }
+
+  async listInbox(ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {
+    return directMessageRepo.listInbox(this.db, ownerGhii, opts);
+  }
+
+  async listConversation(ownerGhii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+    return directMessageRepo.listConversation(this.db, ownerGhii, conversationId, opts);
+  }
+
+  async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
+    return directMessageRepo.listConversations(this.db, ownerGhii);
+  }
+
+  async markMessageRead(id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
+    return directMessageRepo.markMessageRead(this.db, id, ownerGhii);
+  }
+
+  async markConversationRead(ownerGhii: string, conversationId: string): Promise<number> {
+    return directMessageRepo.markConversationRead(this.db, ownerGhii, conversationId);
+  }
+
+  async updateMessageDeliveryStatus(id: string, status: DirectMessageRecord['status'], extra?: { deliveredAt?: string; error?: string }): Promise<DirectMessageRecord | null> {
+    return directMessageRepo.updateMessageDeliveryStatus(this.db, id, status, extra);
+  }
+
+  async setMessageReadReceipt(id: string, readAt: string): Promise<DirectMessageRecord | null> {
+    return directMessageRepo.setMessageReadReceipt(this.db, id, readAt);
+  }
+
+  async updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null> {
+    return directMessageRepo.updateMessageAttachments(this.db, id, ownerGhii, attachments);
+  }
+
+  async deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean> {
+    return directMessageRepo.deleteDirectMessage(this.db, id, ownerGhii);
+  }
+
+  async getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {
+    return directMessageRepo.getContact(this.db, ownerGhii, contactId);
+  }
+
+  async setContactState(ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string): Promise<ContactConsentRecord> {
+    return directMessageRepo.setContactState(this.db, ownerGhii, contactId, state, firstMessageId);
+  }
+
+  async listContacts(ownerGhii: string, opts?: { state?: ContactConsentRecord['state'] }): Promise<ContactConsentRecord[]> {
+    return directMessageRepo.listContacts(this.db, ownerGhii, opts);
   }
 
   // ══════════════════════════════════════════════════════════

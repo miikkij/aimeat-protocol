@@ -110,6 +110,8 @@ import type {
     SharingGroupRecord,
     AgentActivityRecord,
     AgentMessageRecord,
+    DirectMessageRecord,
+    ContactConsentRecord,
     TelemetryEvent,
     WebhookDeliveryLog,
     AgentOnboardingRecord,
@@ -6823,6 +6825,227 @@ export class PrismaStorage implements Storage {
         // Sort by updatedAt descending
         results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
         return results;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Direct Messages (human↔human) ──
+    // ══════════════════════════════════════════════════════════
+
+    /** Composite _id for one mailbox copy of a message. */
+    private dmDocId(mid: string, ownerGhii: string): string { return `${mid}::${ownerGhii}`; }
+    /** Composite _id for a contact-consent record. */
+    private contactDocId(ownerGhii: string, contactId: string): string { return `${ownerGhii}::${contactId}`; }
+
+    private toDirectMessageRecord(row: any): DirectMessageRecord {
+        const record: DirectMessageRecord = {
+            id: row.mid,
+            ownerGhii: row.ownerGhii,
+            conversationId: row.conversationId,
+            senderGhii: row.senderGhii,
+            recipientGhii: row.recipientGhii,
+            body: row.body ?? '',
+            status: row.status as DirectMessageRecord['status'],
+            direction: row.direction as DirectMessageRecord['direction'],
+            origin: row.origin as DirectMessageRecord['origin'],
+            originNodeId: row.originNodeId,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+        if (row.attachments) record.attachments = row.attachments as DirectMessageRecord['attachments'];
+        if (row.replyToId) record.replyToId = row.replyToId;
+        if (row.error) record.error = row.error;
+        if (row.deliveredAt) record.deliveredAt = row.deliveredAt instanceof Date ? row.deliveredAt.toISOString() : row.deliveredAt;
+        if (row.readAt) record.readAt = row.readAt instanceof Date ? row.readAt.toISOString() : row.readAt;
+        return record;
+    }
+
+    private toContactRecord(row: any): ContactConsentRecord {
+        const record: ContactConsentRecord = {
+            ownerGhii: row.ownerGhii,
+            contactId: row.contactId,
+            state: row.state as ContactConsentRecord['state'],
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+        if (row.firstMessageId) record.firstMessageId = row.firstMessageId;
+        return record;
+    }
+
+    async createDirectMessage(record: DirectMessageRecord): Promise<DirectMessageRecord> {
+        this.ensureReady();
+        await this.prisma.directMessage.create({
+            data: {
+                id: this.dmDocId(record.id, record.ownerGhii),
+                mid: record.id,
+                ownerGhii: record.ownerGhii,
+                conversationId: record.conversationId,
+                senderGhii: record.senderGhii,
+                recipientGhii: record.recipientGhii,
+                body: record.body,
+                attachments: (record.attachments as any) ?? null,
+                status: record.status,
+                direction: record.direction,
+                replyToId: record.replyToId ?? null,
+                origin: record.origin,
+                originNodeId: record.originNodeId,
+                error: record.error ?? null,
+                createdAt: new Date(record.createdAt),
+                deliveredAt: record.deliveredAt ? new Date(record.deliveredAt) : null,
+                readAt: record.readAt ? new Date(record.readAt) : null,
+            },
+        });
+        return record;
+    }
+
+    async getDirectMessage(id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.directMessage.findUnique({ where: { id: this.dmDocId(id, ownerGhii) } });
+        return row ? this.toDirectMessageRecord(row) : null;
+    }
+
+    async listInbox(ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where: any = { ownerGhii, direction: 'inbound' };
+        if (opts?.unreadOnly) where.readAt = null;
+
+        const [rows, total, unread] = await Promise.all([
+            this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
+            this.prisma.directMessage.count({ where }),
+            this.prisma.directMessage.count({ where: { ownerGhii, direction: 'inbound', readAt: null } }),
+        ]);
+        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total, unread };
+    }
+
+    async listConversation(ownerGhii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 50;
+        const where = { ownerGhii, conversationId };
+        const [rows, total] = await Promise.all([
+            this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
+            this.prisma.directMessage.count({ where }),
+        ]);
+        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+    }
+
+    async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
+        this.ensureReady();
+        const groups = await this.prisma.directMessage.groupBy({
+            by: ['conversationId'],
+            where: { ownerGhii },
+            _count: { _all: true },
+            _max: { createdAt: true },
+        });
+
+        const results: Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }> = [];
+        for (const g of groups) {
+            const last = await this.prisma.directMessage.findFirst({
+                where: { ownerGhii, conversationId: g.conversationId },
+                orderBy: { createdAt: 'desc' },
+                select: { body: true, direction: true, senderGhii: true, recipientGhii: true },
+            });
+            const unread = await this.prisma.directMessage.count({
+                where: { ownerGhii, conversationId: g.conversationId, direction: 'inbound', readAt: null },
+            });
+            const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
+            results.push({
+                conversationId: g.conversationId,
+                peerGhii: last ? (lastDirection === 'inbound' ? last.senderGhii : last.recipientGhii) : '',
+                lastMessage: last?.body ?? '',
+                lastDirection,
+                messageCount: g._count._all,
+                unread,
+                updatedAt: g._max.createdAt instanceof Date ? g._max.createdAt.toISOString() : (g._max.createdAt ?? ''),
+            });
+        }
+        results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return results;
+    }
+
+    async markMessageRead(id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.directMessage.update({
+                where: { id: this.dmDocId(id, ownerGhii) },
+                data: { status: 'read', readAt: new Date() },
+            });
+            return this.toDirectMessageRecord(row);
+        } catch { return null; }
+    }
+
+    async markConversationRead(ownerGhii: string, conversationId: string): Promise<number> {
+        this.ensureReady();
+        const res = await this.prisma.directMessage.updateMany({
+            where: { ownerGhii, conversationId, direction: 'inbound', readAt: null },
+            data: { status: 'read', readAt: new Date() },
+        });
+        return res.count;
+    }
+
+    async updateMessageDeliveryStatus(id: string, status: DirectMessageRecord['status'], extra?: { deliveredAt?: string; error?: string }): Promise<DirectMessageRecord | null> {
+        this.ensureReady();
+        // Delivery status lives on the sender's (outbound) copy.
+        const outbound = await this.prisma.directMessage.findFirst({ where: { mid: id, direction: 'outbound' } });
+        if (!outbound) return null;
+        const data: any = { status };
+        if (extra?.deliveredAt) data.deliveredAt = new Date(extra.deliveredAt);
+        if (extra?.error !== undefined) data.error = extra.error;
+        const row = await this.prisma.directMessage.update({ where: { id: outbound.id }, data });
+        return this.toDirectMessageRecord(row);
+    }
+
+    async setMessageReadReceipt(id: string, readAt: string): Promise<DirectMessageRecord | null> {
+        this.ensureReady();
+        const outbound = await this.prisma.directMessage.findFirst({ where: { mid: id, direction: 'outbound' } });
+        if (!outbound) return null;
+        const row = await this.prisma.directMessage.update({ where: { id: outbound.id }, data: { status: 'read', readAt: new Date(readAt) } });
+        return this.toDirectMessageRecord(row);
+    }
+
+    async updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.directMessage.update({
+                where: { id: this.dmDocId(id, ownerGhii) },
+                data: { attachments: (attachments as any) ?? null },
+            });
+            return this.toDirectMessageRecord(row);
+        } catch { return null; }
+    }
+
+    async deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.directMessage.delete({ where: { id: this.dmDocId(id, ownerGhii) } });
+            return true;
+        } catch { return false; }
+    }
+
+    async getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.contactConsent.findUnique({ where: { id: this.contactDocId(ownerGhii, contactId) } });
+        return row ? this.toContactRecord(row) : null;
+    }
+
+    async setContactState(ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string): Promise<ContactConsentRecord> {
+        this.ensureReady();
+        const now = new Date();
+        const docId = this.contactDocId(ownerGhii, contactId);
+        const row = await this.prisma.contactConsent.upsert({
+            where: { id: docId },
+            create: { id: docId, ownerGhii, contactId, state, firstMessageId: firstMessageId ?? null, createdAt: now, updatedAt: now },
+            update: { state, ...(firstMessageId ? { firstMessageId } : {}), updatedAt: now },
+        });
+        return this.toContactRecord(row);
+    }
+
+    async listContacts(ownerGhii: string, opts?: { state?: ContactConsentRecord['state'] }): Promise<ContactConsentRecord[]> {
+        this.ensureReady();
+        const where: any = { ownerGhii };
+        if (opts?.state) where.state = opts.state;
+        const rows = await this.prisma.contactConsent.findMany({ where, orderBy: { updatedAt: 'desc' } });
+        return rows.map((r: any) => this.toContactRecord(r));
     }
 
     // ══════════════════════════════════════════════════════════

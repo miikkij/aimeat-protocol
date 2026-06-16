@@ -1541,3 +1541,40 @@ model AgentMessage {
   @@index([agentGaii, threadId, createdAt])
   @@index([agentGaii, status])
 }
+
+model DirectMessage {
+  id             String    @id // composite "<mid>::<ownerGhii>" (one mailbox copy)
+  mid            String // the shared message id (same on sender + recipient copies)
+  ownerGhii      String
+  conversationId String
+  senderGhii     String
+  recipientGhii  String
+  body           String    @default("")
+  attachments    Json?
+  status         String    @default("queued")
+  direction      String
+  replyToId      String?
+  origin         String    @default("local")
+  originNodeId   String
+  error          String?
+  createdAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+  readAt         DateTime?
+
+  @@index([ownerGhii, direction, createdAt])
+  @@index([ownerGhii, conversationId, createdAt])
+  @@index([mid])
+  @@index([status, origin])
+}
+
+model ContactConsent {
+  id             String   @id // composite "<ownerGhii>::<contactId>"
+  ownerGhii      String
+  contactId      String
+  state          String   @default("pending")
+  firstMessageId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  @@index([ownerGhii, state])
+}

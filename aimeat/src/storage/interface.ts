@@ -1962,6 +1962,81 @@ export interface AgentMessageRecord {
   processedAt?: string;
 }
 
+// ── Direct Messages (human↔human GHII messaging + federation) ──
+
+/**
+ * A media object referenced by a direct message — inline in the markdown body via cid:{id}
+ * or appended as a plain attachment. Every referenced storage object is one entry here: the
+ * single source of truth for the duplication / grant / quota / ownership lifecycle.
+ */
+export interface DirectMessageAttachment {
+  /** Short id used by cid:{id} inline references in the markdown body. */
+  id: string;
+  /** true = embedded in the body via cid:; false = appended attachment. */
+  inline: boolean;
+  /** Storage key at the origin (sender's node). */
+  storageKey: string;
+  /** Owner (sender) GHII that holds the original bytes. */
+  ownerGhii: string;
+  /** Node hosting the original bytes. */
+  originNodeId: string;
+  /** How the recipient accesses it. duplicate = the norm; reference = transient (pending/awaiting quota). */
+  mode: 'reference' | 'duplicate';
+  /** Recipient-side storage key, set once the attachment has been duplicated locally. */
+  localKey?: string;
+  mime: string;
+  size: number;
+  /** Original filename / caption. */
+  name?: string;
+  kind: 'image' | 'audio' | 'video' | 'file';
+}
+
+/**
+ * One mailbox copy of a direct message. Both sides store their own row (classic mailbox model):
+ * the sender keeps an `outbound` row, the recipient an `inbound` row, sharing `id`/`conversationId`
+ * so receipts and replies correlate. `ownerGhii` is whose mailbox this copy belongs to.
+ */
+export interface DirectMessageRecord {
+  id: string;
+  /** Whose mailbox copy this row is (sender's copy or recipient's copy). */
+  ownerGhii: string;
+  /** Deterministic id derived from the sorted GHII pair; groups a thread on both nodes. */
+  conversationId: string;
+  senderGhii: string;
+  recipientGhii: string;
+  /** GFM markdown; inline media referenced as cid:{attachmentId}. May be empty if attachment-only. */
+  body: string;
+  attachments?: DirectMessageAttachment[];
+  status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'undeliverable';
+  direction: 'inbound' | 'outbound';
+  /** Message this is a reply to (same conversationId). */
+  replyToId?: string;
+  origin: 'local' | 'federation';
+  /** Node that created (sent) the message. */
+  originNodeId: string;
+  /** Last delivery error, if status is failed/undeliverable. */
+  error?: string;
+  createdAt: string;
+  deliveredAt?: string;
+  readAt?: string;
+}
+
+/**
+ * Per-pair first-contact consent state, stored under the recipient's namespace. Drives the
+ * first-contact gate: no record → pending request; accepted → free-flowing; blocked → rejected.
+ */
+export interface ContactConsentRecord {
+  /** The human who owns this contact list (recipient side). */
+  ownerGhii: string;
+  /** The other party: GHII | GAII | GEAI. */
+  contactId: string;
+  state: 'pending' | 'accepted' | 'blocked';
+  /** The request message that opened the relationship, if any. */
+  firstMessageId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── Telemetry + Webhook Delivery Log (Phase A) ──
 
 export interface TelemetryEvent {
@@ -2077,6 +2152,7 @@ import type { AgentDirectivesRepository } from './repositories/agent-directives.
 import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
+import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 
@@ -2100,6 +2176,7 @@ export interface Storage extends
   CapabilityRepository,
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
   AgentMessageRepository,
+  DirectMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,
   AgentOnboardingRepository,
   StatsRepository { }

@@ -1423,6 +1423,42 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_agent_messages_agent ON agent_messages(agentGaii, threadId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_agent_messages_pending ON agent_messages(agentGaii, status);
 
+    -- ── Direct Messages (human↔human GHII messaging + federation) ──
+    CREATE TABLE IF NOT EXISTS direct_messages (
+      id             TEXT NOT NULL,
+      ownerGhii      TEXT NOT NULL,
+      conversationId TEXT NOT NULL,
+      senderGhii     TEXT NOT NULL,
+      recipientGhii  TEXT NOT NULL,
+      body           TEXT NOT NULL DEFAULT '',
+      attachments    TEXT,
+      status         TEXT NOT NULL DEFAULT 'queued',
+      direction      TEXT NOT NULL,
+      replyToId      TEXT,
+      origin         TEXT NOT NULL DEFAULT 'local',
+      originNodeId   TEXT NOT NULL,
+      error          TEXT,
+      createdAt      TEXT NOT NULL,
+      deliveredAt    TEXT,
+      readAt         TEXT,
+      PRIMARY KEY (id, ownerGhii)
+    );
+    CREATE INDEX IF NOT EXISTS idx_direct_messages_inbox ON direct_messages(ownerGhii, direction, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_direct_messages_convo ON direct_messages(ownerGhii, conversationId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_direct_messages_status ON direct_messages(status, origin);
+
+    -- ── Contact consent (first-contact gate for direct messages) ──
+    CREATE TABLE IF NOT EXISTS contact_consents (
+      ownerGhii      TEXT NOT NULL,
+      contactId      TEXT NOT NULL,
+      state          TEXT NOT NULL DEFAULT 'pending',
+      firstMessageId TEXT,
+      createdAt      TEXT NOT NULL,
+      updatedAt      TEXT NOT NULL,
+      PRIMARY KEY (ownerGhii, contactId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_contact_consents_state ON contact_consents(ownerGhii, state);
+
     -- ── Telemetry Events (Phase A push layer) ──
     CREATE TABLE IF NOT EXISTS telemetry_events (
       id TEXT PRIMARY KEY,
