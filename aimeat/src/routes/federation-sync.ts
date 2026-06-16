@@ -229,7 +229,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                 type: isRequest ? 'direct_message_request' : 'direct_message',
                 title: isRequest ? `${message.senderGhii} wants to message you` : `New message from ${message.senderGhii}`,
                 body: messagePreview(message.body ?? ''),
-                link: isRequest ? '/v1/profile#inbox/requests' : '/v1/profile#inbox',
+                link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${message.conversationId}`,
             });
             emitChange('messages');
         }

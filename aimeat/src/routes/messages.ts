@@ -171,7 +171,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         type: isRequest ? 'direct_message_request' : 'direct_message',
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
         body: messagePreview(input.body),
-        link: isRequest ? '/v1/profile#inbox/requests' : '/v1/profile#inbox',
+        link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
       });
       emitChange('messages');
     } else {

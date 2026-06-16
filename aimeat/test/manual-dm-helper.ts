@@ -48,6 +48,15 @@ if (action === 'send') {
   console.log('sender GHII :', `${name}@${NODE_ID}`);
   console.log('sender priv :', priv);
   console.log('send status :', send.status, JSON.stringify(send.body.data || send.body.error));
+} else if (action === 'sendas') {
+  // sendas <ownerName> <privKeyB64> <targetGhii> <body...>
+  const [, name, priv, target, ...rest] = process.argv.slice(2);
+  const tok = await token(name, priv);
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: { Authorization: `Bearer ${tok}` },
+    body: JSON.stringify({ to: target, body: rest.join(' ') || 'ping' }),
+  });
+  console.log('send status :', send.status, JSON.stringify(send.body.data || send.body.error));
 } else if (action === 'inbox') {
   const tok = await token(arg1, arg2);
   const r = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${tok}` } });
