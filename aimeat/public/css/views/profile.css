@@ -39,6 +39,10 @@
  *     -section-title/-principal/-access) with a subtly distinct faint var(--bg-dim) background.
  *   v2.3.0 — 2026-06-16 — Ecosystem MCP promo sample prompt now targets the organism (not a raw key):
  *     added .pf-eco-mcp-no-organism (the "pick an organism first" hint shown when no organism is set).
+ *   v2.4.0 — 2026-06-16 — Ecosystem card redesign: the app's OWN rendered-Markdown setup guide
+ *     .pf-eco-setup-guide(-md/-missing); the "Ask in Claude" promo moved into its own
+ *     .pf-eco-ask section (reuses .pf-eco-mcp-*). The hardcoded-playbook .pf-eco-setup-* classes
+ *     are now unused but kept for back-compat.
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2817,6 +2821,11 @@
 .pf-eco-auto-status-body { display: flex; flex-direction: column; gap: .4rem; }
 .pf-eco-auto-status-agents { display: flex; flex-wrap: wrap; gap: .35rem; }
 .pf-eco-auto-status-note { margin: 0; font-size: .78rem; }
+
+/* ── Ecosystem app's OWN setup guide (pf-eco-setup-guide-*) — rendered Markdown from the manifest ── */
+.pf-eco-setup-guide-md { font-size: .86rem; line-height: 1.55; color: var(--text); }
+.pf-eco-setup-guide-md > .md-body { margin: 0; }
+.pf-eco-setup-guide-missing { margin: 0; font-size: .82rem; line-height: 1.45; }
 
 /* ── Ecosystem Setup playbook + MCP promo (pf-eco-setup-* / pf-eco-mcp-*) ── */
 .pf-eco-setup-lead { margin: -.25rem 0 .6rem; line-height: 1.5; }

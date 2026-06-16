@@ -10,6 +10,9 @@
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem-apps foundation, chunk 1).
  *   v1.1.0 — 2026-06-15 — Add Phase 5 for GET /v1/ecosystem-apps/:app/data — owner lists the memory
  *     an app wrote (happy path) + 404 for an app the owner never connected.
+ *   v1.2.0 — 2026-06-16 — Add Phase 6 for the app's OWN bilingual Markdown `setup:{fi,en}` guide:
+ *     hello with a manifest carrying `setup` → approve → GET /v1/ecosystem-apps returns `setup`
+ *     (happy path), and an app connected WITHOUT a setup guide returns `setup: null` (fallback case).
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-app-foundation
@@ -307,6 +310,75 @@ await test('Owner GET data for an app they never connected → 404', async () =>
   });
   assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${body.error?.code}`);
+});
+
+// ─── Phase 6: the app's OWN bilingual Markdown setup guide (manifest `setup:{fi,en}`) ───
+console.log('\nPhase 6 — App-provided setup guide (manifest setup:{fi,en})');
+
+const SETUP_APP = 'feedbackdesk';
+const SETUP_FI = '# Näin asennat\n\nLiitä **agenttisi** ja valitse organismi.';
+const SETUP_EN = '# How to set up\n\nConnect your **agent** and pick an organism.';
+let setupDeviceCode = '';
+let setupUserCode = '';
+
+await test('App says hello WITH a manifest carrying setup:{fi,en} → pending request created', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({
+      owner: ownerName,
+      app: SETUP_APP,
+      display_name: 'Feedback Desk',
+      public_key: APP_PUBKEY,
+      scopes: ['memory:read', 'memory:write'],
+      manifest: {
+        app: SETUP_APP,
+        scopes: ['memory:read', 'memory:write'],
+        setup: { fi: SETUP_FI, en: SETUP_EN },
+      },
+    }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.ok === true, `hello failed: ${JSON.stringify(body.error)}`);
+  // The manifest is well-formed → static validation must pass (so approval isn't blocked).
+  assert(body.data.validation?.ok === true, `manifest validation should pass: ${JSON.stringify(body.data.validation)}`);
+  setupDeviceCode = body.data.device_code;
+  setupUserCode = body.data.user_code;
+  assert(!!setupDeviceCode && !!setupUserCode, 'got device + user codes');
+});
+
+await test('Owner approves the setup-bearing app', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${setupUserCode}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.status === 'approved', `expected approved, got ${body.data.status}`);
+});
+
+await test('GET /v1/ecosystem-apps returns the app\'s setup guide (both locales)', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const apps = body.data.ecosystem_apps as any[];
+  const rec = apps.find(a => a.app === SETUP_APP);
+  assert(!!rec, `ecosystem app ${SETUP_APP} not listed`);
+  assert(!!rec.setup, `setup must be present, got ${JSON.stringify(rec.setup)}`);
+  assert(rec.setup.fi === SETUP_FI, `setup.fi mismatch: ${rec.setup.fi}`);
+  assert(rec.setup.en === SETUP_EN, `setup.en mismatch: ${rec.setup.en}`);
+});
+
+await test('An app connected WITHOUT a setup guide returns setup: null (fallback case)', async () => {
+  // The original APP (zendesk) was connected in Phase 1 with NO manifest → no setup guide.
+  const { status, body } = await json('/v1/ecosystem-apps', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const apps = body.data.ecosystem_apps as any[];
+  const rec = apps.find(a => a.app === APP);
+  assert(!!rec, `ecosystem app ${APP} not listed`);
+  assert(rec.setup === null, `setup must be null for an app with no guide, got ${JSON.stringify(rec.setup)}`);
 });
 
 // ─── Summary ───

@@ -8,6 +8,16 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.0.0 — 2026-06-16 — Card REDESIGN: the app's OWN bilingual Markdown setup guide (from its
+ *     manifest `setup:{fi,en}`) is now what the card shows the user. REMOVED the hardcoded
+ *     <EcoSetupPlaybook> (the 4-step checklist + its gotoAgents Agents-tab dump). Added
+ *     <EcoSetupGuide> — renders app.setup[locale] (locale via getLocale(), fallback en→fi) as safe
+ *     Markdown via the shared <Markdown>, with a graceful note when an app onboarded before this
+ *     field (re-connect to load one). PULLED the MCP "Ask in Claude" promo OUT of the playbook into
+ *     its OWN separate <EcoAskInClaude> section (a distinct capability: you query the produced
+ *     analysis yourself over MCP, not part of the automated pipeline). The expanded card now reads
+ *     top→bottom: header+value → setup guide → automation → ask in Claude → data → tech details →
+ *     disconnect. Frontend + i18n only.
  *   v1.0.0 — 2026-06-14 — Initial Ecosystem apps tab (chunk 6): pending approve/deny, connected list,
  *     grants, subscriptions, binding + typed-name revoke. Full card sub-tabs + workflow-authoring
  *     additions deferred to a follow-up.
@@ -91,11 +101,12 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
+import { Markdown } from '/components/Markdown.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
@@ -733,47 +744,55 @@ function resolveOrganismName(organism, orgs) {
 }
 
 /**
- * The guided **Setup playbook** ("Käyttöönotto") + **MCP promo** that sit at the TOP of an expanded
- * GEAI card. This is a GUIDE, not a settings panel — the real config lives in <EcoAutomationSection>
- * below. It reads the live recipe / schedule / agent state and reflects progress.
+ * The app's OWN **setup guide** ("Näin asennat tämän"), rendered at the TOP of an expanded GEAI card
+ * (replacing the old hardcoded playbook). The guidance comes FROM the app, carried in its manifest as
+ * `setup: { fi, en }` (bilingual Markdown) and returned on the connected-app record. We pick the
+ * active UI locale's guide (getLocale()), falling back en → fi, and render it through the shared safe
+ * <Markdown> renderer (Preact vnodes, never innerHTML — no XSS surface).
  *
- * The framing leads with the "why AIMEAT" payoff the operator is about to ask for:
- *   • your insights become reachable from ANY AI chat (Claude / Grok / ChatGPT) over MCP;
- *   • the processing agent is YOURS — the app only recommends a prompt template, it doesn't own it;
- *   • results land in an organism, so they outlast the app and get reused everywhere.
- *
- * The 4 steps + their derived status:
- *   1. App connected — always ✅ (the card only renders for a connected app).
- *   2. Connect your processing agent — ✅ when the recipe has agents selected.
- *   3. Set up automation — ✅ when a publish schedule is enabled AND the recipe is enabled with agents.
- *   4. Choose an organism — ✅ when the recipe has an organism set.
- *
- * The MCP promo below the steps offers a copyable sample prompt that targets the recipe's chosen
- * ORGANISM by its resolved human NAME — the reachable home for the agent's report — never a guessed
- * raw memory key. When no organism is set it shows a "pick an organism first" hint instead.
- *
- * Lazy-loads recipe + schedules + agents + organisms on first render, refreshes on aimeat-live-update.
+ * When the app has no `setup` (it onboarded before this field existed, or simply omitted one) we show
+ * a short honest note telling the owner to re-connect the app to load its guide.
  */
-function EcoSetupPlaybook({ app, showToast }) {
-  const [loaded, setLoaded] = useState(false);
+function EcoSetupGuide({ app }) {
+  const setup = app.setup;
+  const locale = getLocale();
+  // Prefer the active locale; fall back to English, then Finnish — whatever the app actually shipped.
+  const guide = setup && (setup[locale] || setup.en || setup.fi);
+
+  return html`
+    <div class="pf-eco-section pf-eco-setup-guide">
+      <div class="pf-eco-section-title">${t('profile.ecosystem.setupGuideTitle')}</div>
+      ${guide
+        ? html`<div class="pf-eco-setup-guide-md"><${Markdown} text=${guide} /></div>`
+        : html`<p class="pf-eco-dim pf-eco-setup-guide-missing">${t('profile.ecosystem.setupGuideMissing')}</p>`}
+    </div>`;
+}
+
+/**
+ * The separate **"Ask in Claude"** section ("Kysy tuloksista Claudessa"). This is a DISTINCT
+ * capability from the automated pipeline: you query and evaluate the produced analysis YOURSELF over
+ * MCP from any AI chat (Claude / Grok / ChatGPT) — it is NOT part of the automated agent pipeline and
+ * NOT a substitute for the agent. Pulled out of the old setup playbook into its own card so the two
+ * read as two different things.
+ *
+ * The sample prompt targets the recipe's chosen ORGANISM by its resolved human NAME (the reachable
+ * home for the agent's report that an owner / member CAN read over MCP) — never a guessed raw memory
+ * key. When no organism is set we show a "pick an organism first" hint instead of a broken prompt.
+ *
+ * Lazy-loads the recipe + the owner's organisms on first render, refreshes on aimeat-live-update.
+ */
+function EcoAskInClaude({ app }) {
   const [recipe, setRecipe] = useState(null);
-  const [schedules, setSchedules] = useState([]);
-  const [agentCount, setAgentCount] = useState(0);
   const [orgs, setOrgs] = useState([]);
 
   const load = async () => {
     const ownerName = (currentGhii().split('@')[0]) || '';
-    const [recipeResp, schedList, agentList, orgResp] = await Promise.all([
+    const [recipeResp, orgResp] = await Promise.all([
       getAutomationRecipe(app.app).catch(() => null),
-      listAppSchedules(app.app).catch(() => []),
-      listAgents().catch(() => []),
       (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
     ]);
     setRecipe(recipeResp);
-    setSchedules(Array.isArray(schedList) ? schedList : []);
-    setAgentCount((Array.isArray(agentList) ? agentList : []).filter(a => !a.name?.startsWith('session-')).length);
     setOrgs(orgResp?.data?.organisms || []);
-    setLoaded(true);
   };
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -784,77 +803,14 @@ function EcoSetupPlaybook({ app, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [app.app]);
 
-  // CTA: switch to the profile Agents tab IN PLACE via the shell's existing event (landing-page.js
-  // listens for 'aimeat-open-tab' { detail: { tabId } } — the same mechanism other tabs use). A full
-  // ?tab= navigation is unreliable here: the LandingPage's own selection can win.
-  function gotoAgents() {
-    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'agents' } }));
-  }
-  // CTA: scroll the expanded card's Automation config into view.
-  function focusAutomation() {
-    const card = document.querySelector(`[data-eco-auto="${app.app}"]`);
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  // Derived step statuses.
-  const hasAgents = !!(recipe && Array.isArray(recipe.agents) && recipe.agents.length > 0);
-  const scheduleOn = schedules.some(j => j.enabled);
-  const automationOn = scheduleOn && hasAgents && !!(recipe && recipe.enabled);
-  const hasOrganism = !!(recipe && recipe.organism);
-
-  // The MCP promo sample prompt targets the ORGANISM (where the agent's human-readable report
-  // lands and which an owner / member can actually read over MCP) — NOT a guessed raw memory key
-  // (which is owner-scoped to another agent and unreachable from the AI-chat principal). When no
-  // organism is set yet we show a "pick an organism first" hint instead of a broken prompt.
   const organismName = resolveOrganismName(recipe && recipe.organism, orgs);
   const samplePrompt = organismName
     ? t('profile.ecosystem.mcpSamplePromptOrg', { organism: organismName })
     : '';
 
-  const steps = [
-    { done: true, title: t('profile.ecosystem.setupStep1Title'), why: t('profile.ecosystem.setupStep1Why'), cta: null },
-    {
-      done: hasAgents, title: t('profile.ecosystem.setupStep2Title'), why: t('profile.ecosystem.setupStep2Why'),
-      cta: hasAgents ? null : { label: t('profile.ecosystem.setupStep2Cta'), onClick: gotoAgents },
-      note: agentCount === 0 ? t('profile.ecosystem.setupStep2NoAgents') : null,
-    },
-    {
-      done: automationOn, title: t('profile.ecosystem.setupStep3Title'), why: t('profile.ecosystem.setupStep3Why'),
-      cta: automationOn ? null : { label: t('profile.ecosystem.setupStep3Cta'), onClick: focusAutomation },
-    },
-    {
-      done: hasOrganism, title: t('profile.ecosystem.setupStep4Title'), why: t('profile.ecosystem.setupStep4Why'),
-      cta: hasOrganism ? null : { label: t('profile.ecosystem.setupStep4Cta'), onClick: focusAutomation },
-    },
-  ];
-  const doneCount = steps.filter(s => s.done).length;
-
   return html`
-    <div class="pf-eco-section pf-eco-setup">
-      <div class="pf-eco-section-title">${t('profile.ecosystem.setupTitle')}</div>
-      <p class="pf-eco-dim pf-eco-setup-lead">${t('profile.ecosystem.setupLead')}</p>
-
-      <div class="pf-eco-setup-progress">
-        <span class="pf-eco-chip pf-eco-setup-progress-chip">${t('profile.ecosystem.setupProgress', { done: doneCount, total: steps.length })}</span>
-      </div>
-
-      ${!loaded
-        ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.setupLoading')}</div>`
-        : html`
-          <ol class="pf-eco-setup-steps">
-            ${steps.map((s, i) => html`
-              <li class="pf-eco-setup-step ${s.done ? 'pf-eco-setup-step-done' : ''}" key=${i}>
-                <span class="pf-eco-setup-dot ${s.done ? 'pf-eco-setup-dot-done' : 'pf-eco-setup-dot-wait'}">${s.done ? '✓' : ''}</span>
-                <div class="pf-eco-setup-step-body">
-                  <div class="pf-eco-setup-step-title">${s.title}</div>
-                  <div class="pf-eco-dim pf-eco-setup-step-why">${s.why}</div>
-                  ${s.note && html`<div class="pf-eco-dim pf-eco-setup-step-note">${s.note}</div>`}
-                  ${s.cta && html`<button class="btn-outline btn-sm pf-eco-setup-cta" onClick=${s.cta.onClick}>${s.cta.label}</button>`}
-                </div>
-              </li>`)}
-          </ol>`}
-
-      <!-- MCP promo: ask your insights from any AI chat -->
+    <div class="pf-eco-section pf-eco-ask">
+      <div class="pf-eco-section-title">${t('profile.ecosystem.askClaudeTitle')}</div>
       <div class="pf-eco-mcp">
         <div class="pf-eco-mcp-head">
           <span class="pf-eco-mcp-icon">💬</span>
@@ -1118,9 +1074,11 @@ export default function EcosystemTab({ onStats, showToast }) {
                 <div class="pf-eco-card-body">
                   <p class="pf-eco-value-line">${t('profile.ecosystem.appValueLine')}</p>
 
-                  ${app.status !== 'revoked' && html`<${EcoSetupPlaybook} app=${app} showToast=${showToast} />`}
+                  ${app.status !== 'revoked' && html`<${EcoSetupGuide} app=${app} />`}
 
                   <${EcoAutomationSection} app=${app} showToast=${showToast} />
+
+                  ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
 
                   <div class="pf-eco-section">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>

@@ -1035,6 +1035,7 @@ export function initializeSchema(db: Database.Database): void {
       morselBalance REAL NOT NULL DEFAULT 0,
       capabilities  TEXT,
       automation    TEXT,
+      setup         TEXT,
       createdAt     TEXT NOT NULL,
       lastSeen      TEXT NOT NULL
     );
@@ -1062,6 +1063,7 @@ export function initializeSchema(db: Database.Database): void {
       validationResult TEXT,
       capabilities  TEXT,
       automation    TEXT,
+      setup         TEXT,
       appCredentials TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_eco_auth_userCode ON eco_auth(userCode);
@@ -1606,4 +1608,10 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('eco_auth', 'automation', 'TEXT');
   safeAddColumn('ecosystem_apps', 'capabilities', 'TEXT');
   safeAddColumn('ecosystem_apps', 'automation', 'TEXT');
+
+  // Ecosystem-app SETUP guide — the app's OWN bilingual Markdown setup guide ({ fi, en }), stored as
+  // a JSON column and rendered to the owner in the app card. Additive/nullable; old eco rows have
+  // none and the portal shows a graceful "re-connect to load one" fallback.
+  safeAddColumn('eco_auth', 'setup', 'TEXT');
+  safeAddColumn('ecosystem_apps', 'setup', 'TEXT');
 }
