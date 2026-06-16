@@ -144,9 +144,20 @@ function serveSpa(res: import('express').Response, spaPath: string): void {
     html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
   }
 
-  // Inject window.__B for dynamic import() cache-busting in spa.html scripts
+  // Inject window.__B for dynamic import() cache-busting in spa.html scripts, PLUS a tiny
+  // auto-reload watchdog: it polls /v1/build (on focus, on tab-visible, and every 20s) and, the
+  // moment the server reports a different BUILD_ID (i.e. it restarted with new code), reloads the
+  // page so fresh ES modules are fetched. This kills the recurring "restarted the server but the
+  // open tab still runs old code until a manual hard refresh" problem — no F5 ever needed.
   const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
-  html = html.replace('</head>', `<script${nonceAttr}>window.__B="${v}";</script>\n</head>`);
+  const bootScript =
+    `window.__B="${v}";` +
+    `(function(){var c="${BUILD_ID}";` +
+    `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
+    `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
+    `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
+    `window.addEventListener("focus",chk);setInterval(chk,20000);})();`;
+  html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
 
   // Stamp ALL importmap values with the build version — generic regex replaces
   // any value starting with "/" (local path), so new importmap entries are
@@ -296,6 +307,15 @@ const PLATFORMS: AIPlatform[] = [
 
 export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // Build-id probe: the SPA polls this and auto-reloads the open tab when the server restarts
+  // with new code (BUILD_ID changes on every process start) — so you never serve stale ES modules
+  // and never need a manual hard refresh. Public, uncached, tiny. See the auto-reload script
+  // injected by serveSpa().
+  router.get('/v1/build', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ build: BUILD_ID });
+  });
 
   // Cookie consent standalone JS snippet — for manual integration by service builders
   router.get('/v1/portal/cookie-consent.js', (_req, res) => {
