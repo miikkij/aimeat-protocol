@@ -4,13 +4,16 @@
  *   conversation/request list (avatars, last-message preview, time, unread pill) and a thread pane
  *   with date-grouped chat bubbles (left = received / right = sent, with delivery-status ticks),
  *   markdown bodies via the shared Markdown renderer (cid: inline media resolved to the recipient's
- *   local copies; external <img> stripped as a tracking-pixel defense), and a sticky composer with
- *   file attachments. First contact is gated as a request (accept/block). Re-fetches on SSE updates.
- * @structure InboxTab (default) · Avatar · MessageBubble · helpers (peerName, statusTick, dayKey)
+ *   local copies; external <img> stripped as a tracking-pixel defense). The composer is the same
+ *   Toast UI editor used by workspace documents (Markdown⇄WYSIWYG toggle, lazy-loaded), with a
+ *   markdown-textarea + live-preview fallback. First contact is gated as a request (accept/block).
+ *   Re-fetches on SSE updates.
+ * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
- *   v1.1.0 -- 2026-06-16 -- Redesigned as a proper messenger: avatars, chat bubbles with status
- *     ticks, date dividers, sticky composer, empty states. (CSS is linked in spa.html.)
+ *   v1.2.0 -- 2026-06-16 -- Composer upgraded to the shared Toast UI editor (parity with the
+ *     workspace document editor) + markdown-preview fallback.
+ *   v1.1.0 -- 2026-06-16 -- Redesigned as a proper messenger (avatars, bubbles, ticks, dividers).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5).
  */
 import { h } from 'preact';
@@ -23,9 +26,30 @@ import { Markdown } from '/components/Markdown.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as messages from '/js/services/messages.js';
 
+/* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
+ * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
+ * ~520KB, so it stays out of the main bundle and loads only when the Inbox composer mounts. */
+let _tuiPromise = null;
+function loadToastUI() {
+  if (window.toastui && window.toastui.Editor) return Promise.resolve(window.toastui.Editor);
+  if (_tuiPromise) return _tuiPromise;
+  _tuiPromise = new Promise((resolve, reject) => {
+    if (!document.querySelector('link[data-tui]')) {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = '/lib/toastui/toastui-editor.min.css'; css.setAttribute('data-tui', '1');
+      document.head.appendChild(css);
+    }
+    const s = document.createElement('script');
+    s.src = '/lib/toastui/toastui-editor-all.min.js';
+    s.onload = () => (window.toastui && window.toastui.Editor) ? resolve(window.toastui.Editor) : reject(new Error('editor missing'));
+    s.onerror = () => reject(new Error('failed to load editor'));
+    document.head.appendChild(s);
+  });
+  return _tuiPromise;
+}
+
 /* ── Helpers ── */
 
-/** Short display name for a GHII/GAII (the part before @, after any #). */
 function peerName(id) {
   if (!id) return '';
   const beforeAt = id.split('@')[0];
@@ -39,9 +63,7 @@ function Avatar({ seed, size = 36 }) {
 }
 
 const TICK = { sent: '✓', delivered: '✓', read: '✓✓', queued: '🕒', failed: '⚠', undeliverable: '⚠' };
-function statusTick(status) {
-  return TICK[status] || '';
-}
+function statusTick(status) { return TICK[status] || ''; }
 
 function timeShort(s) {
   const d = new Date(s);
@@ -95,6 +117,79 @@ function MessageBubble({ msg, mine, urlMap }) {
     </div>`;
 }
 
+/* Composer — the Toast UI editor (Markdown⇄WYSIWYG toggle, same as workspace documents), with a
+ * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
+ * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
+ * the draft doesn't leak between threads. */
+function Composer({ recipient, sendLabel, sending, onSend }) {
+  const [mode, setMode] = useState('rich');     // 'rich' = Toast UI; 'markdown' = fallback textarea
+  const [md, setMd] = useState('');
+  const [files, setFiles] = useState([]);
+  const containerRef = useRef(null);
+  const editorRef = useRef(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (mode !== 'rich') return undefined;
+    let inst = null, cancelled = false;
+    (async () => {
+      const Editor = await loadToastUI().catch(() => null);
+      if (cancelled) return;
+      if (!Editor) { setMode('markdown'); return; }
+      if (!containerRef.current) return;
+      inst = new Editor({
+        el: containerRef.current,
+        height: '160px',
+        initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
+        previewStyle: 'tab',
+        initialValue: '',
+        usageStatistics: false,
+        toolbarItems: [
+          ['bold', 'italic', 'strike'],
+          ['ul', 'ol', 'task'],
+          ['quote', 'code', 'codeblock'],
+          ['link'],
+        ],
+      });
+      editorRef.current = inst;
+    })();
+    return () => {
+      cancelled = true;
+      if (inst) { try { inst.destroy(); } catch { /* noop */ } }
+      editorRef.current = null;
+    };
+  }, [mode]);
+
+  const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
+  const reset = () => {
+    try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
+    setMd(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
+  };
+  const submit = () => onSend(recipient, getText(), files, reset);
+
+  return html`
+    <div class="inbox-composer">
+      ${files.length > 0 ? html`<div class="inbox-file-chips">
+        ${files.map((f, i) => html`<span class="inbox-file-chip" key=${i}>📎 ${escHtml(f.name)}</span>`)}
+      </div>` : null}
+      ${mode === 'rich'
+        ? html`<div class="inbox-editor" ref=${containerRef}></div>`
+        : html`<div class="inbox-md-fallback">
+            <textarea class="inbox-textarea" rows="3" placeholder=${t('inbox.bodyPlaceholder')}
+              value=${md} onInput=${(e) => setMd(e.target.value)}></textarea>
+            <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
+          </div>`}
+      <div class="inbox-composer-bar">
+        <label class="inbox-attach-btn" title=${t('inbox.attach')}>
+          📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
+        </label>
+        <button class="btn-primary btn-sm" disabled=${sending || !recipient} onClick=${submit}>
+          ${sending ? t('inbox.sending') : sendLabel}
+        </button>
+      </div>
+    </div>`;
+}
+
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -103,10 +198,7 @@ export default function InboxTab({ showToast }) {
   const [urlMap, setUrlMap] = useState({});
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
-  const [body, setBody] = useState('');
-  const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
-  const fileRef = useRef(null);
   const msgsRef = useRef(null);
 
   const loadLists = useCallback(async () => {
@@ -140,17 +232,16 @@ export default function InboxTab({ showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
 
-  // Keep the thread scrolled to the newest message.
   useEffect(() => {
     if (mode === 'thread' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [thread, mode]);
 
   const openConversation = async (conv) => {
-    setActiveConv(conv); setMode('thread'); setBody('');
+    setActiveConv(conv); setMode('thread');
     await loadThread(conv);
     loadLists();
   };
-  const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setBody(''); setFiles([]); };
+  const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); };
 
   const accept = async (contactId) => {
     await messages.acceptRequest(contactId).catch(() => {});
@@ -164,10 +255,10 @@ export default function InboxTab({ showToast }) {
     if (activeConv?.peerGhii === contactId) { setActiveConv(null); setThread([]); setMode('idle'); }
   };
 
-  const doSend = async (recipient) => {
+  const doSend = async (recipient, text, files, reset) => {
     if (sending) return;
-    const text = body.trim();
-    if (!text && files.length === 0) return;
+    const body = (text || '').trim();
+    if (!body && files.length === 0) return;
     setSending(true);
     try {
       const attachments = [];
@@ -175,10 +266,10 @@ export default function InboxTab({ showToast }) {
         const desc = await messages.uploadAttachment(files[i]);
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
-      const resp = await messages.send({ to: recipient, body: text, attachments });
+      const resp = await messages.send({ to: recipient, body, attachments });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
-        setBody(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
+        reset?.();
         const conv = activeConv || { conversationId: resp?.data?.message?.conversationId, peerGhii: recipient };
         setActiveConv(conv); setMode('thread');
         await loadThread(conv);
@@ -189,8 +280,6 @@ export default function InboxTab({ showToast }) {
     }
     setSending(false);
   };
-
-  const onPickFiles = (e) => setFiles(Array.from(e.target.files || []));
 
   /* ── Render ── */
   const renderList = () => html`
@@ -253,26 +342,10 @@ export default function InboxTab({ showToast }) {
               <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap} />`;
           })}
         </div>
-        ${renderComposer(activeConv.peerGhii, t('inbox.reply'))}
+        <${Composer} key=${'c-' + activeConv.conversationId} recipient=${activeConv.peerGhii}
+          sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} />
       </div>`;
   };
-
-  const renderComposer = (recipient, sendLabel) => html`
-    <div class="inbox-composer">
-      ${files.length > 0 ? html`<div class="inbox-file-chips">
-        ${files.map((f, i) => html`<span class="inbox-file-chip" key=${i}>📎 ${escHtml(f.name)}</span>`)}
-      </div>` : null}
-      <textarea class="inbox-textarea" rows="2" placeholder=${t('inbox.bodyPlaceholder')}
-        value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
-      <div class="inbox-composer-bar">
-        <label class="inbox-attach-btn" title=${t('inbox.attach')}>
-          📎<input ref=${fileRef} type="file" multiple hidden onChange=${onPickFiles} />
-        </label>
-        <button class="btn-primary btn-sm" disabled=${sending || (!recipient)} onClick=${() => doSend(recipient)}>
-          ${sending ? t('inbox.sending') : sendLabel}
-        </button>
-      </div>
-    </div>`;
 
   return html`
     <div class="inbox">
@@ -294,7 +367,8 @@ export default function InboxTab({ showToast }) {
               <input class="inbox-input" type="text" placeholder=${t('inbox.toPlaceholder')}
                 value=${to} onInput=${(e) => setTo(e.target.value)} />
             </div>
-            ${renderComposer(to.trim(), t('inbox.send'))}
+            <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
+              sending=${sending} onSend=${doSend} />
           </div>` : null}
 
         ${mode === 'thread' && activeConv ? renderThread() : null}

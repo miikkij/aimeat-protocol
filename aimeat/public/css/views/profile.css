@@ -4,6 +4,10 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.5.0 — 2026-06-16 — Grouped workspace nav: .pj-org-groups/.pj-org-group/.pj-org-group-cap
+ *     (clickable group caption, -static variant)/.pj-org-group-tabs cluster the tab row; stacked-group
+ *     content .pj-group-view/.pj-group-head/.pj-group-sec (scroll-margin anchor); space/tab description
+ *     lines .pj-ov-desc/.pj-tab-desc.
  *   v1.15.0 — 2026-06-15 — Ecosystem apps "Data this app wrote" section: .pf-eco-data,
  *     .pf-eco-data-row/-key/-val/-vis/-time, .pf-eco-data-loading.
  *   v1.16.0 — 2026-06-15 — Ecosystem "Data this app wrote" rows expandable: .pf-eco-data-entry,
@@ -2534,6 +2538,22 @@
 .pj-org-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .pj-org-tab-count { color: var(--muted); font-size: 0.75rem; margin-left: 0.3rem; }
 .pj-org-boardrow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ── Grouped workspace nav: clusters (Workspace related / Records / Document spaces / one per
+   contract), each a small caption above its member tabs, separated by a wider column gap. ── */
+.pj-org-groups { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 1.5rem; border-bottom: 1px solid var(--border); margin: 0.6rem 0 1rem; }
+.pj-org-group { display: flex; flex-direction: column; gap: 0.2rem; }
+.pj-org-group-cap { display: inline-flex; align-items: center; gap: 0.3rem; background: none; border: none; padding: 0 0.1rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); cursor: pointer; text-align: left; }
+.pj-org-group-cap:hover { color: var(--text); }
+.pj-org-group-cap.active { color: var(--accent); font-weight: 700; }
+.pj-org-group-cap-static { cursor: default; }
+.pj-org-group-cap-static:hover { color: var(--muted); }
+.pj-org-group-tabs { display: flex; flex-wrap: wrap; gap: 0.1rem 0.9rem; align-items: flex-end; }
+.pj-org-groups > .pj-ws-tab-add { align-self: flex-end; margin-bottom: 0.1rem; }
+.pj-group-head { margin-bottom: 0.6rem; }
+.pj-group-sec { scroll-margin-top: 0.6rem; }
+.pj-ov-desc { margin: 0 0 0.45rem; }
+.pj-tab-desc { margin: 0 0 0.6rem; }
 
 /* ── OKF-style structure overview (collapsible Markdown map of an organism / workspace) ── */
 .pj-struct-overview { margin: 0.4rem 0 0.8rem; }

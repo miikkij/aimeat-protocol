@@ -28,6 +28,10 @@
  *     (so old connectors' raw manifest writes hit the new enum on existing nodes too, no manual
  *     migration). An operator-customized schema (lockedBy ≠ the system identity) is left alone —
  *     the same guarantee as before.
+ *   v1.4.0 -- 2026-06-16 -- objectType gains an optional `contract` string (a provisioning agent
+ *     stamps it; the workspace UI groups all spaces sharing a contract into one unit). Open schema,
+ *     so it was always accepted — listed for clarity. Seed version bumped 2→3 so the stored system
+ *     schema upgrades in place.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -49,7 +53,7 @@ export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
  */
 /** Bump when the seeded schema changes in a way existing nodes must pick up (e.g. the backing
  *  enum). seedManifestSchema() upgrades any system-seeded record carrying an older version. */
-export const MANIFEST_SEED_VERSION = 2;
+export const MANIFEST_SEED_VERSION = 3;
 
 export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
   // Standard JSON Schema annotation (safe under ajv strict mode) doubling as the seed-version
@@ -92,6 +96,7 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           mode: { enum: ['records', 'document'] },  // 'records' (schema-locked form, default) | 'document' (free-form markdown pages)
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
+          contract: { type: 'string' },  // optional contract id a provisioning agent stamps; the workspace UI groups all spaces sharing a contract into one unit
         },
       },
     },
