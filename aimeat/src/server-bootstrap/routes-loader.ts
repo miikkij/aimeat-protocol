@@ -101,6 +101,7 @@ import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
 import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
+import { messagesRouter } from '../routes/messages.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
@@ -256,6 +257,7 @@ export async function mountRoutes(
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
+  app.use(messagesRouter(config, storage));
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));

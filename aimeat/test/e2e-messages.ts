@@ -1,0 +1,219 @@
+// E2E Tests for Human↔Human Direct Messages (GHII↔GHII), local (same-node) delivery + first-contact gate.
+// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-messages
+// v1.0.0 -- 2026-06-16 -- Initial: send/inbox/conversations/read/reply, request gate, accept, block.
+
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+
+let passed = 0;
+let failed = 0;
+
+async function test(name: string, fn: () => Promise<void>) {
+    try {
+        await fn();
+        passed++;
+        console.log(`  ✅ ${name}`);
+    } catch (err: any) {
+        failed++;
+        console.error(`  ❌ ${name}: ${err.message}`);
+    }
+}
+
+function assert(cond: boolean, msg: string) {
+    if (!cond) throw new Error(msg);
+}
+
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<{ status: number; body: any }> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        const res = await fetch(`${BASE}${path}`, {
+            ...opts,
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+        });
+        const ct = res.headers.get('content-type') ?? '';
+        const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
+        if (res.status === 429 && attempt < retries) {
+            const retryAfter = Number(res.headers.get('Retry-After') || '5');
+            await sleep(retryAfter * 1000 + 500);
+            continue;
+        }
+        return { status: res.status, body };
+    }
+    throw new Error('unreachable');
+}
+
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+
+async function signMsg(privateKeyB64: string, message: string): Promise<string> {
+    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
+    return Buffer.from(sig).toString('base64');
+}
+
+async function ownerToken(name: string, privKey: string): Promise<string> {
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
+    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    return body.data.token;
+}
+
+async function registerOwner(name: string): Promise<{ token: string; ghii: string }> {
+    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    assert(status === 201, `register ${name}: ${status} ${JSON.stringify(body)}`);
+    const token = await ownerToken(name, body.data.private_key);
+    return { token, ghii: `${name}@${NODE_ID}` };
+}
+
+const stamp = Date.now();
+const aliceName = `dmalice${stamp}`;
+const bobName = `dmbob${stamp}`;
+const malName = `dmmal${stamp}`;
+let alice = { token: '', ghii: '' };
+let bob = { token: '', ghii: '' };
+let mal = { token: '', ghii: '' };
+
+let msg1Id = '';
+let convId = '';
+
+console.log('\n=== AIMEAT Direct Messages (human↔human) E2E ===\n');
+
+console.log('Setup -- three owners');
+await test('Register Alice, Bob, Mallory', async () => {
+    alice = await registerOwner(aliceName);
+    bob = await registerOwner(bobName);
+    mal = await registerOwner(malName);
+});
+
+console.log('\nPhase 1 -- First contact becomes a request (gated)');
+await test('1. Alice sends first message to Bob', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'Hi Bob, **markdown** hello!' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.status === 'delivered', `status: ${body.data.message.status}`);
+    assert(body.data.message.senderGhii === alice.ghii, 'sender is alice');
+    msg1Id = body.data.message.id;
+    convId = body.data.message.conversationId;
+    assert(typeof convId === 'string' && convId.length > 0, 'has conversationId');
+});
+
+await test('2. Bob sees it as a pending request (NOT in inbox yet)', async () => {
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(reqs.status === 200, `requests status ${reqs.status}`);
+    const r = reqs.body.data.requests.find((x: any) => x.contactId === alice.ghii);
+    assert(r !== undefined, 'alice appears in Bob requests');
+
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const inInbox = inbox.body.data.messages.find((m: any) => m.id === msg1Id);
+    assert(inInbox === undefined, 'pending request not shown in normal inbox');
+});
+
+await test('3. Cannot read accepted-only conversations until accepted', async () => {
+    const conv = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const c = conv.body.data.conversations.find((x: any) => x.conversationId === convId);
+    assert(c === undefined, 'pending convo hidden from conversation list');
+});
+
+console.log('\nPhase 2 -- Accept + reply (reciprocity)');
+await test('4. Bob accepts the request', async () => {
+    const { status, body } = await json(`/v1/messages/requests/${encodeURIComponent(alice.ghii)}/accept`, {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.contact.state === 'accepted', 'state accepted');
+});
+
+await test('5. Message now appears in Bob inbox (unread=1)', async () => {
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const m = inbox.body.data.messages.find((x: any) => x.id === msg1Id);
+    assert(m !== undefined, 'accepted message visible in inbox');
+    assert(inbox.body.data.unread >= 1, `unread should be >=1, got ${inbox.body.data.unread}`);
+});
+
+await test('6. Bob replies; Alice receives it freely (no request gate on initiator)', async () => {
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({ to: alice.ghii, body: 'Hey Alice, got it!', reply_to: msg1Id }),
+    });
+    assert(send.status === 201, `reply status ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(send.body.data.message.conversationId === convId, 'reply shares conversationId');
+
+    // Alice should have NO pending request from Bob, and should see the reply in her inbox directly.
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(reqs.body.data.requests.find((x: any) => x.contactId === bob.ghii) === undefined, 'no request gate on Alice');
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(inbox.body.data.messages.some((m: any) => m.senderGhii === bob.ghii), 'Bob reply in Alice inbox');
+});
+
+console.log('\nPhase 3 -- Thread + read receipts');
+await test('7. Bob reads the conversation; receipt flips Alice sent-copy to read', async () => {
+    const read = await json(`/v1/messages/conversations/${convId}/read`, {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+    });
+    assert(read.status === 200, `read status ${read.status}`);
+    // Alice's outbound copy (msg1) should now be 'read'.
+    const conv = await json(`/v1/messages/conversations/${convId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    const aliceCopy = conv.body.data.messages.find((m: any) => m.id === msg1Id);
+    assert(aliceCopy !== undefined, 'alice has her copy of msg1');
+    assert(aliceCopy.status === 'read', `alice copy status should be read, got ${aliceCopy.status}`);
+});
+
+await test('8. Conversation now appears for Bob and unread cleared', async () => {
+    const conv = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const c = conv.body.data.conversations.find((x: any) => x.conversationId === convId);
+    assert(c !== undefined, 'accepted convo visible');
+    assert(c.unread === 0, `unread should be 0 after read, got ${c.unread}`);
+    assert(c.peerGhii === alice.ghii, `peer should be alice, got ${c.peerGhii}`);
+});
+
+console.log('\nPhase 4 -- Block (failure mode)');
+await test('9. Bob blocks Mallory proactively; Mallory send is rejected', async () => {
+    const block = await json(`/v1/messages/contacts/${encodeURIComponent(mal.ghii)}/block`, {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+    });
+    assert(block.status === 200, `block status ${block.status}`);
+
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${mal.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'spam spam spam' }),
+    });
+    assert(send.status === 403, `blocked send should be 403, got ${send.status}`);
+    assert(send.body.error?.code === 'BLOCKED', `code BLOCKED, got ${send.body.error?.code}`);
+
+    // Nothing landed in Bob's inbox or requests from Mallory.
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(reqs.body.data.requests.find((x: any) => x.contactId === mal.ghii) === undefined, 'no request from blocked Mallory');
+});
+
+console.log('\nPhase 5 -- Validation');
+await test('10. Sending to a non-existent local recipient 404s', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: `nobodyhere${stamp}@${NODE_ID}`, body: 'hello?' }),
+    });
+    assert(status === 404, `status ${status}`);
+    assert(body.error?.code === 'RECIPIENT_NOT_FOUND', `code: ${body.error?.code}`);
+});
+
+await test('11. Empty message (no body, no attachments) is rejected', async () => {
+    const { status } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: '   ' }),
+    });
+    assert(status === 400, `status ${status}`);
+});
+
+await test('12. Cannot message yourself', async () => {
+    const { status } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: alice.ghii, body: 'note to self' }),
+    });
+    assert(status === 400, `status ${status}`);
+});
+
+console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
+if (failed > 0) process.exit(1);
