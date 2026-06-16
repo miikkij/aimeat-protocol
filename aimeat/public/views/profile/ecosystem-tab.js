@@ -8,6 +8,15 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.1.0 — 2026-06-16 — RECOMMENDED AGENTS in the "③ Process with agent(s)" picker. The app DECLARES
+ *     which agent(s) fit it best (manifest `automation.recommended_agents`: exact `name` and/or
+ *     capability `match_tags` + a bilingual `why`). New <EcoAgentPicker> marks the owner's MATCHING
+ *     agents "★ Suositeltu — <why>" and renders them FIRST (subtle highlight); the rest sit behind a
+ *     collapsed "Näytä kaikki agentit" disclosure so the long list never overwhelms. Matching is by
+ *     NAME or by overlap with the agent's tags/capabilities/technical_capabilities/domain_capabilities
+ *     (from GET /v1/agents). When the app recommends an agent the owner hasn't connected, a hint names
+ *     it + its why. Helpers: agentMatchStrings()/recommendationFor(). i18n: recommendedChip,
+ *     showAllAgents, hideAllAgents, recommendedMissing (both locales). CSS pf-eco-rec-*. Frontend + i18n.
  *   v3.0.0 — 2026-06-16 — Card REDESIGN: the app's OWN bilingual Markdown setup guide (from its
  *     manifest `setup:{fi,en}`) is now what the card shows the user. REMOVED the hardcoded
  *     <EcoSetupPlaybook> (the 4-step checklist + its gotoAgents Agents-tab dump). Added
@@ -229,12 +238,132 @@ function allowedCadencesFor(entry) {
   return allow ? CADENCES.filter(c => allow.includes(c.key)) : CADENCES;
 }
 
+// ── Recommended agents (the app declares which agent(s) fit it best) ─────────
+/**
+ * Collect the capability/tag strings an owner agent exposes for `match_tags` matching: its owner-set
+ * `tags` PLUS its declared capability id lists (`capabilities` / `technical_capabilities` /
+ * `domain_capabilities` from GET /v1/agents). Lower-cased + de-duped for a case-insensitive overlap.
+ */
+function agentMatchStrings(agent) {
+  const out = [];
+  const push = (v) => { if (Array.isArray(v)) for (const x of v) if (typeof x === 'string') out.push(x.toLowerCase()); };
+  push(agent?.tags);
+  push(agent?.capabilities);
+  push(agent?.technical_capabilities);
+  push(agent?.domain_capabilities);
+  return new Set(out);
+}
+
+/**
+ * Decide whether an owner `agent` is RECOMMENDED by the app's `recommended_agents` declarations, and
+ * if so WHY (the bilingual one-liner for the active locale). An agent matches a declaration when its
+ * NAME equals the declaration's `name` (exact) OR ANY of the declaration's `match_tags` appears in the
+ * agent's tags/capabilities. Returns `{ recommended, why }` — `why` is the first matching declaration's
+ * reason in the active locale (en→fi fallback). Pure; safe when `recommended_agents` is absent.
+ */
+function recommendationFor(agent, recommendedAgents, locale) {
+  const decls = Array.isArray(recommendedAgents) ? recommendedAgents : [];
+  if (decls.length === 0) return { recommended: false, why: '' };
+  const agentStrings = agentMatchStrings(agent);
+  for (const d of decls) {
+    const byName = d?.name && d.name === agent?.name;
+    const tags = Array.isArray(d?.match_tags) ? d.match_tags : [];
+    const byTag = tags.some(tag => typeof tag === 'string' && agentStrings.has(tag.toLowerCase()));
+    if (byName || byTag) {
+      const why = d?.why ? (d.why[locale] || d.why.en || d.why.fi || '') : '';
+      return { recommended: true, why };
+    }
+  }
+  return { recommended: false, why: '' };
+}
+
 /**
  * The status-timeline chip for one chain step. `state` is one of:
  * 'ok' (green), 'wait' (neutral/dimmed), 'off' (paused/dimmed), 'error' (danger).
  */
 function EcoStatusChip({ state, label }) {
   return html`<span class="pf-eco-chip pf-eco-auto-status-chip pf-eco-auto-status-${state}">${label}</span>`;
+}
+
+/**
+ * The "③ Process with agent(s)" picker — recommendation-aware so the owner sees WHICH of their agents
+ * fit THIS app and WHY, instead of a flat list of dozens.
+ *
+ * The app DECLARES the agent(s) it works best with in its manifest (`automation.recommended_agents`:
+ * an exact `name` and/or capability `match_tags` + a bilingual `why`). For each of the owner's agents
+ * (the list the picker already has) we compute whether it's recommended — by NAME or by a tag/capability
+ * overlap (we match against the agent's `tags`, `capabilities`, `technical_capabilities`,
+ * `domain_capabilities` from GET /v1/agents). Recommended agents render FIRST, each with a "★ Suositeltu"
+ * chip + the app's `why` line, on a subtly highlighted row. The rest sit behind a collapsed
+ * "Näytä kaikki agentit" disclosure so the long list never overwhelms.
+ *
+ * If the app declares recommendations but the owner has NO matching agent, we surface a hint naming the
+ * recommended agent + its `why`, pointing the owner at the setup guide above (where the agent is built).
+ */
+function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
+  const [showAll, setShowAll] = useState(false);
+  const locale = getLocale();
+  const recommendedAgents = app?.automation?.recommended_agents;
+  const declaresRecommendations = Array.isArray(recommendedAgents) && recommendedAgents.length > 0;
+
+  if (agents.length === 0) {
+    return html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`;
+  }
+
+  // Partition the owner's agents into recommended (with why) and the rest.
+  const recommended = [];
+  const rest = [];
+  for (const a of agents) {
+    const rec = recommendationFor(a, recommendedAgents, locale);
+    if (rec.recommended) recommended.push({ agent: a, why: rec.why });
+    else rest.push(a);
+  }
+
+  const agentLabel = (a) => html`
+    <label class="pf-eco-recipe-agent" key=${a.name}>
+      <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)} />
+      <span>${a.name}</span>
+    </label>`;
+
+  return html`
+    <div class="pf-eco-rec-picker">
+      ${recommended.length > 0 && html`
+        <div class="pf-eco-rec-list">
+          ${recommended.map(({ agent, why }) => html`
+            <label class="pf-eco-rec-agent" key=${agent.name}>
+              <input type="checkbox" checked=${selAgents.includes(agent.name)} onChange=${() => onToggle(agent.name)} />
+              <span class="pf-eco-rec-agent-body">
+                <span class="pf-eco-rec-agent-head">
+                  <span class="pf-eco-rec-agent-name">${agent.name}</span>
+                  <span class="pf-eco-chip pf-eco-rec-chip">${t('profile.ecosystem.recommendedChip')}</span>
+                </span>
+                ${why && html`<span class="pf-eco-dim pf-eco-rec-why">${why}</span>`}
+              </span>
+            </label>`)}
+        </div>`}
+
+      ${declaresRecommendations && recommended.length === 0 && html`
+        <div class="pf-eco-rec-missing">
+          ${recommendedAgents.filter(d => d?.name || d?.why).map((d, i) => html`
+            <p class="pf-eco-dim pf-eco-rec-missing-line" key=${d.name || i}>
+              ${t('profile.ecosystem.recommendedMissing', {
+                name: d.name || '—',
+                why: (d.why && (d.why[locale] || d.why.en || d.why.fi)) || '',
+              })}
+            </p>`)}
+        </div>`}
+
+      ${rest.length > 0 && (recommended.length > 0 || declaresRecommendations
+        ? html`
+          <div class="pf-eco-rec-rest">
+            <button class="pf-eco-auto-how-toggle" aria-expanded=${showAll} onClick=${() => setShowAll(o => !o)}>
+              <span class="pf-eco-caret">${showAll ? '▼' : '▶'}</span>
+              ${showAll ? t('profile.ecosystem.hideAllAgents') : t('profile.ecosystem.showAllAgents', { n: rest.length })}
+            </button>
+            ${showAll && html`<div class="pf-eco-recipe-agents pf-eco-rec-rest-list">${rest.map(agentLabel)}</div>`}
+          </div>`
+        : html`<div class="pf-eco-recipe-agents">${rest.map(agentLabel)}</div>`)}
+    </div>`;
 }
 
 /**
@@ -537,19 +666,10 @@ function EcoAutomationSection({ app, showToast }) {
           </div>
         </div>
 
-        <!-- ③ Process with agent(s) -->
+        <!-- ③ Process with agent(s) — recommended first, the rest behind a disclosure -->
         <div class="pf-eco-auto-flow-step">
           <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep3')}</div>
-          ${agents.length === 0
-            ? html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`
-            : html`
-              <div class="pf-eco-recipe-agents">
-                ${agents.map(a => html`
-                  <label class="pf-eco-recipe-agent" key=${a.name}>
-                    <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => toggleAgent(a.name)} />
-                    <span>${a.name}</span>
-                  </label>`)}
-              </div>`}
+          <${EcoAgentPicker} app=${app} agents=${agents} selAgents=${selAgents} onToggle=${toggleAgent} />
         </div>
 
         <!-- ④ Store results in organism -->

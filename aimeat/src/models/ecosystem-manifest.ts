@@ -17,6 +17,9 @@
  *   v1.3.0 — 2026-06-16 — Accept an optional top-level `setup: { fi, en }` — the app's OWN bilingual
  *     Markdown setup guide (what's needed, why, where, including required agents), rendered to the
  *     owner in the Ecosystem-apps card. The app owns this guidance; the node only stores + returns it.
+ *   v1.4.0 — 2026-06-16 — Accept `automation.recommended_agents` — the app DECLARES which agent(s) fit
+ *     it best (by exact `name` and/or capability `match_tags`) + a bilingual `why`. A HINT only; the
+ *     node marks the owner's matching agents "★ Recommended" and lists them first in the agent picker.
  */
 import { z } from 'zod';
 import { validateAppName } from '../utils/gaii.js';
@@ -46,6 +49,14 @@ export const EcoManifestSchema = z.object({
       cadences: z.array(z.string().max(120)).max(20).optional(),
     })).max(100).optional(),
     advisory_sink: z.string().max(200).optional(),
+    // The app DECLARES which agent(s) fit it best: an exact agent `name` and/or capability
+    // `match_tags`, plus a bilingual `why`. A HINT only — the node marks the owner's matching agents
+    // "★ Recommended" and lists them first in the agent picker.
+    recommended_agents: z.array(z.object({
+      name: z.string().max(120).optional(),
+      match_tags: z.array(z.string().max(200)).max(50).optional(),
+      why: z.object({ fi: z.string().max(2000), en: z.string().max(2000) }),
+    })).max(50).optional(),
   }).optional(),
   // The app's OWN bilingual Markdown setup guide for the owner (what's needed, why, where, including
   // required agents). Optional + back-compat: an app that omits it gets the in-portal fallback note.

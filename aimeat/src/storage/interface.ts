@@ -127,9 +127,15 @@ export interface EcosystemAppRecord {
   capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
   /**
    * Optional automation hints from the manifest: which capabilities are schedulable (and at what
-   * cadences) + an optional advisory sink. A HINT only — never required for an owner to schedule.
+   * cadences) + an optional advisory sink + the agent(s) this app recommends. A HINT only — never
+   * required for an owner to schedule. `recommended_agents` lets the portal mark the owner's matching
+   * agents "★ Recommended" (by exact `name` and/or capability `match_tags`) and list them first.
    */
-  automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
+  automation?: {
+    schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[];
+    advisory_sink?: string;
+    recommended_agents?: { name?: string; match_tags?: string[]; why: { fi: string; en: string } }[];
+  };
   /**
    * The app's OWN bilingual Markdown setup guide for the owner, copied from the validated hello
    * manifest at approval. The portal renders the locale-appropriate guide in the app card (replacing
@@ -363,8 +369,12 @@ export interface EcoAuthorizationRecord {
    * EcosystemAppRecord at approval). Lets the binding carry the capability contract forward.
    */
   capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
-  /** Optional automation hints from the manifest (schedulable capabilities + advisory sink). */
-  automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
+  /** Optional automation hints from the manifest (schedulable capabilities + advisory sink + recommended agents). */
+  automation?: {
+    schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[];
+    advisory_sink?: string;
+    recommended_agents?: { name?: string; match_tags?: string[]; why: { fi: string; en: string } }[];
+  };
   /** The app's OWN bilingual Markdown setup guide (stored at hello, copied onto the EcosystemApp at approval). */
   setup?: { fi: string; en: string };
   appCredentials?: {

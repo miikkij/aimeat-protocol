@@ -2754,6 +2754,24 @@
 .pf-eco-recipe-label { font-weight: 600; font-size: .82rem; color: var(--text-dim); }
 .pf-eco-recipe-agents { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
 .pf-eco-recipe-agent { display: flex; align-items: center; gap: .35rem; font-size: .82rem; cursor: pointer; }
+
+/* Recommended-agent picker: recommended first (subtle highlight), the rest behind a disclosure. */
+.pf-eco-rec-picker { display: flex; flex-direction: column; gap: .55rem; }
+.pf-eco-rec-list { display: flex; flex-direction: column; gap: .4rem; }
+.pf-eco-rec-agent {
+  display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
+  padding: .5rem .6rem; border-radius: 8px;
+  background: var(--bg-dim); border: 1px solid var(--border);
+}
+.pf-eco-rec-agent-body { display: flex; flex-direction: column; gap: .2rem; }
+.pf-eco-rec-agent-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.pf-eco-rec-agent-name { font-weight: 600; font-size: .85rem; color: var(--text); }
+.pf-eco-rec-chip { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
+.pf-eco-rec-why { font-size: .78rem; line-height: 1.35; }
+.pf-eco-rec-missing { display: flex; flex-direction: column; gap: .3rem; }
+.pf-eco-rec-missing-line { margin: 0; font-size: .8rem; line-height: 1.4; }
+.pf-eco-rec-rest { display: flex; flex-direction: column; gap: .4rem; }
+.pf-eco-rec-rest-list { margin-top: .2rem; }
 .pf-eco-recipe-toggle { display: flex; align-items: center; gap: .45rem; font-size: .85rem; cursor: pointer; }
 .pf-eco-recipe-radios { display: flex; flex-direction: column; gap: .45rem; }
 .pf-eco-recipe-radio { display: flex; align-items: flex-start; gap: .45rem; font-size: .85rem; cursor: pointer; }

@@ -13,6 +13,9 @@
  *   v1.2.0 — 2026-06-16 — Add Phase 6 for the app's OWN bilingual Markdown `setup:{fi,en}` guide:
  *     hello with a manifest carrying `setup` → approve → GET /v1/ecosystem-apps returns `setup`
  *     (happy path), and an app connected WITHOUT a setup guide returns `setup: null` (fallback case).
+ *   v1.3.0 — 2026-06-16 — Add Phase 7 for the app's `automation.recommended_agents` (name + match_tags
+ *     + bilingual why): hello with a manifest carrying recommended_agents → approve → GET returns them
+ *     intact (happy path), and a recommendation entry MISSING the required `why` fails static validation.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-app-foundation
@@ -379,6 +382,94 @@ await test('An app connected WITHOUT a setup guide returns setup: null (fallback
   const rec = apps.find(a => a.app === APP);
   assert(!!rec, `ecosystem app ${APP} not listed`);
   assert(rec.setup === null, `setup must be null for an app with no guide, got ${JSON.stringify(rec.setup)}`);
+});
+
+// ─── Phase 7: the app's recommended agents (manifest `automation.recommended_agents`) ───
+console.log('\nPhase 7 — App-declared recommended agents (automation.recommended_agents)');
+
+const REC_APP = 'feedbackrec';
+const REC_AGENTS = [{
+  name: 'feedback-wisdom',
+  match_tags: ['feedback-analysis', 'consumes:feedback-stats@1'],
+  why: {
+    fi: 'Lukee tämän appin feedback-statsit ja tuottaa niistä suositukset.',
+    en: "Reads this app's feedback stats and turns them into recommendations.",
+  },
+}];
+let recUserCode = '';
+
+await test('App says hello WITH automation.recommended_agents → pending request created', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({
+      owner: ownerName,
+      app: REC_APP,
+      display_name: 'Feedback Rec',
+      public_key: APP_PUBKEY,
+      scopes: ['memory:read', 'memory:write'],
+      manifest: {
+        app: REC_APP,
+        scopes: ['memory:read', 'memory:write'],
+        automation: {
+          schedulable: [{ id: 'publish-stats', produces: 'feedback-stats@1', produces_key: 'feedback.stats', cadences: ['weekly'] }],
+          recommended_agents: REC_AGENTS,
+        },
+      },
+    }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.ok === true, `hello failed: ${JSON.stringify(body.error)}`);
+  // The manifest (incl. recommended_agents) is well-formed → static validation must pass.
+  assert(body.data.validation?.ok === true, `manifest validation should pass: ${JSON.stringify(body.data.validation)}`);
+  recUserCode = body.data.user_code;
+  assert(!!recUserCode, 'got user code');
+});
+
+await test('Owner approves the recommendation-bearing app', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${recUserCode}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.status === 'approved', `expected approved, got ${body.data.status}`);
+});
+
+await test('GET /v1/ecosystem-apps returns automation.recommended_agents (name + match_tags + bilingual why)', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const rec = (body.data.ecosystem_apps as any[]).find(a => a.app === REC_APP);
+  assert(!!rec, `ecosystem app ${REC_APP} not listed`);
+  const recs = rec.automation?.recommended_agents;
+  assert(Array.isArray(recs) && recs.length === 1, `recommended_agents must round-trip, got ${JSON.stringify(rec.automation)}`);
+  assert(recs[0].name === 'feedback-wisdom', `name mismatch: ${recs[0].name}`);
+  assert(Array.isArray(recs[0].match_tags) && recs[0].match_tags.includes('feedback-analysis'), `match_tags mismatch: ${JSON.stringify(recs[0].match_tags)}`);
+  assert(recs[0].why?.fi === REC_AGENTS[0].why.fi && recs[0].why?.en === REC_AGENTS[0].why.en, `why mismatch: ${JSON.stringify(recs[0].why)}`);
+});
+
+await test('Failure mode: a recommended_agents entry MISSING `why` fails static validation', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({
+      owner: ownerName,
+      app: 'feedbackbad',
+      display_name: 'Feedback Bad',
+      public_key: APP_PUBKEY,
+      scopes: ['memory:read'],
+      manifest: {
+        app: 'feedbackbad',
+        scopes: ['memory:read'],
+        // `why` is REQUIRED on each recommended_agents entry — omit it to trip manifest_schema.
+        automation: { recommended_agents: [{ name: 'x' }] },
+      },
+    }),
+  });
+  assert(status === 200, `hello itself should respond 200, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.validation?.ok === false, `validation should FAIL for a why-less recommendation: ${JSON.stringify(body.data.validation)}`);
+  const schemaCheck = (body.data.validation?.checks as any[]).find(c => c.name === 'manifest_schema');
+  assert(schemaCheck && schemaCheck.ok === false, `manifest_schema check should be false: ${JSON.stringify(body.data.validation?.checks)}`);
 });
 
 // ─── Summary ───
