@@ -24,6 +24,9 @@
  *   v2.2.0 -- 2026-06-13 -- Deliverable `format` gains `'image'` so an offer can declare its
  *     deliverable IS an image (a /v1/pub URL or { url, mime } at the location key); rendered inline
  *     by the shared image renderer across the agent surfaces. Additive enum → existing docs unchanged.
+ *   v2.3.0 -- 2026-06-16 -- Richer Offerings: deliverable `format` gains `'json'` (structured render of
+ *     the sample + live deliverables); offers gain `dependsOn` (upstream-offer / signal prerequisites)
+ *     surfaced + gated on the card. Both additive/optional → existing docs validate unchanged.
  */
 import { z } from 'zod';
 import { SignalSchema } from './workflow-schemas.js';
@@ -76,7 +79,9 @@ const AvailabilitySchema = z.object({
 const DeliverableSchema = z.object({
   // 'image' = the deliverable IS an image (a /v1/pub URL or { url, mime:image/* } at the location key);
   // the Offers/inbox + task + memory + workflow surfaces render it inline via the shared image renderer.
-  format: z.enum(['document', 'record', 'board-post', 'file', 'app', 'image']),
+  // 'json' = the deliverable is structured data; the sample (and live deliverables) render as a clean
+  // key/value tree rather than raw text. An object `sample` is treated as JSON regardless of `format`.
+  format: z.enum(['document', 'record', 'board-post', 'file', 'app', 'image', 'json']),
   location: z.object({
     space: z.string().max(200).optional(),
     key: z.string().max(400).optional(),
@@ -86,6 +91,28 @@ const DeliverableSchema = z.object({
   // A REAL excerpt from the last successful deliverable, or the literal "untested". Object | string.
   sample: z.union([z.string().max(8000), z.record(z.string(), z.unknown()), z.literal('untested')]).optional(),
 });
+
+// ── Prerequisites (Agent Workflows; optional) ──────────────────────────────────
+// A prerequisite is something that must hold before this offer can usefully run. Two shapes:
+//   - an UPSTREAM OFFER ('{ offer }', optionally on another '{ agent }') — met when that offer's
+//     deliverable.location.key is present + non-empty in owner-scope memory (its output exists);
+//   - a SIGNAL ('{ signal }') evaluated against owner memory with the workflow signal evaluator.
+// `hard` (default true) gates the offer: an unmet hard prereq blocks the Ask. A `hard:false` prereq
+// is advisory (shown, not gated). The node evaluates these on the Offers feed so a card can show a
+// runnable / blocked state with the reason. See docs/plans/2026-06-13-agent-workflows-node-plan.md §5.
+const DependencySchema = z.union([
+  z.object({
+    offer: z.string().min(1).max(100),
+    agent: z.string().max(100).optional(),       // defaults to this offer's own agent
+    hard: z.boolean().optional(),                // default true
+    label: z.string().max(200).optional(),       // human label for the card ("needs first: …")
+  }),
+  z.object({
+    signal: SignalSchema,
+    hard: z.boolean().optional(),                // default true
+    label: z.string().min(1).max(200),           // required: there's no offer id to fall back to
+  }),
+]);
 
 export const OfferSchema = z.object({
   id: z.string().min(1).max(100),
@@ -113,6 +140,9 @@ export const OfferSchema = z.object({
   // `'none'` is allowed here too (not just at the step level) so a genuine SOURCE offer (a fetcher
   // with no memory input) can declare "no input gate" directly instead of a placeholder signal.
   required_to_function: z.union([SignalSchema, z.literal('none')]).optional(),
+  // Prerequisites surfaced + gated on the Offers card (upstream offers and/or signals). Distinct from
+  // `required_to_function` (the workflow consumer gate): dependsOn is the human-facing "needs first".
+  dependsOn: z.array(DependencySchema).max(20).optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
   price: PriceSchema.optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time

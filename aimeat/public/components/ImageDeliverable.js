@@ -23,14 +23,34 @@
  *   v1.0.0 -- 2026-06-13 -- Initial: shared image deliverable detector + renderer across the four
  *     agent surfaces (task result, memory, offers/inbox, workflow run). Pairs with the new
  *     deliverable.format:"image" offer field. See AIMEAT Development note doc-jjif4rs.
+ *   v1.1.0 -- 2026-06-16 -- DeliverableBody renders STRUCTURED values (a JSON object/array, or
+ *     deliverable.format:"json") as a key/value tree via the shared JsonNode, instead of raw JSON in
+ *     a <pre>. Plain-string / image paths unchanged. Pairs with deliverable.format:"json".
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
+import { JsonNode } from '/components/JsonView.js';
 
 const html = htm.bind(h);
+
+/** A value is "structured" (render as a key/value tree, not raw text) when it is a non-null object/
+ *  array, or a string that parses as a JSON object/array. `format:"json"` forces the structured path
+ *  for anything parseable. Returns the parsed value to render, or undefined when it's plain text. */
+function asStructured(value, format) {
+  if (value !== null && typeof value === 'object') return value;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    const looksJson = s[0] === '{' || s[0] === '[';
+    if (s && (looksJson || format === 'json')) {
+      try { const p = JSON.parse(s); if (p !== null && typeof p === 'object') return p; }
+      catch { /* not JSON after all — fall through to text */ }
+    }
+  }
+  return undefined;
+}
 
 // A path ending in one of these (after stripping any ?query / #hash) is treated as an image.
 const IMG_EXT_RE = /\.(jpe?g|png|webp|gif)$/i;
@@ -163,21 +183,26 @@ export function ImageStrip({ images, alt }) {
   return html`<div class="imgd-strip">${descs.map(d => html`<${ImageView} key=${d.url} desc=${d} />`)}</div>`;
 }
 
-/** Convenience body for a deliverable value: render it as an image when the whole value is one,
- *  otherwise as markdown (with any embedded image URLs surfaced as thumbnails), otherwise as JSON.
- *  Failures inside ImageView still render as a failure chip, never an empty box. */
-export function DeliverableBody({ value, alt }) {
+/** Convenience body for a deliverable value, in priority order:
+ *  1. the whole value is an image → inline thumbnail (failure-safe);
+ *  2. it is structured (a JSON object/array, or `format:"json"`) → a clean key/value tree (JsonNode),
+ *     far easier to scan than raw JSON — used for both an offer's `sample` and live deliverables;
+ *  3. otherwise → markdown (with any embedded image URLs surfaced as thumbnails).
+ *  `format` (the offer's deliverable.format) forces the structured path for a parseable string. */
+export function DeliverableBody({ value, alt, format }) {
   const desc = detectImage(value, alt);
   if (desc) return html`<${ImageView} desc=${desc} />`;
-  if (typeof value === 'string') {
-    const urls = findImageUrls(value);
-    return html`
-      <div class="imgd-textblock">
-        <${Markdown} text=${value} />
-        ${urls.length ? html`<${ImageStrip} images=${urls} alt=${alt} />` : null}
-      </div>`;
+  const structured = asStructured(value, format);
+  if (structured !== undefined) {
+    return html`<div class="imgd-json-tree"><${JsonNode} value=${structured} /></div>`;
   }
-  return html`<pre class="imgd-json">${typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '')}</pre>`;
+  const text = typeof value === 'string' ? value : String(value ?? '');
+  const urls = findImageUrls(text);
+  return html`
+    <div class="imgd-textblock">
+      <${Markdown} text=${text} />
+      ${urls.length ? html`<${ImageStrip} images=${urls} alt=${alt} />` : null}
+    </div>`;
 }
 
 export default ImageView;

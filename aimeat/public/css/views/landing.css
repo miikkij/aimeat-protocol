@@ -98,7 +98,7 @@
 .pa { max-width: 760px; margin: 2rem auto; }
 .pa-title { font-size: 1.3rem; margin: 0 0 .3rem; }
 .pa-sub { color: var(--text-dim); font-size: .9rem; margin: 0 0 1rem; }
-.pa-tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.pa-tabs { display: flex; justify-content: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .75rem; }
 .pa-tab { position: relative; display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text-dim); font-size: .88rem; font-weight: 600; cursor: pointer; }
 .pa-tab:hover { border-color: var(--accent); }
 .pa-tab--active { background: var(--accent); border-color: var(--accent); color: #fff; }

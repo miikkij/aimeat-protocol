@@ -8,6 +8,8 @@
  *   v1.0.0 — 2026-06-12 — Initial: publish/read/aggregate + validation.
  *   v1.1.0 — 2026-06-13 — Cover deliverable.format "image" round-trip (test 11b) for the inline
  *     image deliverable rendering feature.
+ *   v1.2.0 — 2026-06-16 — Richer Offerings: json deliverable + object sample round-trip (15), per-offer
+ *     run history via deliverables.offer_id (16), and prerequisite gating runnable/blocked (17).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-offers
 
@@ -204,6 +206,75 @@ await test('14. A callable offer whose backing capability is missing → 404 CAP
     // The 'summarize' offer (published in #11) is public + callable but points at a non-existent capability.
     const r = await json(`/v1/agents/${agentName}/offers/summarize/invoke`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ input: { url: 'https://example.com' } }) });
     assert(r.status === 404 && r.body.error?.code === 'CAPABILITY_NOT_FOUND', `expected 404 CAPABILITY_NOT_FOUND, got ${r.status} ${r.body.error?.code}`);
+});
+
+// ── v2.3: richer Offerings — JSON deliverables, per-offer run history, prerequisite gating ──
+// Publish a fresh doc carrying the offers these tests need: a structured (json) offer + a gated offer
+// whose hard prerequisite (a signal over owner memory) is initially unmet.
+const richDoc = { offers: [
+    {
+        id: 'json-report', title: 'Structured report',
+        ask: 'Ask for a report; I return structured JSON.',
+        deliverable: {
+            format: 'json',
+            location: { space: 'crews.reporter.reports', key: 'reports.latest', visibility: 'owner' },
+            sample: { title: 'Q2 summary', score: 87, tags: ['growth', 'risk'] },
+        },
+    },
+    {
+        id: 'gated-publish', title: 'Publish the report',
+        ask: 'Publish the latest report — but only once the data is ready.',
+        deliverable: { format: 'document', sample: 'untested' },
+        dependsOn: [{ signal: { kind: 'deterministic', key: 'prereq.ready', op: 'nonempty' }, label: 'data ready', hard: true }],
+    },
+] };
+
+await test('15. A json-format offer with an OBJECT sample round-trips', async () => {
+    const pub = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(richDoc) });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const r = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
+    const o = (r.body.data.offers || []).find((x: any) => x.id === 'json-report');
+    assert(!!o && o.deliverable?.format === 'json', `json format preserved: ${JSON.stringify(o?.deliverable)}`);
+    assert(o.deliverable.sample && typeof o.deliverable.sample === 'object' && o.deliverable.sample.score === 87,
+        `object sample preserved: ${JSON.stringify(o.deliverable.sample)}`);
+});
+
+await test('16. A run carries its offer_id in /v1/deliverables so a card can list its own history', async () => {
+    const ct = await json(`/v1/agents/${agentName}/tasks`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({
+        title: 'Generate the Q2 report', description: 'structured', status: 'queued',
+        scope: [{ name: 'offer_id', value: 'json-report', type: 'text' }],
+    }) });
+    assert(ct.status === 201 || ct.status === 200, `create task ${ct.status}: ${JSON.stringify(ct.body.error)}`);
+    const offerTaskId = ct.body.data.task?.id || ct.body.data.id;
+    const dl = await json('/v1/deliverables', { headers: auth(A.token) });
+    assert(dl.status === 200, `deliverables ${dl.status}`);
+    const all = dl.body.data.deliverables || [];
+    const entry = all.find((d: any) => d.task_id === offerTaskId);
+    assert(!!entry && entry.offer_id === 'json-report', `offer_id stamped: ${JSON.stringify(entry)}`);
+    // Filtering by offer_id is exactly what the per-offer "Recent runs" does — and the plain task from
+    // test 8 (no offer_id) must NOT match.
+    const mine = all.filter((d: any) => d.offer_id === 'json-report' && d.agent === agentName);
+    assert(mine.length >= 1 && mine.every((d: any) => d.offer_id === 'json-report'), `per-offer filter: ${mine.length}`);
+    assert(!mine.some((d: any) => d.task_id === taskId), 'the no-offer task from test 8 is excluded');
+});
+
+await test('17. An offer with an unmet HARD prerequisite is gated; satisfying it makes it runnable', async () => {
+    const find = async () => {
+        const r = await json('/v1/offers', { headers: auth(A.token) });
+        const entry = (r.body.data.agents || []).find((x: any) => x.agent === agentName);
+        return (entry?.offers || []).find((o: any) => o.id === 'gated-publish');
+    };
+    const before = await find();
+    assert(!!before?.prereq, `prereq attached: ${JSON.stringify(before)}`);
+    assert(before.prereq.blocked === true && before.prereq.runnable === false, `blocked initially: ${JSON.stringify(before.prereq)}`);
+    assert(before.prereq.items.some((i: any) => i.hard && !i.ok && i.label === 'data ready'), `unmet item with reason: ${JSON.stringify(before.prereq.items)}`);
+
+    // Satisfy the prerequisite by writing the owner-memory key the signal checks.
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: 'prereq.ready', value: 'go' }) });
+    assert(w.status === 200 || w.status === 201, `memory write ${w.status}: ${JSON.stringify(w.body.error)}`);
+
+    const after = await find();
+    assert(after.prereq.blocked === false && after.prereq.runnable === true, `runnable after satisfying: ${JSON.stringify(after.prereq)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
