@@ -17,6 +17,7 @@
   "inbox.noThread": "No messages in this conversation yet.",
   "inbox.empty": "Nothing here yet.",
   "inbox.attachmentPending": "attachment pending",
+  "inbox.attachmentExpired": "attachment expired",
   "inbox.attach": "Attach a file",
   "inbox.today": "Today",
   "inbox.yesterday": "Yesterday",

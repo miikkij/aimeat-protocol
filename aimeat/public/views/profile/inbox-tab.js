@@ -82,9 +82,10 @@ function dayLabel(s) {
 
 /* Build a markdown body safe to render: resolve cid:{id} inline media to the recipient's local
  * presigned URLs, and strip external http(s) images (tracking-pixel defense — DECISION #11). */
-function prepareBody(body, urlMap) {
+function prepareBody(body, urlMap, expiredIds) {
   let out = String(body || '');
   out = out.replace(/!\[([^\]]*)\]\(cid:([a-zA-Z0-9_-]+)\)/g, (m, alt, id) => {
+    if (expiredIds && expiredIds.has(id)) return `*[${alt ? alt + ' — ' : ''}${t('inbox.attachmentExpired')}]*`;
     const url = urlMap[id];
     return url ? `![${alt}](${url})` : `*[${alt || t('inbox.attachmentPending')}]*`;
   });
@@ -94,19 +95,21 @@ function prepareBody(body, urlMap) {
 
 function MessageBubble({ msg, mine, urlMap }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
+  const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   return html`
     <div class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
       ${!mine ? html`<${Avatar} seed=${msg.senderGhii} size=${28} />` : null}
       <div class=${`inbox-bubble ${mine ? 'inbox-bubble--mine' : 'inbox-bubble--theirs'}`}>
-        <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap)} /></div>
+        <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
         ${nonInline.length > 0 && html`
           <div class="inbox-attach-row">
             ${nonInline.map(a => html`
-              <a key=${a.id} class=${`inbox-attach-chip${urlMap[a.id] ? '' : ' inbox-attach-chip--pending'}`}
-                href=${urlMap[a.id] || '#'} target="_blank" rel="noopener">
+              <a key=${a.id} class=${`inbox-attach-chip${(urlMap[a.id] && !a.expired) ? '' : ' inbox-attach-chip--pending'}`}
+                href=${(urlMap[a.id] && !a.expired) ? urlMap[a.id] : '#'} target="_blank" rel="noopener">
                 <span class="inbox-attach-ico">${a.kind === 'image' ? '🖼' : a.kind === 'audio' ? '🎵' : a.kind === 'video' ? '🎬' : '📎'}</span>
                 <span class="inbox-attach-name">${escHtml(a.name || a.storageKey)}</span>
-                ${a.mode !== 'duplicate' ? html`<span class="inbox-attach-pending">${t('inbox.attachmentPending')}</span>` : null}
+                ${a.expired ? html`<span class="inbox-attach-pending">${t('inbox.attachmentExpired')}</span>`
+                  : a.mode !== 'duplicate' ? html`<span class="inbox-attach-pending">${t('inbox.attachmentPending')}</span>` : null}
               </a>`)}
           </div>`}
         <div class="inbox-bubble-meta">

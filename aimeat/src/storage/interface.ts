@@ -1984,6 +1984,8 @@ export interface DirectMessageAttachment {
   mode: 'reference' | 'duplicate';
   /** Recipient-side storage key, set once the attachment has been duplicated locally. */
   localKey?: string;
+  /** Set when a held (reference) attachment was never duplicated within the retry TTL and was dropped. */
+  expired?: boolean;
   mime: string;
   size: number;
   /** Original filename / caption. */

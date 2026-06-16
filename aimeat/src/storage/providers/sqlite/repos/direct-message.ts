@@ -208,6 +208,13 @@ export function listOutboundForRetry(db: Database.Database, limit = 200): Direct
   return rows.map(deserializeMessage);
 }
 
+export function listInboundWithAttachments(db: Database.Database, limit = 200): DirectMessageRecord[] {
+  const rows = db.prepare(
+    "SELECT * FROM direct_messages WHERE direction = 'inbound' AND attachments IS NOT NULL ORDER BY createdAt ASC LIMIT ?",
+  ).all(limit) as Record<string, unknown>[];
+  return rows.map(deserializeMessage);
+}
+
 export function setMessageReadReceipt(db: Database.Database, id: string, readAt: string): DirectMessageRecord | null {
   const row = db.prepare('SELECT ownerGhii FROM direct_messages WHERE id = ? AND direction = ?').get(id, 'outbound') as { ownerGhii: string } | undefined;
   if (!row) return null;
