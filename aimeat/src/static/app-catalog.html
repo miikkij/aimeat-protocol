@@ -5663,9 +5663,9 @@
       prompt += 'If anything about the change is ambiguous, ask me first. Then return the COMPLETE updated HTML file — do not omit any parts.\n\n';
     } else {
       prompt += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
-      prompt += 'My initial idea: ' + (description || '(not specified yet — ask me in Step 1)') + '\n\n';
+      prompt += 'My initial idea: ' + (description || '(not given yet — ask me what to build)') + '\n\n';
       prompt += '## Step 1 — Interview me first\n';
-      prompt += 'Before writing any code, ask me these in ONE message and wait for my answers:\n';
+      prompt += 'If I have not described my idea above, your FIRST reply must ask me what I want to build. Then ask me these in ONE message and wait for my answers:\n';
       prompt += '1. What kind of app? (message board · multiplayer game · notes/journal · habit or expense tracker · family tools like shared lists/calendar · drawing/creative · music jam · real-time collaboration · offer or need help/services · something else)\n';
       prompt += '2. What should it be called?\n';
       prompt += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';

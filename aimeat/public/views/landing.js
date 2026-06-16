@@ -2,13 +2,14 @@
  * @file landing.js
  * @description Logged-out landing page: one story, proven live. Hero → live activity
  *   ticker → today's real node stats + ownership line (the sales core) → three audience
- *   path cards → the 3-step prompt loop → proof gallery of real public apps → footer.
+ *   path cards → the 3-step prompt loop → build-your-app prompt box → proof gallery → footer.
  *   Logged-in visitors are forwarded to the profile Home dashboard. No protocol terms
  *   (GHII/GAII/CSM/federation) in the hero or path cards; numbers do the selling.
- * @structure default export Landing({ navigate }) + Ticker/StatsPanel/PathCards/Gallery
+ * @structure default export Landing({ navigate }) + Ticker/StatsPanel/PathCards/BuildAppPrompt/Gallery
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
+ *   v1.1.0 — 2026-06-16 — Add BuildAppPrompt section: copyable Generate App Prompt from app-catalog.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -178,6 +179,130 @@ ChatGPT, local models) via MCP or connectors. Federation lets separate
 companies share work by consent. Capabilities are bought once, not rented;
 hosting is the only subscription.`;
 
+// Mirrors buildPromptFromBuilder() in app-catalog.html for the "new app / no description" case,
+// with the current node URL injected. If no idea is given the prompt explicitly tells the AI to ask.
+function buildLandingAppPrompt(nodeUrl) {
+  const base = (nodeUrl || '').replace(/\/+$/, '') || window.location.origin;
+  let p = '';
+  p += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
+  p += 'My initial idea: (not given yet — ask me what to build)\n\n';
+  p += '## Step 1 — Interview me first\n';
+  p += 'If I have not described my idea above, your FIRST reply must ask me what I want to build. Then ask me these in ONE message and wait for my answers:\n';
+  p += '1. What kind of app? (message board · multiplayer game · notes/journal · habit or expense tracker · family tools like shared lists/calendar · drawing/creative · music jam · real-time collaboration · offer or need help/services · something else)\n';
+  p += '2. What should it be called?\n';
+  p += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';
+  p += '4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n';
+  p += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
+  p += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
+  p += '## Step 2 — Build it (once I have answered)\n\n';
+  p += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
+  p += '### Available Client Libraries\n';
+  p += 'Load with <script src> from the node base ' + base + '/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n';
+  p += 'Core:\n';
+  p += '- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n';
+  p += '- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n';
+  p += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n\n';
+  p += 'AI (prompt-driven — see the AI section below):\n';
+  p += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
+  p += 'Social & economy:\n';
+  p += '- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n';
+  p += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
+  p += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
+  p += '- aimeat-agents.js — commission & watch the owner\'s AI agents (`AIMEAT.agents`)\n';
+  p += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n';
+  p += 'Media & misc:\n';
+  p += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
+  p += '- aimeat-speech.js — text-to-speech / speech helpers\n';
+  p += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
+  p += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
+  p += '### Auth Pattern\n';
+  p += '```html\n';
+  p += '<script src="' + base + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
+  p += '<script>\n';
+  p += 'AIMEAT.auth.mountLoginButton("#login", {\n';
+  p += '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n';
+  p += '  onLogout: function() { /* hide content */ }\n';
+  p += '});\n';
+  p += '</' + 'script>\n';
+  p += '```\n\n';
+  p += '### Data Storage\n';
+  p += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
+  p += '```javascript\n';
+  p += '// PRIVATE — scoped to the logged-in owner, only they can read it:\n';
+  p += 'await AIMEAT.data.set("myapp.notes", data, { visibility: "private", tags: ["myapp"] });\n';
+  p += 'const mine = await AIMEAT.data.get("myapp.notes");\n';
+  p += '// SHARED/community — public so everyone can read; each user writes their own key:\n';
+  p += 'await AIMEAT.data.set("myapp.shared.<unique-id>", entry, { visibility: "public" });\n';
+  p += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
+  p += 'const results = await AIMEAT.data.search("query");\n';
+  p += '```\n';
+  p += 'Works only when logged in. After a write, read it back to confirm it persisted.\n\n';
+  p += '### AI (prompt-driven)\n';
+  p += 'aimeat-ai runs an LLM on the LOGGED-IN USER\'s own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every "Use AI" control on isAvailable().\n';
+  p += '```html\n';
+  p += '<script src="' + base + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
+  p += '<script src="' + base + '/v1/libs/aimeat-ai.js"></' + 'script>\n';
+  p += '```\n';
+  p += '```javascript\n';
+  p += 'if (await AIMEAT.ai.isAvailable()) {            // false until login + key configured\n';
+  p += '  const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt: "Summarise:\\n" + text });\n';
+  p += '  render(r.content);                            // also: r.model, r.usage, r.budget\n';
+  p += '} else { showHint("Log in and add an AI key to enable this."); }\n';
+  p += '// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n';
+  p += '```\n';
+  p += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
+  p += '### Real-time / multiplayer (optional)\n';
+  p += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n';
+  p += '```javascript\n';
+  p += '// 1) create or join a room\n';
+  p += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
+  p += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
+  p += '// 2) open a WebSocket for live presence + messages\n';
+  p += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
+  p += 'ws.onmessage = (e) => handle(JSON.parse(e.data));\n';
+  p += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
+  p += '```\n';
+  p += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
+  p += '### Design Guidelines\n';
+  p += 'Use CSS variables so the app themes cleanly. Support light AND dark:\n';
+  p += '```css\n';
+  p += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
+  p += '@media (prefers-color-scheme: dark) {\n';
+  p += '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n';
+  p += '```\n';
+  p += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+  p += '### Important Rules\n';
+  p += '- Return the COMPLETE HTML file, not fragments\n';
+  p += '- Never use literal closing script tags in JS comments or strings\n';
+  p += '- Keep it as a single self-contained HTML file\n';
+  p += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
+  p += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
+  p += '- Theme with CSS variables and support both light and dark\n';
+  p += '- Include error handling and loading states for API calls\n';
+  return p;
+}
+
+function BuildAppPrompt() {
+  const [copied, setCopied] = useState(false);
+  const prompt = buildLandingAppPrompt(window.location.origin);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* prompt is visible to select manually */ }
+  };
+  return html`
+    <section class="ld-askai">
+      <h2 class="ld-askai-title">${tr('landing.buildTitle', 'Build your app in 10 minutes — copy this prompt')}</h2>
+      <p class="ld-askai-sub">${tr('landing.buildSub', 'Paste into Claude, ChatGPT or any AI. It asks about your idea, builds the app and publishes it to your node. Share the link when done.')}</p>
+      <div class="ld-askai-box">
+        <pre class="ld-askai-prompt">${prompt}</pre>
+        <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
+      </div>
+    </section>`;
+}
+
 // "Let your own AI tell you what AIMEAT is — for you": the visitor's own AI is a trusted advisor, so
 // it sells better than the landing copy, and it feeds structured facts to the AIs that will field
 // "what is AIMEAT" questions later (AI-SEO). Copy button + the prompt.
@@ -273,6 +398,9 @@ export default function Landing({ navigate }) {
         <span class="ld-loop-arrow">→</span>
         <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app lives on your node. Share the link.')}</span>
       </div>
+
+      <!-- 5b. Build-your-app prompt — the actual prompt to copy, matching app-catalog's Generate App Prompt -->
+      <${BuildAppPrompt} />
 
       <!-- 6. Proof gallery -->
       <${Gallery} onApps=${setApps} />
