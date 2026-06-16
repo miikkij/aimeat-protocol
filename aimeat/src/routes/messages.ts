@@ -25,6 +25,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
+import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
@@ -32,9 +33,12 @@ import { conversationIdFor, messagePreview } from '../utils/messaging.js';
 import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
+import { deliverDirectMessage, propagateReadReceipt } from '../services/message-delivery.js';
+import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
-export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
+export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
+  const deliveryCtx = { config, storage, peers };
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -153,6 +157,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
         createdAt: now, deliveredAt: now,
       });
 
+      // Duplicate attachments into the recipient's storage now (accepted contacts only; a pending
+      // request keeps them as reference until accepted — DECISION #3).
+      if (!isRequest && attachments?.length) {
+        const recCopy = await storage.getDirectMessage(id, recipientGhii);
+        if (recCopy) {
+          const dup = await duplicateMessageAttachments(deliveryCtx, recipientGhii, recCopy);
+          if (dup.changed) await storage.updateMessageAttachments(id, recipientGhii, dup.attachments);
+        }
+      }
+
       await notify(storage, recipientGhii, {
         type: isRequest ? 'direct_message_request' : 'direct_message',
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
@@ -161,7 +175,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
       });
       emitChange('messages');
     } else {
-      // Cross-node delivery is wired in the federation layer; the message stays queued.
+      // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued
+      // and the retry job will deliver it later. deliverDirectMessage updates the stored status.
+      const outcome = await deliverDirectMessage(deliveryCtx, senderCopy);
+      senderCopy.status = outcome;
+      if (outcome === 'delivered') senderCopy.deliveredAt = new Date().toISOString();
       emitChange('messages');
     }
 
@@ -208,12 +226,12 @@ export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/messages/conversations/:conversationId/read', requireAuth(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const conversationId = req.params.conversationId as string;
-    // Capture unread inbound ids first so we can fire local read receipts to the senders' copies.
+    // Capture unread inbound messages first so we can fire read receipts (local or cross-node).
     const before = await storage.listConversation(ghii, conversationId, { page: 1, perPage: 200 });
-    const unreadIds = before.messages.filter(m => m.direction === 'inbound' && !m.readAt).map(m => m.id);
+    const unread = before.messages.filter(m => m.direction === 'inbound' && !m.readAt);
     const count = await storage.markConversationRead(ghii, conversationId);
     const now = new Date().toISOString();
-    for (const id of unreadIds) await storage.setMessageReadReceipt(id, now);
+    for (const m of unread) await propagateReadReceipt(deliveryCtx, m, now);
     emitChange('messages');
     res.json(success(config.nodeId, { read: count }));
   });
@@ -227,8 +245,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
       return;
     }
-    // Local read receipt to the sender's copy.
-    await storage.setMessageReadReceipt(id, updated.readAt ?? new Date().toISOString());
+    // Read receipt to the sender's copy (local update or signed cross-node receipt).
+    await propagateReadReceipt(deliveryCtx, updated, updated.readAt ?? new Date().toISOString());
     emitChange('messages');
     res.json(success(config.nodeId, { message: updated }));
   });
@@ -272,6 +290,18 @@ export function messagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const updated = await storage.setContactState(ghii, contactId, 'accepted');
+
+    // Now that the contact is accepted, duplicate any attachments that were held as reference
+    // while the request was pending (DECISION #3/#10).
+    const convId = conversationIdFor(ghii, contactId);
+    const conv = await storage.listConversation(ghii, convId, { page: 1, perPage: 200 });
+    for (const m of conv.messages) {
+      if (m.direction === 'inbound' && m.attachments?.some(a => a.mode !== 'duplicate')) {
+        const dup = await duplicateMessageAttachments(deliveryCtx, ghii, m);
+        if (dup.changed) await storage.updateMessageAttachments(m.id, ghii, dup.attachments);
+      }
+    }
+
     emitChange('messages');
     res.json(success(config.nodeId, { contact: updated }));
   });

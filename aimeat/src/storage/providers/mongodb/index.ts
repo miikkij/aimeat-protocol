@@ -7003,6 +7003,16 @@ export class PrismaStorage implements Storage {
         return this.toDirectMessageRecord(row);
     }
 
+    async listOutboundForRetry(limit = 200): Promise<DirectMessageRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.directMessage.findMany({
+            where: { direction: 'outbound', status: { in: ['queued', 'failed'] } },
+            orderBy: { createdAt: 'asc' },
+            take: limit,
+        });
+        return rows.map((r: any) => this.toDirectMessageRecord(r));
+    }
+
     async updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null> {
         this.ensureReady();
         try {

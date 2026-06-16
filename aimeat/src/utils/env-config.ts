@@ -425,6 +425,18 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           defaultVal: '10000',
         },
         {
+          envVar: 'AIMEAT_MESSAGE_RETRY_INTERVAL_MS',
+          description: 'Retry interval for queued cross-node direct messages (ms)',
+          value: String(config.messageRetryIntervalMs),
+          defaultVal: '60000',
+        },
+        {
+          envVar: 'AIMEAT_MESSAGE_RETRY_TTL_HOURS',
+          description: 'Give up on undelivered direct messages after this many hours',
+          value: String(config.messageRetryTtlHours),
+          defaultVal: '168',
+        },
+        {
           envVar: 'AIMEAT_GENESIS_MEMORY_CACHE',
           description: 'Cache routed genesis memory results locally',
           value: String(config.genesisMemoryCache),

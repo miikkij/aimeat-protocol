@@ -6394,6 +6394,10 @@ export class SqliteStorage implements Storage {
     return directMessageRepo.setMessageReadReceipt(this.db, id, readAt);
   }
 
+  async listOutboundForRetry(limit?: number): Promise<DirectMessageRecord[]> {
+    return directMessageRepo.listOutboundForRetry(this.db, limit);
+  }
+
   async updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null> {
     return directMessageRepo.updateMessageAttachments(this.db, id, ownerGhii, attachments);
   }

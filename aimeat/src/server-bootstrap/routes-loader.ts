@@ -128,6 +128,7 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createGenesisSyncService } from '../services/genesis-sync.js';
 import { startCacheCleanupJob } from '../services/cache-cleanup.js';
 import { startSyncScheduler } from '../services/sync-scheduler.js';
+import { startMessageRetryJob } from '../services/message-delivery.js';
 import { initStats } from '../services/stats.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { statsMiddleware } from '../middleware/stats.js';
@@ -257,7 +258,7 @@ export async function mountRoutes(
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
-  app.use(messagesRouter(config, storage));
+  app.use(messagesRouter(config, storage, peers));
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));
@@ -495,6 +496,9 @@ export async function mountRoutes(
 
   // Sync Scheduler (B.4) — coordinates catalogue sync + memory replication based on syncMode
   startSyncScheduler(config, storage, peers);
+
+  // Direct-message federation retry — re-attempts queued cross-node messages (DECISION #6)
+  startMessageRetryJob(config, storage, peers);
 
   app.use(specRouter());
 

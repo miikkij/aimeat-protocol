@@ -46,6 +46,8 @@ export interface DirectMessageRepository {
   }): Promise<DirectMessageRecord | null>;
   /** Apply a federated read receipt to the sender's row (status='read' + readAt). */
   setMessageReadReceipt(id: string, readAt: string): Promise<DirectMessageRecord | null>;
+  /** Outbound copies still awaiting cross-node delivery (status queued/failed), oldest first. */
+  listOutboundForRetry(limit?: number): Promise<DirectMessageRecord[]>;
   /** Persist (re)resolved attachment descriptors after duplication/quota handling. */
   updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null>;
   deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean>;
