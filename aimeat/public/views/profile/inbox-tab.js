@@ -243,6 +243,25 @@ export default function InboxTab({ showToast }) {
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); };
 
+  // Open a specific thread when arriving from a notification deep-link (sessionStorage hint set by
+  // the notification bell). 'requests' just lands on the inbox (requests show at the top of the list).
+  const consumeDeepLink = useCallback(async () => {
+    let target = null;
+    try { target = sessionStorage.getItem('aimeat.inbox.open'); } catch { /* noop */ }
+    if (!target) return;
+    try { sessionStorage.removeItem('aimeat.inbox.open'); } catch { /* noop */ }
+    if (target === 'requests') { await loadLists(); return; }
+    const convs = await messages.listConversations().catch(() => []);
+    const conv = convs.find(c => c.conversationId === target);
+    if (conv) openConversation(conv);
+  }, [loadLists]);
+  useEffect(() => { consumeDeepLink(); }, [consumeDeepLink]);
+  useEffect(() => {
+    const handler = (e) => { if (!e.detail?.tabId || e.detail.tabId === 'messages') consumeDeepLink(); };
+    window.addEventListener('aimeat-open-tab', handler);
+    return () => window.removeEventListener('aimeat-open-tab', handler);
+  }, [consumeDeepLink]);
+
   const accept = async (contactId) => {
     await messages.acceptRequest(contactId).catch(() => {});
     showToast?.(t('inbox.acceptedToast'));

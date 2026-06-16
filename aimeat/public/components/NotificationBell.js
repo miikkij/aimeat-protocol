@@ -71,7 +71,27 @@ export function NotificationBell({ t, onNavigate }) {
       await api('/v1/notifications/read', { method: 'POST', body: JSON.stringify({ all: true }) });
     }
   };
-  const clickNotif = (n) => { setOpen(false); if (n.link && onNavigate) onNavigate(n.link); };
+  const clickNotif = (n) => {
+    setOpen(false);
+    if (!n.link) return;
+    // Profile tab deep-links carry a #hash that the SPA router ignores (it matches on pathname
+    // only). Translate them into the profile's tab-open mechanism: prime sessionStorage so a cold
+    // mount opens the tab, navigate to the profile, then dispatch aimeat-open-tab so an
+    // already-mounted profile reacts too. `#inbox[/<conversationId|requests>]` opens that thread.
+    const m = /\/v1\/profile#([a-z]+)(?:\/(.+))?$/i.exec(n.link);
+    if (m) {
+      const tabId = m[1] === 'inbox' ? 'messages' : m[1];
+      const rest = m[2] || '';
+      try {
+        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
+        if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
+      } catch { /* noop */ }
+      if (onNavigate) onNavigate('/v1/profile');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
+      return;
+    }
+    if (onNavigate) onNavigate(n.link);
+  };
 
   return html`
     <div class="notif-bell" ref=${ref}>
