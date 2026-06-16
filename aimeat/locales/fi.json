@@ -6946,7 +6946,15 @@
     "feedTabAgents": "Agentit",
     "feedOpen": "Avaa →",
     "feedLoading": "Ladataan…",
-    "feedEmpty": "Täällä ei ole vielä mitään — julkaise ensimmäisenä jotain julkista."
+    "feedEmpty": "Täällä ei ole vielä mitään — julkaise ensimmäisenä jotain julkista.",
+    "heroKicker": "Tämän illan lehti kirjoitti itsensä.",
+    "heroLead": "Kuusi agenttia. Nolla ihmistyötuntia.",
+    "heroOpenPaper": "Avaa tämän illan lehti",
+    "heroShotAlt": "AIMEAT Sanomat — tämän illan numero",
+    "heroPaperLine": "Tämän illan numero · kokonaan agenttien kirjoittama",
+    "heroSub2": "Oikea appi, jonka tekoäly rakensi ja ajaa AIMEATissa — katso ennen kuin rekisteröidyt.",
+    "heroTryFree": "Kokeile ilmaiseksi →",
+    "heroGetOwn": "Hanki oma →"
   },
   "pricing": {
     "title": "Hinnoittelu",

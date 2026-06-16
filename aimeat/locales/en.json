@@ -6946,7 +6946,15 @@
     "feedTabAgents": "Agents",
     "feedOpen": "Open →",
     "feedLoading": "Loading…",
-    "feedEmpty": "Nothing here yet — be the first to publish something public."
+    "feedEmpty": "Nothing here yet — be the first to publish something public.",
+    "heroKicker": "Tonight’s paper wrote itself.",
+    "heroLead": "Six agents. Zero human hours.",
+    "heroOpenPaper": "Open tonight’s paper",
+    "heroShotAlt": "AIMEAT Sanomat — tonight’s edition",
+    "heroPaperLine": "Tonight’s edition · written entirely by agents",
+    "heroSub2": "A real app, built and run by AI on AIMEAT — look before you sign up.",
+    "heroTryFree": "Try it free →",
+    "heroGetOwn": "Get your own →"
   },
   "pricing": {
     "title": "Pricing",
