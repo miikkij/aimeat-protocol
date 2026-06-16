@@ -21,6 +21,11 @@
  *     (this offer is a step of a workflow, from offer.workflows).
  *   v1.4.1 -- 2026-06-16 -- BUNDLE navigates to the Workflows tab (aimeat-open-tab event) instead of
  *     launching the run, so the user reviews + runs the chain deliberately there.
+ *   v1.5.0 -- 2026-06-16 -- Findability: Do/Map/Inbox segments; facet filters + group-by axis
+ *     (need-verb default) + standing sort (value≠activity) + ⏱ Automatiikassa pinned group; a Mermaid
+ *     orientation map (Kartta); crew-forge "build for this need" empty-state; and an AI need-router
+ *     (✨ Find by need) that ranks the catalogue and proposes a builder brief when nothing fits. Pure
+ *     grouping logic in /js/services/offers-grouping.js; AI via offers.js rankOffersByNeed.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -30,8 +35,10 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
+import { Mermaid } from '/components/Mermaid.js';
 import { dt } from '/js/format.js';
 import * as offersService from '/js/services/offers.js';
+import * as grouping from '/js/services/offers-grouping.js';
 
 const askLabel = (entry, offer) => {
   if (offer?.availability?.scheduleBorn) return t('profile.offers.runNow') || '⏱ Run now';
@@ -319,12 +326,45 @@ function InboxFeed({ showToast }) {
   `;
 }
 
+// ── label helpers (i18n lives here, not in the pure grouping module) ──
+const needLabel = (key) => t('profile.offers.need.' + key) || key;
+const facetLabel = (key) => t('profile.offers.facet.' + key) || key;
+const facetValueLabel = (key, v) => {
+  const map = { cost: 'cost', latency: 'latency', verification: 'verification', dataHandling: 'dataHandling', format: 'format' };
+  return t('profile.offers.' + (map[key] || key) + '.' + v) || v;
+};
+const axisKeyLabel = (axis, key) => {
+  if (axis === 'need') return needLabel(key);
+  if (axis === 'auto') return key === 'auto' ? (t('profile.offers.autoSection') || '⏱ Runs automatically') : (t('profile.offers.manualSection') || 'On demand');
+  if (key === '∅') return t('profile.offers.ungrouped') || 'Other';
+  return key;
+};
+
+/** One collapsible group of offer cards. */
+function GroupSection({ label, count, collapsed, onToggle, children }) {
+  return html`
+    <div class="of-group">
+      <button class="of-group-head" onClick=${onToggle}>
+        <span class="of-group-caret">${collapsed ? '▸' : '▾'}</span>
+        <span class="of-group-title">${label}</span>
+        <span class="of-group-count">${count}</span>
+      </button>
+      ${collapsed ? null : html`<div class="of-group-body">${children}</div>`}
+    </div>`;
+}
+
 export default function OffersTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [view, setView] = useState('do');   // 'do' (activate) | 'inbox' (follow-up)
-  const [feed, setFeed] = useState(null);   // null = loading
+  const [view, setView] = useState('do');   // 'do' | 'map' | 'inbox'
+  const [feed, setFeed] = useState(null);    // null = loading
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const [facets, setFacets] = useState({});  // { facetKey: Set(values) }
+  const [axis, setAxis] = useState('need');
+  const [sortMode, setSortMode] = useState('standing');
+  const [collapsed, setCollapsed] = useState(() => new Set());
+  const [aiOn, setAiOn] = useState(false);
+  const [aiResult, setAiResult] = useState(null);   // null | 'loading' | { ranked, noMatch, brief }
 
   const load = useCallback(async () => {
     try {
@@ -333,6 +373,7 @@ export default function OffersTab({ session, showToast }) {
     } catch { setFeed([]); }
   }, []);
   useEffect(() => { if (session) load(); }, [session, load]);
+  useEffect(() => { if (session) offersService.aiAvailable().then(setAiOn).catch(() => setAiOn(false)); }, [session]);
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => {
     const handler = () => liveRef.current();
@@ -340,36 +381,182 @@ export default function OffersTab({ session, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
 
-  // Flatten to a searchable list of { entry, offer }.
+  // Flatten to { entry, offer, agent }.
   const items = [];
-  for (const entry of (feed || [])) for (const offer of (entry.offers || [])) items.push({ entry, offer });
+  for (const entry of (feed || [])) for (const offer of (entry.offers || [])) items.push({ entry, offer, agent: entry.agent });
+
+  // Text + facet filtering (deterministic, instant).
   const needle = q.trim().toLowerCase();
-  const filtered = needle
-    ? items.filter(({ entry, offer }) =>
-        (offer.title + ' ' + offer.ask + ' ' + (offer.tags || []).join(' ') + ' ' + entry.agent).toLowerCase().includes(needle))
-    : items;
+  const filtered = items.filter(({ entry, offer }) => {
+    if (needle && !(offer.title + ' ' + offer.ask + ' ' + (offer.tags || []).join(' ') + ' ' + entry.agent).toLowerCase().includes(needle)) return false;
+    return grouping.matchesFacets(offer, facets);
+  });
+
+  const availFacets = grouping.availableFacetValues(items);
+  const activeFacetCount = Object.values(facets).reduce((n, s) => n + (s ? s.size : 0), 0);
+
+  const toggleFacet = (key, val) => setFacets(prev => {
+    const next = { ...prev };
+    const set = new Set(next[key] || []);
+    if (set.has(val)) set.delete(val); else set.add(val);
+    next[key] = set;
+    return next;
+  });
+  const clearFilters = () => { setFacets({}); setQ(''); };
+  const toggleCollapse = (key) => setCollapsed(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+
+  // Builder offer (crew-forge): an offer whose consequence is creating an agent — the "no match → make one" path.
+  const builder = items.find(it => (it.offer.consequences || []).some(c => c.type === 'creates-agent'))
+    || items.find(it => /forge/i.test(it.agent));
+  const buildForNeed = async (brief) => {
+    if (!builder) { showToast(t('profile.offers.noBuilder') || 'No agent-builder available. Connect crew-forge first.'); return; }
+    setBusy(true);
+    try {
+      const r = await offersService.ask(builder.entry, builder.offer, brief || q || '');
+      if (r?.ok === false) showToast(r.error?.message || (t('profile.offers.askFailed') || 'Ask failed'));
+      else showToast((t('profile.offers.buildRequested') || 'Asked {agent} to build an agent for this.').replace('{agent}', builder.agent));
+    } catch (e) { showToast((e && e.message) || (t('profile.offers.askFailed') || 'Ask failed')); }
+    finally { setBusy(false); }
+  };
+
+  // AI need-router: rank the catalogue against the typed need (explicit submit only).
+  const runNeedSearch = async () => {
+    if (!q.trim()) return;
+    setAiResult('loading');
+    try {
+      const r = await offersService.rankOffersByNeed(q.trim(), items);
+      setAiResult(r);
+    } catch (e) {
+      setAiResult(null);
+      const code = e?.code;
+      const msg = code === 'NO_API_KEY' ? (t('profile.offers.aiNoKey') || 'Set up an OpenRouter key first (AI settings).')
+        : code === 'QUOTA_EXHAUSTED' || code === 'APP_QUOTA_EXHAUSTED' ? (t('profile.offers.aiQuota') || 'Daily AI budget reached.')
+        : (e?.message || (t('profile.offers.aiFailed') || 'Need search failed.'));
+      showToast(msg);
+    }
+  };
+  const clearAi = () => setAiResult(null);
+
+  const renderCard = (it) => html`<${OfferCard}
+    key=${it.agent + '/' + it.offer.id}
+    entry=${it.entry} offer=${it.offer}
+    showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} onGoInbox=${() => setView('inbox')} />`;
+
+  // Sections for the "Do" browse view: a pinned ⏱ Automatiikassa group, then grouped-by-axis (rest).
+  const autoItems = grouping.sortOffers(filtered.filter(it => grouping.isAuto(it.offer)), sortMode);
+  const restItems = filtered.filter(it => !grouping.isAuto(it.offer));
+  const groups = grouping.groupByAxis(restItems, axis).map(g => ({ ...g, items: grouping.sortOffers(g.items, sortMode) }));
+
+  // Mermaid map source (orientation): groups by the chosen axis over the filtered set.
+  const mapGroups = grouping.groupByAxis(filtered, axis).map(g => ({ label: axisKeyLabel(axis, g.key), items: g.items }));
+  const mermaidSrc = grouping.buildMermaid(t('profile.offers.title') || 'What can I do?', mapGroups);
+
+  const titleByView = view === 'inbox' ? (t('profile.offers.inboxTitle') || 'What came back')
+    : view === 'map' ? (t('profile.offers.mapTitle') || 'Map of what you can do')
+    : (t('profile.offers.title') || 'What can I do?');
+  const descByView = view === 'inbox' ? (t('profile.offers.inboxDesc') || 'Everything your agents delivered — check it and rate it, all in one place.')
+    : view === 'map' ? (t('profile.offers.mapDesc') || 'A bird’s-eye map of your offers, grouped — orient here, act in the list.')
+    : (t('profile.offers.desc') || 'Everything your agents can do for you — search, then ask.');
 
   return html`
     <div class="of">
-      <div class="section-title">${view === 'do' ? (t('profile.offers.title') || 'What can I do?') : (t('profile.offers.inboxTitle') || 'What came back')}</div>
-      <div class="section-desc">${view === 'do' ? (t('profile.offers.desc') || 'Everything your agents can do for you — search, then ask. No clicking through agents and tabs.') : (t('profile.offers.inboxDesc') || 'Everything your agents delivered — check it and rate it, all in one place.')}</div>
+      <div class="section-title">${titleByView}</div>
+      <div class="section-desc">${descByView}</div>
 
       <div class="of-seg">
         <button class="of-seg-btn ${view === 'do' ? 'of-seg-btn--on' : ''}" onClick=${() => setView('do')}>${t('profile.offers.segDo') || 'Do'}</button>
+        <button class="of-seg-btn ${view === 'map' ? 'of-seg-btn--on' : ''}" onClick=${() => setView('map')}>${t('profile.offers.segMap') || 'Map'}</button>
         <button class="of-seg-btn ${view === 'inbox' ? 'of-seg-btn--on' : ''}" onClick=${() => setView('inbox')}>${t('profile.offers.segInbox') || 'Inbox'}</button>
       </div>
 
       ${view === 'inbox' ? html`<${InboxFeed} showToast=${showToast} />` : html`
-        <input class="input-field input-sm of-search" placeholder=${t('profile.offers.searchPlaceholder') || 'What do you want to do?…'} value=${q} onInput=${(e) => setQ(e.target.value)} />
+        <div class="of-toolbar">
+          <input class="input-field input-sm of-search" placeholder=${t('profile.offers.searchPlaceholder') || 'What do you want to do?…'} value=${q}
+            onInput=${(e) => { setQ(e.target.value); if (aiResult) clearAi(); }}
+            onKeyDown=${(e) => { if (e.key === 'Enter' && aiOn) runNeedSearch(); }} />
+          ${aiOn ? html`<button class="btn-outline btn-sm of-ai-btn" disabled=${!q.trim() || aiResult === 'loading'} onClick=${runNeedSearch}>✨ ${t('profile.offers.aiSearch') || 'Find by need'}</button>` : null}
+        </div>
+
+        ${view === 'do' ? html`
+          <div class="of-controls">
+            <label class="of-ctrl"><span>${t('profile.offers.groupBy') || 'Group'}</span>
+              <select class="input-field input-sm" value=${axis} onChange=${(e) => setAxis(e.target.value)}>
+                <option value="need">${t('profile.offers.axis.need') || 'By need'}</option>
+                <option value="agent">${t('profile.offers.axis.agent') || 'By agent'}</option>
+                <option value="auto">${t('profile.offers.axis.auto') || 'By automation'}</option>
+                <option value="tag">${t('profile.offers.axis.tag') || 'By tag'}</option>
+                <option value="capability">${t('profile.offers.axis.capability') || 'By capability'}</option>
+              </select>
+            </label>
+            <label class="of-ctrl"><span>${t('profile.offers.sortBy') || 'Sort'}</span>
+              <select class="input-field input-sm" value=${sortMode} onChange=${(e) => setSortMode(e.target.value)}>
+                <option value="standing">${t('profile.offers.sort.standing') || 'Most valuable'}</option>
+                <option value="cost">${t('profile.offers.sort.cost') || 'Cheapest'}</option>
+                <option value="speed">${t('profile.offers.sort.speed') || 'Fastest'}</option>
+                <option value="name">${t('profile.offers.sort.name') || 'A–Z'}</option>
+              </select>
+            </label>
+          </div>
+        ` : null}
+
+        ${Object.keys(availFacets).length ? html`
+          <div class="of-facets">
+            ${grouping.FACETS.filter(f => availFacets[f.key]).map(f => html`
+              <div class="of-facet" key=${f.key}>
+                <span class="of-facet-label">${facetLabel(f.key)}</span>
+                ${availFacets[f.key].map(v => html`
+                  <button class="of-chip ${facets[f.key]?.has(v) ? 'of-chip--on' : ''}" key=${v} onClick=${() => toggleFacet(f.key, v)}>${escHtml(facetValueLabel(f.key, v))}</button>`)}
+              </div>`)}
+            ${activeFacetCount || needle ? html`<button class="of-link of-clear" onClick=${clearFilters}>${t('profile.offers.clearFilters') || 'Clear'}</button>` : null}
+          </div>` : null}
 
         ${feed === null ? html`<div class="section-desc">…</div>` : null}
         ${feed !== null && items.length === 0 ? html`<div class="empty">${t('profile.offers.empty') || 'None of your agents publish offers yet.'}</div>` : null}
-        ${feed !== null && items.length > 0 && filtered.length === 0 ? html`<div class="section-desc">${t('profile.offers.noMatch') || 'No offers match.'}</div>` : null}
 
-        ${filtered.map(({ entry, offer }) => html`<${OfferCard}
-          key=${entry.agent + '/' + offer.id}
-          entry=${entry} offer=${offer}
-          showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} onGoInbox=${() => setView('inbox')} />`)}
+        ${view === 'map' && items.length > 0 ? html`
+          <div class="of-mapwrap">
+            <${Mermaid} chart=${mermaidSrc} />
+            <div class="of-mini">${t('profile.offers.mapNote') || 'Orientation only — switch to Do to open a card.'}</div>
+          </div>
+        ` : null}
+
+        ${view === 'do' && aiResult && aiResult !== 'loading' ? html`
+          <div class="of-ai-results">
+            <div class="of-ai-head"><span class="of-label">${t('profile.offers.aiResultsTitle') || 'Best matches for your need'}</span><button class="of-link" onClick=${clearAi}>${t('profile.offers.aiClear') || 'Back to browse'}</button></div>
+            ${aiResult.ranked.length === 0 || aiResult.noMatch ? html`
+              <div class="of-empty-need">
+                <div class="of-mini">${t('profile.offers.aiNoMatch') || 'No existing offer fits this need well.'}</div>
+                ${aiResult.brief ? html`<div class="of-brief">${aiResult.brief}</div>` : null}
+                ${builder ? html`<button class="btn-primary btn-sm" disabled=${busy} onClick=${() => buildForNeed(aiResult.brief)}>🛠 ${t('profile.offers.buildForNeed') || 'Build an agent for this →'}</button>` : null}
+              </div>` : null}
+            ${aiResult.ranked.map(({ item, why }) => html`
+              <div class="of-ai-item" key=${item.agent + '/' + item.offer.id}>
+                ${why ? html`<div class="of-why">💡 ${why}</div>` : null}
+                ${renderCard(item)}
+              </div>`)}
+          </div>
+        ` : null}
+
+        ${view === 'do' && aiResult === 'loading' ? html`<div class="section-desc">✨ ${t('profile.offers.aiThinking') || 'Matching your need…'}</div>` : null}
+
+        ${view === 'do' && !aiResult && items.length > 0 ? html`
+          ${filtered.length === 0 ? html`
+            <div class="of-empty-need">
+              <div class="section-desc">${t('profile.offers.noMatch') || 'No offers match.'}</div>
+              ${builder ? html`<button class="btn-primary btn-sm" disabled=${busy} onClick=${() => buildForNeed()}>🛠 ${t('profile.offers.buildForNeed') || 'Build an agent for this →'}</button>` : null}
+            </div>` : html`
+            ${autoItems.length ? html`
+              <${GroupSection} label=${t('profile.offers.autoSection') || '⏱ Runs automatically'} count=${autoItems.length}
+                collapsed=${collapsed.has('__auto')} onToggle=${() => toggleCollapse('__auto')}>
+                ${autoItems.map(renderCard)}
+              <//>` : null}
+            ${groups.map(g => html`
+              <${GroupSection} key=${g.key} label=${axisKeyLabel(axis, g.key)} count=${g.items.length}
+                collapsed=${collapsed.has(axis + ':' + g.key)} onToggle=${() => toggleCollapse(axis + ':' + g.key)}>
+                ${g.items.map(renderCard)}
+              <//>`)}
+          `}
+        ` : null}
       `}
 
       <${ConfirmUI} />

@@ -277,5 +277,25 @@ await test('17. An offer with an unmet HARD prerequisite is gated; satisfying it
     assert(after.prereq.blocked === false && after.prereq.runnable === true, `runnable after satisfying: ${JSON.stringify(after.prereq)}`);
 });
 
+await test('18. A schedule-born offer is flagged auto in /v1/offers (drives the ⏱ Automatiikassa pin)', async () => {
+    const autoDoc = { offers: [
+        ...richDoc.offers,
+        {
+            id: 'daily-digest', title: 'Daily digest',
+            ask: 'I compile a digest every morning.',
+            deliverable: { format: 'document', sample: 'untested' },
+            availability: { scheduleBorn: 'Every morning 08:00' },
+        },
+    ] };
+    const pub = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(autoDoc) });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const r = await json('/v1/offers', { headers: auth(A.token) });
+    const entry = (r.body.data.agents || []).find((x: any) => x.agent === agentName);
+    const auto = (entry?.offers || []).find((o: any) => o.id === 'daily-digest');
+    const plain = (entry?.offers || []).find((o: any) => o.id === 'json-report');
+    assert(auto?.auto === true, `schedule-born → auto:true, got ${JSON.stringify(auto?.auto)}`);
+    assert(plain?.auto === false, `plain offer → auto:false, got ${JSON.stringify(plain?.auto)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

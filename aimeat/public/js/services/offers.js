@@ -16,8 +16,10 @@
  *     the agent treat its own boilerplate as the request).
  *   v1.4.0 -- 2026-06-16 -- listOfferRuns (per-offer run history from the deliverables aggregate) for
  *     the richer Offerings card. (Bundle navigation is event-based in the tab, no service call.)
+ *   v1.5.0 -- 2026-06-16 -- AI need-router: aiAvailable() + rankOffersByNeed() (maps a free-text need
+ *     to fitting offers via the owner's OpenRouter, with a crew-forge brief when nothing fits).
  */
-import { apiGet, apiPost, apiPut } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
 import { createTask, rateTask } from '/js/services/agent-tasks.js';
 
@@ -58,6 +60,54 @@ export async function listOfferRuns({ agent, offerId, limit = 5 }) {
   const r = await listDeliverables().catch(() => null);
   const all = r?.data?.deliverables || [];
   return all.filter(d => d.offer_id === offerId && d.agent === agent).slice(0, limit);
+}
+
+// ── AI need-router (Phase 2): map a free-text NEED → the offers that fit ─────────
+// Layers on top of the deterministic facets/grouping. Uses the owner's OpenRouter key via the generic
+// /v1/ai/complete endpoint (spend-safe, consent-gated) — runs ONLY on explicit submit, never on every
+// keystroke. When nothing fits, it returns noMatch + a one-line brief for crew-forge (close the loop).
+
+/** True when the owner has an OpenRouter key configured (gates the "find by need" button). */
+export async function aiAvailable() {
+  try {
+    const r = await apiGet('/v1/openrouter/settings');
+    return !!(r?.ok && r.data && (r.data.hasApiKey || r.data.has_api_key));
+  } catch { return false; }
+}
+
+/**
+ * Rank the offer catalogue against a free-text need. `items` is the flattened [{ agent, offer }] feed.
+ * Returns { ranked:[{ item, why }], noMatch, brief }. Sends only compact metadata (no secrets). Throws
+ * an Error with .code (NO_API_KEY / QUOTA_EXHAUSTED / …) on failure so the UI can message precisely.
+ */
+export async function rankOffersByNeed(needText, items) {
+  const catalogue = items.map((it, i) => ({
+    n: i, id: it.offer.id, agent: it.agent,
+    title: it.offer.title, ask: it.offer.ask,
+    outcome: it.offer.deliverable?.format,
+    cost: it.offer.cost, speed: it.offer.latency, verified: it.offer.verification,
+  }));
+  const systemPrompt = 'You match a user NEED to a catalogue of AI-agent offers. Choose the few offers '
+    + 'that genuinely fit the need, best first (usually 1–5; fewer is better than padding). If nothing '
+    + 'fits well, set noMatch=true and write a one-sentence brief describing the agent that SHOULD exist '
+    + 'for this need. Reply ONLY as JSON, no prose, no fences: '
+    + '{"ranked":[{"n":<catalogue index>,"why":"<short reason in the SAME language as the need>"}],"noMatch":<bool>,"brief":"<string|empty>"}';
+  const prompt = `NEED: ${needText}\n\nCATALOGUE (${catalogue.length} offers):\n${JSON.stringify(catalogue)}`;
+  const r = await api('/v1/ai/complete', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, systemPrompt, modelRole: 'execution', max_tokens: 900, app_id: 'offers-need-router' }),
+    timeoutMs: 120_000, retries: 0,
+  });
+  if (!r?.ok) { const e = new Error(r?.error?.message || 'AI call failed'); e.code = r?.error?.code || 'UNKNOWN'; throw e; }
+  const content = r.data?.content || '';
+  const m = /\{[\s\S]*\}/.exec(content);
+  let parsed = null;
+  try { parsed = JSON.parse(m ? m[0] : content); } catch { /* unparseable */ }
+  if (!parsed) { const e = new Error('AI returned unparseable JSON'); e.code = 'JSON_PARSE_FAILED'; throw e; }
+  const ranked = (Array.isArray(parsed.ranked) ? parsed.ranked : [])
+    .map(x => ({ item: items[x.n], why: typeof x.why === 'string' ? x.why : '' }))
+    .filter(x => x.item);
+  return { ranked, noMatch: !!parsed.noMatch, brief: typeof parsed.brief === 'string' ? parsed.brief : '' };
 }
 
 /** Fetch a task's deliverable from the AGENT's memory namespace (owner→agent read).
