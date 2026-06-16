@@ -2823,8 +2823,27 @@
 .pf-eco-auto-status-note { margin: 0; font-size: .78rem; }
 
 /* ── Ecosystem app's OWN setup guide (pf-eco-setup-guide-*) — rendered Markdown from the manifest ── */
-.pf-eco-setup-guide-md { font-size: .86rem; line-height: 1.55; color: var(--text); }
-.pf-eco-setup-guide-md > .md-body { margin: 0; }
+.pf-eco-setup-guide-md { font-size: .88rem; line-height: 1.6; color: var(--text); max-width: 74ch; }
+.pf-eco-setup-guide-md .md-body > :first-child { margin-top: 0; }
+.pf-eco-setup-guide-md .md-body > :last-child { margin-bottom: 0; }
+.pf-eco-setup-guide-md .md-body h1 { font-size: 1.25rem; font-weight: 700; line-height: 1.25; margin: 1.5rem 0 .5rem; }
+.pf-eco-setup-guide-md .md-body h2 { font-size: 1.08rem; font-weight: 700; line-height: 1.3; margin: 1.4rem 0 .45rem; padding-top: .2rem; }
+.pf-eco-setup-guide-md .md-body h3 { font-size: .98rem; font-weight: 700; margin: 1.15rem 0 .4rem; }
+.pf-eco-setup-guide-md .md-body h4 { font-size: .9rem; font-weight: 700; margin: 1rem 0 .35rem; }
+.pf-eco-setup-guide-md .md-body p { margin: .5rem 0; }
+.pf-eco-setup-guide-md .md-body ul,
+.pf-eco-setup-guide-md .md-body ol { margin: .5rem 0; padding-left: 1.7rem; }
+.pf-eco-setup-guide-md .md-body li { margin: .35rem 0; }
+.pf-eco-setup-guide-md .md-body li::marker { color: var(--text-dim); }
+.pf-eco-setup-guide-md .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.3rem 0; }
+.pf-eco-setup-guide-md .md-body strong { font-weight: 700; }
+.pf-eco-setup-guide-md .md-body a { color: var(--accent); text-decoration: none; }
+.pf-eco-setup-guide-md .md-body a:hover { text-decoration: underline; }
+.pf-eco-setup-guide-md .md-body .md-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 4px; padding: .05rem .32rem; overflow-wrap: anywhere; }
+.pf-eco-setup-guide-md .md-body .md-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: .7rem .9rem; overflow-x: auto; margin: .6rem 0; }
+.pf-eco-setup-guide-md .md-body .md-pre .md-code { background: none; border: none; padding: 0; font-size: .82rem; white-space: pre; overflow-wrap: normal; }
+.pf-eco-setup-guide-md .md-body blockquote { margin: .7rem 0; padding: .45rem .9rem; border-left: 3px solid var(--accent); color: var(--text-dim); background: var(--bg-dim); border-radius: 0 6px 6px 0; }
+.pf-eco-setup-guide-md .md-body blockquote p { margin: .2rem 0; }
 .pf-eco-setup-guide-missing { margin: 0; font-size: .82rem; line-height: 1.45; }
 
 /* ── Ecosystem Setup playbook + MCP promo (pf-eco-setup-* / pf-eco-mcp-*) ── */

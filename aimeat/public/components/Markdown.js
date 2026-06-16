@@ -25,6 +25,9 @@
  *     so callers can swap a private /v1/storage URL to a fetched blob in the markdown text.
  *   v1.2.0 -- 2026-06-08 -- ```mermaid fenced blocks render as diagrams (lazy-loaded Mermaid),
  *     so documents (and any Markdown view) can embed charts.
+ *   v1.3.0 -- 2026-06-16 -- Horizontal rules (---, ***, ___) render as <hr>; LIST ITEMS may span
+ *     multiple lines (wrapped continuation lines join the current item) so ordered-list numbering no
+ *     longer restarts at 1 on every wrapped line.
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -257,7 +260,17 @@ function parseBlocks(src, onWikiLink) {
       continue;
     }
 
-    // Lists (unordered - / * / +, or ordered 1.)
+    // Horizontal rule: a line of 3+ identical -, *, or _ (e.g. ---, ***, ___) on its own.
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+      blocks.push(h('hr', { class: 'md-hr' }));
+      i++;
+      continue;
+    }
+
+    // Lists (unordered - / * / +, or ordered 1.). A list item may span multiple lines: any following
+    // non-blank line that is NOT a new list item and NOT a block starter is a CONTINUATION of the
+    // current item (joined with a space). Without this, a wrapped item line breaks the list and the
+    // numbering restarts at 1 each time.
     const ulMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
     const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
     if (ulMatch || olMatch) {
@@ -266,8 +279,22 @@ function parseBlocks(src, onWikiLink) {
       while (i < lines.length) {
         const m = lines[i].match(ordered ? /^(\s*)(\d+)\.\s+(.*)$/ : /^(\s*)([-*+])\s+(.*)$/);
         if (!m) break;
-        items.push(h('li', { key: items.length }, parseInline(m[3], onWikiLink)));
+        const parts = [m[3]];
         i++;
+        while (
+          i < lines.length &&
+          lines[i].trim() !== '' &&
+          !/^(\s*)(\d+)\.\s+/.test(lines[i]) &&
+          !/^(\s*)([-*+])\s+/.test(lines[i]) &&
+          !/^#{1,6}\s/.test(lines[i]) &&
+          !/^\s*(`{3,}|~{3,})/.test(lines[i]) &&
+          !/^\s*>/.test(lines[i]) &&
+          !/^\s*([-*_])\1{2,}\s*$/.test(lines[i])
+        ) {
+          parts.push(lines[i].trim());
+          i++;
+        }
+        items.push(h('li', { key: items.length }, parseInline(parts.join(' '), onWikiLink)));
       }
       blocks.push(h(ordered ? 'ol' : 'ul', null, items));
       continue;
