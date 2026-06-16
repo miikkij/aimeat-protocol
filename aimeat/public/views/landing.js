@@ -5,12 +5,14 @@
  *   path cards → the 3-step prompt loop → build-your-app prompt box → proof gallery → footer.
  *   Logged-in visitors are forwarded to the profile Home dashboard. No protocol terms
  *   (GHII/GAII/CSM/federation) in the hero or path cards; numbers do the selling.
- * @structure default export Landing({ navigate }) + Ticker/StatsPanel/PathCards/BuildAppPrompt/Gallery
+ * @structure default export Landing({ navigate }) + StatsPanel/PathCards/BuildAppPrompt/Gallery
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
  *   v1.1.0 — 2026-06-16 — Add BuildAppPrompt section: copyable Generate App Prompt from app-catalog.
  *   v1.2.0 — 2026-06-16 — Embed PublicActivityFeed (3 real-time tabs) after the proof gallery.
+ *   v1.3.0 — 2026-06-16 — Move PublicActivityFeed directly under the hero; remove the now-redundant
+ *     one-line Ticker (the full feed supersedes it).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -22,62 +24,6 @@ import PublicActivityFeed from './landing-activity.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-const relMin = (iso) => {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 60) return (tr('landing.minAgo', '{n} min ago')).replace('{n}', String(mins));
-  return (tr('landing.hAgo', '{n} h ago')).replace('{n}', String(Math.round(mins / 60)));
-};
-
-/* ── Live ticker: one line, refreshed every 10 s from real public activity. ── */
-function Ticker() {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    const load = () => fetch('/v1/public/activity-ticker').then(r => r.json())
-      .then(j => { if (alive && j?.ok !== false) setData(j.data); })
-      .catch(() => { /* static fallback stays */ });
-    load();
-    const iv = setInterval(load, 10_000);
-    return () => { alive = false; clearInterval(iv); };
-  }, []);
-
-  // Event → human sentence WHITELIST. Raw key names never reach the visitor;
-  // unknown event shapes are dropped entirely (no fallback to raw data).
-  const humanize = (item) => {
-    const actor = item.actor || '';
-    const key = item.key || '';
-    if (/statistics|last-init|timestamp|config|cache|readme|\.ui$/i.test(key)) return null;
-    if (actor.startsWith('ext:')) {
-      const name = actor.slice(4).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      return `${name} ${tr('landing.evExtension', 'published an update')}`;
-    }
-    if (/news|article|sanomat|notes|\bdoc|d-/i.test(key)) return tr('landing.evDocument', 'A new document was published');
-    if (/task/i.test(key)) return tr('landing.evTask', 'An agent completed a task');
-    if (/schedule|cron|daily/i.test(key)) return tr('landing.evSchedule', 'A scheduled job ran');
-    return null;
-  };
-  // Freshness rule: a "live" ticker showing a 45-hour-old event undermines the claim.
-  // Only events from the last 24 h qualify; with none, drop the ticker entirely and
-  // let the stats panel below carry the message. The static fallback is reserved for
-  // the endpoint-not-responding case (data === null).
-  const FRESH_MS = 24 * 3600 * 1000;
-  const hit = (data?.items || [])
-    .filter(i => i.at && Date.now() - new Date(i.at).getTime() < FRESH_MS)
-    .map(i => ({ i, txt: humanize(i) })).find(x => x.txt);
-  if (data && !hit) return null;
-  const agentsBit = data?.agents_online > 0
-    ? ` · ${data.agents_online} ${data.agents_online === 1 ? tr('landing.agentOnlineOne', 'agent online') : tr('landing.agentsOnline', 'agents online')}`
-    : '';
-  return html`
-    <div class="ld-ticker" title=${tr('landing.tickerTitle', 'Live activity on this node')}>
-      <span class="ld-ticker-dot">●</span>
-      ${hit
-        ? html`<span class="ld-ticker-text">${escHtml(hit.txt)} · ${relMin(hit.i.at)}${agentsBit}</span>`
-        : html`<span class="ld-ticker-text">${tr('landing.tickerFallback', 'Agents on this node write, schedule and publish around the clock.')}${agentsBit}</span>`}
-    </div>
-  `;
-}
 
 /* ── Today's stats + ownership line — THE sales core. Real numbers; zeros are omitted. ── */
 function StatsPanel({ navigate }) {
@@ -364,11 +310,11 @@ export default function Landing({ navigate }) {
         <p class="ld-hero-sub">${tr('landing.heroSub', 'Open protocol. Run your own node or use ours.')}</p>
       </section>
 
+      <!-- 1.2 Public activity feed — 3 real-time tabs (apps / organisms / agents), right under the hero -->
+      <${PublicActivityFeed} />
+
       <!-- 1.5 Ask your own AI what AIMEAT is — for you -->
       <${AskYourAI} />
-
-      <!-- 2. Live ticker -->
-      <${Ticker} />
 
       <!-- 3. Today's stats + ownership line -->
       <${StatsPanel} navigate=${navigate} />
@@ -406,9 +352,6 @@ export default function Landing({ navigate }) {
 
       <!-- 6. Proof gallery -->
       <${Gallery} onApps=${setApps} />
-
-      <!-- 6.5 Public activity feed — 3 real-time tabs (apps / organisms / agents) -->
-      <${PublicActivityFeed} />
 
       <!-- 7. Footer -->
       <footer class="ld-footer">

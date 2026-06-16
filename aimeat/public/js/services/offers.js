@@ -14,6 +14,8 @@
  *   v1.3.0 -- 2026-06-12 -- Offer task carries ONLY the user's request (title + description); the offer
  *     is referenced via scope.offer_id/offer_title — no more restuffing offer.ask/example (which made
  *     the agent treat its own boilerplate as the request).
+ *   v1.4.0 -- 2026-06-16 -- listOfferRuns (per-offer run history from the deliverables aggregate) +
+ *     runWorkflow (run a bundled workflow as one unit) for the richer Offerings card.
  */
 import { apiGet, apiPost, apiPut } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -48,6 +50,19 @@ export async function setOfferBilling(name, offerId, { price, visibility }) {
 /** The Inbox feed: everything that came back across all agents (non-draft tasks, newest first). */
 export async function listDeliverables() {
   return apiGet('/v1/deliverables');
+}
+
+/** This offer's OWN recent runs: filter the deliverables aggregate by the offer + agent it ran for
+ *  (the Ask flow stamps scope.offer_id, surfaced as `offer_id`). Newest first, capped at `limit`. */
+export async function listOfferRuns({ agent, offerId, limit = 5 }) {
+  const r = await listDeliverables().catch(() => null);
+  const all = r?.data?.deliverables || [];
+  return all.filter(d => d.offer_id === offerId && d.agent === agent).slice(0, limit);
+}
+
+/** Run a whole workflow as one unit (the engine runs the chain). Default target 'live'. */
+export async function runWorkflow(id, { target = 'live' } = {}) {
+  return apiPost(`/v1/workflows/${encodeURIComponent(id)}/run`, { mode: 'full', target });
 }
 
 /** Fetch a task's deliverable from the AGENT's memory namespace (owner→agent read).

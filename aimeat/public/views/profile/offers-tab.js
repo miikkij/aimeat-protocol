@@ -15,6 +15,10 @@
  *   v1.3.0 -- 2026-06-13 -- Image deliverables: the inbox deliverable preview + the offer sample now
  *     render image values (a /v1/pub URL, data: URI, or { url, mime } object) as inline thumbnails via
  *     the shared ImageDeliverable renderer (DeliverableBody). Pairs with deliverable.format:"image".
+ *   v1.4.0 -- 2026-06-16 -- Richer Offerings card: structured (JSON) sample via DeliverableBody format;
+ *     per-offer "Recent runs" (lazy-fetched, reuses DeliverableRow); prerequisites — SHOW ("needs
+ *     first"), GATE (disable Ask + reason when a hard prereq is unmet, from offer.prereq), and BUNDLE
+ *     (run a whole workflow this offer is a step of, from offer.workflows).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -31,6 +35,13 @@ const askLabel = (entry, offer) => {
   if (offer?.availability?.scheduleBorn) return t('profile.offers.runNow') || '⏱ Run now';
   const m = entry.mode || 'interactive';
   return (m === 'task-runner' || m === 'autonomous') ? (t('profile.offers.run') || '▶ Run') : (t('profile.offers.copyPrompt') || '⧉ Copy prompt');
+};
+
+/** Pick a display string from a (possibly localized) title — a plain string or a { locale: text } map. */
+const locTitle = (title) => {
+  if (!title) return '';
+  if (typeof title === 'string') return title;
+  return title.en_US || title.fi_FI || Object.values(title)[0] || '';
 };
 
 function Badges({ offer }) {
@@ -51,9 +62,40 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
   const [vis, setVis] = useState(offer.visibility || 'private');
   const [morsels, setMorsels] = useState(offer.price?.morsels ?? 0);
   const [savingBill, setSavingBill] = useState(false);
+  const [runsOpen, setRunsOpen] = useState(false);
+  const [runs, setRuns] = useState(undefined);   // undefined = not loaded, [] = none
 
   const consequences = offer.consequences || [];
   const gated = consequences.some(c => c.persistent || c.requiresApproval || c.type === 'external-send' || c.type === 'mutates-host' || c.type === 'publishes-public');
+
+  // Prerequisites (server-evaluated against owner memory): show them, and GATE the Ask when a hard
+  // prereq is unmet. `prereq` is absent when the offer declares none → nothing shown, never blocked.
+  const prereq = offer.prereq || null;
+  const blocked = !!prereq?.blocked;
+  const blockedReasons = (prereq?.items || []).filter(i => i.hard && !i.ok).map(i => i.label);
+
+  // Bundling workflows: this offer is a step of a multi-step chain — offer to run the whole thing.
+  const bundles = offer.workflows || [];
+
+  // Per-offer run history — lazy-fetched on first expand (like DeliverableRow's content fetch).
+  const toggleRuns = async () => {
+    const next = !runsOpen; setRunsOpen(next);
+    if (next && runs === undefined) {
+      setRuns('loading');
+      const r = await offersService.listOfferRuns({ agent: entry.agent, offerId: offer.id, limit: 5 }).catch(() => []);
+      setRuns(Array.isArray(r) ? r : []);
+    }
+  };
+
+  const runBundle = async (wf) => {
+    setBusy(true);
+    try {
+      const r = await offersService.runWorkflow(wf.id);
+      if (r?.ok === false) showToast(r?.error?.message || (t('profile.offers.bundleFailed') || 'Could not start the workflow'));
+      else showToast((t('profile.offers.bundleStarted') || 'Workflow “{wf}” started.').replace('{wf}', locTitle(wf.title) || wf.id));
+    } catch (e) { showToast((e && e.message) || (t('profile.offers.bundleFailed') || 'Could not start the workflow')); }
+    finally { setBusy(false); }
+  };
 
   const doAsk = async () => {
     setBusy(true);
@@ -118,17 +160,42 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
                 ${escHtml(t('profile.offers.consequence.' + c.type) || c.type)}${c.requiresApproval ? ' ⚠' : ''}${c.dynamic ? ' ↯' : ''}</span>`)}</div>
           ` : null}
 
+          ${prereq && prereq.items.length ? html`
+            <div class="of-label">${t('profile.offers.needsFirst') || 'Needs first'}</div>
+            <div class="of-prereq-list">${prereq.items.map((it, i) => html`
+              <span class="of-prereq ${it.ok ? 'of-prereq--ok' : (it.hard ? 'of-prereq--blocked' : 'of-prereq--warn')}" key=${i}>
+                <span class="of-prereq-mark">${it.ok ? '✓' : (it.hard ? '✕' : '!')}</span> ${escHtml(it.label)}</span>`)}</div>
+          ` : null}
+
           ${offer.deliverable ? html`
             <div class="of-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${escHtml(offer.deliverable.format || '')}${offer.deliverable.location?.space ? html` <span class="of-mini">→ ${escHtml(offer.deliverable.location.space)}</span>` : null}</div>
             ${offer.deliverable.sample === 'untested'
               ? html`<span class="of-badge of-badge--untested">${t('profile.offers.untested') || 'untested — no sample yet'}</span>`
-              : html`<div class="of-md of-sample-md"><${DeliverableBody} value=${offer.deliverable.sample} alt=${offer.title} /></div>`}
+              : html`<div class="of-md of-sample-md"><${DeliverableBody} value=${offer.deliverable.sample} alt=${offer.title} format=${offer.deliverable.format} /></div>`}
+          ` : null}
+
+          <div class="of-runs">
+            <button class="of-runs-toggle" onClick=${toggleRuns}>${runsOpen ? '▾' : '▸'} ${t('profile.offers.recentRuns') || 'Recent runs'}</button>
+            ${runsOpen ? html`
+              ${runs === 'loading' ? html`<div class="of-mini">…</div>` : null}
+              ${Array.isArray(runs) && runs.length === 0 ? html`<div class="of-mini">${t('profile.offers.noRunsYet') || 'No runs yet for this offer.'}</div>` : null}
+              ${Array.isArray(runs) ? runs.map(d => html`<${DeliverableRow} key=${d.task_id} d=${d} showToast=${showToast} onChanged=${onChanged} />`) : null}
+            ` : null}
+          </div>
+
+          ${bundles.length ? html`
+            <div class="of-bundle">
+              <div class="of-mini">${t('profile.offers.bundleHint') || 'This is a step of a workflow — run the whole chain as one:'}</div>
+              <div class="flex-row-wrap">${bundles.map(wf => html`
+                <button class="btn-outline btn-sm" key=${wf.id} disabled=${busy} onClick=${() => runBundle(wf)}>▶▶ ${escHtml(locTitle(wf.title) || wf.id)}</button>`)}</div>
+            </div>
           ` : null}
 
           <textarea class="input-field input-sm of-input" rows="2" placeholder=${t('profile.offers.requestPlaceholder') || 'Your request (optional — fills the example)…'} value=${input} onInput=${(e) => setInput(e.target.value)}></textarea>
           <div class="flex-row-wrap">
-            <button class="btn-primary btn-sm" disabled=${busy} onClick=${onAsk}>${askLabel(entry, offer)}</button>
+            <button class="btn-primary btn-sm" disabled=${busy || blocked} onClick=${onAsk}>${askLabel(entry, offer)}</button>
           </div>
+          ${blocked ? html`<div class="of-mini of-warn">${(t('profile.offers.blockedReason') || 'Can’t run yet — needs: {what}').replace('{what}', blockedReasons.join(', '))}</div>` : null}
 
           <div class="of-bill">
             <div class="of-label">${t('profile.offers.selling') || 'Selling'}</div>

@@ -8,6 +8,8 @@
  *   v1.2.0 -- 2026-06-12 -- Markdown deliverable/sample (.of-md) + Inbox deep-link (.of-link).
  *   v1.2.1 -- 2026-06-12 -- Scope markdown headings/tables/lists to the card (LLM h1 was giant; tables
  *     now render with borders).
+ *   v1.3.0 -- 2026-06-16 -- Richer Offerings card: prerequisites chips (.of-prereq*), per-offer Recent
+ *     runs (.of-runs*), and the workflow-bundle row (.of-bundle).
  */
 .of { max-width: 920px; }
 .of-search { width: 100%; margin: 0.5rem 0 0.75rem; }
@@ -94,3 +96,19 @@
 .of-md pre { font-size: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; overflow-x: auto; }
 .of-md code { font-size: 0.82em; }
 .of-link { background: none; border: none; padding: 0; margin-left: 0.35rem; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Prerequisites ("needs first") — one chip per dependency, marked met / blocked / advisory. */
+.of-prereq-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.of-prereq { font-size: 0.82rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+.of-prereq-mark { font-weight: 700; }
+.of-prereq--ok { color: var(--success, #10b981); border-color: var(--success, #10b981); }
+.of-prereq--blocked { color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
+.of-prereq--warn { color: var(--warn, #f59e0b); border-color: var(--warn, #f59e0b); }
+
+/* Per-offer Recent runs (collapsible; reuses the inbox DeliverableRow cards inside). */
+.of-runs { display: flex; flex-direction: column; gap: 0.3rem; }
+.of-runs-toggle { align-self: flex-start; background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 0.82rem; }
+.of-runs .of-card { margin: 0.25rem 0; }
+
+/* Workflow bundle row (this offer is a step of a multi-step chain). */
+.of-bundle { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.4rem; border-top: 1px dashed var(--border); }

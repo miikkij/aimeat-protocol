@@ -1382,6 +1382,9 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         completed_at: t.completedAt ?? null,
         updated_at: t.updatedAt,
         deliverable_key: t.deliverableKey ?? null,
+        // The offer this run came from (the Ask flow stamps scope.offer_id), so an Offers card can
+        // pin its OWN run history by filtering this aggregate. null for non-offer tasks.
+        offer_id: t.scope?.find(s => s.name === 'offer_id')?.value ?? null,
         verification: t.verification?.userExpects ?? null,
         rating: t.rating ?? null,
       }));

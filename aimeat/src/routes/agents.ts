@@ -34,7 +34,9 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../services/platform-detector.js';
-import { OffersDocSchema } from '../models/offer-schemas.js';
+import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
+import { evaluateOfferPrereqs, offerHasPrereqs } from '../services/offer-prereqs.js';
+import { listWorkflows } from '../services/workflow/store.js';
 
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
@@ -1581,16 +1583,40 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   // context the cards need (mode, last-seen/online), so the client can search across all agents.
   router.get('/v1/offers', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
     const agents = await storage.getAgentsByOwner(owner);
     const now = Date.now();
+    // Workflows that BUNDLE an offer: the offer is a step of a multi-step chain, so the card can offer
+    // "run the whole workflow" instead of just the one step. Listed once (owner-shared), matched below.
+    const workflows = await listWorkflows(storage, ownerGhii).catch(() => []);
+    const agentInStep = (step: { agent?: string | string[] }, name: string): boolean =>
+      Array.isArray(step.agent) ? step.agent.includes(name) : step.agent === name;
+
     const out: Array<Record<string, unknown>> = [];
     let total = 0;
     for (const a of agents) {
       const rec = await storage.getMemory(a.gaii, `agents.${a.name}.offers`);
-      const offers = ((rec?.value as { offers?: unknown[] } | undefined)?.offers) ?? [];
+      const offers = ((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
       if (!offers.length) continue;
       const online = !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000);
-      out.push({ agent: a.name, gaii: a.gaii, mode: a.mode ?? 'interactive', last_seen: a.lastSeen ?? null, online, offers });
+
+      const enriched: Array<Record<string, unknown>> = [];
+      for (const offer of offers) {
+        const o: Record<string, unknown> = { ...offer };
+        // Prerequisites — evaluated only when the offer declares any (bounds the per-feed cost).
+        if (offerHasPrereqs(offer)) {
+          try { o.prereq = await evaluateOfferPrereqs(storage, config, owner, a.name, offer); }
+          catch { /* a prereq-eval error must never break the whole feed */ }
+        }
+        // Bundling workflows (a multi-step chain this offer is a step of).
+        const bundles = workflows
+          .filter(w => (w.steps?.length ?? 0) > 1 && w.steps.some(s => agentInStep(s, a.name) && s.offer === offer.id))
+          .map(w => ({ id: w.id, title: w.title }));
+        if (bundles.length) o.workflows = bundles;
+        enriched.push(o);
+      }
+
+      out.push({ agent: a.name, gaii: a.gaii, mode: a.mode ?? 'interactive', last_seen: a.lastSeen ?? null, online, offers: enriched });
       total += offers.length;
     }
     res.json(success(config.nodeId, { agents: out, total }));
