@@ -153,6 +153,8 @@
  *     Workspace (📐 Workspace structure overview — per-space recent ids + titles). Lazy-loads a
  *     deterministic Markdown map from the server (orgService.getOrganismOverview / getWorkspaceOverview)
  *     and renders it via the safe Markdown component. Collapsed by default (no cost until opened).
+ *   v1.30.0 — 2026-06-16 — Share tab: a "Publish to public feed" button (whole-workspace public
+ *     toggle) — anything made public is announced on the front-page public activity feed.
  *   v1.28.0 — 2026-06-12 — Overview landing tab: the whole workspace on one vertical scroll — a
  *     "what happened here" strip (last 8 activity events, humanized + clickable) above every
  *     manifest space stacked in order (records: compact rows max 5 + "Show all N →"; documents:
@@ -3129,7 +3131,19 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
       ${activeTab === 'share' ? html`
         <div class="pj-section">
-          <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared.'}</div>
+          <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared. Anything you make public is also announced on the public activity feed on the front page.'}</div>
+          ${share && docTypes.length > 0 ? html`
+            <div class="pj-share-feed">
+              ${share.public
+                ? html`<div class="pj-share-feed-on">
+                    <span>${t('organisms.feedPublishedAll') || '📣 This whole workspace is published to the public feed.'}</span>
+                    <button class="btn-ghost btn-sm" disabled=${shareBusy} onClick=${() => patchShare({ public: false })}>${t('organisms.feedUnpublish') || 'Unpublish'}</button>
+                  </div>`
+                : html`<button class="btn-primary btn-sm" disabled=${shareBusy}
+                    onClick=${() => { if (window.confirm(t('organisms.feedPublishConfirm') || 'Publish every published document in this workspace to the public activity feed on the front page?')) patchShare({ public: true }); }}>
+                    ${t('organisms.feedPublishBtn') || '📣 Publish to public feed'}
+                  </button>`}
+            </div>` : null}
           ${docTypes.length === 0 ? html`<${EmptyState} icon="🌐" text=${t('organisms.noDocSpaces') || 'This workspace has no document spaces to share.'} />` : html`
             ${!share && shareBusy ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : null}
             ${share ? docTypes.map(ot => {

@@ -35,6 +35,8 @@
  *   v1.2.0 -- 2026-05-22 -- Add individual todo update endpoint (PATCH /todos/:todoId)
  *   v1.1.0 -- 2026-05-22 -- Fix: accumulate telemetry across events instead of overwriting; allow agent PATCH on queued tasks
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-06-16 -- Record a public-activity-feed event on task completion when
+ *     the agent published a PUBLIC deliverable.
  */
 
 import { Router } from 'express';
@@ -46,6 +48,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
+import { recordPublicActivity } from '../services/public-activity.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -1026,6 +1029,20 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
+    // Public landing feed — only when the agent published a PUBLIC deliverable (a real material).
+    if (deliverableKey) {
+      void (async () => {
+        const rec = await storage.getMemory(task.agentGaii, deliverableKey);
+        if (rec?.visibility !== 'public') return;
+        await recordPublicActivity(storage, config, {
+          category: 'agents',
+          actor: task.agentGaii,
+          summary: `Agent ${task.agentGaii.split('#')[0]} completed "${task.title}"`,
+          detail: message,
+          link: `/v1/memory/${encodeURIComponent(task.agentGaii)}/${encodeURIComponent(deliverableKey)}`,
+        });
+      })().catch(e => logger.error('public activity (task deliverable) failed', { taskId: id, error: String(e) }));
+    }
     // If this task was dispatched by a workflow, advance that run (output check → next step).
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
       .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));

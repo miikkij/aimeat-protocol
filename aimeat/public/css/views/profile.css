@@ -2235,6 +2235,10 @@
 .pj-share-link { color: var(--accent); font-size: 0.82rem; text-decoration: none; }
 .pj-share-link:hover { text-decoration: underline; }
 .pj-share-empty { margin: 0.2rem 0 0.4rem 1.6rem; }
+/* "Publish to public feed" banner at the top of the Share tab. */
+.pj-share-feed { margin: 0 0 1rem; }
+.pj-share-feed-on { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.6rem 0.9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); font-size: 0.9rem; color: var(--text); }
+.pj-share-feed-on span { flex: 1; }
 .pj-share-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 /* Card fill + shadow so the action buttons stop blending into the tinted panel — matches .pj-toolbar. */
 .pj-share-actions .btn-outline, .pj-share-actions .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }

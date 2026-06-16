@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
  *   v1.1.0 — 2026-06-16 — Add BuildAppPrompt section: copyable Generate App Prompt from app-catalog.
+ *   v1.2.0 — 2026-06-16 — Embed PublicActivityFeed (3 real-time tabs) after the proof gallery.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -17,6 +18,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import PublicActivityFeed from './landing-activity.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -404,6 +406,9 @@ export default function Landing({ navigate }) {
 
       <!-- 6. Proof gallery -->
       <${Gallery} onApps=${setApps} />
+
+      <!-- 6.5 Public activity feed — 3 real-time tabs (apps / organisms / agents) -->
+      <${PublicActivityFeed} />
 
       <!-- 7. Footer -->
       <footer class="ld-footer">

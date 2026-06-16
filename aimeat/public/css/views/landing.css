@@ -4,6 +4,7 @@
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial (landing/portal split).
+ *   v1.1.0 — 2026-06-16 — Add public activity feed styles (pa- prefix).
  */
 .ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
 .ld-hero { text-align: center; padding: 2.5rem 0 1.25rem; }
@@ -92,3 +93,30 @@
 .ld-contact-sub { color: var(--text-dim); font-size: .88rem; }
 .ld-example-img { width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px; margin-bottom: .9rem; }
 .ld-app-badge { font-size: .68rem; font-weight: 600; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; }
+
+/* ── Public activity feed (pa- prefix) ── */
+.pa { max-width: 760px; margin: 2rem auto; }
+.pa-title { font-size: 1.3rem; margin: 0 0 .3rem; }
+.pa-sub { color: var(--text-dim); font-size: .9rem; margin: 0 0 1rem; }
+.pa-tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.pa-tab { position: relative; display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text-dim); font-size: .88rem; font-weight: 600; cursor: pointer; }
+.pa-tab:hover { border-color: var(--accent); }
+.pa-tab--active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pa-tab-icon { font-size: .95rem; }
+.pa-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.1rem; height: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: #fff; font-size: .68rem; font-weight: 700; }
+.pa-tab--active .pa-badge { background: #fff; color: var(--accent); }
+.pa-panel { border: 1px solid var(--border); border-radius: 12px; background: var(--card); overflow: hidden; }
+.pa-empty { padding: 1.5rem 1.25rem; text-align: center; color: var(--text-dim); font-size: .9rem; }
+.pa-list { list-style: none; margin: 0; padding: 0; }
+.pa-row { border-bottom: 1px solid var(--border); }
+.pa-row:last-child { border-bottom: none; }
+.pa-row-head { width: 100%; display: flex; align-items: center; gap: .7rem; padding: .65rem .95rem; background: none; border: none; text-align: left; cursor: pointer; color: var(--text); font-size: .9rem; }
+.pa-row-head:hover { background: var(--bg-surface, var(--bg-dim)); }
+.pa-time { flex: none; font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: .82rem; }
+.pa-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pa-caret { flex: none; color: var(--text-dim); font-size: .8rem; }
+.pa-detail { padding: 0 .95rem .8rem 3.1rem; }
+.pa-detail-text { margin: 0 0 .4rem; color: var(--text-dim); font-size: .85rem; white-space: pre-wrap; word-break: break-word; }
+.pa-detail-actor { margin: 0 0 .4rem; color: var(--muted); font-size: .78rem; }
+.pa-detail-link { color: var(--accent); font-weight: 700; text-decoration: none; font-size: .85rem; }
+.pa-detail-link:hover { text-decoration: underline; }

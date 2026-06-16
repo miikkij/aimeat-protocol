@@ -13,6 +13,8 @@
  *   v1.0.0 — pre-2026-06 — Initial change-event bus for SSE live updates.
  *   v1.1.0 — 2026-06-10 — Add the agent-scoped `delivery` channel for the
  *     connector forward tunnel's realtime reverse delivery.
+ *   v1.2.0 — 2026-06-16 — Add the `publicActivity` broadcast channel carrying a
+ *     full public-feed event payload to every public SSE client (landing feed).
  */
 import { EventEmitter } from 'node:events';
 
@@ -66,4 +68,39 @@ export function onDeliveryEvent(handler: (evt: DeliveryEvent) => void): void {
 
 export function offDeliveryEvent(handler: (evt: DeliveryEvent) => void): void {
   bus.off('delivery', handler);
+}
+
+// ── Public activity channel (broadcast, full payload) ───────────────────────
+// The landing page's public activity feed needs the FULL event (category, time,
+// summary, link) pushed to every connected public SSE client — unlike the coarse
+// `change` channel (a marker the UI uses only to trigger a re-fetch). This is a
+// broadcast (no `target`, unlike `delivery`): every public viewer sees the same
+// public events. Producers call `recordPublicActivity` (services/public-activity.ts)
+// which persists the event, then emits here.
+
+export interface PublicActivityEvent {
+  /** Which landing tab this belongs to. */
+  category: 'apps' | 'organisms' | 'agents';
+  /** ISO 8601 timestamp of when it happened. */
+  at: string;
+  /** Display name segment only — never a full private GAII path. */
+  actor: string;
+  /** One-line human summary shown in the feed row. */
+  summary: string;
+  /** Short curated detail blob (already-public fields only). */
+  detail: string;
+  /** Link to an existing unauthenticated route for the material/event. */
+  link: string;
+}
+
+export function emitPublicActivity(evt: PublicActivityEvent): void {
+  bus.emit('publicActivity', evt);
+}
+
+export function onPublicActivityEvent(handler: (evt: PublicActivityEvent) => void): void {
+  bus.on('publicActivity', handler);
+}
+
+export function offPublicActivityEvent(handler: (evt: PublicActivityEvent) => void): void {
+  bus.off('publicActivity', handler);
 }

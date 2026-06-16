@@ -3956,7 +3956,7 @@ paths:
           description: The app name of the GEAI to disconnect.
       responses:
         '200':
-          description: Deleted. Response data is `{ deleted: true, app, geai }`.
+          description: "Deleted. Response data is `{ deleted: true, app, geai }`."
         '403':
           description: Owner role required.
         '404':
@@ -11174,6 +11174,71 @@ paths:
                       public_writes: { type: integer }
                       tasks_completed: { type: integer }
                       schedules_fired: { type: integer }
+
+  /v1/public/activity-feed:
+    get:
+      operationId: publicActivityFeed
+      summary: Public activity feed for the landing page (public, cached 10 s)
+      description: |
+        Recent PUBLIC activity events — app publishes/updates, public organism and
+        workspace publishes, agent materials and knowledge packages. Each event has a
+        category, timestamp, actor name segment, one-line summary, detail blob and a
+        link to the underlying public material. No auth; rate-limited. Initial load for
+        the landing feed; live updates arrive via GET /v1/public/events.
+      tags: [Public]
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema: { type: string, enum: [apps, organisms, agents] }
+          description: Filter to one tab; omit for all categories.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Feed items, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            category: { type: string, enum: [apps, organisms, agents] }
+                            at: { type: string, format: date-time }
+                            actor: { type: string }
+                            summary: { type: string }
+                            detail: { type: string }
+                            link: { type: string }
+
+  /v1/public/events:
+    get:
+      operationId: publicEventsStream
+      summary: Public Server-Sent Events stream of activity events (public)
+      description: |
+        A public, unauthenticated SSE stream (text/event-stream). Each `data:` message
+        is one PUBLIC activity event (same shape as /v1/public/activity-feed items)
+        pushed live as it happens. Rate-limited with a concurrent-connection cap; no
+        ticket required (unlike the authenticated /v1/events stream).
+      tags: [Public]
+      responses:
+        '200':
+          description: An event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '503':
+          description: Too many open activity streams; retry shortly
 
   /v1/ghii/me:
     get:

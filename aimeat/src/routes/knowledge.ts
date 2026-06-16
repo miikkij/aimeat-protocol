@@ -25,6 +25,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-07 — initial knowledge package system
  *   v1.1.0 — 2026-03-18 — rename routes from /v1/packages/* to /v1/knowledge/*
+ *   v1.2.0 — 2026-06-16 — Record a public-activity-feed event when a package becomes
+ *     catalog_listed (on import and on the sharing private→public edge).
  */
 
 import { Router } from 'express';
@@ -35,6 +37,7 @@ import type { Storage, KnowledgeManifest, MemoryLinkRecord, OperatorReviewRecord
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordPublicActivity } from '../services/public-activity.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { ManifestSchema } from '../schemas/knowledge-package.js';
@@ -238,6 +241,16 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },
     ]));
     emitChange('knowledge');
+    // Public landing feed — only when the package opts into the public catalogue.
+    if (manifest.sharing.catalog_listed) {
+      void recordPublicActivity(storage, config, {
+        category: 'agents',
+        actor: ghii,
+        summary: `Knowledge package "${manifest.name}" published`,
+        detail: manifest.synthesis?.description || '',
+        link: `/v1/knowledge/${packageId}`,
+      }).catch(() => { /* feed is best-effort */ });
+    }
   });
 
   /* ── GET /v1/knowledge/:id — Get package manifest ── */
@@ -482,6 +495,16 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       sharing: manifest.sharing,
     }));
     emitChange('knowledge');
+    // Public landing feed — only on the private→public catalogue edge (don't re-announce).
+    if (manifest.sharing.catalog_listed && existing.visibility !== 'public') {
+      void recordPublicActivity(storage, config, {
+        category: 'agents',
+        actor: (manifest.author as string) || ownerGaii,
+        summary: `Knowledge package "${manifest.name}" published`,
+        detail: manifest.synthesis?.description || '',
+        link: `/v1/knowledge/${packageId}`,
+      }).catch(() => { /* feed is best-effort */ });
+    }
   });
 
   /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */

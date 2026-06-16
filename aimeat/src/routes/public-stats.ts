@@ -7,6 +7,8 @@
  * @structure publicStatsRouter() — GET /v1/public/activity-ticker, GET /v1/public/node-stats-today
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing redesign (live ticker + today's counters).
+ *   v1.1.0 — 2026-06-16 — Exclude synthetic 'activity/' public-activity-feed entries from
+ *     both the ticker and today's public_writes count (they have their own feed).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -35,7 +37,9 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const result = await storage.listAllMemory({ visibility: 'public', limit: 100 });
       items = result.items
-        .filter(m => m.updatedAt)
+        // Exclude synthetic public-activity-feed entries (system@; key 'activity/…') —
+        // they have their own feed and would otherwise double-up in this ticker.
+        .filter(m => m.updatedAt && !m.key.startsWith('activity/'))
         .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
         .slice(0, 10)
         .map(m => ({
@@ -68,7 +72,8 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
     let tasksCompleted = 0;
     try {
       const mem = await storage.listAllMemory({ visibility: 'public', limit: 500 });
-      publicWrites = mem.items.filter(m => isToday(m.updatedAt)).length;
+      // Exclude synthetic public-activity-feed entries — they would inflate the count.
+      publicWrites = mem.items.filter(m => isToday(m.updatedAt) && !m.key.startsWith('activity/')).length;
     } catch { /* 0 */ }
     try {
       const jobs = await storage.listScheduledJobs();
