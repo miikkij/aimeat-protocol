@@ -57,6 +57,15 @@ fn main() {
             tray::setup_tray(app)?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running AIMEAT Desktop");
+        .build(tauri::generate_context!())
+        .expect("error while building AIMEAT Desktop")
+        .run(|app_handle, event| {
+            // On quit, reap EVERY sidecar we spawned (node server, agent supervisor + crew tree,
+            // detached serve daemon). Otherwise they linger and lock node.exe / the .venv, which
+            // breaks the next install ("Error opening file for writing") and corrupts provisioning.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                node_manager::kill_node();
+                agent_runtime::shutdown(app_handle);
+            }
+        });
 }

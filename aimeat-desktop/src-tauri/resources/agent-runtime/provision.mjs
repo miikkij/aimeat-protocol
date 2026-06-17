@@ -129,6 +129,15 @@ async function main() {
     if (r.code !== 0) r = await run('uv', ['sync'], { cwd: REPO_DIR }); // retry without the optional extra
     progress('install-deps', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Dependencies installed.' : (r.err || 'uv sync failed').trim().slice(-400));
     summary.deps = r.code === 0;
+    // uv can report success yet leave the venv without pyvenv.cfg if a stale crew locked it mid-sync
+    // → runtime "No pyvenv.cfg file". If the venv is invalid, rebuild it once.
+    if (summary.deps && existsSync(venv) && !existsSync(join(venv, 'pyvenv.cfg'))) {
+      progress('install-deps', 'running', 'Rebuilding an incomplete .venv…');
+      try { rmSync(venv, { recursive: true, force: true }); } catch { /* locked */ }
+      const r2 = await run('uv', ['sync', '--extra', 'tui'], { cwd: REPO_DIR });
+      summary.deps = r2.code === 0 && existsSync(join(venv, 'pyvenv.cfg'));
+      progress('install-deps', summary.deps ? 'ok' : 'error', summary.deps ? '.venv rebuilt.' : 'Could not build a valid .venv (a process may be locking it).');
+    }
   } else {
     progress('install-deps', 'skipped', 'Skipped — needs uv + the cloned fleet.');
     summary.deps = false;

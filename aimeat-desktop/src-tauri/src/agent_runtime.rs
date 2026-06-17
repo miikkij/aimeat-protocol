@@ -179,10 +179,50 @@ pub fn agent_start(
 pub fn agent_stop(_app: AppHandle) -> Result<(), String> {
     let mut guard = AGENT_CHILD.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = guard.take() {
+        kill_tree(child.id()); // taskkill /T → also reaps the uv + python crew grandchildren
         let _ = child.kill();
         let _ = child.wait();
     }
     Ok(())
+}
+
+/// Kill a process AND its whole child tree. The agent supervisor spawns `uv run python …` (the crew)
+/// and the loopback serve daemon — a plain `child.kill()` would leave those grandchildren alive,
+/// where they LOCK node.exe / the .venv and break the next install or provision.
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+        .output();
+}
+#[cfg(not(windows))]
+fn kill_tree(pid: u32) {
+    let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+}
+
+/// Kill THIS desktop's loopback serve daemon (the one in its isolated home's serve.json). It is
+/// spawned detached so it outlives the crew, so it must be reaped explicitly on shutdown.
+pub fn kill_serve_daemon(app: &AppHandle) {
+    let home = match app.path().app_data_dir() {
+        Ok(d) => strip_verbatim(d).join("agent-runtime").join(".aimeat"),
+        Err(_) => return,
+    };
+    if let Ok(txt) = std::fs::read_to_string(home.join("serve.json")) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+            if let Some(pid) = v.get("pid").and_then(|p| p.as_u64()) {
+                kill_tree(pid as u32);
+            }
+        }
+    }
+}
+
+/// Full agent-side shutdown: kill the supervisor+crew tree and the detached serve daemon. Called
+/// from the app's exit handler so nothing lingers to lock files for the next launch/install.
+pub fn shutdown(app: &AppHandle) {
+    let _ = agent_stop(app.clone());
+    kill_serve_daemon(app);
 }
 
 /// Whether the agent daemon supervisor is currently running.
