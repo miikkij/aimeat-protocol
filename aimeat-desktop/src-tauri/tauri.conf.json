@@ -1,6 +1,6 @@
 {
   "productName": "AIMEAT Personal Node",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
     "frontendDist": "../src"
