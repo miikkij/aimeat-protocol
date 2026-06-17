@@ -14,7 +14,7 @@
  *   v1.0.0 — 2026-06-17 — Initial: git/uv/ollama provisioning of the crewaimeat fleet (owner spec).
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -85,6 +85,15 @@ async function main() {
       progress('fetch-fleet', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Updated.' : (r.err || 'git pull failed').trim());
       summary.fleet = r.code === 0;
     } else {
+      // The dir may exist but not be a git repo (e.g. a leftover .venv from a half-finished
+      // provision). `git clone` REFUSES a non-empty destination ("already exists and is not an
+      // empty directory"), so the clone silently fails and crewaimeat is never fetched →
+      // "No module named 'crewaimeat'". Wipe the dir first for a clean clone. Verified against
+      // a broken install whose crewaimeat/ held only a stale .venv/.
+      if (existsSync(REPO_DIR)) {
+        progress('fetch-fleet', 'running', 'Cleaning a stale crewaimeat dir before clone…');
+        try { rmSync(REPO_DIR, { recursive: true, force: true }); } catch (e) { progress('fetch-fleet', 'error', `Could not clean ${REPO_DIR}: ${e.message}`); }
+      }
       progress('fetch-fleet', 'running', `Cloning ${REPO}…`);
       const r = await run('git', ['clone', '--depth', '1', REPO, REPO_DIR]);
       progress('fetch-fleet', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Cloned.' : (r.err || 'git clone failed').trim());

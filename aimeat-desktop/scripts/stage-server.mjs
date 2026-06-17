@@ -96,6 +96,22 @@ if (existsSync(lockfile)) {
 //    Optionals stay ON so QuickJS's WASM variants ship.
 run('pnpm install --prod --no-frozen-lockfile --node-linker=hoisted --config.confirmModulesPurge=false', serverDir);
 
+// 5b. Dedupe minimatch under readdir-glob. readdir-glob@3 is ESM and does
+//     `import { Minimatch } from "minimatch"`, which needs minimatch >= 9 (ESM named export).
+//     The hoisted prod install is non-deterministic across pnpm versions: on some (CI's 10.30.x)
+//     it NESTS minimatch 5.1.8 (CommonJS, no ESM named export) under readdir-glob, which crashes
+//     the node at boot with: "minimatch does not provide an export named 'Minimatch'". Removing
+//     the nested copy makes readdir-glob resolve the hoisted top-level minimatch (10.x) and the
+//     ESM import works. Verified against the packaged 0.4.5 server. (A pnpm override did NOT fix
+//     this reliably — the post-install removal is the deterministic fix.)
+const nestedMinimatch = join(serverDir, 'node_modules', 'readdir-glob', 'node_modules', 'minimatch');
+if (existsSync(nestedMinimatch)) {
+  rmSync(nestedMinimatch, { recursive: true, force: true });
+  console.log(`[stage-server] removed nested minimatch under readdir-glob (forces the hoisted 10.x): ${nestedMinimatch}`);
+} else {
+  console.log('[stage-server] no nested minimatch under readdir-glob (ok)');
+}
+
 // 6. Sanity check: the native SQLite binary must be present, or the packaged app
 //    will fail to start the node.
 const nativeBinary = join(
