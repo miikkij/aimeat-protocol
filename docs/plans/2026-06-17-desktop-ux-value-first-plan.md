@@ -144,10 +144,25 @@ plain browser; and the local build is windres-blocked). Ships via CI as `desktop
 - **4 — done:** humanized always-visible status ("Your AIMEAT is asleep / Awake").
 - **5 — done:** first-run **welcome overlay** (language pick + start) + in-flow **Ollama detect**
   with install/recheck.
-- **6 — follow-ups (need Rust + a build):** tray notifications on agent results, the Tauri
-  **auto-updater** (needs a signed update feed — gated on code signing), model/RAM guidance, and
-  true in-app structured result rendering (auto-queue a task + poll the node, vs. today's "open the
-  dashboard to confirm"). Tracked here; not in this pass.
+- **6 — polish (0.4.2, frontend):** DONE this pass —
+  - **Prerequisite-aware playbooks** (the priority): each playbook has a `tier`. `local` (free,
+    Ollama/Gemma) cards run; the `cloud` **image** card is NOT offered as free — it shows an
+    "Advanced · needs an OpenRouter key (paid)" badge and opens a **step-by-step OpenRouter guide**
+    (what it is, buy a key, pick a model, wire it, what it costs). No more "free image" letdown.
+  - **Ollama detect on Home** + a clear install/recheck banner (not just a silent log failure).
+  - **Model/RAM hint** before the Gemma pull.
+  - **Lightweight update check:** fetch the latest `desktop-v*` GitHub release; if newer than
+    `APP_VERSION`, show an "A new version is available → Download" banner (no signing needed).
+- **6 — still Rust follow-ups (need a build + decisions):**
+  - **Signed one-click auto-updater** (tauri-plugin-updater): uses minisign (NOT Authenticode, so
+    it works unsigned-installer), but needs `tauri signer generate` → embed pubkey in
+    `tauri.conf.json` + set `TAURI_SIGNING_PRIVATE_KEY`(+password) secrets + emit `latest.json` in
+    the release workflow. One-time keypair step is the developer's; then it's wired. (The 0.4.2
+    banner is the no-signing interim.)
+  - **OS tray notifications** ("your brief is ready" while backgrounded) — Rust notification plugin
+    + a structured "result ready" signal from the crew/daemon.
+  - **True in-app result rendering** — auto-queue the task + poll the node for the agent's output
+    key, vs. today's "open the dashboard to confirm + watch the Activity log".
 
 ## Out of scope (for now)
 - Code signing (tracked in the agent-runtime plan).
