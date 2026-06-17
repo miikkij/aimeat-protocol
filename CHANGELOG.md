@@ -6,6 +6,33 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Richer, findable Offerings ("Tarjoama").** The Offers surface grew from a flat,
+  read-row-by-row list into something you grasp by *need* and *value*. Two layers:
+  - **Self-explanatory offer cards.** Each card now shows a real, structured **example
+    output** (a JSON object/array — or `deliverable.format:"json"` — renders as a clean
+    key/value tree via the shared `JsonNode`, not raw JSON; markdown/image samples
+    unchanged), the offer's own **recent runs** inline (lazy-fetched, filtered by the
+    `offer:<id>` tag the runner stamps, reusing the inbox `DeliverableRow`), and its
+    **prerequisites**: shown as "needs first" chips, *gated* (the Ask is disabled with a
+    reason when a hard prereq — an upstream offer's deliverable or a signal — is unmet,
+    evaluated server-side with the workflow signal evaluator), and *bundled* (when the
+    offer is a step of a multi-step workflow, a button opens it in the **Workflows** tab
+    to run the whole chain). Schema: `deliverable.format` gains `'json'`; offers gain
+    `dependsOn` (upstream-offer / signal prerequisites) — both additive/optional.
+    `models/offer-schemas.ts`, `services/offer-prereqs.ts`, `components/ImageDeliverable.js`,
+    `views/profile/offers-tab.js`; `GET /v1/offers` attaches `prereq` + bundling `workflows`,
+    `GET /v1/deliverables` exposes `offer_id`.
+  - **Find by need, not by scanning.** Facet filters (cost / latency / verification /
+    data-handling / outcome), **need-verb grouping** (Create / Analyze & decide /
+    Communicate / Build & automate / Inspect & report — the default group-by axis,
+    derived deterministically), a **"standing" sort** that ranks by likely value and
+    dependability — **scheduled/automatic offers pinned on top**, *not* by run count — a
+    deterministic, **clickable Mermaid map** (orientation overview; nodes open their card
+    via our own SVG-overlay listener, so Mermaid stays `securityLevel:'strict'` with no
+    XSS surface), and an opt-in **AI "find by need"** that maps a free-text need to the
+    fitting offers via the owner's OpenRouter (`/v1/ai/complete`, spend-safe, on submit
+    only) and, when nothing fits, hands a one-line brief to **crew-forge** to build the
+    missing agent. `services/offers-grouping.js` (pure, deterministic) + `services/offers.js`.
 - **Build an agent in 10 minutes (landing).** The logged-out landing page gains a
   copy-paste agent prompt (`buildLandingAgentPrompt` in `public/views/landing.js`)
   alongside the existing build-an-app prompt. Pasted into Claude/ChatGPT/Grok it
@@ -22,6 +49,60 @@ All notable changes to AIMEAT are documented in this file.
   model defaults to Gemma on Ollama via a bundled `llm_providers.default.json`
   (keyless; `qwen2.5:7b` local fallback). First run downloads Python/uv/crewaimeat
   (nothing Python is baked into the installer).
+
+### Ecosystem applications (GEAI) — peer integration for external services
+
+A **third class of authenticated principal** alongside the human owner (GHII) and the AI agent
+(GAII): the **ecosystem application** (GEAI, `eco:{app}#{owner}@{node}`, role `ecosystem`).
+Modeled as a near-copy of the agent connection — per-user, owner-approved, scoped — so an
+external service (Zendesk-, Airtable-, Notion-class) can exchange **data, capabilities, and
+events** with AIMEAT over the existing connector tunnel while each side keeps its own user
+management (peer integration, not domination). Additive throughout; the agent/owner paths are
+unchanged and the change set ships with E2E coverage on both persistent backends.
+
+- **Identity & onboarding.** New `eco:` identity helpers in `utils/gaii.ts` (kept strictly
+  separate from GAII parsing) and the `ecosystem` role in the auth middleware (its own role;
+  scopes are always enforced — never the owner scope-bypass). A bidirectional "hello
+  integration" handshake (RFC 8628-style): `POST /v1/ecosystem-apps/hello` → the owner approves
+  in their portal with selected scopes + a data-area allowlist → one-time credential pickup —
+  backed by a new `EcosystemAppRecord` + `EcoAuth` record in both storage backends (SQLite +
+  MongoDB). `routes/ecosystem-apps.ts`.
+- **Events & triggers.** A per-GEAI outbound **subscription registry** with best-effort tunnel
+  delivery (`memory.write`, `binding.revoked`, …) and an inbound event ingress
+  (`POST /v1/ecosystem/events`) that fuels a new `ecosystem.event` **workflow trigger**
+  (pins an event major version, fail-safe on mismatch, glob payload match).
+  `routes/ecosystem-events.ts`, `services/ecosystem-events.ts`, `models/ecosystem-event-schemas.ts`.
+- **Capabilities & data access.** A new capability `source.type: 'ecosystem'` routed **over the
+  connector tunnel** via a new server→GEAI `invoke`/`invoke_result` frame, so an owner's agents
+  can invoke a GEAI-provided capability (offline ⇒ `502 ECOSYSTEM_OFFLINE`); the **data-area
+  allowlist** enforced on a GEAI's organism deposits; **read-through references** (`ecosystem_ref`
+  — store the pointer + schema, fetch live content on demand, never persist); and two new
+  workflow **step kinds** — `trigger-geai` (invoke a GEAI capability) and `export-out` (push owner
+  data to a GEAI) — completing on the reply, not an agent task.
+  `services/capability-invoke.ts`, `services/ecosystem-access.ts`, the workflow engine.
+- **Connector ecosystem profile + static validation.** The tunnel upgrade gate admits the
+  `ecosystem` role; the connector's `serve.json` + `/local/status` gain a neutral `principals`
+  list (with an `agents` alias kept for existing sidecars), a `/local/events/next` event
+  long-poll for synchronous-language sidecars, and a configurable dial `wsUrl` (so the connector
+  can target a non-AIMEAT, ecosystem-hosted endpoint). An app may submit a **manifest** at hello;
+  AIMEAT **statically validates** it (schema · app-name · app-match · scope ceiling · capability
+  ids) and a failed validation **blocks approval**. `models/ecosystem-manifest.ts`,
+  `cli/connect/mcp/local-server.ts`, `cli/connect/tunnel-client.ts`.
+- **Automation recipes + advisory delivery (B4–B8).** A per-(owner, app) **automation recipe** —
+  "when this app publishes data on a matching key, run my agent(s)" — materialises an agent task
+  (reusing the scheduler's wake fan-out), routes it into a chosen **organism** (auto-attaching the
+  agent so it passes the workspace gate), optionally **emails the owner a real report on
+  completion** (a summary of the `support-advisory@1` items the agent produced), and runs those
+  advisories through an optional **approval gate** before **delivering** each approved advisory
+  back to the app over the tunnel. `services/ecosystem-automation*.ts`.
+- **Profile "Ecosystem apps" tab.** A new owner-facing tab (sibling of Agents):
+  approve/deny pending integration requests (scope preset + a manifest-validation badge that
+  gates Approve), the connected-GEAI list with grants, event subscriptions, the
+  account-correspondence **binding**, the app's own bilingual **setup guide** + **recommended
+  agents**, the data the app deposited, the automation-recipe editor, and the advisory approval
+  queue — with a typed-name-confirm **disconnect** (hard delete; the owner's deposited data is
+  kept). FI/EN i18n throughout. `public/views/profile/ecosystem-tab.js`,
+  `public/js/services/ecosystem.js`.
 
 ### Desktop: value-first redesign + language selection (0.4.0 → 0.4.2)
 
