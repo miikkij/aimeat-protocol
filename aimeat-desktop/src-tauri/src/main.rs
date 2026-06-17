@@ -32,6 +32,8 @@ fn main() {
             ai_connector::node_login_at,
             ai_connector::node_register,
             ai_connector::queue_agent_task,
+            ai_connector::get_agent_task,
+            ai_connector::get_agent_memory,
             ai_connector::save_ai_endpoint,
             ai_connector::get_ai_settings,
             chat::get_chat_agent,
