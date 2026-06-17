@@ -1175,6 +1175,7 @@
         'home.setup': 'How to set this up →',
         'home.updateAvail': 'A new version is available',
         'home.download': 'Download',
+        'home.install': 'Install update',
         'fw.ramHint': '(needs ~8 GB RAM; a lighter model is used on smaller machines)',
         'or.title': 'Unlock premium agents (like images) with an OpenRouter key',
         'or.sub': 'Some agents need a stronger or image-capable model than the free local one. OpenRouter gives you many models behind one key — pay only for what you use, you set the budget. Here is how:',
@@ -1241,6 +1242,7 @@
         'home.setup': 'Näin otat käyttöön →',
         'home.updateAvail': 'Uusi versio saatavilla',
         'home.download': 'Lataa',
+        'home.install': 'Asenna päivitys',
         'fw.ramHint': '(tarvitsee ~8 GB RAM; pienemmillä koneilla käytetään kevyempää mallia)',
         'or.title': 'Avaa edistyneet agentit (kuten kuvat) OpenRouter-avaimella',
         'or.sub': 'Osa agenteista tarvitsee vahvemman tai kuvia osaavan mallin kuin ilmainen paikallinen. OpenRouter antaa monta mallia yhdellä avaimella — maksat vain käytöstä ja asetat budjetin. Näin:',
@@ -1313,7 +1315,13 @@
         const u = document.createElement('div');
         u.className = 'home-banner home-banner-update';
         const s = document.createElement('span'); s.textContent = t('home.updateAvail') + ' (' + updateInfo.version + ')'; u.appendChild(s);
-        const d = document.createElement('button'); d.className = 'btn'; d.textContent = t('home.download'); d.onclick = () => openExternal(updateInfo.url); u.appendChild(d);
+        const d = document.createElement('button'); d.className = 'btn'; d.textContent = t('home.install');
+        d.onclick = async () => {
+          // Prefer the built-in updater (one-click install); fall back to the download page.
+          try { const ok = await invoke('install_update'); if (!ok) openExternal(updateInfo.url); }
+          catch (e) { openExternal(updateInfo.url); }
+        };
+        u.appendChild(d);
         box.appendChild(u);
       }
     }

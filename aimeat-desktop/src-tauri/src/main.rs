@@ -10,10 +10,12 @@ mod node_manager;
 mod ai_connector;
 mod chat;
 mod agent_runtime;
+mod updater;
 mod tray;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             node_manager::start_node,
             node_manager::stop_node,
@@ -45,6 +47,8 @@ fn main() {
             agent_runtime::agent_start,
             agent_runtime::agent_stop,
             agent_runtime::agent_status,
+            updater::check_update,
+            updater::install_update,
         ])
         .setup(|app| {
             // Initialize system tray
