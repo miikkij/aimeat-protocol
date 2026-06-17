@@ -137,18 +137,39 @@ pub fn agent_provision(app: AppHandle, model: Option<String>, install_uv: bool, 
     if pull_model {
         args.push("--pull-model".into());
     }
-    let env = vec![("AIMEAT_AGENT_MODEL".to_string(), model.unwrap_or_else(|| "gemma3".to_string()))];
+    // qwen2.5:7b by default — crews need tool-calling, which Gemma lacks (see provision.mjs/run-agent.mjs).
+    let env = vec![("AIMEAT_AGENT_MODEL".to_string(), model.unwrap_or_else(|| "qwen2.5:7b".to_string()))];
     spawn_relay(&app, "provision.mjs", args, env, false)
 }
 
 /// Start (or restart) the local agent daemon for a crew module against the local node.
+///
+/// `owner` + `owner_token` (the owner's JWT, obtained via the existing `node_login` command) let
+/// run-agent.mjs auto-approve the agent on the LOCAL node — no manual device-auth. `AIMEAT_HOME`
+/// is an isolated connector home under the app data dir so the desktop's token/serve.json never
+/// collide with the user's global ~/.aimeat fleet.
 #[tauri::command]
-pub fn agent_start(app: AppHandle, crew_module: String, agent_name: String, node_url: String) -> Result<(), String> {
+pub fn agent_start(
+    app: AppHandle,
+    crew_module: String,
+    agent_name: String,
+    node_url: String,
+    owner: String,
+    owner_token: String,
+) -> Result<(), String> {
     let _ = agent_stop(app.clone()); // single instance
+    let aimeat_home = strip_verbatim(app.path().app_data_dir().map_err(|e| e.to_string())?)
+        .join("agent-runtime")
+        .join(".aimeat")
+        .to_string_lossy()
+        .to_string();
     let env = vec![
         ("AIMEAT_CREW_MODULE".to_string(), crew_module),
         ("AIMEAT_AGENT_NAME".to_string(), agent_name),
         ("AIMEAT_NODE_URL".to_string(), node_url.trim_end_matches('/').to_string()),
+        ("AIMEAT_AGENT_OWNER".to_string(), owner),
+        ("AIMEAT_OWNER_TOKEN".to_string(), owner_token),
+        ("AIMEAT_HOME".to_string(), aimeat_home),
     ];
     spawn_relay(&app, "run-agent.mjs", Vec::new(), env, true)
 }
