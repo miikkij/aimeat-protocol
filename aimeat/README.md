@@ -389,6 +389,8 @@ prerequisites** to install. A small control panel starts/stops the node, shows s
 it (port, federation role), connects a local AI (Ollama / LM Studio) to your account, and opens the web
 dashboard in your browser. Your data lives in your own app-data folder and survives restarts.
 
+**Download:** get the latest installer from the [GitHub Releases page](https://github.com/miikkij/aimeat-protocol/releases/latest). Windows installers are code-signed with a certificate provided by the [SignPath Foundation](https://signpath.org) (free code signing for open-source projects).
+
 <p align="center">
   <img src="assets/screenshots/aimeat-desktop.png" alt="AIMEAT Personal Node desktop app — control panel with Getting Started steps, node status (running on port 40050), and node info" width="640" />
 </p>
