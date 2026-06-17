@@ -81,27 +81,21 @@ async function main() {
   progress('check-uv', uv ? 'ok' : 'missing', uv || 'uv not found — install from https://astral.sh/uv (or re-run with --install-uv).');
   summary.uv = !!uv;
 
-  // 3) Clone or update the crewaimeat fleet.
+  // 3) Clone or update the crewaimeat fleet. Any EXISTING dir (a git repo, OR a non-git leftover
+  //    that may be LOCKED so it can't be deleted) is repaired/updated IN PLACE: init (no-op if
+  //    already a repo) + fetch + force-checkout a TRACKING `main`. This avoids `git clone` (which
+  //    refuses a non-empty dir) AND a detached FETCH_HEAD (which then breaks `git pull` with "not
+  //    currently on a branch"). It leaves the gitignored .venv/logs/llm_providers.json untouched.
   if (git) {
-    if (existsSync(join(REPO_DIR, '.git'))) {
+    if (existsSync(REPO_DIR)) {
       progress('fetch-fleet', 'running', 'Updating crewaimeat…');
-      const r = await run('git', ['-C', REPO_DIR, 'pull', '--ff-only']);
-      progress('fetch-fleet', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Updated.' : (r.err || 'git pull failed').trim());
-      summary.fleet = r.code === 0;
-    } else if (existsSync(REPO_DIR)) {
-      // The dir exists but is NOT a git repo — a leftover .venv/ from a half-finished provision,
-      // and it can be LOCKED by a still-running crew process so it cannot be deleted (EPERM), while
-      // `git clone` refuses a non-empty destination. So DON'T delete: turn the existing dir into the
-      // repo IN PLACE via init + fetch + force-checkout. This lays the source down alongside the
-      // (gitignored) .venv/logs without touching them. Verified against a locked, broken install.
-      progress('fetch-fleet', 'running', `Repairing crewaimeat dir (fetch in place)…`);
       await run('git', ['-C', REPO_DIR, 'init', '-q']);
       const add = await run('git', ['-C', REPO_DIR, 'remote', 'add', 'origin', REPO]);
       if (add.code !== 0) await run('git', ['-C', REPO_DIR, 'remote', 'set-url', 'origin', REPO]);
-      const f = await run('git', ['-C', REPO_DIR, 'fetch', '--depth', '1', 'origin', 'HEAD']);
-      const co = f.code === 0 ? await run('git', ['-C', REPO_DIR, 'checkout', '-f', 'FETCH_HEAD']) : f;
+      const f = await run('git', ['-C', REPO_DIR, 'fetch', '--depth', '1', 'origin', 'main']);
+      const co = f.code === 0 ? await run('git', ['-C', REPO_DIR, 'checkout', '-f', '-B', 'main', 'origin/main']) : f;
       const ok = f.code === 0 && co.code === 0;
-      progress('fetch-fleet', ok ? 'ok' : 'error', ok ? 'Fetched.' : (co.err || f.err || 'git fetch/checkout failed').trim());
+      progress('fetch-fleet', ok ? 'ok' : 'error', ok ? 'Updated.' : (co.err || f.err || 'git fetch/checkout failed').trim());
       summary.fleet = ok;
     } else {
       progress('fetch-fleet', 'running', `Cloning ${REPO}…`);
@@ -114,8 +108,14 @@ async function main() {
     summary.fleet = false;
   }
 
+  // Whether the crewaimeat SOURCE is present (this run's fetch may have hiccuped, but a prior run
+  // could have left a valid checkout). Deps + provider config proceed whenever the source exists —
+  // NOT only when this run's fetch succeeded — so a missing llm_providers.json can't strand the
+  // crew on the OpenRouter fallback ("OPENROUTER_API_KEY missing") when it should use local Gemma.
+  const hasSource = existsSync(join(REPO_DIR, 'pyproject.toml'));
+
   // 4) Install the Python env (uv sync, with the fleet TUI extra).
-  if (uv && summary.fleet && !ARGS.has('--skip-sync')) {
+  if (uv && hasSource && !ARGS.has('--skip-sync')) {
     // A half-finished provision can leave a CORRUPT .venv (e.g. no pyvenv.cfg) that uv sync won't
     // repair — `uv run` then fails with "No pyvenv.cfg file". If the venv is invalid, remove it so
     // uv sync rebuilds it cleanly. (Best-effort: if it's still locked, uv sync tries anyway.)
@@ -136,7 +136,7 @@ async function main() {
 
   // 5) Drop the local-Gemma provider config (keep any existing one the user customised).
   const providersTarget = join(REPO_DIR, 'llm_providers.json');
-  if (summary.fleet) {
+  if (hasSource) {
     if (existsSync(providersTarget)) {
       progress('providers', 'ok', 'Kept existing llm_providers.json.');
     } else if (existsSync(PROVIDERS_DEFAULT)) {
