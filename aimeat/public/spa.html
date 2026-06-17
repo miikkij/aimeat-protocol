@@ -223,6 +223,28 @@
   <!-- App root (Preact mounts here) -->
   <div id="app"></div>
 
+  <!-- SSO handoff: the desktop app already holds an authenticated owner JWT (from its inline
+       sign-in). It opens the portal with #handoff=<base64({owner,jwt})> so the browser is logged
+       in WITHOUT a second sign-in. Runs synchronously before the app reads the session. -->
+  <script>
+    (function () {
+      try {
+        var m = location.hash.match(/[#&]handoff=([^&]+)/);
+        if (!m) return;
+        var s = JSON.parse(atob(decodeURIComponent(m[1])));
+        if (s && s.jwt && s.owner) {
+          var node = '';
+          try { node = (JSON.parse(atob(s.jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) || {}).node || ''; } catch (e) {}
+          localStorage.setItem('aimeat_session', JSON.stringify({
+            owner: s.owner, jwt: s.jwt, ghii: node ? (s.owner + '@' + node) : null, gaii: null,
+          }));
+        }
+        // Strip the token from the URL so it is not bookmarked or left in history.
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) { /* ignore a malformed handoff */ }
+    })();
+  </script>
+
   <script type="module">
     import { h, render, Component } from 'preact';
     import { useState, useEffect, useCallback } from 'preact/hooks';
