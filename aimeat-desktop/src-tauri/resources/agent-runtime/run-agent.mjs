@@ -23,6 +23,9 @@
  *   v1.1.0 — 2026-06-17 — Halt the crash-loop with an honest "needs-setup" status.
  *   v2.0.0 — 2026-06-17 — Full orchestrator: isolated AIMEAT_HOME, device-auth auto-approve chain,
  *     token+config placement, ensure_serve, then run the crew. Proven E2E on the real machine.
+ *   v2.1.0 — 2026-06-17 — Start serve via aimeat_crewai's HOME-SCOPED ensure_serve directly (not
+ *     crewaimeat's scripts/ensure_serve.py, whose serve_guard reaps every serve daemon machine-wide).
+ *     The desktop agent now only ever touches its own app-data home — never other homes' daemons.
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -97,7 +100,17 @@ async function ensureAgentToken() {
   return true;
 }
 
-// Step 2 — start the crewaimeat loopback serve daemon (idempotent). Detached from the crew.
+// Step 2 — start the loopback serve daemon for OUR home only (idempotent, detached from the crew).
+// IMPORTANT: call aimeat_crewai's HOME-SCOPED `ensure_serve` directly — NOT crewaimeat's
+// `scripts/ensure_serve.py`, which runs `serve_guard.ensure_single_serve()` whose dedup pass kills
+// EVERY `aimeat connect serve` process machine-wide (it would reap the user's crewfive fleet daemon
+// and any other home's daemon → a reconnect storm). The package's ensure_serve reads/writes only
+// $AIMEAT_HOME/serve.json and pins AIMEAT_HOME on the spawned daemon; it never touches other homes.
+// INVARIANT: starting the desktop agent must only ever affect its own app-data home.
+const ENSURE_SERVE_PY =
+  'from aimeat_crewai import ensure_serve; d = ensure_serve(auto_start=True); '
+  + 'import json, sys; sys.stdout.write(json.dumps({"port": d.get("port"), "pid": d.get("pid")}))';
+
 async function ensureServe() {
   const serveJson = join(AIMEAT_HOME, 'serve.json');
   if (existsSync(serveJson)) {
@@ -106,9 +119,9 @@ async function ensureServe() {
       if (j?.port) { log('Serve daemon already live (port ' + j.port + ').'); return true; }
     } catch { /* fall through and (re)start */ }
   }
-  status('serving', 'Starting the local serve daemon…');
+  status('serving', 'Starting the local serve daemon (this home only)…');
   await new Promise((resolve) => {
-    const p = spawn('uv', ['run', 'python', join('scripts', 'ensure_serve.py')], {
+    const p = spawn('uv', ['run', 'python', '-c', ENSURE_SERVE_PY], {
       cwd: REPO_DIR, shell: false, windowsHide: true, env: childEnv(),
     });
     p.stdout.on('data', (d) => String(d).split('\n').forEach((l) => l.trim() && log(l.trim())));
