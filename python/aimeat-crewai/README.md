@@ -50,7 +50,7 @@ Requires Python 3.10+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`
    ```bash
    npx aimeat connect add --agent company-crew --url http://localhost:40050 --owner <your-handle>
    ```
-   Approve the request in your AIMEAT profile (`http://localhost:40050/v1/profile` -> Agents tab). The agent's token is stored in `~/.aimeat/agents/company-crew/.token`.
+   Approve the request in your AIMEAT profile (`http://localhost:40050/v1/profile` -> Agents tab). The agent's token is stored under the connector home at `agents/company-crew/.token` (see [Connector home](#connector-home-multiple-projects-on-one-machine)).
 
 3. **Use `aimeat_crewai` in your crew code.** See `examples/basic_crew.py` for a full runnable example.
 
@@ -59,8 +59,8 @@ Requires Python 3.10+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`
 ### serve loopback (recommended for local / self-hosted, 0.4.0+)
 
 Attach to the long-lived `aimeat connect serve --http` daemon on `127.0.0.1`.
-`serve_params()` discovers it via `~/.aimeat/serve.json` and **auto-starts it
-if it isn't running**. The daemon holds ONE persistent WebSocket tunnel per
+`serve_params()` discovers it via `<connector-home>/serve.json` and **auto-starts
+it if it isn't running**. The daemon holds ONE persistent WebSocket tunnel per
 agent to the node, so every MCP call from your crew rides that socket — no
 per-call TLS handshakes, no per-crew connector subprocess, and parallel
 kickoffs can all share it (loopback HTTP is naturally concurrent, unlike a
@@ -81,7 +81,7 @@ degrades to direct HTTP — your code doesn't change.
 
 ### stdio (works everywhere with a local connector)
 
-Spawn `aimeat connect serve` as a child process. The connector reads the agent's stored token from `~/.aimeat/` -- no need to handle auth yourself.
+Spawn `aimeat connect serve` as a child process. The connector reads the agent's stored token from the connector home -- no need to handle auth yourself.
 
 ```python
 from aimeat_crewai import create_liaison_agent, stdio_params
@@ -106,6 +106,27 @@ params = http_params(
 with create_liaison_agent(mcp_server_params=params) as liaison:
     ...
 ```
+
+## Connector home (multiple projects on one machine)
+
+The connector keeps its discovery file (`serve.json`), agent tokens, per-agent
+config and the serve daemon under a **connector home** directory. Resolution:
+
+1. `AIMEAT_HOME` environment variable — explicit override, always wins.
+2. otherwise `<cwd>/.aimeat` — the directory you launched the command / crew from.
+
+This is **directory-scoped on purpose**: run two projects on one machine and each
+gets its own daemon, port, tokens and `serve.json`, so they never collide. (The
+old global `~/.aimeat` meant the second `aimeat connect serve` refused to start
+and clients got routed to the wrong daemon — "pid alive but does not answer".)
+
+- Want the old single global home for every project? Set `AIMEAT_HOME=~/.aimeat`.
+- Already registered an agent under the old global `~/.aimeat`? Either run with
+  `AIMEAT_HOME=~/.aimeat`, or re-run `aimeat connect add` from inside the project
+  directory so the token lands in that project's `.aimeat`.
+
+The Python liaison pins `AIMEAT_HOME` into the serve daemon it auto-spawns, so the
+Node daemon and the Python side always agree on the same home.
 
 ## Customising the persona
 
@@ -177,7 +198,7 @@ As of 0.2.0 the liaison loads the AIMEAT skill bundle as a first-class CrewAI Sk
 with create_liaison_agent(
     mcp_server_params=stdio_params(agent_name="company-crew"),
     agent_name="company-crew",
-    # skill_path defaults to auto-detect: ~/.aimeat/company-crew/SKILL.md
+    # skill_path defaults to auto-detect: <connector-home>/company-crew/SKILL.md
     # Pass an explicit Path to override, or `skill_path=None` to disable.
 ) as liaison:
     ...

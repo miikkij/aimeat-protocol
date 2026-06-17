@@ -4,7 +4,8 @@ MCP transport configuration helpers for connecting to an AIMEAT node.
 AIMEAT exposes the same tool surface through two MCP transports:
 
 1. **stdio** -- spawn `aimeat connect serve` as a child process. The connector
-   reads the agent's token from `~/.aimeat/` and authenticates automatically.
+   reads the agent's token from the connector home (`AIMEAT_HOME`, default
+   `<cwd>/.aimeat`) and authenticates automatically.
    This is the recommended transport for local development and self-hosted
    nodes, because authentication "just works" -- whoever ran `aimeat connect
    add` once is the agent identity here.
@@ -110,8 +111,8 @@ def stdio_params(
 ) -> StdioServerParameters:
     """
     Build StdioServerParameters that spawn `aimeat connect serve` as a
-    subprocess. The connector reads the agent's stored token from
-    ~/.aimeat/ so no auth header is needed here.
+    subprocess. The connector reads the agent's stored token from the connector
+    home (`AIMEAT_HOME`, default `<cwd>/.aimeat`) so no auth header is needed here.
 
     Args:
         agent_name: Which registered agent to serve. If omitted, the connector
@@ -166,8 +167,8 @@ def http_params(
             "http://localhost:40050". Trailing slash is normalised away.
         agent_token: Bearer token issued for the agent that will be the
             "voice" of this crew on the AIMEAT side. Obtain via
-            `aimeat connect add` -- the token is stored in
-            ~/.aimeat/agents/<name>/.token .
+            `aimeat connect add` -- the token is stored under the connector
+            home (`AIMEAT_HOME`, default `<cwd>/.aimeat`) at agents/<name>/.token .
         mcp_path: Path of the MCP endpoint on the node. Defaults to "/v1/mcp".
 
     Returns:
@@ -352,7 +353,7 @@ def ensure_serve(
     return its discovery document (`{schema_version, port, pid, agents:
     [{agent, owner, node_url, transport}], started_at}`).
 
-    Discovery: reads `<AIMEAT_HOME or ~/.aimeat>/serve.json`. The file is
+    Discovery: reads `<AIMEAT_HOME or <cwd>/.aimeat>/serve.json`. The file is
     trusted only if its recorded pid is alive AND `GET /local/status` on the
     recorded port answers with that pid -- anything else counts as stale.
     When stale/absent and `auto_start` is True, the daemon is spawned detached
