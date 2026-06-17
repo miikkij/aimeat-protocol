@@ -1150,7 +1150,9 @@
         'fw.step.node': 'Waking your node — your data stays on this computer',
         'fw.step.account': 'Checking your account',
         'fw.step.provision': 'Setting up your local agent (one time)',
-        'fw.step.model': 'Downloading your AI’s brain — Gemma (~3 GB, one time)',
+        'fw.step.model': 'Downloading your AI’s brain (~4.7 GB, one time)',
+        'fw.step.signin': 'Signing in so your agent can be approved…',
+        'fw.needSignin': 'Sign in with your owner account on the AI Setup tab first — your agent needs your approval.',
         'fw.step.start': 'Starting your agent',
         'fw.working': 'Your agent is coming alive — watch below.',
         'fw.idea.label': 'What should it work on?',
@@ -1286,8 +1288,10 @@
         'fw.title': 'Ensimmäistä agenttiasi pystytetään',
         'fw.step.node': 'Herätän nodea — datasi pysyy tällä koneella',
         'fw.step.account': 'Tarkistan tiliäsi',
+        'fw.step.signin': 'Kirjaudutaan sisään agentin hyväksymiseksi…',
+        'fw.needSignin': 'Kirjaudu omistajatililläsi Tekoälyasetukset-välilehdellä — agenttisi tarvitsee hyväksyntäsi.',
         'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
-        'fw.step.model': 'Lataan tekoälysi aivot — Gemma (~3 GB, kerran)',
+        'fw.step.model': 'Lataan tekoälysi aivot (~4,7 GB, kerran)',
         'fw.step.start': 'Käynnistän agenttiasi',
         'fw.working': 'Agenttisi herää eloon — seuraa alta.',
         'fw.idea.label': 'Mitä sen pitäisi työstää?',
@@ -1561,7 +1565,9 @@
 
     async function startPlaybook(pb) {
       activePlaybook = pb;
-      firstWinAgent = pb.id + '-agent';
+      // The agent name MUST equal the crew's hardcoded AGENT_NAME. crewaimeat.research_crew →
+      // "research-crew" (module tail, underscores→hyphens). Mismatch = token under the wrong name.
+      firstWinAgent = pb.crew ? pb.crew.split('.').pop().replace(/_/g, '-') : (pb.id + '-agent');
       const panel = document.getElementById('firstWinPanel');
       panel.style.display = 'block';
       fwFirstWinOpen = true;
@@ -1582,17 +1588,26 @@
       fwLog('> ' + t('fw.step.node'));
       try { const s = await invoke('get_node_status'); if (!s.running) await invoke('start_node', { configPath: '.env' }); } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
+      // 1b) The local agent must be approved by you (its owner). On a local node we auto-approve —
+      //     but that needs you signed in. Reuse the AI Setup session; prompt if not signed in.
+      if (!nodeJwt || !nodeOwner) {
+        fwLog('> ' + t('fw.step.signin'));
+        showToast(t('fw.needSignin'), 'error');
+        navigateTo('ai-setup');
+        return;
+      }
+
       // 2) Provision (clone + uv + providers + pull model). Streams via agent-event; wait for result.
       fwLog('> ' + t('fw.step.provision'));
       fwLog('> ' + t('fw.step.model') + ' ' + t('fw.ramHint'));
       try {
-        await invoke('agent_provision', { model: 'gemma3', installUv: true, pullModel: true });
+        await invoke('agent_provision', { model: 'qwen2.5:7b', installUv: true, pullModel: true });
         await waitForProvision();
       } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
-      // 3) Start the agent daemon.
+      // 3) Start the agent daemon (owner JWT → auto-approve, no manual device-auth).
       fwLog('> ' + t('fw.step.start'));
-      try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 40050) }); }
+      try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 40050), owner: nodeOwner, ownerToken: nodeJwt }); }
       catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
       fwLog('> ' + t('fw.working'));
@@ -1629,6 +1644,7 @@
 
     // ── AI Setup state ──────────────────────────────────────────
     let nodeJwt = null;          // owner JWT obtained via node_login (session-only)
+    let nodeOwner = null;        // signed-in owner username (for local agent auto-approve)
     let currentPort = 40050;     // updated from node status
     let lastServices = [];       // most recent AI scan results
     let currentAi = null;        // the AI settings currently active on the node
@@ -1792,6 +1808,7 @@
       }
       try {
         nodeJwt = await invoke('node_login', { port: currentPort, username, password });
+        nodeOwner = username;
         document.getElementById('aiSignedInUser').textContent = username;
         document.getElementById('aiAuthSignedOut').style.display = 'none';
         document.getElementById('aiAuthSignedIn').style.display = 'block';
@@ -1806,6 +1823,7 @@
 
     function signOutOfNode() {
       nodeJwt = null;
+      nodeOwner = null;
       currentAi = null;
       document.getElementById('aiAuthSignedOut').style.display = 'block';
       document.getElementById('aiAuthSignedIn').style.display = 'none';
@@ -2170,10 +2188,17 @@
     }
     async function startAgent() {
       const crewModule = (document.getElementById('agentCrew').value || 'crewaimeat.research_crew').trim();
-      const agentName = (document.getElementById('agentName').value || 'my-agent').trim();
+      // The agent name MUST match the crew's hardcoded AGENT_NAME (research_crew.py → "research-crew").
+      const agentName = (document.getElementById('agentName').value || 'research-crew').trim();
       const nodeUrl = 'http://localhost:' + (currentPort || 40050);
+      if (!nodeJwt || !nodeOwner) {
+        appendAgentLog('x ' + t('fw.needSignin'));
+        showToast(t('fw.needSignin'), 'error');
+        navigateTo('ai-setup');
+        return;
+      }
       try {
-        await invoke('agent_start', { crewModule, agentName, nodeUrl });
+        await invoke('agent_start', { crewModule, agentName, nodeUrl, owner: nodeOwner, ownerToken: nodeJwt });
       } catch (e) { appendAgentLog('x ' + (e && e.message ? e.message : e)); }
     }
     async function stopAgent() {
