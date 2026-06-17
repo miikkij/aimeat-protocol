@@ -147,5 +147,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
+          body: |
+            Windows installers are code-signed with a certificate provided by the [SignPath Foundation](https://signpath.org) (free code signing for open-source projects).
           generate_release_notes: true
           files: dist/*
