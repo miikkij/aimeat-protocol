@@ -1,6 +1,6 @@
 [package]
 name = "aimeat-desktop"
-version = "0.4.2"
+version = "0.4.3"
 description = "AIMEAT Personal Node — Desktop Application"
 authors = ["Overscale Solutions Oy"]
 license = "MIT"

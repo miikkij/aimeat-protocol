@@ -69,6 +69,11 @@ jobs:
       - name: Build installers (NSIS + MSI)
         run: pnpm tauri build
         working-directory: aimeat-desktop
+        env:
+          # Signs the Tauri updater artifacts (.sig) so the app can verify updates (minisign,
+          # NOT Authenticode). createUpdaterArtifacts in tauri.conf.json requires these.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: List built bundles
         shell: bash
@@ -131,6 +136,25 @@ jobs:
           fi
           cp aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi dist/
           ls -la dist
+
+      # Build the updater manifest the app polls (tauri.conf.json endpoint). The .sig is the
+      # minisign signature tauri build produced over the SAME .exe we publish. NOTE: GitHub
+      # replaces spaces in asset names with dots, so the URL uses the dotted name.
+      - name: Generate update manifest (latest.json)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          NSIS=aimeat-desktop/src-tauri/target/release/bundle/nsis
+          EXE="$(ls $NSIS/*-setup.exe | head -1)"
+          SIG="$(ls $NSIS/*-setup.exe.sig 2>/dev/null | head -1 || true)"
+          if [ -z "$SIG" ]; then echo "No .sig (updater artifacts not built) — skipping latest.json"; exit 0; fi
+          ASSET="$(basename "$EXE" | tr ' ' '.')"
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          PUBDATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          URL="https://github.com/miikkij/aimeat-protocol/releases/download/${GITHUB_REF_NAME}/${ASSET}"
+          jq -n --arg v "$VERSION" --arg d "$PUBDATE" --arg s "$(cat "$SIG")" --arg u "$URL" \
+            '{version:$v, pub_date:$d, platforms:{"windows-x86_64":{signature:$s, url:$u}}}' > dist/latest.json
+          echo "latest.json:"; cat dist/latest.json
 
       - name: Upload build artifacts (run copy)
         uses: actions/upload-artifact@v4
