@@ -686,6 +686,7 @@
             <textarea id="fwIdea" class="fw-idea" rows="2"></textarea>
             <div class="fw-actions">
               <button class="btn" id="fwQueueBtn" onclick="fwQueueTask()" data-i18n="fw.queue">Give it this task →</button>
+              <button class="btn secondary" id="fwBrowserBtn" onclick="fwOpenInBrowser()" data-i18n="fw.openBrowser">Open in browser (signed in) →</button>
               <button class="btn secondary" onclick="fwClose()" data-i18n="fw.cancel">Close</button>
             </div>
             <p class="fw-hint" data-i18n="fw.queueHint">Opens your dashboard where you confirm the task. The result shows up there and in the Activity log below.</p>
@@ -1209,6 +1210,7 @@
         'fw.s3.title': 'Start your agent', 'fw.s3.desc': 'Setting up and starting your local agent — follow the progress below.',
         'fw.queueNeedIdea': 'Type what it should work on first.', 'fw.queueSending': 'Sending the task to your agent…',
         'fw.queueOk': 'Task sent ✓ — your agent is working on it; the result appears below.',
+        'fw.queueWorking': 'Agent is working on it…', 'fw.openBrowser': 'Open in browser (signed in) →',
         'fw.step.start': 'Starting your agent',
         'fw.working': 'Your agent is coming alive — watch below.',
         'fw.idea.label': 'What should it work on?',
@@ -1357,6 +1359,7 @@
         'fw.s3.title': 'Käynnistä agentti', 'fw.s3.desc': 'Pystytetään ja käynnistetään paikallista agenttiasi — seuraa edistymistä alta.',
         'fw.queueNeedIdea': 'Kirjoita ensin mitä sen pitäisi tehdä.', 'fw.queueSending': 'Lähetetään tehtävä agentillesi…',
         'fw.queueOk': 'Tehtävä lähetetty ✓ — agenttisi työstää sitä; tulos ilmestyy alle.',
+        'fw.queueWorking': 'Agentti työstää tehtävää…', 'fw.openBrowser': 'Avaa selaimessa (kirjautuneena) →',
         'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
         'fw.step.model': 'Lataan tekoälysi aivot (~4,7 GB, kerran)',
         'fw.step.start': 'Käynnistän agenttiasi',
@@ -1655,6 +1658,7 @@
       document.getElementById('fwSteps').style.display = 'block';
       document.getElementById('fwSvcStatus').textContent = '';
       document.getElementById('fwAuthStatus').textContent = '';
+      const _qb = document.getElementById('fwQueueBtn'); if (_qb) { _qb.disabled = false; _qb.textContent = t('fw.queue'); }
       fwSetStep('fwStepSvc', 'pending');
       fwSetStep('fwStepAuth', 'pending');
       fwSetStep('fwStepAgent', 'pending');
@@ -1784,9 +1788,21 @@
       try {
         await invoke('queue_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
         fwLog('> ' + t('fw.queueOk'));
+        // Anti-spam: keep the button LOCKED + relabelled while the agent works — one task per session.
+        if (btn) { btn.disabled = true; btn.textContent = t('fw.queueWorking'); }
       } catch (e) {
         fwLog('x ' + (e && e.message ? e.message : e));
-      } finally { if (btn) btn.disabled = false; }
+        if (btn) btn.disabled = false; // re-enable on failure so they can retry
+      }
+    }
+    // Open the web portal already SIGNED IN (hand off the desktop's owner JWT), landing on Agents.
+    function fwOpenInBrowser() {
+      if (!nodeJwt || !nodeOwner) { fwLog('x ' + t('fw.needSignin')); return; }
+      try {
+        const handoff = btoa(JSON.stringify({ owner: nodeOwner, jwt: nodeJwt }));
+        const url = 'http://localhost:' + (currentPort || 40050) + '/v1/profile?tab=agents#handoff=' + encodeURIComponent(handoff);
+        openExternal(url);
+      } catch (e) { fwLog('x ' + (e && e.message ? e.message : e)); }
     }
     function fwClose() { document.getElementById('firstWinPanel').style.display = 'none'; fwFirstWinOpen = false; }
 
