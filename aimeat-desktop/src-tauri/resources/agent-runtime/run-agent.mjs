@@ -168,7 +168,18 @@ function startCrew() {
   });
 }
 
-function halt(message) { stopping = true; status('needs-setup', message); setTimeout(() => process.exit(1), 400); }
+// Kill the crew CHILD TREE. `uv run python …` is a parent of the python that actually runs the
+// crew and holds .venv files open; killing only the child leaves the python grandchild alive,
+// which then LOCKS the dir so the next provision can't repair it (EPERM). taskkill /T reaps the tree.
+function killCrewTree() {
+  if (!child || child.killed) return;
+  const pid = child.pid;
+  try {
+    if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+    else child.kill('SIGKILL');
+  } catch { /* already gone */ }
+}
+function halt(message) { stopping = true; killCrewTree(); status('needs-setup', message); setTimeout(() => process.exit(1), 600); }
 function scheduleRestart() {
   if (stopping) return;
   const wait = backoff; backoff = Math.min(backoff * 2, BACKOFF_MAX);
@@ -178,7 +189,7 @@ function scheduleRestart() {
 function stop() {
   stopping = true;
   status('stopping', 'Stopping agent…');
-  if (child) { try { child.kill(); } catch { /* gone */ } }
+  killCrewTree();
   setTimeout(() => process.exit(0), 1500);
 }
 

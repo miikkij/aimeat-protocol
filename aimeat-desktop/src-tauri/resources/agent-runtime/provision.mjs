@@ -88,16 +88,22 @@ async function main() {
       const r = await run('git', ['-C', REPO_DIR, 'pull', '--ff-only']);
       progress('fetch-fleet', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Updated.' : (r.err || 'git pull failed').trim());
       summary.fleet = r.code === 0;
+    } else if (existsSync(REPO_DIR)) {
+      // The dir exists but is NOT a git repo — a leftover .venv/ from a half-finished provision,
+      // and it can be LOCKED by a still-running crew process so it cannot be deleted (EPERM), while
+      // `git clone` refuses a non-empty destination. So DON'T delete: turn the existing dir into the
+      // repo IN PLACE via init + fetch + force-checkout. This lays the source down alongside the
+      // (gitignored) .venv/logs without touching them. Verified against a locked, broken install.
+      progress('fetch-fleet', 'running', `Repairing crewaimeat dir (fetch in place)…`);
+      await run('git', ['-C', REPO_DIR, 'init', '-q']);
+      const add = await run('git', ['-C', REPO_DIR, 'remote', 'add', 'origin', REPO]);
+      if (add.code !== 0) await run('git', ['-C', REPO_DIR, 'remote', 'set-url', 'origin', REPO]);
+      const f = await run('git', ['-C', REPO_DIR, 'fetch', '--depth', '1', 'origin', 'HEAD']);
+      const co = f.code === 0 ? await run('git', ['-C', REPO_DIR, 'checkout', '-f', 'FETCH_HEAD']) : f;
+      const ok = f.code === 0 && co.code === 0;
+      progress('fetch-fleet', ok ? 'ok' : 'error', ok ? 'Fetched.' : (co.err || f.err || 'git fetch/checkout failed').trim());
+      summary.fleet = ok;
     } else {
-      // The dir may exist but not be a git repo (e.g. a leftover .venv from a half-finished
-      // provision). `git clone` REFUSES a non-empty destination ("already exists and is not an
-      // empty directory"), so the clone silently fails and crewaimeat is never fetched →
-      // "No module named 'crewaimeat'". Wipe the dir first for a clean clone. Verified against
-      // a broken install whose crewaimeat/ held only a stale .venv/.
-      if (existsSync(REPO_DIR)) {
-        progress('fetch-fleet', 'running', 'Cleaning a stale crewaimeat dir before clone…');
-        try { rmSync(REPO_DIR, { recursive: true, force: true }); } catch (e) { progress('fetch-fleet', 'error', `Could not clean ${REPO_DIR}: ${e.message}`); }
-      }
       progress('fetch-fleet', 'running', `Cloning ${REPO}…`);
       const r = await run('git', ['clone', '--depth', '1', REPO, REPO_DIR]);
       progress('fetch-fleet', r.code === 0 ? 'ok' : 'error', r.code === 0 ? 'Cloned.' : (r.err || 'git clone failed').trim());
@@ -110,6 +116,14 @@ async function main() {
 
   // 4) Install the Python env (uv sync, with the fleet TUI extra).
   if (uv && summary.fleet && !ARGS.has('--skip-sync')) {
+    // A half-finished provision can leave a CORRUPT .venv (e.g. no pyvenv.cfg) that uv sync won't
+    // repair — `uv run` then fails with "No pyvenv.cfg file". If the venv is invalid, remove it so
+    // uv sync rebuilds it cleanly. (Best-effort: if it's still locked, uv sync tries anyway.)
+    const venv = join(REPO_DIR, '.venv');
+    if (existsSync(venv) && !existsSync(join(venv, 'pyvenv.cfg'))) {
+      progress('install-deps', 'running', 'Removing a corrupt .venv before sync…');
+      try { rmSync(venv, { recursive: true, force: true }); } catch { /* locked — uv sync will still try */ }
+    }
     progress('install-deps', 'running', 'Installing crewaimeat + aimeat-crewai + crewai (uv sync)…');
     let r = await run('uv', ['sync', '--extra', 'tui'], { cwd: REPO_DIR });
     if (r.code !== 0) r = await run('uv', ['sync'], { cwd: REPO_DIR }); // retry without the optional extra
