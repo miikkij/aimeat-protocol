@@ -1,6 +1,6 @@
 {
   "productName": "AIMEAT Personal Node",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
     "frontendDist": "../src"
@@ -39,6 +39,15 @@
       "resources/server/**/*",
       "resources/agent-runtime/**/*",
       "WebView2Loader.*"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/miikkij/aimeat-protocol/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxOUNFREU3RjE3OTE1NTcKUldSWEZYbng1KzJjMFRCMFJwTGx5SDBSeXI1KytCL3hHTkQ2MkZ1Q1V3VVFxOUwreXgxeWlPREgK"
+    }
   }
 }
