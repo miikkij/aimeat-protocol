@@ -14,6 +14,19 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.6.0 -- Directory-scoped connector home. The connector home (serve.json,
+    agent tokens, per-agent config, the serve daemon) now defaults to
+    `<cwd>/.aimeat` instead of the global `~/.aimeat`, resolved by the new
+    `paths.aimeat_home()` (single source of truth across the package, mirroring
+    the Node connector's getConfigDir). `AIMEAT_HOME` still overrides and always
+    wins. This isolates each project: two crews / two `aimeat connect serve`
+    daemons on one machine no longer collide on a single global serve.json
+    (which caused refused-daemon / wrong-agent routing / "pid alive but does not
+    answer"). `ensure_serve` pins `AIMEAT_HOME` into the serve daemon it spawns,
+    so the Node daemon and the Python side always resolve the same home
+    regardless of spawn cwd. MIGRATION: agents registered under the old global
+    `~/.aimeat` are not moved -- run with `AIMEAT_HOME=~/.aimeat`, or re-run
+    `aimeat connect add` from inside the project directory.
   0.4.0 -- Loopback serve rewiring (Connector Forward Tunnel, Phase 5). The
     daemon now talks to the long-lived `aimeat connect serve --http` loopback
     daemon (auto-started via the serve.json discovery file) instead of the node
