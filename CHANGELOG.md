@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-06-17
+
 ### Added
 
 - **Richer, findable Offerings ("Tarjoama").** The Offers surface grew from a flat,

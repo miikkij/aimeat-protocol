@@ -62,7 +62,7 @@ from .offers import (
 )
 from .offers_tool import offers_check, offers_publish, offers_tools
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "__version__",
