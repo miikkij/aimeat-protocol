@@ -43,6 +43,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Sequence
 
+from .paths import aimeat_home
+
 try:
     from mcp import StdioServerParameters
 except ImportError as exc:  # pragma: no cover
@@ -211,9 +213,9 @@ class AimeatServeError(RuntimeError):
 
 
 def _aimeat_home() -> Path:
-    """Connector home dir -- same precedence the connector uses (AIMEAT_HOME
-    env var wins, else ~/.aimeat)."""
-    return Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
+    """Connector home dir. See :func:`aimeat_crewai.paths.aimeat_home` -- the
+    single source of truth (AIMEAT_HOME env wins, else ``<cwd>/.aimeat``)."""
+    return aimeat_home()
 
 
 def serve_discovery_path() -> Path:
@@ -324,7 +326,11 @@ def _spawn_serve_daemon(
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=log,
-            env={**os.environ, **(env or {})},
+            # Pin AIMEAT_HOME so the spawned Node daemon resolves the SAME home
+            # we just computed -- otherwise it would default to its own cwd
+            # (= spawn_cwd) and could write serve.json somewhere we never read.
+            # Caller-supplied `env` still wins if it sets AIMEAT_HOME explicitly.
+            env={**os.environ, "AIMEAT_HOME": str(home), **(env or {})},
             cwd=cwd,
             **popen_kwargs,
         )

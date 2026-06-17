@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from typing import Any
 
+from .paths import aimeat_home
 from .workflow_spec import NONE, assess_offers_doc
 
 __all__ = [
@@ -127,9 +127,9 @@ def validate_offers_doc(
 
 def resolve_agent_token(agent_name: str) -> str | None:
     """Best-effort read of the connector-stored agent token from
-    ``<AIMEAT_HOME or ~/.aimeat>/agents/<name>/.token`` (the documented location;
-    see mcp_client.http_params). Returns None if not found."""
-    home = Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
+    ``<AIMEAT_HOME or <cwd>/.aimeat>/agents/<name>/.token`` (the documented
+    location; see mcp_client.http_params). Returns None if not found."""
+    home = aimeat_home()
     token_file = home / "agents" / agent_name / ".token"
     try:
         return token_file.read_text(encoding="utf-8").strip() or None

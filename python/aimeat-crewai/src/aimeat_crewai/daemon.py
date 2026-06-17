@@ -93,7 +93,6 @@ in the supervisor should prevent crash loops.
 """
 from __future__ import annotations
 
-import os
 import signal
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -102,6 +101,7 @@ from typing import Any, Callable, Iterable
 
 from .liaison import create_liaison_agent, AimeatLiaisonError
 from .mcp_client import ensure_serve, serve_params
+from .paths import aimeat_home
 
 try:
     import requests
@@ -164,7 +164,7 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     """
     import glob
 
-    home_dir = Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
+    home_dir = aimeat_home()
     tokens_dir = home_dir / "tokens"
     agent_config_path = home_dir / "agents" / agent_name / "config.yaml"
 
