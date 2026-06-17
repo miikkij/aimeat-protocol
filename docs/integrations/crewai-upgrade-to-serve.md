@@ -72,8 +72,8 @@ domain logic.
 
 5. **Verify** end to end:
    - Run the crew once; confirm the liaison's AIMEAT tool calls succeed.
-   - Confirm a `serve.json` appears under `~/.aimeat/` (or `$AIMEAT_HOME`) with a
-     live `pid` and `transport: "tunnel"`.
+   - Confirm a `serve.json` appears under the connector home (`$AIMEAT_HOME`, or
+     the default `<cwd>/.aimeat`) with a live `pid` and `transport: "tunnel"`.
    - For a daemon crew, queue a task on the node and confirm it is picked up in
      ~1s (push) rather than after a full poll interval.
    - Confirm no `aimeat connect serve` subprocess is spawned per worker (one

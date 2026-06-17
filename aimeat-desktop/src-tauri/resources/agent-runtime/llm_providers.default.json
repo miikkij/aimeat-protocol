@@ -1,5 +1,5 @@
 {
-  "_about": "AIMEAT desktop default — every crew runs FULLY LOCAL on Ollama (no API keys, offline). The desktop drops this file into the crewaimeat working directory on first run (as llm_providers.json). gemma3 is the primary model (the newest Gemma on Ollama today; swap to gemma4 once it lands on Ollama). qwen2.5:7b is a local fallback because it is stronger at tool-calling, which the AIMEAT crews lean on. To use a stronger cloud model for harder (e.g. coding) crews, add an OpenRouter/xAI provider AFTER the local one, or switch to the per-crew 'profiles' format — see llm_providers.example.json in the crewaimeat repo.",
+  "_about": "AIMEAT desktop default — every crew runs FULLY LOCAL on Ollama (no API keys, offline). The desktop drops this file into the crewaimeat working directory on first run (as llm_providers.json). qwen2.5:7b is the primary model because the AIMEAT crews REQUIRE tool/function calling and Gemma does NOT support it on Ollama (the model returns HTTP 400 'does not support tools'). Gemma is great for plain chat (the desktop Chat tab) but cannot run agents. To use a stronger cloud model for harder (e.g. coding) crews, add an OpenRouter/xAI provider AFTER the local one, or switch to the per-crew 'profiles' format — see llm_providers.example.json in the crewaimeat repo.",
   "providers": [
     {
       "name": "ollama-local",
@@ -7,7 +7,6 @@
       "base_url": "http://localhost:11434",
       "context": 32768,
       "models": [
-        { "id": "gemma3" },
         { "id": "qwen2.5:7b" }
       ]
     }

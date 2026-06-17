@@ -185,6 +185,25 @@ unchanged and the change set ships with E2E coverage on both persistent backends
 
 ### Changed
 
+- **Connector home is now directory-scoped (`<cwd>/.aimeat`).** The connector
+  (`aimeat connect *`) and the Python liaison previously stored *everything* —
+  the `serve.json` discovery file, agent tokens, per-agent config and the serve
+  daemon — under a single global `~/.aimeat`. Running `aimeat connect serve`
+  from two projects on one machine therefore collided: the second daemon refused
+  to start (the first owns `serve.json`), each project's clients were routed to
+  whichever daemon happened to be up — often one that didn't hold their agents —
+  and a daemon only ever registers the agents present at its startup, so newly
+  connected agents read "pid alive but does not answer". The default home is now
+  `<cwd>/.aimeat`, derived from the directory the command is launched from, so
+  each project gets an independent daemon / port / token set / `serve.json` with
+  no manual setup. `AIMEAT_HOME` still overrides and always wins — set it to
+  `~/.aimeat` to restore the old global behaviour. The Python liaison pins
+  `AIMEAT_HOME` into the daemon it spawns so the Node daemon and Python always
+  resolve the same home regardless of spawn cwd. Resolution is now a single
+  source of truth on each side (`getConfigDir` in `connect/config.ts`;
+  `paths.aimeat_home()` in the Python package). **Migration:** existing agents
+  under `~/.aimeat` are not moved — run connector commands with
+  `AIMEAT_HOME=~/.aimeat`, or re-run `aimeat connect add` inside the project dir.
 - **Dependency modernization.** Updated 28 packages to their latest releases:
   TypeScript 6.0, archiver 8.0, `@noble/ed25519` 3.1 + `@noble/hashes` 2.2,
   zod 4.4, vitest / `@vitest/coverage-v8` 4.1, `@modelcontextprotocol/sdk` 1.29,

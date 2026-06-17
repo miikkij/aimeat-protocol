@@ -21,7 +21,10 @@ import { homedir } from 'node:os';
 const ARGS = new Set(process.argv.slice(2));
 const ENV = process.env;
 const REPO = ENV.AIMEAT_CREWAIMEAT_REPO || 'https://github.com/miikkij/crewaimeat';
-const MODEL = ENV.AIMEAT_AGENT_MODEL || 'gemma3';
+// qwen2.5:7b — NOT gemma. CrewAI agents require tool/function calling; gemma3 returns HTTP 400
+// "does not support tools". qwen2.5:7b is a small tool-capable local model (verified: the crew
+// completes tasks with it). Gemma stays fine for the (tool-less) Chat tab.
+const MODEL = ENV.AIMEAT_AGENT_MODEL || 'qwen2.5:7b';
 const OLLAMA_URL = ENV.AIMEAT_OLLAMA_URL || 'http://localhost:11434';
 const WORKDIR = ENV.AIMEAT_AGENT_WORKDIR || join(homedir(), '.aimeat', 'agent-runtime');
 const REPO_DIR = join(WORKDIR, 'crewaimeat');
@@ -122,7 +125,7 @@ async function main() {
     if (existsSync(providersTarget)) {
       progress('providers', 'ok', 'Kept existing llm_providers.json.');
     } else if (existsSync(PROVIDERS_DEFAULT)) {
-      try { copyFileSync(PROVIDERS_DEFAULT, providersTarget); progress('providers', 'ok', 'Wrote local-Gemma llm_providers.json.'); }
+      try { copyFileSync(PROVIDERS_DEFAULT, providersTarget); progress('providers', 'ok', 'Wrote local-model llm_providers.json.'); }
       catch (e) { progress('providers', 'error', String(e.message)); }
     } else {
       progress('providers', 'missing', `Default provider config not found at ${PROVIDERS_DEFAULT}.`);
