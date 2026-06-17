@@ -665,6 +665,12 @@
                 <span class="fw-step-status" id="fwAuthStatus"></span>
               </div>
             </div>
+            <div class="fw-step" id="fwStepAgent">
+              <div class="fw-step-head"><span class="fw-step-num">3</span><span class="fw-step-title" data-i18n="fw.s3.title">Start your agent</span><span class="fw-step-check">✓</span></div>
+              <div class="fw-step-body">
+                <p class="fw-step-desc" id="fwAgentStatus" data-i18n="fw.s3.desc">Setting up and starting your local agent — follow the progress below.</p>
+              </div>
+            </div>
           </div>
 
           <div id="fwOllama" class="fw-ollama" style="display:none;">
@@ -679,7 +685,7 @@
             <label class="fw-idea-label" data-i18n="fw.idea.label">What should it work on?</label>
             <textarea id="fwIdea" class="fw-idea" rows="2"></textarea>
             <div class="fw-actions">
-              <button class="btn" onclick="fwQueueTask()" data-i18n="fw.queue">Give it this task →</button>
+              <button class="btn" id="fwQueueBtn" onclick="fwQueueTask()" data-i18n="fw.queue">Give it this task →</button>
               <button class="btn secondary" onclick="fwClose()" data-i18n="fw.cancel">Close</button>
             </div>
             <p class="fw-hint" data-i18n="fw.queueHint">Opens your dashboard where you confirm the task. The result shows up there and in the Activity log below.</p>
@@ -1199,7 +1205,10 @@
         'fw.s2.title': 'Create your account & sign in',
         'fw.s2.desc': 'Create the first user — right here. Already have an account? Use the same username and password.',
         'fw.s2.userPh': 'Username', 'fw.s2.passPh': 'Password', 'fw.s2.cta': 'Create account & continue',
-        'fw.s2.need': 'Enter a username and password.', 'fw.s2.working': 'Creating your account…', 'fw.s2.ok': 'Signed in ✓',
+        'fw.s2.need': 'Enter a username and password.', 'fw.s2.working': 'Creating your account…', 'fw.s2.ok': 'Account ready on the node ✓ — continuing to step 3',
+        'fw.s3.title': 'Start your agent', 'fw.s3.desc': 'Setting up and starting your local agent — follow the progress below.',
+        'fw.queueNeedIdea': 'Type what it should work on first.', 'fw.queueSending': 'Sending the task to your agent…',
+        'fw.queueOk': 'Task sent ✓ — your agent is working on it; the result appears below.',
         'fw.step.start': 'Starting your agent',
         'fw.working': 'Your agent is coming alive — watch below.',
         'fw.idea.label': 'What should it work on?',
@@ -1344,7 +1353,10 @@
         'fw.s2.title': 'Luo tunnus ja kirjaudu',
         'fw.s2.desc': 'Luo ensimmäinen käyttäjä — suoraan tässä. Onko tunnus jo? Käytä samaa käyttäjänimeä ja salasanaa.',
         'fw.s2.userPh': 'Käyttäjänimi', 'fw.s2.passPh': 'Salasana', 'fw.s2.cta': 'Luo tunnus & jatka',
-        'fw.s2.need': 'Syötä käyttäjänimi ja salasana.', 'fw.s2.working': 'Luodaan tunnustasi…', 'fw.s2.ok': 'Kirjauduttu ✓',
+        'fw.s2.need': 'Syötä käyttäjänimi ja salasana.', 'fw.s2.working': 'Luodaan tunnustasi…', 'fw.s2.ok': 'Tunnus valmis nodella ✓ — jatketaan vaiheeseen 3',
+        'fw.s3.title': 'Käynnistä agentti', 'fw.s3.desc': 'Pystytetään ja käynnistetään paikallista agenttiasi — seuraa edistymistä alta.',
+        'fw.queueNeedIdea': 'Kirjoita ensin mitä sen pitäisi tehdä.', 'fw.queueSending': 'Lähetetään tehtävä agentillesi…',
+        'fw.queueOk': 'Tehtävä lähetetty ✓ — agenttisi työstää sitä; tulos ilmestyy alle.',
         'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
         'fw.step.model': 'Lataan tekoälysi aivot (~4,7 GB, kerran)',
         'fw.step.start': 'Käynnistän agenttiasi',
@@ -1645,6 +1657,9 @@
       document.getElementById('fwAuthStatus').textContent = '';
       fwSetStep('fwStepSvc', 'pending');
       fwSetStep('fwStepAuth', 'pending');
+      fwSetStep('fwStepAgent', 'pending');
+      // reset the auth fields to editable for a fresh run
+      ['fwUser', 'fwPass', 'fwAuthBtn'].forEach(id => { const e = document.getElementById(id); if (e) e.disabled = false; });
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       fwAdvance();
     }
@@ -1700,6 +1715,8 @@
           document.getElementById('aiAuthSignedIn').style.display = 'block';
         } catch(e){}
         document.getElementById('fwPass').value = '';
+        // Lock step 2 so it stays as a confirmed record (account created on the node) — not editable.
+        ['fwUser', 'fwPass', 'fwAuthBtn'].forEach(id => { const e = document.getElementById(id); if (e) e.disabled = true; });
         st.textContent = t('fw.s2.ok');
         fwAdvance();
       } catch(e) {
@@ -1709,12 +1726,18 @@
 
     // Prereqs met → run whatever the chosen card actually does.
     function fwRunCardAction() {
-      document.getElementById('fwSteps').style.display = 'none';
       const c = fwCard;
       if (!c) return;
-      if (c.kind === 'playbook') { fwRunPlaybook(c.pb); }
-      else if (c.kind === 'image') { fwClose(); openRouterGuide(); }
-      else if (c.kind === 'agents') { fwClose(); navigateTo('agents'); }
+      if (c.kind === 'playbook') {
+        // Keep steps 1+2 visible (done) and open step 3 — the agent setup/start, logged below.
+        fwSetStep('fwStepAgent', 'active');
+        fwRunPlaybook(c.pb);
+      } else {
+        document.getElementById('fwSteps').style.display = 'none';
+        fwClose();
+        if (c.kind === 'image') openRouterGuide();
+        else if (c.kind === 'agents') navigateTo('agents');
+      }
     }
 
     // The local-playbook path: ollama check → provision → start agent → queue (node + sign-in already done).
@@ -1749,12 +1772,21 @@
       document.getElementById('fwQueueWrap').style.display = 'block';
     }
 
-    function fwQueueTask() {
-      // v1: open the dashboard where the user confirms/queues the task (prefill copied for paste).
-      const idea = document.getElementById('fwIdea').value || '';
-      try { if (navigator.clipboard) navigator.clipboard.writeText(idea); } catch(e){}
-      try { invoke('open_portal'); } catch(e){}
-      fwLog('> ' + t('fw.done'));
+    async function fwQueueTask() {
+      // Actually queue the task on the running agent (no browser hop). The crew picks it up and the
+      // result streams into the Activity log below.
+      const idea = (document.getElementById('fwIdea').value || '').trim();
+      const agent = firstWinAgent || 'research-crew';
+      if (!nodeJwt || !nodeOwner) { fwLog('x ' + t('fw.needSignin')); return; }
+      if (!idea) { fwLog('x ' + t('fw.queueNeedIdea')); return; }
+      const btn = document.getElementById('fwQueueBtn'); if (btn) btn.disabled = true;
+      fwLog('> ' + t('fw.queueSending'));
+      try {
+        await invoke('queue_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
+        fwLog('> ' + t('fw.queueOk'));
+      } catch (e) {
+        fwLog('x ' + (e && e.message ? e.message : e));
+      } finally { if (btn) btn.disabled = false; }
     }
     function fwClose() { document.getElementById('firstWinPanel').style.display = 'none'; fwFirstWinOpen = false; }
 
