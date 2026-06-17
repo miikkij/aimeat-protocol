@@ -1192,9 +1192,10 @@
         'fw.step.model': 'Downloading your AI’s brain (~4.7 GB, one time)',
         'fw.step.signin': 'Signing in so your agent can be approved…',
         'fw.needSignin': 'Sign in with your owner account on the AI Setup tab first — your agent needs your approval.',
-        'fw.s1.title': 'Start the service', 'fw.s1.cta': 'Start the service', 'fw.s1.starting': 'Starting…',
+        'fw.s1.title': 'Start the service', 'fw.s1.cta': 'Start the service', 'fw.s1.starting': 'Starting the service…',
+        'fw.s1.checking': 'Checking the service is awake…',
         'fw.s1.desc': 'Your private AIMEAT node runs on your machine. Start it to continue.',
-        'fw.s1.ok': 'Running ✓', 'fw.s1.fail': 'Couldn’t start — see the Logs tab.',
+        'fw.s1.ok': 'Awake ✓', 'fw.s1.fail': 'Couldn’t start — see the Logs tab.',
         'fw.s2.title': 'Create your account & sign in',
         'fw.s2.desc': 'Create the first user — right here. Already have an account? Use the same username and password.',
         'fw.s2.userPh': 'Username', 'fw.s2.passPh': 'Password', 'fw.s2.cta': 'Create account & continue',
@@ -1336,9 +1337,10 @@
         'fw.step.account': 'Tarkistan tiliäsi',
         'fw.step.signin': 'Kirjaudutaan sisään agentin hyväksymiseksi…',
         'fw.needSignin': 'Kirjaudu omistajatililläsi Tekoälyasetukset-välilehdellä — agenttisi tarvitsee hyväksyntäsi.',
-        'fw.s1.title': 'Käynnistä palvelu', 'fw.s1.cta': 'Käynnistä palvelu', 'fw.s1.starting': 'Käynnistetään…',
+        'fw.s1.title': 'Käynnistä palvelu', 'fw.s1.cta': 'Käynnistä palvelu', 'fw.s1.starting': 'Käynnistetään palvelua…',
+        'fw.s1.checking': 'Tarkistetaan että palvelu on hereillä…',
         'fw.s1.desc': 'Yksityinen AIMEAT-node pyörii koneellasi. Käynnistä se jatkaaksesi.',
-        'fw.s1.ok': 'Käynnissä ✓', 'fw.s1.fail': 'Ei käynnistynyt — katso Lokit-välilehti.',
+        'fw.s1.ok': 'Hereillä ✓', 'fw.s1.fail': 'Ei käynnistynyt — katso Lokit-välilehti.',
         'fw.s2.title': 'Luo tunnus ja kirjaudu',
         'fw.s2.desc': 'Luo ensimmäinen käyttäjä — suoraan tässä. Onko tunnus jo? Käytä samaa käyttäjänimeä ja salasanaa.',
         'fw.s2.userPh': 'Käyttäjänimi', 'fw.s2.passPh': 'Salasana', 'fw.s2.cta': 'Luo tunnus & jatka',
@@ -1661,16 +1663,23 @@
     async function fwDoService() {
       const btn = document.getElementById('fwSvcBtn');
       const st = document.getElementById('fwSvcStatus');
-      btn.disabled = true; st.textContent = t('fw.s1.starting');
+      btn.disabled = true;
+      st.textContent = t('fw.s1.starting');
+      await new Promise(r => setTimeout(r, 500)); // let "starting…" register before the work
       try { const s = await invoke('get_node_status'); if (!s.running) await invoke('start_node', { configPath: '.env' }); } catch(e){}
+      // VISIBLY verify the service is actually awake before advancing — never an instant jump.
       let ok = false;
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 30; i++) {
+        st.textContent = t('fw.s1.checking') + ' (' + (i + 1) + ' s)';
         try { const s = await invoke('get_node_status'); if (s && s.running) { ok = true; if (s.port) currentPort = s.port; break; } } catch(e){}
         await new Promise(r => setTimeout(r, 1000));
       }
-      btn.disabled = false;
-      if (ok) { st.textContent = t('fw.s1.ok'); fwAdvance(); }
-      else { st.textContent = t('fw.s1.fail'); }
+      if (!ok) { btn.disabled = false; st.textContent = t('fw.s1.fail'); return; }
+      // Confirmed awake: flip the top status bar FIRST, show the ✓, dwell so the user sees it, THEN step 2.
+      try { checkStatus(); } catch(e){}
+      st.textContent = t('fw.s1.ok');
+      await new Promise(r => setTimeout(r, 1200));
+      fwAdvance();
     }
 
     async function fwDoAuth() {
