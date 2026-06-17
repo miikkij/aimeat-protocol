@@ -1,0 +1,99 @@
+# Builds the AIMEAT Personal Node desktop installer (Tauri, Windows) and publishes it
+# as a downloadable GitHub Release. Triggered by a `desktop-v*.*.*` tag whose numeric part
+# must match aimeat-desktop/src-tauri/tauri.conf.json `version` (mirrors the Python publish
+# workflow's tag-vs-manifest gate). workflow_dispatch builds only (no release) for smoke tests.
+#
+# The installer is what the landing "Get your own →" button links to
+# (https://github.com/miikkij/aimeat-protocol/releases/latest).
+name: Release Desktop Installer
+
+on:
+  push:
+    tags:
+      - 'desktop-v*.*.*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # create the GitHub Release and upload installer assets
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches tauri.conf.json version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#desktop-v}"
+          MANIFEST="$(node -p "require('./aimeat-desktop/src-tauri/tauri.conf.json').version")"
+          echo "tag=$TAG manifest=$MANIFEST"
+          if [ "$TAG" != "$MANIFEST" ]; then
+            echo "::error::Tag desktop-v$TAG does not match tauri.conf.json version $MANIFEST. Bump the manifest before tagging."
+            exit 1
+          fi
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo / Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: aimeat-desktop/src-tauri
+
+      - name: Install server deps (for stage-server build)
+        run: pnpm install --frozen-lockfile
+        working-directory: aimeat
+
+      - name: Install desktop deps (Tauri CLI)
+        run: pnpm install --frozen-lockfile
+        working-directory: aimeat-desktop
+
+      # `pnpm stage` runs stage-node + stage-webview2 + stage-server. The local agent runtime
+      # (resources/agent-runtime/*.mjs + llm_providers.default.json) ships as static bundle
+      # resources (tauri.conf.json), so it needs no staging — Python/uv/Ollama are provisioned
+      # at first run on the user's machine (D1), not baked into the installer.
+      - name: Stage sidecars + server
+        run: pnpm stage
+        working-directory: aimeat-desktop
+
+      - name: Build installers (NSIS + MSI)
+        run: pnpm tauri build
+        working-directory: aimeat-desktop
+
+      - name: List built bundles
+        shell: bash
+        run: ls -R aimeat-desktop/src-tauri/target/release/bundle || true
+
+      # Always keep the artifacts on the run (also covers workflow_dispatch smoke builds).
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimeat-desktop-windows
+          path: |
+            aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+      # Publish the downloadable GitHub Release only for real tags.
+      - name: Create / update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AIMEAT Personal Node ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi

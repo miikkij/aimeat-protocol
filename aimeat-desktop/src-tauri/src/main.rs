@@ -9,6 +9,7 @@
 mod node_manager;
 mod ai_connector;
 mod chat;
+mod agent_runtime;
 mod tray;
 
 fn main() {
@@ -40,6 +41,10 @@ fn main() {
             chat::chat_set_auto_approve,
             chat::chat_clear,
             chat::chat_stop,
+            agent_runtime::agent_provision,
+            agent_runtime::agent_start,
+            agent_runtime::agent_stop,
+            agent_runtime::agent_status,
         ])
         .setup(|app| {
             // Initialize system tray
