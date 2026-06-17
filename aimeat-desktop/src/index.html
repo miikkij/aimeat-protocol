@@ -540,6 +540,35 @@
       font-size: 0.9rem;
       line-height: 1.6;
     }
+
+    /* ── Value-first Home + first-win + language + welcome ── */
+    .lang-select {
+      margin-left: auto; background: rgba(30,20,50,0.6); color: #d8b4fe;
+      border: 1px solid rgba(167,139,250,0.3); border-radius: 8px; padding: 4px 8px;
+      font-size: 0.8rem; cursor: pointer;
+    }
+    .home-sub { color: #a78bfa; font-size: 0.95rem; max-width: 680px; margin: 4px 0 20px; line-height: 1.5; }
+    .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .home-card { display: flex; flex-direction: column; }
+    .home-card h2 { margin-bottom: 8px; }
+    .home-get { color: #cbb8e8; font-size: 0.88rem; line-height: 1.5; flex: 1; margin-bottom: 14px; }
+    .home-get strong { color: #d8b4fe; }
+    .first-win { margin-top: 20px; border-color: rgba(167,139,250,0.35); }
+    .fw-ollama { background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.25); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+    .fw-ollama p { margin-bottom: 8px; font-size: 0.9rem; }
+    .fw-ollama .btn { margin-right: 8px; }
+    .fw-log { max-height: 280px; overflow: auto; background: #0b0b12; padding: 12px; border-radius: 10px; font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5; color: #cbd5e1; }
+    .fw-idea-label { display: block; margin: 14px 0 6px; font-size: 0.85rem; color: #d8b4fe; }
+    .fw-idea { width: 100%; background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.25); border-radius: 10px; padding: 10px; font-size: 0.9rem; resize: vertical; }
+    .fw-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .fw-hint { color: #9ca3af; font-size: 0.8rem; margin-top: 8px; line-height: 1.5; }
+    .welcome-overlay { position: fixed; inset: 0; background: rgba(8,6,16,0.82); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .welcome-box { background: rgba(24,16,40,0.98); border: 1px solid rgba(167,139,250,0.3); border-radius: 20px; padding: 32px; max-width: 460px; text-align: center; }
+    .welcome-box h1 { margin-bottom: 12px; }
+    .welcome-box p { color: #cbb8e8; line-height: 1.6; margin-bottom: 20px; }
+    .welcome-lang-label { display: block; font-size: 0.85rem; color: #d8b4fe; margin-bottom: 6px; }
+    .welcome-lang { background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.3); border-radius: 10px; padding: 8px 12px; font-size: 0.95rem; margin-bottom: 20px; min-width: 160px; }
+    .welcome-start { display: block; width: 100%; }
   </style>
 </head>
 <body>
@@ -547,13 +576,18 @@
     <header class="app-header">
     <nav>
       <span class="brand">AIMEAT</span>
-      <a href="#" class="active" data-page="dashboard">Dashboard</a>
-      <a href="#" data-page="connections">Connections</a>
-      <a href="#" data-page="ai-setup">AI Setup</a>
-      <a href="#" data-page="agents">Agents</a>
-      <a href="#" data-page="chat">Chat</a>
-      <a href="#" data-page="settings">Settings</a>
-      <a href="#" data-page="logs">Logs</a>
+      <a href="#" class="active" data-page="home" data-i18n="nav.home">Home</a>
+      <a href="#" data-page="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+      <a href="#" data-page="connections" data-i18n="nav.connections">Connections</a>
+      <a href="#" data-page="ai-setup" data-i18n="nav.aiSetup">AI Setup</a>
+      <a href="#" data-page="agents" data-i18n="nav.agents">Agents</a>
+      <a href="#" data-page="chat" data-i18n="nav.chat">Chat</a>
+      <a href="#" data-page="settings" data-i18n="nav.settings">Settings</a>
+      <a href="#" data-page="logs" data-i18n="nav.logs">Logs</a>
+      <select id="langSelect" class="lang-select" onchange="setLang(this.value)" title="Language / Kieli">
+        <option value="en">EN</option>
+        <option value="fi">FI</option>
+      </select>
     </nav>
 
     <div class="status-bar">
@@ -566,9 +600,42 @@
     <main id="content">
 
       <!-- ═══════════════════════════════════════════════════════
+           HOME PAGE — outcome-first (value-first), the opening view
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page active" id="page-home">
+        <h1 data-i18n="home.title">What do you want your AI to do for you?</h1>
+        <p class="home-sub" data-i18n="home.sub">Pick one. Everything runs on your machine, on a local model — free, private, no API keys. Your first result appears right here.</p>
+
+        <div class="home-grid" id="homeGrid"><!-- playbook cards rendered by renderHome() --></div>
+
+        <!-- First-win flow: appears when a playbook is started -->
+        <div class="card first-win" id="firstWinPanel" style="display:none;">
+          <h2 id="fwTitle">Setting up your first agent</h2>
+
+          <div id="fwOllama" class="fw-ollama" style="display:none;">
+            <p data-i18n="fw.ollamaMissing">Ollama is needed for the local model. Install it, then run this again.</p>
+            <button class="btn secondary" onclick="openExternal('https://ollama.com')" data-i18n="fw.installOllama">Install Ollama</button>
+            <button class="btn" onclick="fwRecheckOllama()" data-i18n="fw.recheck">I installed it — re-check</button>
+          </div>
+
+          <pre class="fw-log" id="fwLog"></pre>
+
+          <div id="fwQueueWrap" style="display:none;">
+            <label class="fw-idea-label" data-i18n="fw.idea.label">What should it work on?</label>
+            <textarea id="fwIdea" class="fw-idea" rows="2"></textarea>
+            <div class="fw-actions">
+              <button class="btn" onclick="fwQueueTask()" data-i18n="fw.queue">Give it this task →</button>
+              <button class="btn secondary" onclick="fwClose()" data-i18n="fw.cancel">Close</button>
+            </div>
+            <p class="fw-hint" data-i18n="fw.queueHint">Opens your dashboard where you confirm the task. The result shows up there and in the Activity log below.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
            DASHBOARD PAGE
            ═══════════════════════════════════════════════════════ -->
-      <div class="page active" id="page-dashboard">
+      <div class="page" id="page-dashboard">
         <h1>Dashboard</h1>
 
         <div class="card">
@@ -997,10 +1064,280 @@
   <!-- Toast notification element -->
   <div class="toast" id="toast"></div>
 
+  <!-- First-run welcome overlay -->
+  <div class="welcome-overlay" id="welcomeOverlay" style="display:none;">
+    <div class="welcome-box">
+      <h1 data-i18n="welcome.title">Welcome to AIMEAT</h1>
+      <p data-i18n="welcome.sub">Your own AI, running on your computer. Pick a language and do your first thing — you’ll see a real result in a minute.</p>
+      <label class="welcome-lang-label" data-i18n="welcome.lang">Language</label>
+      <select id="welcomeLang" class="welcome-lang">
+        <option value="en">English</option>
+        <option value="fi">Suomi</option>
+      </select>
+      <button class="btn welcome-start" onclick="welcomeStart()" data-i18n="welcome.start">Get started →</button>
+    </div>
+  </div>
+
   <script>
     // Tauri v2 exposes the invoke API at window.__TAURI__.core.invoke
     // (requires app.withGlobalTauri=true in tauri.conf.json).
     const invoke = window.__TAURI__.core.invoke;
+
+    // ── i18n (EN / FI) ──────────────────────────────────────────
+    // Value-first copy: plain language, says what you GET. Keys are namespaced; missing
+    // keys fall back to English, then to the key itself. Static text uses data-i18n;
+    // dynamic strings call t().
+    const STRINGS = {
+      en: {
+        'nav.home': 'Home', 'nav.dashboard': 'Dashboard', 'nav.connections': 'Connections',
+        'nav.aiSetup': 'AI Setup', 'nav.agents': 'Agents', 'nav.chat': 'Chat',
+        'nav.settings': 'Settings', 'nav.logs': 'Logs', 'nav.language': 'Language',
+        'status.asleep': 'Your AIMEAT is asleep — wake it to use your agents',
+        'status.awake': 'Awake — your agents can work',
+        'status.checking': 'Checking…',
+        'home.title': 'What do you want your AI to do for you?',
+        'home.sub': 'Pick one. Everything runs on your machine, on a local model — free, private, no API keys. Your first result appears right here.',
+        'home.youGet': "You'll get:",
+        'home.run': 'Do this',
+        'pb.research.title': 'Research a question',
+        'pb.research.get': 'Ask once, get a clear, sourced answer — written by your own AI.',
+        'pb.research.idea': 'Research this for me and summarise the key points with sources: ',
+        'pb.brief.title': 'Daily brief',
+        'pb.brief.get': 'A short brief on the topics you pick — perfect every morning.',
+        'pb.brief.idea': 'Write me a short brief (5–8 bullet points) on these topics: ',
+        'pb.explain.title': 'Explain it simply',
+        'pb.explain.get': 'A plain-language explanation of anything, in your language.',
+        'pb.explain.idea': 'Explain this in plain language, like I am smart but new to it: ',
+        'home.advanced.title': 'Build your own agent',
+        'home.advanced.get': 'For coders: wire up any crew from the repo.',
+        'home.advanced.cta': 'Open Agents →',
+        'fw.title': 'Setting up your first agent',
+        'fw.step.node': 'Waking your node — your data stays on this computer',
+        'fw.step.account': 'Checking your account',
+        'fw.step.provision': 'Setting up your local agent (one time)',
+        'fw.step.model': 'Downloading your AI’s brain — Gemma (~3 GB, one time)',
+        'fw.step.start': 'Starting your agent',
+        'fw.working': 'Your agent is coming alive — watch below.',
+        'fw.idea.label': 'What should it work on?',
+        'fw.queue': 'Give it this task →',
+        'fw.queueHint': 'Opens your dashboard where you confirm the task. The result shows up there and in the Activity log below.',
+        'fw.activity': 'Activity',
+        'fw.done': 'Your own AI is running on your machine — free and private.',
+        'fw.ollamaMissing': 'Ollama is needed for the local model. Install it, then run this again.',
+        'fw.installOllama': 'Install Ollama',
+        'fw.recheck': 'I installed it — re-check',
+        'fw.cancel': 'Close',
+        'welcome.title': 'Welcome to AIMEAT',
+        'welcome.sub': 'Your own AI, running on your computer. Pick a language and do your first thing — you’ll see a real result in a minute.',
+        'welcome.lang': 'Language',
+        'welcome.start': 'Get started →',
+        'common.openDashboard': 'Open Dashboard',
+        'common.startNode': 'Start Node', 'common.stopNode': 'Stop Node',
+      },
+      fi: {
+        'nav.home': 'Etusivu', 'nav.dashboard': 'Hallinta', 'nav.connections': 'Yhteydet',
+        'nav.aiSetup': 'Tekoälyasetukset', 'nav.agents': 'Agentit', 'nav.chat': 'Chat',
+        'nav.settings': 'Asetukset', 'nav.logs': 'Lokit', 'nav.language': 'Kieli',
+        'status.asleep': 'AIMEATisi nukkuu — herätä se käyttääksesi agentteja',
+        'status.awake': 'Hereillä — agenttisi voivat työskennellä',
+        'status.checking': 'Tarkistetaan…',
+        'home.title': 'Mitä haluat tekoälysi tekevän puolestasi?',
+        'home.sub': 'Valitse yksi. Kaikki pyörii koneellasi, paikallisella mallilla — ilmaiseksi, yksityisesti, ilman API-avaimia. Ensimmäinen tuloksesi ilmestyy tähän.',
+        'home.youGet': 'Saat:',
+        'home.run': 'Tee tämä',
+        'pb.research.title': 'Tutki kysymys',
+        'pb.research.get': 'Kysy kerran, saat selkeän, lähteistetyn vastauksen — oman tekoälysi kirjoittamana.',
+        'pb.research.idea': 'Tutki tämä puolestani ja tiivistä keskeiset kohdat lähteineen: ',
+        'pb.brief.title': 'Päivän kooste',
+        'pb.brief.get': 'Lyhyt kooste valitsemistasi aiheista — täydellinen joka aamuun.',
+        'pb.brief.idea': 'Kirjoita lyhyt kooste (5–8 ranskalaista viivaa) näistä aiheista: ',
+        'pb.explain.title': 'Selitä yksinkertaisesti',
+        'pb.explain.get': 'Selkokielinen selitys mistä tahansa, omalla kielelläsi.',
+        'pb.explain.idea': 'Selitä tämä selkokielellä, ikään kuin olisin fiksu mutta uusi aiheessa: ',
+        'home.advanced.title': 'Rakenna oma agentti',
+        'home.advanced.get': 'Koodareille: kytke mikä tahansa crew repo­sta.',
+        'home.advanced.cta': 'Avaa Agentit →',
+        'fw.title': 'Ensimmäistä agenttiasi pystytetään',
+        'fw.step.node': 'Herätän nodea — datasi pysyy tällä koneella',
+        'fw.step.account': 'Tarkistan tiliäsi',
+        'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
+        'fw.step.model': 'Lataan tekoälysi aivot — Gemma (~3 GB, kerran)',
+        'fw.step.start': 'Käynnistän agenttiasi',
+        'fw.working': 'Agenttisi herää eloon — seuraa alta.',
+        'fw.idea.label': 'Mitä sen pitäisi työstää?',
+        'fw.queue': 'Anna sille tämä tehtävä →',
+        'fw.queueHint': 'Avaa hallintapaneelin, jossa vahvistat tehtävän. Tulos näkyy siellä ja alla Toiminta-lokissa.',
+        'fw.activity': 'Toiminta',
+        'fw.done': 'Oma tekoälysi pyörii koneellasi — ilmaiseksi ja yksityisesti.',
+        'fw.ollamaMissing': 'Paikallinen malli tarvitsee Ollaman. Asenna se ja yritä uudelleen.',
+        'fw.installOllama': 'Asenna Ollama',
+        'fw.recheck': 'Asensin sen — tarkista uudelleen',
+        'fw.cancel': 'Sulje',
+        'welcome.title': 'Tervetuloa AIMEATiin',
+        'welcome.sub': 'Oma tekoälysi, joka pyörii koneellasi. Valitse kieli ja tee ensimmäinen asiasi — näet oikean tuloksen hetkessä.',
+        'welcome.lang': 'Kieli',
+        'welcome.start': 'Aloita →',
+        'common.openDashboard': 'Avaa hallinta',
+        'common.startNode': 'Käynnistä node', 'common.stopNode': 'Pysäytä node',
+      },
+    };
+    let LANG = (() => {
+      try { const s = localStorage.getItem('aimeat.lang'); if (s && STRINGS[s]) return s; } catch (e) {}
+      const os = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      return STRINGS[os] ? os : 'en';
+    })();
+    function t(key) { return (STRINGS[LANG] && STRINGS[LANG][key]) || STRINGS.en[key] || key; }
+    function applyI18n(root) {
+      (root || document).querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      (root || document).querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+    }
+    function setLang(lang) {
+      if (!STRINGS[lang]) return;
+      LANG = lang;
+      try { localStorage.setItem('aimeat.lang', lang); } catch (e) {}
+      document.documentElement.lang = lang;
+      applyI18n();
+      renderHome();
+      try { checkStatus(); } catch (e) {}
+      const sel = document.getElementById('langSelect'); if (sel) sel.value = lang;
+    }
+
+    // ── Home: value-first playbooks + one-click first win ───────
+    // All three starter playbooks run the proven reference crew (research_crew) with a
+    // different pre-filled task. Image/other crews are deferred until verified keyless-local.
+    const PLAYBOOKS = [
+      { id: 'research', crew: 'crewaimeat.research_crew' },
+      { id: 'brief',    crew: 'crewaimeat.research_crew' },
+      { id: 'explain',  crew: 'crewaimeat.research_crew' },
+    ];
+    let activePlaybook = null;
+    let firstWinAgent = null;
+    let fwFirstWinOpen = false;
+    let fwProvisionResolve = null;
+
+    function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function renderHome() {
+      const grid = document.getElementById('homeGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      PLAYBOOKS.forEach(pb => {
+        const card = document.createElement('div');
+        card.className = 'card home-card';
+        card.innerHTML =
+          '<h2>' + escapeHtml(t('pb.' + pb.id + '.title')) + '</h2>' +
+          '<p class="home-get"><strong>' + escapeHtml(t('home.youGet')) + '</strong> ' + escapeHtml(t('pb.' + pb.id + '.get')) + '</p>';
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = t('home.run');
+        btn.onclick = () => startPlaybook(pb);
+        card.appendChild(btn);
+        grid.appendChild(card);
+      });
+      const adv = document.createElement('div');
+      adv.className = 'card home-card';
+      adv.innerHTML = '<h2>' + escapeHtml(t('home.advanced.title')) + '</h2><p class="home-get">' + escapeHtml(t('home.advanced.get')) + '</p>';
+      const ab = document.createElement('button');
+      ab.className = 'btn secondary';
+      ab.textContent = t('home.advanced.cta');
+      ab.onclick = () => navigateTo('agents');
+      adv.appendChild(ab);
+      grid.appendChild(adv);
+    }
+    function homeOpened() { renderHome(); }
+
+    function fwLog(line) {
+      const el = document.getElementById('fwLog');
+      if (!el) return;
+      el.textContent += line + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+    function showOllamaNeeded() {
+      const box = document.getElementById('fwOllama');
+      if (box) box.style.display = 'block';
+      fwLog('! ' + t('fw.ollamaMissing'));
+    }
+    async function fwRecheckOllama() {
+      const box = document.getElementById('fwOllama');
+      let ok = false;
+      try { const svc = await invoke('detect_ai_services'); ok = !!(svc||[]).find(s => s.service_type==='ollama' && s.status==='available'); } catch(e){}
+      if (ok) { if (box) box.style.display = 'none'; if (activePlaybook) startPlaybook(activePlaybook); }
+    }
+    function waitForProvision() {
+      return new Promise(res => {
+        fwProvisionResolve = res;
+        // Safety timeout so the flow never hangs forever (provision can be long on first run).
+        setTimeout(() => { if (fwProvisionResolve) { fwProvisionResolve({ timeout: true }); fwProvisionResolve = null; } }, 20 * 60 * 1000);
+      });
+    }
+
+    async function startPlaybook(pb) {
+      activePlaybook = pb;
+      firstWinAgent = pb.id + '-agent';
+      const panel = document.getElementById('firstWinPanel');
+      panel.style.display = 'block';
+      fwFirstWinOpen = true;
+      document.getElementById('fwLog').textContent = '';
+      document.getElementById('fwTitle').textContent = t('fw.title');
+      document.getElementById('fwQueueWrap').style.display = 'none';
+      document.getElementById('fwOllama').style.display = 'none';
+      document.getElementById('fwIdea').value = t('pb.' + pb.id + '.idea');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      bindAgentEvents();
+
+      // 0) Local model prerequisite.
+      let ollamaOk = false;
+      try { const svc = await invoke('detect_ai_services'); ollamaOk = !!(svc||[]).find(s => s.service_type==='ollama' && s.status==='available'); } catch(e){}
+      if (!ollamaOk) { showOllamaNeeded(); return; }
+
+      // 1) Wake the node.
+      fwLog('> ' + t('fw.step.node'));
+      try { const s = await invoke('get_node_status'); if (!s.running) await invoke('start_node', { configPath: '.env' }); } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
+
+      // 2) Provision (clone + uv + providers + pull model). Streams via agent-event; wait for result.
+      fwLog('> ' + t('fw.step.provision'));
+      fwLog('> ' + t('fw.step.model'));
+      try {
+        await invoke('agent_provision', { model: 'gemma3', installUv: true, pullModel: true });
+        await waitForProvision();
+      } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
+
+      // 3) Start the agent daemon.
+      fwLog('> ' + t('fw.step.start'));
+      try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 40050) }); }
+      catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
+
+      fwLog('> ' + t('fw.working'));
+      document.getElementById('fwQueueWrap').style.display = 'block';
+    }
+
+    function fwQueueTask() {
+      // v1: open the dashboard where the user confirms/queues the task (prefill copied for paste).
+      const idea = document.getElementById('fwIdea').value || '';
+      try { if (navigator.clipboard) navigator.clipboard.writeText(idea); } catch(e){}
+      try { invoke('open_portal'); } catch(e){}
+      fwLog('> ' + t('fw.done'));
+    }
+    function fwClose() { document.getElementById('firstWinPanel').style.display = 'none'; fwFirstWinOpen = false; }
+
+    // ── First-run welcome overlay ───────────────────────────────
+    function maybeShowWelcome() {
+      let seen = false;
+      try { seen = localStorage.getItem('aimeat.welcomed') === '1'; } catch(e){}
+      if (seen) return;
+      const ov = document.getElementById('welcomeOverlay');
+      if (!ov) return;
+      const sel = document.getElementById('welcomeLang');
+      if (sel) sel.value = LANG;
+      ov.style.display = 'flex';
+    }
+    function welcomeStart() {
+      const sel = document.getElementById('welcomeLang');
+      if (sel) setLang(sel.value);
+      try { localStorage.setItem('aimeat.welcomed', '1'); } catch(e){}
+      document.getElementById('welcomeOverlay').style.display = 'none';
+      navigateTo('home');
+    }
 
     // ── AI Setup state ──────────────────────────────────────────
     let nodeJwt = null;          // owner JWT obtained via node_login (session-only)
@@ -1022,6 +1359,7 @@
         page.classList.toggle('active', page.id === 'page-' + pageName);
       });
       // Run page-specific init
+      if (pageName === 'home') homeOpened();
       if (pageName === 'connections') loadConnections();
       if (pageName === 'settings') loadSettings();
       if (pageName === 'ai-setup') aiSetupOpened();
@@ -1059,8 +1397,8 @@
 
         if (status.running) {
           dot.className = 'status-dot';
-          text.textContent = 'Node running (PID: ' + status.pid + ')';
-          btn.textContent = 'Stop Node';
+          text.textContent = t('status.awake');
+          btn.textContent = t('common.stopNode');
           if (portalBtn) portalBtn.disabled = false;
           document.getElementById('nodeStatus').textContent =
             'Running on port ' + status.port;
@@ -1072,8 +1410,8 @@
           }
         } else {
           dot.className = 'status-dot offline';
-          text.textContent = 'Node stopped';
-          btn.textContent = 'Start Node';
+          text.textContent = t('status.asleep');
+          btn.textContent = t('common.startNode');
           if (portalBtn) portalBtn.disabled = true;
           document.getElementById('nodeStatus').textContent = 'Node is not running';
           document.getElementById('nodeUptime').textContent = '';
@@ -1485,6 +1823,7 @@
     // ── Agents (local crewaimeat fleet) ─────────────────────────
     let agentEventBound = false;
     function appendAgentLog(line) {
+      if (fwFirstWinOpen) { try { fwLog(line); } catch(e){} }   // mirror into the first-win panel
       const el = document.getElementById('agentLog');
       if (!el) return;
       el.textContent += line + '\n';
@@ -1500,6 +1839,7 @@
         appendAgentLog('> ' + p.state + (p.message ? ' - ' + p.message : ''));
       } else if (p.type === 'result') {
         appendAgentLog(p.ok ? '== Setup complete ==' : '== Setup incomplete - see messages above ==');
+        if (fwProvisionResolve) { fwProvisionResolve(p); fwProvisionResolve = null; } // unblock the first-win flow
       } else if (p.type === 'log' || p.type === 'stderr') {
         appendAgentLog((p.type === 'stderr' ? '  ! ' : '  ') + (p.text || ''));
       } else if (p.type === 'closed') {
@@ -1903,6 +2243,11 @@
     }
 
     // ── Init ────────────────────────────────────────────────────
+    document.documentElement.lang = LANG;
+    const _langSel = document.getElementById('langSelect'); if (_langSel) _langSel.value = LANG;
+    applyI18n();
+    renderHome();
+    maybeShowWelcome();
     bindChatEvents();
     checkStatus();
     loadDashboardConfig();
