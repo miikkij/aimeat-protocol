@@ -550,6 +550,7 @@
       <a href="#" class="active" data-page="dashboard">Dashboard</a>
       <a href="#" data-page="connections">Connections</a>
       <a href="#" data-page="ai-setup">AI Setup</a>
+      <a href="#" data-page="agents">Agents</a>
       <a href="#" data-page="chat">Chat</a>
       <a href="#" data-page="settings">Settings</a>
       <a href="#" data-page="logs">Logs</a>
@@ -835,6 +836,56 @@
       </div>
 
       <!-- ═══════════════════════════════════════════════════════
+           AGENTS PAGE — local crewaimeat fleet manager (normal-user)
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-agents">
+        <h1>Agents</h1>
+
+        <div class="card">
+          <h2>Local agents (runs on your machine)</h2>
+          <p style="color:#a78bfa; font-size:0.9rem;">
+            Set up a CrewAI agent that runs fully on your computer using a local Ollama model (Gemma) —
+            no API keys, nothing leaves your machine. One-time setup, then start/stop it here.
+          </p>
+          <div style="margin:12px 0;">
+            <label style="display:block; margin-bottom:6px;">Local model
+              <input id="agentModel" type="text" value="gemma3" style="margin-left:8px; width:160px;" />
+            </label>
+            <label style="display:block; margin:6px 0;"><input id="agentInstallUv" type="checkbox" /> Install <code>uv</code> if missing</label>
+            <label style="display:block; margin:6px 0;"><input id="agentPullModel" type="checkbox" checked /> Pull the model with Ollama</label>
+          </div>
+          <button class="btn" id="agentProvisionBtn" onclick="provisionAgents()">Enable local agents</button>
+          <p id="agentProvisionHint" style="font-size:0.82rem; color:#9ca3af; margin-top:8px;">
+            Needs Git, <code>uv</code> (or check the box above) and <a href="#" onclick="openExternal('https://ollama.com');return false;">Ollama</a>.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Run an agent</h2>
+          <div style="margin:8px 0;">
+            <label style="display:block; margin-bottom:6px;">Agent name
+              <input id="agentName" type="text" placeholder="my-agent" style="margin-left:8px; width:160px;" />
+            </label>
+            <label style="display:block; margin-bottom:6px;">Crew module
+              <input id="agentCrew" type="text" value="crewaimeat.research_crew" style="margin-left:8px; width:280px;" />
+            </label>
+          </div>
+          <button class="btn" id="agentStartBtn" onclick="startAgent()">Start agent</button>
+          <button class="btn secondary" id="agentStopBtn" onclick="stopAgent()">Stop</button>
+          <span id="agentState" style="margin-left:12px; color:#a78bfa;">stopped</span>
+          <p style="font-size:0.82rem; color:#9ca3af; margin-top:8px;">
+            Queue work for it from the web dashboard: Profile → Agents → your agent → Tasks → + New Task.
+            <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Activity</h2>
+          <pre id="agentLog" style="max-height:280px; overflow:auto; background:#0b0b12; padding:10px; border-radius:8px; font-size:0.78rem; white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
            SETTINGS PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-settings">
@@ -974,6 +1025,7 @@
       if (pageName === 'connections') loadConnections();
       if (pageName === 'settings') loadSettings();
       if (pageName === 'ai-setup') aiSetupOpened();
+      if (pageName === 'agents') agentsOpened();
       if (pageName === 'chat') chatOpened();
       if (pageName === 'logs') refreshLogs();
       document.body.classList.toggle('chat-page', pageName === 'chat');
@@ -1428,6 +1480,76 @@
     function chatBaseUrl() {
       const target = document.getElementById('chatTarget').value;
       return target === 'aimeat' ? 'https://aimeat.io' : ('http://localhost:' + currentPort);
+    }
+
+    // ── Agents (local crewaimeat fleet) ─────────────────────────
+    let agentEventBound = false;
+    function appendAgentLog(line) {
+      const el = document.getElementById('agentLog');
+      if (!el) return;
+      el.textContent += line + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+    function handleAgentEvent(p) {
+      if (!p || typeof p !== 'object') return;
+      if (p.type === 'progress') {
+        appendAgentLog('* [' + p.step + '] ' + (p.status || '') + (p.message ? ' - ' + p.message : ''));
+      } else if (p.type === 'status') {
+        const st = document.getElementById('agentState');
+        if (st) st.textContent = p.state + (p.message ? ' - ' + p.message : '');
+        appendAgentLog('> ' + p.state + (p.message ? ' - ' + p.message : ''));
+      } else if (p.type === 'result') {
+        appendAgentLog(p.ok ? '== Setup complete ==' : '== Setup incomplete - see messages above ==');
+      } else if (p.type === 'log' || p.type === 'stderr') {
+        appendAgentLog((p.type === 'stderr' ? '  ! ' : '  ') + (p.text || ''));
+      } else if (p.type === 'closed') {
+        appendAgentLog('-- process ended --');
+      }
+    }
+    function bindAgentEvents() {
+      if (agentEventBound) return;
+      const ev = window.__TAURI__ && window.__TAURI__.event;
+      if (ev && ev.listen) {
+        agentEventBound = true; // optimistic; avoid double-binding while the promise resolves
+        ev.listen('agent-event', (e) => handleAgentEvent(e.payload))
+          .catch((err) => { agentEventBound = false; console.error('[agents] failed to bind agent-event:', err); });
+      } else {
+        console.error('[agents] window.__TAURI__.event unavailable — cannot receive agent events');
+      }
+    }
+    async function agentsOpened() {
+      bindAgentEvents();
+      try {
+        const running = await invoke('agent_status');
+        const st = document.getElementById('agentState');
+        if (st) st.textContent = running ? 'running' : 'stopped';
+      } catch (e) { /* command absent in older builds — leave default text */ }
+    }
+    async function provisionAgents() {
+      const btn = document.getElementById('agentProvisionBtn');
+      const model = (document.getElementById('agentModel').value || 'gemma3').trim();
+      const installUv = document.getElementById('agentInstallUv').checked;
+      const pullModel = document.getElementById('agentPullModel').checked;
+      if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
+      appendAgentLog('Starting setup (model=' + model + ')…');
+      try {
+        await invoke('agent_provision', { model, installUv, pullModel });
+      } catch (e) {
+        appendAgentLog('x ' + (e && e.message ? e.message : e));
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Enable local agents'; }
+      }
+    }
+    async function startAgent() {
+      const crewModule = (document.getElementById('agentCrew').value || 'crewaimeat.research_crew').trim();
+      const agentName = (document.getElementById('agentName').value || 'my-agent').trim();
+      const nodeUrl = 'http://localhost:' + (currentPort || 40050);
+      try {
+        await invoke('agent_start', { crewModule, agentName, nodeUrl });
+      } catch (e) { appendAgentLog('x ' + (e && e.message ? e.message : e)); }
+    }
+    async function stopAgent() {
+      try { await invoke('agent_stop'); } catch (e) { appendAgentLog('x ' + (e && e.message ? e.message : e)); }
     }
 
     function bindChatEvents() {

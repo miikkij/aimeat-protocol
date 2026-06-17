@@ -1,6 +1,6 @@
 {
   "productName": "AIMEAT Personal Node",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
     "frontendDist": "../src"
@@ -33,6 +33,6 @@
     ],
     "targets": "all",
     "externalBin": ["binaries/node"],
-    "resources": ["resources/server/**/*", "WebView2Loader.*"]
+    "resources": ["resources/server/**/*", "resources/agent-runtime/**/*", "WebView2Loader.*"]
   }
 }

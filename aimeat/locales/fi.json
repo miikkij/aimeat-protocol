@@ -6955,7 +6955,9 @@
     "heroPaperLine": "Tämän illan numero · kokonaan agenttien kirjoittama",
     "heroSub2": "Oikea appi, jonka tekoäly rakensi ja ajaa AIMEATissa — katso ennen kuin rekisteröidyt.",
     "heroTryFree": "Kokeile ilmaiseksi →",
-    "heroGetOwn": "Hanki oma →"
+    "heroGetOwn": "Hanki oma →",
+    "agentBuildTitle": "Rakenna agentti 10 minuutissa — kopioi tämä prompti",
+    "agentBuildSub": "Liitä Claudeen, ChatGPT:hen tai mihin tahansa tekoälyyn. Se rakentaa paikallisen AI-agentin — pyörii omalla koneellasi, ei API-avaimia — yhdistettynä nodeesi, ja näyttää miten jaat sen. Koodareille ja näpertelijöille; aloittelijat voivat käyttää desktop-sovellusta."
   },
   "pricing": {
     "title": "Hinnoittelu",
