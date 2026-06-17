@@ -320,6 +320,20 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
     Ok(pid)
 }
 
+/// Kill the node sidecar unconditionally (used by the app's exit handler so the server doesn't
+/// linger and lock node.exe / better_sqlite3.node for the next install).
+pub fn kill_node() {
+    if let Ok(mut process) = NODE_PROCESS.lock() {
+        if let Some(mut child) = process.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+    if let Ok(mut start_time) = NODE_START_TIME.lock() {
+        *start_time = None;
+    }
+}
+
 #[tauri::command]
 pub fn stop_node(app: AppHandle, pid: u32) -> Result<(), String> {
     let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
