@@ -74,14 +74,59 @@ jobs:
         shell: bash
         run: ls -R aimeat-desktop/src-tauri/target/release/bundle || true
 
-      # Always keep the artifacts on the run (also covers workflow_dispatch smoke builds).
-      - name: Upload build artifacts
+      # ── Code signing (SignPath / Authenticode) ──────────────────────────
+      # GitHub packs upload-artifact contents into a ZIP, so the SignPath artifact
+      # configuration 'initial' must be zip-wrapped (zip-file > pe-file > authenticode-sign).
+      - name: Stage unsigned installer for signing
+        shell: bash
+        run: |
+          mkdir -p to-sign
+          cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe to-sign/
+
+      - name: Upload unsigned installer (for SignPath)
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: to-sign/*.exe
+          if-no-files-found: error
+
+      - name: Submit to SignPath for Authenticode signing
+        id: signpath
+        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: c824b575-6b8b-4fd5-9e70-d232d2cd71e8
+          project-slug: AIMEAT_Personal_Node
+          signing-policy-slug: Release_signing
+          artifact-configuration-slug: initial
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      # Prefer the SIGNED .exe; fall back to the unsigned one if signing was skipped
+      # (e.g. no secret on a fork). The .msi ships unsigned for now.
+      - name: Assemble release files
+        shell: bash
+        run: |
+          mkdir -p dist
+          SIGNED="$(find signed -name '*-setup.exe' 2>/dev/null | head -1 || true)"
+          if [ -n "$SIGNED" ]; then
+            cp "$SIGNED" dist/
+            echo "Using SIGNED installer: $SIGNED"
+          else
+            cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe dist/
+            echo "WARNING: signed installer not found — using UNSIGNED."
+          fi
+          cp aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi dist/
+          ls -la dist
+
+      - name: Upload build artifacts (run copy)
         uses: actions/upload-artifact@v4
         with:
           name: aimeat-desktop-windows
-          path: |
-            aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi
+          path: dist/*
           if-no-files-found: error
 
       # Publish the downloadable GitHub Release only for real tags.
@@ -94,6 +139,4 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi
+          files: dist/*
