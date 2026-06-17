@@ -149,6 +149,42 @@ pub async fn node_register(port: u16, username: String, password: String) -> Res
     login_at(&base, &username, &password).await
 }
 
+/// Queue a task for a local agent — the Home wizard's "Give it this task" button. POSTs to
+/// {base}/v1/agents/{agent}/tasks with the owner JWT. The running crew picks it up and works it;
+/// the result streams back through the agent's Activity events. (A Rust command, not a webview
+/// fetch, so there is no localhost CORS dependency.)
+#[tauri::command]
+pub async fn queue_agent_task(
+    port: u16,
+    agent: String,
+    owner_token: String,
+    title: String,
+    description: String,
+) -> Result<(), String> {
+    let url = format!("http://localhost:{}/v1/agents/{}/tasks", port, agent);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .json(&serde_json::json!({ "title": title, "description": description }))
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach the node: {}", e))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+    if !status.is_success() {
+        let msg = body
+            .pointer("/error/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("Could not queue the task");
+        return Err(msg.to_string());
+    }
+    Ok(())
+}
+
 /// The AI settings currently stored for the signed-in owner (for display).
 #[derive(Serialize)]
 pub struct AiSettings {
