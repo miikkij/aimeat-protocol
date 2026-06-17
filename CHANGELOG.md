@@ -4,6 +4,56 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Build an agent in 10 minutes (landing).** The logged-out landing page gains a
+  copy-paste agent prompt (`buildLandingAgentPrompt` in `public/views/landing.js`)
+  alongside the existing build-an-app prompt. Pasted into Claude/ChatGPT/Grok it
+  scaffolds an AIMEAT-compatible **crewaimeat** agent that runs **fully local on an
+  Ollama model (Gemma) — no API keys**: clone the fleet, `uv` install, connect to the
+  node, pick or scaffold a crew, run the daemon, publish an offer. The Hero's
+  "Get your own →" now points to the desktop installer's GitHub Release.
+- **Local agent runtime in the desktop app.** The AIMEAT Personal Node app can stand up
+  and supervise local **crewaimeat** agents from a new **Agents** tab. Provisioning and
+  the daemon run as bundled-Node scripts
+  (`aimeat-desktop/resources/agent-runtime/provision.mjs` + `run-agent.mjs`) spawned and
+  relayed by a new Rust module (`agent_runtime.rs`: `agent_provision` / `agent_start` /
+  `agent_stop` / `agent_status`), mirroring the existing chat-bridge pattern. The local
+  model defaults to Gemma on Ollama via a bundled `llm_providers.default.json`
+  (keyless; `qwen2.5:7b` local fallback). First run downloads Python/uv/crewaimeat
+  (nothing Python is baked into the installer).
+
+### Desktop: value-first redesign + language selection (0.4.0 → 0.4.2)
+
+- **Outcome-first Home is the opening view.** Replaces the operator Dashboard as the
+  landing screen with *"What do you want your AI to do for you?"* and starter **playbook
+  cards** (research a question · daily brief · explain it simply), each stating what you
+  *get*. The Dashboard stays one click away in the nav.
+- **Language selection (FI / EN).** New in-app i18n layer (`STRINGS` + `t()` +
+  `data-i18n`) with a header language switch, persisted and defaulting to the OS locale;
+  humanized status copy ("Your AIMEAT is asleep — wake it" / "Awake").
+- **One-click first-win flow.** A playbook card runs a narrated do→get sequence — Ollama
+  check → wake node → provision → pull model → start the agent — streamed into a live
+  Activity log, ending in a "give it this task" step.
+- **Prerequisite-aware playbooks (no false promises).** Each playbook declares a tier:
+  `local` runs free on Ollama/Gemma; the `cloud` **image** playbook is *not* offered as
+  free — it shows an "Advanced · needs an OpenRouter key (paid)" badge and opens a
+  **step-by-step OpenRouter setup guide** (what it is, buy a key, pick a model, wire it,
+  what it costs).
+- **Prerequisite & update surfacing.** Ollama is detected on Home with a clear
+  install/recheck banner (instead of a silent log failure); a model/RAM hint precedes the
+  Gemma pull; and a lightweight update check surfaces a *"new version available → Download"*
+  banner from the latest `desktop-v*` GitHub Release.
+- **First-run welcome** overlay (one sentence + language pick + "do your first thing").
+
+### CI
+
+- **Automated desktop installer release** (`.github/workflows/release-desktop.yml`): a
+  `desktop-v*.*.*` tag builds the Windows installer (NSIS `.exe` + MSI) on a
+  `windows-latest` (MSVC) runner and publishes it as a downloadable GitHub Release, with a
+  tag-vs-`tauri.conf.json` version gate. Releases `desktop-v0.4.0` … `desktop-v0.4.2`
+  produced this way.
+
 ## [1.24.1] - 2026-06-13
 
 ### Changed
