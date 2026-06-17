@@ -562,6 +562,10 @@
     .fw-idea { width: 100%; background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.25); border-radius: 10px; padding: 10px; font-size: 0.9rem; resize: vertical; }
     .fw-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
     .fw-hint { color: #9ca3af; font-size: 0.8rem; margin-top: 8px; line-height: 1.5; }
+    .fw-result { margin-top: 14px; background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.28); border-radius: 12px; padding: 14px 16px; font-size: 0.9rem; color: #d8f5e3; line-height: 1.55; }
+    .fw-result .fw-result-body { margin-top: 8px; white-space: pre-wrap; color: #ece8f5; max-height: 320px; overflow: auto; }
+    .fw-result.working { background: rgba(167,139,250,0.07); border-color: rgba(167,139,250,0.3); color: #cbb8e8; }
+    .fw-result.failed { background: rgba(232,86,74,0.08); border-color: rgba(232,86,74,0.35); color: #f6c8c4; }
     /* Guided sequential steps (service → account) shown after a Home card is picked */
     .fw-steps { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; }
     .fw-step { border: 1px solid rgba(167,139,250,0.18); border-radius: 12px; padding: 14px 16px; background: rgba(15,10,25,0.45); opacity: 0.55; transition: opacity 0.2s, border-color 0.2s; }
@@ -690,6 +694,7 @@
               <button class="btn secondary" onclick="fwClose()" data-i18n="fw.cancel">Close</button>
             </div>
             <p class="fw-hint" data-i18n="fw.queueHint">Opens your dashboard where you confirm the task. The result shows up there and in the Activity log below.</p>
+            <div id="fwResult" class="fw-result" style="display:none;"></div>
           </div>
         </div>
       </div>
@@ -1211,6 +1216,7 @@
         'fw.queueNeedIdea': 'Type what it should work on first.', 'fw.queueSending': 'Sending the task to your agent…',
         'fw.queueOk': 'Task sent ✓ — your agent is working on it; the result appears below.',
         'fw.queueWorking': 'Agent is working on it…', 'fw.openBrowser': 'Open in browser (signed in) →',
+        'fw.resultWorking': 'Your agent is working on it…', 'fw.resultDone': 'Result', 'fw.resultFailed': 'The task failed',
         'fw.step.start': 'Starting your agent',
         'fw.working': 'Your agent is coming alive — watch below.',
         'fw.idea.label': 'What should it work on?',
@@ -1360,6 +1366,7 @@
         'fw.queueNeedIdea': 'Kirjoita ensin mitä sen pitäisi tehdä.', 'fw.queueSending': 'Lähetetään tehtävä agentillesi…',
         'fw.queueOk': 'Tehtävä lähetetty ✓ — agenttisi työstää sitä; tulos ilmestyy alle.',
         'fw.queueWorking': 'Agentti työstää tehtävää…', 'fw.openBrowser': 'Avaa selaimessa (kirjautuneena) →',
+        'fw.resultWorking': 'Agenttisi työstää tätä…', 'fw.resultDone': 'Tulos', 'fw.resultFailed': 'Tehtävä epäonnistui',
         'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
         'fw.step.model': 'Lataan tekoälysi aivot (~4,7 GB, kerran)',
         'fw.step.start': 'Käynnistän agenttiasi',
@@ -1659,6 +1666,8 @@
       document.getElementById('fwSvcStatus').textContent = '';
       document.getElementById('fwAuthStatus').textContent = '';
       const _qb = document.getElementById('fwQueueBtn'); if (_qb) { _qb.disabled = false; _qb.textContent = t('fw.queue'); }
+      fwStopPolling();
+      const _fr = document.getElementById('fwResult'); if (_fr) { _fr.style.display = 'none'; _fr.textContent = ''; }
       fwSetStep('fwStepSvc', 'pending');
       fwSetStep('fwStepAuth', 'pending');
       fwSetStep('fwStepAgent', 'pending');
@@ -1786,14 +1795,51 @@
       const btn = document.getElementById('fwQueueBtn'); if (btn) btn.disabled = true;
       fwLog('> ' + t('fw.queueSending'));
       try {
-        await invoke('queue_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
+        const taskId = await invoke('queue_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
         fwLog('> ' + t('fw.queueOk'));
         // Anti-spam: keep the button LOCKED + relabelled while the agent works — one task per session.
         if (btn) { btn.disabled = true; btn.textContent = t('fw.queueWorking'); }
+        fwPollTask(agent, taskId); // show status + result inline in the panel
       } catch (e) {
         fwLog('x ' + (e && e.message ? e.message : e));
         if (btn) btn.disabled = false; // re-enable on failure so they can retry
       }
+    }
+
+    // Poll the queued task and render its status → result right in the panel ("appears here").
+    let fwPollTimer = null;
+    function fwStopPolling() { if (fwPollTimer) { clearInterval(fwPollTimer); fwPollTimer = null; } }
+    function fwPollTask(agent, taskId) {
+      const box = document.getElementById('fwResult');
+      if (box) { box.style.display = 'block'; box.className = 'fw-result working'; box.textContent = t('fw.resultWorking'); }
+      fwStopPolling();
+      let tries = 0;
+      fwPollTimer = setInterval(async () => {
+        tries += 1;
+        let task = null;
+        try { task = await invoke('get_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, id: taskId }); } catch (e) { return; }
+        if (!task) return;
+        const status = task.status;
+        if (status === 'done') {
+          fwStopPolling();
+          let result = task.message || '';
+          if (task.deliverableKey && task.agentGaii) {
+            try {
+              const mem = await invoke('get_agent_memory', { port: currentPort || 40050, gaii: task.agentGaii, key: task.deliverableKey, ownerToken: nodeJwt });
+              if (mem) result = (typeof mem === 'string') ? mem : (mem.text || mem.content || mem.output || mem.value || JSON.stringify(mem, null, 2));
+            } catch (e) { /* keep the message */ }
+          }
+          if (box) { box.className = 'fw-result'; box.innerHTML = '<strong>' + escapeHtml(t('fw.resultDone')) + '</strong><div class="fw-result-body">' + escapeHtml(String(result || '')) + '</div>'; }
+          const qb = document.getElementById('fwQueueBtn'); if (qb) { qb.disabled = false; qb.textContent = t('fw.queue'); }
+        } else if (status === 'failed') {
+          fwStopPolling();
+          if (box) { box.className = 'fw-result failed'; box.textContent = t('fw.resultFailed') + (task.message ? ': ' + task.message : ''); }
+          const qb = document.getElementById('fwQueueBtn'); if (qb) { qb.disabled = false; qb.textContent = t('fw.queue'); }
+        } else {
+          if (box) { box.className = 'fw-result working'; box.textContent = t('fw.resultWorking') + ' (' + (status || '…') + ' · ' + (tries * 5) + ' s)'; }
+        }
+        if (tries > 240) { fwStopPolling(); } // ~20 min safety cap
+      }, 5000);
     }
     // Open the web portal already SIGNED IN (hand off the desktop's owner JWT), landing on Agents.
     function fwOpenInBrowser() {
@@ -1804,7 +1850,7 @@
         openExternal(url);
       } catch (e) { fwLog('x ' + (e && e.message ? e.message : e)); }
     }
-    function fwClose() { document.getElementById('firstWinPanel').style.display = 'none'; fwFirstWinOpen = false; }
+    function fwClose() { fwStopPolling(); document.getElementById('firstWinPanel').style.display = 'none'; fwFirstWinOpen = false; }
 
     // ── First-run welcome overlay ───────────────────────────────
     function maybeShowWelcome() {

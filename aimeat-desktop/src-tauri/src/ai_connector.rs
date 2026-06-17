@@ -160,16 +160,19 @@ pub async fn queue_agent_task(
     owner_token: String,
     title: String,
     description: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let url = format!("http://localhost:{}/v1/agents/{}/tasks", port, agent);
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
+    // status:"queued" is REQUIRED: for a task-runner agent the node auto-activates a queued task so
+    // the autonomous crew daemon picks it up. Without it the task defaults to "draft" and sits there
+    // forever ("waiting for the agent's plan") — the agent never works a draft.
     let resp = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", owner_token))
-        .json(&serde_json::json!({ "title": title, "description": description }))
+        .json(&serde_json::json!({ "title": title, "description": description, "status": "queued" }))
         .send()
         .await
         .map_err(|e| format!("Cannot reach the node: {}", e))?;
@@ -182,7 +185,64 @@ pub async fn queue_agent_task(
             .unwrap_or("Could not queue the task");
         return Err(msg.to_string());
     }
-    Ok(())
+    // Return the created task id so the wizard can poll it for status + result.
+    body.pointer("/data/task/id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Task created but the node returned no id".to_string())
+}
+
+/// Percent-encode a URL path segment (the agent GAII has `#`/`@`; memory keys can have `.`/`:`).
+fn enc(s: &str) -> String {
+    s.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            _ => format!("%{:02X}", b),
+        })
+        .collect()
+}
+
+async fn get_json(url: &str, owner_token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get(url)
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach the node: {}", e))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+    if !status.is_success() {
+        let msg = body.pointer("/error/message").and_then(|m| m.as_str()).unwrap_or("Request failed");
+        return Err(msg.to_string());
+    }
+    Ok(body)
+}
+
+/// Poll one task's current state (status, message, deliverableKey, agentGaii, …) — the wizard uses
+/// it to show progress and the result inline. GET {base}/v1/agents/{agent}/tasks/{id}.
+#[tauri::command]
+pub async fn get_agent_task(port: u16, agent: String, owner_token: String, id: String) -> Result<serde_json::Value, String> {
+    let url = format!("http://localhost:{}/v1/agents/{}/tasks/{}", port, agent, id);
+    let body = get_json(&url, &owner_token).await?;
+    Ok(body.pointer("/data/task").cloned().unwrap_or(serde_json::Value::Null))
+}
+
+/// Fetch the deliverable a done task published, so the wizard can show the actual result inline.
+/// GET {base}/v1/memory/{agentGaii}/{key}. Returns the memory value (string or object).
+#[tauri::command]
+pub async fn get_agent_memory(port: u16, gaii: String, key: String, owner_token: String) -> Result<serde_json::Value, String> {
+    let url = format!("http://localhost:{}/v1/memory/{}/{}", port, enc(&gaii), enc(&key));
+    let body = get_json(&url, &owner_token).await?;
+    // The memory value lives under data.value (fall back to data).
+    Ok(body
+        .pointer("/data/value")
+        .or_else(|| body.pointer("/data"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
 }
 
 /// The AI settings currently stored for the signed-in owner (for display).
