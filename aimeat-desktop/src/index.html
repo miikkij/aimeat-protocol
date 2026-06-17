@@ -607,7 +607,8 @@
     <div class="status-bar">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Checking node status...</span>
-      <span id="statusPort" style="margin-left: auto; color: #a78bfa;">Port: 40050</span>
+      <span id="appVersion" style="margin-left: auto; color: #8a8aa0; font-size: 0.82rem;"></span>
+      <span id="statusPort" style="margin-left: 16px; color: #a78bfa;">Port: 40050</span>
     </div>
     </header>
 
@@ -2532,6 +2533,8 @@
     // ── Init ────────────────────────────────────────────────────
     document.documentElement.lang = LANG;
     const _langSel = document.getElementById('langSelect'); if (_langSel) _langSel.value = LANG;
+    const _av = document.getElementById('appVersion'); if (_av) _av.textContent = 'v' + APP_VERSION;
+    try { document.title = 'AIMEAT Personal Node — v' + APP_VERSION; } catch (e) {}
     applyI18n();
     homeOpened();
     maybeShowWelcome();
