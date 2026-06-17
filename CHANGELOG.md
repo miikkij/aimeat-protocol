@@ -50,6 +50,52 @@ All notable changes to AIMEAT are documented in this file.
   (keyless; `qwen2.5:7b` local fallback). First run downloads Python/uv/crewaimeat
   (nothing Python is baked into the installer).
 
+### Direct messaging (user↔user) — private GHII↔GHII messages across the federation
+
+People can now message **each other** (not just their agents) by full GHII (`owner@node`), both
+on the same node and **across federation**, with a real **Inbox** in the profile. Distinct from the
+existing agent↔owner channel (`agent-messages`) and from boards — its own record type, routes, and
+UI. Built in layers, each with E2E coverage on both persistent backends (SQLite + MongoDB).
+
+- **Storage (mailbox model).** New `DirectMessageRecord` (each side stores its own copy — the
+  sender an `outbound` row, the recipient an `inbound` row, sharing `id` + a deterministic
+  `conversationId` derived from the sorted participant pair) and `ContactConsentRecord`
+  (the first-contact gate), added across the `Storage` interface, SQLite, and MongoDB/Prisma.
+  `storage/interface.ts`, `storage/repositories/direct-message.repository.ts`,
+  `providers/sqlite/repos/direct-message.ts`, `providers/mongodb`, `prisma/schema*.prisma`.
+- **REST API.** `routes/messages.ts` — `POST /v1/messages` (send), `GET /v1/messages/inbox`,
+  `GET /v1/messages/conversations`, `GET /v1/messages/conversations/:id`,
+  `POST …/:id/read`, `PATCH /v1/messages/:id/read`, `DELETE /v1/messages/:id`,
+  `GET /v1/messages/requests`, `POST /v1/messages/requests/:contactId/accept`,
+  `POST /v1/messages/contacts/:contactId/block`, `GET /v1/messages/contacts`. Sender may be an
+  owner (GHII), agent (GAII), or ecosystem app (GEAI, scope `messages:send`); recipients are
+  always human GHIIs. Body is GFM markdown; `models/message-schemas.ts` validates.
+- **First-contact consent (the gate).** Open addressing, but an unknown sender's first message is
+  held as a **request** (notify + preview, hidden from the normal inbox) until the recipient
+  **accepts** (then both directions flow freely) or **blocks** (proactive hard-block supported).
+  The recipient's own agents/apps auto-accept; sending implies you accept that contact on your own
+  side (so replies are never re-gated).
+- **Federation delivery.** Cross-node messages are signed with the node Ed25519 key and POSTed to
+  the peer's new `POST /v1/federation/message` (verified exactly like memory replication);
+  read/accept receipts via `POST /v1/federation/message/receipt`. A retry job re-attempts queued
+  messages (`AIMEAT_MESSAGE_RETRY_INTERVAL_MS`, default 60s) until the TTL
+  (`AIMEAT_MESSAGE_RETRY_TTL_HOURS`, default 168h/7 days) → `undeliverable`, only while the peer is
+  reachable. `services/message-delivery.ts`.
+- **Media attachments (always duplicate).** Images/audio/video/files ride the storage system; the
+  recipient gets their **own copy** (co-ownership; survives the origin going offline). Cross-node
+  bytes are pulled via a signed `POST /v1/federation/storage/grant` — the origin verifies the
+  message relationship before minting a short-lived presigned download. Over-quota attachments are
+  **held** (`reference`) and the recipient notified; a sweep re-attempts them and **expires** them
+  after the 7-day TTL. Quota-checked via the existing `quota.ts`. `services/attachment-duplication.ts`.
+- **Inbox UI.** New profile **Inbox** tab (pinned under Home with a live unread badge): two-pane
+  messenger — request cards, conversation list with avatars/preview/time/unread, and a thread of
+  chat bubbles (received left / sent right, with delivery ticks, date dividers, markdown via the
+  shared `Markdown` renderer; inline media via `cid:` resolved to the recipient's local copy;
+  external `<img>` stripped as a tracking-pixel defense). The composer is the **same Toast UI
+  editor as workspace documents** (Markdown⇄WYSIWYG) with a markdown+preview fallback. Notification
+  bell deep-links open the Inbox to the exact conversation. `public/views/profile/inbox-tab.js`,
+  `public/js/services/messages.js`, `public/css/views/inbox.css`, `components/NotificationBell.js`.
+
 ### Ecosystem applications (GEAI) — peer integration for external services
 
 A **third class of authenticated principal** alongside the human owner (GHII) and the AI agent
