@@ -569,6 +569,20 @@
     .welcome-lang-label { display: block; font-size: 0.85rem; color: #d8b4fe; margin-bottom: 6px; }
     .welcome-lang { background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.3); border-radius: 10px; padding: 8px 12px; font-size: 0.95rem; margin-bottom: 20px; min-width: 160px; }
     .welcome-start { display: block; width: 100%; }
+    #homeBanners { margin-bottom: 16px; }
+    .home-banner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; font-size: 0.9rem; }
+    .home-banner span { flex: 1; min-width: 180px; }
+    .home-banner .btn { padding: 6px 14px; font-size: 0.8rem; }
+    .home-banner-update { background: rgba(110,231,183,0.1); border-color: rgba(110,231,183,0.35); }
+    .home-badge { display: inline-block; margin-bottom: 12px; font-size: 0.72rem; color: #a78bfa; border: 1px solid rgba(167,139,250,0.3); border-radius: 999px; padding: 2px 10px; }
+    .home-badge-warn { color: #fbbf24; border-color: rgba(251,191,36,0.4); }
+    .home-card-cloud { opacity: 0.92; }
+    .or-box { max-width: 540px; text-align: left; }
+    .or-box h1 { font-size: 1.4rem; }
+    .or-steps { margin: 12px 0; padding-left: 20px; color: #cbb8e8; line-height: 1.7; font-size: 0.9rem; }
+    .or-steps li { margin-bottom: 8px; }
+    .or-note { color: #fbbf24 !important; font-size: 0.85rem !important; }
+    .or-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -606,6 +620,7 @@
         <h1 data-i18n="home.title">What do you want your AI to do for you?</h1>
         <p class="home-sub" data-i18n="home.sub">Pick one. Everything runs on your machine, on a local model — free, private, no API keys. Your first result appears right here.</p>
 
+        <div id="homeBanners"><!-- Ollama / update banners rendered by renderHomeBanners() --></div>
         <div class="home-grid" id="homeGrid"><!-- playbook cards rendered by renderHome() --></div>
 
         <!-- First-win flow: appears when a playbook is started -->
@@ -1078,6 +1093,25 @@
     </div>
   </div>
 
+  <!-- OpenRouter guided setup overlay (the honest paid path for premium/image agents) -->
+  <div class="welcome-overlay" id="orOverlay" style="display:none;">
+    <div class="welcome-box or-box">
+      <h1 data-i18n="or.title">Unlock premium agents with an OpenRouter key</h1>
+      <p data-i18n="or.sub">Some agents need a stronger or image-capable model than the free local one.</p>
+      <ol class="or-steps">
+        <li data-i18n="or.step1">Create a key at openrouter.ai and add a little credit.</li>
+        <li data-i18n="or.step2">Pick a model that fits the task.</li>
+        <li data-i18n="or.step3">Add the key + model to your agent's llm_providers.json.</li>
+        <li data-i18n="or.step4">Restart the agent.</li>
+      </ol>
+      <p class="or-note" data-i18n="or.note">This costs money — you control how much. The free local agents stay free.</p>
+      <div class="or-actions">
+        <button class="btn" onclick="openExternal('https://openrouter.ai')" data-i18n="or.buy">Open openrouter.ai</button>
+        <button class="btn secondary" onclick="closeORGuide()" data-i18n="or.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Tauri v2 exposes the invoke API at window.__TAURI__.core.invoke
     // (requires app.withGlobalTauri=true in tauri.conf.json).
@@ -1131,6 +1165,26 @@
         'welcome.sub': 'Your own AI, running on your computer. Pick a language and do your first thing — you’ll see a real result in a minute.',
         'welcome.lang': 'Language',
         'welcome.start': 'Get started →',
+        'pb.image.title': 'Make an image',
+        'pb.image.get': 'Turn a description into a picture.',
+        'home.needsOllama': 'Needs Ollama',
+        'home.ollamaNeeded': 'Install Ollama to run agents on your machine — free.',
+        'home.installOllama': 'Install Ollama',
+        'home.recheck': 'Re-check',
+        'home.advancedBadge': 'Advanced · needs an OpenRouter key (paid)',
+        'home.setup': 'How to set this up →',
+        'home.updateAvail': 'A new version is available',
+        'home.download': 'Download',
+        'fw.ramHint': '(needs ~8 GB RAM; a lighter model is used on smaller machines)',
+        'or.title': 'Unlock premium agents (like images) with an OpenRouter key',
+        'or.sub': 'Some agents need a stronger or image-capable model than the free local one. OpenRouter gives you many models behind one key — pay only for what you use, you set the budget. Here is how:',
+        'or.step1': '1. Create a key at openrouter.ai and add a little credit — you only pay for what you use.',
+        'or.step2': '2. Pick a model that fits the task — an image-capable model for pictures, a strong text model for hard research.',
+        'or.step3': '3. Add the key + model to your agent: open the crewaimeat folder’s llm_providers.json and add an "openrouter" provider with your key (copy the example in the repo).',
+        'or.step4': '4. Restart the agent. It uses the cloud model when needed and falls back to local Gemma.',
+        'or.note': 'This costs money — you control how much. The free local agents above stay free.',
+        'or.buy': 'Open openrouter.ai',
+        'or.close': 'Close',
         'common.openDashboard': 'Open Dashboard',
         'common.startNode': 'Start Node', 'common.stopNode': 'Stop Node',
       },
@@ -1177,6 +1231,26 @@
         'welcome.sub': 'Oma tekoälysi, joka pyörii koneellasi. Valitse kieli ja tee ensimmäinen asiasi — näet oikean tuloksen hetkessä.',
         'welcome.lang': 'Kieli',
         'welcome.start': 'Aloita →',
+        'pb.image.title': 'Tee kuva',
+        'pb.image.get': 'Muuta kuvaus kuvaksi.',
+        'home.needsOllama': 'Vaatii Ollaman',
+        'home.ollamaNeeded': 'Asenna Ollama ajaaksesi agentteja koneellasi — ilmaiseksi.',
+        'home.installOllama': 'Asenna Ollama',
+        'home.recheck': 'Tarkista uudelleen',
+        'home.advancedBadge': 'Edistynyt · vaatii OpenRouter-avaimen (maksullinen)',
+        'home.setup': 'Näin otat käyttöön →',
+        'home.updateAvail': 'Uusi versio saatavilla',
+        'home.download': 'Lataa',
+        'fw.ramHint': '(tarvitsee ~8 GB RAM; pienemmillä koneilla käytetään kevyempää mallia)',
+        'or.title': 'Avaa edistyneet agentit (kuten kuvat) OpenRouter-avaimella',
+        'or.sub': 'Osa agenteista tarvitsee vahvemman tai kuvia osaavan mallin kuin ilmainen paikallinen. OpenRouter antaa monta mallia yhdellä avaimella — maksat vain käytöstä ja asetat budjetin. Näin:',
+        'or.step1': '1. Luo avain osoitteessa openrouter.ai ja lisää vähän saldoa — maksat vain käytöstä.',
+        'or.step2': '2. Valitse tehtävään sopiva malli — kuvia osaava malli kuviin, vahva tekstimalli vaativaan tutkimukseen.',
+        'or.step3': '3. Lisää avain + malli agentillesi: avaa crewaimeat-kansion llm_providers.json ja lisää "openrouter"-provider avaimellasi (kopioi repon esimerkistä).',
+        'or.step4': '4. Käynnistä agentti uudelleen. Se käyttää pilvimallia tarvittaessa ja putoaa takaisin paikalliseen Gemmaan.',
+        'or.note': 'Tämä maksaa — sinä hallitset kuinka paljon. Yllä olevat ilmaiset paikalliset agentit pysyvät ilmaisina.',
+        'or.buy': 'Avaa openrouter.ai',
+        'or.close': 'Sulje',
         'common.openDashboard': 'Avaa hallinta',
         'common.startNode': 'Käynnistä node', 'common.stopNode': 'Pysäytä node',
       },
@@ -1203,34 +1277,70 @@
     }
 
     // ── Home: value-first playbooks + one-click first win ───────
-    // All three starter playbooks run the proven reference crew (research_crew) with a
-    // different pre-filled task. Image/other crews are deferred until verified keyless-local.
+    // Each playbook declares its tier so we only PROMISE what the user can actually get:
+    //   tier 'local' — runs free on Ollama/Gemma (research/brief/explain via research_crew).
+    //   tier 'cloud' — needs a paid OpenRouter key + the right model (e.g. images). We never
+    //   run these as if free; the card opens a step-by-step setup guide instead (no letdown).
+    const APP_VERSION = '0.4.2';
     const PLAYBOOKS = [
-      { id: 'research', crew: 'crewaimeat.research_crew' },
-      { id: 'brief',    crew: 'crewaimeat.research_crew' },
-      { id: 'explain',  crew: 'crewaimeat.research_crew' },
+      { id: 'research', crew: 'crewaimeat.research_crew', tier: 'local' },
+      { id: 'brief',    crew: 'crewaimeat.research_crew', tier: 'local' },
+      { id: 'explain',  crew: 'crewaimeat.research_crew', tier: 'local' },
+      { id: 'image',    crew: null,                       tier: 'cloud' },
     ];
     let activePlaybook = null;
+    let ollamaReady = null;   // null = unknown, true/false after detect
+    let updateInfo = null;    // { version, url } when a newer release exists
     let firstWinAgent = null;
     let fwFirstWinOpen = false;
     let fwProvisionResolve = null;
 
     function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+    function renderHomeBanners() {
+      const box = document.getElementById('homeBanners');
+      if (!box) return;
+      box.innerHTML = '';
+      if (ollamaReady === false) {
+        const b = document.createElement('div');
+        b.className = 'home-banner';
+        const s = document.createElement('span'); s.textContent = t('home.ollamaNeeded'); b.appendChild(s);
+        const i = document.createElement('button'); i.className = 'btn secondary'; i.textContent = t('home.installOllama'); i.onclick = () => openExternal('https://ollama.com'); b.appendChild(i);
+        const r = document.createElement('button'); r.className = 'btn'; r.textContent = t('home.recheck'); r.onclick = () => homeOpened(); b.appendChild(r);
+        box.appendChild(b);
+      }
+      if (updateInfo) {
+        const u = document.createElement('div');
+        u.className = 'home-banner home-banner-update';
+        const s = document.createElement('span'); s.textContent = t('home.updateAvail') + ' (' + updateInfo.version + ')'; u.appendChild(s);
+        const d = document.createElement('button'); d.className = 'btn'; d.textContent = t('home.download'); d.onclick = () => openExternal(updateInfo.url); u.appendChild(d);
+        box.appendChild(u);
+      }
+    }
+
     function renderHome() {
+      renderHomeBanners();
       const grid = document.getElementById('homeGrid');
       if (!grid) return;
       grid.innerHTML = '';
       PLAYBOOKS.forEach(pb => {
         const card = document.createElement('div');
-        card.className = 'card home-card';
-        card.innerHTML =
-          '<h2>' + escapeHtml(t('pb.' + pb.id + '.title')) + '</h2>' +
-          '<p class="home-get"><strong>' + escapeHtml(t('home.youGet')) + '</strong> ' + escapeHtml(t('pb.' + pb.id + '.get')) + '</p>';
+        card.className = 'card home-card' + (pb.tier === 'cloud' ? ' home-card-cloud' : '');
+        let h = '<h2>' + escapeHtml(t('pb.' + pb.id + '.title')) + '</h2>' +
+                '<p class="home-get"><strong>' + escapeHtml(t('home.youGet')) + '</strong> ' + escapeHtml(t('pb.' + pb.id + '.get')) + '</p>';
+        if (pb.tier === 'cloud') h += '<div class="home-badge">' + escapeHtml(t('home.advancedBadge')) + '</div>';
+        else if (ollamaReady === false) h += '<div class="home-badge home-badge-warn">' + escapeHtml(t('home.needsOllama')) + '</div>';
+        card.innerHTML = h;
         const btn = document.createElement('button');
-        btn.className = 'btn';
-        btn.textContent = t('home.run');
-        btn.onclick = () => startPlaybook(pb);
+        if (pb.tier === 'cloud') {
+          btn.className = 'btn secondary';
+          btn.textContent = t('home.setup');
+          btn.onclick = () => openRouterGuide();
+        } else {
+          btn.className = 'btn';
+          btn.textContent = t('home.run');
+          btn.onclick = () => startPlaybook(pb);
+        }
         card.appendChild(btn);
         grid.appendChild(card);
       });
@@ -1244,7 +1354,34 @@
       adv.appendChild(ab);
       grid.appendChild(adv);
     }
-    function homeOpened() { renderHome(); }
+
+    async function homeOpened() {
+      try { const svc = await invoke('detect_ai_services'); ollamaReady = !!(svc||[]).find(s => s.service_type === 'ollama' && s.status === 'available'); }
+      catch(e){ ollamaReady = null; }
+      renderHome();
+      checkForUpdate();
+    }
+
+    function isNewer(a, b) {
+      const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+      for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x > y; }
+      return false;
+    }
+    async function checkForUpdate() {
+      try {
+        const r = await fetch('https://api.github.com/repos/miikkij/aimeat-protocol/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } });
+        if (!r.ok) return;
+        const j = await r.json();
+        const tag = j.tag_name || '';
+        if (!tag.startsWith('desktop-v')) return;
+        const ver = tag.replace(/^desktop-v/, '');
+        if (isNewer(ver, APP_VERSION)) { updateInfo = { version: ver, url: j.html_url }; renderHomeBanners(); }
+      } catch(e){}
+    }
+
+    // OpenRouter guided setup — the honest paid path for premium/image agents (no false free promise).
+    function openRouterGuide() { const ov = document.getElementById('orOverlay'); if (ov) ov.style.display = 'flex'; }
+    function closeORGuide() { const ov = document.getElementById('orOverlay'); if (ov) ov.style.display = 'none'; }
 
     function fwLog(line) {
       const el = document.getElementById('fwLog');
@@ -1296,7 +1433,7 @@
 
       // 2) Provision (clone + uv + providers + pull model). Streams via agent-event; wait for result.
       fwLog('> ' + t('fw.step.provision'));
-      fwLog('> ' + t('fw.step.model'));
+      fwLog('> ' + t('fw.step.model') + ' ' + t('fw.ramHint'));
       try {
         await invoke('agent_provision', { model: 'gemma3', installUv: true, pullModel: true });
         await waitForProvision();
@@ -2246,7 +2383,7 @@
     document.documentElement.lang = LANG;
     const _langSel = document.getElementById('langSelect'); if (_langSel) _langSel.value = LANG;
     applyI18n();
-    renderHome();
+    homeOpened();
     maybeShowWelcome();
     bindChatEvents();
     checkStatus();
