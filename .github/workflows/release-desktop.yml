@@ -91,9 +91,18 @@ jobs:
           path: to-sign/*.exe
           if-no-files-found: error
 
+      # secrets context is NOT allowed in a step-level `if:`, so probe it in a step `env` first.
+      - name: Check signing availability
+        id: cansign
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "enabled=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Submit to SignPath for Authenticode signing
         id: signpath
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: steps.cansign.outputs.enabled == 'true'
         uses: signpath/github-action-submit-signing-request@v1
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
