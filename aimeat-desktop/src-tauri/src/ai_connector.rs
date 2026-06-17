@@ -115,6 +115,40 @@ pub async fn node_login_at(base_url: String, username: String, password: String)
     login_at(&base_url, &username, &password).await
 }
 
+/// Register a new owner on the LOCAL node and return the owner JWT — the Home wizard's one-step
+/// "create account & continue" (no browser). POST {base}/v1/ghii { username, display_name, password }.
+/// If the name already exists, that's fine — we just sign in (so the same button works for a
+/// returning user with the right password). Returns the owner token via login.
+#[tauri::command]
+pub async fn node_register(port: u16, username: String, password: String) -> Result<String, String> {
+    let base = format!("http://localhost:{}", port);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .post(format!("{}/v1/ghii", base))
+        .json(&serde_json::json!({ "username": username, "display_name": username, "password": password }))
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach {}: {}", base, e))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+
+    // Success → sign in. Name taken → also fine (existing account) → sign in and let the password
+    // decide. Any other failure (e.g. weak password) → surface it.
+    if !status.is_success() {
+        let code = body.pointer("/error/code").and_then(|c| c.as_str()).unwrap_or("");
+        let msg = body.pointer("/error/message").and_then(|m| m.as_str()).unwrap_or("Registration failed");
+        let name_taken = status.as_u16() == 409 || code == "NAME_TAKEN" || msg.to_lowercase().contains("already");
+        if !name_taken {
+            return Err(msg.to_string());
+        }
+    }
+    login_at(&base, &username, &password).await
+}
+
 /// The AI settings currently stored for the signed-in owner (for display).
 #[derive(Serialize)]
 pub struct AiSettings {

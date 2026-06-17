@@ -562,6 +562,24 @@
     .fw-idea { width: 100%; background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.25); border-radius: 10px; padding: 10px; font-size: 0.9rem; resize: vertical; }
     .fw-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
     .fw-hint { color: #9ca3af; font-size: 0.8rem; margin-top: 8px; line-height: 1.5; }
+    /* Guided sequential steps (service → account) shown after a Home card is picked */
+    .fw-steps { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; }
+    .fw-step { border: 1px solid rgba(167,139,250,0.18); border-radius: 12px; padding: 14px 16px; background: rgba(15,10,25,0.45); opacity: 0.55; transition: opacity 0.2s, border-color 0.2s; }
+    .fw-step.active { opacity: 1; border-color: rgba(167,139,250,0.5); background: rgba(167,139,250,0.07); }
+    .fw-step.done { opacity: 0.85; border-color: rgba(74,222,128,0.35); }
+    .fw-step-head { display: flex; align-items: center; gap: 10px; }
+    .fw-step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(167,139,250,0.18); color: #d8b4fe; font-size: 0.82rem; font-weight: 600; flex: 0 0 auto; }
+    .fw-step.active .fw-step-num { background: linear-gradient(135deg,#a78bfa,#f472b6); color: #fff; }
+    .fw-step.done .fw-step-num { background: rgba(74,222,128,0.2); color: #4ade80; }
+    .fw-step-title { font-weight: 600; color: #ece8f5; font-size: 0.95rem; }
+    .fw-step-check { margin-left: auto; color: #4ade80; font-weight: 700; opacity: 0; }
+    .fw-step.done .fw-step-check { opacity: 1; }
+    .fw-step-body { display: none; margin-top: 12px; padding-left: 34px; }
+    .fw-step.active .fw-step-body { display: block; }
+    .fw-step-desc { color: #cbb8e8; font-size: 0.88rem; line-height: 1.5; margin-bottom: 12px; }
+    .fw-input { display: block; width: 100%; max-width: 320px; background: rgba(15,10,25,0.7); color: #ece8f5; border: 1px solid rgba(167,139,250,0.25); border-radius: 10px; padding: 9px 12px; font-size: 0.9rem; margin-bottom: 10px; }
+    .fw-input:focus { outline: none; border-color: rgba(167,139,250,0.6); }
+    .fw-step-status { display: inline-block; margin-left: 12px; font-size: 0.85rem; color: #cbb8e8; }
     .welcome-overlay { position: fixed; inset: 0; background: rgba(8,6,16,0.82); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .welcome-box { background: rgba(24,16,40,0.98); border: 1px solid rgba(167,139,250,0.3); border-radius: 20px; padding: 32px; max-width: 460px; text-align: center; }
     .welcome-box h1 { margin-bottom: 12px; }
@@ -627,6 +645,27 @@
         <!-- First-win flow: appears when a playbook is started -->
         <div class="card first-win" id="firstWinPanel" style="display:none;">
           <h2 id="fwTitle">Setting up your first agent</h2>
+
+          <div id="fwSteps" class="fw-steps" style="display:none;">
+            <div class="fw-step" id="fwStepSvc">
+              <div class="fw-step-head"><span class="fw-step-num">1</span><span class="fw-step-title" data-i18n="fw.s1.title">Start the service</span><span class="fw-step-check">✓</span></div>
+              <div class="fw-step-body">
+                <p class="fw-step-desc" data-i18n="fw.s1.desc">Your private AIMEAT node runs on your machine. Start it to continue.</p>
+                <button class="btn" id="fwSvcBtn" onclick="fwDoService()" data-i18n="fw.s1.cta">Start the service</button>
+                <span class="fw-step-status" id="fwSvcStatus"></span>
+              </div>
+            </div>
+            <div class="fw-step" id="fwStepAuth">
+              <div class="fw-step-head"><span class="fw-step-num">2</span><span class="fw-step-title" data-i18n="fw.s2.title">Create your account &amp; sign in</span><span class="fw-step-check">✓</span></div>
+              <div class="fw-step-body">
+                <p class="fw-step-desc" data-i18n="fw.s2.desc">Create the first user — right here. Already have an account? Use the same username and password.</p>
+                <input id="fwUser" class="fw-input" placeholder="Username" data-i18n-ph="fw.s2.userPh" autocomplete="off" spellcheck="false" />
+                <input id="fwPass" class="fw-input" type="password" placeholder="Password" data-i18n-ph="fw.s2.passPh" autocomplete="off" onkeydown="if(event.key==='Enter')fwDoAuth()" />
+                <button class="btn" id="fwAuthBtn" onclick="fwDoAuth()" data-i18n="fw.s2.cta">Create account &amp; continue</button>
+                <span class="fw-step-status" id="fwAuthStatus"></span>
+              </div>
+            </div>
+          </div>
 
           <div id="fwOllama" class="fw-ollama" style="display:none;">
             <p data-i18n="fw.ollamaMissing">Ollama is needed for the local model. Install it, then run this again.</p>
@@ -1153,6 +1192,13 @@
         'fw.step.model': 'Downloading your AI’s brain (~4.7 GB, one time)',
         'fw.step.signin': 'Signing in so your agent can be approved…',
         'fw.needSignin': 'Sign in with your owner account on the AI Setup tab first — your agent needs your approval.',
+        'fw.s1.title': 'Start the service', 'fw.s1.cta': 'Start the service', 'fw.s1.starting': 'Starting…',
+        'fw.s1.desc': 'Your private AIMEAT node runs on your machine. Start it to continue.',
+        'fw.s1.ok': 'Running ✓', 'fw.s1.fail': 'Couldn’t start — see the Logs tab.',
+        'fw.s2.title': 'Create your account & sign in',
+        'fw.s2.desc': 'Create the first user — right here. Already have an account? Use the same username and password.',
+        'fw.s2.userPh': 'Username', 'fw.s2.passPh': 'Password', 'fw.s2.cta': 'Create account & continue',
+        'fw.s2.need': 'Enter a username and password.', 'fw.s2.working': 'Creating your account…', 'fw.s2.ok': 'Signed in ✓',
         'fw.step.start': 'Starting your agent',
         'fw.working': 'Your agent is coming alive — watch below.',
         'fw.idea.label': 'What should it work on?',
@@ -1290,6 +1336,13 @@
         'fw.step.account': 'Tarkistan tiliäsi',
         'fw.step.signin': 'Kirjaudutaan sisään agentin hyväksymiseksi…',
         'fw.needSignin': 'Kirjaudu omistajatililläsi Tekoälyasetukset-välilehdellä — agenttisi tarvitsee hyväksyntäsi.',
+        'fw.s1.title': 'Käynnistä palvelu', 'fw.s1.cta': 'Käynnistä palvelu', 'fw.s1.starting': 'Käynnistetään…',
+        'fw.s1.desc': 'Yksityinen AIMEAT-node pyörii koneellasi. Käynnistä se jatkaaksesi.',
+        'fw.s1.ok': 'Käynnissä ✓', 'fw.s1.fail': 'Ei käynnistynyt — katso Lokit-välilehti.',
+        'fw.s2.title': 'Luo tunnus ja kirjaudu',
+        'fw.s2.desc': 'Luo ensimmäinen käyttäjä — suoraan tässä. Onko tunnus jo? Käytä samaa käyttäjänimeä ja salasanaa.',
+        'fw.s2.userPh': 'Käyttäjänimi', 'fw.s2.passPh': 'Salasana', 'fw.s2.cta': 'Luo tunnus & jatka',
+        'fw.s2.need': 'Syötä käyttäjänimi ja salasana.', 'fw.s2.working': 'Luodaan tunnustasi…', 'fw.s2.ok': 'Kirjauduttu ✓',
         'fw.step.provision': 'Pystytän paikallista agenttia (kertaluontoinen)',
         'fw.step.model': 'Lataan tekoälysi aivot (~4,7 GB, kerran)',
         'fw.step.start': 'Käynnistän agenttiasi',
@@ -1490,11 +1543,11 @@
         if (pb.tier === 'cloud') {
           btn.className = 'btn secondary';
           btn.textContent = t('home.setup');
-          btn.onclick = () => openRouterGuide();
+          btn.onclick = () => startCardFlow({ kind: 'image' });
         } else {
           btn.className = 'btn';
           btn.textContent = t('home.run');
-          btn.onclick = () => startPlaybook(pb);
+          btn.onclick = () => startCardFlow({ kind: 'playbook', pb });
         }
         card.appendChild(btn);
         grid.appendChild(card);
@@ -1505,7 +1558,7 @@
       const ab = document.createElement('button');
       ab.className = 'btn secondary';
       ab.textContent = t('home.advanced.cta');
-      ab.onclick = () => navigateTo('agents');
+      ab.onclick = () => startCardFlow({ kind: 'agents' });
       adv.appendChild(ab);
       grid.appendChild(adv);
     }
@@ -1553,7 +1606,7 @@
       const box = document.getElementById('fwOllama');
       let ok = false;
       try { const svc = await invoke('detect_ai_services'); ok = !!(svc||[]).find(s => s.service_type==='ollama' && s.status==='available'); } catch(e){}
-      if (ok) { if (box) box.style.display = 'none'; if (activePlaybook) startPlaybook(activePlaybook); }
+      if (ok) { if (box) box.style.display = 'none'; if (activePlaybook) fwRunPlaybook(activePlaybook); }
     }
     function waitForProvision() {
       return new Promise(res => {
@@ -1563,11 +1616,20 @@
       });
     }
 
-    async function startPlaybook(pb) {
-      activePlaybook = pb;
-      // The agent name MUST equal the crew's hardcoded AGENT_NAME. crewaimeat.research_crew →
-      // "research-crew" (module tail, underscores→hyphens). Mismatch = token under the wrong name.
-      firstWinAgent = pb.crew ? pb.crew.split('.').pop().replace(/_/g, '-') : (pb.id + '-agent');
+    // ── Guided sequential flow shown after ANY Home card is picked ───────────────
+    // Steps run in order and confirm before advancing; already-satisfied steps are skipped:
+    //   1) start the local service (node)   2) create account & sign in (inline, no browser)
+    // then the card's own path runs (playbook task / OpenRouter guide / Agents tab).
+    let fwCard = null;
+
+    function fwSetStep(id, state) {
+      const el = document.getElementById(id);
+      if (el) el.className = 'fw-step' + (state ? ' ' + state : '');
+    }
+
+    function startCardFlow(card) {
+      fwCard = card;
+      activePlaybook = (card && card.kind === 'playbook') ? card.pb : null;
       const panel = document.getElementById('firstWinPanel');
       panel.style.display = 'block';
       fwFirstWinOpen = true;
@@ -1575,29 +1637,92 @@
       document.getElementById('fwTitle').textContent = t('fw.title');
       document.getElementById('fwQueueWrap').style.display = 'none';
       document.getElementById('fwOllama').style.display = 'none';
-      document.getElementById('fwIdea').value = t('pb.' + pb.id + '.idea');
+      document.getElementById('fwSteps').style.display = 'block';
+      document.getElementById('fwSvcStatus').textContent = '';
+      document.getElementById('fwAuthStatus').textContent = '';
+      fwSetStep('fwStepSvc', 'pending');
+      fwSetStep('fwStepAuth', 'pending');
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      fwAdvance();
+    }
+
+    // Decide the next step from live state; skip what's already done, then run the card's action.
+    async function fwAdvance() {
+      let running = false;
+      try { const s = await invoke('get_node_status'); running = !!s.running; if (s && s.port) currentPort = s.port; } catch(e){}
+      if (!running) { fwSetStep('fwStepSvc', 'active'); fwSetStep('fwStepAuth', 'pending'); return; }
+      fwSetStep('fwStepSvc', 'done');
+      if (!nodeJwt || !nodeOwner) { fwSetStep('fwStepAuth', 'active'); return; }
+      fwSetStep('fwStepAuth', 'done');
+      fwRunCardAction();
+    }
+
+    async function fwDoService() {
+      const btn = document.getElementById('fwSvcBtn');
+      const st = document.getElementById('fwSvcStatus');
+      btn.disabled = true; st.textContent = t('fw.s1.starting');
+      try { const s = await invoke('get_node_status'); if (!s.running) await invoke('start_node', { configPath: '.env' }); } catch(e){}
+      let ok = false;
+      for (let i = 0; i < 20; i++) {
+        try { const s = await invoke('get_node_status'); if (s && s.running) { ok = true; if (s.port) currentPort = s.port; break; } } catch(e){}
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      btn.disabled = false;
+      if (ok) { st.textContent = t('fw.s1.ok'); fwAdvance(); }
+      else { st.textContent = t('fw.s1.fail'); }
+    }
+
+    async function fwDoAuth() {
+      const user = document.getElementById('fwUser').value.trim();
+      const pass = document.getElementById('fwPass').value;
+      const st = document.getElementById('fwAuthStatus');
+      const btn = document.getElementById('fwAuthBtn');
+      if (!user || !pass) { st.textContent = t('fw.s2.need'); return; }
+      btn.disabled = true; st.textContent = t('fw.s2.working');
+      try {
+        // One step: create the account (or reuse it if the name exists) and sign in → owner JWT.
+        const token = await invoke('node_register', { port: currentPort || 40050, username: user, password: pass });
+        nodeJwt = token; nodeOwner = user;
+        // Mirror into the AI Setup signed-in state so the rest of the app sees one session.
+        try {
+          document.getElementById('aiSignedInUser').textContent = user;
+          document.getElementById('aiAuthSignedOut').style.display = 'none';
+          document.getElementById('aiAuthSignedIn').style.display = 'block';
+        } catch(e){}
+        document.getElementById('fwPass').value = '';
+        st.textContent = t('fw.s2.ok');
+        fwAdvance();
+      } catch(e) {
+        st.textContent = (e && e.message ? e.message : e) || t('fw.s2.fail');
+      } finally { btn.disabled = false; }
+    }
+
+    // Prereqs met → run whatever the chosen card actually does.
+    function fwRunCardAction() {
+      document.getElementById('fwSteps').style.display = 'none';
+      const c = fwCard;
+      if (!c) return;
+      if (c.kind === 'playbook') { fwRunPlaybook(c.pb); }
+      else if (c.kind === 'image') { fwClose(); openRouterGuide(); }
+      else if (c.kind === 'agents') { fwClose(); navigateTo('agents'); }
+    }
+
+    // The local-playbook path: ollama check → provision → start agent → queue (node + sign-in already done).
+    async function fwRunPlaybook(pb) {
+      // The agent name MUST equal the crew's hardcoded AGENT_NAME. crewaimeat.research_crew →
+      // "research-crew" (module tail, underscores→hyphens). Mismatch = token under the wrong name.
+      firstWinAgent = pb.crew ? pb.crew.split('.').pop().replace(/_/g, '-') : (pb.id + '-agent');
+      document.getElementById('fwQueueWrap').style.display = 'none';
+      document.getElementById('fwOllama').style.display = 'none';
+      document.getElementById('fwIdea').value = t('pb.' + pb.id + '.idea');
       bindAgentEvents();
 
-      // 0) Local model prerequisite.
+      // Local model prerequisite.
       let ollamaOk = false;
       try { const svc = await invoke('detect_ai_services'); ollamaOk = !!(svc||[]).find(s => s.service_type==='ollama' && s.status==='available'); } catch(e){}
       if (!ollamaOk) { showOllamaNeeded(); return; }
 
-      // 1) Wake the node.
-      fwLog('> ' + t('fw.step.node'));
-      try { const s = await invoke('get_node_status'); if (!s.running) await invoke('start_node', { configPath: '.env' }); } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
-
-      // 1b) The local agent must be approved by you (its owner). On a local node we auto-approve —
-      //     but that needs you signed in. Reuse the AI Setup session; prompt if not signed in.
-      if (!nodeJwt || !nodeOwner) {
-        fwLog('> ' + t('fw.step.signin'));
-        showToast(t('fw.needSignin'), 'error');
-        navigateTo('ai-setup');
-        return;
-      }
-
-      // 2) Provision (clone + uv + providers + pull model). Streams via agent-event; wait for result.
+      // Provision (clone + uv + providers + pull model). Streams via agent-event; wait for result.
       fwLog('> ' + t('fw.step.provision'));
       fwLog('> ' + t('fw.step.model') + ' ' + t('fw.ramHint'));
       try {
@@ -1605,7 +1730,7 @@
         await waitForProvision();
       } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
-      // 3) Start the agent daemon (owner JWT → auto-approve, no manual device-auth).
+      // Start the agent daemon (owner JWT → auto-approve, no manual device-auth).
       fwLog('> ' + t('fw.step.start'));
       try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 40050), owner: nodeOwner, ownerToken: nodeJwt }); }
       catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
