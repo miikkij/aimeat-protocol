@@ -651,42 +651,42 @@
            DASHBOARD PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-dashboard">
-        <h1>Dashboard</h1>
+        <h1 data-i18n="pg.dash.title">Dashboard</h1>
 
         <div class="card">
-          <h2>Getting Started</h2>
+          <h2 data-i18n="pg.dash.gettingStarted">Getting Started</h2>
           <ol class="steps">
-            <li><strong>Start your node</strong> — click <em>Start Node</em> below.</li>
-            <li><strong>Create your account</strong> — open the web dashboard and register (Kirjaudu / Rekisteröidy).
+            <li data-i18n-html="pg.dash.step1"><strong>Start your node</strong> — click <em>Start Node</em> below.</li>
+            <li data-i18n-html="pg.dash.step2"><strong>Create your account</strong> — open the web dashboard and register (Kirjaudu / Rekisteröidy).
               <button class="btn secondary" onclick="openPortal()">Open Dashboard</button></li>
-            <li><strong>Connect a local AI</strong> (optional) — go to <em>AI Setup</em>, sign in, pick a model.
+            <li data-i18n-html="pg.dash.step3"><strong>Connect a local AI</strong> (optional) — go to <em>AI Setup</em>, sign in, pick a model.
               <button class="btn secondary" onclick="navigateTo('ai-setup')">AI Setup</button></li>
           </ol>
         </div>
 
         <div class="card">
-          <h2>Node Status</h2>
+          <h2 data-i18n="pg.dash.nodeStatus">Node Status</h2>
           <p id="nodeStatus">Loading...</p>
           <p id="nodeUptime" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px;"></p>
           <br />
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
-            <button class="btn secondary" id="openPortalBtn" onclick="openPortal()" disabled>Open Dashboard in Browser</button>
+            <button class="btn secondary" id="openPortalBtn" onclick="openPortal()" disabled data-i18n="pg.dash.openBrowser">Open Dashboard in Browser</button>
           </div>
         </div>
 
         <div class="card">
-          <h2>Quick Info</h2>
+          <h2 data-i18n="pg.dash.quickInfo">Quick Info</h2>
           <dl class="info-grid" id="dashboardInfo">
-            <dt>Node ID</dt>
+            <dt data-i18n="pg.info.nodeId">Node ID</dt>
             <dd id="dashNodeId">Loading...</dd>
-            <dt>Port</dt>
+            <dt data-i18n="pg.info.port">Port</dt>
             <dd id="dashPort">--</dd>
-            <dt>Role</dt>
+            <dt data-i18n="pg.info.role">Role</dt>
             <dd id="dashRole">--</dd>
-            <dt>Storage</dt>
-            <dd id="dashStorage">SQLite (persistent)</dd>
-            <dt>Data folder</dt>
+            <dt data-i18n="pg.info.storage">Storage</dt>
+            <dd id="dashStorage" data-i18n="pg.info.sqlite">SQLite (persistent)</dd>
+            <dt data-i18n="pg.info.dataFolder">Data folder</dt>
             <dd id="dashDataDir">--</dd>
           </dl>
         </div>
@@ -696,38 +696,38 @@
            CONNECTIONS PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-connections">
-        <h1>Connections</h1>
+        <h1 data-i18n="pg.conn.title">Connections</h1>
 
         <div class="card">
-          <h2>Node Identity</h2>
+          <h2 data-i18n="pg.conn.nodeIdentity">Node Identity</h2>
           <dl class="info-grid">
-            <dt>Node ID</dt>
+            <dt data-i18n="pg.info.nodeId">Node ID</dt>
             <dd id="connNodeId">Loading...</dd>
-            <dt>Port</dt>
+            <dt data-i18n="pg.info.port">Port</dt>
             <dd id="connPort">--</dd>
-            <dt>Federation Role</dt>
+            <dt data-i18n="pg.info.fedRole">Federation Role</dt>
             <dd id="connRole">--</dd>
-            <dt>Status</dt>
+            <dt data-i18n="pg.info.status">Status</dt>
             <dd id="connStatus">--</dd>
           </dl>
         </div>
 
         <div class="card">
-          <h2>Anchor / Genesis</h2>
+          <h2 data-i18n="pg.conn.anchor">Anchor / Genesis</h2>
           <dl class="info-grid">
-            <dt>Genesis URL</dt>
-            <dd id="connGenesisUrl">Not configured</dd>
-            <dt>Connection</dt>
+            <dt data-i18n="pg.info.genesisUrl">Genesis URL</dt>
+            <dd id="connGenesisUrl" data-i18n="pg.info.notConfigured">Not configured</dd>
+            <dt data-i18n="pg.info.connection">Connection</dt>
             <dd id="connGenesisStatus">--</dd>
           </dl>
         </div>
 
         <div class="card">
-          <h2>Federation Peers</h2>
+          <h2 data-i18n="pg.conn.peers">Federation Peers</h2>
           <div class="empty-state">
             <div class="icon">&#x1f310;</div>
-            <p>Federation peers will appear here once your node<br>is connected to the network.</p>
-            <p style="margin-top: 8px; font-size: 0.8rem;">Configure a Genesis URL in Settings to join a federation.</p>
+            <p data-i18n-html="pg.conn.peersEmpty">Federation peers will appear here once your node<br>is connected to the network.</p>
+            <p style="margin-top: 8px; font-size: 0.8rem;" data-i18n="pg.conn.peersHint">Configure a Genesis URL in Settings to join a federation.</p>
           </div>
         </div>
       </div>
@@ -736,91 +736,91 @@
            AI SETUP PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-ai-setup">
-        <h1>AI Setup</h1>
+        <h1 data-i18n="pg.ai.title">AI Setup</h1>
 
         <div class="card">
-          <h2>Sign in to your node</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+          <h2 data-i18n="pg.ai.signIn">Sign in to your node</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.signInDesc">
             Choosing an AI below saves it to your owner account on this node (the same place the web Dashboard
             stores it). Start the node, then sign in. No account yet? Open the Dashboard in your browser and register first.
           </p>
           <div id="aiAuthSignedOut">
             <div class="form-group">
-              <label for="aiUser">Owner username</label>
-              <input type="text" id="aiUser" placeholder="e.g. alice" autocomplete="off" />
+              <label for="aiUser" data-i18n="pg.ai.ownerUser">Owner username</label>
+              <input type="text" id="aiUser" placeholder="e.g. alice" data-i18n-ph="pg.ai.ownerUserPh" autocomplete="off" />
             </div>
             <div class="form-group">
-              <label for="aiPass">Password</label>
-              <input type="password" id="aiPass" placeholder="Your password" autocomplete="off" />
+              <label for="aiPass" data-i18n="pg.ai.password">Password</label>
+              <input type="password" id="aiPass" placeholder="Your password" data-i18n-ph="pg.ai.passwordPh" autocomplete="off" />
             </div>
-            <button class="btn" onclick="signInToNode()">Sign In</button>
+            <button class="btn" onclick="signInToNode()" data-i18n="pg.ai.signInBtn">Sign In</button>
           </div>
           <div id="aiAuthSignedIn" style="display: none;">
-            <span class="status-indicator online"><span class="dot"></span>Signed in as <span id="aiSignedInUser"></span></span>
-            <button class="btn secondary" onclick="signOutOfNode()" style="margin-left: 12px; padding: 6px 14px; font-size: 0.8rem;">Sign out</button>
+            <span class="status-indicator online"><span class="dot"></span><span data-i18n="pg.ai.signedInAs">Signed in as</span> <span id="aiSignedInUser"></span></span>
+            <button class="btn secondary" onclick="signOutOfNode()" style="margin-left: 12px; padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.ai.signOut">Sign out</button>
           </div>
         </div>
 
         <div class="card" id="currentAiCard" style="display: none;">
-          <h2>Current node AI</h2>
+          <h2 data-i18n="pg.ai.currentAi">Current node AI</h2>
           <dl class="info-grid">
-            <dt>Provider</dt>
+            <dt data-i18n="pg.ai.provider">Provider</dt>
             <dd id="curAiProvider">--</dd>
-            <dt>Model</dt>
+            <dt data-i18n="pg.ai.model">Model</dt>
             <dd id="curAiModel">--</dd>
-            <dt>Endpoint</dt>
+            <dt data-i18n="pg.ai.endpoint">Endpoint</dt>
             <dd id="curAiEndpoint">--</dd>
           </dl>
-          <p class="form-hint" style="margin-top: 12px;">This is what your node uses for AI right now.</p>
+          <p class="form-hint" style="margin-top: 12px;" data-i18n="pg.ai.currentAiHint">This is what your node uses for AI right now.</p>
         </div>
 
         <div class="card">
-          <h2>Local AI Services</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+          <h2 data-i18n="pg.ai.localServices">Local AI Services</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.localServicesDesc">
             Detect a local AI (LM Studio, Ollama) and set it as your node's AI. Pick a model, then "Use this".
           </p>
           <div id="aiServicesList">
-            <p>Scanning for local AI services...</p>
+            <p data-i18n="pg.ai.scanning">Scanning for local AI services...</p>
           </div>
           <br />
-          <button class="btn secondary" onclick="detectAI()">Scan Again</button>
+          <button class="btn secondary" onclick="detectAI()" data-i18n="pg.ai.scanAgain">Scan Again</button>
         </div>
 
         <div class="card">
-          <h2>No local AI yet? Set up Ollama (free)</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+          <h2 data-i18n="pg.ai.noAiTitle">No local AI yet? Set up Ollama (free)</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.noAiDesc">
             Ollama runs open models locally on your machine and serves them at http://localhost:11434.
           </p>
           <ol class="steps">
-            <li><strong>Download &amp; install Ollama</strong>
+            <li data-i18n-html="pg.ai.ollamaStep1"><strong>Download &amp; install Ollama</strong>
               <button class="btn secondary" onclick="openExternal('https://ollama.com/download')">Get Ollama</button></li>
-            <li><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
+            <li data-i18n-html="pg.ai.ollamaStep2"><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
               <div class="code-box">
                 <code>ollama pull qwen2.5:7b</code>
                 <button class="btn secondary" onclick="copyText('ollama pull qwen2.5:7b')" style="padding: 4px 10px; font-size: 0.72rem;">Copy</button>
               </div>
             </li>
-            <li><strong>Come back</strong> and click <em>Scan Again</em> above — it'll show up as Available.</li>
+            <li data-i18n-html="pg.ai.ollamaStep3"><strong>Come back</strong> and click <em>Scan Again</em> above — it'll show up as Available.</li>
           </ol>
         </div>
 
         <div class="card">
-          <h2>Custom AI Endpoint</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+          <h2 data-i18n="pg.ai.customTitle">Custom AI Endpoint</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.customDesc">
             Manually set an OpenAI-compatible endpoint. Saves to your account's AI settings on this node
             (same as the web Dashboard).
           </p>
           <div class="form-group">
-            <label for="customAiUrl">Endpoint URL</label>
+            <label for="customAiUrl" data-i18n="pg.ai.endpointUrl">Endpoint URL</label>
             <input type="url" id="customAiUrl" placeholder="http://localhost:1234/v1" />
-            <div class="form-hint">The OpenAI-compatible base URL (include /v1)</div>
+            <div class="form-hint" data-i18n="pg.ai.endpointUrlHint">The OpenAI-compatible base URL (include /v1)</div>
           </div>
           <div class="form-group">
-            <label for="customAiModel">Model</label>
+            <label for="customAiModel" data-i18n="pg.ai.model">Model</label>
             <input type="text" id="customAiModel" placeholder="e.g. qwen2.5:7b" />
-            <div class="form-hint">The model id the endpoint should use</div>
+            <div class="form-hint" data-i18n="pg.ai.modelHint">The model id the endpoint should use</div>
           </div>
-          <button class="btn" onclick="saveCustomAi()">Save Endpoint</button>
+          <button class="btn" onclick="saveCustomAi()" data-i18n="pg.ai.saveEndpoint">Save Endpoint</button>
         </div>
       </div>
 
@@ -828,57 +828,57 @@
            CHAT PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-chat">
-        <h1>Chat</h1>
+        <h1 data-i18n="pg.chat.title">Chat</h1>
 
         <div class="card" id="chatSetup">
-          <h2>Connect your AI chat</h2>
-          <p class="form-hint" style="margin-bottom: 16px;">
+          <h2 data-i18n="pg.chat.connect">Connect your AI chat</h2>
+          <p class="form-hint" style="margin-bottom: 16px;" data-i18n-html="pg.chat.connectDesc">
             A local Ollama model talks to your AIMEAT node <strong>as your own registered agent</strong>. It can read
             and manage your organisms, workspaces, knowledge, and see which agents are active.
           </p>
 
           <div id="chatOllamaStatus" style="margin-bottom: 14px;">Checking Ollama…</div>
           <div id="chatOllamaHelp" style="display: none; margin-bottom: 18px;">
-            <p class="form-hint" style="margin-bottom: 10px;">
+            <p class="form-hint" style="margin-bottom: 10px;" data-i18n="pg.chat.ollamaHelp">
               Ollama runs the local AI model on your machine (free). Install it, pull a model, then re-scan.
             </p>
             <ol class="steps" style="margin-bottom: 10px;">
-              <li><strong>Download &amp; install Ollama</strong>
+              <li data-i18n-html="pg.ai.ollamaStep1"><strong>Download &amp; install Ollama</strong>
                 <button class="btn secondary" onclick="openExternal('https://ollama.com/download')">Get Ollama</button></li>
-              <li><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
+              <li data-i18n-html="pg.ai.ollamaStep2"><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
                 <div class="code-box">
                   <code>ollama pull qwen2.5:7b</code>
                   <button class="btn secondary" onclick="copyText('ollama pull qwen2.5:7b')" style="padding: 4px 10px; font-size: 0.72rem;">Copy</button>
                 </div>
               </li>
-              <li><strong>Make sure Ollama is running</strong>, then re-scan.</li>
+              <li data-i18n-html="pg.chat.ollamaStep3"><strong>Make sure Ollama is running</strong>, then re-scan.</li>
             </ol>
-            <button class="btn secondary" onclick="chatOpened()">Re-scan for Ollama</button>
+            <button class="btn secondary" onclick="chatOpened()" data-i18n="pg.chat.rescan">Re-scan for Ollama</button>
           </div>
 
           <div class="form-group">
-            <label for="chatTarget">Node</label>
+            <label for="chatTarget" data-i18n="pg.chat.node">Node</label>
             <select id="chatTarget" class="ai-model-select" style="max-width: none; width: 100%;">
-              <option value="local">This node (localhost)</option>
+              <option value="local" data-i18n="pg.chat.thisNode">This node (localhost)</option>
               <option value="aimeat">aimeat.io</option>
             </select>
           </div>
           <div class="form-group">
-            <label for="chatUser">Owner username</label>
-            <input type="text" id="chatUser" placeholder="e.g. alice" autocomplete="off" />
-            <div class="form-hint">Required — you sign in to your owner account before each connection.</div>
+            <label for="chatUser" data-i18n="pg.ai.ownerUser">Owner username</label>
+            <input type="text" id="chatUser" placeholder="e.g. alice" data-i18n-ph="pg.ai.ownerUserPh" autocomplete="off" />
+            <div class="form-hint" data-i18n="pg.chat.ownerHint">Required — you sign in to your owner account before each connection.</div>
           </div>
           <div class="form-group">
-            <label for="chatPass">Password</label>
-            <input type="password" id="chatPass" placeholder="Your password" autocomplete="off" />
+            <label for="chatPass" data-i18n="pg.ai.password">Password</label>
+            <input type="password" id="chatPass" placeholder="Your password" data-i18n-ph="pg.ai.passwordPh" autocomplete="off" />
           </div>
           <div class="form-group">
-            <label for="chatModel">Ollama model</label>
+            <label for="chatModel" data-i18n="pg.chat.ollamaModel">Ollama model</label>
             <select id="chatModel" class="ai-model-select" style="max-width: none; width: 100%;"></select>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="btn" id="chatConnectBtn" onclick="chatConnect()">Register &amp; Start Chat</button>
-            <button class="btn secondary" onclick="openChatMemory()" style="padding: 8px 16px;">Saved chats</button>
+            <button class="btn" id="chatConnectBtn" onclick="chatConnect()" data-i18n="pg.chat.startChat">Register &amp; Start Chat</button>
+            <button class="btn secondary" onclick="openChatMemory()" style="padding: 8px 16px;" data-i18n="pg.chat.savedChats">Saved chats</button>
           </div>
           <p id="chatSetupStatus" class="form-hint" style="margin-top: 12px;"></p>
         </div>
@@ -888,16 +888,16 @@
             <span class="status-indicator online"><span class="dot"></span><span id="chatAgentLabel">agent</span></span>
             <span id="chatModelLabel" class="chat-model-chip"></span>
             <label style="font-size: 0.8rem; color: #a78bfa; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: auto;">
-              <input type="checkbox" id="chatAutoApprove" onchange="chatToggleAuto()" /> Auto-approve writes
+              <input type="checkbox" id="chatAutoApprove" onchange="chatToggleAuto()" /> <span data-i18n="pg.chat.autoApprove">Auto-approve writes</span>
             </label>
-            <button class="btn secondary" onclick="chatClearCurrent()" style="padding: 6px 14px; font-size: 0.8rem;">Clear</button>
-            <button class="btn secondary" onclick="chatStop()" style="padding: 6px 14px; font-size: 0.8rem;">Disconnect</button>
+            <button class="btn secondary" onclick="chatClearCurrent()" style="padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.chat.clear">Clear</button>
+            <button class="btn secondary" onclick="chatStop()" style="padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.chat.disconnect">Disconnect</button>
           </div>
           <div id="chatLog" class="chat-log"></div>
           <div class="chat-input">
-            <input type="text" id="chatInput" placeholder="Ask about your organisms, workspaces, knowledge…"
+            <input type="text" id="chatInput" placeholder="Ask about your organisms, workspaces, knowledge…" data-i18n-ph="pg.chat.inputPh"
               onkeydown="if(event.key==='Enter')chatSend()" disabled />
-            <button class="btn" id="chatSendBtn" onclick="chatSend()" disabled>Send</button>
+            <button class="btn" id="chatSendBtn" onclick="chatSend()" disabled data-i18n="pg.chat.send">Send</button>
           </div>
         </div>
 
@@ -905,10 +905,10 @@
         <div id="chatMemoryModal" class="chat-modal" style="display: none;">
           <div class="chat-modal-card">
             <div class="chat-modal-head">
-              <h2 style="margin: 0;">Saved chats</h2>
-              <button class="btn secondary" onclick="closeChatMemory()" style="padding: 4px 14px;">Close</button>
+              <h2 style="margin: 0;" data-i18n="pg.chat.savedChats">Saved chats</h2>
+              <button class="btn secondary" onclick="closeChatMemory()" style="padding: 4px 14px;" data-i18n="or.close">Close</button>
             </div>
-            <p class="form-hint" style="margin: 8px 0 14px;">
+            <p class="form-hint" style="margin: 8px 0 14px;" data-i18n="pg.chat.savedHint">
               Each saved conversation is tied to a host + owner + model and lives only on this machine. The AI
               re-reads live data every turn, so resuming a chat never shows stale information.
             </p>
@@ -921,48 +921,48 @@
            AGENTS PAGE — local crewaimeat fleet manager (normal-user)
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-agents">
-        <h1>Agents</h1>
+        <h1 data-i18n="nav.agents">Agents</h1>
 
         <div class="card">
-          <h2>Local agents (runs on your machine)</h2>
-          <p style="color:#a78bfa; font-size:0.9rem;">
+          <h2 data-i18n="pg.ag.local">Local agents (runs on your machine)</h2>
+          <p style="color:#a78bfa; font-size:0.9rem;" data-i18n="pg.ag.localDesc">
             Set up a CrewAI agent that runs fully on your computer using a local Ollama model (Gemma) —
             no API keys, nothing leaves your machine. One-time setup, then start/stop it here.
           </p>
           <div style="margin:12px 0;">
-            <label style="display:block; margin-bottom:6px;">Local model
+            <label style="display:block; margin-bottom:6px;"><span data-i18n="pg.ag.localModel">Local model</span>
               <input id="agentModel" type="text" value="gemma3" style="margin-left:8px; width:160px;" />
             </label>
-            <label style="display:block; margin:6px 0;"><input id="agentInstallUv" type="checkbox" /> Install <code>uv</code> if missing</label>
-            <label style="display:block; margin:6px 0;"><input id="agentPullModel" type="checkbox" checked /> Pull the model with Ollama</label>
+            <label style="display:block; margin:6px 0;"><input id="agentInstallUv" type="checkbox" /> <span data-i18n-html="pg.ag.installUv">Install <code>uv</code> if missing</span></label>
+            <label style="display:block; margin:6px 0;"><input id="agentPullModel" type="checkbox" checked /> <span data-i18n="pg.ag.pullModel">Pull the model with Ollama</span></label>
           </div>
-          <button class="btn" id="agentProvisionBtn" onclick="provisionAgents()">Enable local agents</button>
-          <p id="agentProvisionHint" style="font-size:0.82rem; color:#9ca3af; margin-top:8px;">
+          <button class="btn" id="agentProvisionBtn" onclick="provisionAgents()" data-i18n="pg.ag.enable">Enable local agents</button>
+          <p id="agentProvisionHint" style="font-size:0.82rem; color:#9ca3af; margin-top:8px;" data-i18n-html="pg.ag.needs">
             Needs Git, <code>uv</code> (or check the box above) and <a href="#" onclick="openExternal('https://ollama.com');return false;">Ollama</a>.
           </p>
         </div>
 
         <div class="card">
-          <h2>Run an agent</h2>
+          <h2 data-i18n="pg.ag.run">Run an agent</h2>
           <div style="margin:8px 0;">
-            <label style="display:block; margin-bottom:6px;">Agent name
+            <label style="display:block; margin-bottom:6px;"><span data-i18n="pg.ag.agentName">Agent name</span>
               <input id="agentName" type="text" placeholder="my-agent" style="margin-left:8px; width:160px;" />
             </label>
-            <label style="display:block; margin-bottom:6px;">Crew module
+            <label style="display:block; margin-bottom:6px;"><span data-i18n="pg.ag.crewModule">Crew module</span>
               <input id="agentCrew" type="text" value="crewaimeat.research_crew" style="margin-left:8px; width:280px;" />
             </label>
           </div>
-          <button class="btn" id="agentStartBtn" onclick="startAgent()">Start agent</button>
-          <button class="btn secondary" id="agentStopBtn" onclick="stopAgent()">Stop</button>
-          <span id="agentState" style="margin-left:12px; color:#a78bfa;">stopped</span>
-          <p style="font-size:0.82rem; color:#9ca3af; margin-top:8px;">
+          <button class="btn" id="agentStartBtn" onclick="startAgent()" data-i18n="pg.ag.start">Start agent</button>
+          <button class="btn secondary" id="agentStopBtn" onclick="stopAgent()" data-i18n="pg.ag.stop">Stop</button>
+          <span id="agentState" style="margin-left:12px; color:#a78bfa;" data-i18n="pg.ag.stopped">stopped</span>
+          <p style="font-size:0.82rem; color:#9ca3af; margin-top:8px;" data-i18n-html="pg.ag.queueHint">
             Queue work for it from the web dashboard: Profile → Agents → your agent → Tasks → + New Task.
             <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>
           </p>
         </div>
 
         <div class="card">
-          <h2>Activity</h2>
+          <h2 data-i18n="fw.activity">Activity</h2>
           <pre id="agentLog" style="max-height:280px; overflow:auto; background:#0b0b12; padding:10px; border-radius:8px; font-size:0.78rem; white-space:pre-wrap;"></pre>
         </div>
       </div>
@@ -971,71 +971,71 @@
            SETTINGS PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-settings">
-        <h1>Settings</h1>
+        <h1 data-i18n="nav.settings">Settings</h1>
 
         <div class="card">
-          <h2>Node Settings</h2>
+          <h2 data-i18n="pg.set.nodeSettings">Node Settings</h2>
           <div class="form-group">
-            <label for="settingsNodeId">Node ID</label>
+            <label for="settingsNodeId" data-i18n="pg.info.nodeId">Node ID</label>
             <input type="text" id="settingsNodeId" readonly />
-            <div class="form-hint">Generated during setup. Cannot be changed.</div>
+            <div class="form-hint" data-i18n="pg.set.nodeIdHint">Generated during setup. Cannot be changed.</div>
           </div>
           <div class="form-group">
-            <label for="settingsPort">Port</label>
+            <label for="settingsPort" data-i18n="pg.info.port">Port</label>
             <input type="number" id="settingsPort" min="1024" max="65535" value="40050" />
-            <div class="form-hint">Network port for the AIMEAT server (default: 40050)</div>
+            <div class="form-hint" data-i18n="pg.set.portHint">Network port for the AIMEAT server (default: 40050)</div>
           </div>
           <div class="form-group">
-            <label for="settingsRole">Federation Role</label>
+            <label for="settingsRole" data-i18n="pg.info.fedRole">Federation Role</label>
             <select id="settingsRole">
-              <option value="standalone">Standalone</option>
-              <option value="operator">Operator (Genesis)</option>
-              <option value="contributor">Contributor (Anchor)</option>
-              <option value="personal">Personal</option>
+              <option value="standalone" data-i18n="pg.set.roleStandalone">Standalone</option>
+              <option value="operator" data-i18n="pg.set.roleOperator">Operator (Genesis)</option>
+              <option value="contributor" data-i18n="pg.set.roleContributor">Contributor (Anchor)</option>
+              <option value="personal" data-i18n="pg.set.rolePersonal">Personal</option>
             </select>
-            <div class="form-hint">Determines how this node participates in the network</div>
+            <div class="form-hint" data-i18n="pg.set.roleHint">Determines how this node participates in the network</div>
           </div>
         </div>
 
         <div class="card">
-          <h2>Storage</h2>
+          <h2 data-i18n="pg.set.storage">Storage</h2>
           <dl class="info-grid">
-            <dt>Backend</dt>
-            <dd>SQLite (persistent — survives restarts)</dd>
-            <dt>Database</dt>
+            <dt data-i18n="pg.set.backend">Backend</dt>
+            <dd data-i18n="pg.set.sqlitePersist">SQLite (persistent — survives restarts)</dd>
+            <dt data-i18n="pg.set.database">Database</dt>
             <dd id="settingsDbPath">--</dd>
           </dl>
-          <p class="form-hint" style="margin-top: 12px;">
+          <p class="form-hint" style="margin-top: 12px;" data-i18n="pg.set.storageHint">
             Your data lives in this folder. Back it up by copying the whole folder while the node is stopped.
           </p>
         </div>
 
         <div class="card">
-          <h2>Security</h2>
+          <h2 data-i18n="pg.set.security">Security</h2>
           <dl class="info-grid">
-            <dt>API-key encryption</dt>
+            <dt data-i18n="pg.set.apiEnc">API-key encryption</dt>
             <dd id="settingsEncStatus">--</dd>
           </dl>
-          <p class="form-hint" style="margin-top: 12px;">
+          <p class="form-hint" style="margin-top: 12px;" data-i18n="pg.set.apiEncHint">
             Required to store your OpenRouter API key. Auto-generated on this node — no setup needed.
           </p>
         </div>
 
         <div class="card">
-          <h2>Federation</h2>
+          <h2 data-i18n="pg.set.federation">Federation</h2>
           <div class="form-group">
-            <label for="settingsGenesisUrl">Genesis URL</label>
+            <label for="settingsGenesisUrl" data-i18n="pg.info.genesisUrl">Genesis URL</label>
             <input type="url" id="settingsGenesisUrl" placeholder="https://genesis.example.com" />
-            <div class="form-hint">URL of the genesis node to connect to (for contributor/personal roles)</div>
+            <div class="form-hint" data-i18n="pg.set.genesisHint">URL of the genesis node to connect to (for contributor/personal roles)</div>
           </div>
         </div>
 
         <div class="card">
-          <h2>AI Connection</h2>
+          <h2 data-i18n="pg.set.aiConnection">AI Connection</h2>
           <div class="form-group">
-            <label for="settingsAiEndpoint">AI Endpoint URL</label>
+            <label for="settingsAiEndpoint" data-i18n="pg.set.aiEndpoint">AI Endpoint URL</label>
             <input type="url" id="settingsAiEndpoint" placeholder="http://localhost:1234/v1" />
-            <div class="form-hint">OpenAI-compatible endpoint for AI features</div>
+            <div class="form-hint" data-i18n="pg.set.aiEndpointHint">OpenAI-compatible endpoint for AI features</div>
           </div>
           <div style="margin-top: 8px;">
             <span id="settingsAiStatus"></span>
@@ -1043,8 +1043,8 @@
         </div>
 
         <div style="display: flex; gap: 12px; margin-top: 8px;">
-          <button class="btn" onclick="saveSettings()">Save Settings</button>
-          <button class="btn secondary" onclick="loadSettings()">Reset</button>
+          <button class="btn" onclick="saveSettings()" data-i18n="pg.set.save">Save Settings</button>
+          <button class="btn secondary" onclick="loadSettings()" data-i18n="pg.set.reset">Reset</button>
         </div>
       </div>
 
@@ -1052,24 +1052,24 @@
            LOGS PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-logs">
-        <h1>Logs</h1>
+        <h1 data-i18n="nav.logs">Logs</h1>
 
         <div class="card">
           <div class="log-controls">
             <label>
               <input type="checkbox" id="logAutoScroll" checked />
-              Auto-scroll
+              <span data-i18n="pg.logs.autoScroll">Auto-scroll</span>
             </label>
             <label>
               <input type="checkbox" id="logAutoRefresh" checked />
-              Auto-refresh (2s)
+              <span data-i18n="pg.logs.autoRefresh">Auto-refresh (2s)</span>
             </label>
             <div style="margin-left: auto; display: flex; gap: 8px;">
-              <button class="btn secondary" onclick="refreshLogs()" style="padding: 6px 14px; font-size: 0.8rem;">Refresh</button>
-              <button class="btn danger" onclick="clearLogs()" style="padding: 6px 14px; font-size: 0.8rem;">Clear Logs</button>
+              <button class="btn secondary" onclick="refreshLogs()" style="padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.logs.refresh">Refresh</button>
+              <button class="btn danger" onclick="clearLogs()" style="padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.logs.clear">Clear Logs</button>
             </div>
           </div>
-          <div class="log-viewer" id="logViewer">No log output yet. Start the node to see logs.</div>
+          <div class="log-viewer" id="logViewer" data-i18n="pg.logs.empty">No log output yet. Start the node to see logs.</div>
         </div>
       </div>
 
@@ -1188,6 +1188,76 @@
         'or.close': 'Close',
         'common.openDashboard': 'Open Dashboard',
         'common.startNode': 'Start Node', 'common.stopNode': 'Stop Node',
+        'pg.dash.title': 'Dashboard',
+        'pg.dash.gettingStarted': 'Getting Started',
+        'pg.dash.step1': '<strong>Start your node</strong> — click <em>Start Node</em> below.',
+        'pg.dash.step2': '<strong>Create your account</strong> — open the web dashboard and register. <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>',
+        'pg.dash.step3': '<strong>Connect a local AI</strong> (optional) — go to <em>AI Setup</em>, sign in, pick a model. <button class="btn secondary" onclick="navigateTo(\'ai-setup\')">AI Setup</button>',
+        'pg.dash.nodeStatus': 'Node Status',
+        'pg.dash.openBrowser': 'Open Dashboard in Browser',
+        'pg.dash.quickInfo': 'Quick Info',
+        'pg.info.nodeId': 'Node ID', 'pg.info.port': 'Port', 'pg.info.role': 'Role',
+        'pg.info.storage': 'Storage', 'pg.info.sqlite': 'SQLite (persistent)', 'pg.info.dataFolder': 'Data folder',
+        'pg.info.fedRole': 'Federation Role', 'pg.info.status': 'Status', 'pg.info.genesisUrl': 'Genesis URL',
+        'pg.info.notConfigured': 'Not configured', 'pg.info.connection': 'Connection',
+        'pg.conn.title': 'Connections', 'pg.conn.nodeIdentity': 'Node Identity', 'pg.conn.anchor': 'Anchor / Genesis',
+        'pg.conn.peers': 'Federation Peers',
+        'pg.conn.peersEmpty': 'Federation peers will appear here once your node<br>is connected to the network.',
+        'pg.conn.peersHint': 'Configure a Genesis URL in Settings to join a federation.',
+        'pg.ai.title': 'AI Setup', 'pg.ai.signIn': 'Sign in to your node',
+        'pg.ai.signInDesc': 'Choosing an AI below saves it to your owner account on this node (the same place the web Dashboard stores it). Start the node, then sign in. No account yet? Open the Dashboard in your browser and register first.',
+        'pg.ai.ownerUser': 'Owner username', 'pg.ai.ownerUserPh': 'e.g. alice',
+        'pg.ai.password': 'Password', 'pg.ai.passwordPh': 'Your password',
+        'pg.ai.signInBtn': 'Sign In', 'pg.ai.signedInAs': 'Signed in as', 'pg.ai.signOut': 'Sign out',
+        'pg.ai.currentAi': 'Current node AI', 'pg.ai.provider': 'Provider', 'pg.ai.model': 'Model', 'pg.ai.endpoint': 'Endpoint',
+        'pg.ai.currentAiHint': 'This is what your node uses for AI right now.',
+        'pg.ai.localServices': 'Local AI Services',
+        'pg.ai.localServicesDesc': 'Detect a local AI (LM Studio, Ollama) and set it as your node\'s AI. Pick a model, then "Use this".',
+        'pg.ai.scanning': 'Scanning for local AI services...', 'pg.ai.scanAgain': 'Scan Again',
+        'pg.ai.noAiTitle': 'No local AI yet? Set up Ollama (free)',
+        'pg.ai.noAiDesc': 'Ollama runs open models locally on your machine and serves them at http://localhost:11434.',
+        'pg.ai.ollamaStep1': '<strong>Download &amp; install Ollama</strong> <button class="btn secondary" onclick="openExternal(\'https://ollama.com/download\')">Get Ollama</button>',
+        'pg.ai.ollamaStep2': '<strong>Pull a model</strong> — open a terminal (PowerShell) and run: <div class="code-box"><code>ollama pull qwen2.5:7b</code><button class="btn secondary" onclick="copyText(\'ollama pull qwen2.5:7b\')" style="padding: 4px 10px; font-size: 0.72rem;">Copy</button></div>',
+        'pg.ai.ollamaStep3': '<strong>Come back</strong> and click <em>Scan Again</em> above — it\'ll show up as Available.',
+        'pg.ai.customTitle': 'Custom AI Endpoint',
+        'pg.ai.customDesc': 'Manually set an OpenAI-compatible endpoint. Saves to your account\'s AI settings on this node (same as the web Dashboard).',
+        'pg.ai.endpointUrl': 'Endpoint URL', 'pg.ai.endpointUrlHint': 'The OpenAI-compatible base URL (include /v1)',
+        'pg.ai.modelHint': 'The model id the endpoint should use', 'pg.ai.saveEndpoint': 'Save Endpoint',
+        'pg.chat.title': 'Chat', 'pg.chat.connect': 'Connect your AI chat',
+        'pg.chat.connectDesc': 'A local Ollama model talks to your AIMEAT node <strong>as your own registered agent</strong>. It can read and manage your organisms, workspaces, knowledge, and see which agents are active.',
+        'pg.chat.ollamaHelp': 'Ollama runs the local AI model on your machine (free). Install it, pull a model, then re-scan.',
+        'pg.chat.ollamaStep3': '<strong>Make sure Ollama is running</strong>, then re-scan.',
+        'pg.chat.rescan': 'Re-scan for Ollama', 'pg.chat.node': 'Node', 'pg.chat.thisNode': 'This node (localhost)',
+        'pg.chat.ownerHint': 'Required — you sign in to your owner account before each connection.',
+        'pg.chat.ollamaModel': 'Ollama model', 'pg.chat.startChat': 'Register & Start Chat', 'pg.chat.savedChats': 'Saved chats',
+        'pg.chat.autoApprove': 'Auto-approve writes', 'pg.chat.clear': 'Clear', 'pg.chat.disconnect': 'Disconnect',
+        'pg.chat.inputPh': 'Ask about your organisms, workspaces, knowledge…', 'pg.chat.send': 'Send',
+        'pg.chat.savedHint': 'Each saved conversation is tied to a host + owner + model and lives only on this machine. The AI re-reads live data every turn, so resuming a chat never shows stale information.',
+        'pg.ag.local': 'Local agents (runs on your machine)',
+        'pg.ag.localDesc': 'Set up a CrewAI agent that runs fully on your computer using a local Ollama model (Gemma) — no API keys, nothing leaves your machine. One-time setup, then start/stop it here.',
+        'pg.ag.localModel': 'Local model', 'pg.ag.installUv': 'Install <code>uv</code> if missing',
+        'pg.ag.pullModel': 'Pull the model with Ollama', 'pg.ag.enable': 'Enable local agents',
+        'pg.ag.needs': 'Needs Git, <code>uv</code> (or check the box above) and <a href="#" onclick="openExternal(\'https://ollama.com\');return false;">Ollama</a>.',
+        'pg.ag.run': 'Run an agent', 'pg.ag.agentName': 'Agent name', 'pg.ag.crewModule': 'Crew module',
+        'pg.ag.start': 'Start agent', 'pg.ag.stop': 'Stop', 'pg.ag.stopped': 'stopped',
+        'pg.ag.queueHint': 'Queue work for it from the web dashboard: Profile → Agents → your agent → Tasks → + New Task. <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>',
+        'pg.set.nodeSettings': 'Node Settings', 'pg.set.nodeIdHint': 'Generated during setup. Cannot be changed.',
+        'pg.set.portHint': 'Network port for the AIMEAT server (default: 40050)',
+        'pg.set.roleStandalone': 'Standalone', 'pg.set.roleOperator': 'Operator (Genesis)',
+        'pg.set.roleContributor': 'Contributor (Anchor)', 'pg.set.rolePersonal': 'Personal',
+        'pg.set.roleHint': 'Determines how this node participates in the network',
+        'pg.set.storage': 'Storage', 'pg.set.backend': 'Backend', 'pg.set.sqlitePersist': 'SQLite (persistent — survives restarts)',
+        'pg.set.database': 'Database',
+        'pg.set.storageHint': 'Your data lives in this folder. Back it up by copying the whole folder while the node is stopped.',
+        'pg.set.security': 'Security', 'pg.set.apiEnc': 'API-key encryption',
+        'pg.set.apiEncHint': 'Required to store your OpenRouter API key. Auto-generated on this node — no setup needed.',
+        'pg.set.federation': 'Federation', 'pg.set.genesisHint': 'URL of the genesis node to connect to (for contributor/personal roles)',
+        'pg.set.aiConnection': 'AI Connection', 'pg.set.aiEndpoint': 'AI Endpoint URL',
+        'pg.set.aiEndpointHint': 'OpenAI-compatible endpoint for AI features', 'pg.set.save': 'Save Settings', 'pg.set.reset': 'Reset',
+        'pg.logs.autoScroll': 'Auto-scroll', 'pg.logs.autoRefresh': 'Auto-refresh (2s)',
+        'pg.logs.refresh': 'Refresh', 'pg.logs.clear': 'Clear Logs', 'pg.logs.empty': 'No log output yet. Start the node to see logs.',
+        'pg.status.runningPort': 'Running on port {port}', 'pg.status.notRunning': 'Node is not running', 'pg.status.uptime': 'Uptime: {m}m {s}s',
+        'pg.ag.running': 'running',
       },
       fi: {
         'nav.home': 'Etusivu', 'nav.dashboard': 'Hallinta', 'nav.connections': 'Yhteydet',
@@ -1255,6 +1325,76 @@
         'or.close': 'Sulje',
         'common.openDashboard': 'Avaa hallinta',
         'common.startNode': 'Käynnistä node', 'common.stopNode': 'Pysäytä node',
+        'pg.dash.title': 'Hallinta',
+        'pg.dash.gettingStarted': 'Aloitus',
+        'pg.dash.step1': '<strong>Käynnistä node</strong> — klikkaa alla <em>Käynnistä node</em>.',
+        'pg.dash.step2': '<strong>Luo tili</strong> — avaa web-hallintapaneeli ja rekisteröidy. <button class="btn secondary" onclick="openPortal()">Avaa hallinta</button>',
+        'pg.dash.step3': '<strong>Kytke paikallinen tekoäly</strong> (valinnainen) — mene <em>Tekoälyasetukset</em>, kirjaudu, valitse malli. <button class="btn secondary" onclick="navigateTo(\'ai-setup\')">Tekoälyasetukset</button>',
+        'pg.dash.nodeStatus': 'Noden tila',
+        'pg.dash.openBrowser': 'Avaa hallinta selaimessa',
+        'pg.dash.quickInfo': 'Pikatiedot',
+        'pg.info.nodeId': 'Node-ID', 'pg.info.port': 'Portti', 'pg.info.role': 'Rooli',
+        'pg.info.storage': 'Tallennus', 'pg.info.sqlite': 'SQLite (pysyvä)', 'pg.info.dataFolder': 'Datakansio',
+        'pg.info.fedRole': 'Federaatiorooli', 'pg.info.status': 'Tila', 'pg.info.genesisUrl': 'Genesis-URL',
+        'pg.info.notConfigured': 'Ei määritetty', 'pg.info.connection': 'Yhteys',
+        'pg.conn.title': 'Yhteydet', 'pg.conn.nodeIdentity': 'Noden identiteetti', 'pg.conn.anchor': 'Anchor / Genesis',
+        'pg.conn.peers': 'Federaation vertaiset',
+        'pg.conn.peersEmpty': 'Federaation vertaiset näkyvät tässä, kun nodesi<br>on yhdistetty verkkoon.',
+        'pg.conn.peersHint': 'Määritä Genesis-URL Asetuksissa liittyäksesi federaatioon.',
+        'pg.ai.title': 'Tekoälyasetukset', 'pg.ai.signIn': 'Kirjaudu nodeesi',
+        'pg.ai.signInDesc': 'Alta valittu tekoäly tallennetaan omistajatilillesi tällä nodella (sama paikka kuin web-hallintapaneeli). Käynnistä node ja kirjaudu. Ei tiliä vielä? Avaa hallinta selaimessa ja rekisteröidy ensin.',
+        'pg.ai.ownerUser': 'Omistajan käyttäjänimi', 'pg.ai.ownerUserPh': 'esim. alice',
+        'pg.ai.password': 'Salasana', 'pg.ai.passwordPh': 'Salasanasi',
+        'pg.ai.signInBtn': 'Kirjaudu', 'pg.ai.signedInAs': 'Kirjautunut käyttäjänä', 'pg.ai.signOut': 'Kirjaudu ulos',
+        'pg.ai.currentAi': 'Noden nykyinen tekoäly', 'pg.ai.provider': 'Tarjoaja', 'pg.ai.model': 'Malli', 'pg.ai.endpoint': 'Päätepiste',
+        'pg.ai.currentAiHint': 'Tätä nodesi käyttää tekoälyyn juuri nyt.',
+        'pg.ai.localServices': 'Paikalliset tekoälypalvelut',
+        'pg.ai.localServicesDesc': 'Havaitse paikallinen tekoäly (LM Studio, Ollama) ja aseta se nodesi tekoälyksi. Valitse malli ja "Käytä tätä".',
+        'pg.ai.scanning': 'Etsitään paikallisia tekoälypalveluita...', 'pg.ai.scanAgain': 'Skannaa uudelleen',
+        'pg.ai.noAiTitle': 'Ei paikallista tekoälyä? Asenna Ollama (ilmainen)',
+        'pg.ai.noAiDesc': 'Ollama ajaa avoimia malleja paikallisesti koneellasi ja tarjoaa ne osoitteessa http://localhost:11434.',
+        'pg.ai.ollamaStep1': '<strong>Lataa &amp; asenna Ollama</strong> <button class="btn secondary" onclick="openExternal(\'https://ollama.com/download\')">Hae Ollama</button>',
+        'pg.ai.ollamaStep2': '<strong>Vedä malli</strong> — avaa terminaali (PowerShell) ja aja: <div class="code-box"><code>ollama pull qwen2.5:7b</code><button class="btn secondary" onclick="copyText(\'ollama pull qwen2.5:7b\')" style="padding: 4px 10px; font-size: 0.72rem;">Kopioi</button></div>',
+        'pg.ai.ollamaStep3': '<strong>Palaa takaisin</strong> ja klikkaa yllä <em>Skannaa uudelleen</em> — se näkyy Saatavilla-tilassa.',
+        'pg.ai.customTitle': 'Mukautettu tekoälypäätepiste',
+        'pg.ai.customDesc': 'Aseta käsin OpenAI-yhteensopiva päätepiste. Tallentuu tilisi tekoälyasetuksiin tällä nodella (kuten web-hallinta).',
+        'pg.ai.endpointUrl': 'Päätepisteen URL', 'pg.ai.endpointUrlHint': 'OpenAI-yhteensopiva perus-URL (sisällytä /v1)',
+        'pg.ai.modelHint': 'Mallin id jota päätepiste käyttää', 'pg.ai.saveEndpoint': 'Tallenna päätepiste',
+        'pg.chat.title': 'Chat', 'pg.chat.connect': 'Yhdistä tekoälychat',
+        'pg.chat.connectDesc': 'Paikallinen Ollama-malli puhuu AIMEAT-nodellesi <strong>omana rekisteröitynä agenttinasi</strong>. Se voi lukea ja hallita organismejasi, työtilojasi, tietämystäsi, ja nähdä mitkä agentit ovat aktiivisia.',
+        'pg.chat.ollamaHelp': 'Ollama ajaa paikallisen tekoälymallin koneellasi (ilmainen). Asenna se, vedä malli, ja skannaa uudelleen.',
+        'pg.chat.ollamaStep3': '<strong>Varmista että Ollama on käynnissä</strong>, ja skannaa uudelleen.',
+        'pg.chat.rescan': 'Skannaa Ollama uudelleen', 'pg.chat.node': 'Node', 'pg.chat.thisNode': 'Tämä node (localhost)',
+        'pg.chat.ownerHint': 'Pakollinen — kirjaudut omistajatilillesi ennen jokaista yhteyttä.',
+        'pg.chat.ollamaModel': 'Ollama-malli', 'pg.chat.startChat': 'Rekisteröi & aloita chat', 'pg.chat.savedChats': 'Tallennetut chatit',
+        'pg.chat.autoApprove': 'Hyväksy kirjoitukset automaattisesti', 'pg.chat.clear': 'Tyhjennä', 'pg.chat.disconnect': 'Katkaise',
+        'pg.chat.inputPh': 'Kysy organismeistasi, työtiloistasi, tietämyksestäsi…', 'pg.chat.send': 'Lähetä',
+        'pg.chat.savedHint': 'Jokainen tallennettu keskustelu on sidottu isäntään + omistajaan + malliin ja elää vain tällä koneella. Tekoäly lukee live-datan joka vuorolla, joten keskustelun jatkaminen ei näytä vanhentunutta tietoa.',
+        'pg.ag.local': 'Paikalliset agentit (pyörivät koneellasi)',
+        'pg.ag.localDesc': 'Pystytä CrewAI-agentti joka pyörii täysin koneellasi paikallisella Ollama-mallilla (Gemma) — ei API-avaimia, mikään ei lähde koneeltasi. Kertapystytys, sitten start/stop tästä.',
+        'pg.ag.localModel': 'Paikallinen malli', 'pg.ag.installUv': 'Asenna <code>uv</code> jos puuttuu',
+        'pg.ag.pullModel': 'Vedä malli Ollamalla', 'pg.ag.enable': 'Ota paikalliset agentit käyttöön',
+        'pg.ag.needs': 'Tarvitsee Gitin, <code>uv</code>:n (tai ruksaa yllä oleva ruutu) ja <a href="#" onclick="openExternal(\'https://ollama.com\');return false;">Ollaman</a>.',
+        'pg.ag.run': 'Aja agentti', 'pg.ag.agentName': 'Agentin nimi', 'pg.ag.crewModule': 'Crew-moduuli',
+        'pg.ag.start': 'Käynnistä agentti', 'pg.ag.stop': 'Pysäytä', 'pg.ag.stopped': 'pysäytetty',
+        'pg.ag.queueHint': 'Jonota sille työtä web-hallinnasta: Profiili → Agentit → agenttisi → Tehtävät → + Uusi tehtävä. <button class="btn secondary" onclick="openPortal()">Avaa hallinta</button>',
+        'pg.set.nodeSettings': 'Noden asetukset', 'pg.set.nodeIdHint': 'Luotu asennuksen aikana. Ei muutettavissa.',
+        'pg.set.portHint': 'AIMEAT-serverin verkkoportti (oletus: 40050)',
+        'pg.set.roleStandalone': 'Itsenäinen', 'pg.set.roleOperator': 'Operaattori (Genesis)',
+        'pg.set.roleContributor': 'Osallistuja (Anchor)', 'pg.set.rolePersonal': 'Henkilökohtainen',
+        'pg.set.roleHint': 'Määrittää miten tämä node osallistuu verkkoon',
+        'pg.set.storage': 'Tallennus', 'pg.set.backend': 'Taustajärjestelmä', 'pg.set.sqlitePersist': 'SQLite (pysyvä — säilyy uudelleenkäynnistyksissä)',
+        'pg.set.database': 'Tietokanta',
+        'pg.set.storageHint': 'Datasi elää tässä kansiossa. Varmuuskopioi kopioimalla koko kansio kun node on pysäytetty.',
+        'pg.set.security': 'Tietoturva', 'pg.set.apiEnc': 'API-avaimen salaus',
+        'pg.set.apiEncHint': 'Vaaditaan OpenRouter-API-avaimesi tallentamiseen. Generoidaan automaattisesti tällä nodella — ei asennusta.',
+        'pg.set.federation': 'Federaatio', 'pg.set.genesisHint': 'Genesis-noden URL johon yhdistetään (osallistuja/henkilökohtainen-rooleille)',
+        'pg.set.aiConnection': 'Tekoälyyhteys', 'pg.set.aiEndpoint': 'Tekoälypäätepisteen URL',
+        'pg.set.aiEndpointHint': 'OpenAI-yhteensopiva päätepiste tekoälyominaisuuksille', 'pg.set.save': 'Tallenna asetukset', 'pg.set.reset': 'Palauta',
+        'pg.logs.autoScroll': 'Automaattivieritys', 'pg.logs.autoRefresh': 'Automaattipäivitys (2s)',
+        'pg.logs.refresh': 'Päivitä', 'pg.logs.clear': 'Tyhjennä lokit', 'pg.logs.empty': 'Ei lokia vielä. Käynnistä node nähdäksesi lokit.',
+        'pg.status.runningPort': 'Käynnissä portissa {port}', 'pg.status.notRunning': 'Node ei ole käynnissä', 'pg.status.uptime': 'Käynnissä: {m}m {s}s',
+        'pg.ag.running': 'käynnissä',
       },
     };
     let LANG = (() => {
@@ -1266,6 +1406,8 @@
     function applyI18n(root) {
       (root || document).querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
       (root || document).querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+      // For elements whose text contains markup or nested buttons, translate as HTML.
+      (root || document).querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
     }
     function setLang(lang) {
       if (!STRINGS[lang]) return;
@@ -1546,19 +1688,19 @@
           btn.textContent = t('common.stopNode');
           if (portalBtn) portalBtn.disabled = false;
           document.getElementById('nodeStatus').textContent =
-            'Running on port ' + status.port;
+            t('pg.status.runningPort').replace('{port}', status.port);
           if (status.uptime_seconds != null) {
             const mins = Math.floor(status.uptime_seconds / 60);
             const secs = status.uptime_seconds % 60;
             document.getElementById('nodeUptime').textContent =
-              'Uptime: ' + mins + 'm ' + secs + 's';
+              t('pg.status.uptime').replace('{m}', mins).replace('{s}', secs);
           }
         } else {
           dot.className = 'status-dot offline';
           text.textContent = t('status.asleep');
           btn.textContent = t('common.startNode');
           if (portalBtn) portalBtn.disabled = true;
-          document.getElementById('nodeStatus').textContent = 'Node is not running';
+          document.getElementById('nodeStatus').textContent = t('pg.status.notRunning');
           document.getElementById('nodeUptime').textContent = '';
         }
         portEl.textContent = 'Port: ' + status.port;
@@ -2007,7 +2149,7 @@
       try {
         const running = await invoke('agent_status');
         const st = document.getElementById('agentState');
-        if (st) st.textContent = running ? 'running' : 'stopped';
+        if (st) st.textContent = running ? t('pg.ag.running') : t('pg.ag.stopped');
       } catch (e) { /* command absent in older builds — leave default text */ }
     }
     async function provisionAgents() {
