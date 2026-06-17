@@ -24,16 +24,26 @@
  *   v1.1.0 -- 2026-05-28 -- Security warning on wake.command (executes via exec)
  *   v2.0.0 -- 2026-05-29 -- Per-agent config layout + runner block + loadAllAgents
  *   v2.1.0 -- 2026-06-10 -- AIMEAT_HOME env override for the connector home dir
+ *   v2.2.0 -- 2026-06-17 -- Default home is now <cwd>/.aimeat (directory-scoped)
+ *                           instead of the global ~/.aimeat, so two projects on
+ *                           one machine get independent daemons / tokens /
+ *                           serve.json instead of colliding. AIMEAT_HOME still
+ *                           overrides; set it to ~/.aimeat for the old global mode.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
 
-// AIMEAT_HOME overrides the connector home (~/.aimeat) — used by tests to run
-// against a throwaway directory and by operators running isolated daemons.
-const CONFIG_DIR = process.env.AIMEAT_HOME ?? join(homedir(), '.aimeat');
+// Connector home resolution (directory-scoped):
+//   1. AIMEAT_HOME env var — explicit override, always wins.
+//   2. else <cwd>/.aimeat — the directory the `aimeat` command was launched
+//      from. This keeps each project's daemon, tokens and serve.json isolated
+//      so running `aimeat connect serve` from two projects on one machine no
+//      longer fights over a single global ~/.aimeat (last-writer / refused
+//      daemon / wrong-agent routing). Set AIMEAT_HOME=~/.aimeat for the old
+//      global behaviour. Captured once at module load = the launch directory.
+const CONFIG_DIR = process.env.AIMEAT_HOME ?? join(process.cwd(), '.aimeat');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.yaml');
 
 export function getConfigDir(): string { return CONFIG_DIR; }
