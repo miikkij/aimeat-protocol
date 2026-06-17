@@ -8,7 +8,7 @@
  *   local Ollama model — it never bundles them; missing tools are reported, not fatal.
  * @structure emits {type:"progress",step,status,message} lines + a final {type:"result",ok,...}
  * @usage node provision.mjs [--install-uv] [--pull-model] [--skip-sync]
- *   env: AIMEAT_AGENT_WORKDIR, AIMEAT_AGENT_MODEL=gemma3, AIMEAT_CREWAIMEAT_REPO,
+ *   env: AIMEAT_AGENT_WORKDIR, AIMEAT_AGENT_MODEL=gemma4:latest, AIMEAT_CREWAIMEAT_REPO,
  *        AIMEAT_PROVIDERS_DEFAULT (path to llm_providers.default.json), AIMEAT_OLLAMA_URL
  * @version-history
  *   v1.0.0 — 2026-06-17 — Initial: git/uv/ollama provisioning of the crewaimeat fleet (owner spec).
@@ -21,10 +21,11 @@ import { homedir } from 'node:os';
 const ARGS = new Set(process.argv.slice(2));
 const ENV = process.env;
 const REPO = ENV.AIMEAT_CREWAIMEAT_REPO || 'https://github.com/miikkij/crewaimeat';
-// qwen2.5:7b — NOT gemma. CrewAI agents require tool/function calling; gemma3 returns HTTP 400
-// "does not support tools". qwen2.5:7b is a small tool-capable local model (verified: the crew
-// completes tasks with it). Gemma stays fine for the (tool-less) Chat tab.
-const MODEL = ENV.AIMEAT_AGENT_MODEL || 'qwen2.5:7b';
+// gemma4:latest — CrewAI agents require tool/function calling. gemma4 supports it (verified:
+// returns proper tool_calls via the Ollama OpenAI-compat endpoint); gemma3 does NOT (HTTP 400
+// "does not support tools"). So the agent model must be gemma4 (or another tool-capable model),
+// NOT gemma3. Override with AIMEAT_AGENT_MODEL.
+const MODEL = ENV.AIMEAT_AGENT_MODEL || 'gemma4:latest';
 const OLLAMA_URL = ENV.AIMEAT_OLLAMA_URL || 'http://localhost:11434';
 const WORKDIR = ENV.AIMEAT_AGENT_WORKDIR || join(homedir(), '.aimeat', 'agent-runtime');
 const REPO_DIR = join(WORKDIR, 'crewaimeat');
