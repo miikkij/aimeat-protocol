@@ -1,6 +1,6 @@
 {
   "name": "aimeat-desktop",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "description": "AIMEAT Personal Node — Desktop GUI (Tauri)",
   "private": true,
   "scripts": {

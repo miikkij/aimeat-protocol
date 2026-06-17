@@ -245,6 +245,23 @@ pub async fn get_agent_memory(port: u16, gaii: String, key: String, owner_token:
         .unwrap_or(serde_json::Value::Null))
 }
 
+/// Get a done task's deliverable WITHOUT needing the task's deliverableKey — the autonomous daemon
+/// completes tasks deterministically and does NOT stamp deliverableKey on the task record, so we
+/// find the result by its tag instead: GET {base}/v1/memory?tags=task:{id} returns the published
+/// memory entries; the deliverable is the `.latest_output` one (value included inline). Returns its
+/// value (the result text), or null if not published yet.
+#[tauri::command]
+pub async fn get_task_deliverable(port: u16, owner_token: String, task_id: String) -> Result<serde_json::Value, String> {
+    let url = format!("http://localhost:{}/v1/memory?tags=task:{}", port, enc(&task_id));
+    let body = get_json(&url, &owner_token).await?;
+    let items = body.pointer("/data/items").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let pick = items
+        .iter()
+        .find(|it| it.get("key").and_then(|k| k.as_str()).map(|k| k.ends_with(".latest_output")).unwrap_or(false))
+        .or_else(|| items.iter().find(|it| !it.get("key").and_then(|k| k.as_str()).map(|k| k.contains(".live")).unwrap_or(false)));
+    Ok(pick.and_then(|it| it.get("value")).cloned().unwrap_or(serde_json::Value::Null))
+}
+
 /// The AI settings currently stored for the signed-in owner (for display).
 #[derive(Serialize)]
 pub struct AiSettings {

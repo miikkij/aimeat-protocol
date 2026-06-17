@@ -1508,7 +1508,7 @@
     //   tier 'local' — runs free on Ollama/Gemma (research/brief/explain via research_crew).
     //   tier 'cloud' — needs a paid OpenRouter key + the right model (e.g. images). We never
     //   run these as if free; the card opens a step-by-step setup guide instead (no letdown).
-    const APP_VERSION = '0.4.10';
+    const APP_VERSION = '0.4.11';
     const PLAYBOOKS = [
       { id: 'research', crew: 'crewaimeat.research_crew', tier: 'local' },
       { id: 'brief',    crew: 'crewaimeat.research_crew', tier: 'local' },
@@ -1822,14 +1822,15 @@
         const status = task.status;
         if (status === 'done') {
           fwStopPolling();
-          let result = task.message || '';
-          if (task.deliverableKey && task.agentGaii) {
-            try {
-              const mem = await invoke('get_agent_memory', { port: currentPort || 40050, gaii: task.agentGaii, key: task.deliverableKey, ownerToken: nodeJwt });
-              if (mem) result = (typeof mem === 'string') ? mem : (mem.text || mem.content || mem.output || mem.value || JSON.stringify(mem, null, 2));
-            } catch (e) { /* keep the message */ }
-          }
-          if (box) { box.className = 'fw-result'; box.innerHTML = '<strong>' + escapeHtml(t('fw.resultDone')) + '</strong><div class="fw-result-body">' + escapeHtml(String(result || '')) + '</div>'; }
+          // The daemon completes deterministically and does NOT stamp deliverableKey on the task, so
+          // fetch the result by its task tag (robust — works without deliverableKey on the record).
+          let result = '';
+          try {
+            const mem = await invoke('get_task_deliverable', { port: currentPort || 40050, ownerToken: nodeJwt, taskId: taskId });
+            if (mem) result = (typeof mem === 'string') ? mem : (mem.text || mem.content || mem.output || mem.value || JSON.stringify(mem, null, 2));
+          } catch (e) { /* fall back to the message */ }
+          if (!result) result = task.message || '(done)';
+          if (box) { box.className = 'fw-result'; box.innerHTML = '<strong>' + escapeHtml(t('fw.resultDone')) + '</strong><div class="fw-result-body">' + escapeHtml(String(result)) + '</div>'; }
           const qb = document.getElementById('fwQueueBtn'); if (qb) { qb.disabled = false; qb.textContent = t('fw.queue'); }
         } else if (status === 'failed') {
           fwStopPolling();
