@@ -103,6 +103,7 @@ jobs:
       - name: Submit to SignPath for Authenticode signing
         id: signpath
         if: steps.cansign.outputs.enabled == 'true'
+        continue-on-error: true  # don't fail the release while Foundation/trusted-build-system is pending
         uses: signpath/github-action-submit-signing-request@v1
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
