@@ -137,8 +137,8 @@ pub fn agent_provision(app: AppHandle, model: Option<String>, install_uv: bool, 
     if pull_model {
         args.push("--pull-model".into());
     }
-    // qwen2.5:7b by default — crews need tool-calling, which Gemma lacks (see provision.mjs/run-agent.mjs).
-    let env = vec![("AIMEAT_AGENT_MODEL".to_string(), model.unwrap_or_else(|| "qwen2.5:7b".to_string()))];
+    // gemma4 by default — crews need tool-calling. gemma4 supports it; gemma3 does not (see provision.mjs).
+    let env = vec![("AIMEAT_AGENT_MODEL".to_string(), model.unwrap_or_else(|| "gemma4:latest".to_string()))];
     spawn_relay(&app, "provision.mjs", args, env, false)
 }
 

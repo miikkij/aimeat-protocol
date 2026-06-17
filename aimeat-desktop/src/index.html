@@ -1601,7 +1601,7 @@
       fwLog('> ' + t('fw.step.provision'));
       fwLog('> ' + t('fw.step.model') + ' ' + t('fw.ramHint'));
       try {
-        await invoke('agent_provision', { model: 'qwen2.5:7b', installUv: true, pullModel: true });
+        await invoke('agent_provision', { model: 'gemma4:latest', installUv: true, pullModel: true });
         await waitForProvision();
       } catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
