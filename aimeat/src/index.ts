@@ -11,6 +11,7 @@
  * @version-history v1.9.8 — 2026-05-28 — Add connector CLI tools/schema/call fallback commands.
  * @version-history v1.9.9 — 2026-05-28 — Allow connector fallback flags through top-level parsing.
  * @version-history v1.9.10 — 2026-05-28 — Narrow permissive parseArgs values before applying node CLI string flags.
+ * @version-history v1.25.1 — 2026-06-18 — Self-heal scaffolded assets on start after a package upgrade; read update version from package.json.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -394,10 +395,12 @@ if (subcommand === 'config') {
     console.error('Could not locate package assets. Is aimeat installed correctly?');
     process.exit(1);
   }
-  const pkgJsonPath = join(pkgRoot, 'package.json');
-  const pkgVersion = existsSync(pkgJsonPath)
-    ? JSON.parse(readFileSync(pkgJsonPath, 'utf-8')).version as string
-    : '0.0.0';
+  // The version lives in the package's package.json (next to dist/), not inside the
+  // assets root that findPackageRoot returns (which is dist/ for an npm install).
+  let pkgVersion = '0.0.0';
+  for (const p of [join(__pkgRoot, 'package.json'), join(pkgRoot, 'package.json')]) {
+    if (existsSync(p)) { pkgVersion = JSON.parse(readFileSync(p, 'utf-8')).version as string; break; }
+  }
   const result = doScaffold(pkgRoot, process.cwd(), pkgVersion);
   console.log(`Assets updated: ${result.copied} new, ${result.updated} updated, ${result.skippedModified} skipped (user-modified)`);
   for (const file of result.modifiedFiles) {
@@ -710,6 +713,31 @@ if (subcommand === 'config') {
   console.log('\n  Done!\n');
   process.exit(0);
 } else if (subcommand === 'start' || subcommand === 'serve') {
+  // Self-heal runtime assets after a package upgrade. The server serves
+  // CWD/{public,locales,static} ahead of the package's own copies, so an
+  // `npm i -g aimeat@latest` alone would keep serving the pages/translations
+  // scaffolded by the previous version. Refresh them here (operator edits preserved)
+  // so the upgrade is the only step — no manual `aimeat update` to remember.
+  try {
+    const { autoHealAssets, findPackageRoot } = await import('./cli/scaffold.js');
+    const assetsRoot = findPackageRoot(dirname(fileURLToPath(import.meta.url)));
+    if (assetsRoot) {
+      let pkgVersion = '0.0.0';
+      try {
+        pkgVersion = JSON.parse(readFileSync(join(__pkgRoot, 'package.json'), 'utf-8')).version as string;
+      } catch { /* leave 0.0.0 — still distinct from any real manifest version */ }
+      const healed = autoHealAssets(assetsRoot, process.cwd(), pkgVersion);
+      if (healed && (healed.copied + healed.updated) > 0) {
+        logger.info(`📦 Refreshed ${healed.copied + healed.updated} runtime file(s) for aimeat v${pkgVersion} — pages & translations are up to date.`);
+        if (healed.skippedModified > 0) {
+          logger.info(`   Your own edits were kept (${healed.skippedModified} customized file${healed.skippedModified === 1 ? '' : 's'} preserved).`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn(`Asset self-heal skipped: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   // Start the server
   // Auto-generate admin password if not set
   if (!config.adminPassword) {
