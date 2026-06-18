@@ -1297,12 +1297,13 @@ await test('GET /v1/site/prompt — AI prompt (no auth)', async () => {
     assert(body.data.prompt.length > 0, 'prompt not empty');
 });
 
-await test('GET /v1/site/template — no template yet', async () => {
+await test('GET /v1/site/template — no template yet (200 with null)', async () => {
     const { status, body } = await json('/v1/site/template', {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(status === 404, `expected 404, got ${status}`);
-    assert(body.ok === false, 'not ok');
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.template === null, 'template is null when no custom template');
 });
 
 await test('POST /v1/site/template — upload template', async () => {

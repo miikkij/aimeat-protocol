@@ -1,3 +1,13 @@
+/**
+ * @file src/routes/site.ts
+ * @description Portal/site routes — serve the portal HTML and manage the operator's custom
+ *              template, portal memory/KV, changelog and cache. Protocol-only (no SSR beyond
+ *              the operator-authored portal template).
+ * @usage Mounted in server.ts via siteRouter(config, storage).
+ * @version-history
+ *   v1.1.0 — 2026-06-18 — GET /v1/site/template returns 200 {template:null} (not 404) when no
+ *            custom template is set, so polling clients stop logging spurious 404s.
+ */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -53,10 +63,17 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // GET /v1/site/template — Download current template (operator)
+    // No custom template is a normal state (default portal active), NOT an error:
+    // return 200 with template:null so clients don't log a spurious 404 on every poll.
     router.get('/v1/site/template', requireAuth(), requireRole('operator'), async (_req, res) => {
         const result = await site.getTemplate();
         if (!result) {
-            res.status(404).json(error(config.nodeId, 'NO_TEMPLATE', 'No custom template. Default portal is active.'));
+            res.json(success(config.nodeId, {
+                template: null,
+                size_bytes: 0,
+                updated_at: null,
+                tags_found: [],
+            }));
             return;
         }
         res.json(success(config.nodeId, {

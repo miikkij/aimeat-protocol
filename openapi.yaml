@@ -15138,13 +15138,15 @@ paths:
       summary: Download current template
       description: |
         Download the current custom HTML template.
+        When no custom template is set (the built-in default portal is active),
+        returns `200` with `template: null` — this is a normal state, not an error.
         Operator-only (Tier 2).
       tags: [Site]
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Current template content
+          description: Current template content (template is null when the default portal is active)
           content:
             application/json:
               schema:
@@ -15157,17 +15159,18 @@ paths:
                         properties:
                           template:
                             type: string
+                            nullable: true
+                            description: HTML template, or null when no custom template is set
                           size_bytes:
                             type: integer
                           updated_at:
                             type: string
                             format: date-time
+                            nullable: true
                           tags_found:
                             type: array
                             items:
                               type: string
-        '404':
-          $ref: '#/components/responses/NotFound'
 
     post:
       operationId: uploadSiteTemplate
