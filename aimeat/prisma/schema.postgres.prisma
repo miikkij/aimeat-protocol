@@ -1578,3 +1578,18 @@ model ContactConsent {
 
   @@index([ownerGhii, state])
 }
+
+model MessageDeliveryLog {
+  id           String   @id
+  messageId    String
+  origin       String
+  targetNodeId String
+  status       String
+  httpStatus   Int?
+  errorMessage String?
+  latencyMs    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}

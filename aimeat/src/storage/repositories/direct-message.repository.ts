@@ -8,7 +8,7 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
 
-import type { DirectMessageRecord, ContactConsentRecord } from '../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../interface.js';
 
 export interface DirectMessageRepository {
   // ── Messages ──
@@ -53,6 +53,12 @@ export interface DirectMessageRepository {
   /** Persist (re)resolved attachment descriptors after duplication/quota handling. */
   updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null>;
   deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean>;
+
+  // ── Delivery telemetry (operator dashboard; no content/identities) ──
+  appendMessageDeliveryLog(log: MessageDeliveryLog): Promise<void>;
+  listMessageDeliveryLogs(limit?: number): Promise<MessageDeliveryLog[]>;
+  getMessageDeliveryStats(): Promise<MessageDeliveryStats>;
+  pruneMessageDeliveryLogs(keep?: number): Promise<number>;
 
   // ── Contact consent (first-contact gate) ──
   getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null>;

@@ -63,6 +63,8 @@ import type {
   AgentMessageRecord,
   DirectMessageRecord,
   ContactConsentRecord,
+  MessageDeliveryLog,
+  MessageDeliveryStats,
   TelemetryEvent,
   WebhookDeliveryLog,
   AgentOnboardingRecord,
@@ -6408,6 +6410,22 @@ export class SqliteStorage implements Storage {
 
   async deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean> {
     return directMessageRepo.deleteDirectMessage(this.db, id, ownerGhii);
+  }
+
+  async appendMessageDeliveryLog(log: MessageDeliveryLog): Promise<void> {
+    directMessageRepo.appendMessageDeliveryLog(this.db, log);
+  }
+
+  async listMessageDeliveryLogs(limit?: number): Promise<MessageDeliveryLog[]> {
+    return directMessageRepo.listMessageDeliveryLogs(this.db, limit);
+  }
+
+  async getMessageDeliveryStats(): Promise<MessageDeliveryStats> {
+    return directMessageRepo.getMessageDeliveryStats(this.db);
+  }
+
+  async pruneMessageDeliveryLogs(keep?: number): Promise<number> {
+    return directMessageRepo.pruneMessageDeliveryLogs(this.db, keep);
   }
 
   async getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {

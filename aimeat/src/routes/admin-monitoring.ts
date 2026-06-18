@@ -192,6 +192,15 @@ export function adminMonitoringRouter(
         }));
     });
 
+    // GET /v1/admin/messages/stats — direct-message delivery telemetry (operator only).
+    // Operator visibility into whether sends land or pile up in errors. Carries NO message content
+    // and NO participant identities — only routing/outcome metadata.
+    router.get('/v1/admin/messages/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const stats = await storage.getMessageDeliveryStats();
+        const recent = await storage.listMessageDeliveryLogs(50);
+        res.json(success(config.nodeId, { stats, recent }));
+    });
+
     // GET /v1/admin/backup — export all data as JSON (operator only)
     router.get('/v1/admin/backup', requireAuth(), requireRole('operator'), async (_req, res) => {
         const owners = await storage.listOwners();

@@ -13,8 +13,9 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 3: federation delivery).
  */
 
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord } from '../storage/interface.js';
+import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -56,15 +57,21 @@ function peerForNode(peers: Map<string, PeerInfo>, nodeId: string): PeerInfo | u
 export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessageRecord): Promise<'delivered' | 'queued' | 'undeliverable'> {
   const { config, storage, peers } = ctx;
   const targetNode = parseGaiiLoose(record.recipientGhii).node;
+  const started = Date.now();
+
+  // Operator telemetry — never carries content or participant identities, only routing/outcome.
+  const log = (status: MessageDeliveryLog['status'], extra?: { httpStatus?: number; errorMessage?: string }) =>
+    logDelivery(ctx, { messageId: record.id, origin: 'federation', targetNodeId: targetNode, status, latencyMs: Date.now() - started, ...extra });
 
   const peer = peerForNode(peers, targetNode);
   if (!peer || peer.status === 'offline' || peer.status === 'unreachable') {
     // Peer not reachable — leave queued; the retry job will try again (no failure counted).
+    await log('queued', { errorMessage: peer ? `peer_${peer.status}` : 'no_peer' });
     return 'queued';
   }
 
   const nodeKey = await storage.getNodeKey();
-  if (!nodeKey) return 'queued';
+  if (!nodeKey) { await log('queued', { errorMessage: 'no_node_key' }); return 'queued'; }
 
   const payload = buildMessagePayload(config, record);
   const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
@@ -78,6 +85,7 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
     });
     if (resp.ok) {
       await storage.updateMessageDeliveryStatus(record.id, 'delivered', { deliveredAt: new Date().toISOString() });
+      await log('delivered', { httpStatus: resp.status });
       return 'delivered';
     }
     if (resp.status === 403) {
@@ -85,15 +93,26 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
       let reason = 'rejected';
       try { reason = ((await resp.json()) as { error?: { code?: string } })?.error?.code ?? 'rejected'; } catch { /* ignore */ }
       await storage.updateMessageDeliveryStatus(record.id, 'undeliverable', { error: reason });
+      await log('undeliverable', { httpStatus: resp.status, errorMessage: reason });
       return 'undeliverable';
     }
     // Transient remote error — keep queued for retry.
     await storage.updateMessageDeliveryStatus(record.id, 'queued', { error: `http_${resp.status}` });
+    await log('queued', { httpStatus: resp.status, errorMessage: `http_${resp.status}` });
     return 'queued';
   } catch (err) {
-    await storage.updateMessageDeliveryStatus(record.id, 'queued', { error: err instanceof Error ? err.message : 'network_error' });
+    const msg = err instanceof Error ? err.message : 'network_error';
+    await storage.updateMessageDeliveryStatus(record.id, 'queued', { error: msg });
+    await log('queued', { errorMessage: msg });
     return 'queued';
   }
+}
+
+/** Append a delivery-log row (best-effort; telemetry must never break delivery). */
+export async function logDelivery(ctx: DeliveryCtx, entry: Omit<MessageDeliveryLog, 'id' | 'createdAt'>): Promise<void> {
+  try {
+    await ctx.storage.appendMessageDeliveryLog({ ...entry, id: randomUUID(), createdAt: new Date().toISOString() });
+  } catch { /* telemetry is best-effort */ }
 }
 
 /**
@@ -148,6 +167,8 @@ export function startMessageRetryJob(config: AimeatConfig, storage: Storage, pee
     }
     // Also re-attempt / expire held (reference) attachments on the recipient side (DECISION #10).
     await sweepReferenceAttachments(ctx).catch(err => logger.error('attachment sweep failed', { error: (err as Error).message }));
+    // Cap the delivery-telemetry log so it can't grow unbounded.
+    await storage.pruneMessageDeliveryLogs(10000).catch(() => {});
   }
 
   return setInterval(() => {

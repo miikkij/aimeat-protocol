@@ -112,6 +112,8 @@ import type {
     AgentMessageRecord,
     DirectMessageRecord,
     ContactConsentRecord,
+    MessageDeliveryLog,
+    MessageDeliveryStats,
     TelemetryEvent,
     WebhookDeliveryLog,
     AgentOnboardingRecord,
@@ -7040,6 +7042,67 @@ export class PrismaStorage implements Storage {
             await this.prisma.directMessage.delete({ where: { id: this.dmDocId(id, ownerGhii) } });
             return true;
         } catch { return false; }
+    }
+
+    async appendMessageDeliveryLog(log: MessageDeliveryLog): Promise<void> {
+        this.ensureReady();
+        await this.prisma.messageDeliveryLog.create({
+            data: {
+                id: log.id, messageId: log.messageId, origin: log.origin, targetNodeId: log.targetNodeId,
+                status: log.status, httpStatus: log.httpStatus ?? null, errorMessage: log.errorMessage ?? null,
+                latencyMs: log.latencyMs, createdAt: new Date(log.createdAt),
+            },
+        });
+    }
+
+    private toMessageDeliveryLog(row: any): MessageDeliveryLog {
+        const rec: MessageDeliveryLog = {
+            id: row.id, messageId: row.messageId, origin: row.origin, targetNodeId: row.targetNodeId,
+            status: row.status, latencyMs: row.latencyMs ?? 0,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+        if (row.httpStatus != null) rec.httpStatus = row.httpStatus;
+        if (row.errorMessage) rec.errorMessage = row.errorMessage;
+        return rec;
+    }
+
+    async listMessageDeliveryLogs(limit = 100): Promise<MessageDeliveryLog[]> {
+        this.ensureReady();
+        const rows = await this.prisma.messageDeliveryLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
+        return rows.map((r: any) => this.toMessageDeliveryLog(r));
+    }
+
+    async getMessageDeliveryStats(): Promise<MessageDeliveryStats> {
+        this.ensureReady();
+        const since = new Date(Date.now() - 24 * 3600_000);
+        const [all, recent] = await Promise.all([
+            this.prisma.messageDeliveryLog.groupBy({ by: ['status'], _count: { _all: true } }),
+            this.prisma.messageDeliveryLog.groupBy({ by: ['status'], where: { createdAt: { gte: since } }, _count: { _all: true } }),
+        ]);
+        const byStatus: Record<string, number> = {};
+        const byStatus24h: Record<string, number> = {};
+        let total = 0, total24h = 0;
+        for (const r of all) { byStatus[r.status] = r._count._all; total += r._count._all; }
+        for (const r of recent) { byStatus24h[r.status] = r._count._all; total24h += r._count._all; }
+        const nodes = await this.prisma.messageDeliveryLog.groupBy({ by: ['targetNodeId'], _count: { _all: true } });
+        const topTargetNodes = await Promise.all(
+            nodes.sort((a: any, b: any) => b._count._all - a._count._all).slice(0, 10).map(async (n: any) => ({
+                nodeId: n.targetNodeId,
+                total: n._count._all,
+                failed: await this.prisma.messageDeliveryLog.count({ where: { targetNodeId: n.targetNodeId, status: { in: ['failed', 'undeliverable'] } } }),
+            })),
+        );
+        return { total, total24h, byStatus, byStatus24h, topTargetNodes };
+    }
+
+    async pruneMessageDeliveryLogs(keep = 10000): Promise<number> {
+        this.ensureReady();
+        const cutoff = await this.prisma.messageDeliveryLog.findMany({
+            orderBy: { createdAt: 'desc' }, skip: keep, take: 1, select: { createdAt: true },
+        });
+        if (cutoff.length === 0) return 0;
+        const res = await this.prisma.messageDeliveryLog.deleteMany({ where: { createdAt: { lt: cutoff[0].createdAt } } });
+        return res.count;
     }
 
     async getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {

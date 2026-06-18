@@ -2024,6 +2024,34 @@ export interface DirectMessageRecord {
 }
 
 /**
+ * Operator-facing delivery telemetry for one direct-message send attempt. Deliberately carries NO
+ * message content and NO participant identities — only the routing/outcome metadata an operator
+ * needs to see whether sends succeed or pile up in errors (status, target node, http/error, latency).
+ */
+export interface MessageDeliveryLog {
+  id: string;
+  /** The message's uuid (correlation only — not content). */
+  messageId: string;
+  origin: 'local' | 'federation';
+  /** Recipient's node id (where it was being delivered). */
+  targetNodeId: string;
+  status: 'delivered' | 'queued' | 'failed' | 'undeliverable';
+  httpStatus?: number;
+  errorMessage?: string;
+  latencyMs: number;
+  createdAt: string;
+}
+
+/** Aggregated delivery stats for the operator dashboard. */
+export interface MessageDeliveryStats {
+  total: number;
+  total24h: number;
+  byStatus: Record<string, number>;
+  byStatus24h: Record<string, number>;
+  topTargetNodes: Array<{ nodeId: string; total: number; failed: number }>;
+}
+
+/**
  * Per-pair first-contact consent state, stored under the recipient's namespace. Drives the
  * first-contact gate: no record → pending request; accepted → free-flowing; blocked → rejected.
  */

@@ -10,7 +10,7 @@
  */
 
 import type Database from 'better-sqlite3';
-import type { DirectMessageRecord, ContactConsentRecord } from '../../../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
 
 // ── Helpers ──
 
@@ -238,6 +238,67 @@ export function updateMessageAttachments(
 export function deleteDirectMessage(db: Database.Database, id: string, ownerGhii: string): boolean {
   const info = db.prepare('DELETE FROM direct_messages WHERE id = ? AND ownerGhii = ?').run(id, ownerGhii);
   return info.changes > 0;
+}
+
+// ── Delivery telemetry ──
+
+function deserializeLog(row: Record<string, unknown>): MessageDeliveryLog {
+  const rec: MessageDeliveryLog = {
+    id: row.id as string,
+    messageId: row.messageId as string,
+    origin: row.origin as MessageDeliveryLog['origin'],
+    targetNodeId: row.targetNodeId as string,
+    status: row.status as MessageDeliveryLog['status'],
+    latencyMs: (row.latencyMs as number) ?? 0,
+    createdAt: row.createdAt as string,
+  };
+  if (row.httpStatus != null) rec.httpStatus = row.httpStatus as number;
+  if (row.errorMessage) rec.errorMessage = row.errorMessage as string;
+  return rec;
+}
+
+export function appendMessageDeliveryLog(db: Database.Database, log: MessageDeliveryLog): void {
+  db.prepare(
+    `INSERT INTO message_delivery_log (id, messageId, origin, targetNodeId, status, httpStatus, errorMessage, latencyMs, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    log.id, log.messageId, log.origin, log.targetNodeId, log.status,
+    log.httpStatus ?? null, log.errorMessage ?? null, log.latencyMs, log.createdAt,
+  );
+}
+
+export function listMessageDeliveryLogs(db: Database.Database, limit = 100): MessageDeliveryLog[] {
+  const rows = db.prepare('SELECT * FROM message_delivery_log ORDER BY createdAt DESC LIMIT ?').all(limit) as Record<string, unknown>[];
+  return rows.map(deserializeLog);
+}
+
+export function getMessageDeliveryStats(db: Database.Database): MessageDeliveryStats {
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const byStatus: Record<string, number> = {};
+  const byStatus24h: Record<string, number> = {};
+  for (const r of db.prepare('SELECT status, COUNT(*) c FROM message_delivery_log GROUP BY status').all() as Array<{ status: string; c: number }>) {
+    byStatus[r.status] = r.c;
+  }
+  for (const r of db.prepare('SELECT status, COUNT(*) c FROM message_delivery_log WHERE createdAt >= ? GROUP BY status').all(since) as Array<{ status: string; c: number }>) {
+    byStatus24h[r.status] = r.c;
+  }
+  const total = (db.prepare('SELECT COUNT(*) c FROM message_delivery_log').get() as { c: number }).c;
+  const total24h = (db.prepare('SELECT COUNT(*) c FROM message_delivery_log WHERE createdAt >= ?').get(since) as { c: number }).c;
+  const topTargetNodes = (db.prepare(
+    `SELECT targetNodeId nodeId, COUNT(*) total,
+            SUM(CASE WHEN status IN ('failed','undeliverable') THEN 1 ELSE 0 END) failed
+     FROM message_delivery_log GROUP BY targetNodeId ORDER BY total DESC LIMIT 10`,
+  ).all() as Array<{ nodeId: string; total: number; failed: number }>).map(r => ({ nodeId: r.nodeId, total: r.total, failed: r.failed ?? 0 }));
+  return { total, total24h, byStatus, byStatus24h, topTargetNodes };
+}
+
+export function pruneMessageDeliveryLogs(db: Database.Database, keep = 10000): number {
+  const info = db.prepare(
+    `DELETE FROM message_delivery_log WHERE id NOT IN (
+       SELECT id FROM message_delivery_log ORDER BY createdAt DESC LIMIT ?
+     )`,
+  ).run(keep);
+  return info.changes;
 }
 
 // ── Contact consent ──
