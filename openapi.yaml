@@ -9651,6 +9651,62 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/admin/messages/stats:
+    get:
+      operationId: getMessageDeliveryStats
+      summary: Direct-message delivery telemetry (operator)
+      description: >-
+        Aggregated delivery stats for human↔human direct messages plus the most recent attempts.
+        Privacy by design — carries NO message content and NO participant identities, only
+        routing/outcome metadata (status, target node, http/error, latency).
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Delivery stats + recent attempts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stats:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              total24h: { type: integer }
+                              byStatus: { type: object, additionalProperties: { type: integer } }
+                              byStatus24h: { type: object, additionalProperties: { type: integer } }
+                              topTargetNodes:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    nodeId: { type: string }
+                                    total: { type: integer }
+                                    failed: { type: integer }
+                          recent:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                messageId: { type: string }
+                                origin: { type: string, enum: [local, federation] }
+                                targetNodeId: { type: string }
+                                status: { type: string, enum: [delivered, queued, failed, undeliverable] }
+                                httpStatus: { type: integer }
+                                errorMessage: { type: string }
+                                latencyMs: { type: integer }
+                                createdAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/admin/backup:
     get:
       operationId: getBackup

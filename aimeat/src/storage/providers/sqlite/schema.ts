@@ -1459,6 +1459,21 @@ export function initializeSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_contact_consents_state ON contact_consents(ownerGhii, state);
 
+    -- ── Direct-message delivery telemetry (operator dashboard; no content/identities) ──
+    CREATE TABLE IF NOT EXISTS message_delivery_log (
+      id           TEXT PRIMARY KEY,
+      messageId    TEXT NOT NULL,
+      origin       TEXT NOT NULL,
+      targetNodeId TEXT NOT NULL,
+      status       TEXT NOT NULL,
+      httpStatus   INTEGER,
+      errorMessage TEXT,
+      latencyMs    INTEGER NOT NULL DEFAULT 0,
+      createdAt    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_message_delivery_created ON message_delivery_log(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_message_delivery_status ON message_delivery_log(status);
+
     -- ── Telemetry Events (Phase A push layer) ──
     CREATE TABLE IF NOT EXISTS telemetry_events (
       id TEXT PRIMARY KEY,

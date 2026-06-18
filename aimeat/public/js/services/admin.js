@@ -38,6 +38,9 @@ export const patchBoardMembers = (id, body) => apiPatch(`/v1/boards/${encodeURIC
 // ── Work ──
 export const getAdminWork    = ()       => apiGet('/v1/admin/work');
 
+// ── Direct-message delivery telemetry ──
+export const getMessageStats = ()       => apiGet('/v1/admin/messages/stats');
+
 // ── Maintenance ──
 export const getMaintenance  = ()       => apiGet('/v1/admin/maintenance');
 export const setMaintenance  = (enabled, message) => apiPost('/v1/admin/maintenance', { enabled, message });

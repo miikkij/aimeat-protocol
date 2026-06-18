@@ -101,6 +101,22 @@ await test('3. Expired attachment is not retried again', async () => {
     'expired attachment remains expired/reference');
 });
 
+await test('4. Delivery telemetry: append → stats → list (no content/identities)', async () => {
+  await storage.appendMessageDeliveryLog({ id: 'log1', messageId: 'm1', origin: 'federation', targetNodeId: 'aimeat-fi-001-peer', status: 'delivered', latencyMs: 12, createdAt: new Date().toISOString() });
+  await storage.appendMessageDeliveryLog({ id: 'log2', messageId: 'm2', origin: 'federation', targetNodeId: 'aimeat-fi-001-peer', status: 'undeliverable', errorMessage: 'blocked', latencyMs: 5, createdAt: new Date().toISOString() });
+
+  const stats = await storage.getMessageDeliveryStats();
+  assert(stats.total >= 2, `total counts logs, got ${stats.total}`);
+  assert((stats.byStatus.delivered ?? 0) >= 1 && (stats.byStatus.undeliverable ?? 0) >= 1, 'byStatus has delivered + undeliverable');
+  const top = stats.topTargetNodes.find(n => n.nodeId === 'aimeat-fi-001-peer');
+  assert(!!top && top.failed >= 1, 'top target node tracks failed count');
+
+  const recent = await storage.listMessageDeliveryLogs(10);
+  assert(recent.length >= 2, 'recent logs returned');
+  const r: any = recent[0];
+  assert(!('body' in r) && !('senderGhii' in r) && !('recipientGhii' in r), 'telemetry carries NO content or participant identities');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
 process.exit(0);

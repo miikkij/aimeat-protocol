@@ -33,7 +33,7 @@ import { conversationIdFor, messagePreview } from '../utils/messaging.js';
 import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
-import { deliverDirectMessage, propagateReadReceipt } from '../services/message-delivery.js';
+import { deliverDirectMessage, propagateReadReceipt, logDelivery } from '../services/message-delivery.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -173,6 +173,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         body: messagePreview(input.body),
         link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
       });
+      await logDelivery(deliveryCtx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
       emitChange('messages');
     } else {
       // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued
