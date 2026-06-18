@@ -4,6 +4,24 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.25.1] - 2026-06-18
+
+### Fixed
+
+- **Upgrades no longer leave pages and translations stale.** The node serves
+  `CWD/{public,locales,static}` ahead of the package's own copies, so after a package
+  upgrade (`npm i -g aimeat@latest`) those scaffolded copies kept serving the *previous*
+  version's pages and translations until someone remembered to run `aimeat update` — which
+  was easy to miss and looked like the new texts had been "lost". `aimeat start` now
+  **self-heals** automatically: when the installed package is newer than the scaffolded
+  copy in the working directory, it refreshes the runtime assets in place and logs what it
+  did. Operator-modified files are detected via the checksum manifest and **preserved** —
+  the upgrade is the only step you need. New `autoHealAssets()` in `src/cli/scaffold.ts`,
+  wired into the `start`/`serve` path in `src/index.ts`.
+- **`aimeat update` now records the real package version** in `.aimeat-manifest.json`.
+  It previously read the version from `dist/package.json` (absent in npm installs), so the
+  manifest was always stamped `0.0.0`; it now reads the package's actual `package.json`.
+
 ## [1.25.0] - 2026-06-17
 
 ### Added

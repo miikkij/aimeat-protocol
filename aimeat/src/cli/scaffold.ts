@@ -1,7 +1,14 @@
 /**
- * Scaffold utility for `aimeat init` and `aimeat update`.
- * Copies runtime assets (public/, locales/, static/) into a target directory
- * with a checksum manifest to avoid overwriting user-modified files.
+ * @file scaffold.ts
+ * @description Scaffold utility for `aimeat init`, `aimeat update`, and start-time self-heal.
+ *   Copies runtime assets (public/, locales/, static/) into a target directory with a
+ *   checksum manifest, so the server's CWD-first asset copies stay in sync with the
+ *   installed package while never clobbering user-modified files.
+ * @structure scaffoldFiles (core copy + manifest), autoHealAssets (version-gated auto
+ *   refresh for `aimeat start`), findPackageRoot (locate shipped assets), manifest helpers.
+ * @usage Imported by src/index.ts (update + start) and src/cli/init-wizard.ts (init).
+ * @version-history v1.25.1 — 2026-06-18 — Add autoHealAssets so an upgraded package
+ *   refreshes pages/translations on next `aimeat start` without a manual `aimeat update`.
  */
 
 import { createHash } from 'node:crypto';
@@ -145,6 +152,32 @@ export function scaffoldFiles(
   });
 
   return result;
+}
+
+/**
+ * Self-heal runtime assets at startup.
+ *
+ * The server serves CWD/{public,locales,static} ahead of the package's own copies,
+ * so after a package upgrade (e.g. `npm i -g aimeat@latest`) those scaffolded copies
+ * would keep serving the OLD pages and translations until someone remembered to run
+ * `aimeat update`. This refreshes them automatically on the next `aimeat start`,
+ * preserving any operator-modified files (same checksum-manifest logic as scaffoldFiles).
+ *
+ * Returns the ScaffoldResult when it healed, or null when there was nothing to do:
+ *  - No manifest in targetDir → this directory holds no scaffolded deployment (a fresh/
+ *    empty dir, or running from the package itself); the server already falls back to the
+ *    package's current assets, and we must not create a scaffold the operator never asked for.
+ *  - Manifest already on pkgVersion → assets are current.
+ */
+export function autoHealAssets(
+  pkgRoot: string,
+  targetDir: string,
+  pkgVersion: string,
+): ScaffoldResult | null {
+  const manifest = readManifest(targetDir);
+  if (!manifest) return null;
+  if (manifest.version === pkgVersion) return null;
+  return scaffoldFiles(pkgRoot, targetDir, pkgVersion);
 }
 
 /**

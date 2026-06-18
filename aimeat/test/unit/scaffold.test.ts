@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { computeFileHash, readManifest, writeManifest, scaffoldFiles } from '../../src/cli/scaffold.js';
+import { computeFileHash, readManifest, writeManifest, scaffoldFiles, autoHealAssets } from '../../src/cli/scaffold.js';
 import type { ScaffoldManifest } from '../../src/cli/scaffold.js';
 
 describe('scaffold', () => {
@@ -93,6 +93,51 @@ describe('scaffold', () => {
       writeFileSync(join(srcDir, 'public', 'js', 'new.js'), 'new file');
       const result = scaffoldFiles(srcDir, targetDir, '1.3.0');
       expect(result.copied).toBeGreaterThanOrEqual(1);
+      expect(existsSync(join(targetDir, 'public', 'js', 'new.js'))).toBe(true);
+    });
+  });
+
+  describe('autoHealAssets', () => {
+    it('does nothing when no manifest exists (un-scaffolded dir)', () => {
+      const result = autoHealAssets(srcDir, targetDir, '1.3.0');
+      expect(result).toBeNull();
+      // Must not create a scaffold the operator never asked for.
+      expect(existsSync(join(targetDir, 'public', 'css', 'theme.css'))).toBe(false);
+      expect(readManifest(targetDir)).toBeNull();
+    });
+
+    it('does nothing when the manifest is already on the current version', () => {
+      scaffoldFiles(srcDir, targetDir, '1.3.0');
+      writeFileSync(join(srcDir, 'public', 'css', 'theme.css'), 'body { color: blue; }');
+      const result = autoHealAssets(srcDir, targetDir, '1.3.0');
+      expect(result).toBeNull();
+      // Stale-but-same-version: not refreshed (version gate, no per-file hashing).
+      expect(readFileSync(join(targetDir, 'public', 'css', 'theme.css'), 'utf-8')).toBe('body { color: red; }');
+    });
+
+    it('refreshes assets when the package version is newer', () => {
+      scaffoldFiles(srcDir, targetDir, '1.2.0');
+      writeFileSync(join(srcDir, 'locales', 'en.json'), '{"hello":"updated"}');
+      const result = autoHealAssets(srcDir, targetDir, '1.3.0');
+      expect(result).not.toBeNull();
+      expect(result!.updated).toBeGreaterThanOrEqual(1);
+      expect(readFileSync(join(targetDir, 'locales', 'en.json'), 'utf-8')).toBe('{"hello":"updated"}');
+      expect(readManifest(targetDir)!.version).toBe('1.3.0');
+    });
+
+    it('preserves operator-modified files while refreshing the rest', () => {
+      scaffoldFiles(srcDir, targetDir, '1.2.0');
+      // Operator customized their translations in the deployed copy.
+      writeFileSync(join(targetDir, 'locales', 'en.json'), '{"hello":"custom"}');
+      // New package ships new translations AND a new page.
+      writeFileSync(join(srcDir, 'locales', 'en.json'), '{"hello":"shipped"}');
+      writeFileSync(join(srcDir, 'public', 'js', 'new.js'), 'brand new');
+      const result = autoHealAssets(srcDir, targetDir, '1.3.0');
+      expect(result).not.toBeNull();
+      expect(result!.skippedModified).toBeGreaterThanOrEqual(1);
+      // Customization kept...
+      expect(readFileSync(join(targetDir, 'locales', 'en.json'), 'utf-8')).toBe('{"hello":"custom"}');
+      // ...new page still arrives.
       expect(existsSync(join(targetDir, 'public', 'js', 'new.js'))).toBe(true);
     });
   });
