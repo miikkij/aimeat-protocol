@@ -6,7 +6,7 @@ reference server (`../aimeat`): start/stop the node, see its status and logs, co
 dashboard — all from one window. Data is stored in **persistent SQLite** and survives restarts.
 
 > The desktop window is the *control panel*. The actual AIMEAT product UI is the **web portal** the node serves
-> at `http://localhost:40050/v1/portal` — use **Open Dashboard in Browser** once the node is running.
+> at `http://localhost:41050/v1/portal` — use **Open Dashboard in Browser** once the node is running.
 
 ---
 
@@ -145,4 +145,4 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
   Windows 11 / is auto-installed by the installer.
 - **Logs** — check the **Logs** tab, or open
   `%APPDATA%\com.overscale.aimeat-desktop\aimeat-node.log` directly.
-- **Port already in use** — another process holds `40050`. Stop it, or change `AIMEAT_PORT` in the Settings tab.
+- **Port already in use** — another process holds `41050`. Stop it, or change `AIMEAT_PORT` in the Settings tab.
