@@ -22,7 +22,7 @@ aimeat.io's MCP. The bundled `node.exe` only runs the bridge, not the server.
 2. **Safety:** writes (create/update/delete/publish/add) require **per-action approval** by default; a toggle
    switches to **auto-approve** once trusted (global), plus **"always allow this tool"** per-tool memory. This sits
    ON TOP of the agent's own scope limits (defense in depth).
-3. **Target:** user-selectable **aimeat.io** *or* **localhost:40050**.
+3. **Target:** user-selectable **aimeat.io** *or* **localhost:41050**.
 4. **Tool surface:** scoped **`/v2/mcp/<role>`** (`appdev` + `agent`), not the full 50+ tool `/v1/mcp` — better
    tool selection for a small model + natural safety boundary.
 
@@ -87,7 +87,7 @@ From then on the chat connects to MCP **as that agent**: `Authorization: Bearer 
    └─ HANDS:  MCP StreamableHTTP client → <base>/v2/mcp/appdev   (Bearer AGENT-token) ← AIMEAT (as the registered agent)
                          │
                          ▼
-            AIMEAT node:  https://aimeat.io   OR   http://localhost:40050
+            AIMEAT node:  https://aimeat.io   OR   http://localhost:41050
 ```
 
 **Agent loop (in the bridge):**

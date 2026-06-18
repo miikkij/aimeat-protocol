@@ -630,7 +630,7 @@
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Checking node status...</span>
       <span id="appVersion" style="margin-left: auto; color: #8a8aa0; font-size: 0.82rem;"></span>
-      <span id="statusPort" style="margin-left: 16px; color: #a78bfa;">Port: 40050</span>
+      <span id="statusPort" style="margin-left: 16px; color: #a78bfa;">Port: 41050</span>
     </div>
     </header>
 
@@ -1034,8 +1034,8 @@
           </div>
           <div class="form-group">
             <label for="settingsPort" data-i18n="pg.info.port">Port</label>
-            <input type="number" id="settingsPort" min="1024" max="65535" value="40050" />
-            <div class="form-hint" data-i18n="pg.set.portHint">Network port for the AIMEAT server (default: 40050)</div>
+            <input type="number" id="settingsPort" min="1024" max="65535" value="41050" />
+            <div class="form-hint" data-i18n="pg.set.portHint">Network port for the AIMEAT server (default: 41050)</div>
           </div>
           <div class="form-group">
             <label for="settingsRole" data-i18n="pg.info.fedRole">Federation Role</label>
@@ -1309,7 +1309,7 @@
         'pg.ag.start': 'Start agent', 'pg.ag.stop': 'Stop', 'pg.ag.stopped': 'stopped',
         'pg.ag.queueHint': 'Queue work for it from the web dashboard: Profile → Agents → your agent → Tasks → + New Task. <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>',
         'pg.set.nodeSettings': 'Node Settings', 'pg.set.nodeIdHint': 'Generated during setup. Cannot be changed.',
-        'pg.set.portHint': 'Network port for the AIMEAT server (default: 40050)',
+        'pg.set.portHint': 'Network port for the AIMEAT server (default: 41050)',
         'pg.set.roleStandalone': 'Standalone', 'pg.set.roleOperator': 'Operator (Genesis)',
         'pg.set.roleContributor': 'Contributor (Anchor)', 'pg.set.rolePersonal': 'Personal',
         'pg.set.roleHint': 'Determines how this node participates in the network',
@@ -1461,7 +1461,7 @@
         'pg.ag.start': 'Käynnistä agentti', 'pg.ag.stop': 'Pysäytä', 'pg.ag.stopped': 'pysäytetty',
         'pg.ag.queueHint': 'Jonota sille työtä web-hallinnasta: Profiili → Agentit → agenttisi → Tehtävät → + Uusi tehtävä. <button class="btn secondary" onclick="openPortal()">Avaa hallinta</button>',
         'pg.set.nodeSettings': 'Noden asetukset', 'pg.set.nodeIdHint': 'Luotu asennuksen aikana. Ei muutettavissa.',
-        'pg.set.portHint': 'AIMEAT-serverin verkkoportti (oletus: 40050)',
+        'pg.set.portHint': 'AIMEAT-serverin verkkoportti (oletus: 41050)',
         'pg.set.roleStandalone': 'Itsenäinen', 'pg.set.roleOperator': 'Operaattori (Genesis)',
         'pg.set.roleContributor': 'Osallistuja (Anchor)', 'pg.set.rolePersonal': 'Henkilökohtainen',
         'pg.set.roleHint': 'Määrittää miten tämä node osallistuu verkkoon',
@@ -1719,7 +1719,7 @@
       btn.disabled = true; st.textContent = t('fw.s2.working');
       try {
         // One step: create the account (or reuse it if the name exists) and sign in → owner JWT.
-        const token = await invoke('node_register', { port: currentPort || 40050, username: user, password: pass });
+        const token = await invoke('node_register', { port: currentPort || 41050, username: user, password: pass });
         nodeJwt = token; nodeOwner = user;
         // Mirror into the AI Setup signed-in state so the rest of the app sees one session.
         try {
@@ -1778,7 +1778,7 @@
 
       // Start the agent daemon (owner JWT → auto-approve, no manual device-auth).
       fwLog('> ' + t('fw.step.start'));
-      try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 40050), owner: nodeOwner, ownerToken: nodeJwt }); }
+      try { await invoke('agent_start', { crewModule: pb.crew, agentName: firstWinAgent, nodeUrl: 'http://localhost:' + (currentPort || 41050), owner: nodeOwner, ownerToken: nodeJwt }); }
       catch(e){ fwLog('x ' + (e && e.message ? e.message : e)); }
 
       fwLog('> ' + t('fw.working'));
@@ -1795,7 +1795,7 @@
       const btn = document.getElementById('fwQueueBtn'); if (btn) btn.disabled = true;
       fwLog('> ' + t('fw.queueSending'));
       try {
-        const taskId = await invoke('queue_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
+        const taskId = await invoke('queue_agent_task', { port: currentPort || 41050, agent, ownerToken: nodeJwt, title: idea.slice(0, 60), description: idea });
         fwLog('> ' + t('fw.queueOk'));
         // Anti-spam: keep the button LOCKED + relabelled while the agent works — one task per session.
         if (btn) { btn.disabled = true; btn.textContent = t('fw.queueWorking'); }
@@ -1817,7 +1817,7 @@
       fwPollTimer = setInterval(async () => {
         tries += 1;
         let task = null;
-        try { task = await invoke('get_agent_task', { port: currentPort || 40050, agent, ownerToken: nodeJwt, id: taskId }); } catch (e) { return; }
+        try { task = await invoke('get_agent_task', { port: currentPort || 41050, agent, ownerToken: nodeJwt, id: taskId }); } catch (e) { return; }
         if (!task) return;
         const status = task.status;
         if (status === 'done') {
@@ -1826,7 +1826,7 @@
           // fetch the result by its task tag (robust — works without deliverableKey on the record).
           let result = '';
           try {
-            const mem = await invoke('get_task_deliverable', { port: currentPort || 40050, ownerToken: nodeJwt, taskId: taskId });
+            const mem = await invoke('get_task_deliverable', { port: currentPort || 41050, ownerToken: nodeJwt, taskId: taskId });
             if (mem) result = (typeof mem === 'string') ? mem : (mem.text || mem.content || mem.output || mem.value || JSON.stringify(mem, null, 2));
           } catch (e) { /* fall back to the message */ }
           if (!result) result = task.message || '(done)';
@@ -1847,7 +1847,7 @@
       if (!nodeJwt || !nodeOwner) { fwLog('x ' + t('fw.needSignin')); return; }
       try {
         const handoff = btoa(JSON.stringify({ owner: nodeOwner, jwt: nodeJwt }));
-        const url = 'http://localhost:' + (currentPort || 40050) + '/v1/profile?tab=agents#handoff=' + encodeURIComponent(handoff);
+        const url = 'http://localhost:' + (currentPort || 41050) + '/v1/profile?tab=agents#handoff=' + encodeURIComponent(handoff);
         openExternal(url);
       } catch (e) { fwLog('x ' + (e && e.message ? e.message : e)); }
     }
@@ -1875,7 +1875,7 @@
     // ── AI Setup state ──────────────────────────────────────────
     let nodeJwt = null;          // owner JWT obtained via node_login (session-only)
     let nodeOwner = null;        // signed-in owner username (for local agent auto-approve)
-    let currentPort = 40050;     // updated from node status
+    let currentPort = 41050;     // updated from node status
     let lastServices = [];       // most recent AI scan results
     let currentAi = null;        // the AI settings currently active on the node
 
@@ -2226,7 +2226,7 @@
     async function saveSettings() {
       const config = {
         node_id: document.getElementById('settingsNodeId').value,
-        port: parseInt(document.getElementById('settingsPort').value, 10) || 40050,
+        port: parseInt(document.getElementById('settingsPort').value, 10) || 41050,
         federation_role: document.getElementById('settingsRole').value,
         genesis_url: document.getElementById('settingsGenesisUrl').value || null,
         ai_endpoint: document.getElementById('settingsAiEndpoint').value || null,
@@ -2420,7 +2420,7 @@
       const crewModule = (document.getElementById('agentCrew').value || 'crewaimeat.research_crew').trim();
       // The agent name MUST match the crew's hardcoded AGENT_NAME (research_crew.py → "research-crew").
       const agentName = (document.getElementById('agentName').value || 'research-crew').trim();
-      const nodeUrl = 'http://localhost:' + (currentPort || 40050);
+      const nodeUrl = 'http://localhost:' + (currentPort || 41050);
       if (!nodeJwt || !nodeOwner) {
         appendAgentLog('x ' + t('fw.needSignin'));
         showToast(t('fw.needSignin'), 'error');

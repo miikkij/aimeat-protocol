@@ -17,7 +17,7 @@
  *   env: AIMEAT_HOME (isolated connector home), AIMEAT_AGENT_WORKDIR, AIMEAT_CREW_MODULE,
  *        AIMEAT_AGENT_NAME (must match the crew's AGENT_NAME, e.g. research-crew),
  *        AIMEAT_AGENT_OWNER, AIMEAT_OWNER_TOKEN (owner JWT for auto-approve),
- *        AIMEAT_NODE_URL=http://localhost:40050, AIMEAT_OLLAMA_URL
+ *        AIMEAT_NODE_URL=http://localhost:41050, AIMEAT_OLLAMA_URL
  * @version-history
  *   v1.0.0 — 2026-06-17 — Initial uv-run daemon supervisor with backoff + JSON status.
  *   v1.1.0 — 2026-06-17 — Halt the crash-loop with an honest "needs-setup" status.
@@ -26,11 +26,14 @@
  *   v2.1.0 — 2026-06-17 — Start serve via aimeat_crewai's HOME-SCOPED ensure_serve directly (not
  *     crewaimeat's scripts/ensure_serve.py, whose serve_guard reaps every serve daemon machine-wide).
  *     The desktop agent now only ever touches its own app-data home — never other homes' daemons.
+ *   v2.2.0 — 2026-06-18 — Self-heal stale tokens: validate the cached token against the node before
+ *     reuse (discard + re-register if 401/403/404), and handle the crew's AUTH_EXIT_CODE (78) by
+ *     re-registering a fresh token instead of crash-looping on the dead one (capped re-auth attempts).
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 
 const ENV = process.env;
 const WORKDIR = ENV.AIMEAT_AGENT_WORKDIR || join(homedir(), '.aimeat', 'agent-runtime');
@@ -42,12 +45,15 @@ const MODULE = ENV.AIMEAT_CREW_MODULE || 'crewaimeat.research_crew';
 const AGENT = ENV.AIMEAT_AGENT_NAME || 'research-crew';
 const OWNER = ENV.AIMEAT_AGENT_OWNER || '';
 const OWNER_TOKEN = ENV.AIMEAT_OWNER_TOKEN || '';
-const NODE_URL = (ENV.AIMEAT_NODE_URL || 'http://localhost:40050').replace(/\/+$/, '');
+const NODE_URL = (ENV.AIMEAT_NODE_URL || 'http://localhost:41050').replace(/\/+$/, '');
 const OLLAMA_URL = ENV.AIMEAT_OLLAMA_URL || 'http://localhost:11434';
 
 const BACKOFF_MIN = 2000, BACKOFF_MAX = 60000;
 const FAST_CRASH_MS = 15000, MAX_FAST_CRASHES = 2;
-let backoff = BACKOFF_MIN, fastCrashes = 0, sawSetupError = false, spawnAt = 0;
+// The crew exits with this code when its token is missing/rejected past the wait window
+// (crewaimeat AUTH_EXIT_CODE). It means "re-auth needed", NOT a crash to back off on.
+const AUTH_EXIT_CODE = 78, MAX_REAUTH_ATTEMPTS = 3;
+let backoff = BACKOFF_MIN, fastCrashes = 0, sawSetupError = false, spawnAt = 0, reauthAttempts = 0;
 let stopping = false, child = null;
 
 function emit(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
@@ -73,10 +79,35 @@ async function api(method, path, body, token) {
 
 const tokenPath = () => join(AIMEAT_HOME, 'tokens', `${AGENT}@${OWNER}.token`);
 
-// Step 1 — ensure the agent has a stored token in the isolated home. Auto-approve with the owner JWT
-// (no manual device-auth) the first time; reuse it afterwards.
+function discardToken() {
+  try { rmSync(tokenPath(), { force: true }); } catch { /* already gone */ }
+}
+
+// Probe whether a stored agent token still authenticates with the node. Mirrors the crew's own
+// check (GET /v1/agents/{agent}/tasks): 'ok' (200), 'stale' (401/403/404 — denied/revoked, or the
+// node was reset and no longer knows this agent), or 'unknown' (network/5xx — don't act on it).
+async function probeToken(token) {
+  try {
+    const r = await api('GET', `/v1/agents/${encodeURIComponent(AGENT)}/tasks?status=active`, undefined, token);
+    if (r.status === 200) return 'ok';
+    if (r.status === 401 || r.status === 403 || r.status === 404) return 'stale';
+    return 'unknown';
+  } catch { return 'unknown'; }
+}
+
+// Step 1 — ensure the agent has a stored token in the isolated home that the node ACCEPTS. Auto-approve
+// with the owner JWT (no manual device-auth) the first time; reuse it afterwards — but only after
+// confirming the node still accepts it. A stale token (node DB reset, agent removed, token revoked)
+// is discarded and re-registered, so the agent self-heals instead of crash-looping on a dead token.
 async function ensureAgentToken() {
-  if (existsSync(tokenPath())) { log('Agent token present — reusing.'); return true; }
+  if (existsSync(tokenPath())) {
+    const cached = readFileSync(tokenPath(), 'utf-8').trim();
+    const state = cached ? await probeToken(cached) : 'stale';
+    if (state === 'ok') { log('Agent token present and accepted — reusing.'); return true; }
+    if (state === 'unknown') { log('Agent token present (node unreachable — reusing; will re-auth if rejected).'); return true; }
+    log('Stored agent token is no longer accepted by the node — re-registering.');
+    discardToken();
+  }
   if (!OWNER || !OWNER_TOKEN) {
     halt('Sign in with your owner account first — the agent needs your approval to connect to this node.');
     return false;
@@ -162,6 +193,12 @@ function startCrew() {
     const ranMs = Date.now() - spawnAt;
     if (ranMs < FAST_CRASH_MS) fastCrashes += 1; else fastCrashes = 0;
     if (sawSetupError) { halt('The agent hit a setup error (see messages above). Stopped to avoid an error loop.'); return; }
+    // The crew gave up waiting for approval: its token is stale. Don't restart with the same dead
+    // token (that loops forever) — discard it and re-register a fresh, node-accepted one.
+    if (code === AUTH_EXIT_CODE) { void reauthAndRestart(); return; }
+    // Exited for a non-auth reason after running a while → the token clearly worked; give any future
+    // re-auth a fresh attempt budget.
+    if (ranMs >= FAST_CRASH_MS) reauthAttempts = 0;
     if (fastCrashes >= MAX_FAST_CRASHES) { halt(`The agent crashed ${fastCrashes} times right after starting (exit ${code}). Stopped to avoid an error loop.`); return; }
     status('crashed', `Exited with code ${code}. Restarting…`, { code });
     scheduleRestart();
@@ -185,6 +222,30 @@ function scheduleRestart() {
   const wait = backoff; backoff = Math.min(backoff * 2, BACKOFF_MAX);
   status('restarting', `Restarting in ${Math.round(wait / 1000)}s…`, { waitMs: wait });
   setTimeout(startCrew, wait);
+}
+
+// Re-auth path: the crew exited because its token is no longer accepted. Discard the dead token,
+// re-register a fresh one (auto-approve via owner JWT), then restart the crew. Capped so a node that
+// rejects even freshly-minted tokens (clock skew, wrong node, broken keys) halts instead of looping.
+async function reauthAndRestart() {
+  if (stopping) return;
+  reauthAttempts += 1;
+  if (reauthAttempts > MAX_REAUTH_ATTEMPTS) {
+    halt('The node keeps rejecting this agent even after re-registering. Check that you are signed in to the correct node, then start the agent again.');
+    return;
+  }
+  status('connecting', 'Agent token expired or was revoked — re-registering…');
+  discardToken();
+  try {
+    if (!(await ensureAgentToken())) return; // halt() already emitted (e.g. owner not signed in)
+  } catch (e) {
+    halt('Re-registration failed: ' + (e?.message || String(e)));
+    return;
+  }
+  if (stopping) return;
+  // A fresh, node-accepted token — this is recovery, not a crash loop.
+  backoff = BACKOFF_MIN; fastCrashes = 0;
+  scheduleRestart();
 }
 function stop() {
   stopping = true;

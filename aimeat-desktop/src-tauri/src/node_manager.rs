@@ -21,8 +21,14 @@ use tauri::{AppHandle, Manager};
 static NODE_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 static NODE_START_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 
-/// Default port the AIMEAT server listens on.
-const DEFAULT_PORT: u16 = 40050;
+/// Default port the AIMEAT server listens on. Deliberately NOT 40050 — that is the dev
+/// server's default, and a desktop node sharing it collides with anyone running `pnpm dev`
+/// (port-bind failure, then the agent talks to the wrong node and its token is rejected).
+/// The desktop personal node uses its own dedicated port.
+const DEFAULT_PORT: u16 = 41050;
+/// Legacy desktop port (== the dev-server default). Existing installs still pinned to this
+/// value are migrated to DEFAULT_PORT on startup so the desktop stops colliding with dev.
+const LEGACY_PORT: u16 = 40050;
 /// Default node id used when none has been configured yet.
 const DEFAULT_NODE_ID: &str = "aimeat-local-001-dev";
 
@@ -201,6 +207,26 @@ fn log_marker(log_file: &Path, message: &str) {
     }
 }
 
+/// Rewrite `AIMEAT_PORT=40050` (the legacy desktop default, shared with the dev server) to the
+/// current DEFAULT_PORT. Idempotent and conservative: only an exact match of the old default is
+/// changed, so a port the user deliberately set is preserved.
+fn migrate_legacy_port(env_file: &Path) -> Result<(), String> {
+    let content = std::fs::read_to_string(env_file).unwrap_or_default();
+    let from = format!("AIMEAT_PORT={}", LEGACY_PORT);
+    let to = format!("AIMEAT_PORT={}", DEFAULT_PORT);
+    if !content.lines().any(|l| l.trim() == from.as_str()) {
+        return Ok(());
+    }
+    let body = content
+        .lines()
+        .map(|l| if l.trim() == from.as_str() { to.as_str() } else { l })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let migrated = if content.ends_with('\n') { format!("{}\n", body) } else { body };
+    std::fs::write(env_file, migrated)
+        .map_err(|e| format!("Failed to migrate .env port: {}", e))
+}
+
 /// Ensure the data dir exists, a default SQLite `.env` is present, and the security
 /// keys are set. Keys are generated ONCE: a fresh `.env` includes them; an existing
 /// `.env` missing them is backfilled without touching any value already set.
@@ -213,6 +239,11 @@ fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
             .map_err(|e| format!("Failed to write default .env: {}", e))?;
         return Ok(());
     }
+
+    // Migrate the legacy desktop port (40050 — the dev-server default) to the dedicated desktop
+    // port so a running `pnpm dev` no longer collides. Only the old default is touched; a custom
+    // port the user chose is left alone. Done before backfill so later reads see the new value.
+    migrate_legacy_port(&rt.env_file)?;
 
     // Backfill missing security keys into an existing .env (idempotent).
     let content = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
