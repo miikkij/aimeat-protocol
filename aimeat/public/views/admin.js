@@ -1,6 +1,10 @@
 /**
- * Admin Dashboard — SPA View
- * Sidebar layout with data preloading and tab components.
+ * @file public/views/admin.js
+ * @description Admin Dashboard SPA view — sidebar layout with data preloading and tab components.
+ * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
+ *            live-updates trigger a debounced, silent background refresh.
+ * @version-history
+ *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -132,6 +136,7 @@ export default function Admin({ navigate, locale }) {
   const [lastUpdate, setLastUpdate] = useState(null);
   const mountRef = useRef(true);
   const retriedRef = useRef(false);
+  const reloadTimerRef = useRef(null);
 
   // Auth listener
   useEffect(() => {
@@ -158,9 +163,11 @@ export default function Admin({ navigate, locale }) {
   // Cleanup
   useEffect(() => { mountRef.current = true; return () => { mountRef.current = false; }; }, []);
 
-  // Load all data — server-side auth is the source of truth
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  // Load all data — server-side auth is the source of truth.
+  // `silent` skips the loading spinner so SSE-driven background refreshes don't
+  // flicker the "Loading…" button on busy nodes (only manual refresh shows it).
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     setAccessDenied(false);
     try {
@@ -309,13 +316,23 @@ export default function Admin({ navigate, locale }) {
     if (session) loadAll();
   }, [session, loadAll]);
 
-  // SSE live updates — auto-reload on server-side data changes
+  // SSE live updates — auto-reload on server-side data changes.
+  // Debounced + silent: busy nodes emit many events per second; without this the
+  // whole dashboard re-fetches (and flickers "Loading…") on every single event.
   useEffect(() => {
     if (!session) return;
     connect(() => getSession()?.jwt);
-    onUpdate(loadAll);
+    const debouncedReload = () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => {
+        reloadTimerRef.current = null;
+        if (mountRef.current) loadAll(true);
+      }, 1500);
+    };
+    onUpdate(debouncedReload);
     return () => {
-      offUpdate(loadAll);
+      offUpdate(debouncedReload);
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       disconnect();
     };
   }, [session, loadAll]);
