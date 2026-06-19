@@ -8,10 +8,11 @@ import { num, dt, Empty, EconRow } from './shared.js';
 import { getAgentDetail } from '/js/services/admin.js';
 
 export default function AgentsTab({ data }) {
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
+  const [expanded, setExpanded] = useState({});
+
   const ag = data.agents;
   if (!ag?.agents?.length) return html`<${Empty} text=${t('dashboard.noAgentsRegistered')} />`;
-
-  const [expanded, setExpanded] = useState({});
 
   async function toggleDetail(gaii, idx) {
     if (expanded[idx]) {

@@ -44,6 +44,7 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
+import { getSoftwareVersion } from '../utils/version.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -158,6 +159,17 @@ function serveSpa(res: import('express').Response, spaPath: string): void {
     `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
     `window.addEventListener("focus",chk);setInterval(chk,20000);})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
+
+  // Make the running AIMEAT version visible from the page itself — a view-source comment plus a
+  // queryable meta tag. Lets anyone confirm which version a node runs (esp. across federation peers)
+  // without an API call: View Source, or `document.querySelector('meta[name=aimeat-version]').content`.
+  const version = getSoftwareVersion();
+  html = html.replace(
+    '</head>',
+    `<meta name="aimeat-version" content="${version}">\n` +
+    `<meta name="aimeat-build" content="${BUILD_ID}">\n` +
+    `<!-- AIMEAT v${version} · build ${BUILD_ID} -->\n</head>`,
+  );
 
   // Stamp ALL importmap values with the build version — generic regex replaces
   // any value starting with "/" (local path), so new importmap entries are
@@ -314,7 +326,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // injected by serveSpa().
   router.get('/v1/build', (_req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ build: BUILD_ID });
+    res.json({ build: BUILD_ID, version: getSoftwareVersion() });
   });
 
   // Cookie consent standalone JS snippet — for manual integration by service builders

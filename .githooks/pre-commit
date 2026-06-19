@@ -24,4 +24,7 @@ pnpm -s typecheck
 echo "[pre-commit] Type check — frontend / checkJs (typecheck:frontend)…"
 pnpm -s typecheck:frontend
 
+echo "[pre-commit] Importmap ↔ imports in sync (check:importmap)…"
+pnpm -s check:importmap
+
 echo "[pre-commit] ✓ all checks passed"

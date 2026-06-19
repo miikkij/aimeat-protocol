@@ -61,8 +61,7 @@ export function Modal({ open, onClose, title, className = '', children }) {
  *   - danger: if true, confirm button is styled red (for destructive actions)
  */
 export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger }) {
-  if (!open) return null;
-
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const onBackdrop = useCallback((e) => {
     if (e.target === e.currentTarget) onClose();
   }, [onClose]);
@@ -73,6 +72,8 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  if (!open) return null;
 
   return html`
     <div class="modal-overlay" onClick=${onBackdrop}>

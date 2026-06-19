@@ -183,8 +183,10 @@ All commands from **project root** (root `package.json` proxies to `aimeat/`).
 
 ```bash
 pnpm dev                 # Dev server (auto-reload), port 40050
-pnpm typecheck           # tsc --noEmit
-pnpm lint
+pnpm typecheck           # tsc --noEmit (backend: src/, bin/, scripts/)
+pnpm typecheck:frontend  # tsc --noEmit -p tsconfig.frontend.json (checkJs over public/)
+pnpm check:importmap     # verify spa.html importmap ↔ absolute /js|/components|/views imports
+pnpm lint                # eslint src/ public/
 pnpm test:e2e:sqlite     # E2E, SQLite (fast iteration, default)
 pnpm test:e2e:mongodb    # E2E, MongoDB (run before end-of-plan)
 pnpm build && pnpm start
@@ -193,6 +195,8 @@ pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
 ```
 
 Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding`. Memory-backend test commands are **deprecated** — don't use them.
+
+**Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` pass. The same four run in CI (`.github/workflows/ci.yml`). E2E/Playwright are NOT in the hook (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
 
 ## Code Conventions
 

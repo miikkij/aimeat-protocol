@@ -300,11 +300,12 @@ function GuideIndex({ locale, onSelectGuide, navigate }) {
 function GuideDetail({ slug, locale, onBack }) {
   const labels = LABELS[locale] || LABELS.en;
   const guide = GUIDES[slug];
-  if (!guide) return html`<div class="gd-container"><p>Guide not found.</p></div>`;
-  const data = guide[locale] || guide.en;
+  const data = guide ? (guide[locale] || guide.en) : null;
 
-  // Build markdown for clipboard
+  // Hooks must run unconditionally before any early return (Rules of Hooks) — guard their
+  // bodies against a missing guide instead.
   const buildMarkdown = useCallback(() => {
+    if (!data) return '';
     let md = '# ' + data.title + '\n\nNode URL: ' + NODE_URL + '\n\nIMPORTANT: Make it a single downloadable HTML file.\n\n';
     data.sections.forEach(s => {
       md += '## ' + s.heading + '\n\n' + s.body + '\n\n';
@@ -316,9 +317,12 @@ function GuideDetail({ slug, locale, onBack }) {
   }, [data]);
 
   useEffect(() => {
+    if (!data) return;
     document.title = data.title + ' | AIME AT';
     window.scrollTo(0, 0);
-  }, [slug, data.title]);
+  }, [slug, data]);
+
+  if (!guide) return html`<div class="gd-container"><p>Guide not found.</p></div>`;
 
   return html`
     <div class="gd-container">

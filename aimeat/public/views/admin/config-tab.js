@@ -33,11 +33,12 @@ const SOURCE_BADGE = {
 };
 
 export default function ConfigTab({ data, reload }) {
-  const s = data.configSchema;
-  if (!s || !s.schema) return html`<${Empty} text=${t('dashboard.configNotAvailable')} />`;
-
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const [pending, setPending] = useState({});
   const [result, setResult] = useState(null);
+
+  const s = data.configSchema;
+  if (!s || !s.schema) return html`<${Empty} text=${t('dashboard.configNotAvailable')} />`;
 
   const schema = s.schema;
   const editable = s.editable !== false;

@@ -33,10 +33,10 @@ const BUCKETS = [
 
 export default function SharedBoard({ agents, onboardings, onAgentClick }) {
   const [bucketFilter, setBucketFilter] = useState(null);
-  if (!agents || agents.length === 0) return null;
 
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const agentStates = useMemo(() => {
-    const rows = agents.map(agent => {
+    const rows = (agents || []).map(agent => {
       const state = detectAgentState(agent, onboardings?.[agent.name]);
       return { agent, state, bucket: BUCKET_OF[state] || 'quiet', onboarding: onboardings?.[agent.name] };
     });
@@ -62,6 +62,8 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
     }
     return tagCounts;
   }, [agentStates]);
+
+  if (!agents || agents.length === 0) return null;
 
   return html`
     <div class="pf-agd-board">
