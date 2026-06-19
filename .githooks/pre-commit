@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# AIMEAT pre-commit gate — blocks the commit unless the fast static checks pass:
+#   1. ESLint (src/ + public/)           — pnpm lint
+#   2. Backend type check (tsc)          — pnpm typecheck
+#   3. Frontend type check (checkJs)     — pnpm typecheck:frontend
+#
+# These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
+# (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
+#
+# Bypass in a genuine emergency with:  git commit --no-verify
+#
+# Activated via `git config core.hooksPath .githooks` (set automatically by the root
+# package.json "prepare" script on `pnpm install`).
+
+set -e
+
+echo "[pre-commit] ESLint (lint)…"
+pnpm -s lint
+
+echo "[pre-commit] Type check — backend (typecheck)…"
+pnpm -s typecheck
+
+echo "[pre-commit] Type check — frontend / checkJs (typecheck:frontend)…"
+pnpm -s typecheck:frontend
+
+echo "[pre-commit] ✓ all checks passed"
