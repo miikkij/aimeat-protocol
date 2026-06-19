@@ -162,5 +162,24 @@ await test('9. Partial term matches (prefix/substring): "qwopdoc" finds the "qwo
     assert(!!hit, `partial term must match the full word, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
 });
 
+await test('10. Public scope finds another user\'s public knowledge package — with producer + kind', async () => {
+    const term = 'zubpublicterm';
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: 'packages/zub-pkg/manifest', value: { name: `Public ${term} digest`, content_type: 'news' }, visibility: 'public', tags: ['knowledge-package', 'news'] }) });
+    assert(w.status === 201 || w.status === 200, `pkg ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const r = await json(`/v1/librarian/search?q=${term}&scope=public`, { headers: auth(B.token) });
+    assert(r.status === 200, `search ${r.status}`);
+    const hit = (r.body.data.hits || []).find((h: any) => h.packageId === 'zub-pkg');
+    assert(!!hit, `B must find A's public knowledge package, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+    assert(hit.kind === 'knowledge', `kind should be knowledge, got ${hit.kind}`);
+    assert(typeof hit.producer === 'string' && hit.producer.includes(A.name), `producer should be A, got ${hit.producer}`);
+    assert(/Public .*digest/.test(hit.title), `title should be the package name, got ${hit.title}`);
+});
+
+await test('11. Own scope does NOT return another user\'s public content', async () => {
+    const r = await json(`/v1/librarian/search?q=zubpublicterm&scope=own`, { headers: auth(B.token) });
+    assert(r.status === 200, `search ${r.status}`);
+    assert((r.body.data.hits || []).length === 0, `own scope must not see A's content, got ${r.body.data.total}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

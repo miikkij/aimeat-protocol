@@ -62,7 +62,10 @@ All notable changes to AIMEAT are documented in this file.
     (Prisma `contains`, owner-scoped) — both so a partial term ("aichologis") finds the full word.
     Results are organism-annotated with snippets; **"Open"** takes an organism hit to its real home —
     the organism's workspace **document** (the rendered doc view, deep-linked), not the raw memory
-    list. `src/routes/librarian.ts`, `src/services/librarian.ts`, storage interface +
+    list. A **"Public knowledge"** scope flips the same search to the whole node's public-visibility
+    content — knowledge packages, public workspace documents, public memory — each hit carrying its
+    **producer** (provenance) and opening in the public no-auth viewers
+    (`/v1/publicknowledgeviewer`, `/v1/publicworkspaceviewer`). `src/routes/librarian.ts`, `src/services/librarian.ts`, storage interface +
     `sqlite/{schema,repos/memory}` + `mongodb/index.ts`, `public/views/profile/notebook-tab.js`,
     `public/js/services/notebook.js`.
   - **AI placement (classify → disambiguate → materialize).** `POST /v1/librarian/classify` sends the

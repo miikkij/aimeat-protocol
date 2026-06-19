@@ -31,6 +31,12 @@
   flex: 1;
 }
 
+.pf-nb-scope { margin-bottom: var(--space-sm, 0.75rem); }
+.pf-nb-hit-producer {
+  margin-top: var(--space-xs, 0.4rem);
+  color: var(--text-dim, var(--text));
+}
+
 .pf-nb-hits {
   display: flex;
   flex-direction: column;

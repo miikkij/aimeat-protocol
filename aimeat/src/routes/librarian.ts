@@ -38,6 +38,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     limit = Math.min(limit, MAX_LIMIT);
 
     const keyPrefix = (req.query.prefix as string | undefined)?.trim() || undefined;
+    const scope = req.query.scope === 'public' ? 'public' : 'own';
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
 
@@ -48,6 +49,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       query: q,
       limit,
       keyPrefix,
+      scope,
     });
 
     res.json(success(config.nodeId, {

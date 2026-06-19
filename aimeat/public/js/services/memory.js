@@ -32,9 +32,10 @@ export async function searchMemory(query, agentGaii) {
  * Librarian full-text search across all of the caller's content (GET /v1/librarian/search).
  * Returns the ranked hits array (each: { key, title, snippet, score, organismId, workspaceId, ... }).
  */
-export async function librarianSearch(query, limit) {
+export async function librarianSearch(query, limit, scope) {
   let url = `/v1/librarian/search?q=${encodeURIComponent(query)}`;
   if (limit) url += `&limit=${encodeURIComponent(limit)}`;
+  if (scope) url += `&scope=${encodeURIComponent(scope)}`;
   const data = await apiGet(url);
   const hits = data?.data?.hits || [];
   return Array.isArray(hits) ? hits : [];

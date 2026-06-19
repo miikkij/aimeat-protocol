@@ -73,6 +73,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState(null);   // null = not searched yet
   const [searching, setSearching] = useState(false);
+  const [searchScope, setSearchScope] = useState('own');   // 'own' | 'public'
 
   // Slice B — placement suggestion for one note at a time.
   const [sortingKey, setSortingKey] = useState(null);   // note key being classified (loading)
@@ -140,35 +141,62 @@ export default function NotebookTab({ session, showToast, onStats }) {
     }, { danger: true });
   }
 
-  async function handleSearch() {
-    const q = query.trim();
+  async function runSearch(q, scope) {
     if (!q) { setHits(null); return; }
     setSearching(true);
     try {
-      const results = await memoryService.librarianSearch(q, 50);
-      setHits(results);
+      setHits(await memoryService.librarianSearch(q, 50, scope));
     } catch (e) {
       showToast(e.message || t('profile.error'), true);
       setHits([]);
     } finally { setSearching(false); }
   }
+  function handleSearch() { runSearch(query.trim(), searchScope); }
+  function pickScope(scope) {
+    setSearchScope(scope);
+    if (query.trim()) runSearch(query.trim(), scope);   // re-run so the toggle shows immediately
+  }
 
-  // Open a librarian hit at its REAL home: an organism document opens that organism's workspace and
-  // deep-links to the document (the readable, rendered doc view) — not the raw Memory key list. A
-  // personal (non-organism) entry has no better home, so it opens the Memory tab.
+  function hitDocId(hit) {
+    const prefix = `organism.${hit.organismId}.w.${hit.workspaceId}.${hit.space}.`;
+    return hit.space && hit.key.startsWith(prefix) ? hit.key.slice(prefix.length).split('.')[0] : null;
+  }
+  /** Whether a hit has a place to open (so the button is shown). */
+  function canOpen(hit) {
+    if (hit.kind === 'knowledge') return !!hit.packageId;
+    if (hit.organismId && hit.workspaceId) return true;
+    return searchScope !== 'public';   // personal memory only has an in-app home in your own scope
+  }
+  // Open a hit at its real home. Knowledge → the public knowledge viewer; an organism document →
+  // the in-app workspace doc (your own) or the public no-auth workspace viewer (public scope); a
+  // personal entry → the Memory tab.
   function openHit(hit) {
+    if (hit.kind === 'knowledge' && hit.packageId) {
+      window.open(`/v1/publicknowledgeviewer?id=${encodeURIComponent(hit.packageId)}`, '_blank', 'noopener');
+      return;
+    }
     if (hit.organismId && hit.workspaceId) {
+      const docId = hitDocId(hit);
+      if (searchScope === 'public') {
+        let u = `/v1/publicworkspaceviewer?org=${encodeURIComponent(hit.organismId)}&ws=${encodeURIComponent(hit.workspaceId)}`;
+        if (hit.space && docId) u += `&type=${encodeURIComponent(hit.space)}&id=${encodeURIComponent(docId)}`;
+        window.open(u, '_blank', 'noopener');
+        return;
+      }
       try {
         sessionStorage.setItem('aimeat.ws.openId', hit.organismId);
         sessionStorage.setItem('aimeat.ws.openWs', hit.workspaceId);
-        const prefix = `organism.${hit.organismId}.w.${hit.workspaceId}.${hit.space}.`;
-        const docId = hit.space && hit.key.startsWith(prefix) ? hit.key.slice(prefix.length).split('.')[0] : null;
         if (docId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.openDoc`, JSON.stringify({ namespace: hit.space, id: docId }));
       } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
-    } else {
-      window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
+      return;
     }
+    if (searchScope !== 'public') window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
+  }
+
+  /** Short producer label for a public hit: agent#owner or owner (drop the @node). */
+  function producerLabel(gaii) {
+    return String(gaii || '').split('@')[0];
   }
 
   // Collapse cycle for an inbox note: one line → peek → full → one line.
@@ -344,14 +372,17 @@ export default function NotebookTab({ session, showToast, onStats }) {
     <div class="pf-nb-hit" key=${hit.key}>
       <div class="pf-nb-hit-head">
         <span class="pf-nb-hit-title">${escHtml(hit.title || hit.key)}</span>
-        ${hit.organismId
-          ? html`<span class="badge badge-info">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
-          : html`<span class="badge">${t('profile.notebook.personalNote')}</span>`}
+        ${hit.kind === 'knowledge'
+          ? html`<span class="badge badge-success">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}</span>`
+          : hit.organismId
+            ? html`<span class="badge badge-info">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
+            : html`<span class="badge">${t('profile.notebook.personalNote')}</span>`}
       </div>
+      ${searchScope === 'public' && html`<div class="text-meta-sm pf-nb-hit-producer">${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
       ${hit.snippet && html`<div class="pf-nb-hit-snippet">${escHtml(hit.snippet)}</div>`}
       <div class="pf-nb-hit-foot">
         <span class="text-meta-sm pf-nb-hit-key" title=${hit.key}>${escHtml(hit.key)}</span>
-        <button class="btn-ghost btn-sm" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>
+        ${canOpen(hit) && html`<button class="btn-ghost btn-sm" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>`}
       </div>
     </div>
   `;
@@ -375,6 +406,10 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
     <div class="section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
     <div class="section-desc">${t('profile.notebook.librarianDesc')}</div>
+    <div class="sub-tabs pf-nb-scope">
+      <button class="sub-tab ${searchScope === 'own' ? 'active' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
+      <button class="sub-tab ${searchScope === 'public' ? 'active' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
+    </div>
     <div class="action-bar">
       <div class="search-bar pf-nb-search">
         <input type="text" class="input-field" placeholder=${t('profile.notebook.searchPlaceholder')}
