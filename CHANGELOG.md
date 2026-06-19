@@ -4,6 +4,39 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Google sign-in (social login).** Humans can now create an account or log in with **Continue with
+  Google** straight from the sign-in modal — no username/password required. A generic, **config-gated**
+  OIDC sign-in path (`AIMEAT_GOOGLE_OAUTH_ENABLED` + client id/secret; redirect URI derived from
+  `baseUrl` or overridden via `AIMEAT_GOOGLE_OAUTH_REDIRECT_URI`) that reuses the same OIDC
+  relying-party client as FTN. Two browser-navigation endpoints: `GET /v1/ghii/login/google`
+  (→ redirect to Google) and `GET /v1/ghii/login/google/callback` (exchange → map → session →
+  redirect). **Account mapping:** a returning user is matched by Google's stable `sub`; a first-time
+  user is **linked** to an existing account only when Google's **verified** email matches a GHII whose
+  email was already **locally verified** (preventing takeover of an account that merely *claimed* an
+  email), otherwise a **new** owner + GHII is created (username derived from the email, welcome bonus
+  applied, email recorded as verified → level 1). On success the node establishes the normal owner
+  session (httpOnly refresh cookie + access token) and redirects back to the SPA, which boots
+  logged-in; failures redirect to `/?auth_error=<CODE>`. New GHII field `googleSub` (+ `getGHIIByGoogleSub`)
+  across both backends (SQLite column/index/migration, Prisma mongo + postgres schemas). The
+  **Continue with Google** button only renders when the node is configured (baked-in
+  `GOOGLE_LOGIN_ENABLED`), with EN+FI strings (`modal.googleSignIn`, `modal.orLabel`). `src/routes/oauth-login.ts`,
+  `src/server-bootstrap/routes-loader.ts`, `src/routes/libs.ts`, `src/config.ts`, `.env.example`,
+  `src/utils/env-config.ts`, storage layer + Prisma schemas, `openapi.yaml`,
+  `test/unit/oauth-login.test.ts` (create / returning / link / no-link-on-unverified + failures),
+  `test/e2e-oauth-login.ts` (disabled-guard).
+- **Sign-in modal submits on Enter.** Pressing Enter in any sign-in field (username / password /
+  display name) triggers Sign In / Register, unless a request is already in flight. `src/routes/libs.ts`.
+
+### Fixed
+
+- **OIDC code exchange against RFC 9207 providers (e.g. Google).** `exchangeCode` now reconstructs the
+  callback URL with `state` and the provider's `iss` (issuer) parameter and passes `expectedState`, so
+  token exchange no longer fails with *"invalid response encountered"* when the authorization server
+  advertises `authorization_response_iss_parameter_supported`. Also fixes the FTN callback path.
+  `src/services/oidc-client.ts`.
+
 ## [1.26.0] - 2026-06-19
 
 ### Added
