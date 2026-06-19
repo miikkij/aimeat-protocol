@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-06-19
+
 ### Added
 
 - **Configurable header navigation.** Operators can now choose which public links appear in the site
