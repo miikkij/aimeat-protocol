@@ -126,5 +126,34 @@ await test('6. Auth scope: another owner (B) does not get A\'s private content',
     assert((r.body.data.hits || []).length === 0, `B must not see A's content, got ${r.body.data.total} hits`);
 });
 
+await test('7. Classify without an OpenRouter key is rejected cleanly (400 NO_OPENROUTER_KEY)', async () => {
+    const r = await json('/v1/librarian/classify', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ text: 'a note to file somewhere' }) });
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+    assert(r.body.error?.code === 'NO_OPENROUTER_KEY', `expected NO_OPENROUTER_KEY, got ${JSON.stringify(r.body.error)}`);
+});
+
+await test('8. Materialize flow (API path): a document filed into a new workspace is found by the librarian', async () => {
+    // Replicates what the client materializeDocument() orchestrates: new workspace (registry +
+    // manifest with a document space) + a document instance, then the librarian finds it.
+    const WS = 'ws-materialized';
+    const root = `organism.${org1}.w.${WS}`;
+    const reg = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${org1}.meta.workspaces`, value: { workspaces: [{ id: 'ws-lib1', name: 'Coordination' }, { id: WS, name: 'Notebook', createdAt: new Date().toISOString() }] }, visibility: 'private' }) });
+    assert(reg.status === 200 || reg.status === 201, `registry ${reg.status}`);
+    const manifest = { manifestVersion: '1.0', id: org1, name: 'Notebook', kind: 'project', status: 'active', objectTypes: [
+        { name: 'Pages', namespace: 'pages', schemaRef: 'schema:document@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true },
+    ] };
+    const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(mr.status === 200 || mr.status === 201, `manifest ${mr.status}: ${JSON.stringify(mr.body.error)}`);
+    const docTerm = 'qwopdocterm';
+    const doc = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root}.pages.doc-1.latest`, value: { id: 'doc-1', title: `Filed ${docTerm} note`, markdown: `# Filed\n\nThis ${docTerm} document was materialized from a note.` }, visibility: 'private' }) });
+    assert(doc.status === 200 || doc.status === 201, `doc ${doc.status}: ${JSON.stringify(doc.body.error)}`);
+
+    const r = await json(`/v1/librarian/search?q=${docTerm}`, { headers: auth(A.token) });
+    assert(r.status === 200, `search ${r.status}`);
+    const hit = (r.body.data.hits || []).find((h: any) => h.organismId === org1 && h.workspaceId === WS);
+    assert(!!hit, `expected the materialized document among hits, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+    assert(hit.space === 'pages', `expected space=pages, got ${hit.space}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

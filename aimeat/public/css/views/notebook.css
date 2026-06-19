@@ -95,3 +95,45 @@
   gap: var(--space-sm, 0.75rem);
   margin-top: var(--space-xs, 0.4rem);
 }
+.pf-nb-note-btns {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+}
+
+.pf-nb-suggest {
+  margin-top: var(--space-sm, 0.75rem);
+  padding: var(--space-md, 1rem);
+  background: var(--surface, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-reason {
+  font-style: italic;
+  margin-bottom: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-label {
+  font-size: 0.8em;
+  color: var(--text-dim, var(--text));
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-body {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+.pf-nb-suggest-alts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+}

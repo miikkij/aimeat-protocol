@@ -1,0 +1,278 @@
+- generic [ref=e1]:
+  - 'heading "AIMEAT — AI Memory Exchange and Action Transfer. Open protocol for AI agents: persistent memory, identity, app generation, and federated node networks." [level=1] [ref=e2]'
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "AIME ♥ AT" [ref=e6] [cursor=pointer]:
+          - /url: /v1/portal
+          - text: AIME
+          - generic [ref=e7]: ♥
+          - generic [ref=e8]: AT
+        - generic [ref=e9]: ♥ 993
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - link "Kokeile" [ref=e12] [cursor=pointer]:
+            - /url: /v1/portal
+          - link "Miten se toimii" [ref=e13] [cursor=pointer]:
+            - /url: /v1/how-it-works
+          - link "Yrityksellesi" [ref=e14] [cursor=pointer]:
+            - /url: /v1/business
+          - link "Kehittäjille" [ref=e15] [cursor=pointer]:
+            - /url: /v1/portal?view=dev
+          - link "Apua" [ref=e16] [cursor=pointer]:
+            - /url: /v1/help
+          - link "Sovellukset" [ref=e17] [cursor=pointer]:
+            - /url: /app-catalog.html
+          - link "Profiili" [ref=e18] [cursor=pointer]:
+            - /url: /v1/profile
+          - link "Hallinta" [ref=e19] [cursor=pointer]:
+            - /url: /v1/admin
+          - generic [ref=e20]:
+            - button "Vaihda tummaan tilaan" [ref=e21] [cursor=pointer]: ☾
+            - button "EN" [ref=e22] [cursor=pointer]
+            - button "FI" [ref=e23] [cursor=pointer]
+        - button "Ilmoitukset" [ref=e25] [cursor=pointer]: 🔔
+        - generic [ref=e27]:
+          - generic [ref=e29]: kirjautuneena
+          - generic [ref=e30]: happyadmin@aimeat-local-001-dev
+          - button "Kirjaudu ulos" [ref=e31] [cursor=pointer]
+    - generic [ref=e34]:
+      - complementary [ref=e35]:
+        - generic [ref=e36]:
+          - img [ref=e38]
+          - generic [ref=e51]: happyadmin
+        - button "🏠 Koti" [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: 🏠
+          - generic [ref=e54]: Koti
+        - button "📬 Postilaatikko 1" [ref=e55] [cursor=pointer]:
+          - generic [ref=e56]: 📬
+          - generic [ref=e57]: Postilaatikko
+          - generic [ref=e58]: "1"
+        - generic [ref=e59]:
+          - generic [ref=e60]: Kiinnitetyt
+          - button "🏢 Organismit 📌" [ref=e61] [cursor=pointer]:
+            - generic [ref=e62]: 🏢
+            - generic [ref=e63]: Organismit
+            - button "📌" [ref=e64]
+          - button "🤖 Agentit 📌" [ref=e65] [cursor=pointer]:
+            - generic [ref=e66]: 🤖
+            - generic [ref=e67]: Agentit
+            - button "📌" [ref=e68]
+          - button "🧠 Muisti 📌" [ref=e69] [cursor=pointer]:
+            - generic [ref=e70]: 🧠
+            - generic [ref=e71]: Muisti
+            - button "📌" [ref=e72]
+          - button "⏰ Ajastin 📌" [ref=e73] [cursor=pointer]:
+            - generic [ref=e74]: ⏰
+            - generic [ref=e75]: Ajastin
+            - button "📌" [ref=e76]
+        - generic [ref=e77]:
+          - button "▼ Tieto" [ref=e78] [cursor=pointer]:
+            - generic [ref=e79]: ▼
+            - text: Tieto
+          - button "🏢 Organismit 📌" [ref=e80] [cursor=pointer]:
+            - generic [ref=e81]: 🏢
+            - generic [ref=e82]: Organismit
+            - button "📌" [ref=e83]
+          - button "🧠 Muisti 📌" [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]: 🧠
+            - generic [ref=e86]: Muisti
+            - button "📌" [ref=e87]
+          - button "📓 Muistikirja 📌" [active] [ref=e88] [cursor=pointer]:
+            - generic [ref=e89]: 📓
+            - generic [ref=e90]: Muistikirja
+            - button "📌" [ref=e91]
+          - button "📚 Tietopankki" [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]: 📚
+            - generic [ref=e94]: Tietopankki
+          - button "📋 Taulut" [ref=e95] [cursor=pointer]:
+            - generic [ref=e96]: 📋
+            - generic [ref=e97]: Taulut
+        - generic [ref=e98]:
+          - button "▼ Automaatio" [ref=e99] [cursor=pointer]:
+            - generic [ref=e100]: ▼
+            - text: Automaatio
+          - button "🤖 Agentit 📌" [ref=e101] [cursor=pointer]:
+            - generic [ref=e102]: 🤖
+            - generic [ref=e103]: Agentit
+            - button "📌" [ref=e104]
+          - button "🔌 Ekosysteemisovellukset" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]: 🔌
+            - generic [ref=e107]: Ekosysteemisovellukset
+          - button "🧰 Tarjoama" [ref=e108] [cursor=pointer]:
+            - generic [ref=e109]: 🧰
+            - generic [ref=e110]: Tarjoama
+          - button "⏰ Ajastin 📌" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]: ⏰
+            - generic [ref=e113]: Ajastin
+            - button "📌" [ref=e114]
+          - button "🔀 Työnkulut" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]: 🔀
+            - generic [ref=e117]: Työnkulut
+          - button "🛠️ Palvelut" [ref=e118] [cursor=pointer]:
+            - generic [ref=e119]: 🛠️
+            - generic [ref=e120]: Palvelut
+          - button "🔗 MCP" [ref=e121] [cursor=pointer]:
+            - generic [ref=e122]: 🔗
+            - generic [ref=e123]: MCP
+        - generic [ref=e124]:
+          - button "▼ Tapahtumat" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: ▼
+            - text: Tapahtumat
+          - button "🔔 Ilmoitukset" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]: 🔔
+            - generic [ref=e129]: Ilmoitukset
+          - button "📧 Sähköposti" [ref=e130] [cursor=pointer]:
+            - generic [ref=e131]: 📧
+            - generic [ref=e132]: Sähköposti
+          - button "💬 Keskustelusessiot" [ref=e133] [cursor=pointer]:
+            - generic [ref=e134]: 💬
+            - generic [ref=e135]: Keskustelusessiot
+        - generic [ref=e136]:
+          - button "▼ Rakenna & jaa" [ref=e137] [cursor=pointer]:
+            - generic [ref=e138]: ▼
+            - text: Rakenna & jaa
+          - button "⚙️ Sovellukset" [ref=e139] [cursor=pointer]:
+            - generic [ref=e140]: ⚙️
+            - generic [ref=e141]: Sovellukset
+          - button "🔴 Generaattori" [ref=e142] [cursor=pointer]:
+            - generic [ref=e143]: 🔴
+            - generic [ref=e144]: Generaattori
+          - button "🔌 Laajennukset" [ref=e145] [cursor=pointer]:
+            - generic [ref=e146]: 🔌
+            - generic [ref=e147]: Laajennukset
+          - button "⚡ Kyvykkyydet" [ref=e148] [cursor=pointer]:
+            - generic [ref=e149]: ⚡
+            - generic [ref=e150]: Kyvykkyydet
+          - button "📦 Paketit" [ref=e151] [cursor=pointer]:
+            - generic [ref=e152]: 📦
+            - generic [ref=e153]: Paketit
+          - button "🎨 Portfolio" [ref=e154] [cursor=pointer]:
+            - generic [ref=e155]: 🎨
+            - generic [ref=e156]: Portfolio
+          - button "🎯 Kalibraattori" [ref=e157] [cursor=pointer]:
+            - generic [ref=e158]: 🎯
+            - generic [ref=e159]: Kalibraattori
+          - button "📋 Työt" [ref=e160] [cursor=pointer]:
+            - generic [ref=e161]: 📋
+            - generic [ref=e162]: Työt
+        - generic [ref=e163]:
+          - button "▼ Tili" [ref=e164] [cursor=pointer]:
+            - generic [ref=e165]: ▼
+            - text: Tili
+          - button "💎 Lompakko" [ref=e166] [cursor=pointer]:
+            - generic [ref=e167]: 💎
+            - generic [ref=e168]: Lompakko
+          - button "🔒 Tietolompakko" [ref=e169] [cursor=pointer]:
+            - generic [ref=e170]: 🔒
+            - generic [ref=e171]: Tietolompakko
+          - button "🔐 Pääsy" [ref=e172] [cursor=pointer]:
+            - generic [ref=e173]: 🔐
+            - generic [ref=e174]: Pääsy
+        - generic [ref=e175]:
+          - button "▼ Infrastruktuuri" [ref=e176] [cursor=pointer]:
+            - generic [ref=e177]: ▼
+            - text: Infrastruktuuri
+          - button "🌐 Federaatio" [ref=e178] [cursor=pointer]:
+            - generic [ref=e179]: 🌐
+            - generic [ref=e180]: Federaatio
+          - button "🖥️ Solmut" [ref=e181] [cursor=pointer]:
+            - generic [ref=e182]: 🖥️
+            - generic [ref=e183]: Solmut
+          - button "🛡️ Turvallisuus" [ref=e184] [cursor=pointer]:
+            - generic [ref=e185]: 🛡️
+            - generic [ref=e186]: Turvallisuus
+      - main [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - button "muokkaa profiilia" [ref=e190]:
+              - img [ref=e191]
+            - generic [ref=e204]:
+              - generic [ref=e206]: happyadmin
+              - generic [ref=e207]: happyadmin@aimeat-local-001-dev
+              - generic [ref=e208]: "Solmu: http://localhost:40050"
+              - generic [ref=e209]: Itsenäinen
+            - button "Profiili" [ref=e210] [cursor=pointer]
+          - generic [ref=e211]:
+            - button "📱 6 Sovellukset" [ref=e212] [cursor=pointer]:
+              - text: 📱
+              - generic [ref=e213]: "6"
+              - text: Sovellukset
+            - button "🧠 282 Muistit" [ref=e214] [cursor=pointer]:
+              - text: 🧠
+              - generic [ref=e215]: "282"
+              - text: Muistit
+            - button "💎 993 Muruset" [ref=e216] [cursor=pointer]:
+              - text: 💎
+              - generic [ref=e217]: "993"
+              - text: Muruset
+            - button "🔌 6 Palvelut" [ref=e218] [cursor=pointer]:
+              - text: 🔌
+              - generic [ref=e219]: "6"
+              - text: Palvelut
+            - button "🤖 7 Agentit" [ref=e220] [cursor=pointer]:
+              - text: 🤖
+              - generic [ref=e221]: "7"
+              - text: Agentit
+        - generic [ref=e222]:
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]: Tavoitettavuus
+              - generic [ref=e226]: Näytä muille, oletko tavoitettavissa. Pidä automaattisena, aseta käsin tai valitse kuka sen näkee.
+            - generic "Tavoitettavissa" [ref=e227]:
+              - generic "Tavoitettavissa" [ref=e228]
+              - generic [ref=e229]: Tavoitettavissa
+          - generic [ref=e230]:
+            - generic [ref=e231]: Miten tila määräytyy
+            - generic [ref=e232]:
+              - button "Automaattinen" [ref=e233] [cursor=pointer]
+              - button "Käsin" [ref=e234] [cursor=pointer]
+          - generic [ref=e235]: Näkyy tavoitettavissa, kun portaali on auki.
+          - generic [ref=e236]:
+            - generic [ref=e237]: Kuka näkee
+            - combobox "Kuka näkee" [ref=e238] [cursor=pointer]:
+              - option "Kaikki" [selected]
+              - option "Vain kontaktit"
+              - option "Ei kukaan"
+          - generic [ref=e239]: Kuka tahansa verkossa (jaetaan federoiduille nodeille).
+        - generic [ref=e240]:
+          - generic [ref=e241]:
+            - generic [ref=e242]: Jatka
+            - button "🏢 Split Verify Org 2 h sitten" [ref=e243] [cursor=pointer]:
+              - generic [ref=e244]: 🏢
+              - generic [ref=e245]: Split Verify Org
+              - generic [ref=e246]: 2 h sitten
+            - button "🗂 Verify WS 2 h sitten" [ref=e247] [cursor=pointer]:
+              - generic [ref=e248]: 🗂
+              - generic [ref=e249]: Verify WS
+              - generic [ref=e250]: 2 h sitten
+            - button "🏢 Share UI Test 2 h sitten" [ref=e251] [cursor=pointer]:
+              - generic [ref=e252]: 🏢
+              - generic [ref=e253]: Share UI Test
+              - generic [ref=e254]: 2 h sitten
+            - button "🗂 Handbook 3 h sitten" [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]: 🗂
+              - generic [ref=e257]: Handbook
+              - generic [ref=e258]: 3 h sitten
+            - button "🏢 Ultima-V Remake 6 pv sitten" [ref=e259] [cursor=pointer]:
+              - generic [ref=e260]: 🏢
+              - generic [ref=e261]: Ultima-V Remake
+              - generic [ref=e262]: 6 pv sitten
+          - generic [ref=e263]:
+            - button "Agentit" [ref=e264] [cursor=pointer]
+            - button "🤖 Dify 5.6.2026" [ref=e265] [cursor=pointer]:
+              - generic [ref=e266]: 🤖
+              - generic [ref=e267]: Dify
+              - generic [ref=e268]: 5.6.2026
+            - button "🤖 Dify 5.6.2026" [ref=e269] [cursor=pointer]:
+              - generic [ref=e270]: 🤖
+              - generic [ref=e271]: Dify
+              - generic [ref=e272]: 5.6.2026
+            - button "🤖 ranger 28.5.2026" [ref=e273] [cursor=pointer]:
+              - generic [ref=e274]: 🤖
+              - generic [ref=e275]: ranger
+              - generic [ref=e276]: 28.5.2026
+            - button "⏰ Refresh resource totals once a day at 04:00 seuraava ajo 20.6. klo 04.00" [ref=e277] [cursor=pointer]:
+              - generic [ref=e278]: ⏰
+              - generic [ref=e279]: Refresh resource totals once a day at 04:00
+              - generic [ref=e280]: seuraava ajo 20.6. klo 04.00
