@@ -22,6 +22,7 @@ import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
+import { presence } from '../services/presence.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
@@ -180,6 +181,10 @@ export async function initializeServices(
 
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
   startHeartbeatJob(config, storage, peers, networkDirectory);
+
+  // Presence tracker — local online state (from SSE) + federated remote cache, with a
+  // change-driven push loop (≤1/min) to active peers. Reads always resolve locally.
+  presence.init(config, storage, peers);
 
   // A.4: Wire peer recovery to key exchange + future full sync
   setOnPeerRecovery((peerId: string) => {

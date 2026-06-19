@@ -70,6 +70,7 @@ import { knowledgeRouter } from '../routes/knowledge.js';
 import { siteRouter } from '../routes/site.js';
 import { realtimeRouter } from '../routes/realtime.js';
 import { sseRouter } from '../routes/sse.js';
+import { presenceRouter } from '../routes/presence.js';
 import { adminFeaturesRouter } from '../routes/admin-features.js';
 import { setupRouter } from '../routes/setup.js';
 import { extensionsRouter } from '../routes/extensions.js';
@@ -211,6 +212,7 @@ export async function mountRoutes(
   app.use(authRouter(config, storage));
   app.use(accessTokensRouter(config, storage));
   app.use(sseRouter(config, storage));
+  app.use(presenceRouter(config, storage));
 
   // Relay nodes skip agent-hosting routes entirely
   app.use('/v1/owners', rejectForRelay);
@@ -315,6 +317,8 @@ export async function mountRoutes(
     if (req.path.startsWith('/peer/introduce')) return next();
     // Allow public directory and heartbeat/ping
     if (req.path === '/directory' || req.path === '/ping' || req.path === '/heartbeat' || req.path === '/service-summary') return next();
+    // Allow signed peer-to-peer presence pushes (verified by node signature in the handler)
+    if (req.path === '/presence' && req.method === 'POST') return next();
     // Allow federated auth verification (called by remote nodes)
     if (req.path === '/auth/verify' && req.method === 'POST') return next();
     return requireExtended(req, res, next);

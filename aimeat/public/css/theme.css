@@ -903,6 +903,36 @@ a { color: inherit; text-decoration: none; }
   animation: livePulse 1.5s ease-in-out infinite;
 }
 
+/* ── Presence indicator (canonical) ──
+   Backed by /components/PresenceDot.js. A small availability dot (+ optional
+   label) shown next to a person across views. Colors are theme tokens so the
+   dot flips in dark mode: available→success, busy→danger, away→warn,
+   offline/unknown→muted (unknown is extra-faded). */
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+.presence-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.presence--md .presence-dot { width: 10px; height: 10px; }
+.presence-dot--available { background: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.45); }
+.presence-dot--busy { background: var(--danger); }
+.presence-dot--away { background: var(--warn); }
+.presence-dot--offline { background: var(--text-muted); }
+.presence-dot--unknown { background: var(--text-muted); opacity: 0.4; }
+.presence-label {
+  font-size: 0.85em;
+  color: var(--text-dim);
+}
+
 /* ── Key/value detail row (canonical) ──
    Backed by /components/KeyValueRow.js. A label/value pair laid out flex
    space-between: muted label on the left, emphasized value on the right,

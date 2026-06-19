@@ -2,6 +2,7 @@
  * @file hobbies.js
  * @description Hobbies view module — multi-view hobby directory (home, search, profile, join, me, matches) rendered with Preact + HTM.
  * @version-history
+ *   v1.3.0 — 2026-06-19 — Show a presence dot next to people in the directory results + profile header (shared <PresenceDot>)
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced light-only rgba(255,255,255,...) divider with var(--border))
  *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): hb-btn* → canonical
  *     theme.css btn-primary / btn-outline / btn-danger / btn-sm.
@@ -15,6 +16,7 @@ import { escHtml, escAttr } from '/js/utils.js';
 import { t, getLocale, switchLocale } from '/js/i18n.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { PresenceDot } from '/components/PresenceDot.js';
 
 const html = htm.bind(h);
 
@@ -207,7 +209,7 @@ function SearchView({ goTo, initData }) {
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
                 <span style="font-size:1.5rem;">${entry.avatar || '\uD83D\uDE0A'}</span>
                 <div>
-                  <div class="hb-card-title">${entry.displayName}</div>
+                  <div class="hb-card-title">${entry.displayName} <${PresenceDot} ghii=${entry.ghii} /></div>
                   ${(entry.city || entry.area) && html`<div class="hb-card-meta">${[entry.city, entry.area].filter(Boolean).join(', ')}</div>`}
                 </div>
               </div>
@@ -282,7 +284,7 @@ function ProfileView({ goTo, ghii }) {
     <div class="hb-profile-header">
       <span class="hb-profile-avatar">${entry.avatar || '\uD83D\uDE0A'}</span>
       <div>
-        <div class="hb-profile-name">${entry.displayName}</div>
+        <div class="hb-profile-name">${entry.displayName} <${PresenceDot} ghii=${ghii} label=${true} /></div>
         <div class="hb-profile-ghii">${ghii}</div>
       </div>
     </div>
