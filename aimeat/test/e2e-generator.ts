@@ -912,6 +912,23 @@ await test('Delete test owner (cascade)', async () => {
     assert(status === 200, `delete owner status ${status}`);
 });
 
+// ─── Screenshot route path-traversal guard (H-1 regression) ───
+// The screenshot route is unauthenticated; projectId must be validated so it
+// cannot escape the temp screenshot dir into arbitrary files.
+await test('Screenshot route rejects invalid projectId (H-1)', async () => {
+    // A `.` (the traversal primitive) is not allowed in projectId → 400.
+    const dot = await json('/v1/generator/has.dot/screenshots/x.png');
+    assert(dot.status === 400, `expected 400 for dotted projectId, got ${dot.status}: ${JSON.stringify(dot.body)}`);
+    // Encoded traversal must never return file content (400 from validator, or 404 if the
+    // router pre-rejects the encoded slash — either way, not served).
+    const evil = encodeURIComponent('../../../../etc/passwd');
+    const trav = await json(`/v1/generator/${evil}/screenshots/x.png`);
+    assert(trav.status !== 200, `traversal must not be served, got ${trav.status}`);
+    // A well-formed but unknown projectId passes validation and 404s on the missing file.
+    const clean = await json('/v1/generator/gen-000000-abc123/screenshots/x.png');
+    assert(clean.status === 404, `expected 404 for clean unknown projectId, got ${clean.status}`);
+});
+
 // ─── Summary ───
 console.log(`\n${'─'.repeat(40)}`);
 console.log(`Generator E2E: ${passed} passed, ${failed} failed`);

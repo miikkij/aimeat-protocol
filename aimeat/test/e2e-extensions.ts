@@ -374,6 +374,193 @@ await test('DELETE /v1/extensions/test-memory \u2014 cleanup memory extension', 
     assert(body.data?.deleted === 'test-memory', 'deleted name matches');
 });
 
+// ─── Phase 6: Wallet consume amount guard (CR-1 regression) ───
+// A negative consume amount must NOT mint morsels (it would invert the debit).
+console.log('Phase 6 — Wallet consume guard (CR-1)');
+
+const walletManifest = `
+extension: "1.0"
+metadata:
+  name: "test-wallet-guard"
+  version: "1.0.0"
+  description: "Extension that consumes morsels — used to verify the amount guard"
+  author: "test"
+required_apis:
+  - wallet
+actions:
+  - id: spend
+    description: "Consume the given amount and report the result + balance"
+    method: POST
+    path: "/v1/ext/test-wallet-guard/spend"
+    script: "actions/spend.js"
+limits:
+  memory_mb: 16
+  timeout_ms: 2000
+  max_api_calls: 10
+federation:
+  advertise: false
+`;
+
+const walletScripts: Record<string, string> = {
+    'actions/spend.js': `export default async function(ctx, input) {
+    const result = await ctx.wallet.consume(input.amount, 'e2e-cr1');
+    const balance = await ctx.wallet.getBalance();
+    return { result, balance };
+  }`,
+};
+
+async function ownerBalance(): Promise<number> {
+    const { body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return body.data?.balance ?? 0;
+}
+
+await test('Install + activate wallet-guard extension', async () => {
+    const inst = await json('/v1/extensions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ manifest: walletManifest, scripts: walletScripts }),
+    });
+    assert(inst.status === 201, `install status ${inst.status}: ${JSON.stringify(inst.body)}`);
+    const act = await json('/v1/extensions/test-wallet-guard/activate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(act.status === 200, `activate status ${act.status}: ${JSON.stringify(act.body)}`);
+});
+
+// The REST consume wrapper rejects bad amounts by throwing INVALID_AMOUNT (matching its
+// existing DEBIT_LIMIT throw), so the action surfaces a 500 EXTENSION_ERROR. The security
+// invariant we assert is that the balance is NOT minted.
+await test('Negative consume amount does NOT mint morsels (CR-1)', async () => {
+    const before = await ownerBalance();
+    const { status, body } = await json('/v1/ext/test-wallet-guard/spend', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ amount: -1000000 }),
+    });
+    assert(status === 500, `expected 500 (rejected), got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false && /INVALID_AMOUNT/.test(body.error?.message ?? ''),
+        `expected INVALID_AMOUNT rejection, got: ${JSON.stringify(body.error)}`);
+    const after = await ownerBalance();
+    assert(after === before, `balance must be unchanged after negative consume (before=${before}, after=${after})`);
+});
+
+await test('Zero consume amount is rejected (CR-1)', async () => {
+    const before = await ownerBalance();
+    const { status, body } = await json('/v1/ext/test-wallet-guard/spend', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ amount: 0 }),
+    });
+    assert(status === 500, `expected 500 (rejected), got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false && /INVALID_AMOUNT/.test(body.error?.message ?? ''),
+        `expected INVALID_AMOUNT rejection, got: ${JSON.stringify(body.error)}`);
+    const after = await ownerBalance();
+    assert(after === before, `balance must be unchanged after zero consume (before=${before}, after=${after})`);
+});
+
+await test('Positive consume amount debits normally (happy path)', async () => {
+    const before = await ownerBalance();
+    assert(before >= 1, `owner needs >=1 morsel for this test, has ${before}`);
+    const { status, body } = await json('/v1/ext/test-wallet-guard/spend', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ amount: 1 }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.result?.success === true, `consume should succeed, got: ${JSON.stringify(body.data?.result)}`);
+    const after = await ownerBalance();
+    assert(after === before - 1, `balance must drop by 1 (before=${before}, after=${after})`);
+});
+
+await test('Cleanup wallet-guard extension', async () => {
+    const { status } = await json('/v1/extensions/test-wallet-guard', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `delete status ${status}`);
+});
+
+// ─── Phase 7: Extension memory quota (H-5 regression) ───
+// ctx.memory.set must enforce the per-value-size hard limit (default 1 MB) — an
+// extension writing directly via storage would otherwise bypass it (DoS).
+console.log('Phase 7 — Extension memory quota (H-5)');
+
+const memManifest = `
+extension: "1.0"
+metadata:
+  name: "test-mem-quota"
+  version: "1.0.0"
+  description: "Writes to extension memory — used to verify the value-size limit"
+  author: "test"
+required_apis:
+  - memory
+actions:
+  - id: bigset
+    description: "Set a value of the requested byte size"
+    method: POST
+    path: "/v1/ext/test-mem-quota/bigset"
+    script: "actions/bigset.js"
+limits:
+  memory_mb: 16
+  timeout_ms: 2000
+  max_api_calls: 10
+federation:
+  advertise: false
+`;
+
+const memScripts: Record<string, string> = {
+    'actions/bigset.js': `export default async function(ctx, input) {
+    const big = 'x'.repeat(input.size);
+    await ctx.memory.set(input.key || 'blob', big);
+    return { ok: true, bytes: big.length };
+  }`,
+};
+
+await test('Install + activate mem-quota extension', async () => {
+    const inst = await json('/v1/extensions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ manifest: memManifest, scripts: memScripts }),
+    });
+    assert(inst.status === 201, `install status ${inst.status}: ${JSON.stringify(inst.body)}`);
+    const act = await json('/v1/extensions/test-mem-quota/activate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(act.status === 200, `activate status ${act.status}: ${JSON.stringify(act.body)}`);
+});
+
+await test('Small extension memory write succeeds (happy path)', async () => {
+    const { status, body } = await json('/v1/ext/test-mem-quota/bigset', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'small', size: 1024 }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.ok === true, `expected ok, got: ${JSON.stringify(body.data)}`);
+});
+
+await test('Oversized extension memory write is rejected (H-5)', async () => {
+    // 2 MB — exceeds the default 1 MB (memoryMaxValueSizeKb=1024) per-value limit.
+    const { status, body } = await json('/v1/ext/test-mem-quota/bigset', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'huge', size: 2 * 1024 * 1024 }),
+    });
+    assert(status === 500, `expected 500 (rejected), got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false && /QUOTA_EXCEEDED/.test(body.error?.message ?? ''),
+        `expected QUOTA_EXCEEDED, got: ${JSON.stringify(body.error)}`);
+});
+
+await test('Cleanup mem-quota extension', async () => {
+    const { status } = await json('/v1/extensions/test-mem-quota', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `delete status ${status}`);
+});
+
 // ─── Cleanup: delete test owner (cascade) ───
 console.log('Cleanup');
 
