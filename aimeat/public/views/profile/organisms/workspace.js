@@ -160,6 +160,20 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deep-link from the librarian "Open" button: aimeat.ws.{org}.{ws}.openDoc = { namespace, id }.
+  // Once the manifest is loaded we resolve the namespace → object-type name, open that space tab and
+  // its document, then clear the key (one-shot).
+  const openDocKey = 'aimeat.ws.' + orgId + '.' + wsId + '.openDoc';
+  useEffect(() => {
+    if (!ws?.manifest) return;
+    let req = null;
+    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch (e) { req = null; }
+    if (!req || !req.namespace || !req.id) return;
+    const ot = (ws.manifest.objectTypes || []).find(o => o.namespace === req.namespace);
+    if (ot) { setTab('space:' + ot.name); setActiveDoc({ type: ot.name, mode: 'view', page: { id: req.id } }); }
+    try { sessionStorage.removeItem(openDocKey); } catch (e) { /* noop */ }
+  }, [ws, openDocKey]);
+
   // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
   useEffect(() => {
     try {
