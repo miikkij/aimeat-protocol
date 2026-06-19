@@ -8741,6 +8741,10 @@ paths:
                   type: string
                   enum: [federation, private]
                   description: Peering mode controlling which federation features are enabled
+                tier:
+                  type: string
+                  enum: [genesis, member, visiting]
+                  description: Change the peer's trust tier; re-derives the canonical permission flags
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -8767,6 +8771,81 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/federation/peers/{nodeId}/promote:
+    post:
+      operationId: promotePeer
+      summary: Promote a visiting peer to full member (operator vouch)
+      description: |
+        The local operator's deliberate vouch (100% trust in the person who brought the node).
+        Eligibility is measured against the active network policy (uptime %, days active, successful
+        work, signed introduce, domain). A not-yet-eligible peer can be promoted with `{ force: true }`
+        (audited) since the human vouch is itself the trust source. Flips tier → member and re-derives
+        the full member permission flags.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force: { type: boolean, description: Promote even if not yet eligible (audited override) }
+      responses:
+        '200': { description: Promoted to member }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Not eligible (criteria not met; use force to override) }
+
+  /v1/federation/network-policy:
+    get:
+      operationId: getNetworkPolicy
+      summary: The active federation network policy (signed)
+      description: Public — peers fetch and signature-verify this doc to measure joining/visiting peers.
+      tags: [Federation]
+      responses:
+        '200': { description: The active network policy doc }
+    put:
+      operationId: setNetworkPolicy
+      summary: Author the federation network policy (genesis/operator)
+      description: |
+        Author the network-policy doc (auto-admit conditions, visiting permission caps, and promotion
+        criteria — a fixed set of measurable fields, no DSL). Signed with the node key; version auto-incremented.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Stored policy doc }
+
+  /v1/federation/network-policy/pull:
+    post:
+      operationId: pullNetworkPolicy
+      summary: Pull + apply the network policy from this node's genesis
+      description: |
+        Fetch the policy from the configured genesis (or `source_url`), verify its signature against the
+        issuing peer's known public key, and apply it only if newer than the local version.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source_url: { type: string, description: Override the genesis URL to pull from }
+      responses:
+        '200': { description: Applied or skipped (not newer) }
+        '401': { description: Invalid signature }
+        '403': { description: Unknown issuer }
+        '502': { description: Fetch failed }
 
   # ── Federation Auth (cross-node identity verification) ─────
   /v1/federation/service-summary:

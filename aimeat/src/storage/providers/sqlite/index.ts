@@ -4936,13 +4936,14 @@ export class SqliteStorage implements Storage {
 
   async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.peerMode || 'federation', peer.allowFederatedAuth ? 1 : 0,
       (peer.federationAuthScopes ?? []).join(','),
-      peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null);
+      peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
+      peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null);
   }
 
   async listFederationPeers(): Promise<FederationPeerRecord[]> {
@@ -4963,6 +4964,10 @@ export class SqliteStorage implements Storage {
       tier: (r.tier as FederationPeerRecord['tier']) || 'member',
       availability: (r.availability as FederationPeerRecord['availability']) ?? null,
       expiresAt: (r.expiresAt as string) ?? null,
+      heartbeatOk: (r.heartbeatOk as number) ?? 0,
+      heartbeatTotal: (r.heartbeatTotal as number) ?? 0,
+      availabilityWindow: (r.availabilityWindow as string) ?? null,
+      availabilityPct: r.availabilityPct == null ? null : (r.availabilityPct as number),
     }));
   }
 

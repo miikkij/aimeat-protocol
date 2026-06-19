@@ -999,6 +999,14 @@ export interface FederationPeerRecord {
   availability?: 'temporary' | 'permanent' | 'unknown' | null;
   /** Optional expiry for time-limited visiting peers (Phase B). */
   expiresAt?: string | null;
+  /** Lifetime successful heartbeats (Phase B uptime). */
+  heartbeatOk?: number;
+  /** Lifetime attempted heartbeats (Phase B uptime). */
+  heartbeatTotal?: number;
+  /** JSON ring of daily heartbeat buckets `{ days: [{ d, ok, total }] }` over the availability window. */
+  availabilityWindow?: string | null;
+  /** Computed availability % over the window (denormalized for cheap reads). */
+  availabilityPct?: number | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

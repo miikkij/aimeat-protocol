@@ -7,6 +7,8 @@
  *   v1.0.0 — 2026-03-15 — Initial federation sync routes
  *   v1.1.0 — 2026-03-20 — Add federation template endpoints (GET /v1/federation/templates, POST /v1/federation/templates/sync)
  *   v1.2.0 — 2026-05-22 — Add POST /v1/federation/memory/list for peer-to-peer memory browsing
+ *   v1.3.0 — 2026-06-19 — Trust advisory: a `suspend` demotes a member peer back to the visiting
+ *     tier (strips elevated flags); `ban` now also purges the peer from storage (Phase B).
  */
 
 import { Router } from 'express';
@@ -18,6 +20,7 @@ import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sign, verify } from '../auth/keypair.js';
+import { deriveTierFlags } from '../services/federation-tiers.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { RouteHop, RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage } from '../types/route-manifest.js';
@@ -444,11 +447,28 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             created_at: new Date().toISOString(),
         };
 
-        // If ban advisory, auto-de-peer the target
+        // If ban advisory, auto-de-peer the target (and purge from storage).
         if (advisory_type === 'ban') {
             const targetPeer = [...peers.entries()].find(([, p]) => p.nodeId === target_node);
             if (targetPeer) {
                 peers.delete(targetPeer[0]);
+                storage.deleteFederationPeer(targetPeer[1].nodeId).catch(() => {});
+            }
+        }
+
+        // If suspend advisory, demote a full member back to the low-trust visiting tier and strip
+        // its elevated permission flags (provider/relay/replication/auth). This is the trust-revocation
+        // lever for the visiting/member model — a suspended node can never be a provider until re-vouched.
+        if (advisory_type === 'suspend') {
+            const entry = [...peers.entries()].find(([, p]) => p.nodeId === target_node);
+            if (entry) {
+                const peer = entry[1];
+                if ((peer.tier ?? 'member') !== 'visiting') {
+                    peer.tier = 'visiting';
+                    Object.assign(peer, deriveTierFlags('visiting'));
+                    storage.saveFederationPeer(peer).catch(() => {});
+                    logger.warn(`Peer ${target_node} demoted to visiting after suspend advisory`, { reason });
+                }
             }
         }
 

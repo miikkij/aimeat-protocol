@@ -39,6 +39,7 @@ const ALL_SUITES = [
     'test/e2e-federation.ts',
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
+    'test/e2e-federation-policy.ts',
     'test/federation-mesh.ts',
     'test/federation-multinode.ts',
     'test/federation-messages.ts',

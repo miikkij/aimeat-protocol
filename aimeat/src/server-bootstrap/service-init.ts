@@ -173,6 +173,10 @@ export async function initializeServices(
         tier: sp.tier ?? 'member',
         availability: sp.availability ?? undefined,
         expiresAt: sp.expiresAt ?? null,
+        heartbeatOk: sp.heartbeatOk ?? 0,
+        heartbeatTotal: sp.heartbeatTotal ?? 0,
+        availabilityWindow: sp.availabilityWindow ?? null,
+        availabilityPct: sp.availabilityPct ?? null,
       });
     }
     if (savedPeers.length > 0) {

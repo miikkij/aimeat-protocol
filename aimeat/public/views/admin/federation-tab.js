@@ -5,6 +5,8 @@
  * @structure FederationTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.3.0 — 2026-06-19 — Phase B: Promote button is eligibility-aware (uses promotion_eligible /
+ *     promotion_failing from the API; forced override prompts when not yet eligible).
  *   v1.2.0 — 2026-06-19 — Visiting-node tier: Tier + Availability badges in the live-peers
  *     table, an "open join" toggle, and a Promote (vouch) button for visiting peers.
  *   v1.1.0 — 2026-06-02 — Admin design unification: inline button color style
@@ -20,7 +22,7 @@ import { dt, num, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } f
 import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
-  testFederationNode, joinGenesisNetwork, updatePeerPolicy, getNetworkDirectory,
+  testFederationNode, joinGenesisNetwork, updatePeerPolicy, promotePeer, getNetworkDirectory,
   getConfig, saveConfig,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
@@ -187,6 +189,20 @@ export default function FederationTab({ data, reload }) {
     catch (e) { setTestResult({ error: e.message }); }
     finally { setTesting(false); }
   }, [testUrl]);
+
+  const doPromote = useCallback((p) => {
+    // Eligible → vouch directly. Not eligible → confirm a forced (audited) override.
+    const run = async (force) => {
+      try { await promotePeer(p.node_id, force ? { force: true } : {}); flash(t('dashboard.fedPromoted')); reload(); }
+      catch (e) {
+        if (e.code === 'NOT_ELIGIBLE') {
+          confirm((t('dashboard.fedPromoteForceConfirm') || 'Not eligible yet. Promote anyway (vouch)?') + (p.promotion_failing?.length ? '\n' + p.promotion_failing.join(', ') : ''), () => run(true));
+        } else { flashErr(e.message); }
+      }
+    };
+    if (p.promotion_eligible) confirm(t('dashboard.fedPromoteConfirm'), () => run(false));
+    else run(false); // will 409 → prompts for forced override
+  }, [reload]);
 
   const doAddPeer = useCallback(async () => {
     if (!addNodeId || !addUrl) { flashErr(t('dashboard.fedAddPeerMissing')); return; }
@@ -425,7 +441,7 @@ export default function FederationTab({ data, reload }) {
                   <button class="adm-btn-sm" onClick=${() => doActivate(p.node_id)}>\u25B6 ${t('dashboard.fedActivate')}</button>
                 `}
                 ${p.tier === 'visiting' && html`
-                  <button class="adm-btn-sm" title=${t('dashboard.fedPromoteHint')} onClick=${() => confirm(t('dashboard.fedPromoteConfirm'), async () => { try { await updatePeerPolicy(p.node_id, { tier: 'member' }); flash(t('dashboard.fedPromoted')); reload(); } catch (e) { flashErr(e.message); } })}>\u2B06 ${t('dashboard.fedPromote')}</button>
+                  <button class="adm-btn-sm" title=${p.promotion_eligible ? t('dashboard.fedPromoteHint') : ((t('dashboard.fedPromoteNotEligible') || 'Not yet eligible') + (p.promotion_failing?.length ? ': ' + p.promotion_failing.join(', ') : ''))} onClick=${() => doPromote(p)}>${p.promotion_eligible ? '\u2B06' : '\u26A0'} ${t('dashboard.fedPromote')}</button>
                 `}
                 ${(p.status === 'active' || p.status === 'degraded') && html`
                   <button class="adm-btn-sm" onClick=${() => doRemove(p.node_id)}>${t('dashboard.fedDepeer')}</button>

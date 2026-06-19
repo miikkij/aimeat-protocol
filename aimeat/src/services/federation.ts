@@ -8,6 +8,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
+import { recordHeartbeatOutcome } from './federation-availability.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 
@@ -37,6 +38,11 @@ export interface PeerInfo {
     availability?: 'temporary' | 'permanent' | 'unknown';
     /** Optional expiry for time-limited visiting peers (populated/enforced in Phase B). */
     expiresAt?: string | null;
+    /** Lifetime successful / attempted heartbeats + windowed availability (Phase B). */
+    heartbeatOk?: number;
+    heartbeatTotal?: number;
+    availabilityWindow?: string | null;
+    availabilityPct?: number | null;
 }
 
 /**
@@ -168,6 +174,13 @@ export function startHeartbeatJob(
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
 
+        // Availability-measurement options (Phase B uptime tracking)
+        const availOpts = {
+            windowDays: config.federationAvailabilityWindowDays,
+            permanentThreshold: config.federationAvailabilityPermanentThreshold,
+            minSamples: config.federationAvailabilityMinSamples,
+        };
+
         for (const [key, peer] of activePeers) {
             // Per-peer stagger: skip this peer if not yet due
             const stagger = peerStaggerMs(config.nodeId, peer.nodeId, BASE_INTERVAL_MS);
@@ -205,6 +218,7 @@ export function startHeartbeatJob(
                     peer.lastSeen = new Date().toISOString();
                     peer.status = 'active';
                     peerFailures.set(key, 0);
+                    recordHeartbeatOutcome(peer, true, new Date(), availOpts);
                     storage.saveFederationPeer(peer).catch(() => {});
 
                     // Detect catalogue hash mismatch for sync triggering
@@ -285,6 +299,7 @@ export function startHeartbeatJob(
                         peer.status = 'degraded';
                         logger.warn(`Peer ${peer.nodeId} degraded after ${failures} consecutive failures`);
                     }
+                    recordHeartbeatOutcome(peer, false, new Date(), availOpts);
                     storage.saveFederationPeer(peer).catch(() => {});
                 }
             } catch {
@@ -298,6 +313,7 @@ export function startHeartbeatJob(
                 } else if (failures >= 3) {
                     peer.status = 'degraded';
                 }
+                recordHeartbeatOutcome(peer, false, new Date(), availOpts);
                 storage.saveFederationPeer(peer).catch(() => {});
             }
         }

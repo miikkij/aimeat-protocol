@@ -4641,6 +4641,8 @@
     "fedPromote": "Ylennä",
     "fedPromoteHint": "Ylennä tämä vieraileva node täysjäseneksi (antaa palveluntarjoaja-, relay- ja replikointioikeudet).",
     "fedPromoteConfirm": "Ylennetäänkö tämä vieraileva node täysjäseneksi? Tämä on takuu siitä ja antaa täydet federaatio-oikeudet.",
+    "fedPromoteNotEligible": "Ei vielä kelpoinen",
+    "fedPromoteForceConfirm": "Tämä node ei vielä täytä ylennyskriteerejä. Ylennetäänkö silti (sinun takuusi)?",
     "fedPromoted": "Vertainen ylennetty jäseneksi",
     "fedLivePeersExplain": "Tällä hetkellä rekisteröidyt vertaiset ja niiden reaaliaikainen tila. Sydämenlyöntimonitori pingaa jokaista vertaista 5 minuutin välein.",
     "fedLivePeersHelpTitle": "Vertaisten tilojen ymmärtäminen",
