@@ -31,9 +31,18 @@ export interface LibrarianHit {
   workspaceId?: string;
   space?: string;
   updatedAt: string;
+  /** Original producer (= ownerGaii); meaningful in the public scope where it is someone else. */
+  producer: string;
+  /** What the hit is, for the badge + the right "open" target. */
+  kind: 'knowledge' | 'document' | 'memory';
+  /** Knowledge-package id (kind==='knowledge'), parsed from the `packages/{id}/…` key. */
+  packageId?: string;
+  /** Knowledge content type (kind==='knowledge'), if present on the manifest. */
+  contentType?: string;
 }
 
 const ORG_KEY = /^organism\.([^.]+)(?:\.w\.([^.]+)\.([^.]+))?/;
+const PKG_KEY = /^packages\/([^/]+)\//;
 
 /** Tokens used for snippet windowing (mirrors the FTS tokenizer: unicode words/numbers). */
 function queryTokens(query: string): string[] {
@@ -102,37 +111,52 @@ function snippetOf(text: string, tokens: string[]): string {
 }
 
 /**
- * Fan a single ranked full-text query across every identity the viewer owns. Owner sessions cover
- * the GHII + all agents + all ecosystem apps; agent sessions are scoped to the agent itself.
+ * Run a single ranked full-text query.
+ *   - scope 'own' (default): fanned across every identity the viewer owns (GHII + agents + ecosystem
+ *     apps; an agent session is scoped to itself).
+ *   - scope 'public': across the WHOLE node, restricted to public-visibility content — knowledge
+ *     packages, public workspace documents and public memory — so you can find what others (and
+ *     their agents) have published, with the producer kept on each hit.
  */
 export async function librarianSearch(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; isOwnerSession: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string },
+  opts: { ownerName: string; isOwnerSession: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public' },
 ): Promise<{ hits: LibrarianHit[]; ownersSearched: number }> {
   const tokens = queryTokens(opts.query);
   if (tokens.length === 0) return { hits: [], ownersSearched: 0 };
-
-  let ownerGaiis: string[];
-  if (opts.isOwnerSession) {
-    const ghii = `${opts.ownerName}@${config.nodeId}`;
-    const agents = await storage.getAgentsByOwner(opts.ownerName);
-    const ecoApps = await storage.getEcosystemAppsByOwner(opts.ownerName);
-    ownerGaiis = [ghii, ...agents.map(a => a.gaii), ...ecoApps.map(a => a.geai)];
-  } else {
-    ownerGaiis = [opts.viewerGaii];
-  }
-
   const limit = opts.limit ?? 50;
-  const raw = await storage.searchText(opts.query, { ownerGaiis, keyPrefix: opts.keyPrefix, limit, maxFlags: 0 });
+
+  let raw;
+  let ownersSearched: number;
+  if (opts.scope === 'public') {
+    raw = await storage.searchText(opts.query, { visibility: 'public', keyPrefix: opts.keyPrefix, limit, maxFlags: 0 });
+    ownersSearched = -1;   // public: the whole node, not a counted owner set
+  } else {
+    let ownerGaiis: string[];
+    if (opts.isOwnerSession) {
+      const ghii = `${opts.ownerName}@${config.nodeId}`;
+      const agents = await storage.getAgentsByOwner(opts.ownerName);
+      const ecoApps = await storage.getEcosystemAppsByOwner(opts.ownerName);
+      ownerGaiis = [ghii, ...agents.map(a => a.gaii), ...ecoApps.map(a => a.geai)];
+    } else {
+      ownerGaiis = [opts.viewerGaii];
+    }
+    raw = await storage.searchText(opts.query, { ownerGaiis, keyPrefix: opts.keyPrefix, limit, maxFlags: 0 });
+    ownersSearched = ownerGaiis.length;
+  }
 
   const hits: LibrarianHit[] = raw.map(({ record, score }) => {
     const m = ORG_KEY.exec(record.key);
+    const pkg = PKG_KEY.exec(record.key);
+    const v = (record.value && typeof record.value === 'object') ? record.value as Record<string, unknown> : null;
+    const isManifest = record.key.endsWith('/manifest') && !!pkg;
+    const kind: LibrarianHit['kind'] = pkg ? 'knowledge' : m ? 'document' : 'memory';
     const text = flatten(record.value);
     return {
       key: record.key,
       ownerGaii: record.ownerGaii,
-      title: titleOf(record.value, record.key),
+      title: isManifest && typeof v?.name === 'string' ? v.name : titleOf(record.value, record.key),
       snippet: snippetOf(text, tokens),
       score,
       visibility: record.visibility,
@@ -141,8 +165,12 @@ export async function librarianSearch(
       workspaceId: m?.[2],
       space: m?.[3],
       updatedAt: record.updatedAt,
+      producer: record.ownerGaii,
+      kind,
+      packageId: pkg?.[1],
+      contentType: isManifest && typeof v?.content_type === 'string' ? v.content_type : undefined,
     };
   });
 
-  return { hits, ownersSearched: ownerGaiis.length };
+  return { hits, ownersSearched };
 }

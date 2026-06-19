@@ -6501,6 +6501,16 @@ paths:
           schema:
             type: string
           description: Restrict to memory keys beginning with this prefix (e.g. `organism.{id}.`)
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [own, public]
+            default: own
+          description: >
+            `own` (default) searches all of the caller's content; `public` searches public-visibility
+            content across the whole node (knowledge packages, public workspace documents, public
+            memory), each hit carrying its producer.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
