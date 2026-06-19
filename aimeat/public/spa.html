@@ -476,10 +476,24 @@
     }
 
     // ── Header Component ──
+    // Built-in public links. Operators can show/hide and reorder these via the admin
+    // Portal tab (persisted at /v1/site/header-nav). Auth/role-gated links (Apps, Profile,
+    // Admin) are NOT in this list — they stay forced by the session/role checks below.
+    const PUBLIC_NAV_LINKS = [
+      { id: 'try',        path: '/v1/portal',          key: 'nav.try' },
+      { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works' },
+      { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business' },
+      { id: 'devView',    path: '/v1/portal?view=dev', key: 'nav.devView',    matchActive: false },
+      { id: 'help',       path: '/v1/help',            key: 'nav.help' },
+    ];
+
     function Header({ navigate, locale }) {
       const [session, setSession] = useState(null);
       const [morsels, setMorsels] = useState(null);
       const [menuOpen, setMenuOpen] = useState(false);
+      // Header nav config: { order, hidden }. Defaults to all visible in declared order
+      // until the public /v1/site/header-nav fetch resolves (no flash of empty nav).
+      const [navConfig, setNavConfig] = useState({ order: PUBLIC_NAV_LINKS.map(l => l.id), hidden: [] });
 
       // Check auth state
       useEffect(() => {
@@ -495,6 +509,21 @@
         // Re-check when auth lib fires events
         window.addEventListener('aimeat-auth-change', checkAuth);
         return () => window.removeEventListener('aimeat-auth-change', checkAuth);
+      }, []);
+
+      // Load operator-configured header nav (public endpoint, no auth needed).
+      useEffect(() => {
+        let cancelled = false;
+        fetch('/v1/site/header-nav')
+          .then(r => r.json())
+          .then(d => {
+            if (cancelled || !d?.ok || !d.data) return;
+            const order = Array.isArray(d.data.order) ? d.data.order : PUBLIC_NAV_LINKS.map(l => l.id);
+            const hidden = Array.isArray(d.data.hidden) ? d.data.hidden : [];
+            setNavConfig({ order, hidden });
+          })
+          .catch(e => console.warn('Header nav fetch failed:', e.message));
+        return () => { cancelled = true; };
       }, []);
 
       // Fetch morsels when session is available
@@ -523,6 +552,13 @@
 
       const currentPath = location.pathname;
 
+      // Resolve the public links to render: config order, minus hidden, by declared id.
+      const linkById = Object.fromEntries(PUBLIC_NAV_LINKS.map(l => [l.id, l]));
+      const hiddenSet = new Set(navConfig.hidden);
+      const visibleLinks = navConfig.order
+        .map(id => linkById[id])
+        .filter(l => l && !hiddenSet.has(l.id));
+
       return html`
         <nav class="topnav">
           <div style="display:flex;align-items:center;gap:20px">
@@ -536,14 +572,14 @@
             <button class="topnav-burger" aria-label="Menu" aria-expanded=${menuOpen ? 'true' : 'false'}
               onClick=${() => setMenuOpen(o => !o)}>☰</button>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
-              <!-- "Try it" leads to the landing's path cards + app gallery — an empty
-                   Welcome Board on /v1/classic was the weakest possible first experience.
+              <!-- Public links are operator-configurable (visibility + order) via the admin
+                   Portal tab. "Try it" leads to the landing's path cards + app gallery.
                    Classic stays reachable deeper (landing card B "Start building"). -->
-              <a href="/v1/portal" onClick=${(e) => { handleNav(e, '/v1/portal'); setMenuOpen(false); }} class="${currentPath === '/v1/portal' ? 'active' : ''}">${t('nav.try')}</a>
-              <a href="/v1/how-it-works" onClick=${(e) => { handleNav(e, '/v1/how-it-works'); setMenuOpen(false); }} class="${currentPath === '/v1/how-it-works' ? 'active' : ''}">${t('nav.howItWorks') || 'How it works'}</a>
-              <a href="/v1/business" onClick=${(e) => { handleNav(e, '/v1/business'); setMenuOpen(false); }} class="${currentPath === '/v1/business' ? 'active' : ''}">${t('nav.business') || 'For your business'}</a>
-              <a href="/v1/portal?view=dev" onClick=${(e) => { handleNav(e, '/v1/portal?view=dev'); setMenuOpen(false); }}>${t('nav.devView')}</a>
-              <a href="/v1/help" onClick=${(e) => { handleNav(e, '/v1/help'); setMenuOpen(false); }} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
+              ${visibleLinks.map(link => html`
+                <a href="${link.path}" key=${link.id}
+                  onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
+                  class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
+              `)}
               ${session && html`
                 <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
                 <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>

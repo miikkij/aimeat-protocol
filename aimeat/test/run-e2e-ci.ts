@@ -88,6 +88,7 @@ const ALL_SUITES = [
     'test/e2e-phase0.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
+    'test/e2e-header-nav.ts',
     'test/e2e-security.ts',
     'test/e2e-storage-visibility.ts',
     'test/e2e-subdomains.ts',

@@ -169,6 +169,8 @@ export const importSiteBundle = (bundle) => apiPost('/v1/site/import', bundle);
 export const clearSiteCache   = ()      => apiPost('/v1/site/cache-invalidate');
 export const getSitePrompt    = ()      => apiGet('/v1/site/prompt');
 export const triggerLbSync    = ()      => apiPost('/v1/admin/site/sync');
+export const getHeaderNav     = ()      => apiGet('/v1/site/header-nav');
+export const saveHeaderNav    = (order, hidden) => apiPut('/v1/site/header-nav', { order, hidden });
 
 // ── Memory (for portal memory keys) ──
 export const addMemory       = (key, value) => apiPost('/v1/memory', { key, value, visibility: 'private' });

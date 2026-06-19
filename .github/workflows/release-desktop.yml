@@ -79,61 +79,15 @@ jobs:
         shell: bash
         run: ls -R aimeat-desktop/src-tauri/target/release/bundle || true
 
-      # ── Code signing (SignPath / Authenticode) ──────────────────────────
-      # GitHub packs upload-artifact contents into a ZIP, so the SignPath artifact
-      # configuration 'initial' must be zip-wrapped (zip-file > pe-file > authenticode-sign).
-      - name: Stage unsigned installer for signing
-        shell: bash
-        run: |
-          mkdir -p to-sign
-          cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe to-sign/
-
-      - name: Upload unsigned installer (for SignPath)
-        id: upload-unsigned
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installer
-          path: to-sign/*.exe
-          if-no-files-found: error
-
-      # secrets context is NOT allowed in a step-level `if:`, so probe it in a step `env` first.
-      - name: Check signing availability
-        id: cansign
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        run: |
-          if [ -n "$TOKEN" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "enabled=false" >> "$GITHUB_OUTPUT"; fi
-
-      - name: Submit to SignPath for Authenticode signing
-        id: signpath
-        if: steps.cansign.outputs.enabled == 'true'
-        continue-on-error: true  # don't fail the release while Foundation/trusted-build-system is pending
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: c824b575-6b8b-4fd5-9e70-d232d2cd71e8
-          project-slug: AIMEAT_Personal_Node
-          signing-policy-slug: Release_signing
-          artifact-configuration-slug: initial
-          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed
-
-      # Prefer the SIGNED .exe; fall back to the unsigned one if signing was skipped
-      # (e.g. no secret on a fork). The .msi ships unsigned for now.
+      # ── Code signing ────────────────────────────────────────────────────
+      # Installers currently ship UNSIGNED (Windows SmartScreen will warn).
+      # A free Authenticode signing method is being evaluated; the signing
+      # step will be added back here once one is chosen.
       - name: Assemble release files
         shell: bash
         run: |
           mkdir -p dist
-          SIGNED="$(find signed -name '*-setup.exe' 2>/dev/null | head -1 || true)"
-          if [ -n "$SIGNED" ]; then
-            cp "$SIGNED" dist/
-            echo "Using SIGNED installer: $SIGNED"
-          else
-            cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe dist/
-            echo "WARNING: signed installer not found — using UNSIGNED."
-          fi
+          cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe dist/
           cp aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi dist/
           ls -la dist
 
@@ -172,7 +126,5 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          body: |
-            Windows installers are code-signed with a certificate provided by the [SignPath Foundation](https://signpath.org) (free code signing for open-source projects).
           generate_release_notes: true
           files: dist/*

@@ -27,6 +27,19 @@ const SPA_HTML_PATH = resolveSpaHtmlPath();
 const SITE_TEMPLATE_KEY = '__site_template__';
 // System owner GAII used for site template storage
 const SITE_OWNER_GAII = '__site__';
+// Portal memory key holding the header navigation configuration (order + hidden)
+const HEADER_NAV_KEY = 'portal/header-nav';
+// Canonical ids of the public header links an operator may show/hide/reorder.
+// Auth/role-gated links (Apps, Profile, Admin) are NOT configurable — they stay
+// forced by their existing session/role rules in the SPA header.
+export const PUBLIC_NAV_LINK_IDS = ['try', 'howItWorks', 'business', 'devView', 'help'] as const;
+
+export interface HeaderNavConfig {
+    /** Display order of public link ids (always normalized to cover all known ids). */
+    order: string[];
+    /** Subset of public link ids that should be hidden. */
+    hidden: string[];
+}
 
 // Config keys safe to expose via {{config:*}} tags
 const CONFIG_WHITELIST = new Set([
@@ -294,6 +307,67 @@ export class SiteService {
         } catch {
             return [];
         }
+    }
+
+    /**
+     * Get the header navigation config (public links order + hidden set).
+     * Always returns a normalized config: `order` covers every known public id
+     * (stored order first, then any newly-added built-ins), and `hidden` is the
+     * stored hidden ids intersected with the known set. Missing/invalid stored
+     * data falls back to all links visible in their default order.
+     */
+    async getHeaderNav(): Promise<HeaderNavConfig> {
+        const known = PUBLIC_NAV_LINK_IDS as readonly string[];
+        let storedOrder: string[] = [];
+        let storedHidden: string[] = [];
+        try {
+            const record = await this.storage.getMemory(SITE_OWNER_GAII, HEADER_NAV_KEY);
+            if (record) {
+                const raw = typeof record.value === 'string' ? JSON.parse(record.value) : record.value;
+                if (raw && typeof raw === 'object') {
+                    if (Array.isArray(raw.order)) storedOrder = raw.order.filter((id: unknown) => typeof id === 'string');
+                    if (Array.isArray(raw.hidden)) storedHidden = raw.hidden.filter((id: unknown) => typeof id === 'string');
+                }
+            }
+        } catch {
+            // Corrupt JSON or storage miss → fall back to defaults below.
+        }
+        // Normalize: keep known stored ids in order, then append any known ids not yet listed.
+        const order = storedOrder.filter(id => known.includes(id));
+        for (const id of known) if (!order.includes(id)) order.push(id);
+        const hidden = storedHidden.filter(id => known.includes(id));
+        return { order, hidden };
+    }
+
+    /** Persist the header navigation config. Validates ids against the known public set. */
+    async setHeaderNav(input: { order?: unknown; hidden?: unknown }, changedBy: string): Promise<HeaderNavConfig> {
+        const known = PUBLIC_NAV_LINK_IDS as readonly string[];
+        const order = Array.isArray(input.order) ? input.order : [];
+        const hidden = Array.isArray(input.hidden) ? input.hidden : [];
+        for (const id of [...order, ...hidden]) {
+            if (typeof id !== 'string' || !known.includes(id)) {
+                throw new SiteError('HEADER_NAV_INVALID', `Unknown header link id: ${String(id)}`, 422);
+            }
+        }
+        const value = JSON.stringify({
+            order: order.filter((id: unknown) => typeof id === 'string'),
+            hidden: hidden.filter((id: unknown) => typeof id === 'string'),
+        });
+        const now = new Date().toISOString();
+        await this.storage.setMemory({
+            key: HEADER_NAV_KEY,
+            ownerGaii: SITE_OWNER_GAII,
+            value,
+            visibility: 'public',
+            tags: ['site'],
+            ttlHours: null,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+        });
+        this.invalidateCache();
+        await this.addChangeLog('memory_set', `Updated header navigation config (${HEADER_NAV_KEY})`, changedBy);
+        return this.getHeaderNav();
     }
 
     // ── Internal ──
