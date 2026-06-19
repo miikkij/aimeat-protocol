@@ -787,6 +787,10 @@ model FederationPeer {
   tier                 String    @default("member")
   availability         String?
   expiresAt            DateTime?
+  heartbeatOk          Int       @default(0)
+  heartbeatTotal       Int       @default(0)
+  availabilityWindow   String?
+  availabilityPct      Int?
 
   @@index([status])
 }

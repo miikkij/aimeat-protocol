@@ -1581,6 +1581,11 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('federation_peers', 'tier', "TEXT NOT NULL DEFAULT 'member'");
   safeAddColumn('federation_peers', 'availability', 'TEXT');
   safeAddColumn('federation_peers', 'expiresAt', 'TEXT');
+  // Phase B — heartbeat uptime measurement
+  safeAddColumn('federation_peers', 'heartbeatOk', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('federation_peers', 'heartbeatTotal', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('federation_peers', 'availabilityWindow', 'TEXT');
+  safeAddColumn('federation_peers', 'availabilityPct', 'INTEGER');
 
   // Federation Mesh Phase 1 — per-record federation opt-in
   safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');

@@ -4641,6 +4641,8 @@
     "fedPromote": "Promote",
     "fedPromoteHint": "Promote this visiting node to a full member (grants provider, relay and replication rights).",
     "fedPromoteConfirm": "Promote this visiting node to a full member? This vouches for it and grants full federation rights.",
+    "fedPromoteNotEligible": "Not yet eligible",
+    "fedPromoteForceConfirm": "This node does not yet meet the promotion criteria. Promote anyway (your vouch)?",
     "fedPromoted": "Peer promoted to member",
     "fedLivePeersExplain": "Currently registered peers and their real-time health status. The heartbeat monitor pings each peer every 5 minutes.",
     "fedLivePeersHelpTitle": "Understanding peer statuses",

@@ -21,6 +21,10 @@ import { peerKeyCache, performKeyExchange } from '../services/federation-helpers
 import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../services/presence.js';
 import { deriveTierFlags, coerceTier, type PeerTier } from '../services/federation-tiers.js';
+import {
+    getActivePolicy, storeActivePolicy, coercePolicy, policySignString, evaluateAutoAdmit, evaluatePromotion,
+    type NetworkPolicyDoc, type PromotionMetrics,
+} from '../services/network-policy.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -28,6 +32,29 @@ let summaryHashExpiry = 0;
 
 export function federationPeerRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
+
+    /** Build the measurable metrics for a peer's promotion eligibility (Phase B). */
+    async function promotionMetrics(peer: PeerInfo, allWork?: { status: string; providerGaii: string; requesterGaii: string }[]): Promise<PromotionMetrics> {
+        const daysActive = (Date.now() - new Date(peer.addedAt).getTime()) / 86_400_000;
+        let successfulWork = 0;
+        try {
+            const work = allWork ?? (await storage.listAllWork() as unknown as { status: string; providerGaii: string; requesterGaii: string }[]);
+            const done = new Set(['completed', 'delivered']);
+            const suffix = `@${peer.nodeId}`;
+            successfulWork = work.filter(w => done.has(w.status) && (String(w.providerGaii).endsWith(suffix) || String(w.requesterGaii).endsWith(suffix))).length;
+        } catch { /* none */ }
+        return {
+            availabilityPct: peer.availabilityPct ?? null,
+            daysActive,
+            successfulWork,
+            // Persistent advisory flag store is out of scope for Phase B — a `suspend` advisory
+            // instead structurally demotes a member back to visiting (see federation-sync.ts).
+            activeFlags: 0,
+            signedIntroduce: !!peer.publicKey,
+            protocolVersion: 'v1',
+            nodeUrl: peer.url,
+        };
+    }
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
     router.get('/v1/federation/directory', async (_req, res) => {
@@ -176,7 +203,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         // peers can browse/discover + request paid work, but get NO provider/relay/
         // memory-replication/federated-auth rights (deriveTierFlags('visiting')).
         // Reaching 'member' still requires a deliberate local-operator promotion.
-        if (config.federationOpenJoin) {
+        // Network policy may further gate (or disable) auto-admit by domain/protocol.
+        const policy = await getActivePolicy(storage);
+        const policyAdmit = evaluateAutoAdmit({ node_url }, policy);
+        if (config.federationOpenJoin && policyAdmit.allowed) {
             // SSRF: node_url drives the outbound key-exchange below.
             const urlCheck = await validateOutboundUrl(node_url);
             if (!urlCheck.valid) {
@@ -564,25 +594,41 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     });
 
     // GET /v1/federation/peers — list active peers (operator auth)
-    router.get('/v1/federation/peers', requireAuth(), requireRole('operator'), (_req, res) => {
-        const peerList = [...peers.values()].map(p => ({
-            node_id: p.nodeId,
-            url: p.url,
-            public_key: p.publicKey,
-            status: p.status,
-            added_at: p.addedAt,
-            last_seen: p.lastSeen,
-            share_catalogue: p.shareCatalogue ?? true,
-            replicate_memory: p.replicateMemory ?? true,
-            allow_routing: p.allowRouting ?? true,
-            peer_mode: p.peerMode ?? 'federation',
-            allow_federated_auth: p.allowFederatedAuth ?? false,
-            federation_auth_scopes: p.federationAuthScopes ?? [],
-            tier: p.tier ?? 'member',
-            availability: p.availability ?? null,
-            expires_at: p.expiresAt ?? null,
-            ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
-                ? { depeer_grace_end: (p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd } : {}),
+    router.get('/v1/federation/peers', requireAuth(), requireRole('operator'), async (_req, res) => {
+        // Compute promotion eligibility for visiting peers (one work scan + policy fetch reused).
+        const policy = await getActivePolicy(storage);
+        const allWork = await storage.listAllWork().catch(() => []) as unknown as { status: string; providerGaii: string; requesterGaii: string }[];
+        const peerList = await Promise.all([...peers.values()].map(async p => {
+            let promotion_eligible: boolean | undefined;
+            let promotion_failing: string[] | undefined;
+            if ((p.tier ?? 'member') === 'visiting') {
+                const verdict = evaluatePromotion(await promotionMetrics(p, allWork), policy);
+                promotion_eligible = verdict.eligible;
+                promotion_failing = verdict.failing;
+            }
+            return {
+                node_id: p.nodeId,
+                url: p.url,
+                public_key: p.publicKey,
+                status: p.status,
+                added_at: p.addedAt,
+                last_seen: p.lastSeen,
+                share_catalogue: p.shareCatalogue ?? true,
+                replicate_memory: p.replicateMemory ?? true,
+                allow_routing: p.allowRouting ?? true,
+                peer_mode: p.peerMode ?? 'federation',
+                allow_federated_auth: p.allowFederatedAuth ?? false,
+                federation_auth_scopes: p.federationAuthScopes ?? [],
+                tier: p.tier ?? 'member',
+                availability: p.availability ?? null,
+                availability_pct: p.availabilityPct ?? null,
+                heartbeat_ok: p.heartbeatOk ?? 0,
+                heartbeat_total: p.heartbeatTotal ?? 0,
+                expires_at: p.expiresAt ?? null,
+                ...(promotion_eligible !== undefined ? { promotion_eligible, promotion_failing } : {}),
+                ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
+                    ? { depeer_grace_end: (p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd } : {}),
+            };
         }));
 
         res.json(success(config.nodeId, {
@@ -681,6 +727,114 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             federation_auth_scopes: peer.federationAuthScopes,
             updated: true,
         }));
+        emitChange('federation');
+    });
+
+    // POST /v1/federation/peers/:nodeId/promote — promote a visiting peer to full member.
+    // This is the local operator's deliberate "vouch" (100% trust in the person who brought the
+    // node). Eligibility is measured against the active network policy; an operator may override a
+    // not-yet-eligible peer with { force: true } (audited) — the human vouch is itself the trust source.
+    router.post('/v1/federation/peers/:nodeId/promote', requireAuth(), requireRole('operator'), async (req, res) => {
+        const nodeId = req.params.nodeId as string;
+        const peer = peers.get(nodeId) ?? [...peers.values()].find(p => p.nodeId === nodeId);
+        if (!peer) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peer not found: ${nodeId}`));
+            return;
+        }
+        const force = req.body?.force === true;
+        const policy = await getActivePolicy(storage);
+        const verdict = evaluatePromotion(await promotionMetrics(peer), policy);
+        if (!verdict.eligible && !force) {
+            res.status(409).json(error(config.nodeId, 'NOT_ELIGIBLE', `Peer does not meet promotion criteria: ${verdict.failing.join(', ')}`, undefined, { failing: verdict.failing }));
+            return;
+        }
+
+        peer.tier = 'member';
+        Object.assign(peer, deriveTierFlags('member'));
+        await storage.saveFederationPeer(peer);
+        logger.info(`Peer ${nodeId} promoted to member`, { forced: !force ? false : !verdict.eligible, by: req.auth?.owner, failing: verdict.failing });
+
+        res.json(success(config.nodeId, {
+            node_id: nodeId,
+            tier: peer.tier,
+            promoted: true,
+            forced: force && !verdict.eligible,
+            was_eligible: verdict.eligible,
+        }));
+        emitChange('federation');
+    });
+
+    // ── Network policy (genesis-defined federation rules) ──
+
+    // GET /v1/federation/network-policy — public: the active signed policy doc (peers fetch + verify this).
+    router.get('/v1/federation/network-policy', async (_req, res) => {
+        const policy = await getActivePolicy(storage);
+        res.json(success(config.nodeId, { policy }));
+    });
+
+    // PUT /v1/federation/network-policy — author the network policy (operator). Signed with the node key.
+    router.put('/v1/federation/network-policy', requireAuth(), requireRole('operator'), async (req, res) => {
+        const incoming = coercePolicy(req.body ?? {});
+        const current = await getActivePolicy(storage);
+        const doc: NetworkPolicyDoc = {
+            ...incoming,
+            policy_version: Math.max(incoming.policy_version || 0, (current.policy_version || 0) + 1),
+            issued_by: config.nodeId,
+            issued_at: new Date().toISOString(),
+            signature: undefined,
+        };
+        const nodeKey = await storage.getNodeKey();
+        if (nodeKey) doc.signature = await sign(nodeKey.privateKey, policySignString(doc));
+        await storeActivePolicy(storage, doc);
+        res.json(success(config.nodeId, { policy: doc }));
+        emitChange('federation');
+    });
+
+    // POST /v1/federation/network-policy/pull — fetch the policy from this node's genesis and apply it
+    // (operator). The doc is signature-verified against the genesis peer's known public key and only
+    // applied if its policy_version is newer than the local one.
+    router.post('/v1/federation/network-policy/pull', requireAuth(), requireRole('operator'), async (req, res) => {
+        const source = (req.body?.source_url as string) || config.genesisUrl;
+        if (!source) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No genesis/source URL configured'));
+            return;
+        }
+        const urlCheck = await validateOutboundUrl(source);
+        if (!urlCheck.valid) {
+            res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'source URL failed validation'));
+            return;
+        }
+        let doc: NetworkPolicyDoc;
+        try {
+            const resp = await fetch(`${source.replace(/\/+$/, '')}/v1/federation/network-policy`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
+            if (!resp.ok) { res.status(502).json(error(config.nodeId, 'FETCH_FAILED', `Source returned ${resp.status}`)); return; }
+            const body = await resp.json() as { data?: { policy?: unknown } };
+            doc = coercePolicy(body?.data?.policy);
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'FETCH_FAILED', e instanceof Error ? e.message : 'fetch failed'));
+            return;
+        }
+
+        // Verify the genesis signature against the issuing node's known public key (peer record or key cache).
+        const issuer = peers.get(doc.issued_by) ?? [...peers.values()].find(p => p.nodeId === doc.issued_by);
+        const issuerKey = issuer?.publicKey || peerKeyCache.get(doc.issued_by)?.publicKey;
+        if (!issuerKey) {
+            res.status(403).json(error(config.nodeId, 'UNKNOWN_ISSUER', `Policy issuer ${doc.issued_by} is not a known peer`));
+            return;
+        }
+        const sigOk = doc.signature ? await verify(issuerKey, policySignString(doc), doc.signature).catch(() => false) : false;
+        if (!sigOk) {
+            res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE', 'Policy signature verification failed'));
+            return;
+        }
+
+        const current = await getActivePolicy(storage);
+        if (doc.policy_version <= current.policy_version) {
+            res.json(success(config.nodeId, { applied: false, reason: 'not_newer', current_version: current.policy_version }));
+            return;
+        }
+        await storeActivePolicy(storage, doc);
+        res.json(success(config.nodeId, { applied: true, policy_version: doc.policy_version }));
         emitChange('federation');
     });
 

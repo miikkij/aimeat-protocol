@@ -193,6 +193,12 @@ export interface AimeatConfig {
   federationDefaultScopes: string[];
   /** Open federation join: when true, a signed `introduce` self-admits as a low-trust 'visiting' peer (no manual approval). Default off. */
   federationOpenJoin: boolean;
+  /** Peer availability window (days) over which heartbeat uptime % is computed. */
+  federationAvailabilityWindowDays: number;
+  /** Uptime % at/above which a peer is labelled 'permanent' (else 'temporary'). */
+  federationAvailabilityPermanentThreshold: number;
+  /** Minimum heartbeat samples in the window before a real availability label is assigned. */
+  federationAvailabilityMinSamples: number;
 
   // Security limits (configurable per security audit)
   loginRateLimitMax: number;
@@ -612,6 +618,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationAuthPolicy: (process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'disabled') as 'disabled' | 'all_peers' | 'specific_peers',
     federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
     federationOpenJoin: process.env.AIMEAT_FEDERATION_OPEN_JOIN === 'true',
+    federationAvailabilityWindowDays: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_WINDOW_DAYS ?? '30', 10),
+    federationAvailabilityPermanentThreshold: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_PERMANENT_THRESHOLD ?? '90', 10),
+    federationAvailabilityMinSamples: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_MIN_SAMPLES ?? '288', 10),
 
     // Security limits
     loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),
