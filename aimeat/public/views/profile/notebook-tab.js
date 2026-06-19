@@ -153,8 +153,22 @@ export default function NotebookTab({ session, showToast, onStats }) {
     } finally { setSearching(false); }
   }
 
-  function openInMemory() {
-    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
+  // Open a librarian hit at its REAL home: an organism document opens that organism's workspace and
+  // deep-links to the document (the readable, rendered doc view) — not the raw Memory key list. A
+  // personal (non-organism) entry has no better home, so it opens the Memory tab.
+  function openHit(hit) {
+    if (hit.organismId && hit.workspaceId) {
+      try {
+        sessionStorage.setItem('aimeat.ws.openId', hit.organismId);
+        sessionStorage.setItem('aimeat.ws.openWs', hit.workspaceId);
+        const prefix = `organism.${hit.organismId}.w.${hit.workspaceId}.${hit.space}.`;
+        const docId = hit.space && hit.key.startsWith(prefix) ? hit.key.slice(prefix.length).split('.')[0] : null;
+        if (docId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.openDoc`, JSON.stringify({ namespace: hit.space, id: docId }));
+      } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
+    }
   }
 
   // Collapse cycle for an inbox note: one line → peek → full → one line.
@@ -337,7 +351,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       ${hit.snippet && html`<div class="pf-nb-hit-snippet">${escHtml(hit.snippet)}</div>`}
       <div class="pf-nb-hit-foot">
         <span class="text-meta-sm pf-nb-hit-key" title=${hit.key}>${escHtml(hit.key)}</span>
-        <button class="btn-ghost btn-sm" onClick=${openInMemory}>${t('profile.notebook.openInMemory')}</button>
+        <button class="btn-ghost btn-sm" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>
       </div>
     </div>
   `;
