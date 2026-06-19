@@ -2942,3 +2942,16 @@
 .pf-eco-tech-section-title { font-weight: 700; font-size: .82rem; margin-bottom: .4rem; color: var(--text-dim); }
 .pf-eco-tech-principal { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; word-break: break-all; }
 .pf-eco-tech-access { margin: -.15rem 0 .4rem; }
+
+/* ── Presence control (Koti home) — backed by PresenceControl in landing-page.js.
+   Self-contained card; previews the same <PresenceDot> shown next to people. ── */
+.pf-presence-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1rem 1.1rem; margin-bottom: 1rem; }
+.pf-presence-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.pf-presence-head .section-desc { margin-bottom: .75rem; }
+.pf-presence-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .5rem 0; }
+.pf-presence-label { font-size: .85rem; font-weight: 600; color: var(--text-dim); }
+.pf-presence-modes { display: inline-flex; gap: .4rem; }
+.pf-presence-pill { border: 1px solid var(--border); background: var(--bg-dim); color: var(--text); border-radius: 999px; padding: .3rem .85rem; font-size: .82rem; cursor: pointer; }
+.pf-presence-pill--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pf-presence-pill:disabled { opacity: .6; cursor: default; }
+.pf-presence-hint { font-size: .78rem; color: var(--text-dim); margin: .15rem 0 .35rem; }

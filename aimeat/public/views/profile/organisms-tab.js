@@ -11,6 +11,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v1.2.0 — 2026-06-19 — Show a presence dot next to each member name (shared <PresenceDot>).
  *   v1.0.0 — 2026-03-17 — Remove all inline style attributes; use CSS utility classes
  *   v1.1.0 — 2026-06-08 — Doc index merges draft+published per id (draft badge no longer hidden by a
  *     published version); editor hydrates private /v1/storage images to auth'd blob URLs; new
@@ -182,6 +183,7 @@ import { useConfirm } from '/components/Modal.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { KeyValueRow } from '/components/KeyValueRow.js';
 import { SearchBar } from '/components/SearchBar.js';
+import { PresenceDot } from '/components/PresenceDot.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
@@ -545,6 +547,10 @@ function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
  */
 function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm, onChanged, show }) {
   const orgId = org.id;
+  // Membership is keyed by bare owner name; presence needs a full GHII. Local members
+  // resolve via this node; an already-qualified (federated) ghii is passed through.
+  const myNode = (window.AIMEAT?.auth?.getSession?.()?.ghii || '').split('@')[1] || '';
+  const toGhii = (id) => (id && !id.includes('@')) ? (myNode ? `${id}@${myNode}` : '') : (id || '');
   const [requests, setRequests] = useState(null);
   const [members, setMembers] = useState(null);
   const [banned, setBanned] = useState([]);
@@ -701,7 +707,7 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
               <div class="pj-org-avatar" aria-hidden="true">${orgInitials(m.ghii)}</div>
               <div class="pj-org-main pj-org-main-static">
                 <div class="pj-org-titlerow">
-                  <span class="pj-org-name">${(m.ghii)}</span>
+                  <span class="pj-org-name">${(m.ghii)} <${PresenceDot} ghii=${toGhii(m.ghii)} /></span>
                   <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'}">${(m.role || 'member')}</span>
                 </div>
                 ${(acc || m.joinedAt) ? html`

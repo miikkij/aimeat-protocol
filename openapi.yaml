@@ -58,6 +58,8 @@ tags:
     description: Node directory and action/agent catalogue
   - name: Federation
     description: Node peering and cross-node routing
+  - name: Presence
+    description: Human (GHII) presence/availability — manual/auto status, who-can-see visibility, federated cache
   - name: Admin
     description: Operator dashboard and configuration
   - name: MCP
@@ -13339,6 +13341,106 @@ paths:
       responses:
         '201': { description: Imported — returns the new organism id + restored workspaces }
         '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/presence/me:
+    get:
+      operationId: getMyPresence
+      summary: The caller's own presence config + computed status
+      description: |
+        Returns the owner's presence config (`mode`, `status`, `visibility`) and their own computed
+        status (`available`/`busy`/`away`/`offline`). Visibility never hides presence from the owner.
+      tags: [Presence]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Presence config + own status }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      operationId: updateMyPresence
+      summary: Update the caller's presence config
+      description: |
+        Partial update. `mode`: `auto` (derived from open portal connection) or `manual`.
+        `status`: `available` | `busy` | `away` | `invisible` (invisible appears offline to everyone).
+        `visibility`: `everyone` (also federated to peers) | `contacts` (owners you've messaged, this
+        node only) | `nobody`.
+      tags: [Presence]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode: { type: string, enum: [auto, manual] }
+                status: { type: string, enum: [available, busy, away, invisible] }
+                visibility: { type: string, enum: [everyone, contacts, nobody] }
+      responses:
+        '200': { description: Updated presence config + own status }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/presence:
+    get:
+      operationId: getPresenceBatch
+      summary: Viewer-scoped presence for many identities
+      description: |
+        Batch read (max 200 ids). Returns a map of GHII → `{ status, since }`, each resolved against the
+        viewer's visibility. Local owners are computed live; remote owners come from the federated cache.
+        A hidden/unknown target reads as `unknown`.
+      tags: [Presence]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: ids, in: query, required: true, schema: { type: string }, description: "Comma-separated GHIIs (owner@node)" }
+      responses:
+        '200': { description: Map of ghii → status }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/presence/{ghii}:
+    get:
+      operationId: getPresence
+      summary: Viewer-scoped presence for a single identity
+      tags: [Presence]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: ghii, in: path, required: true, schema: { type: string }, description: "Target GHII (owner@node)" }
+      responses:
+        '200': { description: "{ ghii, status, since }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/federation/presence:
+    post:
+      operationId: receiveFederatedPresence
+      summary: Receive a peer node's presence push (snapshot or delta)
+      description: |
+        Peer-to-peer endpoint. Accepts a signed batch of presence updates from an active peer and
+        stores them in the local federated cache (read locally by presence endpoints). Verified via the
+        peer's node Ed25519 signature over `from_node_id|timestamp|JSON(updates)`; 5-minute freshness.
+        Only `everyone`-visibility owners are ever pushed; a `status: unknown` update evicts a cache entry.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_node_id, timestamp, updates]
+              properties:
+                from_node_id: { type: string }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string, description: Base64 Ed25519 signature }
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ghii: { type: string }
+                      status: { type: string, enum: [available, busy, away, offline, unknown] }
+                      since: { type: string, nullable: true }
+      responses:
+        '200': { description: Updates accepted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid signature }
+        '403': { description: Source node is not an active peer }
 
   /v1/notifications:
     get:

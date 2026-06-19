@@ -406,6 +406,33 @@
     "workaroundNote": "Kopioi muistosi ja liitä se suoraan AI-keskusteluun. Toimii aina, kaikkialla."
   },
   "comingSoon": "Tulossa pian",
+  "presence": {
+    "status": {
+      "available": "Tavoitettavissa",
+      "busy": "Kiireinen",
+      "away": "Poissa",
+      "offline": "Offline",
+      "invisible": "Näkymätön",
+      "unknown": "Ei tiedossa"
+    },
+    "control": {
+      "title": "Tavoitettavuus",
+      "desc": "Näytä muille, oletko tavoitettavissa. Pidä automaattisena, aseta käsin tai valitse kuka sen näkee.",
+      "modeLabel": "Miten tila määräytyy",
+      "modeAuto": "Automaattinen",
+      "modeAutoHint": "Näkyy tavoitettavissa, kun portaali on auki.",
+      "modeManual": "Käsin",
+      "statusLabel": "Tilasi",
+      "visibilityLabel": "Kuka näkee",
+      "visEveryone": "Kaikki",
+      "visEveryoneHint": "Kuka tahansa verkossa (jaetaan federoiduille nodeille).",
+      "visContacts": "Vain kontaktit",
+      "visContactsHint": "Henkilöt joille olet viestittänyt (vain tämä node).",
+      "visNobody": "Ei kukaan",
+      "saved": "Tavoitettavuus päivitetty",
+      "saveError": "Tavoitettavuuden päivitys epäonnistui"
+    }
+  },
   "profile": {
     "title": "Oma profiili",
     "subtitle": "Profiili",

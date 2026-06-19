@@ -406,6 +406,33 @@
     "workaroundNote": "Copy your memories and paste directly into any AI chat. Always works, everywhere."
   },
   "comingSoon": "Coming soon",
+  "presence": {
+    "status": {
+      "available": "Available",
+      "busy": "Busy",
+      "away": "Away",
+      "offline": "Offline",
+      "invisible": "Invisible",
+      "unknown": "Unknown"
+    },
+    "control": {
+      "title": "Presence",
+      "desc": "Let others see whether you're reachable. Keep it automatic, set it manually, or choose who can see it.",
+      "modeLabel": "How your status is set",
+      "modeAuto": "Automatic",
+      "modeAutoHint": "Shown as available while you have the portal open.",
+      "modeManual": "Manual",
+      "statusLabel": "Your status",
+      "visibilityLabel": "Who can see it",
+      "visEveryone": "Everyone",
+      "visEveryoneHint": "Anyone on the network (shared with federated nodes).",
+      "visContacts": "Contacts only",
+      "visContactsHint": "People you've messaged (this node only).",
+      "visNobody": "Nobody",
+      "saved": "Presence updated",
+      "saveError": "Couldn't update presence"
+    }
+  },
   "profile": {
     "title": "My Profile",
     "subtitle": "Profile",

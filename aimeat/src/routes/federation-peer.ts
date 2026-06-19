@@ -19,6 +19,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
 import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
+import { presence, presenceSignString, type PresenceUpdate } from '../services/presence.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -461,6 +462,47 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             },
         }));
         emitChange('federation');
+    });
+
+    // POST /v1/federation/presence — receive a peer's presence push (snapshot or delta)
+    // SECURITY: must come from a known active peer with a valid Ed25519 signature.
+    router.post('/v1/federation/presence', async (req, res) => {
+        const { from_node_id, timestamp, updates, signature } = req.body ?? {};
+
+        if (!from_node_id || !timestamp || !Array.isArray(updates)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'from_node_id, timestamp, and updates[] are required'));
+            return;
+        }
+
+        const peer = peers.get(from_node_id) ?? [...peers.values()].find(p => p.nodeId === from_node_id);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+
+        // Timestamp freshness (5-minute window)
+        const ts = new Date(timestamp).getTime();
+        if (isNaN(ts) || Math.abs(Date.now() - ts) > 300_000) {
+            res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP', 'Timestamp is missing, invalid, or outside the 5-minute window'));
+            return;
+        }
+
+        // Verify signature over the canonical (from_node_id|timestamp|updates) string.
+        if (peer.publicKey) {
+            let valid: boolean;
+            try {
+                valid = await verify(peer.publicKey, presenceSignString(from_node_id, timestamp, updates as PresenceUpdate[]), signature);
+            } catch {
+                valid = false;
+            }
+            if (!valid) {
+                res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE', 'Presence signature verification failed'));
+                return;
+            }
+        }
+
+        presence.applyRemoteUpdates(from_node_id, updates as PresenceUpdate[]);
+        res.json(success(config.nodeId, { accepted: true, count: updates.length }));
     });
 
     // GET /v1/federation/peers — list active peers (operator auth)

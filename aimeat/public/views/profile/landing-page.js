@@ -15,6 +15,8 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.3.0 — 2026-06-19 — Add the PresenceControl card to the home dashboard (own availability:
+ *     auto/manual status + who-can-see visibility), previewing the shared <PresenceDot>.
  *   v3.2.0 — 2026-06-10 — Sidebar reorg: groups follow the information-refinement pipeline
  *     (Information / Automation / Activity / Build & Share / Account / Infrastructure) —
  *     Daily/Personal/Technical are gone. Pinned section under Home (pin-on-hover 📌, max 5,
@@ -65,7 +67,9 @@ import * as orgService from '/js/services/organisms.js';
 import { listRecents } from '/js/recents.js';
 import { getMemory, createMemory } from '/js/services/memory.js';
 import { listInbox } from '/js/services/messages.js';
+import { getMyPresence, setMyPresence } from '/js/services/presence.js';
 import { Spinner } from './shared.js';
+import { PresenceDot } from '/components/PresenceDot.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
@@ -511,6 +515,88 @@ function AgentsCard({ owner }) {
           <span class="pf-home-row-label">${escHtml(nextJob.name || nextJob.id || '')}</span>
           <span class="pf-home-row-meta">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
         </button>` : null}
+    </div>
+  `;
+}
+
+/* "Presence" — the owner's own availability control: status source (auto/manual),
+ * chosen status, and who-can-see visibility. One self-contained card; the dot it
+ * previews is the same <PresenceDot> rendered next to people everywhere else. */
+function PresenceControl() {
+  const [cfg, setCfg] = useState(null);
+  const [status, setStatus] = useState('unknown');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await getMyPresence();
+      if (r?.data) { setCfg(r.data.config); setStatus(r.data.status || 'unknown'); }
+    } catch { /* control stays hidden until it loads */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (partial) => {
+    if (!cfg) return;
+    const optimistic = { ...cfg, ...partial };
+    setCfg(optimistic);
+    setSaving(true);
+    try {
+      const r = await setMyPresence(partial);
+      if (r?.data) { setCfg(r.data.config); setStatus(r.data.status || 'unknown'); }
+    } catch { setCfg(cfg); /* revert */ }
+    setSaving(false);
+  };
+
+  if (!cfg) return null;
+
+  return html`
+    <div class="pf-presence-card">
+      <div class="pf-presence-head">
+        <div>
+          <div class="section-title">${t('presence.control.title')}</div>
+          <div class="section-desc">${t('presence.control.desc')}</div>
+        </div>
+        <${PresenceDot} status=${status} size="md" label=${true} />
+      </div>
+
+      <div class="pf-presence-row">
+        <label class="pf-presence-label">${t('presence.control.modeLabel')}</label>
+        <div class="pf-presence-modes">
+          <button class=${'pf-presence-pill' + (cfg.mode === 'auto' ? ' pf-presence-pill--on' : '')}
+            disabled=${saving} onClick=${() => save({ mode: 'auto' })}>${t('presence.control.modeAuto')}</button>
+          <button class=${'pf-presence-pill' + (cfg.mode === 'manual' ? ' pf-presence-pill--on' : '')}
+            disabled=${saving} onClick=${() => save({ mode: 'manual' })}>${t('presence.control.modeManual')}</button>
+        </div>
+      </div>
+
+      ${cfg.mode === 'auto' ? html`
+        <div class="pf-presence-hint">${t('presence.control.modeAutoHint')}</div>
+      ` : html`
+        <div class="pf-presence-row">
+          <label class="pf-presence-label" for="pf-presence-status">${t('presence.control.statusLabel')}</label>
+          <select id="pf-presence-status" class="pf-edit-select" value=${cfg.status} disabled=${saving}
+            onChange=${(e) => save({ status: e.target.value })}>
+            <option value="available">${t('presence.status.available')}</option>
+            <option value="busy">${t('presence.status.busy')}</option>
+            <option value="away">${t('presence.status.away')}</option>
+            <option value="invisible">${t('presence.status.invisible')}</option>
+          </select>
+        </div>
+      `}
+
+      <div class="pf-presence-row">
+        <label class="pf-presence-label" for="pf-presence-vis">${t('presence.control.visibilityLabel')}</label>
+        <select id="pf-presence-vis" class="pf-edit-select" value=${cfg.visibility} disabled=${saving}
+          onChange=${(e) => save({ visibility: e.target.value })}>
+          <option value="everyone">${t('presence.control.visEveryone')}</option>
+          <option value="contacts">${t('presence.control.visContacts')}</option>
+          <option value="nobody">${t('presence.control.visNobody')}</option>
+        </select>
+      </div>
+      <div class="pf-presence-hint">
+        ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
+          : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
+      </div>
     </div>
   `;
 }
@@ -1035,6 +1121,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
+          <${PresenceControl} />
           ${isNew ? html`<${HeroOnboarding} switchTab=${(id) => open(id, 'main')} />` : null}
           ${(isNew || isActive) ? html`<${KnowledgeCallout} switchTab=${() => open('knowledge', 'main')} />` : null}
           ${isNew ? html`<${GhostTiles} switchTab=${() => open('packages', 'main')} />` : null}

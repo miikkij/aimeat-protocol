@@ -9,6 +9,8 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.3.0 -- 2026-06-19 -- Mark the owner online/offline in the PresenceTracker on stream
+ *     open/close (presence feature); ticket carries the resolved presence GHII.
  *   v1.1.0 -- 2026-05-31 -- Flush after each write; SSE is now excluded from the
  *     global compression middleware (which buffered the stream and silently
  *     dropped all live updates).
@@ -24,10 +26,14 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
+import { presence } from '../services/presence.js';
 
 interface Ticket {
   sub: string;
   expires: number;
+  /** Resolved presence identity (GHII for owner sessions) — marked online while the stream is open. */
+  presenceGhii: string;
 }
 
 const tickets = new Map<string, Ticket>();
@@ -49,6 +55,7 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
     tickets.set(ticket, {
       sub: req.auth!.sub,
       expires: Date.now() + 30_000,
+      presenceGhii: resolveIdentity(req.auth!, config.nodeId),
     });
     res.json(success(config.nodeId, { ticket, expires: 30 }));
   });
@@ -70,6 +77,10 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
 
     // Consume the ticket (single-use)
     tickets.delete(ticketId);
+
+    // Presence: an open portal stream means this owner is reachable. The tracker
+    // ignores agent/non-local identities, so this is safe to call unconditionally.
+    presence.markOnline(t.presenceGhii);
 
     // SSE headers
     res.writeHead(200, {
@@ -125,6 +136,7 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       clearInterval(keepalive);
       if (trailingTimer) clearTimeout(trailingTimer);
       offChangeEvent(handler);
+      presence.markOffline(t.presenceGhii);
     });
   });
 

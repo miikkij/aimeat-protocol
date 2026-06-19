@@ -11,6 +11,8 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.3.0 -- 2026-06-19 -- Show a presence dot next to peers (request rows, conversation list,
+ *     thread header) via the shared <PresenceDot>.
  *   v1.2.0 -- 2026-06-16 -- Composer upgraded to the shared Toast UI editor (parity with the
  *     workspace document editor) + markdown-preview fallback.
  *   v1.1.0 -- 2026-06-16 -- Redesigned as a proper messenger (avatars, bubbles, ticks, dividers).
@@ -24,6 +26,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
+import { PresenceDot } from '/components/PresenceDot.js';
 import * as messages from '/js/services/messages.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
@@ -313,7 +316,7 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-request-top">
               <${Avatar} seed=${r.contactId} size=${36} />
               <div class="inbox-request-id">
-                <div class="inbox-name">${escHtml(peerName(r.contactId))}</div>
+                <div class="inbox-name">${escHtml(peerName(r.contactId))} <${PresenceDot} ghii=${r.contactId} /></div>
                 <div class="inbox-sub">${escHtml(r.contactId)}</div>
               </div>
             </div>
@@ -332,7 +335,7 @@ export default function InboxTab({ showToast }) {
           <${Avatar} seed=${c.peerGhii} size=${40} />
           <div class="inbox-conv-main">
             <div class="inbox-conv-line1">
-              <span class="inbox-name">${escHtml(peerName(c.peerGhii))}</span>
+              <span class="inbox-name">${escHtml(peerName(c.peerGhii))} <${PresenceDot} ghii=${c.peerGhii} /></span>
               <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
             </div>
             <div class="inbox-conv-line2">
@@ -350,7 +353,7 @@ export default function InboxTab({ showToast }) {
         <div class="inbox-thread-head">
           <${Avatar} seed=${activeConv.peerGhii} size=${36} />
           <div class="inbox-thread-id">
-            <div class="inbox-name">${escHtml(peerName(activeConv.peerGhii))}</div>
+            <div class="inbox-name">${escHtml(peerName(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
             <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
           </div>
         </div>
