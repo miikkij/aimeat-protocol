@@ -69,6 +69,7 @@ import CapabilitiesTab from './profile/capabilities-tab.js';
 import SchedulerTab from './profile/scheduler-tab.js';
 import WorkflowsTab from './profile/workflows-tab.js';
 import InboxTab from './profile/inbox-tab.js';
+import NotebookTab from './profile/notebook-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
@@ -87,6 +88,7 @@ const TABS = [
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
   { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
   { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
+  { id: 'notebook',      key: 'profile.tabs.notebook',       component: NotebookTab,       minTier: 'new' },
   { id: 'work',          key: 'profile.tabs.work',           component: WorkTab,           minTier: 'active' },
   { id: 'actions',       key: 'profile.tabs.services',       component: ServicesTab,       minTier: 'active' },
   { id: 'boards',        key: 'profile.tabs.boards',         component: BoardsTab,         minTier: 'active' },

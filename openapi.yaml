@@ -6469,6 +6469,42 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/librarian/search:
+    get:
+      operationId: librarianSearch
+      summary: Librarian full-text search across all of the caller's content
+      description: >
+        Tier-1 "librarian" retrieval — one ranked full-text query (SQLite FTS5 / MongoDB $text)
+        fanned across every identity the caller owns (GHII + agents + ecosystem apps), so it reaches
+        every organism they have contributed to plus their personal memory. Returns ranked,
+        snippeted, organism-annotated hits to pick from.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Natural-language search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Max hits to return
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Restrict to memory keys beginning with this prefix (e.g. `organism.{id}.`)
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

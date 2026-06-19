@@ -1,0 +1,97 @@
+/**
+ * @file notebook.css
+ * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
+ *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
+ * @version-history
+ *   v1.0.0 — 2026-06-19 — Initial: capture + librarian + inbox (slice A).
+ */
+
+.pf-nb-capture {
+  margin-bottom: var(--space-lg, 1.5rem);
+}
+.pf-nb-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  font-family: inherit;
+}
+.pf-nb-capture-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.pf-nb-section {
+  margin-top: var(--space-lg, 1.5rem);
+}
+
+.pf-nb-search {
+  flex: 1;
+}
+
+.pf-nb-hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-hit {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+.pf-nb-hit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-hit-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.pf-nb-hit-snippet {
+  margin-top: var(--space-xs, 0.4rem);
+  color: var(--text-dim, var(--text));
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+.pf-nb-hit-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-hit-key {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.pf-nb-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-note {
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+.pf-nb-note-text {
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pf-nb-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-xs, 0.4rem);
+}

@@ -29,6 +29,7 @@ import { schemaRouter } from '../routes/schemas.js';
 import { consentRouter } from '../routes/consent.js';
 import { permissionsRouter } from '../routes/permissions.js';
 import { memoryRouter } from '../routes/memory.js';
+import { librarianRouter } from '../routes/librarian.js';
 import { actionsRouter } from '../routes/actions.js';
 import { catalogueRouter } from '../routes/catalogue.js';
 import { workRouter } from '../routes/work.js';
@@ -275,6 +276,7 @@ export async function mountRoutes(
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
+  app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval
   if (config.generatorEnabled) {
     app.use(generatorRouter(config, storage));   // Agent-driven service generator
     app.use(generatorAutopilotRouter(config, storage)); // Backend autopilot for generator
