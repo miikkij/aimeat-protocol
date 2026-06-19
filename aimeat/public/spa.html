@@ -64,6 +64,9 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/theme.css">
+  <!-- Canonical styles for the shared <Markdown> component — load before views so it styles
+       rendered markdown everywhere the component is used (no per-view re-definition). -->
+  <link rel="stylesheet" href="/css/components/markdown.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/portal.css">

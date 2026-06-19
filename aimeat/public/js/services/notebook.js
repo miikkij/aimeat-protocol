@@ -12,7 +12,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: classify + materialize-document orchestration (slice B).
  */
-import { apiPost } from '/js/api.js';
+import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
 import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot } from '/js/services/organisms.js';
 
@@ -23,9 +23,16 @@ function rid(prefix) {
   return prefix + r;
 }
 
-/** Ask the backend AI classifier where a note belongs. Returns the ClassifyResult envelope's data. */
+/** Ask the backend AI classifier where a note belongs. Returns the ClassifyResult envelope's data.
+ *  This is a slow AI call — give it the full AI timeout (30 min) and DO NOT retry, otherwise the
+ *  default 30s client timeout aborts a model that is still thinking and re-fires the request. */
 export async function classifyNote(text) {
-  const resp = await apiPost('/v1/librarian/classify', { text });
+  const resp = await api('/v1/librarian/classify', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+    timeoutMs: 1_800_000,
+    retries: 0,
+  });
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Classify failed');
   return resp?.data || null;
 }

@@ -38,8 +38,22 @@ export interface PromptSeedEntry {
 
 // Generator-specific seeds are in a separate file to keep this file manageable
 import { GENERATOR_PROMPT_SEEDS } from './generator-prompt-seeds.js';
+import { NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Group: builders — notebook placement classifier (code-owned, re-synced from seed)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: 'notebook-classify',
+    group: 'builders',
+    name: 'Notebook Placement Classifier',
+    description: 'Files a free-text notebook note into the right organism → workspace → document space and drafts a clean document. Used by POST /v1/librarian/classify.',
+    content: NOTEBOOK_CLASSIFY_TEMPLATE,
+    variables: ['structure', 'note'],
+    usedIn: ['/v1/librarian/classify'],
+  },
 
   // ═══════════════════════════════════════════════════════════════════
   // Group: tiers — from src/routes/prompts.ts
