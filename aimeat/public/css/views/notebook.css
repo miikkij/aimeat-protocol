@@ -85,8 +85,9 @@
 }
 .pf-nb-note-text {
   color: var(--text);
-  white-space: pre-wrap;
   word-break: break-word;
+  max-height: 22rem;
+  overflow-y: auto;
 }
 .pf-nb-note-foot {
   display: flex;
@@ -137,3 +138,20 @@
   gap: var(--space-sm, 0.75rem);
   margin-top: var(--space-sm, 0.75rem);
 }
+
+.pf-nb-progress { gap: var(--space-sm, 0.75rem); }
+.pf-nb-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pf-nb-step {
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  opacity: 0.6;
+}
+.pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
+.pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }

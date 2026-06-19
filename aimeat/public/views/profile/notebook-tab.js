@@ -21,8 +21,14 @@ import * as memoryService from '/js/services/memory.js';
 import { classifyNote, materializeDocument } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
+import { Markdown } from '/components/Markdown.js';
+import { OpenRouterSettings } from './generator-settings.js';
 
 const NEW = '__new__';
+
+// Stages shown while the (slow) AI classify call runs, so the user sees what is happening. The
+// timer advances to (and dwells on) the AI step — that is genuinely where the wait is spent.
+const NB_STEPS = ['profile.notebook.step1', 'profile.notebook.step2'];
 
 const INBOX_PREFIX = 'notebook.inbox.';
 
@@ -61,8 +67,13 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
   // Slice B — placement suggestion for one note at a time.
   const [sortingKey, setSortingKey] = useState(null);   // note key being classified (loading)
+  const [sortStep, setSortStep] = useState(0);          // progress stage index during classify
+  const [sortError, setSortError] = useState(null);     // { noteKey, message } — persistent inline error
   const [suggest, setSuggest] = useState(null);         // { noteKey, result, edit }
   const [materializing, setMaterializing] = useState(false);
+  const stepTimer = useRef(null);
+  function stopStepTimer() { if (stepTimer.current) { clearInterval(stepTimer.current); stepTimer.current = null; } }
+  useEffect(() => stopStepTimer, []);
 
   useEffect(() => { if (session) { loadInbox(); loadOrgNames(); } }, [session]);
 
@@ -158,14 +169,19 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
   async function handleSuggest(note) {
     setSuggest(null);
+    setSortError(null);
     setSortingKey(note.key);
+    setSortStep(0);
+    stopStepTimer();
+    // Walk the user through the expected stages while the AI thinks (the call can take ~30s).
+    stepTimer.current = setInterval(() => setSortStep(s => Math.min(s + 1, NB_STEPS.length - 1)), 2500);
     try {
       const result = await classifyNote(noteText(note.value));
-      if (!result) { showToast(t('profile.error'), true); return; }
+      if (!result) throw new Error(t('profile.error'));
       setSuggest({ noteKey: note.key, result, edit: initEdit(result) });
     } catch (e) {
-      showToast(e.message || t('profile.error'), true);
-    } finally { setSortingKey(null); }
+      setSortError({ noteKey: note.key, message: e.message || t('profile.error'), code: e.code });
+    } finally { stopStepTimer(); setSortingKey(null); }
   }
 
   function patchEdit(patch) {
@@ -345,7 +361,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
         : html`<div class="pf-nb-inbox">
             ${inbox.map(note => html`
               <div class="pf-nb-note" key=${note.key}>
-                <div class="pf-nb-note-text">${escHtml(noteText(note.value))}</div>
+                <div class="pf-nb-note-text"><${Markdown} text=${noteText(note.value)} /></div>
                 <div class="pf-nb-note-foot">
                   <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
                   <div class="pf-nb-note-btns">
@@ -356,6 +372,27 @@ export default function NotebookTab({ session, showToast, onStats }) {
                     <button class="btn-danger btn-sm" onClick=${() => handleDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
                   </div>
                 </div>
+                ${sortingKey === note.key && html`
+                  <div class="pf-nb-suggest pf-nb-progress">
+                    <${Spinner} text=${t(NB_STEPS[sortStep])} />
+                    <ol class="pf-nb-steps">
+                      ${NB_STEPS.map((s, i) => html`
+                        <li key=${i} class="pf-nb-step ${i < sortStep ? 'done' : i === sortStep ? 'active' : ''}">
+                          ${i < sortStep ? '✓' : i === sortStep ? '→' : '·'} ${t(s)}
+                        </li>`)}
+                    </ol>
+                  </div>`}
+                ${sortError?.noteKey === note.key && html`
+                  <div class="pf-nb-suggest pf-nb-progress">
+                    <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.sortErrorTitle')}: ${escHtml(sortError.message)}</span></div>
+                    ${sortError.code === 'NO_OPENROUTER_KEY' && html`
+                      <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
+                      <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
+                    <div class="pf-nb-suggest-actions">
+                      <button class="btn-primary btn-sm" onClick=${() => handleSuggest(note)}>${t('profile.notebook.tryAgain')}</button>
+                      <button class="btn-ghost btn-sm" onClick=${() => setSortError(null)}>${t('profile.notebook.dismiss')}</button>
+                    </div>
+                  </div>`}
                 ${suggest?.noteKey === note.key && renderSuggestPanel()}
               </div>
             `)}
