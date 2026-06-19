@@ -857,6 +857,7 @@ const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuInformation', items: [   // raw → curated → governed
     { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
     { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
+    { id: 'notebook', icon: '\u{1F4D3}', labelKey: 'profile.tabs.notebook' },
     { id: 'knowledge', icon: '\u{1F4DA}', labelKey: 'knowledge.tabLabel' },
     { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
   ] },

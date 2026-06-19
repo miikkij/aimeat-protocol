@@ -82,6 +82,8 @@ import * as agentActivityRepo from './repos/agent-activity.js';
 import * as agentMessageRepo from './repos/agent-message.js';
 import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
+import { searchTextMemory } from './repos/memory.js';
+import type { MemoryTextHit, MemoryTextSearchOpts } from '../../repositories/memory.repository.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -685,6 +687,10 @@ export class SqliteStorage implements Storage {
       }
     }
     return results;
+  }
+
+  async searchText(query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]> {
+    return searchTextMemory(this.db, query, opts);
   }
 
   private deserializeMemory(row: Record<string, unknown>): MemoryRecord {

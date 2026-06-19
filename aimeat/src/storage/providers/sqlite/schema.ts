@@ -1677,4 +1677,40 @@ export function initializeSchema(db: Database.Database): void {
   // none and the portal shows a graceful "re-connect to load one" fallback.
   safeAddColumn('eco_auth', 'setup', 'TEXT');
   safeAddColumn('ecosystem_apps', 'setup', 'TEXT');
+
+  // ── Memory full-text search (Tier-1 librarian retrieval) ──
+  // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
+  // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER
+  // INSERT/UPDATE/DELETE triggers keep it in sync SYNCHRONOUSLY, so a just-captured note is
+  // immediately findable (the librarian "capture → ask" loop tolerates no indexing lag). Search
+  // uses `memory_fts MATCH ?` joined back to memory by rowid, ranked by bm25.
+  // See docs/internal/design-organism-notebook-and-librarian.md §4 (Tier 1).
+  db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
+      key, value, tags,
+      tokenize = 'unicode61 remove_diacritics 2'
+    );
+
+    CREATE TRIGGER IF NOT EXISTS memory_fts_ai AFTER INSERT ON memory BEGIN
+      INSERT INTO memory_fts(rowid, key, value, tags)
+      VALUES (new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, ''));
+    END;
+    CREATE TRIGGER IF NOT EXISTS memory_fts_ad AFTER DELETE ON memory BEGIN
+      DELETE FROM memory_fts WHERE rowid = old.rowid;
+    END;
+    CREATE TRIGGER IF NOT EXISTS memory_fts_au AFTER UPDATE ON memory BEGIN
+      DELETE FROM memory_fts WHERE rowid = old.rowid;
+      INSERT INTO memory_fts(rowid, key, value, tags)
+      VALUES (new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, ''));
+    END;
+  `);
+
+  // Backfill rows written before the FTS table / triggers existed (pure SQL — idempotent: only
+  // inserts memory rows whose rowid is missing from the index).
+  db.exec(`
+    INSERT INTO memory_fts(rowid, key, value, tags)
+    SELECT m.rowid, m.key, COALESCE(m.value, ''), COALESCE(m.tags, '')
+    FROM memory m
+    WHERE m.rowid NOT IN (SELECT rowid FROM memory_fts);
+  `);
 }

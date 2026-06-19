@@ -75,6 +75,11 @@ model Memory {
   flagCount  Int      @default(0)
   allowedOrigins String[]
   groupId    String?
+  // Flattened searchable text (key + string leaves of value + tags), maintained on every write.
+  // A MongoDB `$text` index on this field is created at startup (see MongoStorage.init) — Tier-1
+  // librarian full-text search. SQLite indexes the value directly via FTS5, so this field is
+  // MongoDB/Postgres-only. See docs/internal/design-organism-notebook-and-librarian.md §4.
+  searchBlob String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

@@ -1,5 +1,18 @@
 import type Database from 'better-sqlite3';
 import type { MemoryRecord } from '../../../interface.js';
+import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+
+/**
+ * Turn a free-text query into an FTS5 MATCH expression: extract unicode word/number tokens,
+ * prefix-match each (`tok*`) and OR them together for recall (bm25 still ranks multi-token hits
+ * highest). Tokens are pure alphanumerics so no FTS5 escaping is needed. Returns null when the
+ * query has no usable tokens (caller returns no hits).
+ */
+function toFtsMatch(raw: string): string | null {
+  const tokens = raw.toLowerCase().match(/[\p{L}\p{N}]+/gu);
+  if (!tokens || tokens.length === 0) return null;
+  return tokens.map(t => `${t}*`).join(' OR ');
+}
 
 function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
   const record: MemoryRecord = {
@@ -184,4 +197,49 @@ export function searchMemory(db: Database.Database, ownerGaii: string, query: st
     }
   }
   return results;
+}
+
+export function searchTextMemory(db: Database.Database, query: string, opts?: MemoryTextSearchOpts): MemoryTextHit[] {
+  const match = toFtsMatch(query);
+  if (!match) return [];
+
+  const where: string[] = ['memory_fts MATCH ?'];
+  const params: unknown[] = [match];
+
+  if (opts?.ownerGaiis?.length) {
+    where.push(`m.ownerGaii IN (${opts.ownerGaiis.map(() => '?').join(', ')})`);
+    params.push(...opts.ownerGaiis);
+  }
+  if (opts?.keyPrefix) {
+    where.push('m.key LIKE ?');
+    params.push(opts.keyPrefix + '%');
+  }
+  if (opts?.visibility) {
+    where.push('m.visibility = ?');
+    params.push(opts.visibility);
+  }
+
+  // bm25(): lower is more relevant → ORDER BY ASC, fetch extra to survive TTL/flag filtering.
+  const limit = opts?.limit ?? 50;
+  const sql = `
+    SELECT m.*, bm25(memory_fts) AS _rank
+    FROM memory_fts
+    JOIN memory m ON m.rowid = memory_fts.rowid
+    WHERE ${where.join(' AND ')}
+    ORDER BY _rank
+    LIMIT ?`;
+  const rows = db.prepare(sql).all(...params, limit * 2) as Record<string, unknown>[];
+
+  const hits: MemoryTextHit[] = [];
+  for (const row of rows) {
+    if (hits.length >= limit) break;
+    const record = deserializeMemory(row);
+    if (isMemoryExpired(record)) {
+      db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+      continue;
+    }
+    if (opts?.maxFlags !== undefined && (record.flagCount ?? 0) > opts.maxFlags) continue;
+    hits.push({ record, score: -(row._rank as number) });
+  }
+  return hits;
 }

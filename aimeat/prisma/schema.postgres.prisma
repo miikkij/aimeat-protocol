@@ -77,6 +77,11 @@ model Memory {
   flagCount  Int      @default(0)
   allowedOrigins String[]
   groupId    String?
+  // Flattened searchable text (key + string leaves of value + tags), maintained on every write.
+  // A MongoDB `$text` index on this field is created at startup (see MongoStorage.init) — Tier-1
+  // librarian full-text search. SQLite indexes the value directly via FTS5, so this field is
+  // MongoDB/Postgres-only. See docs/internal/design-organism-notebook-and-librarian.md §4.
+  searchBlob String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -1072,7 +1077,8 @@ model DeviceAuth {
   mode             String?
 }
 
-// Ecosystem application (GEAI) principal — mirror of Agent, minus task/agent-only fields.
+// Ecosystem application (GEAI) principal — mirror of Agent, minus task/agent-only fields,
+// plus the ecosystem binding fields (app, boundRef, dataAreas, status).
 model EcosystemApp {
   id            String   @id @default(cuid())
   geai          String   @unique
@@ -1088,6 +1094,7 @@ model EcosystemApp {
   morselBalance Int      @default(0)
   capabilities  Json?
   automation    Json?
+  setup         Json?
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -1116,6 +1123,7 @@ model EcoAuth {
   validationResult Json?
   capabilities   Json?
   automation     Json?
+  setup          Json?
   appCredentials Json?
 }
 
@@ -1415,6 +1423,7 @@ model AgentTask {
   deliverableKey   String?
   rating           Json?
   triage           String?
+  automation       Json?
 
   @@index([agentGaii, status])
   @@index([ownerGaii])
