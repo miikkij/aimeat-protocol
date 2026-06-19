@@ -6,6 +6,30 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Configurable header navigation.** Operators can now choose which public links appear in the site
+  header and in what order, from the admin **Portal** tab. The five built-in public links (Try it,
+  How it works, For your business, Dev view, Help) get per-link visibility toggles + ↑/↓ reordering;
+  auth/role-gated links (Apps, Profile, Admin) are not configurable and keep following their existing
+  sign-in/role rules. Config is persisted (portal memory key `portal/header-nav`, no new storage
+  schema) and read by the SPA header via a new **public** `GET /v1/site/header-nav`; operators save via
+  `PUT /v1/site/header-nav` (operator-only, blocked in load-balancer mode, ids validated → `422
+  HEADER_NAV_INVALID`). The header renders defaults immediately and applies the config when it loads
+  (no flash). `src/services/site.ts`, `src/routes/site.ts`, `public/spa.html`,
+  `public/views/admin/portal-tab.js`, EN+FI `dashboard.portalNav*` strings, E2E `test/e2e-header-nav.ts`.
+- **App Catalog — single-app detail view with a live AI edit loop.** Clicking a local app card now
+  opens a full-screen **App Detail** overlay (reusing the launcher-overlay pattern — no new routing,
+  no SSR) that unifies the app's three previously-scattered representations: the local IndexedDB copy,
+  the published `AppRecord`, and its community origin. It shows a merged **Status** (local size vs
+  published version + an "in sync / differs / not published" verdict — which nothing surfaced before),
+  **About** (description, category, tags, source, size, dates, cortex extensions), **inline Versions**
+  (live from `GET /v1/apps/:owner/:filename/versions`, with View/Restore/Fork), and every existing
+  action as buttons. New: an **Edit with AI** loop that runs on the user's **own OpenRouter key** —
+  describe a change → `POST /v1/ai/complete` → the result is saved as a **new local draft** (never
+  overwrites the working copy) → **Test draft** launches it in the sandboxed iframe → **Keep** persists
+  it or **Discard** drops it. After Keep, a one-click **Publish as vN+1** opens the publish flow
+  prefilled with the existing filename. Card click opens Details; a hover **▶** on each card preserves
+  launch-on-click. New EN+FI strings under `detail.*` / `ctx.details`. Frontend-only, all in
+  `src/static/app-catalog.html`. Design: `docs/internal/design-app-detail-view.md`.
 - **Federation book — a phone-book of the federation (operators + resources + versions + settings).**
   Every node can now see who runs the federation and what each node offers, with a consistent
   network-wide view. Built on one shared **node-card** (`GET /v1/federation/node-card`, public): a
