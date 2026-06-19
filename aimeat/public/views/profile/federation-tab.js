@@ -6,6 +6,8 @@
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#11): peer online/offline dot
  *     uses canonical <StatusDot> (alive/dead) instead of bespoke .peer-dot.
+ *   v1.3.0 — 2026-06-19 — Show peer tier (visiting/member/genesis) + availability
+ *     (temporary/permanent) pills next to the status (visiting-node feature).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -56,6 +58,8 @@ export default function FederationTab({ session, showToast }) {
                     <div class="card-subtitle">${escHtml(p.url || '')}</div>
                   </div>
                   <div class="peer-status">
+                    <span class="badge ${(p.tier || 'member') === 'visiting' ? 'badge-info' : (p.tier || 'member') === 'genesis' ? 'badge-info' : 'badge-success'}">${t('profile.federation.tier_' + (p.tier || 'member')) || (p.tier || 'member')}</span>
+                    ${p.availability && p.availability !== 'unknown' ? html`<span class="badge ${p.availability === 'permanent' ? 'badge-success' : 'badge-info'}">${t('profile.federation.avail_' + p.availability) || p.availability}</span>` : null}
                     <${StatusDot} status=${alive ? 'alive' : 'dead'} />
                     <span class="fed-status-text ${alive ? 'online' : 'offline'}">${alive ? t('profile.federation.online') : t('profile.federation.offline')}</span>
                   </div>

@@ -993,6 +993,12 @@ export interface FederationPeerRecord {
   peerMode: 'federation' | 'private';
   allowFederatedAuth: boolean;
   federationAuthScopes: string[];
+  /** Trust tier: 'genesis' | 'member' | 'visiting'. Absent (legacy rows) → 'member'. */
+  tier?: 'genesis' | 'member' | 'visiting';
+  /** Availability label from heartbeat uptime (Phase B): 'temporary' | 'permanent' | 'unknown'. */
+  availability?: 'temporary' | 'permanent' | 'unknown' | null;
+  /** Optional expiry for time-limited visiting peers (Phase B). */
+  expiresAt?: string | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

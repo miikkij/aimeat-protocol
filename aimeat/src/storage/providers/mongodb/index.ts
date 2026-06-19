@@ -4599,8 +4599,8 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         await this.prisma.federationPeer.upsert({
             where: { nodeId: peer.nodeId },
-            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [] },
-            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [] },
+            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [], tier: peer.tier ?? 'member', availability: peer.availability ?? null, expiresAt: peer.expiresAt ? new Date(peer.expiresAt) : null },
+            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [], tier: peer.tier ?? 'member', availability: peer.availability ?? null, expiresAt: peer.expiresAt ? new Date(peer.expiresAt) : null },
         });
     }
 
@@ -4620,6 +4620,9 @@ export class PrismaStorage implements Storage {
             peerMode: r.peerMode || 'federation',
             allowFederatedAuth: r.allowFederatedAuth ?? false,
             federationAuthScopes: r.federationAuthScopes ?? [],
+            tier: r.tier ?? 'member',
+            availability: r.availability ?? null,
+            expiresAt: r.expiresAt instanceof Date ? r.expiresAt.toISOString() : (r.expiresAt ?? null),
         }));
     }
 

@@ -926,6 +926,21 @@ components:
         status:
           type: string
           enum: [active, degraded, offline]
+        tier:
+          type: string
+          enum: [genesis, member, visiting]
+          default: member
+          description: "Trust tier. 'visiting' = low-trust self-join (browse + request work only); 'member' = full peer; promoted by a local operator."
+        availability:
+          type: string
+          enum: [temporary, permanent, unknown]
+          nullable: true
+          description: "Availability label derived from heartbeat uptime (Phase B)."
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Optional expiry for time-limited visiting peers."
         peered_since:
           type: string
           format: date-time
@@ -17260,8 +17275,14 @@ paths:
   /v1/federation/peer/introduce:
     post:
       operationId: introducePeer
-      summary: Introduce a new peer (genesis)
-      description: Public endpoint for peer-to-peer node introduction.
+      summary: Introduce a new peer
+      description: |
+        Public, signed endpoint for peer-to-peer node introduction. By default creates a `pending`
+        peering request for operator approval (202). When the operator has enabled open join
+        (`federation.open_join`), a verified introduction instead self-admits the caller as a
+        low-trust `visiting` peer immediately (200, `{ status: active, tier: visiting }`) — visiting
+        peers may browse/discover and request paid work, but get no provider/relay/replication/auth
+        rights until a local operator promotes them to `member`.
       tags: [Federation]
       requestBody:
         required: true
@@ -17271,7 +17292,9 @@ paths:
               type: object
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: Auto-admitted as a visiting peer (open join enabled)
+        '202':
+          description: Pending operator approval (default)
 
   /v1/federation/peer/introduce/{id}/status:
     get:

@@ -784,6 +784,9 @@ model FederationPeer {
   peerMode             String   @default("federation")
   allowFederatedAuth   Boolean  @default(false)
   federationAuthScopes String[] @default([])
+  tier                 String    @default("member")
+  availability         String?
+  expiresAt            DateTime?
 
   @@index([status])
 }

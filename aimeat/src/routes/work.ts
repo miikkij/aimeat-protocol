@@ -150,6 +150,12 @@ async function createWorkItem(
     // This is a personal node agent — treat as local work, notify via tunnel/mailbox later
     personalNodeTarget = resolved.nodeId;
   } else if (resolved && !resolved.local) {
+    // Visiting-tier peers are not providers-of-record: never route work to them
+    // (allowRouting=false). This is the cap that makes the lightweight join safe.
+    const targetPeer = peers.get(resolved.nodeId) ?? [...peers.values()].find(p => p.nodeId === resolved.nodeId);
+    if (targetPeer && targetPeer.allowRouting === false) {
+      return { error: 'Target node does not accept routed work (visiting tier)', status: 403, code: 'POLICY_DENIED' };
+    }
     // Charge 1 morsel cross-node routing fee (§15) — atomic debit prevents double-spending
     const debited = await storage.debitBalance(requesterGaii, 1);
     if (!debited) {

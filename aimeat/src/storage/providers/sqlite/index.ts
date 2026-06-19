@@ -4936,12 +4936,13 @@ export class SqliteStorage implements Storage {
 
   async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.peerMode || 'federation', peer.allowFederatedAuth ? 1 : 0,
-      (peer.federationAuthScopes ?? []).join(','));
+      (peer.federationAuthScopes ?? []).join(','),
+      peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null);
   }
 
   async listFederationPeers(): Promise<FederationPeerRecord[]> {
@@ -4959,6 +4960,9 @@ export class SqliteStorage implements Storage {
       peerMode: (r.peerMode as FederationPeerRecord['peerMode']) || 'federation',
       allowFederatedAuth: r.allowFederatedAuth === 1,
       federationAuthScopes: ((r.federationAuthScopes as string) || '').split(',').filter(Boolean),
+      tier: (r.tier as FederationPeerRecord['tier']) || 'member',
+      availability: (r.availability as FederationPeerRecord['availability']) ?? null,
+      expiresAt: (r.expiresAt as string) ?? null,
     }));
   }
 
