@@ -931,6 +931,10 @@ components:
           enum: [genesis, member, visiting]
           default: member
           description: "Trust tier. 'visiting' = low-trust self-join (browse + request work only); 'member' = full peer; promoted by a local operator."
+        software_version:
+          type: string
+          nullable: true
+          description: "Peer's AIMEAT software version (from heartbeat) — lets you see which features a peer has."
         availability:
           type: string
           enum: [temporary, permanent, unknown]
@@ -8831,6 +8835,65 @@ paths:
       description: |
         Fetch the policy from the configured genesis (or `source_url`), verify its signature against the
         issuing peer's known public key, and apply it only if newer than the local version.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source_url: { type: string, description: Override the genesis URL to pull from }
+      responses:
+        '200': { description: Applied or skipped (not newer) }
+        '401': { description: Invalid signature }
+        '403': { description: Unknown issuer }
+        '502': { description: Fetch failed }
+
+  /v1/federation/node-card:
+    get:
+      operationId: getNodeCard
+      summary: This node's federation card
+      description: |
+        Public self-descriptor for the federation book: AIMEAT software version, node type, enabled
+        feature capabilities, curated federation settings, operator GHIIs (name + avatar), and a
+        resource summary (action/agent/board/CSM counts + a few highlights). Returns `{ listed:false }`
+        when the node has opted out of the book (`federation.book_listed=false`).
+      tags: [Federation]
+      responses:
+        '200': { description: "The node card (or listed:false when opted out)" }
+
+  /v1/federation/book:
+    get:
+      operationId: getFederationBook
+      summary: The federation book (operators + resources per node)
+      description: |
+        Public. The federation "phone book": every listed node's operator GHIIs, offered resources,
+        AIMEAT version, and curated settings. The primary (genesis/anchor, no `genesisUrl`) assembles
+        and signs it; leaf nodes mirror it. `is_primary` indicates whether this node authored it.
+      tags: [Federation]
+      responses:
+        '200': { description: "{ book, is_primary }" }
+
+  /v1/federation/book/rebuild:
+    post:
+      operationId: rebuildFederationBook
+      summary: Reassemble the federation book (primary, operator)
+      description: The primary refetches its peers' node-cards, rebuilds + signs the book, and stores it.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Rebuilt book }
+
+  /v1/federation/book/pull:
+    post:
+      operationId: pullFederationBook
+      summary: Pull + mirror the federation book from this node's genesis (operator)
+      description: |
+        Leaf nodes fetch the book from the configured genesis (or `source_url`), verify the primary's
+        signature against its known key, and apply it only if newer than the local copy.
       tags: [Federation]
       security:
         - BearerAuth: []

@@ -1586,6 +1586,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('federation_peers', 'heartbeatTotal', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('federation_peers', 'availabilityWindow', 'TEXT');
   safeAddColumn('federation_peers', 'availabilityPct', 'INTEGER');
+  // Federation book / version visibility — peer software version + node-card hash
+  safeAddColumn('federation_peers', 'softwareVersion', 'TEXT');
+  safeAddColumn('federation_peers', 'nodeCardHash', 'TEXT');
 
   // Federation Mesh Phase 1 — per-record federation opt-in
   safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');

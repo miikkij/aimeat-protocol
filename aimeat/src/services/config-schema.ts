@@ -202,6 +202,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', validate: v => ['disabled', 'all_peers', 'specific_peers'].includes(v as string), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
   { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'string', validate: () => true, immutable: false, description: 'Default scopes for federated users (comma-separated)' },
   { key: 'federationOpenJoin', dotPath: 'federation.open_join', envVar: 'AIMEAT_FEDERATION_OPEN_JOIN', type: 'boolean', validate: () => true, immutable: false, description: 'Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)' },
+  { key: 'federationBookListed', dotPath: 'federation.book_listed', envVar: 'AIMEAT_FEDERATION_BOOK_LISTED', type: 'boolean', validate: () => true, immutable: false, description: 'List this node (operators + resources) in the federation book; off = privacy opt-out' },
 
   // ── Security limits (mutable) ──
   { key: 'loginRateLimitMax', dotPath: 'security.login_rate_limit_max', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Max login attempts per minute per IP', range: '1-1000' },

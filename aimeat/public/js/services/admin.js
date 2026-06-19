@@ -66,6 +66,9 @@ export const removePeerEmergency = (nodeId) => apiDelete(`/v1/federation/peers/$
 export const testFederationNode = (targetUrl) => apiPost('/v1/federation/test', { target_url: targetUrl });
 export const updatePeerPolicy = (nodeId, policy) => apiPut(`/v1/federation/peers/${encodeURIComponent(nodeId)}`, policy);
 export const promotePeer = (nodeId, opts = {}) => apiPost(`/v1/federation/peers/${encodeURIComponent(nodeId)}/promote`, opts);
+export const getFederationBook = () => apiGet('/v1/federation/book');
+export const rebuildFederationBook = () => apiPost('/v1/federation/book/rebuild', {});
+export const pullFederationBook = () => apiPost('/v1/federation/book/pull', {});
 export const joinGenesisNetwork = (genesisUrl, role) => apiPost('/v1/admin/federation/join', { genesis_url: genesisUrl, role: role || 'contributor' });
 
 // ── Hooks ──

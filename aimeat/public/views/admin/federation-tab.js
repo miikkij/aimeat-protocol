@@ -5,6 +5,9 @@
  * @structure FederationTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.4.0 — 2026-06-19 — Federation book: a Version column + "behind" badge in the live-peers
+ *     table, and a Federation Book section (operators + resources + version + settings per node,
+ *     with Rebuild on the primary / Mirror-from-genesis on leaves).
  *   v1.3.0 — 2026-06-19 — Phase B: Promote button is eligibility-aware (uses promotion_eligible /
  *     promotion_failing from the API; forced override prompts when not yet eligible).
  *   v1.2.0 — 2026-06-19 — Visiting-node tier: Tier + Availability badges in the live-peers
@@ -23,6 +26,7 @@ import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
   testFederationNode, joinGenesisNetwork, updatePeerPolicy, promotePeer, getNetworkDirectory,
+  getFederationBook, rebuildFederationBook, pullFederationBook,
   getConfig, saveConfig,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
@@ -71,6 +75,20 @@ export default function FederationTab({ data, reload }) {
     if (res.ok) { setActionSuccess(t('dashboard.fedOpenJoinUpdated')); setTimeout(() => setActionSuccess(null), 3000); }
     else setActionError(res.error?.message || 'Failed to save');
   };
+
+  // ── Federation Book state ──
+  const [book, setBook] = useState(null);
+  const [bookPrimary, setBookPrimary] = useState(false);
+  const loadBook = useCallback(async () => {
+    try { const r = await getFederationBook(); setBook(r.data?.book || null); setBookPrimary(!!r.data?.is_primary); }
+    catch { setBook(null); }
+  }, []);
+  useEffect(() => { loadBook(); }, [loadBook]);
+  useEffect(() => {
+    const h = () => loadBook();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, [loadBook]);
 
   const doSaveAuthPolicy = async (policy, scopes) => {
     const changes = [
@@ -204,6 +222,15 @@ export default function FederationTab({ data, reload }) {
     else run(false); // will 409 → prompts for forced override
   }, [reload]);
 
+  const doRebuildBook = useCallback(async () => {
+    try { await rebuildFederationBook(); flash(t('dashboard.fedBookRebuilt') || 'Book rebuilt'); loadBook(); }
+    catch (e) { flashErr(e.message); }
+  }, [loadBook]);
+  const doPullBook = useCallback(async () => {
+    try { const r = await pullFederationBook(); flash(r.data?.applied ? (t('dashboard.fedBookPulled') || 'Book mirrored') : (t('dashboard.fedBookUpToDate') || 'Already up to date')); loadBook(); }
+    catch (e) { flashErr(e.message); }
+  }, [loadBook]);
+
   const doAddPeer = useCallback(async () => {
     if (!addNodeId || !addUrl) { flashErr(t('dashboard.fedAddPeerMissing')); return; }
     try { new URL(addUrl); } catch { flashErr(t('dashboard.fedInvalidUrl') || 'Invalid URL format'); return; }
@@ -236,6 +263,25 @@ export default function FederationTab({ data, reload }) {
     const map = { genesis: 'info', member: 'healthy', visiting: 'watch' };
     const label = t(`dashboard.fedTier_${tt}`) || tt;
     return html`<${Badge} type=${map[tt] || 'neutral'} label=${label} />`;
+  }
+
+  // Compare semver-ish version strings; returns 1/0/-1. Non-numeric/"unknown" sort lowest.
+  function cmpVersion(a, b) {
+    const pa = String(a || '').split('.').map(n => parseInt(n, 10));
+    const pb = String(b || '').split('.').map(n => parseInt(n, 10));
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const x = Number.isFinite(pa[i]) ? pa[i] : -1;
+      const y = Number.isFinite(pb[i]) ? pb[i] : -1;
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  }
+  // Highest version seen across peers — peers below it are flagged "behind" (a feature-gap hint).
+  const maxPeerVersion = livePeers.reduce((m, p) => (p.software_version && cmpVersion(p.software_version, m) > 0 ? p.software_version : m), '');
+  function versionCell(v) {
+    if (!v) return html`<span class="adm-text-dim">—</span>`;
+    const behind = maxPeerVersion && cmpVersion(v, maxPeerVersion) < 0;
+    return html`<span>${v}</span>${behind ? html` <${Badge} type="watch" label=${t('dashboard.fedBehind') || 'behind'} />` : null}`;
   }
 
   function availabilityBadge(av) {
@@ -332,6 +378,44 @@ export default function FederationTab({ data, reload }) {
       `}
     </div>
 
+    <!-- ═══ Federation Book ═══ -->
+    <div class="adm-card adm-mt-lg">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedBookTitle')}</h4>
+          <p class="adm-text-dim adm-text-base" style="margin:0">${t('dashboard.fedBookDesc')}</p>
+        </div>
+        ${bookPrimary
+          ? html`<button class="adm-btn-sm" onClick=${doRebuildBook}>↻ ${t('dashboard.fedBookRebuild')}</button>`
+          : html`<button class="adm-btn-sm" onClick=${doPullBook}>⬇ ${t('dashboard.fedBookPull')}</button>`}
+      </div>
+      ${!book || !book.nodes?.length
+        ? html`<${Empty} text=${t('dashboard.fedBookEmpty')} />`
+        : html`<div class="scrollable adm-mt-md"><table>
+            <thead><tr>
+              <th>${t('dashboard.nodeId')}</th>
+              <th>${t('dashboard.fedBookOperators')}</th>
+              <th>${t('dashboard.fedVersionLabel')}</th>
+              <th>${t('dashboard.fedBookResources')}</th>
+              <th>${t('dashboard.fedBookSettings')}</th>
+            </tr></thead>
+            <tbody>
+              ${book.nodes.map(n => html`<tr key=${n.node_id}>
+                <td class="mono adm-text-sm">${escHtml(n.node_id)}<div class="adm-text-dim" style="font-size:.7rem">${escHtml(n.node_type || '')}</div></td>
+                <td class="adm-text-sm">${(n.operators || []).map(o => html`<div title=${escHtml(o.ghii)}>${o.avatar ? o.avatar + ' ' : ''}${escHtml(o.display_name || o.ghii)}</div>`)}${!(n.operators || []).length ? html`<span class="adm-text-dim">—</span>` : null}</td>
+                <td class="adm-text-sm">${versionCell(n.software_version)}</td>
+                <td class="adm-text-sm">${n.resources ? html`<span title=${(n.resources.highlights || []).join(', ')}>${n.resources.actions}a · ${n.resources.agents}g · ${n.resources.boards}b · ${n.resources.csms}c</span>` : '—'}</td>
+                <td style="display:flex;gap:4px;flex-wrap:wrap">
+                  ${n.settings?.open_join ? html`<${Badge} type="watch" label=${t('dashboard.fedBookOpenJoin')} />` : null}
+                  ${n.settings?.auth_policy && n.settings.auth_policy !== 'disabled' ? html`<${Badge} type="info" label=${'auth:' + n.settings.auth_policy} />` : null}
+                  ${n.settings?.cross_federation ? html`<${Badge} type="neutral" label=${t('dashboard.fedBookCrossFed')} />` : null}
+                </td>
+              </tr>`)}
+            </tbody>
+          </table></div>
+          <p class="adm-text-dim" style="font-size:.7rem;margin-top:6px">${t('dashboard.fedBookVersion')}: ${book.book_version} · ${escHtml(book.issued_by || '')}</p>`}
+    </div>
+
     <!-- ═══ Network Directory ═══ -->
     <div class="adm-card adm-mt-lg">
       <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedNetworkDirectoryTitle')}</h4>
@@ -411,6 +495,7 @@ export default function FederationTab({ data, reload }) {
             <th>URL</th>
             <th>${t('dashboard.statusLabel')}</th>
             <th>${t('dashboard.fedTierLabel')}</th>
+            <th>${t('dashboard.fedVersionLabel')}</th>
             <th>${t('dashboard.fedAddedAt')}</th>
             <th>${t('dashboard.lastSeen')}</th>
             <th>${t('dashboard.fedPublicKey')}</th>
@@ -423,6 +508,7 @@ export default function FederationTab({ data, reload }) {
               <td class="mono adm-text-sm">${escHtml(p.url || '\u2014')}</td>
               <td>${statusBadge(p.status)}</td>
               <td style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${tierBadge(p.tier)}${availabilityBadge(p.availability)}</td>
+              <td class="adm-text-sm">${versionCell(p.software_version)}</td>
               <td class="adm-text-dim">${dt(p.added_at)}</td>
               <td class="adm-text-dim">${dt(p.last_seen)}</td>
               <td class="mono" style="font-size:.7rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title=${p.public_key || ''}>${p.public_key ? p.public_key.substring(0, 16) + '...' : '\u2014'}</td>

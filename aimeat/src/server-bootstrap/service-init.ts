@@ -23,6 +23,7 @@ import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
 import { presence } from '../services/presence.js';
+import { assembleBook, pullBook } from '../services/federation-book.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
@@ -177,6 +178,8 @@ export async function initializeServices(
         heartbeatTotal: sp.heartbeatTotal ?? 0,
         availabilityWindow: sp.availabilityWindow ?? null,
         availabilityPct: sp.availabilityPct ?? null,
+        softwareVersion: sp.softwareVersion ?? null,
+        nodeCardHash: sp.nodeCardHash ?? null,
       });
     }
     if (savedPeers.length > 0) {
@@ -192,6 +195,25 @@ export async function initializeServices(
   // Presence tracker — local online state (from SSE) + federated remote cache, with a
   // change-driven push loop (≤1/min) to active peers. Reads always resolve locally.
   presence.init(config, storage, peers);
+
+  // Federation book — the primary (genesis/anchor, no genesisUrl) assembles the book of operator
+  // GHIIs + resources from its peers' node-cards; leaf nodes mirror it by pulling from their genesis.
+  // Runs on a low-frequency timer; manual rebuild/pull endpoints exist too.
+  if (config.crossFederationEnabled !== false) {
+    const isPrimary = !config.genesisUrl;
+    const BOOK_INTERVAL_MS = 120_000;
+    const tick = () => {
+      if (isPrimary) {
+        assembleBook(config, storage, peers).catch(err => logger.warn('Federation book assembly failed', { error: String(err) }));
+      } else {
+        pullBook(config, storage, peers).then(r => {
+          if (r.applied) logger.info('Federation book mirrored from genesis', { version: r.book_version });
+        }).catch(err => logger.warn('Federation book pull failed', { error: String(err) }));
+      }
+    };
+    setTimeout(tick, 15_000); // initial run shortly after boot
+    setInterval(tick, BOOK_INTERVAL_MS);
+  }
 
   // A.4: Wire peer recovery to key exchange + future full sync
   setOnPeerRecovery((peerId: string) => {

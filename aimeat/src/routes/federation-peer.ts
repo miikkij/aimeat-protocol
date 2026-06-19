@@ -25,6 +25,9 @@ import {
     getActivePolicy, storeActivePolicy, coercePolicy, policySignString, evaluateAutoAdmit, evaluatePromotion,
     type NetworkPolicyDoc, type PromotionMetrics,
 } from '../services/network-policy.js';
+import {
+    buildNodeCard, assembleBook, getActiveBook, pullBook,
+} from '../services/federation-book.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -67,6 +70,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 last_seen: p.lastSeen,
                 tier: p.tier ?? 'member',
                 availability: p.availability ?? null,
+                software_version: p.softwareVersion ?? null,
                 expires_at: p.expiresAt ?? null,
             }));
 
@@ -624,6 +628,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 availability_pct: p.availabilityPct ?? null,
                 heartbeat_ok: p.heartbeatOk ?? 0,
                 heartbeat_total: p.heartbeatTotal ?? 0,
+                software_version: p.softwareVersion ?? null,
                 expires_at: p.expiresAt ?? null,
                 ...(promotion_eligible !== undefined ? { promotion_eligible, promotion_failing } : {}),
                 ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
@@ -838,6 +843,41 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         emitChange('federation');
     });
 
+    // ── Federation book (operator phone-book: GHIIs + resources + version + settings) ──
+
+    // GET /v1/federation/node-card — public: this node's card (descriptor + operators + resources).
+    router.get('/v1/federation/node-card', async (_req, res) => {
+        const card = await buildNodeCard(config, storage);
+        res.json(success(config.nodeId, card));
+    });
+
+    // GET /v1/federation/book — public: the active book (primary = authoritative; leaf = cached mirror).
+    router.get('/v1/federation/book', async (_req, res) => {
+        const book = await getActiveBook(storage);
+        res.json(success(config.nodeId, {
+            book: book ?? { book_version: 0, issued_by: config.nodeId, issued_at: new Date(0).toISOString(), nodes: [] },
+            is_primary: !config.genesisUrl,
+        }));
+    });
+
+    // POST /v1/federation/book/rebuild — primary reassembles the book from peers' node-cards (operator).
+    router.post('/v1/federation/book/rebuild', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const book = await assembleBook(config, storage, peers);
+        res.json(success(config.nodeId, { book, nodes: book.nodes.length }));
+        emitChange('federation');
+    });
+
+    // POST /v1/federation/book/pull — leaf mirrors the book from its genesis: fetch + verify + version-gate.
+    router.post('/v1/federation/book/pull', requireAuth(), requireRole('operator'), async (req, res) => {
+        const r = await pullBook(config, storage, peers, req.body?.source_url as string | undefined);
+        if (!r.ok) {
+            res.status(r.status).json(error(config.nodeId, r.code ?? 'FETCH_FAILED', r.message ?? 'pull failed'));
+            return;
+        }
+        res.json(success(config.nodeId, { applied: r.applied, reason: r.reason, book_version: r.book_version, nodes: r.nodes }));
+        emitChange('federation');
+    });
+
     // DELETE /v1/federation/peers/:nodeId — de-peer (operator only)
     // Normal: grace period (configurable, default 72h) — in-flight work completes, new requests blocked
     // Emergency (?emergency=true): immediate disconnect, cancel in-flight work, return escrow
@@ -978,12 +1018,15 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
     // POST /v1/federation/ping — federation health check (used by peers)
     router.post('/v1/federation/ping', async (req, res) => {
-        const { from_node } = req.body ?? {};
+        const { from_node, node_id, software_version } = req.body ?? {};
+        const fromId = (from_node || node_id) as string | undefined;
 
-        if (from_node && peers.has(from_node)) {
-            const peer = peers.get(from_node)!;
+        if (fromId && peers.has(fromId)) {
+            const peer = peers.get(fromId)!;
             peer.lastSeen = new Date().toISOString();
             peer.status = 'active';
+            // Federation version visibility: record the peer's advertised AIMEAT version.
+            if (typeof software_version === 'string') peer.softwareVersion = software_version;
             storage.saveFederationPeer(peer).catch(() => {});
         }
 

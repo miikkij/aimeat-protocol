@@ -9,6 +9,7 @@ import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { recordHeartbeatOutcome } from './federation-availability.js';
+import { getSoftwareVersion } from '../utils/version.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 
@@ -43,6 +44,10 @@ export interface PeerInfo {
     heartbeatTotal?: number;
     availabilityWindow?: string | null;
     availabilityPct?: number | null;
+    /** Peer's AIMEAT software version (from heartbeat) — federation version visibility. */
+    softwareVersion?: string | null;
+    /** Hash of the peer's node-card, for change-detection when assembling the federation book. */
+    nodeCardHash?: string | null;
 }
 
 /**
@@ -192,6 +197,7 @@ export function startHeartbeatJob(
                     node_id: config.nodeId,
                     timestamp: new Date().toISOString(),
                     version: 'v1',
+                    software_version: getSoftwareVersion(),
                     stats: {
                         agents_active: agents.length,
                         actions_published: actions.length,

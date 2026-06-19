@@ -4936,14 +4936,15 @@ export class SqliteStorage implements Storage {
 
   async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.peerMode || 'federation', peer.allowFederatedAuth ? 1 : 0,
       (peer.federationAuthScopes ?? []).join(','),
       peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
-      peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null);
+      peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null,
+      peer.softwareVersion ?? null, peer.nodeCardHash ?? null);
   }
 
   async listFederationPeers(): Promise<FederationPeerRecord[]> {
@@ -4968,6 +4969,8 @@ export class SqliteStorage implements Storage {
       heartbeatTotal: (r.heartbeatTotal as number) ?? 0,
       availabilityWindow: (r.availabilityWindow as string) ?? null,
       availabilityPct: r.availabilityPct == null ? null : (r.availabilityPct as number),
+      softwareVersion: (r.softwareVersion as string) ?? null,
+      nodeCardHash: (r.nodeCardHash as string) ?? null,
     }));
   }
 

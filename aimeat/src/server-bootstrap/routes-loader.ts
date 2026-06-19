@@ -321,6 +321,8 @@ export async function mountRoutes(
     if (req.path === '/presence' && req.method === 'POST') return next();
     // Allow public read of the network policy (peers fetch + verify it)
     if (req.path === '/network-policy' && req.method === 'GET') return next();
+    // Allow public read of the federation book + node-card (peers mirror/fetch these)
+    if ((req.path === '/book' || req.path === '/node-card') && req.method === 'GET') return next();
     // Allow federated auth verification (called by remote nodes)
     if (req.path === '/auth/verify' && req.method === 'POST') return next();
     return requireExtended(req, res, next);
