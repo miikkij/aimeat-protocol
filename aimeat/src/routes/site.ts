@@ -7,6 +7,8 @@
  * @version-history
  *   v1.1.0 — 2026-06-18 — GET /v1/site/template returns 200 {template:null} (not 404) when no
  *            custom template is set, so polling clients stop logging spurious 404s.
+ *   v1.2.0 — 2026-06-19 — Add GET (public) + PUT (operator) /v1/site/header-nav for
+ *            operator-configurable header navigation links (visibility + order).
  */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -178,6 +180,32 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         await site.invalidateCacheAction(req.auth!.sub);
         res.json(success(config.nodeId, { cache_cleared: true }));
         emitChange('site');
+    });
+
+    // GET /v1/site/header-nav — Header navigation config (public; the SPA header reads this)
+    // Public on purpose: the header renders for anonymous visitors too. Returns a normalized
+    // { order, hidden } over the known public link ids (defaults = all visible, default order).
+    router.get('/v1/site/header-nav', async (_req, res) => {
+        const data = await site.getHeaderNav();
+        res.json(success(config.nodeId, data, [
+            { description: 'Update header navigation (operator)', method: 'PUT', url: '/v1/site/header-nav' },
+        ]));
+    });
+
+    // PUT /v1/site/header-nav — Update header navigation config (operator)
+    router.put('/v1/site/header-nav', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+        const { order, hidden } = req.body ?? {};
+        try {
+            const data = await site.setHeaderNav({ order, hidden }, req.auth!.sub);
+            res.json(success(config.nodeId, data));
+            emitChange('site');
+        } catch (err) {
+            if (err instanceof SiteError) {
+                res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            throw err;
+        }
     });
 
     // GET /v1/site/prompt — AI navigation prompt

@@ -249,10 +249,9 @@ itself. A later `crewaimeat` PyPI/tag release is optional.
   fallbacks the user can add later. Probe local capability against the curated tool filter
   (`crewaimeat/scripts/check_models.py`).
 - **D3 — resolved:** GUI for normal users; the existing `crewaimeat-tui` for vibecoder/dev.
-- **D4 — code signing:** no cert today. Free path for an MIT OSS project: **SignPath Foundation**
-  (free code signing for open source) or **Azure Trusted Signing** (low-cost). Requires applying/
-  registration but no fee for qualifying OSS. Interim: ship unsigned (SmartScreen warning),
-  add free OSS signing once approved.
+- **D4 — code signing:** no cert today; installers ship unsigned (SmartScreen warning). A free
+  Authenticode signing path is being evaluated. Add the signing step back into
+  `release-desktop.yml` once a method is chosen.
 - **D5 — interim CTA target:** before the first `desktop-v*` GitHub Release exists, "Get your own
   →" points to the repo **Releases page**; once the release workflow publishes the installer, it
   resolves to the direct download. (This is what D5 asked: where the button goes in the gap before

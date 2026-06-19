@@ -13,6 +13,8 @@
  *     (now /v1/site/memory → __site__ so {{memory:portal/*}} resolves); add AI
  *     bundle import (/v1/site/import) so the AI-Assisted result no longer 422s in
  *     the template box; reload the preview iframe after every change + Clear Cache.
+ *   v1.4.0 — 2026-06-19 — Add Header Navigation section: operator show/hide + reorder
+ *     of the public header links (persisted via /v1/site/header-nav).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -24,9 +26,19 @@ import { dt, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, setSiteMemory, deleteSiteMemory,
-  importSiteBundle, triggerLbSync,
+  importSiteBundle, triggerLbSync, getHeaderNav, saveHeaderNav,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+
+// Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html
+// and PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable.
+const HEADER_LINK_LABELS = {
+  try: 'nav.try',
+  howItWorks: 'nav.howItWorks',
+  business: 'nav.business',
+  devView: 'nav.devView',
+  help: 'nav.help',
+};
 
 export default function PortalTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -43,17 +55,58 @@ export default function PortalTab({ data, reload }) {
   const [newKey, setNewKey] = useState('');
   const [newVal, setNewVal] = useState('');
   const [aiBundle, setAiBundle] = useState('');
+  // Header nav: ordered list of { id, visible }. null while loading.
+  const [navLinks, setNavLinks] = useState(null);
+  const [navSaving, setNavSaving] = useState(false);
   // Bumped after any change so the preview iframe re-fetches `/` (busts browser cache).
   const [previewNonce, setPreviewNonce] = useState(0);
   const bumpPreview = () => setPreviewNonce(n => n + 1);
 
-  useEffect(() => { loadMemKeys(); }, []);
+  useEffect(() => { loadMemKeys(); loadNav(); }, []);
 
   async function loadMemKeys() {
     try {
       const res = await getSiteMemoryKeys();
       setMemKeys(res.data?.keys || []);
     } catch { setMemKeys([]); }
+  }
+
+  async function loadNav() {
+    try {
+      const res = await getHeaderNav();
+      const order = res.data?.order || Object.keys(HEADER_LINK_LABELS);
+      const hidden = new Set(res.data?.hidden || []);
+      setNavLinks(order
+        .filter(id => HEADER_LINK_LABELS[id])
+        .map(id => ({ id, visible: !hidden.has(id) })));
+    } catch { setNavLinks([]); }
+  }
+
+  function toggleNav(id) {
+    setNavLinks(links => links.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
+  }
+
+  function moveNav(idx, dir) {
+    setNavLinks(links => {
+      const next = links.slice();
+      const j = idx + dir;
+      if (j < 0 || j >= next.length) return next;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  }
+
+  async function saveNav() {
+    if (!navLinks) return;
+    setNavSaving(true);
+    try {
+      const order = navLinks.map(l => l.id);
+      const hidden = navLinks.filter(l => !l.visible).map(l => l.id);
+      await saveHeaderNav(order, hidden);
+      showOk(t('dashboard.portalNavSaved'));
+      bumpPreview();
+    } catch (e) { showErr(e.message); }
+    finally { setNavSaving(false); }
   }
 
   async function saveTemplate() {
@@ -186,6 +239,41 @@ export default function PortalTab({ data, reload }) {
       <div class="adm-flex adm-mt-sm">
         <button class="adm-btn-action" onClick=${doClearCache}>\u{1F6AB} ${t('dashboard.portalClearCache')}</button>
       </div>
+    </div>
+
+    <!-- Header navigation -->
+    <div class="adm-card">
+      <h3>${t('dashboard.portalNavTitle')}</h3>
+      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalNavExplain')}</p>
+      ${navLinks === null
+        ? html`<div class="adm-text-dim">${t('dashboard.loading')}...</div>`
+        : html`
+          <table>
+            <thead><tr>
+              <th>${t('dashboard.portalNavLink')}</th>
+              <th>${t('dashboard.portalNavVisible')}</th>
+              <th>${t('dashboard.portalNavOrder')}</th>
+            </tr></thead>
+            <tbody>
+              ${navLinks.map((l, idx) => html`<tr key=${l.id}>
+                <td>${t(HEADER_LINK_LABELS[l.id]) || l.id}</td>
+                <td>
+                  <label class="adm-flex-center">
+                    <input type="checkbox" checked=${l.visible} onChange=${() => toggleNav(l.id)} />
+                    <span class="adm-text-dim">${l.visible ? t('dashboard.portalNavShown') : t('dashboard.portalNavHidden')}</span>
+                  </label>
+                </td>
+                <td>
+                  <button class="adm-btn-sm" disabled=${idx === 0} onClick=${() => moveNav(idx, -1)} title=${t('dashboard.portalNavMoveUp')}>↑</button>
+                  <button class="adm-btn-sm" disabled=${idx === navLinks.length - 1} onClick=${() => moveNav(idx, 1)} title=${t('dashboard.portalNavMoveDown')}>↓</button>
+                </td>
+              </tr>`)}
+            </tbody>
+          </table>
+          <div class="adm-flex adm-mt-sm">
+            <button class="adm-btn-action" disabled=${navSaving} onClick=${saveNav}>\u{1F4BE} ${t('dashboard.portalNavSave')}</button>
+          </div>
+        `}
     </div>
 
     <!-- Template editor -->

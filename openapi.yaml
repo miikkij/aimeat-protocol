@@ -266,6 +266,24 @@ components:
         hints:
           $ref: '#/components/schemas/Hints'
 
+    HeaderNavConfig:
+      type: object
+      description: |
+        Public header navigation configuration. `order` lists the public link ids in
+        display order; `hidden` is the subset that should not be rendered. Known ids:
+        `try`, `howItWorks`, `business`, `devView`, `help`.
+      properties:
+        order:
+          type: array
+          items:
+            type: string
+          example: [try, howItWorks, business, devView, help]
+        hidden:
+          type: array
+          items:
+            type: string
+          example: [business]
+
     ErrorDetail:
       type: object
       required: [code, message]
@@ -15833,6 +15851,62 @@ paths:
                         properties:
                           cache_cleared:
                             type: boolean
+
+  /v1/site/header-nav:
+    get:
+      operationId: getSiteHeaderNav
+      summary: Get header navigation config
+      description: |
+        Returns the operator-configured header navigation for the public site header:
+        the display `order` and `hidden` set over the known public link ids
+        (`try`, `howItWorks`, `business`, `devView`, `help`). Defaults to all links
+        visible in their declared order. No authentication required (Tier 0) — the
+        header renders for anonymous visitors too.
+      tags: [Site]
+      responses:
+        '200':
+          description: Header navigation config
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HeaderNavConfig'
+    put:
+      operationId: setSiteHeaderNav
+      summary: Update header navigation config
+      description: |
+        Update the public header navigation (visibility + order). Ids must be a subset
+        of the known public link ids; auth/role-gated links (Apps, Profile, Admin) are
+        not configurable. Operator-only (Tier 2). Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeaderNavConfig'
+      responses:
+        '200':
+          description: Updated (normalized) header navigation config
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HeaderNavConfig'
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /v1/site/prompt:
     get:

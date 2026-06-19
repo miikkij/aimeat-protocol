@@ -798,6 +798,121 @@
       width: 100%;
     }
 
+    /* ── App Detail View (full-screen overlay, reuses iframe-view chrome) ── */
+
+    #detail-view {
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #detail-view[hidden] { display: none; }
+
+    #detail-view .dtl-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--surface-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    #detail-view .dtl-toolbar .dtl-toolbar-title {
+      flex: 1;
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #detail-view .dtl-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .dtl-section {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm, 12px);
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+
+    .dtl-section h3 {
+      margin: 0 0 12px;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: .02em;
+    }
+
+    .dtl-status-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 8px; }
+    .dtl-stat { display: flex; flex-direction: column; gap: 2px; }
+    .dtl-stat .dtl-stat-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .dtl-stat .dtl-stat-val { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+    .dtl-sync { font-size: .82rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; display: inline-block; }
+    .dtl-sync.ok { background: rgba(52,211,153,.12); color: #34d399; }
+    .dtl-sync.diff { background: rgba(245,158,11,.14); color: #f59e0b; }
+    .dtl-sync.none { background: var(--bg-subtle); color: var(--text-muted); }
+
+    .dtl-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .dtl-meta-item .dtl-meta-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }
+    .dtl-desc { font-size: .9rem; color: var(--text); line-height: 1.5; margin: 0 0 14px; }
+
+    .dtl-ai-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+    #detail-ai-input {
+      flex: 1; min-width: 240px; min-height: 64px; resize: vertical;
+      background: var(--bg-subtle); color: var(--text);
+      border: 1px solid var(--border-subtle); border-radius: 10px;
+      padding: 10px 12px; font-size: .9rem; font-family: inherit;
+    }
+    .dtl-ai-status { font-size: .82rem; margin-top: 10px; min-height: 1.1em; color: var(--text-muted); }
+    .dtl-ai-draft { margin-top: 12px; padding: 12px; border: 1px dashed var(--border-hover, var(--border-subtle)); border-radius: 10px; }
+    .dtl-ai-draft[hidden] { display: none; }
+
+    .dtl-btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .dtl-btn {
+      padding: 8px 14px; border-radius: 9px; border: 1px solid var(--border-subtle);
+      background: var(--bg-subtle); color: var(--text); cursor: pointer;
+      font-size: .85rem; font-weight: 600; transition: all .15s;
+    }
+    .dtl-btn:hover { border-color: var(--border-hover, var(--accent)); }
+    .dtl-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .dtl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .dtl-btn.success { background: #34d399; border-color: #34d399; color: #04231a; }
+    .dtl-btn.danger { color: #E8564A; border-color: rgba(232,86,74,.3); }
+
+    .dtl-version-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+    .dtl-version-row:last-child { border-bottom: none; }
+
+    /* Card quick-launch (▶) shown on hover — preserves launch-on-click muscle memory */
+    .app-card .card-quick-launch {
+      position: absolute; top: 8px; left: 8px; z-index: 3;
+      width: 26px; height: 26px; border-radius: 7px;
+      border: 1px solid var(--border-subtle); background: var(--surface-glass);
+      color: var(--text); cursor: pointer; font-size: .8rem; line-height: 1;
+      opacity: 0; transition: opacity .15s;
+    }
+    .app-card:hover .card-quick-launch { opacity: 1; }
+    .app-card .card-quick-launch:hover { border-color: var(--accent); color: var(--accent); }
+
     /* ── Context Menu ──────────────────────────────── */
 
     #context-menu {
@@ -1677,7 +1792,18 @@
     <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
   </div>
 
+  <!-- App Detail View — unified single-app overlay -->
+  <div id="detail-view" hidden>
+    <div class="dtl-toolbar">
+      <button class="icon-btn" onclick="window._launcher.closeDetailView()" title="Close">&#x2715;</button>
+      <span class="dtl-toolbar-title" id="detail-title"></span>
+      <button class="dtl-btn primary" id="detail-launch-btn" onclick="window._launcher.detailLaunch()" data-i18n="detail.launch">&#x25B6; Launch</button>
+    </div>
+    <div class="dtl-body" id="detail-body"></div>
+  </div>
+
   <div id="context-menu" hidden>
+    <button data-action="details" data-i18n="ctx.details">&#x1F50E; Details</button>
     <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
     <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
     <button data-action="toggle-mode" data-i18n="ctx.toggleMode">&#x1F504; Switch open mode</button>
@@ -2010,6 +2136,48 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'ctx.details': '🔎 Details',
+      'detail.launch': '▶ Launch',
+      'detail.status': 'Status',
+      'detail.statusLocal': 'Local copy',
+      'detail.statusPublished': 'Published',
+      'detail.notPublished': 'Not published',
+      'detail.publishedOnly': 'Published — no local copy yet',
+      'detail.inSync': 'In sync with published version',
+      'detail.localNewer': 'Local copy differs from the published version',
+      'detail.about': 'About',
+      'detail.category': 'Category',
+      'detail.tags': 'Tags',
+      'detail.size': 'Size',
+      'detail.created': 'Added',
+      'detail.usesCortex': 'Uses extensions',
+      'detail.downloads': 'Downloads',
+      'detail.sourceLabel': 'Source',
+      'detail.openModeLabel': 'Open mode',
+      'detail.versions': 'Versions',
+      'detail.loadingVersions': 'Loading versions…',
+      'detail.noVersions': 'No published versions yet.',
+      'detail.needServerVersions': 'Set the AIMEAT server URL in Settings to see published versions.',
+      'detail.editAi': '✨ Edit with AI',
+      'detail.editAiHint': 'Describe a change. The AI rewrites the app using your own OpenRouter key, saves a draft you can test, then keep or discard.',
+      'detail.editAiPh': 'e.g. add a dark mode toggle in the top-right corner',
+      'detail.run': '✨ Generate change',
+      'detail.running': 'Generating…',
+      'detail.test': '▶ Test draft',
+      'detail.keep': '✔ Keep draft',
+      'detail.discard': '✕ Discard',
+      'detail.draftReady': 'Draft ready — test it, then keep or discard.',
+      'detail.kept': 'Draft kept as your local copy.',
+      'detail.discarded': 'Draft discarded.',
+      'detail.aiUnavailable': 'AI editing needs an OpenRouter key. Add one in AIMEAT settings, then reload.',
+      'detail.aiLoginNeeded': 'Sign in to your AIMEAT node to use AI editing.',
+      'detail.aiNoHtml': 'The AI reply had no usable HTML document — nothing was saved. Try rephrasing.',
+      'detail.aiUsage': 'AI spend today',
+      'detail.aiTruncated': 'App is large; only part of it was sent to the AI.',
+      'detail.actions': 'Actions',
+      'detail.publish': '🚀 Publish',
+      'detail.publishAs': '🚀 Publish as',
+      'detail.urlCantEdit': 'This is a URL-linked app — there is no local source to edit with AI.',
       'jsonImport.title': '📥 Import JSON backup',
       'jsonImport.desc': 'Choose which apps to import. Apps already in this catalog are marked as duplicates and unchecked — nothing is imported without your selection.',
       'jsonImport.statusDup': 'duplicate',
@@ -2181,6 +2349,48 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'ctx.details': '🔎 Tiedot',
+      'detail.launch': '▶ Käynnistä',
+      'detail.status': 'Tila',
+      'detail.statusLocal': 'Paikallinen kopio',
+      'detail.statusPublished': 'Julkaistu',
+      'detail.notPublished': 'Ei julkaistu',
+      'detail.publishedOnly': 'Julkaistu — ei vielä paikallista kopiota',
+      'detail.inSync': 'Sama kuin julkaistu versio',
+      'detail.localNewer': 'Paikallinen kopio eroaa julkaistusta versiosta',
+      'detail.about': 'Tiedot',
+      'detail.category': 'Kategoria',
+      'detail.tags': 'Tagit',
+      'detail.size': 'Koko',
+      'detail.created': 'Lisätty',
+      'detail.usesCortex': 'Käyttää laajennuksia',
+      'detail.downloads': 'Latauksia',
+      'detail.sourceLabel': 'Lähde',
+      'detail.openModeLabel': 'Avaustapa',
+      'detail.versions': 'Versiot',
+      'detail.loadingVersions': 'Ladataan versioita…',
+      'detail.noVersions': 'Ei vielä julkaistuja versioita.',
+      'detail.needServerVersions': 'Aseta AIMEAT-palvelimen osoite asetuksissa nähdäksesi julkaistut versiot.',
+      'detail.editAi': '✨ Muokkaa tekoälyllä',
+      'detail.editAiHint': 'Kuvaile muutos. Tekoäly kirjoittaa sovelluksen uudelleen omalla OpenRouter-avaimellasi, tallentaa luonnoksen jota voit testata, ja sitten säilytät tai hylkäät sen.',
+      'detail.editAiPh': 'esim. lisää tumman tilan vaihtokytkin oikeaan yläkulmaan',
+      'detail.run': '✨ Luo muutos',
+      'detail.running': 'Luodaan…',
+      'detail.test': '▶ Testaa luonnos',
+      'detail.keep': '✔ Säilytä luonnos',
+      'detail.discard': '✕ Hylkää',
+      'detail.draftReady': 'Luonnos valmis — testaa, sitten säilytä tai hylkää.',
+      'detail.kept': 'Luonnos säilytetty paikallisena kopiona.',
+      'detail.discarded': 'Luonnos hylätty.',
+      'detail.aiUnavailable': 'Tekoälymuokkaus vaatii OpenRouter-avaimen. Lisää se AIMEAT-asetuksiin ja lataa sivu uudelleen.',
+      'detail.aiLoginNeeded': 'Kirjaudu AIMEAT-nodeen käyttääksesi tekoälymuokkausta.',
+      'detail.aiNoHtml': 'Tekoälyn vastauksessa ei ollut käyttökelpoista HTML-dokumenttia — mitään ei tallennettu. Muotoile pyyntö uudelleen.',
+      'detail.aiUsage': 'Tekoälykulutus tänään',
+      'detail.aiTruncated': 'Sovellus on suuri; vain osa siitä lähetettiin tekoälylle.',
+      'detail.actions': 'Toiminnot',
+      'detail.publish': '🚀 Julkaise',
+      'detail.publishAs': '🚀 Julkaise versiona',
+      'detail.urlCantEdit': 'Tämä on URL-linkitetty sovellus — paikallista lähdekoodia ei voi muokata tekoälyllä.',
       'jsonImport.title': '📥 Tuo JSON-varmuuskopio',
       'jsonImport.desc': 'Valitse mitkä appit tuodaan. Katalogissa jo olevat on merkitty duplikaateiksi ja jätetty valitsematta — mitään ei tuoda ilman valintaasi.',
       'jsonImport.statusDup': 'duplikaatti',
@@ -3146,7 +3356,8 @@
           var app = filtered[i];
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
-            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
+            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.openDetailView(\'' + escapeHtml(app.id) + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
+              '<button class="card-quick-launch" onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" title="Launch">\u25B6</button>' +
               '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
@@ -3292,6 +3503,10 @@
     if (!app) return;
 
     switch (action) {
+      case 'details':
+        openDetailView(appId);
+        break;
+
       case 'edit':
         // Open modal pre-filled with app data
         editingAppId = appId;
@@ -3965,8 +4180,14 @@
     }
 
     publishAppId = appId;
-    var safeName = (app.name || 'app').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').toLowerCase();
-    if (!/\.html?$/i.test(safeName)) safeName += '.html';
+    // Republish keeps the same filename so the server appends v(N+1); otherwise derive from name.
+    var safeName;
+    if (app.published && app.publishedFilename) {
+      safeName = app.publishedFilename;
+    } else {
+      safeName = (app.name || 'app').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').toLowerCase();
+      if (!/\.html?$/i.test(safeName)) safeName += '.html';
+    }
     document.getElementById('publish-filename').value = safeName;
     document.getElementById('publish-access-code').value = '';
     document.getElementById('publish-status').textContent = '';
@@ -4978,6 +5199,408 @@
       .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
+  // ── App Detail View ───────────────────────────────
+  // One unified overlay per app: merges the local IndexedDB copy with the
+  // published AppRecord, surfaces every action, and hosts a live AI edit loop
+  // (describe → /v1/ai/complete on the user's own OpenRouter key → draft local
+  // version → test → keep/discard → optional one-click publish).
+
+  var detailAppId = null;
+  var detailDraftBlob = null;   // base64 of the pending AI-generated draft (never overwrites app.blob until Keep)
+  var detailAiAvailable = false;
+  var detailVersionsHtml = null; // cached rendered versions list, survives re-renders
+
+  function detailGetApp() {
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === detailAppId) return allApps[i];
+    }
+    return null;
+  }
+
+  function blobToHtml(blob) {
+    try { return decodeURIComponent(escape(atob(blob))); } catch (e) { return ''; }
+  }
+  function htmlToBlob(html) {
+    return btoa(unescape(encodeURIComponent(html)));
+  }
+
+  function openDetailView(appId) {
+    detailAppId = appId;
+    detailDraftBlob = null;
+    detailVersionsHtml = null;
+    var app = detailGetApp();
+    if (!app) return;
+    document.getElementById('detail-view').hidden = false;
+    renderDetailView();
+    // AI availability + published versions load asynchronously and re-render in place.
+    detailCheckAiAvailability();
+    var owner = currentOwnerName();
+    if (app.published && app.publishedFilename && owner) {
+      detailLoadVersions(owner, app.publishedFilename);
+    }
+  }
+
+  function closeDetailView() {
+    document.getElementById('detail-view').hidden = true;
+    detailAppId = null;
+    detailDraftBlob = null;
+  }
+
+  function detailLaunch() {
+    var app = detailGetApp();
+    if (app) launchApp(app.id, app.openMode || 'tab');
+  }
+
+  function currentOwnerName() {
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        return window.AIMEAT.auth.getSession().owner || null;
+      }
+      var stored = localStorage.getItem('aimeat_session');
+      if (stored) return JSON.parse(stored).owner || null;
+    } catch (e) {}
+    return null;
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return '—';
+    return bytes < 1024 ? bytes + ' B'
+      : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB'
+      : (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function renderDetailView() {
+    var app = detailGetApp();
+    if (!app) return;
+    var config = loadConfig();
+    var hasServer = !!config.aimeatUrl;
+    var icon = app.icon || '\u{1F4DD}';
+    var isUrlApp = (app.source === 'url' && !app.blob);
+
+    document.getElementById('detail-title').innerHTML =
+      '<span style="font-size:1.3rem">' + escapeHtml(icon) + '</span> ' + escapeHtml(app.name || 'App');
+
+    // ── STATUS ──
+    var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0; // base64 → bytes approx
+    var publishedV = app.publishedVersionNumber ? ('v' + app.publishedVersionNumber) : (app.published ? 'v?' : t('detail.notPublished'));
+    var syncClass, syncText;
+    if (!app.published) { syncClass = 'none'; syncText = t('detail.notPublished'); }
+    else if (detailDraftBlob) { syncClass = 'diff'; syncText = t('detail.localNewer'); }
+    else { syncClass = 'ok'; syncText = t('detail.inSync'); }
+
+    var statusHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.status') + '</h3>' +
+        '<div class="dtl-status-row">' +
+          '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusLocal') + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : (isUrlApp ? 'URL' : '—')) + '</span></div>' +
+          '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusPublished') + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div>' +
+        '</div>' +
+        '<span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + '</span>' +
+      '</div>';
+
+    // ── ABOUT ──
+    var tags = (app.tags && app.tags.length) ? app.tags.join(', ') : '—';
+    var cortex = (app.usesCortex && app.usesCortex.length) ? app.usesCortex.join(', ') : '—';
+    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
+    var aboutHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.about') + '</h3>' +
+        (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + '</p>' : '') +
+        '<div class="dtl-meta-grid">' +
+          metaItem(t('detail.category'), app.category || 'utility') +
+          metaItem(t('detail.tags'), tags) +
+          metaItem(t('detail.sourceLabel'), sourceLabelText(app.source)) +
+          metaItem(t('detail.openModeLabel'), app.openMode || 'tab') +
+          metaItem(t('detail.size'), app.blob ? fmtSize(localBytes) : '—') +
+          metaItem(t('detail.created'), created) +
+          metaItem(t('detail.usesCortex'), cortex) +
+        '</div>' +
+      '</div>';
+
+    // ── EDIT WITH AI ──
+    var aiHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.editAi') + '</h3>' +
+        '<p class="dtl-desc">' + t('detail.editAiHint') + '</p>';
+    if (isUrlApp) {
+      aiHtml += '<span class="dtl-sync none">' + t('detail.urlCantEdit') + '</span>';
+    } else {
+      aiHtml +=
+        '<div class="dtl-ai-row">' +
+          '<textarea id="detail-ai-input" placeholder="' + escapeHtml(t('detail.editAiPh')) + '"' + (detailAiAvailable ? '' : ' disabled') + '></textarea>' +
+          '<button class="dtl-btn primary" id="detail-ai-run" onclick="window._launcher.detailAiRun()"' + (detailAiAvailable ? '' : ' disabled') + '>' + t('detail.run') + '</button>' +
+        '</div>' +
+        '<div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? '' : escapeHtml(detailAiUnavailableMsg())) + '</div>' +
+        '<div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? '' : ' hidden') + '>' +
+          '<div class="dtl-ai-status" style="margin:0 0 8px">' + t('detail.draftReady') + '</div>' +
+          '<div class="dtl-btn-row">' +
+            '<button class="dtl-btn" onclick="window._launcher.detailAiTest()">' + t('detail.test') + '</button>' +
+            '<button class="dtl-btn success" onclick="window._launcher.detailAiKeep()">' + t('detail.keep') + '</button>' +
+            '<button class="dtl-btn" onclick="window._launcher.detailAiDiscard()">' + t('detail.discard') + '</button>' +
+          '</div>' +
+        '</div>';
+    }
+    aiHtml += '</div>';
+
+    // ── VERSIONS ──
+    var versionsHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.versions') + '</h3>' +
+        '<div id="detail-versions-list">' +
+          (detailVersionsHtml !== null ? detailVersionsHtml :
+            (!hasServer ? '<span class="dtl-sync none">' + t('detail.needServerVersions') + '</span>'
+             : (app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.loadingVersions') + '</span>'
+                : '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'))) +
+        '</div>' +
+      '</div>';
+
+    // ── ACTIONS ──
+    var publishLabel = (app.published && app.publishedVersionNumber)
+      ? (t('detail.publishAs') + ' v' + (app.publishedVersionNumber + 1))
+      : t('detail.publish');
+    var actionsHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.actions') + '</h3>' +
+        '<div class="dtl-btn-row">' +
+          (isUrlApp ? '' : '<button class="dtl-btn" onclick="window._launcher.detailEditSource()">' + t('ctx.viewSource') + '</button>') +
+          (isUrlApp ? '' : '<button class="dtl-btn" onclick="window._launcher.detailImproveExternal()">' + t('ctx.improveAi') + '</button>') +
+          '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t('ctx.sharePrompt') + '</button>' +
+          (isUrlApp ? '' : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + '</button>') +
+          '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t('ctx.delete') + '</button>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('detail-body').innerHTML =
+      statusHtml + aboutHtml + aiHtml + versionsHtml + actionsHtml;
+  }
+
+  function metaItem(label, val) {
+    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div>' +
+      '<div class="dtl-meta-val">' + escapeHtml(val || '—') + '</div></div>';
+  }
+
+  function sourceLabelText(src) {
+    var map = { url: 'URL', file: 'File', paste: 'Paste', aimeat: 'AIMEAT', zip: 'ZIP' };
+    return map[src] || (src || '—');
+  }
+
+  function detailAiUnavailableMsg() {
+    return getCortexOwnerToken() ? t('detail.aiUnavailable') : t('detail.aiLoginNeeded');
+  }
+
+  // Probe whether the signed-in owner has an OpenRouter key configured.
+  function detailCheckAiAvailability() {
+    detailAiAvailable = false;
+    var config = loadConfig();
+    var token = getCortexOwnerToken();
+    if (!config.aimeatUrl || !token) { renderDetailView(); return; }
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(url + '/v1/openrouter/settings', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
+        if (detailAppId) renderDetailView();
+      })
+      .catch(function() { detailAiAvailable = false; if (detailAppId) renderDetailView(); });
+  }
+
+  function detailLoadVersions(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions')
+      .then(function(resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
+      .then(function(json) {
+        var listEl = document.getElementById('detail-versions-list');
+        if (!listEl) return;
+        var versions = json.data && json.data.versions ? json.data.versions : [];
+        if (versions.length === 0) { detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'; listEl.innerHTML = detailVersionsHtml; return; }
+        var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+        var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+        var html = '';
+        for (var i = 0; i < versions.length; i++) {
+          var v = versions[i];
+          var isLatest = (i === 0);
+          var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
+          var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+          var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
+          html +=
+            '<div class="dtl-version-row">' +
+              '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
+                '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + '</span></div>' +
+              '<div class="dtl-btn-row">' +
+                '<button class="dtl-btn" onclick="window.open(\'' + escapeHtml(viewU) + '\', \'_blank\')">' + t('card.view') + '</button>' +
+                (isLatest ? '' : '<button class="dtl-btn" onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.restore') + '</button>') +
+                '<button class="dtl-btn" onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.fork') + '</button>' +
+              '</div>' +
+            '</div>';
+        }
+        detailVersionsHtml = html;
+        listEl.innerHTML = html;
+      })
+      .catch(function() {
+        detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>';
+        var listEl = document.getElementById('detail-versions-list');
+        if (listEl) listEl.innerHTML = detailVersionsHtml;
+      });
+  }
+
+  // ── Detail: live AI edit loop ─────────────────────
+
+  // Pull a complete HTML document out of a raw model reply (strips markdown
+  // fences / prose). Returns null if no usable document is present.
+  function extractHtmlFromAi(content) {
+    if (!content) return null;
+    var text = String(content).trim();
+    // Strip a single leading/trailing markdown fence if present.
+    var fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    if (fence && fence[1]) text = fence[1].trim();
+    var lower = text.toLowerCase();
+    var startDoc = lower.indexOf('<!doctype');
+    var startHtml = lower.indexOf('<html');
+    var start = startDoc !== -1 ? startDoc : startHtml;
+    if (start === -1) {
+      // No doc markers — accept it only if it at least looks like markup.
+      if (text.indexOf('<') !== -1 && text.indexOf('>') !== -1 && text.length > 30) return text;
+      return null;
+    }
+    return text.slice(start);
+  }
+
+  function detailAiRun() {
+    var app = detailGetApp();
+    if (!app) return;
+    var inputEl = document.getElementById('detail-ai-input');
+    var statusEl = document.getElementById('detail-ai-status');
+    var runBtn = document.getElementById('detail-ai-run');
+    var change = (inputEl.value || '').trim();
+    if (!change) { inputEl.focus(); return; }
+
+    var token = getCortexOwnerToken();
+    if (!token) { statusEl.textContent = t('detail.aiLoginNeeded'); return; }
+    var config = loadConfig();
+    if (!config.aimeatUrl) { statusEl.textContent = t('detail.aiUnavailable'); return; }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+
+    var html = app.blob ? blobToHtml(app.blob) : '';
+    if (!html) { statusEl.textContent = t('detail.urlCantEdit'); return; }
+
+    // Cap context to keep the request from blowing the model window; warn if cut.
+    var MAX = 120000;
+    var truncated = false;
+    if (html.length > MAX) { html = html.slice(0, MAX); truncated = true; }
+
+    var systemPrompt = 'You are editing a single-file HTML web app that runs on the AIMEAT platform. '
+      + 'You will be given the current full HTML source and a change request. '
+      + 'Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. '
+      + 'Preserve every existing AIMEAT integration (script tags loading /v1/libs/*, AIMEAT.* API calls, cortex extension scripts) unless the change specifically requires altering them. '
+      + 'Keep the result a single self-contained file that supports both light and dark themes.';
+    var userPrompt = 'Change request:\n' + change + '\n\nCurrent HTML source:\n' + html;
+
+    runBtn.disabled = true;
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('detail.running');
+
+    fetch(aimeatUrl + '/v1/ai/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        prompt: userPrompt,
+        systemPrompt: systemPrompt,
+        app_id: 'app-catalog',
+        max_tokens: 16000
+      })
+    })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        runBtn.disabled = false;
+        if (!json || !json.ok) {
+          var code = (json && json.error && json.error.code) || '';
+          var msg = (json && json.error && (json.error.message)) || (json && json.error_description) || 'AI request failed';
+          statusEl.style.color = 'var(--accent)';
+          statusEl.textContent = '✘ ' + (code ? '[' + code + '] ' : '') + msg;
+          return;
+        }
+        var content = json.data && json.data.content ? json.data.content : '';
+        var newHtml = extractHtmlFromAi(content);
+        if (!newHtml) {
+          statusEl.style.color = 'var(--accent)';
+          statusEl.textContent = '✘ ' + t('detail.aiNoHtml');
+          return;
+        }
+        detailDraftBlob = htmlToBlob(newHtml);
+        statusEl.style.color = '#34d399';
+        var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== 'undefined'
+          ? (' · ' + t('detail.aiUsage') + ': $' + Number(json.data.budget.spent_today_usd).toFixed(3)) : '';
+        statusEl.textContent = '✔ ' + t('detail.draftReady') + (truncated ? ' (' + t('detail.aiTruncated') + ')' : '') + usage;
+        renderDetailView();
+        // renderDetailView rebuilds the status line; restore the success message after.
+        var s2 = document.getElementById('detail-ai-status');
+        if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('detail.draftReady') + usage; }
+      })
+      .catch(function(err) {
+        runBtn.disabled = false;
+        statusEl.style.color = 'var(--accent)';
+        statusEl.textContent = '✘ ' + (err.message || 'AI request failed');
+      });
+  }
+
+  function detailAiTest() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    // Launch the draft in the iframe overlay WITHOUT persisting it.
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    var title = document.getElementById('iframe-title');
+    title.textContent = (app.name || 'App') + ' (draft)';
+    iframe.removeAttribute('src');
+    iframe.srcdoc = blobToHtml(detailDraftBlob);
+    currentIframeUrl = '';
+    delete iframe.dataset.appId;
+    view.hidden = false;
+  }
+
+  function detailAiKeep() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    app.blob = detailDraftBlob;
+    app.source = app.source === 'url' ? 'paste' : (app.source || 'paste');
+    app.url = app.url || null;
+    detailDraftBlob = null;
+    saveApp(app).then(function() {
+      renderApps();
+      renderDetailView();
+      var s2 = document.getElementById('detail-ai-status');
+      if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('detail.kept'); }
+    });
+  }
+
+  function detailAiDiscard() {
+    detailDraftBlob = null;
+    renderDetailView();
+    var s2 = document.getElementById('detail-ai-status');
+    if (s2) s2.textContent = t('detail.discarded');
+  }
+
+  // ── Detail: action shortcuts (reuse existing flows) ──
+
+  function detailEditSource() { var app = detailGetApp(); if (app) viewSource(app); }
+  function detailImproveExternal() { var app = detailGetApp(); if (app) openPromptBuilder(app); }
+  function detailSharePrompt() { var app = detailGetApp(); if (app) generateSharePrompt(app); }
+  function detailPublish() { if (detailAppId) showPublishModal(detailAppId); }
+  function detailDelete() {
+    var app = detailGetApp();
+    if (!app) return;
+    if (!confirm('Delete "' + (app.name || 'this app') + '"?')) return;
+    if (app.publishedFilename) addImportIgnore(app.publishedFilename);
+    var id = app.id;
+    deleteApp(id).then(function() {
+      closeDetailView();
+      renderApps();
+      loadPublishedApps();
+    });
+  }
+
   // ── App Versions / Restore / Fork ─────────────────
 
   // Fetch one app version's raw bytes and return them base64-encoded. Chunked
@@ -5969,6 +6592,18 @@
     showVersionsModal: showVersionsModal,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
+    openDetailView: openDetailView,
+    closeDetailView: closeDetailView,
+    detailLaunch: detailLaunch,
+    detailAiRun: detailAiRun,
+    detailAiTest: detailAiTest,
+    detailAiKeep: detailAiKeep,
+    detailAiDiscard: detailAiDiscard,
+    detailEditSource: detailEditSource,
+    detailImproveExternal: detailImproveExternal,
+    detailSharePrompt: detailSharePrompt,
+    detailPublish: detailPublish,
+    detailDelete: detailDelete,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
@@ -6244,7 +6879,9 @@
     document.addEventListener('keydown', function (e) {
       // Escape — close modals / overlays (source-overlay first in cascade)
       if (e.key === 'Escape') {
-        if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
+        if (!document.getElementById('iframe-view').hidden) {
+          closeIframe();
+        } else if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
           closeCortexEditor();
         } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
           closePbPanel();
@@ -6268,6 +6905,8 @@
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {
           closeModal();
+        } else if (!document.getElementById('detail-view').hidden) {
+          closeDetailView();
         }
         return;
       }
