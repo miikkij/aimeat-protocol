@@ -21,13 +21,9 @@ import { useConfirm } from '/components/Modal.js';
 
 export default function PushTab({ data, reload }) {
   const push = data.push;
-  if (!push) return html`<${Empty} text=${t('dashboard.pushNotConfigured')} />`;
 
-  const subs = push.subscriptions || [];
-  const templates = push.templates || [];
-  const locales = push.locales || ['en'];
-
-  const [tplLocale, setTplLocale] = useState(locales[0] || 'en');
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
+  const [tplLocale, setTplLocale] = useState((push?.locales || ['en'])[0] || 'en');
   const [saving, setSaving] = useState(null);
   const [testStatus, setTestStatus] = useState(null);
   const [resetStatus, setResetStatus] = useState(null);
@@ -35,6 +31,12 @@ export default function PushTab({ data, reload }) {
   const [subStatus, setSubStatus] = useState(null); // null | 'subscribing' | 'subscribed' | 'unsubscribing' | 'error'
   const { confirm, ConfirmUI } = useConfirm();
   const [toast, showErr, showOk, clearToast] = useToast();
+
+  if (!push) return html`<${Empty} text=${t('dashboard.pushNotConfigured')} />`;
+
+  const subs = push.subscriptions || [];
+  const templates = push.templates || [];
+  const locales = push.locales || ['en'];
 
   const localeTpls = templates.filter(tpl => tpl.locale === tplLocale);
 

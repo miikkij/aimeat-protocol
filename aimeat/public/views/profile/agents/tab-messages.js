@@ -48,6 +48,17 @@ function threadLabel(thread) {
 function CommandPalette({ commands, onSend }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
+  const categories = useMemo(() => {
+    const cats = {};
+    for (const cmd of (commands || [])) {
+      const cat = cmd.category || t('profile.agents.detail.messages.commands.defaultCategory');
+      if (!cats[cat]) cats[cat] = [];
+      cats[cat].push(cmd);
+    }
+    return cats;
+  }, [commands]);
+
   if (!commands || commands.length === 0) {
     // No registered commands → one quiet line, not an expandable empty box.
     return html`
@@ -57,16 +68,6 @@ function CommandPalette({ commands, onSend }) {
       </div>
     `;
   }
-
-  const categories = useMemo(() => {
-    const cats = {};
-    for (const cmd of commands) {
-      const cat = cmd.category || t('profile.agents.detail.messages.commands.defaultCategory');
-      if (!cats[cat]) cats[cat] = [];
-      cats[cat].push(cmd);
-    }
-    return cats;
-  }, [commands]);
 
   return html`
     <div class="pf-agd-commands">

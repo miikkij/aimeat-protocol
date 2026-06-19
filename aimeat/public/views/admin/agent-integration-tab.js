@@ -70,7 +70,7 @@ export default function AgentIntegrationTab({ data, session }) {
 
   return html`
     <div>
-      ${renderPlatformRegistry(platforms, totalAgents, session, loadData)}
+      <${PlatformRegistry} platforms=${platforms} totalAgents=${totalAgents} session=${session} loadData=${loadData} />
       ${renderOnboardingOverview(onboarding, readiness, session, loadData)}
       ${renderSkillBundles(bundles, handleRegenerate, regenerating, session)}
       ${renderBundleTemplates()}
@@ -78,8 +78,9 @@ export default function AgentIntegrationTab({ data, session }) {
   `;
 }
 
-/* ── M8: Merged Platform column (name + ID as secondary text) ── */
-function renderPlatformRegistry(platforms, totalAgents, session, loadData) {
+/* ── M8: Merged Platform column (name + ID as secondary text) ──
+   A real component (not a render-helper) so its useState obeys the Rules of Hooks. */
+function PlatformRegistry({ platforms, totalAgents, session, loadData }) {
   const [showForm, setShowForm] = useState(false);
 
   return html`

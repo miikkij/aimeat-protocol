@@ -24,6 +24,28 @@ The AIMEAT SPA uses **Preact + HTM** with no build step — all code runs direct
 - Direct browser debugging (source = running code)
 - Works offline on any HTTP server
 
+### Type Checking (no build, still type-safe)
+
+The browser loads the raw `.js` — but the frontend is **still type-checked** so the no-build choice
+doesn't cost type safety. `pnpm typecheck:frontend` runs `tsc --noEmit -p tsconfig.frontend.json`
+with `checkJs` over `public/`, validating the JSDoc you write. It emits nothing; it only checks.
+
+- **`aimeat/tsconfig.frontend.json`** — `checkJs` config; `paths` map the importmap specifiers
+  (`preact`, `preact/hooks`, `htm`, `/js/*`, `/components/*`, `/views/*`) so `tsc` resolves them.
+- **`public/types/aimeat-globals.d.ts`** — ambient declarations for browser/SDK globals loaded
+  outside ES modules (`window.AIMEAT`, `Chart`, `mermaid`, build-time `__APP_VERSION__`) and the
+  `code`/`status`/`response` fields `api.js` attaches to thrown errors.
+- **`public/types/vendored-libs.d.ts`** — loose stubs so minified vendored libs aren't deep-checked.
+- Add a JSDoc cast for DOM access TS can't infer: `const v = /** @type {HTMLInputElement} */ (el).value;`
+- Vendored minified files under `public/lib/` carry `// @ts-nocheck`; don't type-check them.
+
+**`pnpm check:importmap`** is a separate guard (`tsc` can't catch this): every absolute first-party
+import (`/js/…`, `/components/…`, `/views/…`) must have an identity entry in the `spa.html`
+importmap, or it loads **without** the `?v=BUILD_ID` cache-bust stamp and goes stale after a deploy.
+
+All of `typecheck:frontend`, `check:importmap`, and `lint` (now covering `public/`) run in the
+pre-commit hook and in CI — see CLAUDE.md "Key Commands".
+
 ---
 
 ## File Structure

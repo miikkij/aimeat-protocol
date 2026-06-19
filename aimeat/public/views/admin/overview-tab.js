@@ -8,9 +8,7 @@ import { num, fmtUp, Badge, StatsGrid, EconRow, HealthRow } from './shared.js';
 import { apiGet } from '/js/api.js';
 
 export default function OverviewTab({ data }) {
-  const d = data.dash;
-  if (!d) return html`<div class="empty">${t('dashboard.loading')}</div>`;
-
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const [activeTaskCount, setActiveTaskCount] = useState(null);
   const [sharingGroupCount, setSharingGroupCount] = useState(null);
 
@@ -31,6 +29,9 @@ export default function OverviewTab({ data }) {
       .then(r => setSharingGroupCount(r.data?.total || 0))
       .catch(() => setSharingGroupCount(0));
   }, []);
+
+  const d = data.dash;
+  if (!d) return html`<div class="empty">${t('dashboard.loading')}</div>`;
 
   const h_ = d.health;
   const c = d.counts;

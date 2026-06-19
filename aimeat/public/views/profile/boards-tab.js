@@ -34,6 +34,9 @@ export default function BoardsTab({ session, showToast }) {
   const [boardView, setBoardView] = useState(null);
   const [brdSubTab, setBrdSubTab] = useState('mine');
   const [showBrdForm, setShowBrdForm] = useState(false);
+  // Refs used by the board-detail view below — declared unconditionally (Rules of Hooks).
+  const postRef = useRef(null);
+  const memberInputRef = useRef(null);
 
   useEffect(() => {
     if (session) loadMyData();
@@ -176,8 +179,6 @@ export default function BoardsTab({ session, showToast }) {
   }
 
   if (boardView) {
-    const postRef = useRef(null);
-    const memberInputRef = useRef(null);
     const bd = boardView.boardData;
     const showMembers = bd && bd.visibility === 'shared' && isBoardOwner(bd);
     return html`

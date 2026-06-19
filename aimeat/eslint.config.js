@@ -16,6 +16,7 @@
 
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
 import aimeatPlugin from './eslint-rules/index.js';
 
 export default tseslint.config(
@@ -53,8 +54,13 @@ export default tseslint.config(
     // browser/SDK globals (window, document, AIMEAT, …) and would only flood with false
     // positives that tsc already covers — defer it to tsc.
     files: ['public/**/*.js', 'public/**/*.d.ts'],
+    plugins: { 'react-hooks': reactHooks },
     rules: {
       'no-undef': 'off',
+      // Preact uses the same hook contract as React, so these rules apply. Warn-level for now
+      // (gradual adoption) — surfaces missing/incorrect effect deps and hook-ordering issues.
+      'react-hooks/rules-of-hooks': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
       // Pre-existing legacy-frontend findings surfaced when lint coverage was extended to
       // public/ (2026-06-19). None are runtime bugs (verified) — they're style/best-practice
       // debt to clean up incrementally. Kept as warnings (consistent with this config's

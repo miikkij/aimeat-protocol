@@ -259,20 +259,6 @@ export default function Profile({ navigate, locale }) {
     }
   }
 
-  // Not logged in
-  if (!session) {
-    return html`
-      <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
-        <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
-      </div>
-      <div class="pf">
-        <div class="login-prompt">
-          <h1>\u{1F496} ${t('profile.signInTitle')}</h1>
-          <p>${t('profile.signInDesc')}</p>
-        </div>
-      </div>`;
-  }
-
   // Common props passed to all tabs
   const tabProps = { session, showToast, onStats: updateStats, navigate, locale };
 
@@ -288,6 +274,20 @@ export default function Profile({ navigate, locale }) {
     const tab = TABS.find(t => t.id === tabId);
     return tab ? t(tab.key) : tabId;
   }, []);
+
+  // Not logged in — guard placed AFTER the hooks above (Rules of Hooks).
+  if (!session) {
+    return html`
+      <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
+        <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
+      </div>
+      <div class="pf">
+        <div class="login-prompt">
+          <h1>\u{1F496} ${t('profile.signInTitle')}</h1>
+          <p>${t('profile.signInDesc')}</p>
+        </div>
+      </div>`;
+  }
 
   return html`
     <div class="pf">

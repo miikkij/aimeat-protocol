@@ -12,6 +12,7 @@
     "aimeat": "aimeat/dist/bin/aimeat.js"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "build": "cd aimeat && pnpm build",
     "build-desktop": "cd aimeat-desktop && pnpm package",
     "dev": "cd aimeat && pnpm dev",
@@ -19,6 +20,7 @@
     "link:global": "cd aimeat && npm link",
     "typecheck": "cd aimeat && pnpm typecheck",
     "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
+    "check:importmap": "cd aimeat && pnpm check:importmap",
     "lint": "cd aimeat && pnpm lint",
     "test": "cd aimeat && pnpm test",
     "test:unit": "cd aimeat && pnpm test",

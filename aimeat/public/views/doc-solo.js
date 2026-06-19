@@ -9,6 +9,8 @@
  * @structure DocSolo (default export)
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: pop-out document window.
+ *   v1.0.1 — 2026-06-19 — Import DocumentView/DocumentEditor from their new home
+ *     (./profile/organisms/document.js) after the organisms-tab module split.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -18,7 +20,7 @@ import { getSession } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import * as orgService from '/js/services/organisms.js';
-import { DocumentView, DocumentEditor } from './profile/organisms-tab.js';
+import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
 
 const html = htm.bind(h);
 

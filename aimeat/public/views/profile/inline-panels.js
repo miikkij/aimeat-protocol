@@ -35,8 +35,8 @@ const PANELS = {
 
 export function InlinePanel({ panelId, onClose, switchTab, session }) {
   const cfg = PANELS[panelId];
-  if (!cfg) return null;
 
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const panelRef = useRef(null);
 
   /* Smooth scroll into view after opening */
@@ -47,6 +47,8 @@ export function InlinePanel({ panelId, onClose, switchTab, session }) {
       }, 100);
     }
   }, [panelId]);
+
+  if (!cfg) return null;
 
   return html`
     <div class="pf-inline-panel open" ref=${panelRef}>

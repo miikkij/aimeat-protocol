@@ -47,6 +47,10 @@ jobs:
         working-directory: aimeat
         run: pnpm typecheck:frontend
 
+      - name: Importmap consistency (spa.html ↔ absolute imports)
+        working-directory: aimeat
+        run: pnpm check:importmap
+
       - name: Build
         working-directory: aimeat
         run: pnpm build

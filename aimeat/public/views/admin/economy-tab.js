@@ -8,12 +8,13 @@ import { num, EconRow, StatsGrid } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 
 export default function EconomyTab({ data, reload }) {
-  const e = data.dash?.economy;
-  if (!e) return html`<div class="empty">${t('dashboard.loading')}</div>`;
-
+  // Hooks must run unconditionally before any early return (Rules of Hooks).
   const [mintGaii, setMintGaii] = useState('');
   const [mintAmount, setMintAmount] = useState('');
   const [mintResult, setMintResult] = useState(null);
+
+  const e = data.dash?.economy;
+  if (!e) return html`<div class="empty">${t('dashboard.loading')}</div>`;
 
   async function doMint() {
     const amount = parseInt(mintAmount, 10);
