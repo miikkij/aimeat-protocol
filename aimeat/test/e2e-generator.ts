@@ -929,6 +929,13 @@ await test('Screenshot route rejects invalid projectId (H-1)', async () => {
     assert(clean.status === 404, `expected 404 for clean unknown projectId, got ${clean.status}`);
 });
 
+// NOTE (H-7): the testCode execution route (POST /v1/generator/:projectId/test/:componentId)
+// is now gated by requireRole('operator') because testCode runs unsandboxed in the host
+// process. The non-operator deny path is covered deterministically in
+// test/unit/auth-middleware.test.ts ("owner/agent cannot access operator-only endpoints");
+// it cannot be reproduced here because this single-operator harness mints owner+operator
+// roles into every principal (including agent tokens of the operator-owner).
+
 // ─── Summary ───
 console.log(`\n${'─'.repeat(40)}`);
 console.log(`Generator E2E: ${passed} passed, ${failed} failed`);

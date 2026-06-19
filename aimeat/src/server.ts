@@ -46,7 +46,12 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
   const trustProxy = process.env.AIMEAT_TRUST_PROXY;
   if (trustProxy === 'true') {
+    // SECURITY: `true` trusts the X-Forwarded-For header from ANY upstream, so a
+    // direct client can spoof its source IP and defeat per-IP rate limiting. Only
+    // safe when every request is guaranteed to pass through a trusted proxy that
+    // overwrites XFF. Prefer a hop count (e.g. AIMEAT_TRUST_PROXY=1) or a subnet.
     app.set('trust proxy', true);
+    logger.warn('AIMEAT_TRUST_PROXY=true trusts X-Forwarded-For from any upstream — source IPs are spoofable unless a trusted proxy always overwrites XFF. Prefer a hop count (e.g. "1") or a CIDR.');
   } else if (trustProxy) {
     app.set('trust proxy', trustProxy);
   } else if (config.baseUrl && !config.baseUrl.includes('localhost') && !config.baseUrl.includes('127.0.0.1')) {

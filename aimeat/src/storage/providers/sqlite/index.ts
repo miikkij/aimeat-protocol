@@ -14,6 +14,9 @@
  *     buckets forked across an owner's identity forms into one canonical bucket.
  *   v1.3.0 — 2026-06-12 — Add subdomain_sites CRUD (operator-managed
  *     subdomain → published-app/redirect mappings).
+ *   v1.3.1 — 2026-06-19 — Security (CR-1): reject negative/non-finite amounts in
+ *     debitBalance/creditBalance/creditBalanceCapped/transferBalance to prevent
+ *     negative-amount morsel minting (0 still allowed — free/0-cost work escrow).
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
@@ -413,6 +416,10 @@ export class SqliteStorage implements Storage {
   }
 
   async debitBalance(gaii: string, amount: number): Promise<boolean> {
+    // SECURITY: reject negative/non-finite amounts. A negative amount would INVERT the
+    // subtraction (balance - (-n) = balance + n) and mint morsels. 0 is allowed (no-op;
+    // free/0-cost work escrow relies on it).
+    if (!Number.isFinite(amount) || amount < 0) return false;
     const ghii = this.resolveGhii(gaii);
     if (!ghii) return false;
     const result = this.db.prepare(
@@ -422,6 +429,8 @@ export class SqliteStorage implements Storage {
   }
 
   async creditBalance(gaii: string, amount: number): Promise<boolean> {
+    // SECURITY: reject negative/non-finite amounts (a negative credit would silently debit); 0 is a no-op.
+    if (!Number.isFinite(amount) || amount < 0) return false;
     const ghii = this.resolveGhii(gaii);
     if (!ghii) return false;
     const result = this.db.prepare(
@@ -431,6 +440,8 @@ export class SqliteStorage implements Storage {
   }
 
   async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
+    // SECURITY: reject negative/non-finite amounts (NaN would slip past the actualCredit<=0 guard below).
+    if (!Number.isFinite(amount) || amount < 0) return 0;
     const ghii = this.resolveGhii(gaii);
     if (!ghii) return 0;
     const txn = this.db.transaction(() => {
@@ -447,6 +458,8 @@ export class SqliteStorage implements Storage {
   }
 
   async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
+    // SECURITY: reject negative/non-finite amounts (a negative transfer would drain the recipient); 0 is a no-op.
+    if (!Number.isFinite(amount) || amount < 0) return false;
     const fromGhii = this.resolveGhii(fromGaii);
     const toGhii = this.resolveGhii(toGaii);
     if (!fromGhii || !toGhii) return false;
@@ -1590,8 +1603,8 @@ export class SqliteStorage implements Storage {
          totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
          emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
          loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
-         trustScore, morselBalance, allowedOrigins)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         googleSub, trustScore, morselBalance, allowedOrigins)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ghii, record.username, record.nodeId, record.displayName,
         record.bio ?? null, record.avatar ?? null, record.locale ?? null,
@@ -1609,6 +1622,7 @@ export class SqliteStorage implements Storage {
         record.verifiedAttributes ? JSON.stringify(record.verifiedAttributes) : null,
         record.verificationIssuer ?? null, record.verificationCredentialHash ?? null,
         record.ftnVerified ? 1 : 0,
+        record.googleSub ?? null,
         record.trustScore ?? null, record.morselBalance ?? null,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       );
@@ -1634,6 +1648,11 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeGHII(row) : null;
   }
 
+  async getGHIIByGoogleSub(googleSub: string): Promise<GHIIRecord | null> {
+    const row = this.db.prepare('SELECT * FROM ghiis WHERE googleSub = ?').get(googleSub) as Record<string, unknown> | undefined;
+    return row ? this.deserializeGHII(row) : null;
+  }
+
   async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
     const existing = await this.getGHII(ghii);
     if (!existing) return null;
@@ -1646,7 +1665,7 @@ export class SqliteStorage implements Storage {
        emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
        notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
        verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
-       trustScore = ?, morselBalance = ?, allowedOrigins = ?
+       googleSub = ?, trustScore = ?, morselBalance = ?, allowedOrigins = ?
        WHERE ghii = ?`
     ).run(
       updated.username, updated.nodeId, updated.displayName,
@@ -1665,6 +1684,7 @@ export class SqliteStorage implements Storage {
       updated.verifiedAttributes ? JSON.stringify(updated.verifiedAttributes) : null,
       updated.verificationIssuer ?? null, updated.verificationCredentialHash ?? null,
       updated.ftnVerified ? 1 : 0,
+      updated.googleSub ?? null,
       updated.trustScore ?? null, updated.morselBalance ?? null,
       updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       ghii,
@@ -1728,6 +1748,7 @@ export class SqliteStorage implements Storage {
     if (row.verificationIssuer) record.verificationIssuer = row.verificationIssuer as string;
     if (row.verificationCredentialHash) record.verificationCredentialHash = row.verificationCredentialHash as string;
     if (row.ftnVerified) record.ftnVerified = (row.ftnVerified as number) === 1;
+    if (row.googleSub) record.googleSub = row.googleSub as string;
     if (row.trustScore !== null && row.trustScore !== undefined) record.trustScore = row.trustScore as number;
     if (row.morselBalance !== null && row.morselBalance !== undefined) record.morselBalance = row.morselBalance as number;
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
@@ -3337,7 +3358,7 @@ export class SqliteStorage implements Storage {
     return {
       id: row.id as string,
       owner: row.owner as string,
-      type: row.type as 'eudiw' | 'ftn',
+      type: row.type as 'eudiw' | 'ftn' | 'google_login',
       state: row.state as string,
       nonce: row.nonce as string,
       redirectUri: row.redirectUri as string,

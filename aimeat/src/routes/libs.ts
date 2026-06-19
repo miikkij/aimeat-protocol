@@ -4,6 +4,12 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.18.0 - 2026-06-20 - Sign-in modal submits on Enter from any field (username/password/
+ *   display name), unless the button is mid-request.
+ * v1.17.0 - 2026-06-20 - Sign-in modal shows a "Continue with Google" button when the node
+ *   has Google sign-in configured (GOOGLE_LOGIN_ENABLED baked in from config). The button
+ *   navigates to /v1/ghii/login/google; the node sets a refresh cookie on callback and the
+ *   SPA boots logged-in. New modal i18n keys: orLabel, googleSignIn.
  * v1.16.0 - 2026-06-09 - Sign-in modal (showLoginModal) gains a self-contained EN/FI
  *   language switcher. The modal now loads its own translations (same 'aimeat-lang'
  *   key + cookie as the header) and re-renders in place on switch, so it shows/lets
@@ -308,6 +314,9 @@ const NODE_URL = (function() {
 })();
 
 const NODE_ID = '${config.nodeId}';
+
+// Social login availability (baked in server-side from node config).
+const GOOGLE_LOGIN_ENABLED = ${config.googleOAuthEnabled ? 'true' : 'false'};
 
 // ── Ed25519 via Web Crypto ──
 
@@ -1158,6 +1167,15 @@ function showLoginModal(opts, renderBtn) {
     + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
     + '</div>'
     + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    // Social login (Google) — only shown when the node has Google sign-in configured
+    + (GOOGLE_LOGIN_ENABLED ? (
+        '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px">'
+        + '<span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i.orLabel || 'OR') + '<span style="flex:1;height:1px;background:#E5E7EB"></span>'
+        + '</div>'
+        + '<button id="aimeat-google-btn" type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">'
+        + '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>'
+        + escHtml(i.googleSignIn || 'Continue with Google') + '</button>'
+      ) : '')
     + '<div style="margin-top:14px;display:flex;gap:16px">'
     + '<a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
     + '<a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
@@ -1223,6 +1241,16 @@ function showLoginModal(opts, renderBtn) {
   });
 
   document.getElementById('aimeat-cancel-btn').addEventListener('click', () => modal.remove());
+
+  // Google sign-in — full-page navigation to the OIDC start endpoint. The node sets a
+  // refresh cookie on callback and redirects back; the SPA then boots logged-in.
+  var googleBtn = document.getElementById('aimeat-google-btn');
+  if (googleBtn) {
+    googleBtn.addEventListener('click', function() {
+      var back = encodeURIComponent(location.pathname + location.search + location.hash);
+      location.href = NODE_URL + '/v1/ghii/login/google?redirect=' + back;
+    });
+  }
 
   // Helper to toggle between views
   function showView(view) {
@@ -1306,6 +1334,18 @@ function showLoginModal(opts, renderBtn) {
     } catch(_) { /* always show success */ }
     msgEl.textContent = i.usernameSent || 'If an account with that email exists, your username was sent.';
     msgEl.style.display = 'block';
+  });
+
+  // Enter in any of the sign-in fields submits (unless the button is mid-request/disabled).
+  ['aimeat-username', 'aimeat-password', 'aimeat-displayname'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      var btn = document.getElementById('aimeat-go-btn');
+      if (btn && !btn.disabled) btn.click();
+    });
   });
 
   document.getElementById('aimeat-go-btn').addEventListener('click', async () => {

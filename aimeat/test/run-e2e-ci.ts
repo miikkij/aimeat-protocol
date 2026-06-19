@@ -21,6 +21,7 @@ const ALL_SUITES = [
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',
+    'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
     'test/e2e-apps.ts',

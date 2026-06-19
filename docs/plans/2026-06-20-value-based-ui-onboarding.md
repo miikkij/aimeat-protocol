@@ -2,7 +2,29 @@
 
 **Date:** 2026-06-20
 **Owner:** Jouni
-**Status:** Plan — approved decisions locked, mechanics decided, implementation not started.
+**Status:** Phase 1 (jargon) DONE + browser-verified. Phase 2 (hero pixel grid) next.
+
+## Progress log
+
+**2026-06-20 — Phase 1 (jargon translation) shipped & verified.**
+- Translated the Tier-1 first-impression copy in `en.json` + `fi.json`: `registerDesc`,
+  `registerBtn`, `whyGhii` (×2) — GHII jargon → "your own private space" / "your own digital
+  identity — only you control it".
+- Organism **gloss** (not rename) at its newcomer touchpoints: `profile.notebook.desc`,
+  `profile.services.setupStep4Why` → "shared space (organism)" / "yhteinen tila (organismi)".
+- **Bonus:** normalized the Finnish heart-morsel inconsistency (`Muruset`→`Sydänmuruset`,
+  `morselia`→`murusia` in 4 user-facing spots, `Morselisaldo`→`Murusaldo`). EN was already
+  consistent.
+- **Deferred `capability`:** it is two different concepts in the UI (an agent's *skills* vs. the
+  buy-once *capability* binding) with no clean newcomer touchpoint — glossing it would land in the
+  wrong place. Revisit in Phase 4 (Home) with full context.
+- Verified: both locales valid JSON, 6742 keys, full parity; dev server serves the new strings
+  (no cache); notebook gloss renders correctly in-context (Finnish).
+
+**Finding for Phase 2 — there are TWO landing pages.** `/` serves a marketing page ("Your AI
+agents. Your data. Your control.") that is NOT [landing.js](../../aimeat/public/views/landing.js);
+`landing.js` is served at `/v1/portal`. Resolve which is the canonical front door for a newcomer
+BEFORE placing the hero pixel grid (Step 1 below).
 
 ## Problem
 

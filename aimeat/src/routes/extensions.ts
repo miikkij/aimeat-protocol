@@ -11,6 +11,8 @@
  *   v1.1.0 — 2026-06-05 — Add PUT /v1/extensions/:name idempotent upsert: redeploy in place
  *     (preserving ext:{name} memory + instances) instead of DELETE→re-POST; extract shared
  *     manifest validator so POST and PUT stay in sync.
+ *   v1.1.1 — 2026-06-19 — Security (CR-1): ctx.wallet.consume rejects non-positive/non-finite
+ *     amounts before debiting (a negative amount would mint morsels).
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -25,7 +27,8 @@ import type { Scheduler } from '../services/scheduler.js';
 import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { safeFetch } from '../utils/url-validator.js';
+import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { ExtensionInstallSchema, validateBody } from '../models/schemas.js';
 
@@ -1078,6 +1081,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return record ? record.value : null;
           },
           set: async (key, value) => {
+            await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
             const existing = await storage.getMemory(extMemoryOwner, key);
             const now = new Date().toISOString();
             await storage.setMemory({
@@ -1113,9 +1117,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
         },
         fetch: async (url, opts) => {
-          const ssrfCheck = await validateOutboundUrl(url);
-          if (!ssrfCheck.valid) throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
-          const resp = await fetch(url, {
+          // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
+          const resp = await safeFetch(url, {
             method: opts?.method || 'GET',
             headers: opts?.headers,
             body: opts?.body,
@@ -1160,6 +1163,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
         wallet: {
           consume: async (amount: number, reason: string) => {
+            // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
+            if (!Number.isFinite(amount) || amount <= 0) {
+              throw new Error('INVALID_AMOUNT: consume amount must be a positive number');
+            }
             if (amount > config.extensionMaxDebitPerCall) {
               throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
             }
@@ -1320,6 +1327,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return record ? record.value : null;
           },
           set: async (key, value) => {
+            await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
             const existing = await storage.getMemory(extMemoryOwner, key);
             const now = new Date().toISOString();
             await storage.setMemory({
@@ -1356,9 +1364,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
         },
         fetch: async (url, opts) => {
-          const ssrfCheck = await validateOutboundUrl(url);
-          if (!ssrfCheck.valid) throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
-          const resp = await fetch(url, {
+          // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
+          const resp = await safeFetch(url, {
             method: opts?.method || 'GET',
             headers: opts?.headers,
             body: opts?.body,
@@ -1404,6 +1411,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         wallet: {
           // SECURITY: Extensions can only debit the calling agent's own balance
           consume: async (amount: number, reason: string) => {
+            // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
+            if (!Number.isFinite(amount) || amount <= 0) {
+              throw new Error('INVALID_AMOUNT: consume amount must be a positive number');
+            }
             if (amount > config.extensionMaxDebitPerCall) {
               throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
             }

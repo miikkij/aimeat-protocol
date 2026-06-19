@@ -1,3 +1,13 @@
+/**
+ * @file rate-limit.ts
+ * @description Per-instance, in-memory request rate limiter. Keys by GAII when
+ *   authenticated, else by client IP (IPv6 aggregated to /64 so host-bit rotation
+ *   can't mint fresh buckets). Role-based multipliers widen limits for owners/operators.
+ * @usage app.use(rateLimit({ windowMs, max }, roleMultipliers))
+ * @version-history
+ *   v1.1.0 — 2026-06-20 — Security (H-6): aggregate IPv6 keys to /64. NOTE: the
+ *     bucket store is still per-process — needs a shared store before multi-replica deploy.
+ */
 import type { Request, Response, NextFunction } from 'express';
 import type { RateLimitTier, RoleMultipliers } from '../config.js';
 import { getStats } from '../services/stats.js';
@@ -6,6 +16,24 @@ import { getPromMetrics } from '../services/prometheus.js';
 interface RateBucket {
     count: number;
     resetAt: number;
+}
+
+/**
+ * Normalise an IP into a rate-limit key. IPv6 addresses are aggregated to their
+ * /64 network — providers hand out whole /64 (or larger) blocks to a single
+ * customer, so without this an attacker rotates the 64 host bits to get an
+ * unlimited supply of fresh buckets. IPv4 is keyed by the full address.
+ */
+function ipRateKey(ip: string | undefined): string {
+    if (!ip) return 'unknown';
+    if (!ip.includes(':')) return ip; // IPv4
+    // Expand any `::` compression, then keep the first 4 hextets (the /64 network).
+    const [head, tail = ''] = ip.split('::');
+    const headGroups = head ? head.split(':') : [];
+    const tailGroups = tail ? tail.split(':') : [];
+    const missing = Math.max(0, 8 - headGroups.length - tailGroups.length);
+    const full = [...headGroups, ...Array(missing).fill('0'), ...tailGroups];
+    return full.slice(0, 4).map(g => g || '0').join(':') + '::/64';
 }
 
 export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: RoleMultipliers) {
@@ -25,10 +53,11 @@ export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: R
     cleanup.unref();
 
     return (req: Request, res: Response, next: NextFunction) => {
-        // Key by GAII if authenticated, otherwise by IP
-        const resolvedKey = req.auth?.sub ?? req.ip ?? req.socket.remoteAddress;
-        const key = resolvedKey ?? 'unknown';
-        if (!resolvedKey) getStats()?.increment('rate_limit.unknown_key');
+        // Key by GAII if authenticated, otherwise by IP (IPv6 aggregated to /64)
+        const rawIp = req.ip ?? req.socket.remoteAddress;
+        const resolvedKey = req.auth?.sub ?? ipRateKey(rawIp);
+        const key = resolvedKey || 'unknown';
+        if (!req.auth?.sub && !rawIp) getStats()?.increment('rate_limit.unknown_key');
         const now = Date.now();
 
         // Determine role-based multiplier
