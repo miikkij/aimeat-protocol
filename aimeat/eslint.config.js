@@ -10,6 +10,8 @@
  *   v1.0.0 — 2026-03-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-03-13 — Added custom aimeat plugin (file-header, max-file-lines)
  *   v1.2.0 — 2026-06-05 — Ignore src/generated/** (Prisma clients, openapi types)
+ *   v1.3.0 — 2026-06-19 — Lint public/ (frontend); ignore vendored frontend dirs;
+ *     defer no-undef to tsc (tsconfig.frontend.json checkJs) for browser globals
  */
 
 import eslint from '@eslint/js';
@@ -20,7 +22,17 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ['dist/**', 'node_modules/**', 'test/**', 'src/static/**', 'src/generated/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'test/**',
+      'src/static/**',
+      'src/generated/**',
+      // Vendored / generated frontend bundles — not our source.
+      'public/lib/**',
+      'public/cortex-bundled/**',
+      'public/samples/**',
+    ],
   },
   {
     plugins: {
@@ -33,6 +45,23 @@ export default tseslint.config(
       // Custom AIMEAT rules
       'aimeat/file-header': 'warn',
       'aimeat/max-file-lines': ['warn', { max: 500 }],
+    },
+  },
+  {
+    // The no-build frontend in public/ is type-checked by tsconfig.frontend.json (checkJs),
+    // which detects undefined names with full type info. eslint's no-undef can't see the
+    // browser/SDK globals (window, document, AIMEAT, …) and would only flood with false
+    // positives that tsc already covers — defer it to tsc.
+    files: ['public/**/*.js', 'public/**/*.d.ts'],
+    rules: {
+      'no-undef': 'off',
+      // Pre-existing legacy-frontend findings surfaced when lint coverage was extended to
+      // public/ (2026-06-19). None are runtime bugs (verified) — they're style/best-practice
+      // debt to clean up incrementally. Kept as warnings (consistent with this config's
+      // warn-based gradual adoption) so they stay visible without blocking CI.
+      'no-useless-escape': 'warn',
+      'preserve-caught-error': 'warn',
+      'no-useless-assignment': 'warn',
     },
   },
 );

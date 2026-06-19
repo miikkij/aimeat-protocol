@@ -9,13 +9,14 @@
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5: Inbox tab).
+ *   v1.0.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  */
 import { api, apiGet } from '/js/api.js';
 
 const enc = encodeURIComponent;
 
 /** Send a direct message. `attachments` is an array of descriptors (storage_key, mime, size, kind, inline, id). */
-export async function send({ to, body, attachments, replyTo }) {
+export async function send({ to, body, attachments, replyTo } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any }} */ ({})) {
   return api('/v1/messages', {
     method: 'POST',
     body: JSON.stringify({ to, body, attachments, reply_to: replyTo }),

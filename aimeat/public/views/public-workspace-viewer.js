@@ -15,6 +15,7 @@
  *   v1.0.0 — 2026-06-09 — Initial: slice 2 of the workspace public-sharing plan.
  *   v1.1.0 — 2026-06-09 — Continuous whole-space render (all pages stacked → print captures everything)
  *     with scroll-spy TOC; "Copy AI link" button exposing the ?format=md Markdown-bundle API URL.
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -103,7 +104,7 @@ export default function PublicWorkspaceViewer() {
     if (isSingle || !Array.isArray(docs) || docs.length === 0) return;
     const obs = new IntersectionObserver((entries) => {
       const top = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (top) setSelected(top.target.dataset.pwvKey);
+      if (top) setSelected(/** @type {HTMLElement} */ (top.target).dataset.pwvKey);
     }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
     docs.forEach(d => { const el = document.getElementById(anchorId(d)); if (el) obs.observe(el); });
     return () => obs.disconnect();

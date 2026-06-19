@@ -18,6 +18,7 @@
     "start": "cd aimeat && pnpm start",
     "link:global": "cd aimeat && npm link",
     "typecheck": "cd aimeat && pnpm typecheck",
+    "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
     "lint": "cd aimeat && pnpm lint",
     "test": "cd aimeat && pnpm test",
     "test:unit": "cd aimeat && pnpm test",

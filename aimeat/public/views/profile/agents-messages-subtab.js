@@ -16,6 +16,7 @@
  *   v1.2.0 -- 2026-05-22 -- Fix: use camelCase field names from API (createdAt, metadata.tokensUsed)
  *   v1.1.0 -- 2026-05-22 -- Show timestamp on messages, sort oldest-first (chat-style)
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
+ *   v1.3.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -262,7 +263,7 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
   const lastSeen = null; // TODO Phase 2+: derive from agent.last_seen
 
   // Oldest-first (chat order).
-  const sorted = [...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  const sorted = [...messages].sort((a, b) => +new Date(a.createdAt || 0) - +new Date(b.createdAt || 0));
   // Latest message id per thread -> an option-prompt is answerable only while it
   // is the newest message in its thread (any later message locks it).
   const lastIdByThread = {};

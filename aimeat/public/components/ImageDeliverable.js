@@ -26,6 +26,7 @@
  *   v1.1.0 -- 2026-06-16 -- DeliverableBody renders STRUCTURED values (a JSON object/array, or
  *     deliverable.format:"json") as a key/value tree via the shared JsonNode, instead of raw JSON in
  *     a <pre>. Plain-string / image paths unchanged. Pairs with deliverable.format:"json".
+ *   v1.1.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -148,7 +149,7 @@ export function ImageView({ desc }) {
     if (!authed) { setSrc(url); setFailed(false); return undefined; }
     let cancelled = false;
     setSrc(null); setFailed(false);
-    const headers = {};
+    const headers = /** @type {Record<string,string>} */ ({});
     const session = window.AIMEAT?.auth?.getSession?.();
     if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
     fetch(url, { headers })

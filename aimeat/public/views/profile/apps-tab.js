@@ -4,6 +4,7 @@
  * @version-history
  *   v1.1.0 — 2026-03-19 — Add launch button to My Apps list
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, text-caption, etc.)
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -42,7 +43,7 @@ export default function AppsTab({ session, showToast, onStats }) {
 
   async function handleUpload(file, screenshot, accessCode) {
     if (!file) { showToast(t('profile.apps.selectFile'), true); return; }
-    const readFile = (f) => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+    const readFile = (f) => new Promise(res => { const r = new FileReader(); r.onload = () => res(/** @type {string} */ (r.result).split(',')[1]); r.readAsDataURL(f); });
     const contentBase64 = await readFile(file);
     const opts = {};
     if (accessCode) opts.accessCode = accessCode;

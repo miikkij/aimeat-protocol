@@ -8,6 +8,7 @@
  *   v1.3.0 — 2026-06-02 — Component unification (#17): migrate the "Load more" button to
  *     the canonical LoadMore component (removes an inline style="text-align:center;
  *     margin-top:1.5rem;"; identical visual — same .load-more wrapper + .btn-outline).
+ *   v1.3.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -235,7 +236,7 @@ export default function PublicKnowledgeViewer() {
   const openPackage = useCallback((id) => {
     setPackageId(id);
     setView('detail');
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     url.searchParams.set('id', id);
     history.pushState(null, '', url.toString());
   }, []);
@@ -243,7 +244,7 @@ export default function PublicKnowledgeViewer() {
   const goBack = useCallback(() => {
     setView('browse');
     setPackageId(null);
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     url.searchParams.delete('id');
     history.pushState(null, '', url.toString());
   }, []);

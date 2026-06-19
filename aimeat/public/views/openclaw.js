@@ -176,7 +176,7 @@ function OpenClawView() {
         ].map(([title, steps]) => html`
           <div class="oc-scenario">
             <h4>${title}</h4>
-            <div class="flow"><ol>${steps.map(s => html`<li>${s}</li>`)}</ol></div>
+            <div class="flow"><ol>${(/** @type {any[]} */ (steps)).map(s => html`<li>${s}</li>`)}</ol></div>
           </div>
         `)}
       </div>

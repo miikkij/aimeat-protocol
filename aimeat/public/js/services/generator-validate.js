@@ -44,6 +44,7 @@
  *   v4.5.0 — 2026-03-16 — Cortex validator supports single-block format (YAML + JS
  *     separated by // lib/ comment) in addition to legacy separate blocks. Accept
  *     var/let/const for LIB_NAME declaration.
+ *   v4.5.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '../../lib/yaml.mjs';
 
@@ -63,7 +64,7 @@ function sanitizeJson(text) {
   // Strip markdown backslash escaping: \[ \] \{ \} \( \) \* \_ \` \| \~ \#
   s = s.replace(/\\([[\]{}()*_`|~#])/g, '$1');
   s = s.replace(/,\s*([}\]])/g, '$1');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   return s;
 }
 
@@ -81,7 +82,7 @@ function preCleanYaml(text) {
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   // Fix common AI mistake: action list items missing "id:" key
   // e.g. "  - refreshQuotes\n    description:" → "  - id: refreshQuotes\n    description:"
   // Only match lines under "actions:" where the list item is a bare word followed by description on next line
@@ -895,11 +896,8 @@ export function validateBlueprint(result) {
       }
     }
 
-    // Preserve new top-level blueprint fields
-    if (parsed.settings) parsed.settings = parsed.settings;
-    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
-    if (parsed.architecture) parsed.architecture = parsed.architecture;
-
+    // New top-level blueprint fields (settings/testScenarios/architecture) are preserved
+    // automatically — `parsed` is returned in full below.
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {
     errors.push(`Invalid JSON: ${e.message}`);

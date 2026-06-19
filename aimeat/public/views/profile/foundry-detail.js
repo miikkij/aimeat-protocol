@@ -131,7 +131,7 @@ export function getWorkflowStep(component, validationResult, result) {
 
 /** Small circle-with-arrow SVG placed inline next to the current action target.
  * @param {Object} props
- * @param {'right'|'down'} [props.direction='right'] — arrow direction
+ * @param {'right'|'down'} [props.direction='right'] - arrow direction
  */
 function StepArrow({ direction = 'right' } = {}) {
   const chevron = direction === 'down'

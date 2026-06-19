@@ -5,6 +5,7 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Component unification (#11): live-feed header dot uses
  *     canonical <StatusDot status="live" /> instead of bespoke .live-dot.
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -1180,7 +1181,7 @@ function TheWorld({ navigate }) {
     // Trigger login modal
     const slot = document.getElementById('headerAuth');
     const loginBtn = slot && slot.querySelector('#aimeat-login-btn');
-    if (loginBtn) loginBtn.click();
+    if (loginBtn) /** @type {HTMLElement} */ (loginBtn).click();
   }, [navigate]);
 
   return html`
@@ -1289,7 +1290,7 @@ export default function Portal({ navigate, locale }) {
       // Trigger login via the header auth button
       const loginBtn = document.querySelector('#headerAuth #aimeat-login-btn');
       if (loginBtn) {
-        loginBtn.click();
+        /** @type {HTMLElement} */ (loginBtn).click();
         // After login, the aimeat-auth-change event will fire and we re-check
         const handler = () => {
           const s = getCurrentSession();

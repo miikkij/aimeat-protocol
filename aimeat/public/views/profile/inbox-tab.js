@@ -17,6 +17,7 @@
  *     workspace document editor) + markdown-preview fallback.
  *   v1.1.0 -- 2026-06-16 -- Redesigned as a proper messenger (avatars, bubbles, ticks, dividers).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5).
+ *   v1.3.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';

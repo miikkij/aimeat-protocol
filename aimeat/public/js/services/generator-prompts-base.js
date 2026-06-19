@@ -28,7 +28,7 @@ Available building blocks:
 - Cortex: Client-side JS domain library (IIFE on AIMEAT namespace). Wraps extension APIs and memory reads into clean domain methods for apps.
 
 Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
-  ctx.memory.get(key) → value or null (ALWAYS null-check before using: `|| []` or `|| {}`)
+  ctx.memory.get(key) → value or null (ALWAYS null-check before using: \`|| []\` or \`|| {}\`)
   ctx.memory.set(key, value) → void
   ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
   ctx.memory.delete(key) → boolean
@@ -1483,7 +1483,7 @@ export function summarizeExtensionApi(result) {
     : '';
 
   if (actionsSection) {
-    const actionBlocks = actionsSection.split(/\n  - id:/);
+    const actionBlocks = actionsSection.split(/\n {2}- id:/);
     for (const block of actionBlocks.slice(1)) {
       const id = block.split('\n')[0].trim();
       const desc = block.match(/description:\s*"([^"]+)"/)?.[1] || '';

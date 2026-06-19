@@ -12,7 +12,7 @@ import { t } from '/js/i18n.js';
  * @param {Set<string>} props.selected — currently active filter tags
  * @param {(tag: string) => void} props.onToggle — called when a tag is clicked
  * @param {() => void} props.onClear — called when clear button is clicked
- * @param {number} [props.limit] — show only the first N tags behind a "show all" toggle.
+ * @param {number} [props.limit] - show only the first N tags behind a "show all" toggle.
  *   Selected tags always stay visible so an active filter can't hide its own pill.
  */
 export default function TagCloud({ tags, selected, onToggle, onClear, limit }) {

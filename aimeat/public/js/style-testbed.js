@@ -7,6 +7,7 @@
  *   (no inline handlers) to satisfy the static-asset CSP (script-src 'self').
  * @version-history
  *   v1.0.0 — 2026-06-02 — Initial testbed behavior
+ *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 (function () {
   'use strict';
@@ -95,7 +96,7 @@
         const sel = variant.querySelector('.stb-decide');
         if (!sel) return; // canonical reference — no decision
         total += 1;
-        const val = sel.value;
+        const val = /** @type {HTMLInputElement} */ (sel).value;
         if (val !== '') decided += 1;
         sel.classList.toggle('stb-chosen', val !== '');
         const clone = variant.getAttribute('data-clone') || '';
@@ -104,7 +105,7 @@
         rows.push('  [' + pad(LABEL[val] || val, 18) + '] ' + pad(clone, 46) + ' ' + sitesStr);
       });
       const note = fam.querySelector('.stb-note');
-      const noteVal = note && note.value.trim();
+      const noteVal = note && /** @type {HTMLInputElement} */ (note).value.trim();
 
       lines.push('## ' + famName);
       rows.forEach((r) => lines.push(r));
@@ -113,7 +114,7 @@
     });
 
     const out = document.getElementById('stb-output');
-    if (out) out.value = lines.join('\n');
+    if (out) /** @type {HTMLInputElement} */ (out).value = lines.join('\n');
     const count = document.getElementById('stb-count');
     if (count) count.textContent = '(' + decided + '/' + total + ' clones decided)';
   }
@@ -140,9 +141,9 @@
       setTimeout(() => { btn.classList.remove('stb-copied'); btn.textContent = prev; }, 1500);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(out.value).then(done, () => { out.select(); document.execCommand('copy'); done(); });
+      navigator.clipboard.writeText(/** @type {HTMLInputElement} */ (out).value).then(done, () => { /** @type {HTMLInputElement} */ (out).select(); document.execCommand('copy'); done(); });
     } else {
-      out.select();
+      /** @type {HTMLInputElement} */ (out).select();
       document.execCommand('copy');
       done();
     }

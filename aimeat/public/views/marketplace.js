@@ -5,6 +5,7 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Component unification (#18 category cards): category tiles
  *     use canonical theme.css .category-card / -icon / -name / -count (was .mk-category-*).
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -379,19 +380,19 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
   const submit = () => {
     setMsg(''); setErr(''); setSending(true);
     const data = {
-      title: document.getElementById('mk-sell-title').value,
-      description: document.getElementById('mk-sell-desc').value,
-      category: document.getElementById('mk-sell-category').value,
-      price: parseInt(document.getElementById('mk-sell-price').value, 10),
+      title: /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-title')).value,
+      description: /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-desc')).value,
+      category: /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-category')).value,
+      price: parseInt(/** @type {HTMLInputElement} */ (document.getElementById('mk-sell-price')).value, 10),
     };
-    const condition = document.getElementById('mk-sell-condition').value;
+    const condition = /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-condition')).value;
     if (condition) data.condition = condition;
-    const availability = document.getElementById('mk-sell-avail').value;
+    const availability = /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-avail')).value;
     if (availability) data.availability = availability;
-    const city = document.getElementById('mk-sell-city').value;
-    const area = document.getElementById('mk-sell-area').value;
+    const city = /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-city')).value;
+    const area = /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-area')).value;
     if (city || area) { data.location = {}; if (city) data.location.city = city; if (area) data.location.area = area; }
-    const tags = document.getElementById('mk-sell-tags').value;
+    const tags = /** @type {HTMLInputElement} */ (document.getElementById('mk-sell-tags')).value;
     if (tags) data.tags = tags.split(',').map(s => s.trim()).filter(Boolean);
 
     extAction('create-listing', data)

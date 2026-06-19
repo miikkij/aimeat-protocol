@@ -7,6 +7,7 @@
  *   v1.1.0 — 2026-06-02 — Component unification (#11): node-badge dot uses
  *     canonical <StatusDot status="online" /> instead of bespoke .dv-dot
  *     (which had a hardcoded #22c55e — now tokenized via the component).
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -23,7 +24,9 @@ const NODE_URL = window.location.origin;
 /* ══════════════════════════════════════════════
    i18n — use SPA i18n.js t() with 'dev.' prefix
    ══════════════════════════════════════════════ */
-function dt(key) {
+// `locale` is accepted for call-site symmetry but currently unused — t() resolves against
+// the active global locale, not a per-call override.
+function dt(key, _locale) {
   return globalT('dev.' + key);
 }
 
@@ -612,7 +615,7 @@ function CommunityApps({ locale, isLoggedIn, session }) {
                            style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.25rem .4rem;color:var(--text);font-size:.8rem;width:120px" />
                     <a href="#" onClick=${e => {
                       e.preventDefault();
-                      const code = document.getElementById(codeInputId)?.value?.trim();
+                      const code = /** @type {HTMLInputElement} */ (document.getElementById(codeInputId))?.value?.trim();
                       if (!code) return;
                       window.open(NODE_URL + app.download_url + '?code=' + encodeURIComponent(code));
                     }} style="font-size:.85rem">\u2b07 ${dt('download', locale)}</a>

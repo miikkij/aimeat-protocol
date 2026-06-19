@@ -41,7 +41,7 @@ export async function listPending() {
 }
 
 /** Approve or deny a pending request by its user code, selecting scopes (and optional data areas). */
-export async function approve(userCode, { action, scopes, data_areas } = {}) {
+export async function approve(userCode, { action, scopes, data_areas } = /** @type {{ action?: string, scopes?: any, data_areas?: any }} */ ({})) {
   return apiPost(`/v1/ecosystem-apps/${encodeURIComponent(userCode)}/approve`, { action, scopes, data_areas });
 }
 

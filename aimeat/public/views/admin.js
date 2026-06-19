@@ -5,6 +5,7 @@
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
  *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
+ *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -341,7 +342,7 @@ export default function Admin({ navigate, locale }) {
   function switchPage(id) {
     setActivePage(id);
     // Update URL without reload
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     url.searchParams.set('tab', id);
     history.replaceState(null, '', url);
   }

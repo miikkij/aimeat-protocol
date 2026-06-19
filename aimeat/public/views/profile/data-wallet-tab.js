@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial data wallet tab implementation
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline styles with CSS classes
+ *   v1.1.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -279,7 +280,7 @@ export default function DataWalletTab({ session, showToast }) {
                 <td><input type="checkbox" checked=${selectedConsents.has(cId)}
                   onChange=${(e) => {
                     const next = new Set(selectedConsents);
-                    e.target.checked ? next.add(cId) : next.delete(cId);
+                    if (e.target.checked) next.add(cId); else next.delete(cId);
                     setSelectedConsents(next);
                   }} /></td>
                 <td><span class="dw-code-accent">${escHtml(c.data_pattern || c.pattern || '-')}</span></td>

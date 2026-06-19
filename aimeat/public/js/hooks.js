@@ -52,8 +52,7 @@ export function useApiCall(endpoint, options = {}) {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  // deps are intentionally dynamic — eslint-disable-next-line is correct here
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // deps are intentionally dynamic (endpoint/method/reloadKey + caller-supplied deps)
   }, [endpoint, method, reloadKey, ...deps]);
 
   /** Call reload() to re-trigger the fetch (e.g. after a mutation). */

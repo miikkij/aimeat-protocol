@@ -66,7 +66,7 @@ export async function deletePost(boardId, postId) {
 }
 
 /** Update board members (add/remove GAIIs). */
-export async function updateBoardMembers(boardId, { add, remove }) {
+export async function updateBoardMembers(boardId, { add, remove } = /** @type {{ add?: any, remove?: any }} */ ({})) {
   return api(`/v1/boards/${encodeURIComponent(boardId)}/members`, {
     method: 'PATCH',
     body: JSON.stringify({ add, remove }),

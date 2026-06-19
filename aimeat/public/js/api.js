@@ -123,7 +123,9 @@ export function apiPatch(path, body) {
   return api(path, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
-/** DELETE shorthand. */
-export function apiDelete(path) {
-  return api(path, { method: 'DELETE' });
+/** DELETE shorthand. Forwards an optional request body (e.g. `{ target }`). */
+export function apiDelete(path, body) {
+  return api(path, body === undefined
+    ? { method: 'DELETE' }
+    : { method: 'DELETE', body: JSON.stringify(body) });
 }

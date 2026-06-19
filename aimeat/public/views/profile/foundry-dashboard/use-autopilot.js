@@ -27,6 +27,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-tab.js ProjectDashboard
  *   v2.0.0 — 2026-03-26 — Wire multi-pass flow: runComponentPasses for extension/cortex/app
+ *   v2.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { t } from '/js/i18n.js';
 import { apiPost, apiDelete } from '/js/api.js';
@@ -206,7 +207,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
    * @param {string} cid - Component ID
    * @param {Object} project - Project object (with blueprint)
    * @param {Object} interviewSpec - Interview spec
-   * @returns {{ success: boolean, content: string|null, updated: Object }} - Final result
+   * @returns {Promise<{ success: boolean, content: string|null, updated: Object }>} - Final result
    */
   async function runComponentPasses(comp, cid, project, interviewSpec) {
     const blueprint = project.blueprint;
@@ -734,7 +735,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               await writeProjectLog(projectId, 'extension_probe_start', { meta: { component: comp.label, extensionName: updated.registeredAs, scenarios: probeScenarios.length, by: 'autopilot' } });
 
               const probeResp = await probeExtension(projectId, updated.registeredAs, probeScenarios);
-              const probeResults = probeResp?.data?.results || [];
+              const probeResults = /** @type {any} */ (probeResp)?.data?.results || [];
 
               // Save probe results + context bundle — downstream prompts will inject these
               const contextBundle = createBundle(updated, probeResults);
