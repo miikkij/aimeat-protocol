@@ -391,6 +391,13 @@ dashboard in your browser. Your data lives in your own app-data folder and survi
 
 **Download:** get the latest installer from the [GitHub Releases page](https://github.com/miikkij/aimeat-protocol/releases/latest).
 
+> **Windows SmartScreen note.** The installer is not yet code-signed, so Windows may show a blue
+> *"Windows protected your PC"* SmartScreen prompt the first time you run it. This is expected for
+> new independent software and does **not** mean anything is wrong with the download. To continue,
+> click **More info → Run anyway**. If you'd like to verify the file first, every release lists the
+> binaries on its [Releases page](https://github.com/miikkij/aimeat-protocol/releases/latest) — you
+> can also build it yourself from source (below). A signed installer is on our roadmap.
+
 <p align="center">
   <img src="assets/screenshots/aimeat-desktop.png" alt="AIMEAT Personal Node desktop app — control panel with Getting Started steps, node status (running on port 40050), and node info" width="640" />
 </p>
