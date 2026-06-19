@@ -862,8 +862,10 @@ async function doPasswordLogin(){
       document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
     }
     var d=r.data;
-    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
-    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:d.owner.name,gaii:d.agent.gaii,ghii:d.ghii.ghii,jwt:d.token,publicKey:'',privateKey:d.agent_private_key}));}catch(e){}
+    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load.
+    // SECURITY (M-5): never persist a private key here — nothing reads it, and a stored
+    // private key is pure XSS-theft surface. Only the non-secret session fields + the JWT.
+    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:d.owner.name,gaii:d.agent.gaii,ghii:d.ghii.ghii,jwt:d.token}));}catch(e){}
     showLoginSuccess(d.token,['owner','operator'],'/v1/admin');
     document.getElementById('btnPwLogin').textContent='Login';
     document.getElementById('btnPwLogin').disabled=false;

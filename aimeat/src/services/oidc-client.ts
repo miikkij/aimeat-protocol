@@ -4,6 +4,9 @@
  *   Broker-agnostic: works with any standard OIDC provider (FTN, BankID, MitID).
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial implementation
+ *   v1.1.0 — 2026-06-20 — exchangeCode now reconstructs the callback URL with state + iss
+ *     (RFC 9207) and passes expectedState, fixing "invalid response encountered" against
+ *     providers (e.g. Google) that advertise authorization_response_iss_parameter_supported.
  */
 
 import * as oidc from 'openid-client';
@@ -82,14 +85,25 @@ export function createOidcClient(clientConfig: OidcClientConfig): OidcClient {
       return { authorizationUrl, state, nonce };
     },
 
-    async exchangeCode(code: string, _state: string, expectedNonce: string): Promise<OidcTokenResult> {
+    async exchangeCode(code: string, state: string, expectedNonce: string): Promise<OidcTokenResult> {
       if (!serverConfig) throw new Error('OIDC client not initialized');
 
       try {
+        // Reconstruct the callback URL openid-client validates. It must carry every response
+        // parameter the AS requires: `state` (CSRF binding — also enforced at our layer by the
+        // nonce lookup) and, for providers that advertise RFC 9207 (`iss`) support such as
+        // Google, the `iss` parameter — otherwise validation fails with "invalid response
+        // encountered". `iss` is the provider's stable issuer identity from discovery metadata.
+        const callbackUrl = new URL(clientConfig.redirectUri);
+        callbackUrl.searchParams.set('code', code);
+        if (state) callbackUrl.searchParams.set('state', state);
+        const issuer = serverConfig.serverMetadata().issuer;
+        if (issuer) callbackUrl.searchParams.set('iss', issuer);
+
         const tokens = await oidc.authorizationCodeGrant(
           serverConfig,
-          new URL(`${clientConfig.redirectUri}?code=${encodeURIComponent(code)}`),
-          { expectedNonce },
+          callbackUrl,
+          { expectedNonce, expectedState: state || oidc.skipStateCheck },
         );
 
         const claims = tokens.claims();
