@@ -6,6 +6,47 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Federation book — a phone-book of the federation (operators + resources + versions + settings).**
+  Every node can now see who runs the federation and what each node offers, with a consistent
+  network-wide view. Built on one shared **node-card** (`GET /v1/federation/node-card`, public): a
+  node's AIMEAT software version, type, enabled feature capabilities, a **curated** set of federation
+  behaviour settings (open-join, auth policy, cross-federation… no internal limits/secrets), its
+  **operator GHIIs** (operators only, with a per-node privacy opt-out `federation.book_listed`), and a
+  resource summary (action/agent/board/CSM counts + a few highlights). The **primary** (genesis/anchor
+  — the node with no `genesisUrl`) assembles the cards into a **signed book** and serves it; **leaf
+  nodes mirror** it (pull → Ed25519 signature-verify against the issuer's key → version-gate → cache),
+  so a leaf sees the *whole* mesh, not just its direct peers. `GET /v1/federation/book`,
+  `POST /v1/federation/book/{rebuild,pull}` + a low-frequency auto-assemble/auto-mirror timer.
+  Admin Federation tab gains a **Federation Book** table (node, operators, version, resources,
+  settings) with Rebuild (primary) / Mirror-from-genesis (leaf). Reuses the signed-doc pattern from
+  the network policy. `src/services/federation-book.ts`, `src/utils/node-descriptor.ts`,
+  `src/utils/version.ts`, `src/routes/federation-peer.ts`, `public/views/admin/federation-tab.js`.
+- **Federation version & settings visibility.** `/.well-known/aimeat` now advertises
+  `software_version` + `features_enabled` + `federation_settings`; the heartbeat carries a peer's
+  software version (persisted on the peer record, both backends), surfaced on
+  `GET /v1/federation/peers` + the directory and shown as a **Version** column with a "behind" badge
+  in the admin Federation tab — so operators can tell which AIMEAT a peer runs and infer feature gaps.
+- **Lightweight federation join — "visiting node" tier.** Joining no longer requires two manual
+  operator steps. With **open join** enabled (`federation.open_join`, off by default), a signed
+  `introduce` self-admits as a low-trust **`visiting`** peer: it can browse the catalogue/directory,
+  read presence, and request paid work, but is **not** a provider/relay/replication/auth target until
+  a local operator **promotes** it to **`member`** (a deliberate vouch). Promotion eligibility is
+  *measured* against a genesis-defined, signed **network policy** (`src/services/network-policy.ts`)
+  — uptime %, days active, successful work, signed introduce — with a `force` override (audited).
+  **Uptime** is tracked from the heartbeat (lifetime counters + a 30-day window → `permanent`/
+  `temporary`/`unknown` availability). A `suspend` trust advisory demotes a member back to visiting.
+  Tier + availability + promotion controls surface in the admin Federation tab.
+  `src/services/federation-tiers.ts`, `src/services/federation-availability.ts`, `federation-peer.ts`.
+- **Presence / availability for people.** Owners get a presence control on the profile **Koti** home
+  (status source auto/manual, status available·busy·away·invisible, and who-can-see visibility
+  everyone·contacts·nobody). A reusable **`<PresenceDot>`** (shared store with batched fetch + live
+  refresh) shows reachability next to people in the inbox, organism member lists, and the directory.
+  Auto status derives from an open portal SSE connection. Presence is **federated** (only
+  `everyone`-visibility, change-driven push ≤1/min, mirrored to peers; `contacts` stays node-local).
+  `src/services/presence.ts`, `src/routes/presence.ts`, `public/components/PresenceDot.js`,
+  `public/js/presence-store.js`. Future incentive design (uptime rewards → stablecoin, deferred):
+  `docs/federation-economic-layer.md`.
+
 - **Organism Notebook + Librarian — capture anything, let AI file it, find it later.** A new
   profile tab (**Muistikirja**, under the "Tieto" sidebar group) that closes the loop from a loose
   thought to a filed, findable document. Three capabilities:
@@ -43,6 +84,86 @@ All notable changes to AIMEAT are documented in this file.
 
 Design: `docs/internal/design-organism-notebook-and-librarian.md`. OpenAPI + E2E
 (`aimeat/test/e2e-librarian.ts`, both backends) updated alongside.
+
+- **Frontend type-checking with no build step (`pnpm typecheck:frontend`).** The no-build Preact +
+  HTM frontend in `public/` is now type-checked: `aimeat/tsconfig.frontend.json` runs `tsc --noEmit`
+  with `checkJs` over the JSDoc-annotated `.js` (emits nothing — the browser still loads raw source).
+  `paths` map the importmap specifiers (`preact`, `preact/hooks`, `htm`, `/js/*`, `/components/*`,
+  `/views/*`) so `tsc` resolves them; `public/types/aimeat-globals.d.ts` declares the globals loaded
+  outside ES modules (`window.AIMEAT`, `Chart`, `mermaid`, build-time `__APP_VERSION__`) plus the
+  `code`/`status`/`response` fields `api.js` attaches to errors; `public/types/vendored-libs.d.ts`
+  stubs the minified vendored libs. Frontend `tsc` is at **0 errors**. This delivers the type-safety
+  the no-build decision always promised but never enforced.
+- **ESLint now covers `public/` too** (`eslint src/ public/`). `no-undef` is deferred to `tsc` there
+  (it sees the browser/SDK globals ESLint can't); vendored/generated frontend trees are ignored;
+  `eslint-plugin-react-hooks` was added (warn-level) — it caught real Rules-of-Hooks bugs (see Fixed).
+  Pre-existing legacy-style findings are kept at warn (gradual adoption); **0 lint errors**.
+- **Importmap consistency check (`pnpm check:importmap`, `aimeat/scripts/check-importmap.ts`).** Fails
+  the build if any absolute first-party import (`/js/…`, `/components/…`, `/views/…`) is missing an
+  identity entry in the `spa.html` importmap — without one the module loads but is **not** stamped
+  with `?v=BUILD_ID`, so browsers serve a stale copy after a deploy. `tsc` cannot catch this (it
+  resolves the path to the real file regardless of the importmap).
+- **Commit gate: pre-commit hook + CI.** A committed `.githooks/pre-commit` (auto-activated by the
+  root `prepare` script via `git config core.hooksPath .githooks`) blocks any commit unless
+  `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` pass; the same four run in
+  `.github/workflows/ci.yml`. E2E/Playwright stay out of the hook (too slow / need a DB). Bypass with
+  `git commit --no-verify`.
+- **Running AIMEAT version is visible from the page and `/v1/build`.** `portal.ts` injects a
+  `<meta name="aimeat-version">` tag and a view-source comment into the served SPA shell, and
+  `GET /v1/build` now returns `{ build, version }` (was `build` only). Complements the federation
+  node descriptor's `software_version` (`src/utils/version.ts`, `node-descriptor.ts`) so you can
+  always tell which version a node — local or federated — is running.
+
+### Changed
+
+- **Organisms tab split into cohesive modules (no behaviour or visual change).** The oversized
+  `public/views/profile/organisms-tab.js` (≈3825 lines) was carved into 14 focused sub-modules under
+  `public/views/profile/organisms/` — `helpers.js`, `widgets.js` (StructureOverview), `panels.js`
+  (OrgSearch / IncomingInvitations / BoardPreview), `home.js` (OrganismHome), `workspace-list.js`,
+  `workspace.js` (the manifest-driven Workspace), `members.js`, `agents.js`, `document.js`
+  (DocumentView / DocumentEditor + the lazy Toast UI loader), `schema-form.js`, `workspace-comments.js`,
+  `activity-panel.js`, `participants-panel.js`, `sources-panel.js`. The tab file itself is now a
+  ≈456-line shell (the list + routing). Every shared primitive it already used (Spinner, EmptyState,
+  KeyValueRow, SearchBar, Markdown, Mermaid, PresenceDot, VisibilityPill, useConfirm) is preserved —
+  nothing was re-implemented. The pre-2.0 per-version changelog for this file now lives in git history.
+- **`KebabMenu` and `TagInput` promoted to the profile shared layer** (`public/views/profile/shared.js`)
+  so any profile view can reuse the generic "…" actions menu and tag-chip input; markup and CSS classes
+  (`.pj-menu*` / `.pj-taginput*`) are unchanged, so the look is identical.
+- **Inline `style="display:none"` removed** from the organism/workspace ZIP-import file inputs in favour
+  of a `.pj-hidden-input` class in `profile.css` (frontend styling rule — no inline layout styles).
+  `doc-solo.js` now imports `DocumentView` / `DocumentEditor` from their new home
+  (`organisms/document.js`); importmap entries added in `spa.html` for the new modules. Static checks
+  (typecheck:frontend, lint, check:importmap) stay green and the tab was browser-verified end to end
+  (list, create, workspace, records/documents, comments, sources, activity, participants, board,
+  doc-solo) with no regressions.
+
+### Fixed
+
+These were all surfaced by the new frontend type-checking / lint gates above.
+
+- **Foundry & Generator AI context prompt was silently truncated to ~25%.** Unescaped backticks in
+  the `AIMEAT_CONTEXT` template literal (`generator-prompts-base.js`, `foundry-prompts-base.js`)
+  closed the string early, so the constant was **940 of its intended 3683 characters** — the entire
+  extension-sandbox API reference (memory.search, wallet, consent, fetch, examples) was missing from
+  the prompt sent to the model. Backticks escaped; the full context is restored.
+- **`apiDelete(url, body)` silently dropped the request body** (`public/js/api.js`) — DELETEs that
+  meant to send a payload (e.g. knowledge link removal) went out empty. It now forwards an optional
+  JSON body.
+- **Admin → Security tab toasts were broken** (`views/admin/security-tab.js`): it destructured the
+  array-returning `useToast()` as an object, so `showToast` was `undefined` — every error/success
+  path threw a `TypeError` (masking the real error) and the toast never rendered. Switched to the
+  canonical `[toast, showErr, showOk, clearToast]` pattern.
+- **`comps` ReferenceError** in the Foundry translation-removal path (`js/services/foundry.js`) —
+  the sibling-component lookup referenced an undefined `comps`; corrected to `components`.
+- **Broken `htm/preact` import in the view scaffold** (`views/_template.js`) — an unmapped specifier
+  that would 404 for anyone scaffolding from it; aligned to the codebase's `htm` + `preact` + `bind`
+  convention.
+- **32 Rules-of-Hooks violations fixed across 13 files** (hooks called after an early return or
+  inside a conditional — a real Preact state-corruption risk): the admin push/agents/config/economy/
+  overview tabs, the profile shell, guides, boards, inline-panels, shared-board, tab-messages, and
+  Modal's ConfirmDialog. The admin `renderPlatformRegistry` render-helper (which called `useState`)
+  was converted into a proper `PlatformRegistry` component. No behaviour change; the profile shell
+  and agent-integration tab were browser-verified.
 
 ## [1.25.1] - 2026-06-18
 
