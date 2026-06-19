@@ -86,8 +86,40 @@
 .pf-nb-note-text {
   color: var(--text);
   word-break: break-word;
-  max-height: 22rem;
-  overflow-y: auto;
+}
+.pf-nb-note-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim, var(--text));
+}
+.pf-nb-note-text--peek {
+  max-height: 9rem;
+  overflow: hidden;
+  position: relative;
+}
+.pf-nb-note-text--peek::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(transparent, var(--bg-dim, var(--card)));
+  pointer-events: none;
+}
+
+.pf-nb-inbox-bar { margin-bottom: var(--space-sm, 0.75rem); }
+.pf-nb-sort { max-width: 12rem; }
+.pf-nb-note-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-view-btn {
+  padding: 0.05rem 0.45rem;
+  line-height: 1.2;
 }
 .pf-nb-note-foot {
   display: flex;

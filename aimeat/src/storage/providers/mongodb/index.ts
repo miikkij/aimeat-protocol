@@ -167,24 +167,6 @@ export class PrismaStorage implements Storage {
         }
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
-        await this.ensureMemoryTextIndex();
-    }
-
-    /**
-     * Create the MongoDB `$text` index on Memory.searchBlob used by searchText() (Tier-1 librarian
-     * retrieval). `default_language: 'none'` disables English stemming/stopword removal so mixed
-     * Finnish/English text is indexed verbatim. Idempotent — re-running with identical options is a
-     * no-op; logged and swallowed on failure (search degrades, the node still runs).
-     */
-    private async ensureMemoryTextIndex(): Promise<void> {
-        try {
-            await this.prisma!.$runCommandRaw({
-                createIndexes: 'Memory',
-                indexes: [{ key: { searchBlob: 'text' }, name: 'memory_searchblob_text', default_language: 'none' }],
-            });
-        } catch (err: any) {
-            logger.warn(`Memory $text index not created — librarian full-text search degraded. ${err?.message ?? err}`);
-        }
     }
 
     /**
@@ -780,43 +762,27 @@ export class PrismaStorage implements Storage {
         const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu);
         if (!tokens || tokens.length === 0) return [];
 
-        const match: Record<string, unknown> = { $text: { $search: tokens.join(' ') } };
-        if (opts?.ownerGaiis?.length) match.ownerGaii = { $in: opts.ownerGaiis };
-        if (opts?.visibility) match.visibility = opts.visibility;
-        if (opts?.keyPrefix) {
-            const escaped = opts.keyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            match.key = { $regex: `^${escaped}` };
-        }
+        const where: Record<string, unknown> = { OR: tokens.map(tok => ({ searchBlob: { contains: tok, mode: 'insensitive' } })) };
+        if (opts?.ownerGaiis?.length) where.ownerGaii = { in: opts.ownerGaiis };
+        if (opts?.visibility) where.visibility = opts.visibility;
+        if (opts?.keyPrefix) where.key = { startsWith: opts.keyPrefix };
         const limit = opts?.limit ?? 50;
 
-        // $text must be in the first $match stage; textScore is higher-is-better (our contract).
-        const ranked = await this.prisma.memory.aggregateRaw({
-            pipeline: [
-                { $match: match },
-                { $addFields: { _score: { $meta: 'textScore' } } },
-                { $sort: { _score: -1 } },
-                { $limit: limit * 2 },
-                { $project: { _id: 0, ownerGaii: 1, key: 1, _score: 1 } },
-            ],
-        }) as unknown as Array<{ ownerGaii: string; key: string; _score: number }>;
-        if (!ranked.length) return [];
+        const rows = await this.prisma.memory.findMany({ where, take: limit * 4 }) as any[];
 
-        // Re-load full records (preserving rank order) and apply TTL / flag filtering.
-        const rows = await this.prisma.memory.findMany({
-            where: { OR: ranked.map(r => ({ ownerGaii: r.ownerGaii, key: r.key })) },
-        });
-        const byKey = new Map<string, any>(rows.map((r: any) => [`${r.ownerGaii} ${r.key}`, r]));
-
-        const hits: MemoryTextHit[] = [];
-        for (const r of ranked) {
-            if (hits.length >= limit) break;
-            const row = byKey.get(`${r.ownerGaii} ${r.key}`);
-            if (!row) continue;
-            if (row.ttlHours && Date.now() > new Date(row.createdAt).getTime() + row.ttlHours * 3600_000) continue;
-            if (opts?.maxFlags !== undefined && (row.flagCount ?? 0) > opts.maxFlags) continue;
-            hits.push({ record: this.toMemoryRecord(row), score: r._score });
-        }
-        return hits;
+        // Rank: more distinct tokens matched first, then most-recently updated. (No bm25 here; the
+        // librarian's value is finding the right records, and an AI rerank can follow — design §4.)
+        return rows
+            .filter(r => !r.ttlHours || Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000)
+            .filter(r => opts?.maxFlags === undefined || (r.flagCount ?? 0) <= opts.maxFlags)
+            .map(r => {
+                const blob = String(r.searchBlob ?? '').toLowerCase();
+                const score = tokens.reduce((n, t) => n + (blob.includes(t) ? 1 : 0), 0);
+                return { record: this.toMemoryRecord(r), score, updatedAt: r.updatedAt as Date };
+            })
+            .sort((a, b) => (b.score - a.score) || (b.updatedAt.getTime() - a.updatedAt.getTime()))
+            .slice(0, limit)
+            .map(({ record, score }) => ({ record, score }));
     }
 
     // ── Actions ─────────────────────────────────────────────────
