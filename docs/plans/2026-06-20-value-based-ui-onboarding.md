@@ -2,8 +2,29 @@
 
 **Date:** 2026-06-20
 **Owner:** Jouni
-**Status:** Phase 1 (jargon) DONE + verified. Phase 2 pixel-grid REVERTED (proved nothing about
-AIMEAT). Phase 2 redesigned as "build-to-touch" — concept locked, MVP slice to confirm, not built.
+**Status:** Phase 1 (jargon) DONE. Phase 2 pixel-grid REVERTED. Phase 2 redesigned as
+"build-to-touch / wall of creations" — first slice (BuildHero + live wall) DONE + browser-verified.
+
+## 2026-06-20 — Phase 2 first slice shipped & verified (BuildHero + live wall)
+
+Concept converged with owner: the "canvas" = the **wall of creations itself**. The hero is the
+proven app-catalog king flow elevated to the front door — *build a real app with your AI, it's
+yours, it goes live on the wall.*
+
+- [landing.js](../../aimeat/public/views/landing.js): replaced the Sanomat `Hero` with `BuildHero`
+  (value pitch + one-click "Copy the build prompt", reusing `buildLandingAppPrompt`); rewrote
+  `Gallery` into a **live wall** that renders the REAL published apps from `/v1/apps`
+  (manifest-driven: name, description, author), with a friendly empty state.
+- i18n keys `landing.buildHero*` + `landing.wall*` added to both locales.
+- **No new backend** — reuses the existing app build prompt, the apps API, and the publish flow.
+- Verified in-browser (FI, logged-in via in-app flag): hero renders, the wall shows real apps
+  (LIVE SSE App, Comicland v2, Weather Gladiators, Kiosk Display, Admin Panel, Rick and Morty…)
+  with authors. Gates green: lint 0 errors, typecheck:frontend clean, importmap in sync, locales
+  6750/6750 parity. (The one console 401 is the pre-existing `/v1/auth/refresh`, unrelated.)
+
+**Next within this concept (not built):** anon/Google publish tiering (anon → anon-space limited,
+one-tap Google for owned/permanent), the "twist" gamification + per-creation private data, and
+folding the lower full build-prompt section into the hero to avoid duplication.
 
 ## 2026-06-20 — Phase 2 pixel-grid reverted; redesigned as "build-to-touch"
 

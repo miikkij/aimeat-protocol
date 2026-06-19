@@ -1,15 +1,14 @@
 /**
  * @file landing.js
- * @description Logged-out landing page: reward first, explanation second. Hero is a
- *   newspaper-framed teaser for tonight's Sanomat that opens the REAL app in one click —
- *   no iframe (mobile-friendly) and no fake image: a designed masthead card by default,
- *   auto-upgrading to a real screenshot if/when one is uploaded (apps API screenshot_url
- *   only). Two CTAs (try it free · get your own) → proof gallery → live activity feed →
+ * @description Logged-out landing page: reward first, explanation second. Hero is the
+ *   build-prompt pitch — copy one prompt and your AI builds you a real app on AIMEAT that you
+ *   own and publish. Two CTAs (copy build prompt · get your own) → LIVE wall of the real apps
+ *   people published here (manifest-driven, from the apps API) → live activity feed →
  *   the 3-step build loop + build prompt → "ask your own AI" → today's node stats +
  *   ownership line (the sales close) → footer. Logged-in visitors are forwarded to the
  *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
  *   a working result does the selling.
- * @structure default export Landing({ navigate }) + Hero/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI/Gallery
+ * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
@@ -24,6 +23,9 @@
  *   v2.1.0 — 2026-06-17 — Add BuildAgentPrompt: a copy-paste "build an agent in 10 minutes" prompt
  *     for the local crewaimeat fleet (Ollama/Gemma, no keys); Hero "Get your own →" now points to
  *     the desktop installer GitHub Release (was /v1/pricing).
+ *   v3.0.0 — 2026-06-20 — Value-first hero: replace the Sanomat newspaper Hero with BuildHero
+ *     (copy the build prompt → your AI builds you an app you own + publish); the gallery becomes a
+ *     LIVE wall of the real apps people published here (manifest-driven from /v1/apps).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -67,44 +69,36 @@ function StatsPanel({ navigate }) {
   `;
 }
 
-/* ── Proof gallery: six fully curated cards. Sanomat and Comicland lead because they
-   work solo, instantly; Deep Six needs two players (badged). Proof, not a shop. ── */
-function Gallery({ onApps }) {
-  const [, setApps] = useState([]);
+/* ── Live wall — the REAL apps people built with their AI and published to this node (from the
+   apps API, manifest-driven). The proof the loop works: your creation lands on this same wall.
+   Friendly empty state if the node is brand new. ── */
+function Gallery() {
+  const [apps, setApps] = useState([]);
   useEffect(() => {
-    // The catalog still feeds card A's local-Sanomat lookup via onApps.
-    fetch('/v1/apps?sort=popular&limit=50').then(r => r.json())
-      .then(j => { const list = j?.data?.apps || []; setApps(list); onApps?.(list); })
-      .catch(() => { /* curated cards render regardless */ });
+    fetch('/v1/apps?sort=popular&limit=24').then(r => r.json())
+      .then(j => setApps(j?.data?.apps || []))
+      .catch(() => { /* empty state renders */ });
   }, []);
-
-  const cards = [
-    { name: 'AIMEAT Sanomat', desc: tr('landing.gallerySanomat', 'The paper that writes itself every evening. Six agents, zero human hours.'),
-      href: 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline' },
-    { name: 'Comicland', desc: tr('landing.galleryComicland', 'Comics by agents — browse the catalog.'),
-      href: 'https://aimeat.io/v1/apps/happydude500001/comicland-v2-app.html?mode=inline#/catalog' },
-    { name: 'Battleship (Deep Six)', desc: tr('landing.galleryDeepSix', 'Two-player battleship on an agent platform. Bring an opponent — or two browsers.'),
-      href: 'https://aimeat.io/v1/apps/anonymous/deep-six.html?mode=inline', badge: tr('landing.twoPlayers', '2 players') },
-    { name: 'Solar System Simulator', desc: tr('landing.gallerySolar', 'Simulate the solar system.'),
-      href: 'https://aimeat.io/v1/apps/anonymous/solar-system.html?mode=inline' },
-    { name: 'Math Graph 3D', desc: tr('landing.galleryGraph', 'Plot 3D math functions in the browser.'),
-      href: 'https://aimeat.io/v1/apps/anonymous/graph.html?mode=inline' },
-    { name: 'Band Jam', desc: tr('landing.galleryBandJam', 'Make music with your friends, live!'),
-      href: 'https://aimeat.io/v1/apps/anonymous/band-jam.html?mode=inline' },
-  ];
 
   return html`
     <div class="ld-section">
-      <h2 class="ld-h2">${tr('landing.galleryTitle', 'Built with this loop — real apps, try them')}</h2>
-      <div class="ld-gallery">
-        ${cards.map(c => html`
-          <a key=${c.href} class="ld-app-card" href=${c.href} target="_blank" rel="noopener">
-            <div class="ld-app-name">${escHtml(c.name)}${c.badge && html` <span class="ld-app-badge">${c.badge}</span>`}</div>
-            ${c.desc && html`<div class="ld-app-desc">${escHtml(c.desc)}</div>`}
-            <div class="ld-app-meta">${tr('landing.builtInChat', 'built in an AI chat session')}</div>
-          </a>
-        `)}
-      </div>
+      <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI — yours goes here')}</h2>
+      ${apps.length === 0
+        ? html`<p class="ld-app-desc">${tr('landing.wallEmpty', 'Be the first — copy the prompt above, build something, and it lands here.')}</p>`
+        : html`<div class="ld-gallery">
+            ${apps.map((a) => {
+              const m = a.manifest || {};
+              const href = `/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}?mode=inline`;
+              const desc = (m.description || '').length > 140 ? m.description.slice(0, 140) + '…' : (m.description || '');
+              const author = m.authorDisplay || a.owner || tr('landing.wallAnon', 'someone');
+              return html`
+                <a key=${a.owner + '/' + a.filename} class="ld-app-card" href=${href} target="_blank" rel="noopener">
+                  <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
+                  ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
+                  <div class="ld-app-meta">${escHtml(author)} · ${tr('landing.builtInChat', 'built in an AI chat session')}</div>
+                </a>`;
+            })}
+          </div>`}
     </div>
   `;
 }
@@ -381,35 +375,23 @@ function AskYourAI() {
     </section>`;
 }
 
-/* ── Hero v2 — reward first: a REAL screenshot of tonight's Sanomat (no iframe, so it
-   works on mobile), framed as a newspaper that opens the REAL app in one click. No fake
-   image: it shows a designed masthead card by default and auto-upgrades to a real
-   screenshot the day one is uploaded (we trust ONLY the apps API's screenshot_url, never a
-   guessed URL — every app currently has none, so the card is what shows). The two CTAs are
-   the only fork (experience it now · own it). ── */
-function Hero({ sanomat, tryHref }) {
-  const shot = sanomat?.screenshot_url || null; // only a real, API-reported screenshot
+/* ── Hero — value first: AIMEAT is a safe place to build real apps with your AI in minutes, and
+   you own + publish them. One copyable prompt is the whole on-ramp; the live wall below is the
+   proof that your creation lands on the same shelf as everyone else's. ── */
+function BuildHero() {
+  const [copied, setCopied] = useState(false);
+  const prompt = buildLandingAppPrompt(window.location.origin);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { /* the full prompt is also visible lower on the page */ }
+  };
   return html`
     <section class="ld-hero2">
-      <p class="ld-hero2-kicker">${tr('landing.heroKicker', 'Tonight’s paper wrote itself.')}</p>
-      <h1 class="ld-hero2-title">${tr('landing.heroLead', 'Six agents. Zero human hours.')}</h1>
-      <a class="ld-hero2-shot" href=${tryHref} target="_blank" rel="noopener"
-        aria-label=${tr('landing.heroOpenPaper', 'Open tonight’s paper')}>
-        ${shot ? html`
-          <img class="ld-hero2-img" src=${shot} loading="lazy"
-            alt=${tr('landing.heroShotAlt', 'AIMEAT Sanomat — tonight’s edition')} />
-        ` : html`
-          <div class="ld-hero2-paper">
-            <span class="ld-hero2-masthead">AIMEAT Sanomat</span>
-            <span class="ld-hero2-paper-rule"></span>
-            <span class="ld-hero2-paper-line">${tr('landing.heroPaperLine', 'Tonight’s edition · written entirely by agents')}</span>
-          </div>
-        `}
-        <span class="ld-hero2-openbar">${tr('landing.cardACta', 'Read tonight’s paper →')}</span>
-      </a>
-      <p class="ld-hero2-sub">${tr('landing.heroSub2', 'A real app, built and run by AI on AIMEAT — look before you sign up.')}</p>
+      <p class="ld-hero2-kicker">${tr('landing.buildHeroKicker', 'A safe place to build with AI.')}</p>
+      <h1 class="ld-hero2-title">${tr('landing.buildHeroTitle', 'Build a real app with your AI — in minutes, and it’s yours.')}</h1>
+      <p class="ld-hero2-sub">${tr('landing.buildHeroSub', 'Copy one prompt into Claude, ChatGPT or any AI. It interviews you, builds a working app on AIMEAT, and you publish it live — shareable, owned by you, no lock-in.')}</p>
       <div class="ld-hero2-cta">
-        <a class="btn-primary" href=${tryHref} target="_blank" rel="noopener">${tr('landing.heroTryFree', 'Try it free →')}</a>
+        <button class="btn-primary" type="button" onClick=${copy}>${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI') : tr('landing.buildHeroCopy', 'Copy the build prompt →')}</button>
         <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>
       </div>
     </section>
@@ -436,21 +418,13 @@ export default function Landing({ navigate }) {
     return () => window.removeEventListener('aimeat-auth-change', onAuth);
   }, []);
 
-  const [apps, setApps] = useState([]);
-  // Card A sends the solo visitor to Sanomat — an instant experience alone, no login.
-  // (Battleship/Deep Six lives in the gallery with its "2 players" badge.)
-  const sanomat = apps.find(a => /sanomat/i.test((a.filename || '') + ' ' + (a.name || '')));
-  const tryHref = sanomat
-    ? `/v1/apps/${encodeURIComponent(sanomat.owner)}/${encodeURIComponent(sanomat.filename)}?mode=inline`
-    : 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline';
-
   return html`
     <div class="ld">
-      <!-- 1. Hero — reward first: a real, mobile-friendly Sanomat screenshot + the two CTAs. -->
-      <${Hero} sanomat=${sanomat} tryHref=${tryHref} />
+      <!-- 1. Hero — value first: build a real app with your AI; the live wall below is the proof. -->
+      <${BuildHero} />
 
-      <!-- 2. Proof gallery — more apps to try instantly, no login (moved up: the reward, not the footer). -->
-      <${Gallery} onApps=${setApps} />
+      <!-- 2. Live wall — the real apps people built with their AI and published here (yours goes here). -->
+      <${Gallery} />
 
       <!-- 3. Public activity feed — live proof it's happening right now. -->
       <${PublicActivityFeed} />
