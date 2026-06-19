@@ -574,6 +574,8 @@ export interface GHIIRecord {
   verificationIssuer?: string;
   verificationCredentialHash?: string;
   ftnVerified?: boolean;
+  // Social login — stable provider subject for Google sign-in account linking
+  googleSub?: string;               // Google OIDC `sub` (stable per-user id)
   // Economy (documented in GHII plan, now implemented)
   trustScore?: number;              // Aggregate trust score (0-100)
   morselBalance?: number;           // Morsel wallet balance
@@ -958,7 +960,7 @@ export interface TrustedIssuerRecord {
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  type: 'eudiw' | 'ftn';
+  type: 'eudiw' | 'ftn' | 'google_login';
   state: string;
   nonce: string;
   redirectUri: string;

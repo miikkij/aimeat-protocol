@@ -1,9 +1,14 @@
 /**
- * Quota enforcement and overage charging — RFC §8.2, §8.4, §5.7.4, §15
+ * @file quota.ts
+ * @description Quota enforcement and overage charging — RFC §8.2, §8.4, §5.7.4, §15
  *
  * Memory:        default 10 MB total per agent, 10 morsels/MB/month overage
  * Storage:       default 100 MB total per agent, 100 morsels/GB/month overage
  * Micro-memory:  default 500 KB total per agent (hard limit)
+ *
+ * @version-history
+ *   v1.1.0 — 2026-06-20 — Security (H-5): add enforceExtensionMemoryLimits() so
+ *     extension ctx.memory.set respects the per-value-size + per-key-count limits.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -43,6 +48,35 @@ export async function getMicroMemoryTotalBytes(storage: Storage, gaii: string): 
         }
     }
     return total;
+}
+
+/**
+ * Enforce the per-value-size and per-key-count hard limits for an extension's
+ * `ctx.memory.set`. The REST `/v1/memory` handler enforces these, but extensions
+ * write via `storage.setMemory()` directly and would otherwise bypass them — a
+ * loop of large writes could exhaust disk/DB. Throws on violation (surfaces as an
+ * extension error). `ownerGaii` is the extension namespace (`ext:{name}`).
+ */
+export async function enforceExtensionMemoryLimits(
+    config: AimeatConfig,
+    storage: Storage,
+    ownerGaii: string,
+    key: string,
+    value: unknown,
+): Promise<void> {
+    const maxValueSize = config.memoryMaxValueSizeKb * 1024;
+    const valueSize = Buffer.byteLength(JSON.stringify(value ?? null), 'utf8');
+    if (valueSize > maxValueSize) {
+        throw new Error(`QUOTA_EXCEEDED: value size ${valueSize} bytes exceeds limit of ${maxValueSize} bytes`);
+    }
+    // Only count keys when adding a new one (updates to an existing key don't grow the count).
+    const existing = await storage.getMemory(ownerGaii, key);
+    if (!existing) {
+        const allKeys = await storage.listMemory(ownerGaii);
+        if (allKeys.length >= config.memoryMaxKeysPerAgent) {
+            throw new Error(`QUOTA_EXCEEDED: memory key limit reached (${config.memoryMaxKeysPerAgent}). Delete unused keys first.`);
+        }
+    }
 }
 
 // ── Quota check results ──

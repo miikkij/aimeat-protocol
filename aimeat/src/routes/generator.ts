@@ -342,9 +342,14 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
   // POST /v1/generator/:projectId/test/:componentId — execute AI-generated test code
   // NOTE: registered before bulk test and /:projectId/components/:componentId
+  // SECURITY (H-7): testCode runs via `new Function` in the host Node process
+  // (and/or a CSP-bypassed Playwright browser) with NO sandbox — i.e. RCE as the
+  // caller. Restricted to operator: on a single-operator node this is the same
+  // person who already controls the host; on a multi-owner node it prevents a
+  // regular owner from escalating past their data scope to host/secrets.
   router.post('/v1/generator/:projectId/test/:componentId',
     requireAuth(),
-    requireRole('owner'),
+    requireRole('operator'),
     async (req, res) => {
       const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
@@ -681,6 +686,13 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const projectId = req.params['projectId'] as string;
       const filename = req.params['filename'] as string;
 
+      // SECURITY: this route is unauthenticated. BOTH path segments must be
+      // validated — an unvalidated projectId allows traversal out of the temp
+      // screenshot dir (e.g. `..%2f..%2f...`) → arbitrary file read.
+      if (!/^[A-Za-z0-9_-]+$/.test(projectId)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Invalid projectId'));
+        return;
+      }
       if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
         res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Invalid filename'));
         return;

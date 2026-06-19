@@ -20,7 +20,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 
 /* ── Zod validation schema ── */
@@ -209,7 +209,8 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     let deliveryError: string | undefined;
 
     try {
-      const resp = await fetch(agent.webhookUrl, {
+      // safeFetch validates the stored webhook URL + re-validates redirects (SSRF guard).
+      const resp = await safeFetch(agent.webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -40,6 +40,7 @@ function deserializeGHII(row: Record<string, unknown>): GHIIRecord {
   if (row.verificationIssuer) record.verificationIssuer = row.verificationIssuer as string;
   if (row.verificationCredentialHash) record.verificationCredentialHash = row.verificationCredentialHash as string;
   if (row.ftnVerified) record.ftnVerified = (row.ftnVerified as number) === 1;
+  if (row.googleSub) record.googleSub = row.googleSub as string;
   if (row.trustScore !== null && row.trustScore !== undefined) record.trustScore = row.trustScore as number;
   if (row.morselBalance !== null && row.morselBalance !== undefined) record.morselBalance = row.morselBalance as number;
   if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
@@ -54,8 +55,8 @@ export function createGHII(db: Database.Database, record: GHIIRecord): GHIIRecor
        totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
        emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
        loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
-       trustScore, morselBalance, allowedOrigins)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       googleSub, trustScore, morselBalance, allowedOrigins)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ghii, record.username, record.nodeId, record.displayName,
       record.bio ?? null, record.avatar ?? null, record.locale ?? null,
@@ -73,6 +74,7 @@ export function createGHII(db: Database.Database, record: GHIIRecord): GHIIRecor
       record.verifiedAttributes ? JSON.stringify(record.verifiedAttributes) : null,
       record.verificationIssuer ?? null, record.verificationCredentialHash ?? null,
       record.ftnVerified ? 1 : 0,
+      record.googleSub ?? null,
       record.trustScore ?? null, record.morselBalance ?? null,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
     );
@@ -98,6 +100,11 @@ export function getGHIIByEmailHash(db: Database.Database, emailHash: string): GH
   return row ? deserializeGHII(row) : null;
 }
 
+export function getGHIIByGoogleSub(db: Database.Database, googleSub: string): GHIIRecord | null {
+  const row = db.prepare('SELECT * FROM ghiis WHERE googleSub = ?').get(googleSub) as Record<string, unknown> | undefined;
+  return row ? deserializeGHII(row) : null;
+}
+
 export function updateGHII(db: Database.Database, ghii: string, updates: Partial<GHIIRecord>): GHIIRecord | null {
   const existing = getGHII(db, ghii);
   if (!existing) return null;
@@ -110,7 +117,7 @@ export function updateGHII(db: Database.Database, ghii: string, updates: Partial
      emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
      notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
      verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
-     trustScore = ?, morselBalance = ?, allowedOrigins = ?
+     googleSub = ?, trustScore = ?, morselBalance = ?, allowedOrigins = ?
      WHERE ghii = ?`
   ).run(
     updated.username, updated.nodeId, updated.displayName,
@@ -129,6 +136,7 @@ export function updateGHII(db: Database.Database, ghii: string, updates: Partial
     updated.verifiedAttributes ? JSON.stringify(updated.verifiedAttributes) : null,
     updated.verificationIssuer ?? null, updated.verificationCredentialHash ?? null,
     updated.ftnVerified ? 1 : 0,
+    updated.googleSub ?? null,
     updated.trustScore ?? null, updated.morselBalance ?? null,
     updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
     ghii,

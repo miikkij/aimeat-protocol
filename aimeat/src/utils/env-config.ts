@@ -952,6 +952,29 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
       ],
     },
     {
+      title: 'Social Login (Google)',
+      entries: [
+        {
+          envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED',
+          description: 'Enable Google sign-in (OIDC)',
+          value: config.googleOAuthEnabled ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_GOOGLE_OAUTH_CLIENT_ID',
+          description: 'Google OAuth 2.0 client ID',
+          value: config.googleOAuthClientId ? '(set)' : '(not set)',
+          defaultVal: '(none)',
+        },
+        {
+          envVar: 'AIMEAT_GOOGLE_OAUTH_REDIRECT_URI',
+          description: 'Google OAuth redirect URI (default: <baseUrl>/v1/ghii/login/google/callback)',
+          value: config.googleOAuthRedirectUri || '(derived from baseUrl)',
+          defaultVal: '(derived)',
+        },
+      ],
+    },
+    {
       title: 'Realtime P2P',
       entries: [
         {

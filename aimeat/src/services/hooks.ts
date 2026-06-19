@@ -1,7 +1,7 @@
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 
 export interface HookContext {
     [key: string]: unknown;
@@ -50,7 +50,7 @@ export async function executeHooks(
                     continue;
                 }
 
-                const response = await fetch(webhookUrl, {
+                const response = await safeFetch(webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

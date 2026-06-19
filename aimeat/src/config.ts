@@ -305,6 +305,12 @@ export interface AimeatConfig {
   nonceTtlSeconds: number;
   nationalEidPidClaim: string;
 
+  // Social login — Google OAuth/OIDC sign-in (generic, config-gated)
+  googleOAuthEnabled: boolean;
+  googleOAuthClientId: string;
+  googleOAuthClientSecret: string;
+  googleOAuthRedirectUri: string;  // empty = derive from baseUrl
+
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;
   maxGenesisPeers: number;
@@ -708,6 +714,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     vcIssuerDid: process.env.AIMEAT_VC_ISSUER_DID ?? '',
     nonceTtlSeconds: parseInt(process.env.AIMEAT_NONCE_TTL_SECONDS ?? '300', 10),
     nationalEidPidClaim: process.env.AIMEAT_NATIONAL_EID_PID_CLAIM ?? 'personal_identity_code',
+    googleOAuthEnabled: process.env.AIMEAT_GOOGLE_OAUTH_ENABLED === 'true',
+    googleOAuthClientId: process.env.AIMEAT_GOOGLE_OAUTH_CLIENT_ID ?? '',
+    googleOAuthClientSecret: process.env.AIMEAT_GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+    googleOAuthRedirectUri: process.env.AIMEAT_GOOGLE_OAUTH_REDIRECT_URI ?? '',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),

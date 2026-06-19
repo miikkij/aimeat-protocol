@@ -40,6 +40,10 @@
  *                          rule materialising agent tasks on a matching data publish.
  *   v1.8.0 — 2026-06-15 — Persist AgentTask `automation` (JSON) — ecosystem-app recipe
  *                          provenance/routing for B5 (organism) + B6 (email on completion).
+ *   v1.8.1 — 2026-06-19 — Security (CR-1): reject negative/non-finite amounts in
+ *                          debitBalance/creditBalance/creditBalanceCapped/transferBalance
+ *                          to prevent negative-amount morsel minting (0 still allowed —
+ *                          free/0-cost work escrow).
  */
 
 import { execSync } from 'node:child_process';
@@ -497,6 +501,10 @@ export class PrismaStorage implements Storage {
     }
 
     async debitBalance(gaii: string, amount: number): Promise<boolean> {
+        // SECURITY: reject negative/non-finite amounts. A negative amount would INVERT the
+        // decrement (decrement: -n adds n) and mint morsels. 0 is allowed (no-op;
+        // free/0-cost work escrow relies on it).
+        if (!Number.isFinite(amount) || amount < 0) return false;
         this.ensureReady();
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
@@ -511,6 +519,8 @@ export class PrismaStorage implements Storage {
     }
 
     async creditBalance(gaii: string, amount: number): Promise<boolean> {
+        // SECURITY: reject negative/non-finite amounts (a negative credit would silently debit); 0 is a no-op.
+        if (!Number.isFinite(amount) || amount < 0) return false;
         this.ensureReady();
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
@@ -525,6 +535,8 @@ export class PrismaStorage implements Storage {
     }
 
     async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
+        // SECURITY: reject negative/non-finite amounts (NaN would slip past the actualCredit<=0 guard below).
+        if (!Number.isFinite(amount) || amount < 0) return 0;
         this.ensureReady();
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return 0;
@@ -546,6 +558,8 @@ export class PrismaStorage implements Storage {
     }
 
     async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
+        // SECURITY: reject negative/non-finite amounts (a negative transfer would drain the recipient); 0 is a no-op.
+        if (!Number.isFinite(amount) || amount < 0) return false;
         this.ensureReady();
         const fromGhii = await this.resolveGhii(fromGaii);
         const toGhii = await this.resolveGhii(toGaii);
@@ -1678,6 +1692,7 @@ export class PrismaStorage implements Storage {
             verificationIssuer: row.verificationIssuer ?? undefined,
             verificationCredentialHash: row.verificationCredentialHash ?? undefined,
             ftnVerified: row.ftnVerified ?? undefined,
+            googleSub: row.googleSub ?? undefined,
             trustScore: row.trustScore ?? undefined,
             morselBalance: row.morselBalance ?? undefined,
             allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined,
@@ -1720,6 +1735,7 @@ export class PrismaStorage implements Storage {
                     verificationIssuer: record.verificationIssuer,
                     verificationCredentialHash: record.verificationCredentialHash,
                     ftnVerified: record.ftnVerified ?? false,
+                    googleSub: record.googleSub,
                     trustScore: record.trustScore,
                     morselBalance: record.morselBalance,
                     allowedOrigins: record.allowedOrigins ?? [],
@@ -1749,6 +1765,12 @@ export class PrismaStorage implements Storage {
     async getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null> {
         this.ensureReady();
         const row = await this.prisma.ghii.findFirst({ where: { emailHash } });
+        return row ? this.toGHIIRecord(row) : null;
+    }
+
+    async getGHIIByGoogleSub(googleSub: string): Promise<GHIIRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.ghii.findFirst({ where: { googleSub } });
         return row ? this.toGHIIRecord(row) : null;
     }
 
@@ -2908,7 +2930,7 @@ export class PrismaStorage implements Storage {
         return {
             id: row.id,
             owner: row.owner,
-            type: row.type as 'eudiw' | 'ftn',
+            type: row.type as 'eudiw' | 'ftn' | 'google_login',
             state: row.state,
             nonce: row.nonce,
             redirectUri: row.redirectUri,

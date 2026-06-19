@@ -14,6 +14,7 @@
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.1 -- 2026-06-19 -- Security (CR-1): ctx.wallet.consume rejects non-positive/non-finite amounts before debiting.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,6 +28,8 @@ import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { enforceExtensionMemoryLimits } from '../services/quota.js';
+import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -171,6 +174,7 @@ export function registerExtensionsTools(
                         return record ? record.value : null;
                     },
                     set: async (key, value) => {
+                        await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
                         const existing = await storage.getMemory(extMemoryOwner, key);
                         const now = new Date().toISOString();
                         await storage.setMemory({
@@ -203,7 +207,8 @@ export function registerExtensionsTools(
                     },
                 },
                 fetch: async (url, opts) => {
-                    const resp = await fetch(url, {
+                    // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
+                    const resp = await safeFetch(url, {
                         method: opts?.method || 'GET',
                         headers: opts?.headers,
                         body: opts?.body,
@@ -221,6 +226,10 @@ export function registerExtensionsTools(
                 },
                 wallet: {
                     consume: async (amount: number, reason: string) => {
+                        // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
+                        if (!Number.isFinite(amount) || amount <= 0) {
+                            return { success: false, error: 'INVALID_AMOUNT: consume amount must be a positive number' };
+                        }
                         const debited = await storage.debitBalance(agentGaii, amount);
                         if (!debited) return { success: false, error: 'Insufficient balance' };
                         await storage.addTransaction({

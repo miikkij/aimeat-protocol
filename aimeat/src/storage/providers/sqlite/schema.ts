@@ -260,6 +260,7 @@ export function initializeSchema(db: Database.Database): void {
       verificationIssuer         TEXT,
       verificationCredentialHash TEXT,
       ftnVerified                INTEGER DEFAULT 0,
+      googleSub                  TEXT,
       trustScore                 REAL,
       morselBalance              REAL,
       allowedOrigins             TEXT
@@ -855,6 +856,7 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_storage_files_ownerGaii ON storage_files(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_ghii_ownerName ON ghiis(ownerName);
     CREATE INDEX IF NOT EXISTS idx_ghii_emailHash ON ghiis(emailHash);
+    CREATE INDEX IF NOT EXISTS idx_ghii_googleSub ON ghiis(googleSub);
     CREATE INDEX IF NOT EXISTS idx_chat_ownerName ON chat_instances(ownerName);
     CREATE INDEX IF NOT EXISTS idx_email_ver_ownerName ON email_verifications(ownerName);
     CREATE INDEX IF NOT EXISTS idx_personal_ownerName ON personal_nodes(ownerName);
@@ -1599,6 +1601,9 @@ export function initializeSchema(db: Database.Database): void {
   // Security audit — per-account password brute-force protection
   safeAddColumn('ghiis', 'passwordFailedAttempts', 'INTEGER DEFAULT 0');
   safeAddColumn('ghiis', 'passwordLockedUntil', 'TEXT');
+
+  // Social login — Google OIDC subject for account linking
+  safeAddColumn('ghiis', 'googleSub', 'TEXT');
 
   // Security audit — per-peer federation auth policy
   safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');

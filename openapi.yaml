@@ -12131,6 +12131,75 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /v1/ghii/login/google:
+    get:
+      operationId: ghiiLoginGoogleStart
+      summary: Begin Google sign-in (social login)
+      description: |
+        Starts the Google OIDC sign-in flow and redirects the browser to Google's
+        consent screen. Available only when the node has Google sign-in configured
+        (`AIMEAT_GOOGLE_OAUTH_ENABLED=true` + client credentials); otherwise returns 503.
+        This is a browser-navigation endpoint, not an API call.
+      tags: [GHII-Web]
+      parameters:
+        - name: redirect
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Same-site absolute path to return to after a successful login (must start
+            with `/`). Defaults to `/`. Other values are ignored for safety.
+      responses:
+        '302':
+          description: Redirect to the Google authorization endpoint
+        '503':
+          description: Google sign-in is not available on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: FEATURE_DISABLED
+
+  /v1/ghii/login/google/callback:
+    get:
+      operationId: ghiiLoginGoogleCallback
+      summary: Google sign-in OIDC redirect callback
+      description: |
+        Google redirects the browser here with `code` and `state` after consent. The node
+        exchanges the code, maps the Google identity to a GHII (linking to an existing account
+        when Google's verified email matches a locally-verified account, otherwise creating a
+        new account), establishes an owner session (httpOnly refresh cookie + access token),
+        and redirects back to the SPA. On any failure it redirects to `/?auth_error=<CODE>`.
+      tags: [GHII-Web]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Google
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Opaque state value issued at the start of the flow
+      responses:
+        '302':
+          description: |
+            Redirect back to the SPA on success (refresh cookie set), or to
+            `/?auth_error=<CODE>` on failure.
+        '503':
+          description: Google sign-in is not available on this node
+
   # ============================================================
   # Phase 1.4: Directories
   # ============================================================

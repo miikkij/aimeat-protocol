@@ -331,6 +331,7 @@ model Ghii {
   verificationIssuer         String?
   verificationCredentialHash String?
   ftnVerified                Boolean  @default(false)
+  googleSub                  String?
   trustScore                 Int?
   morselBalance              Int?
   allowedOrigins             String[]
@@ -339,6 +340,7 @@ model Ghii {
 
   @@index([ownerName])
   @@index([emailHash])
+  @@index([googleSub])
 }
 
 model Extension {

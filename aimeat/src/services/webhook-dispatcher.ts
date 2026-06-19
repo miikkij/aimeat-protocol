@@ -62,7 +62,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import type { Storage, WebhookDeliveryLog } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { type WebhookEventType, type WebhookPayload, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 
@@ -172,7 +172,8 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
     // HMAC-SHA256 signature
     const signature = createHmac('sha256', secret).update(body).digest('hex');
 
-    fetch(url, {
+    // safeFetch re-validates every redirect hop so the webhook URL can't bounce to an internal target.
+    safeFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
