@@ -4,6 +4,46 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Organism Notebook + Librarian — capture anything, let AI file it, find it later.** A new
+  profile tab (**Muistikirja**, under the "Tieto" sidebar group) that closes the loop from a loose
+  thought to a filed, findable document. Three capabilities:
+  - **Capture.** A free-text box writes the note straight to a `notebook.inbox.{id}` memory key —
+    nothing is sorted until you choose. The inbox notes render as proper Markdown, are **collapsible**
+    (one-line / preview / full, cycled per note), and have a **type-to-filter** + **date sort** so a
+    long inbox stays browsable.
+  - **Librarian retrieval.** `GET /v1/librarian/search?q=` runs ONE ranked full-text query fanned
+    across every identity the caller owns (GHII + agents + ecosystem apps), so a single search reaches
+    every organism they have contributed to plus their personal notes. Built on a new generic
+    `Storage.searchText()` primitive: **SQLite FTS5** (a `memory_fts` virtual table kept in sync by
+    triggers, bm25-ranked, prefix matching) and **MongoDB** case-insensitive substring matching
+    (Prisma `contains`, owner-scoped) — both so a partial term ("aichologis") finds the full word.
+    Results are organism-annotated with snippets; **"Open"** takes an organism hit to its real home —
+    the organism's workspace **document** (the rendered doc view, deep-linked), not the raw memory
+    list. `src/routes/librarian.ts`, `src/services/librarian.ts`, storage interface +
+    `sqlite/{schema,repos/memory}` + `mongodb/index.ts`, `public/views/profile/notebook-tab.js`,
+    `public/js/services/notebook.js`.
+  - **AI placement (classify → disambiguate → materialize).** `POST /v1/librarian/classify` sends the
+    note plus the caller's organism/workspace/document-space structure to their own OpenRouter model
+    and returns a suggested placement (organism → workspace → document space) with a drafted title +
+    clean Markdown body, alternatives, and a "create new" hint when nothing fits. The Notebook shows
+    the suggestion with **step-by-step progress** while the model thinks, a persistent inline error
+    (with the OpenRouter key-setup form inlined when no key is configured), and an editable
+    accept / override / **create-new organism·workspace·document-space** flow. Materialize then
+    composes the document over the existing generic memory/organism APIs (no per-feature backend
+    write route) and drops the source note. The classify prompt is an operator-managed system prompt
+    (`notebook-classify`, `builders` group, single-sourced via `services/notebook-classify-prompt.ts`).
+    `src/services/notebook-classify.ts`, `src/services/prompt-defaults.ts`.
+- **One canonical Markdown stylesheet.** The shared `<Markdown>` component (`components/Markdown.js`)
+  now has a single global stylesheet `public/css/components/markdown.css` (loaded in `spa.html`),
+  replacing four per-view copies that each scoped `.md-body` to their own container — so rendered
+  Markdown looks the same, readable way **everywhere** the component is used (headings, bordered
+  tables, code blocks, blockquotes, lists, links), with no per-view re-styling.
+
+Design: `docs/internal/design-organism-notebook-and-librarian.md`. OpenAPI + E2E
+(`aimeat/test/e2e-librarian.ts`, both backends) updated alongside.
+
 ## [1.25.1] - 2026-06-18
 
 ### Fixed
