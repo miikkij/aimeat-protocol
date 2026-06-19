@@ -170,6 +170,9 @@ export async function initializeServices(
         peerMode: sp.peerMode || 'federation',
         allowFederatedAuth: sp.allowFederatedAuth ?? false,
         federationAuthScopes: sp.federationAuthScopes ?? [],
+        tier: sp.tier ?? 'member',
+        availability: sp.availability ?? undefined,
+        expiresAt: sp.expiresAt ?? null,
       });
     }
     if (savedPeers.length > 0) {

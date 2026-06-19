@@ -5,6 +5,8 @@
  * @structure FederationTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.2.0 — 2026-06-19 — Visiting-node tier: Tier + Availability badges in the live-peers
+ *     table, an "open join" toggle, and a Promote (vouch) button for visiting peers.
  *   v1.1.0 — 2026-06-02 — Admin design unification: inline button color style
  *     on the approve action → adm-btn-success.
  */
@@ -45,6 +47,7 @@ export default function FederationTab({ data, reload }) {
   const [authPolicy, setAuthPolicy] = useState('disabled');
   const [defaultScopes, setDefaultScopes] = useState([]);
   const [authPolicyLoading, setAuthPolicyLoading] = useState(true);
+  const [openJoin, setOpenJoin] = useState(false);
 
   useEffect(() => {
     getConfig().then(res => {
@@ -53,10 +56,19 @@ export default function FederationTab({ data, reload }) {
         setAuthPolicy(s['federation.auth_policy']?.value ?? 'disabled');
         const scopes = s['federation.default_scopes']?.value ?? 'memory:read,catalogue:read';
         setDefaultScopes(typeof scopes === 'string' ? scopes.split(',').filter(Boolean) : (scopes || []));
+        const oj = s['federation.open_join']?.value;
+        setOpenJoin(oj === true || oj === 'true');
       }
       setAuthPolicyLoading(false);
     });
   }, []);
+
+  const doSaveOpenJoin = async (v) => {
+    setOpenJoin(v);
+    const res = await saveConfig([{ path: 'federation.open_join', value: v }]);
+    if (res.ok) { setActionSuccess(t('dashboard.fedOpenJoinUpdated')); setTimeout(() => setActionSuccess(null), 3000); }
+    else setActionError(res.error?.message || 'Failed to save');
+  };
 
   const doSaveAuthPolicy = async (policy, scopes) => {
     const changes = [
@@ -203,6 +215,18 @@ export default function FederationTab({ data, reload }) {
     return html`<${Badge} type=${map[status] || 'watch'} label=${status || 'unknown'} />`;
   }
 
+  function tierBadge(tier) {
+    const tt = tier || 'member';
+    const map = { genesis: 'info', member: 'healthy', visiting: 'watch' };
+    const label = t(`dashboard.fedTier_${tt}`) || tt;
+    return html`<${Badge} type=${map[tt] || 'neutral'} label=${label} />`;
+  }
+
+  function availabilityBadge(av) {
+    if (!av || av === 'unknown') return null;
+    return html`<${Badge} type=${av === 'permanent' ? 'healthy' : 'watch'} label=${t(`dashboard.fedAvail_${av}`) || av} />`;
+  }
+
   return html`
     <p class="adm-text-dim adm-mb-md" style="margin:0">${t('dashboard.federationExplain')}</p>
 
@@ -283,6 +307,12 @@ export default function FederationTab({ data, reload }) {
             </div>
           </div>
         `}
+        <div class="adm-mt-md" style="border-top:1px solid var(--border);padding-top:12px">
+          <label class="adm-text-sm" style="display:flex;gap:8px;align-items:center">
+            <input type="checkbox" checked=${openJoin} onChange=${(e) => doSaveOpenJoin(e.target.checked)} />
+            <span><b>${t('dashboard.fedOpenJoinLabel')}</b> — ${t('dashboard.fedOpenJoinDesc')}</span>
+          </label>
+        </div>
       `}
     </div>
 
@@ -364,6 +394,7 @@ export default function FederationTab({ data, reload }) {
             <th>${t('dashboard.nodeId')}</th>
             <th>URL</th>
             <th>${t('dashboard.statusLabel')}</th>
+            <th>${t('dashboard.fedTierLabel')}</th>
             <th>${t('dashboard.fedAddedAt')}</th>
             <th>${t('dashboard.lastSeen')}</th>
             <th>${t('dashboard.fedPublicKey')}</th>
@@ -375,6 +406,7 @@ export default function FederationTab({ data, reload }) {
               <td class="mono adm-text-sm">${escHtml(p.node_id)}</td>
               <td class="mono adm-text-sm">${escHtml(p.url || '\u2014')}</td>
               <td>${statusBadge(p.status)}</td>
+              <td style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${tierBadge(p.tier)}${availabilityBadge(p.availability)}</td>
               <td class="adm-text-dim">${dt(p.added_at)}</td>
               <td class="adm-text-dim">${dt(p.last_seen)}</td>
               <td class="mono" style="font-size:.7rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title=${p.public_key || ''}>${p.public_key ? p.public_key.substring(0, 16) + '...' : '\u2014'}</td>
@@ -391,6 +423,9 @@ export default function FederationTab({ data, reload }) {
               <td style="display:flex;gap:4px;flex-wrap:wrap">
                 ${p.status === 'approved' && html`
                   <button class="adm-btn-sm" onClick=${() => doActivate(p.node_id)}>\u25B6 ${t('dashboard.fedActivate')}</button>
+                `}
+                ${p.tier === 'visiting' && html`
+                  <button class="adm-btn-sm" title=${t('dashboard.fedPromoteHint')} onClick=${() => confirm(t('dashboard.fedPromoteConfirm'), async () => { try { await updatePeerPolicy(p.node_id, { tier: 'member' }); flash(t('dashboard.fedPromoted')); reload(); } catch (e) { flashErr(e.message); } })}>\u2B06 ${t('dashboard.fedPromote')}</button>
                 `}
                 ${(p.status === 'active' || p.status === 'degraded') && html`
                   <button class="adm-btn-sm" onClick=${() => doRemove(p.node_id)}>${t('dashboard.fedDepeer')}</button>

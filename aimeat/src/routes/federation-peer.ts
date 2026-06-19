@@ -20,6 +20,7 @@ import { emitChange } from '../services/event-bus.js';
 import { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
 import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../services/presence.js';
+import { deriveTierFlags, coerceTier, type PeerTier } from '../services/federation-tiers.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -37,6 +38,9 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 url: p.url,
                 status: p.status,
                 last_seen: p.lastSeen,
+                tier: p.tier ?? 'member',
+                availability: p.availability ?? null,
+                expires_at: p.expiresAt ?? null,
             }));
 
         // Include personal nodes in the directory
@@ -165,6 +169,64 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
         const id = `peer-req-${randomBytes(8).toString('hex')}`;
         const now = new Date().toISOString();
+
+        // ── Open federation join (opt-in) ──
+        // When the operator has enabled open join, a verified introduction self-admits
+        // as a LOW-TRUST 'visiting' peer immediately — no manual approval. Visiting
+        // peers can browse/discover + request paid work, but get NO provider/relay/
+        // memory-replication/federated-auth rights (deriveTierFlags('visiting')).
+        // Reaching 'member' still requires a deliberate local-operator promotion.
+        if (config.federationOpenJoin) {
+            // SSRF: node_url drives the outbound key-exchange below.
+            const urlCheck = await validateOutboundUrl(node_url);
+            if (!urlCheck.valid) {
+                res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'node_url failed validation'));
+                return;
+            }
+
+            const flags = deriveTierFlags('visiting');
+            const visitingPeer: PeerInfo = {
+                nodeId: node_id,
+                url: node_url,
+                publicKey: public_key,
+                status: 'active',
+                addedAt: now,
+                lastSeen: now,
+                ...flags,
+                tier: 'visiting',
+            };
+            peers.set(node_id, visitingPeer);
+            await storage.saveFederationPeer(visitingPeer);
+
+            // Record the (auto-approved) request for audit + reciprocal auto-add on key exchange.
+            await storage.createPeeringRequest({
+                id,
+                fromNodeUrl: node_url,
+                fromNodeId: node_id,
+                toNodeId: config.nodeId,
+                targetUrl: node_url,
+                publicKey: public_key,
+                message: message ?? '',
+                status: 'auto_approved',
+                createdAt: now,
+                updatedAt: now,
+            });
+
+            const keyExchange = await performKeyExchange(node_url, config, storage)
+                .catch(() => ({ success: false }));
+
+            res.status(200).json(success(config.nodeId, {
+                request_id: id,
+                status: 'active',
+                tier: 'visiting',
+                key_exchange: keyExchange.success ? 'completed' : 'failed',
+                message: 'Joined as a visiting node. Browse the catalogue and request work; ask the operator to promote you to a full member.',
+            }, [
+                { description: 'Browse the federation directory', method: 'GET', url: '/v1/federation/directory' },
+            ]));
+            emitChange('federation');
+            return;
+        }
 
         // SECURITY: Never auto-approve — always create pending request for operator review
         await storage.createPeeringRequest({
@@ -360,12 +422,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 status: 'approved',
                 addedAt: now,
                 lastSeen: now,
-                shareCatalogue: true,
-                replicateMemory: true,
-                allowRouting: true,
-                peerMode: 'federation',
-                allowFederatedAuth: false,
-                federationAuthScopes: [],
+                ...deriveTierFlags('member'),
+                tier: 'member',
             };
             peers.set(peerInfo.nodeId, peerInfo);
             await storage.saveFederationPeer(peerInfo);
@@ -520,6 +578,9 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             peer_mode: p.peerMode ?? 'federation',
             allow_federated_auth: p.allowFederatedAuth ?? false,
             federation_auth_scopes: p.federationAuthScopes ?? [],
+            tier: p.tier ?? 'member',
+            availability: p.availability ?? null,
+            expires_at: p.expiresAt ?? null,
             ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
                 ? { depeer_grace_end: (p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd } : {}),
         }));
@@ -552,12 +613,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             status: 'pending',
             addedAt: now,
             lastSeen: now,
-            shareCatalogue: true,
-            replicateMemory: true,
-            allowRouting: true,
-            peerMode: 'federation',
-            allowFederatedAuth: false,
-            federationAuthScopes: [],
+            ...deriveTierFlags('member'),
+            tier: 'member',
         };
         peers.set(node_id, peerInfo);
         await storage.saveFederationPeer(peerInfo);
@@ -584,22 +641,38 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode, allow_federated_auth, federation_auth_scopes } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
+
+        // Tier change (e.g. promote visiting → member) re-derives the canonical flags first,
+        // so a promotion grants the full member capability set in one step. Explicit flag
+        // fields below may still override afterwards.
+        const currentTier = coerceTier(peer.tier);
+        if (tier === 'genesis' || tier === 'member' || tier === 'visiting') {
+            peer.tier = tier;
+            Object.assign(peer, deriveTierFlags(tier));
+        }
+        const effectiveTier = coerceTier(peer.tier);
+
+        // Guard: a 'visiting' peer must not be silently granted provider/relay/replication/auth
+        // via flag fields — those caps require an actual tier change (promotion). Catalogue read
+        // and peerMode remain freely editable.
+        const blockElevation = effectiveTier === 'visiting';
         if (typeof share_catalogue === 'boolean') peer.shareCatalogue = share_catalogue;
-        if (typeof replicate_memory === 'boolean') peer.replicateMemory = replicate_memory;
-        if (typeof allow_routing === 'boolean') peer.allowRouting = allow_routing;
+        if (typeof replicate_memory === 'boolean' && !(blockElevation && replicate_memory)) peer.replicateMemory = replicate_memory;
+        if (typeof allow_routing === 'boolean' && !(blockElevation && allow_routing)) peer.allowRouting = allow_routing;
         if (peer_mode === 'federation' || peer_mode === 'private') peer.peerMode = peer_mode;
-        if (typeof allow_federated_auth === 'boolean') peer.allowFederatedAuth = allow_federated_auth;
-        if (Array.isArray(federation_auth_scopes)) peer.federationAuthScopes = federation_auth_scopes;
+        if (typeof allow_federated_auth === 'boolean' && !(blockElevation && allow_federated_auth)) peer.allowFederatedAuth = allow_federated_auth;
+        if (Array.isArray(federation_auth_scopes) && !blockElevation) peer.federationAuthScopes = federation_auth_scopes;
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
             node_id: nodeId,
             url: peer.url,
             status: peer.status,
+            tier: peer.tier ?? currentTier,
             share_catalogue: peer.shareCatalogue,
             replicate_memory: peer.replicateMemory,
             allow_routing: peer.allowRouting,
@@ -803,6 +876,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
             if ((isGenesis || hasApprovedRequest) && senderUrl) {
                 const now = new Date().toISOString();
+                const tier: PeerTier = isGenesis ? 'genesis' : 'member';
                 const newPeer: PeerInfo = {
                     nodeId: node_id,
                     url: senderUrl,
@@ -810,12 +884,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                     status: 'active',
                     addedAt: now,
                     lastSeen: now,
-                    shareCatalogue: true,
-                    replicateMemory: true,
-                    allowRouting: true,
-                    peerMode: 'federation',
-                    allowFederatedAuth: false,
-                    federationAuthScopes: [],
+                    ...deriveTierFlags(tier),
+                    tier,
                 };
                 peers.set(node_id, newPeer);
                 await storage.saveFederationPeer(newPeer);

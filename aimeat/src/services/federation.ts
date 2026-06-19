@@ -31,6 +31,12 @@ export interface PeerInfo {
     peerMode: 'federation' | 'private';
     allowFederatedAuth: boolean;
     federationAuthScopes: string[];
+    /** Trust tier: 'genesis' | 'member' | 'visiting' (see services/federation-tiers.ts). Absent → 'member'. */
+    tier?: 'genesis' | 'member' | 'visiting';
+    /** Availability label derived from heartbeat uptime (Phase B): 'temporary' | 'permanent' | 'unknown'. */
+    availability?: 'temporary' | 'permanent' | 'unknown';
+    /** Optional expiry for time-limited visiting peers (populated/enforced in Phase B). */
+    expiresAt?: string | null;
 }
 
 /**

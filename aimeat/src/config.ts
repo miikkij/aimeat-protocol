@@ -191,6 +191,8 @@ export interface AimeatConfig {
   genesisUrl: string | null;
   federationAuthPolicy: 'disabled' | 'all_peers' | 'specific_peers';
   federationDefaultScopes: string[];
+  /** Open federation join: when true, a signed `introduce` self-admits as a low-trust 'visiting' peer (no manual approval). Default off. */
+  federationOpenJoin: boolean;
 
   // Security limits (configurable per security audit)
   loginRateLimitMax: number;
@@ -609,6 +611,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
     federationAuthPolicy: (process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'disabled') as 'disabled' | 'all_peers' | 'specific_peers',
     federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
+    federationOpenJoin: process.env.AIMEAT_FEDERATION_OPEN_JOIN === 'true',
 
     // Security limits
     loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),

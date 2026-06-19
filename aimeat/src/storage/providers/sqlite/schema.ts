@@ -1577,6 +1577,10 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('federation_peers', 'replicateMemory', 'INTEGER NOT NULL DEFAULT 1');
   safeAddColumn('federation_peers', 'allowRouting', 'INTEGER NOT NULL DEFAULT 1');
   safeAddColumn('federation_peers', 'peerMode', "TEXT NOT NULL DEFAULT 'federation'");
+  // Visiting-node tier (lightweight federation join). Legacy peers default to 'member'.
+  safeAddColumn('federation_peers', 'tier', "TEXT NOT NULL DEFAULT 'member'");
+  safeAddColumn('federation_peers', 'availability', 'TEXT');
+  safeAddColumn('federation_peers', 'expiresAt', 'TEXT');
 
   // Federation Mesh Phase 1 — per-record federation opt-in
   safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');
