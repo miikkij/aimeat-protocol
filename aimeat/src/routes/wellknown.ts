@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
+import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 
 export function wellknownRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -16,13 +17,18 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       personal: ['memory', 'actions', 'work', 'wallet'],
     };
 
+    const descriptor = buildNodeDescriptor(config);
+
     res.json(success(config.nodeId, {
       node_id: config.nodeId,
       type: config.nodeType,
       protocol: 'aimeat',
       version: 'v1',
+      software_version: descriptor.software_version,
       public_key: nodeKey?.publicKey ?? null,
       capabilities: capsByType[config.nodeType],
+      features_enabled: descriptor.capabilities,
+      federation_settings: descriptor.settings,
       endpoints: {
         bootstrap: '/',
         spec: '/v1/spec',

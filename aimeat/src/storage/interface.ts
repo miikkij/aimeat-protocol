@@ -1007,6 +1007,10 @@ export interface FederationPeerRecord {
   availabilityWindow?: string | null;
   /** Computed availability % over the window (denormalized for cheap reads). */
   availabilityPct?: number | null;
+  /** Peer's AIMEAT software version (from heartbeat). */
+  softwareVersion?: string | null;
+  /** Hash of the peer's node-card, for federation-book change detection. */
+  nodeCardHash?: string | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

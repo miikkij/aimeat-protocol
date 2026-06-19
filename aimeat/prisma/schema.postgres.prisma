@@ -791,6 +791,8 @@ model FederationPeer {
   heartbeatTotal       Int       @default(0)
   availabilityWindow   String?
   availabilityPct      Int?
+  softwareVersion      String?
+  nodeCardHash         String?
 
   @@index([status])
 }
