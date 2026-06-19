@@ -2,7 +2,49 @@
 
 **Date:** 2026-06-20
 **Owner:** Jouni
-**Status:** Phase 1 (jargon) + Phase 2 MVP (hero pixel grid) DONE + browser-verified. Refinements next.
+**Status:** Phase 1 (jargon) DONE + verified. Phase 2 pixel-grid REVERTED (proved nothing about
+AIMEAT). Phase 2 redesigned as "build-to-touch" — concept locked, MVP slice to confirm, not built.
+
+## 2026-06-20 — Phase 2 pixel-grid reverted; redesigned as "build-to-touch"
+
+**Why reverted.** The shared paintable pixel grid demonstrated *nothing* about AIMEAT: it had no AI,
+no creation, no ownership — the three things AIMEAT actually is. Painting a coloured dot trivialises
+the product. Reverted in the working tree (it had been committed in `da43ca4d`; the jargon work was
+in an earlier commit, so restoring landing.js/landing.css/locales to `da43ca4d^` removed the grid and
+kept the jargon). Owner decision.
+
+**New concept — "build-to-touch": a shared canvas you can only affect by building an app with AI.**
+- There is one **shared canvas / dataset** (a public AIMEAT memory artifact) everyone sees.
+- You **cannot edit it directly.** The only way to affect it is to **build your own app with AI**
+  (the prompt loop) that reads/writes that shared data through AIMEAT's APIs. Building + publishing
+  the app IS the "touch to the platform" — you have now published something of your own.
+- Your app is **your own lens/view** into the shared data — you give it a twist.
+- Published apps are listed below as a growing wall: "this user made an app over this canvas — with
+  a twist." Everyone contributes a variation.
+- Each point/app can hold **per-point private data others can't see** except through that software
+  (consent/visibility).
+
+**Why this actually proves AIMEAT** — it maps 1:1 to the core architecture (CLAUDE.md "No SSR"):
+*CSM defines the data shape → generic APIs handle storage/consent/validation → clients render UI.*
+The shared canvas = the shared data; each user's app = a client over it. The landing becomes a live
+proof of AIMEAT's thesis: AI-assisted creation, ownership, shared data with many lenses, consent.
+
+**Proposed MVP slice (build on existing machinery, don't reinvent):**
+1. **Shared canvas data contract** — one public memory key (e.g. `shared.canvas`) with a documented
+   read/write shape (grid of points/cells + optional per-point private field).
+2. **Canvas-specialised build prompt** — the hero prompt is not "build any app"; it is "build YOUR
+   app that draws on / views the shared canvas," with the canvas API + data shape + how to add a
+   twist + how to store per-point private data baked in. Reuses the prompt-loop pattern
+   (`buildLandingAppPrompt`).
+3. **Wall of canvas apps** — list below the hero of apps tagged as canvas-apps (maker + twist),
+   each openable. Reuses the apps catalogue, filtered by tag.
+
+**Honest constraint to surface:** building + publishing an app uses the user's own AI chat (the
+prompt loop) and likely login to publish to their node — so the reward (your app on the wall) is the
+*real* loop, not a fully-anonymous instant action. The "instant" part is getting your tailored
+prompt + seeing the wall of others' apps. This is honest to AIMEAT (unlike the fake pixel).
+
+**Deferred within this concept:** real morsel debit, heavy gamification, per-point private-data UX.
 
 ## Progress log
 
