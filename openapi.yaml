@@ -6505,6 +6505,36 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/librarian/classify:
+    post:
+      operationId: librarianClassify
+      summary: AI placement suggestion for a free-text note (notebook)
+      description: >
+        Owner-scoped. Given a free-text note and the caller's organism/workspace structure, asks the
+        caller's own OpenRouter model to suggest where the note belongs (organism → workspace →
+        document space) and to draft a clean document title + markdown. Returns the suggestion,
+        alternatives, an optional create-new hint, and the structure context (for override UI). The
+        materialize step runs client-side over the generic memory/organism APIs.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: The free-text note to classify
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

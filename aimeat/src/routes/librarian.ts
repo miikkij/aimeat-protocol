@@ -14,10 +14,11 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { librarianSearch } from '../services/librarian.js';
+import { classifyNote, ClassifyError } from '../services/notebook-classify.js';
 
 const MAX_LIMIT = 100;
 
@@ -57,6 +58,35 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     }, [
       { description: 'Read a hit in full', method: 'GET', url: '/v1/memory/{key}' },
     ]));
+  });
+
+  // POST /v1/librarian/classify — AI placement suggestion for a free-text note (notebook slice B).
+  // Owner-scoped: it decrypts the caller's own OpenRouter key. The materialize step runs client-side
+  // over the generic memory/organism APIs.
+  router.post('/v1/librarian/classify', requireAuth(), requireRole('owner'), async (req, res) => {
+    const { text } = req.body as { text?: string };
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
+      return;
+    }
+    req.setTimeout(600_000);
+    res.setTimeout(600_000);
+    try {
+      const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+      const result = await classifyNote(storage, config, {
+        gaii: viewerGaii,
+        ownerName: req.auth!.owner as string,
+        viewerGaii,
+        text,
+      });
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof ClassifyError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      res.status(500).json(error(config.nodeId, 'CLASSIFY_FAILED', (e as Error).message));
+    }
   });
 
   return router;

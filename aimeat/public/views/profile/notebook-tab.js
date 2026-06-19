@@ -18,8 +18,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
+import { classifyNote, materializeDocument } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
+
+const NEW = '__new__';
 
 const INBOX_PREFIX = 'notebook.inbox.';
 
@@ -55,6 +58,11 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState(null);   // null = not searched yet
   const [searching, setSearching] = useState(false);
+
+  // Slice B — placement suggestion for one note at a time.
+  const [sortingKey, setSortingKey] = useState(null);   // note key being classified (loading)
+  const [suggest, setSuggest] = useState(null);         // { noteKey, result, edit }
+  const [materializing, setMaterializing] = useState(false);
 
   useEffect(() => { if (session) { loadInbox(); loadOrgNames(); } }, [session]);
 
@@ -129,6 +137,153 @@ export default function NotebookTab({ session, showToast, onStats }) {
     window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
   }
 
+  // ── Slice B: classify → suggestion → materialize ──
+
+  /** Build the initial editable plan from a classify result. */
+  function initEdit(result) {
+    const s = result.suggestion || {};
+    const cn = result.createNew || {};
+    const organismId = s.organismId || (cn.suggest ? NEW : NEW);
+    const workspaceId = organismId === NEW ? NEW : (s.workspaceId || NEW);
+    return {
+      organismId,
+      organismName: cn.organismName || '',
+      workspaceId,
+      workspaceName: cn.workspaceName || '',
+      space: workspaceId === NEW ? '' : (s.space || ''),
+      title: s.title || '',
+      markdown: s.markdown || '',
+    };
+  }
+
+  async function handleSuggest(note) {
+    setSuggest(null);
+    setSortingKey(note.key);
+    try {
+      const result = await classifyNote(noteText(note.value));
+      if (!result) { showToast(t('profile.error'), true); return; }
+      setSuggest({ noteKey: note.key, result, edit: initEdit(result) });
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+    } finally { setSortingKey(null); }
+  }
+
+  function patchEdit(patch) {
+    setSuggest(s => s ? { ...s, edit: { ...s.edit, ...patch } } : s);
+  }
+
+  function onOrganismChange(organismId) {
+    if (organismId === NEW) { patchEdit({ organismId: NEW, workspaceId: NEW, space: '' }); return; }
+    const org = suggest.result.context.organisms.find(o => o.id === organismId);
+    const firstWs = org?.workspaces?.[0];
+    patchEdit({ organismId, workspaceId: firstWs ? firstWs.id : NEW, space: firstWs?.documentSpaces?.[0]?.namespace || '' });
+  }
+
+  function onWorkspaceChange(workspaceId) {
+    if (workspaceId === NEW) { patchEdit({ workspaceId: NEW, space: '' }); return; }
+    const org = suggest.result.context.organisms.find(o => o.id === suggest.edit.organismId);
+    const ws = org?.workspaces?.find(w => w.id === workspaceId);
+    patchEdit({ workspaceId, space: ws?.documentSpaces?.[0]?.namespace || '' });
+  }
+
+  function applyAlternative(alt) {
+    const org = suggest.result.context.organisms.find(o => o.id === alt.organismId);
+    const ws = org?.workspaces?.find(w => w.id === alt.workspaceId);
+    patchEdit({
+      organismId: alt.organismId || NEW,
+      workspaceId: alt.workspaceId || NEW,
+      space: alt.space || ws?.documentSpaces?.[0]?.namespace || '',
+    });
+  }
+
+  async function handleMaterialize() {
+    if (!suggest) return;
+    const e = suggest.edit;
+    if (!e.title.trim()) { showToast(t('profile.notebook.titleRequired'), true); return; }
+    if (e.organismId === NEW && !e.organismName.trim()) { showToast(t('profile.notebook.orgNameRequired'), true); return; }
+    setMaterializing(true);
+    try {
+      await materializeDocument({
+        organismId: e.organismId === NEW ? null : e.organismId,
+        organismName: e.organismName,
+        workspaceId: (e.organismId === NEW || e.workspaceId === NEW) ? null : e.workspaceId,
+        workspaceName: e.workspaceName,
+        space: (e.organismId === NEW || e.workspaceId === NEW || !e.space) ? null : e.space,
+        title: e.title.trim(),
+        markdown: e.markdown,
+        sourceKey: suggest.noteKey,
+      });
+      showToast(t('profile.notebook.materialized'));
+      setSuggest(null);
+      await loadInbox();
+      loadOrgNames();   // a just-created organism's name should resolve in subsequent search badges
+    } catch (err) {
+      showToast(err.message || t('profile.error'), true);
+    } finally { setMaterializing(false); }
+  }
+
+  const renderSuggestPanel = () => {
+    const { result, edit } = suggest;
+    const orgs = result.context?.organisms || [];
+    const org = orgs.find(o => o.id === edit.organismId);
+    const workspaces = org?.workspaces || [];
+    const ws = workspaces.find(w => w.id === edit.workspaceId);
+    const docSpaces = ws?.documentSpaces || [];
+    const conf = result.suggestion ? Math.round((result.suggestion.confidence || 0) * 100) : null;
+    return html`
+      <div class="pf-nb-suggest">
+        ${result.suggestion?.reason && html`<div class="text-meta-sm pf-nb-suggest-reason">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}</div>`}
+
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldOrganism')}</label>
+        <select class="input-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
+          ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name)}</option>`)}
+          <option value=${NEW}>➕ ${t('profile.notebook.newOrganism')}</option>
+        </select>
+        ${edit.organismId === NEW && html`
+          <input type="text" class="input-field" placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
+            value=${edit.organismName} onInput=${e => patchEdit({ organismName: e.target.value })} />`}
+
+        ${edit.organismId !== NEW && html`
+          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldWorkspace')}</label>
+          <select class="input-field" value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}>
+            ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name)}</option>`)}
+            <option value=${NEW}>➕ ${t('profile.notebook.newWorkspace')}</option>
+          </select>`}
+        ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
+          <input type="text" class="input-field" placeholder=${t('profile.notebook.newWsNamePlaceholder')}
+            value=${edit.workspaceName} onInput=${e => patchEdit({ workspaceName: e.target.value })} />`}
+
+        ${edit.organismId !== NEW && edit.workspaceId !== NEW && docSpaces.length > 0 && html`
+          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldSpace')}</label>
+          <select class="input-field" value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}>
+            ${docSpaces.map(s => html`<option key=${s.namespace} value=${s.namespace}>${escHtml(s.name)}</option>`)}
+          </select>`}
+
+        ${result.alternatives?.length > 0 && html`
+          <div class="pf-nb-suggest-alts">
+            <span class="text-meta-sm">${t('profile.notebook.alternatives')}</span>
+            ${result.alternatives.map((alt, i) => html`
+              <button key=${i} class="btn-ghost btn-sm" onClick=${() => applyAlternative(alt)}>
+                ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` ▸ ${escHtml(alt.workspaceName)}` : ''}
+              </button>`)}
+          </div>`}
+
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldTitle')}</label>
+        <input type="text" class="input-field" value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldBody')}</label>
+        <textarea class="input-field pf-nb-suggest-body" rows="6" value=${edit.markdown}
+          onInput=${e => patchEdit({ markdown: e.target.value })}></textarea>
+
+        <div class="pf-nb-suggest-actions">
+          <button class="btn-primary" disabled=${materializing} onClick=${handleMaterialize}>
+            ${materializing ? '…' : t('profile.notebook.materializeBtn')}
+          </button>
+          <button class="btn-ghost btn-sm" onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}</button>
+        </div>
+      </div>
+    `;
+  };
+
   const renderHit = (hit) => html`
     <div class="pf-nb-hit" key=${hit.key}>
       <div class="pf-nb-hit-head">
@@ -193,8 +348,15 @@ export default function NotebookTab({ session, showToast, onStats }) {
                 <div class="pf-nb-note-text">${escHtml(noteText(note.value))}</div>
                 <div class="pf-nb-note-foot">
                   <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
-                  <button class="btn-danger btn-sm" onClick=${() => handleDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
+                  <div class="pf-nb-note-btns">
+                    <button class="btn-primary btn-sm" disabled=${sortingKey === note.key}
+                      onClick=${() => handleSuggest(note)}>
+                      ${sortingKey === note.key ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
+                    </button>
+                    <button class="btn-danger btn-sm" onClick=${() => handleDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
+                  </div>
                 </div>
+                ${suggest?.noteKey === note.key && renderSuggestPanel()}
               </div>
             `)}
           </div>`
