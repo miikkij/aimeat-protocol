@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 **Owner:** Jouni
-**Status:** Phase 1 (jargon) DONE + browser-verified. Phase 2 (hero pixel grid) next.
+**Status:** Phase 1 (jargon) + Phase 2 MVP (hero pixel grid) DONE + browser-verified. Refinements next.
 
 ## Progress log
 
@@ -21,10 +21,36 @@
 - Verified: both locales valid JSON, 6742 keys, full parity; dev server serves the new strings
   (no cache); notebook gloss renders correctly in-context (Finnish).
 
-**Finding for Phase 2 — there are TWO landing pages.** `/` serves a marketing page ("Your AI
-agents. Your data. Your control.") that is NOT [landing.js](../../aimeat/public/views/landing.js);
-`landing.js` is served at `/v1/portal`. Resolve which is the canonical front door for a newcomer
-BEFORE placing the hero pixel grid (Step 1 below).
+**2026-06-20 — Phase 2 MVP (hero pixel grid) shipped & verified.**
+- Replaced the Sanomat newspaper Hero with `PixelGridHero` in
+  [landing.js](../../aimeat/public/views/landing.js) (`/v1/portal`, the human front door): a shared
+  24×12 r/place canvas + 8-colour palette + heart-quota bar. Styles `.ld-cv-*` in
+  [landing.css](../../aimeat/public/css/views/landing.css). i18n keys `landing.canvas*` added to
+  both locales.
+- **No new backend** — reuses the anonymous-token + public-memory mechanism (same as the oneliners
+  feed): `POST /v1/auth/anonymous` → write/read the shared public key `anonymous.canvas` under the
+  shared anonymous GAII. r/place persistence (pixels stay until overpainted) falls out of the
+  single shared key.
+- Heart quota is **client-side** for anon (localStorage, 20) with a register-to-paint-more CTA when
+  it hits 0. The real per-pixel morsel debit is deferred (see below).
+- Verified in-browser: renders (FI), painting applies the colour, hearts 20→19, and the write
+  PERSISTS — `GET …/anonymous.canvas` returns `{pixels:{"16,4":0}}`, public, readable by all. The
+  pre-first-write 404s on the read poll are handled gracefully (same as oneliners). Gates green:
+  lint 0 errors, typecheck:frontend clean, importmap in sync, locales 6751/6751 parity.
+
+**Phase 2 refinements still open (deferred):**
+- **Real morsel debit per pixel** (the locked "morsels = paint quota" decision) — needs a server
+  path; current anon quota is client-side UX only.
+- **Concurrency:** painting read-modify-writes the whole grid (last-write-wins); fine for a hero,
+  not for scale. Per-pixel writes if traffic grows.
+- **Registered-user painting / keeping your art** post-login (the landing redirects logged-in users
+  away today).
+
+**Front door resolved (2026-06-20).** `/` is INTENTIONALLY differentiated by client: an AI/bot/
+crawler gets an accelerated, machine-readable version at `/`; a human is redirected to
+`/v1/portal`. So the **human front door is [landing.js](../../aimeat/public/views/landing.js) at
+`/v1/portal`** — that is where the hero pixel grid goes. The `/` AI-facing page is deliberate and
+stays untouched. (Earlier "stale PWA cache" hypothesis was wrong — it's by design.)
 
 ## Problem
 
