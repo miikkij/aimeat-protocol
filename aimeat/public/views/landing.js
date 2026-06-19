@@ -9,7 +9,7 @@
  *   ownership line (the sales close) → footer. Logged-in visitors are forwarded to the
  *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
  *   a working result does the selling.
- * @structure default export Landing({ navigate }) + Hero/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI/Gallery
+ * @structure default export Landing({ navigate }) + PixelGridHero/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI/Gallery
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
@@ -24,9 +24,13 @@
  *   v2.1.0 — 2026-06-17 — Add BuildAgentPrompt: a copy-paste "build an agent in 10 minutes" prompt
  *     for the local crewaimeat fleet (Ollama/Gemma, no keys); Hero "Get your own →" now points to
  *     the desktop installer GitHub Release (was /v1/pricing).
+ *   v3.0.0 — 2026-06-20 — Value-first hero: replace the Sanomat newspaper Hero with PixelGridHero —
+ *     a shared paintable pixel grid (r/place style) on the anonymous-token + public-memory
+ *     mechanism (key "anonymous.canvas"), client-side heart quota for anon painters with a
+ *     register-to-paint-more CTA. Sanomat survives as proof in the gallery.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -381,35 +385,114 @@ function AskYourAI() {
     </section>`;
 }
 
-/* ── Hero v2 — reward first: a REAL screenshot of tonight's Sanomat (no iframe, so it
-   works on mobile), framed as a newspaper that opens the REAL app in one click. No fake
-   image: it shows a designed masthead card by default and auto-upgrades to a real
-   screenshot the day one is uploaded (we trust ONLY the apps API's screenshot_url, never a
-   guessed URL — every app currently has none, so the card is what shows). The two CTAs are
-   the only fork (experience it now · own it). ── */
-function Hero({ sanomat, tryHref }) {
-  const shot = sanomat?.screenshot_url || null; // only a real, API-reported screenshot
+/* ── Hero v3 — value-first: a shared paintable pixel grid. The whole AIMEAT value loop in one
+   action — paint a cell, it appears live on a canvas everyone shares, and stays until someone
+   paints over it (r/place style). Reuses the anonymous-token + public-memory mechanism (same as
+   the oneliners feed) — no new backend: the shared anonymous GAII makes "anonymous.canvas" one
+   canvas for all. Anonymous painters get a small client-side heart quota; running out is the
+   EARNED moment to register (the value loop, not a gate). Sanomat lives on as proof in the
+   gallery below. ── */
+const CANVAS_KEY = 'anonymous.canvas';
+const CANVAS_COLS = 24;       // keep in sync with .ld-cv-board grid-template-columns in landing.css
+const CANVAS_ROWS = 12;
+const CANVAS_PALETTE = 8;     // palette indices 0..7; colours defined in landing.css (.ld-cv-cell.p0..p7)
+const ANON_HEARTS = 20;       // client-side heart quota for anonymous painters (UX; server enforces real limits)
+
+function loadHearts() {
+  try { const v = parseInt(localStorage.getItem('aimeat.canvas.hearts') || '', 10); return Number.isFinite(v) ? v : ANON_HEARTS; }
+  catch { return ANON_HEARTS; }
+}
+function saveHearts(n) { try { localStorage.setItem('aimeat.canvas.hearts', String(n)); } catch { /* ignore */ } }
+
+function triggerLogin() {
+  const btn = document.querySelector('#headerAuth #aimeat-login-btn');
+  if (btn) /** @type {HTMLElement} */ (btn).click();
+}
+
+function PixelGridHero({ tryHref }) {
+  const [pixels, setPixels] = useState({});   // { "x,y": paletteIndex }
+  const [sel, setSel] = useState(0);          // selected palette index
+  const [hearts, setHearts] = useState(loadHearts);
+  const authRef = useRef(null);               // { token, gaii }
+  const busyRef = useRef(false);
+
+  // One-time anonymous auth, then load + poll the shared canvas (same pattern as the oneliners feed).
+  useEffect(() => {
+    let iv; let alive = true;
+    fetch('/v1/auth/anonymous', { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        const d = j?.data; if (!d?.gaii) return;
+        authRef.current = { token: d.token, gaii: d.gaii };
+        const url = '/v1/memory/' + encodeURIComponent(d.gaii) + '/' + CANVAS_KEY;
+        const load = () => fetch(url).then(r => r.ok ? r.json() : null)
+          .then(m => { if (alive && m?.data?.value?.pixels) setPixels(m.data.value.pixels); })
+          .catch(() => { /* keep current */ });
+        load();
+        iv = setInterval(load, 5000);
+      })
+      .catch(() => { /* canvas stays empty; CTAs still work */ });
+    return () => { alive = false; if (iv) clearInterval(iv); };
+  }, []);
+
+  const paint = async (x, y) => {
+    const auth = authRef.current;
+    if (!auth || busyRef.current || hearts <= 0) return;
+    const cellKey = x + ',' + y;
+    if (pixels[cellKey] === sel) return;            // already this colour
+    busyRef.current = true;
+    const next = { ...pixels, [cellKey]: sel };
+    setPixels(next);                                // optimistic; poll reconciles with others
+    const left = hearts - 1; setHearts(left); saveHearts(left);
+    try {
+      await fetch('/v1/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.token },
+        body: JSON.stringify({ key: CANVAS_KEY, value: { pixels: next, updated: new Date().toISOString() }, visibility: 'public' })
+      });
+    } catch { /* optimistic state stays */ }
+    busyRef.current = false;
+  };
+
+  const out = hearts <= 0;
+  const cells = [];
+  for (let y = 0; y < CANVAS_ROWS; y++) {
+    for (let x = 0; x < CANVAS_COLS; x++) {
+      const idx = pixels[x + ',' + y];
+      cells.push(html`<button type="button" key=${x + ',' + y}
+        class=${'ld-cv-cell' + (idx != null ? ' p' + idx : '')}
+        disabled=${out}
+        aria-label=${tr('landing.canvasCell', 'Paint cell')}
+        onClick=${() => paint(x, y)}></button>`);
+    }
+  }
+  const swatches = [];
+  for (let i = 0; i < CANVAS_PALETTE; i++) {
+    swatches.push(html`<button type="button" key=${i}
+      class=${'ld-cv-sw p' + i + (sel === i ? ' is-sel' : '')}
+      aria-pressed=${sel === i}
+      aria-label=${tr('landing.canvasColor', 'Colour') + ' ' + (i + 1)}
+      onClick=${() => setSel(i)}></button>`);
+  }
+
   return html`
-    <section class="ld-hero2">
-      <p class="ld-hero2-kicker">${tr('landing.heroKicker', 'Tonight’s paper wrote itself.')}</p>
-      <h1 class="ld-hero2-title">${tr('landing.heroLead', 'Six agents. Zero human hours.')}</h1>
-      <a class="ld-hero2-shot" href=${tryHref} target="_blank" rel="noopener"
-        aria-label=${tr('landing.heroOpenPaper', 'Open tonight’s paper')}>
-        ${shot ? html`
-          <img class="ld-hero2-img" src=${shot} loading="lazy"
-            alt=${tr('landing.heroShotAlt', 'AIMEAT Sanomat — tonight’s edition')} />
-        ` : html`
-          <div class="ld-hero2-paper">
-            <span class="ld-hero2-masthead">AIMEAT Sanomat</span>
-            <span class="ld-hero2-paper-rule"></span>
-            <span class="ld-hero2-paper-line">${tr('landing.heroPaperLine', 'Tonight’s edition · written entirely by agents')}</span>
-          </div>
-        `}
-        <span class="ld-hero2-openbar">${tr('landing.cardACta', 'Read tonight’s paper →')}</span>
-      </a>
-      <p class="ld-hero2-sub">${tr('landing.heroSub2', 'A real app, built and run by AI on AIMEAT — look before you sign up.')}</p>
+    <section class="ld-cv-hero">
+      <p class="ld-hero2-kicker">${tr('landing.canvasKicker', 'This canvas is alive right now.')}</p>
+      <h1 class="ld-hero2-title">${tr('landing.canvasTitle', 'Leave your mark.')}</h1>
+      <div class="ld-cv-board">${cells}</div>
+      <div class="ld-cv-bar">
+        <div class="ld-cv-palette">${swatches}</div>
+        <div class="ld-cv-hearts" aria-live="polite">
+          ${out
+            ? html`<span class="ld-cv-out">${tr('landing.canvasOut', 'Out of hearts — register to paint more')}</span>`
+            : html`<span>♥ ${hearts} ${tr('landing.canvasHeartsLeft', 'hearts left')}</span>`}
+        </div>
+      </div>
+      <p class="ld-hero2-sub">${tr('landing.canvasSub', 'Paint a pixel — it shows up live for everyone and stays until someone paints over it. No signup to try.')}</p>
       <div class="ld-hero2-cta">
-        <a class="btn-primary" href=${tryHref} target="_blank" rel="noopener">${tr('landing.heroTryFree', 'Try it free →')}</a>
+        ${out
+          ? html`<button class="btn-primary" type="button" onClick=${triggerLogin}>${tr('landing.canvasRegister', 'Register — get more hearts')}</button>`
+          : html`<a class="btn-primary" href=${tryHref} target="_blank" rel="noopener">${tr('landing.canvasSeeApp', 'See a finished app →')}</a>`}
         <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>
       </div>
     </section>
@@ -446,8 +529,9 @@ export default function Landing({ navigate }) {
 
   return html`
     <div class="ld">
-      <!-- 1. Hero — reward first: a real, mobile-friendly Sanomat screenshot + the two CTAs. -->
-      <${Hero} sanomat=${sanomat} tryHref=${tryHref} />
+      <!-- 1. Hero — value first: a shared paintable pixel grid (your mark, live, owned). Sanomat
+           survives as proof in the gallery below. -->
+      <${PixelGridHero} tryHref=${tryHref} />
 
       <!-- 2. Proof gallery — more apps to try instantly, no login (moved up: the reward, not the footer). -->
       <${Gallery} onApps=${setApps} />
