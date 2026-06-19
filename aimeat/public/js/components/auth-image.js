@@ -7,6 +7,7 @@
  *        html`<${AuthImage} src="/v1/memory/files/foo.png" class="file-thumb" alt="foo" />`
  * @version-history
  *   v1.0.0 — 2026-03-17 — Initial implementation
+ *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -21,7 +22,7 @@ export default function AuthImage({ src, alt, ...props }) {
     if (!src) return;
 
     let cancelled = false;
-    const headers = {};
+    const headers = /** @type {Record<string,string>} */ ({});
 
     if (window.AIMEAT?.auth?.hasSession) {
       const session = window.AIMEAT.auth.getSession();
@@ -32,7 +33,7 @@ export default function AuthImage({ src, alt, ...props }) {
 
     fetch(src, { headers })
       .then(r => {
-        if (!r.ok) throw new Error(r.status);
+        if (!r.ok) throw new Error(String(r.status));
         return r.blob();
       })
       .then(blob => {

@@ -172,6 +172,7 @@
  *     renderOvSection); clicking a single space scrolls to (and expands) its section. Spaces and the
  *     static tabs now show a description (manifest `type.<name>.desc`/objectType `description`, or a
  *     static i18n string) under their title.
+ *   v1.31.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -817,7 +818,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const sortedMine = useMemo(() => {
     const arr = [...(myOrganisms || [])];
     if (sortMode === 'name') arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
-    else if (sortMode === 'newest') arr.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    else if (sortMode === 'newest') arr.sort((a, b) => +new Date(b.createdAt || 0) - +new Date(a.createdAt || 0));
     else if (customOrder.length) {
       const pos = new Map(customOrder.map((id, i) => [id, i]));
       arr.sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : Infinity) - (pos.has(b.id) ? pos.get(b.id) : Infinity));
@@ -1274,8 +1275,7 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
       && form.visibility === prev.visibility && form.interests.join(' ') === prev.interests.join(' ');
     if (untouched) setForm(baseline);
     prevBaselineRef.current = baseline;
-  }, [baseline]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const dirty = form.name !== baseline.name || form.description !== baseline.description
+  }, [baseline]);  const dirty = form.name !== baseline.name || form.description !== baseline.description
     || form.type !== baseline.type || form.join_policy !== baseline.join_policy
     || form.visibility !== baseline.visibility
     || form.interests.join(' ') !== baseline.interests.join(' ');
@@ -1913,8 +1913,7 @@ function ParticipantsPanel({ orgId, wsId, showToast }) {
   }, [orgId, wsId]);
   const isManager = !!(data && (data.nodes || []).some(n => (n.owners || []).some(o => o.isSelf && o.isCreator)));
   const loadAccess = () => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {});
-  useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data]);   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!data || !(data.nodes || []).length) return null;
+  useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data]);  if (!data || !(data.nodes || []).length) return null;
   const owners = [];
   for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
 
@@ -2113,8 +2112,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [orgId, wsId]);   // eslint-disable-line react-hooks/exhaustive-deps
-  // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
+  }, [orgId, wsId]);  // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
   // each independent. The window name is unique per document, so re-clicking focuses the open one.
   const popOut = (typeName, docId) => {
     const u = '/v1/profile?doc=' + encodeURIComponent(`${orgId}:${wsId}:${typeName}:${docId}`);
@@ -2253,8 +2251,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     const next = { __base: new Date().toISOString() };
     try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) { /* noop */ }
     setSeen(next);
-  }, [seen, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [seen, ws]);
   // Changes landing on the tab the user is LOOKING at are seen immediately — otherwise a draft
   // saved while you're on its space tab would raise that tab's own badge.
   useEffect(() => {
@@ -2485,13 +2482,11 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       setSName(next.name); setSSummary(next.summary); setSAutonomy(next.autonomy);
       seededRef.current = next;
     }
-  }, [showSettings, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [showSettings, ws]);
   // Public sharing lives in its own tab — lazy-load the share state the first time it opens.
   useEffect(() => {
     if (tab === 'share' && share === null && ws?.manifest) loadShare();
-  }, [tab, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [tab, ws]);
   // Dirty-check against the manifest: Save enables only on real changes (doubles as the
   // unsaved-changes indicator), Cancel resets the fields, and closing a dirty panel asks first.
   const wsDirty = !!ws?.manifest && (sName !== (ws.manifest.name || '')

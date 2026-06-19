@@ -1,0 +1,40 @@
+{
+  // @file tsconfig.frontend.json
+  // @description Type-checking config for the no-build Preact + HTM frontend in public/.
+  //   The browser still loads raw .js via native ESM + importmap; this config exists ONLY
+  //   to run `tsc --noEmit` over the JSDoc-annotated frontend (checkJs) so the type-safety
+  //   the no-build decision promised is actually enforced. It emits nothing.
+  // @usage  pnpm typecheck:frontend   (and in CI alongside the backend typecheck)
+  // @structure  paths/ map importmap specifiers (preact, htm, /js/*, /components/*) to files;
+  //   moduleResolution "bundler" tolerates extensionless + absolute-style specifiers.
+  // @version-history
+  //   v1.0.0 — 2026-06-19 — Initial frontend type-checking config (checkJs, non-strict baseline)
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "preact": ["./public/types/vendored-libs.d.ts"],
+      "preact/hooks": ["./public/types/vendored-libs.d.ts"],
+      "htm": ["./public/types/vendored-libs.d.ts"],
+      "/*": ["./public/*"]
+    },
+    "types": []
+  },
+  "include": ["public/**/*.js", "public/**/*.d.ts"],
+  "exclude": [
+    "node_modules",
+    "public/lib/**",
+    "public/cortex-bundled/**",
+    "public/samples/**",
+    "public/sw.js"
+  ]
+}

@@ -19,22 +19,22 @@ const html = htm.bind(h);
 
 export default function SecurityTab() {
   const [state, setState] = useState({ incidents: [], open: 0, total: 0, loading: true });
-  const { toast, showToast } = useToast();
+  const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
   const load = async () => {
     try { const r = await getSecurityIncidents(); setState({ incidents: r?.data?.incidents || [], open: r?.data?.open || 0, total: r?.data?.total || 0, loading: false }); }
-    catch (e) { setState({ incidents: [], open: 0, total: 0, loading: false }); showToast((e && e.message) || 'Failed to load incidents'); }
+    catch (e) { setState({ incidents: [], open: 0, total: 0, loading: false }); showErr((e && e.message) || 'Failed to load incidents'); }
   };
   useEffect(() => { load(); }, []);
 
   const resolve = async (id) => {
-    try { await resolveSecurityIncident(id); showToast(t('admin.security.resolved') || 'Incident resolved'); load(); }
-    catch (e) { showToast((e && e.message) || 'Failed'); }
+    try { await resolveSecurityIncident(id); showOk(t('admin.security.resolved') || 'Incident resolved'); load(); }
+    catch (e) { showErr((e && e.message) || 'Failed'); }
   };
   const remove = (id) => confirm(
     t('admin.security.deleteConfirm') || 'Delete this incident and its quarantined file?',
-    async () => { try { await deleteSecurityIncident(id); showToast(t('admin.security.deleted') || 'Deleted'); load(); } catch (e) { showToast((e && e.message) || 'Failed'); } },
+    async () => { try { await deleteSecurityIncident(id); showOk(t('admin.security.deleted') || 'Deleted'); load(); } catch (e) { showErr((e && e.message) || 'Failed'); } },
     { danger: true, title: t('admin.security.title') || 'Security' },
   );
   const downloadQuarantine = async (id) => {
@@ -46,12 +46,12 @@ export default function SecurityTab() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `quarantine-${id}.zip`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch (e) { showToast((e && e.message) || 'No quarantined file'); }
+    } catch (e) { showErr((e && e.message) || 'No quarantined file'); }
   };
 
   return html`
     <div class="adm-section">
-      <${ConfirmUI} /><${Toast} toast=${toast} />
+      <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <div class="adm-card">
         <h2 class="adm-sec-title">${'🛡️ '}${t('admin.security.title') || 'Security'}</h2>
         <p class="adm-sec-desc">

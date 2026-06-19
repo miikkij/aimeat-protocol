@@ -47,6 +47,7 @@
  *   v5.0.0 — 2026-03-26 — Add validateSkeleton with cross-check against interview
  *     sampleResponse; add validateUnit with anti-pattern scan; add crossCheckSampleData,
  *     extractOutputFieldsNearUrl, deepFieldExists helpers
+ *   v5.0.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -66,7 +67,7 @@ function sanitizeJson(text) {
   // Strip markdown backslash escaping: \[ \] \{ \} \( \) \* \_ \` \| \~ \#
   s = s.replace(/\\([[\]{}()*_`|~#])/g, '$1');
   s = s.replace(/,\s*([}\]])/g, '$1');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   return s;
 }
 
@@ -84,7 +85,7 @@ function preCleanYaml(text) {
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   // Fix common AI mistake: action list items missing "id:" key
   // e.g. "  - refreshQuotes\n    description:" → "  - id: refreshQuotes\n    description:"
   // Only match lines under "actions:" where the list item is a bare word followed by description on next line
@@ -889,11 +890,8 @@ export function validateBlueprint(result) {
       }
     }
 
-    // Preserve new top-level blueprint fields
-    if (parsed.settings) parsed.settings = parsed.settings;
-    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
-    if (parsed.architecture) parsed.architecture = parsed.architecture;
-
+    // New top-level blueprint fields (settings/testScenarios/architecture) are preserved
+    // automatically — `parsed` is returned in full below.
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {
     errors.push(`Invalid JSON: ${e.message}`);
@@ -1022,7 +1020,7 @@ function extractOutputFieldsNearUrl(yaml, url) {
       }
     }
     // Stop at the next action/method
-    if (nearUrl && inOutput && /^  - id:|^  - name:|^\w/.test(line) && !line.includes(url)) {
+    if (nearUrl && inOutput && /^ {2}- id:|^ {2}- name:|^\w/.test(line) && !line.includes(url)) {
       break;
     }
   }

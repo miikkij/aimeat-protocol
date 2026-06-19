@@ -9,6 +9,7 @@
  *     canonical /components/Spinner.js (single source of the .spinner markup).
  *   v1.3.0 — 2026-06-02 — Component unification (#22): GlassCard now delegates to the
  *     canonical /components/Card.js via variant="glass" (.card-glass); call sites unchanged.
+ *   v1.3.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -40,7 +41,7 @@ export function recipientBadge(recipient) {
 /** Check if a consent is expiring within 7 days. */
 export function isExpiringSoon(expiresAt) {
   if (!expiresAt) return false;
-  const diff = new Date(expiresAt) - Date.now();
+  const diff = +new Date(expiresAt) - Date.now();
   return diff > 0 && diff < 7 * 86400000;
 }
 

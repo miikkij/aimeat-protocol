@@ -18,6 +18,7 @@
  *   v1.2.0 -- 2026-05-24 -- Add command-reply visual pairing for slash commands
  *   v1.1.0 -- 2026-05-24 -- M7: visual distinction for command messages (slash prefix)
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
+ *   v1.6.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  */
 
 import { h } from 'preact';
@@ -332,7 +333,7 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
       ${messages.length > 0 && html`
         <div class="pf-agd-msg-history" ref=${historyRef}>
           ${(() => {
-            const sorted = [...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+            const sorted = [...messages].sort((a, b) => +new Date(a.createdAt || 0) - +new Date(b.createdAt || 0));
             // An option-prompt is answerable only while it is the newest message
             // in its thread (any later message locks it). Map each thread to its
             // last message id, and each prompt_id to the owner's chosen text.

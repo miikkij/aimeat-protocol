@@ -14,6 +14,7 @@
  *   - renderStep4 — Step 4 UI (Synthesis — grouped proposals + A/B/C options)
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial V2 implementation
+ *   v1.0.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -40,7 +41,7 @@ import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js
 
 // ── Helpers ──
 
-async function callModel(projectId, prompt, modelId, { retries = 1, temperature, top_p, max_tokens } = {}) {
+async function callModel(projectId, prompt, modelId, { retries = 1, temperature, top_p, max_tokens } = /** @type {{ retries?: number, temperature?: number, top_p?: number, max_tokens?: number }} */ ({})) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
@@ -436,7 +437,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         const { getVersion } = await import('/js/services/calibrator.js');
         const ver = await getVersion(projectId, batchVersion);
         if (ver?.prompt) batchPrompt = ver.prompt;
-      } catch {}
+      } catch { /* best effort — fall through to the no-prompt guard below */ }
     }
     if (!batchPrompt) { showToast?.('Could not load prompt for this batch\'s version', true); return; }
 

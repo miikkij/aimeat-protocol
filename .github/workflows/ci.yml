@@ -43,6 +43,10 @@ jobs:
         working-directory: aimeat
         run: pnpm typecheck
 
+      - name: Type check (frontend — checkJs over public/)
+        working-directory: aimeat
+        run: pnpm typecheck:frontend
+
       - name: Build
         working-directory: aimeat
         run: pnpm build

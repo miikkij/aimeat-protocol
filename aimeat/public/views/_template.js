@@ -13,8 +13,10 @@
  *   6. Create public/css/views/myview.css for view-specific styles
  * ─────────────────────────────────────────────────────────────────────────────
  */
-import { html }                    from 'htm/preact';
+import { h }                       from 'preact';
+import htm                         from 'htm';
 import { useState, useEffect }     from 'preact/hooks';
+const html = htm.bind(h);
 import { t }                       from '/js/i18n.js';
 import { escHtml }                 from '/js/utils.js';
 import { apiGet, apiPost }         from '/js/api.js';

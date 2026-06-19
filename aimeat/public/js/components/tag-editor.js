@@ -9,7 +9,7 @@ import { t } from '/js/i18n.js';
  * @param {Object} props
  * @param {string[]} props.tags — current tags on the item
  * @param {(tags: string[]) => void} props.onSave — called with updated tag array on add/remove
- * @param {number} [props.maxTags=20] — maximum tags allowed
+ * @param {number} [props.maxTags=20] - maximum tags allowed
  */
 export default function TagEditor({ tags, onSave, maxTags = 20 }) {
   const [input, setInput] = useState('');

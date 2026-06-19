@@ -18,6 +18,7 @@
  *     pf-sharing-box, pf-sharing-heading, kpkg-detail-loading). Replace inline
  *     visibility pill with shared VisibilityPill component. Replace hardcoded English
  *     strings with i18n t() calls.
+ *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -393,7 +394,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     if (!el) {
       const all = document.querySelectorAll('[data-entry-key]');
       for (const candidate of all) {
-        if (candidate.dataset.entryKey.endsWith('/' + entryKey)) { el = candidate; break; }
+        if (/** @type {HTMLElement} */ (candidate).dataset.entryKey.endsWith('/' + entryKey)) { el = candidate; break; }
       }
     }
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('kpkg-entry-highlight'); setTimeout(() => el.classList.remove('kpkg-entry-highlight'), 1500); }

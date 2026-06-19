@@ -23,6 +23,7 @@
  *   v1.4.0 — 2026-06-02 — Component unification (#11): all six extension/instance
  *     status dots use the canonical <StatusDot> instead of bespoke .ext-status-dot
  *     (which had hardcoded #4ade80/#9ca3af — now tokenized via the component).
+ *   v1.4.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -577,18 +578,18 @@ export default function ExtensionsTab({ session, showToast }) {
     try {
       let manifest = '';
       if (manifestMode === 'upload') {
-        const fileInput = document.getElementById('ext-manifest-file');
+        const fileInput = /** @type {HTMLInputElement} */ (document.getElementById('ext-manifest-file'));
         if (!fileInput?.files[0]) throw new Error('No manifest file selected');
         manifest = await fileInput.files[0].text();
       } else {
-        const textarea = document.getElementById('ext-manifest-text');
+        const textarea = /** @type {HTMLInputElement} */ (document.getElementById('ext-manifest-text'));
         manifest = textarea?.value || '';
         if (!manifest.trim()) throw new Error('Manifest is empty');
       }
 
       const libs = {};
       if (libMode === 'upload') {
-        const libInput = document.getElementById('ext-lib-files');
+        const libInput = /** @type {HTMLInputElement} */ (document.getElementById('ext-lib-files'));
         if (libInput?.files) {
           for (const f of libInput.files) {
             libs[f.name] = await f.text();

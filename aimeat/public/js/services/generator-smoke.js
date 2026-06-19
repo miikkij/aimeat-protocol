@@ -7,6 +7,7 @@
  *   const result = await smokeTest('extension', 'prh-tiedonhaku', session);
  * @version-history
  *   v1.0.0 — 2026-03-26 — Initial smoke test module
+ *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 
 import { apiPost, apiGet } from '/js/api.js';
@@ -16,7 +17,7 @@ import { apiPost, apiGet } from '/js/api.js';
  * @param {string} type - Component type: 'extension', 'cortex', 'app'
  * @param {string} registeredAs - The registered name of the component
  * @param {object} session - Auth session for API calls
- * @returns {{ passed: boolean, error: string|null }}
+ * @returns {Promise<{ passed: boolean, error: string|null }>}
  */
 export async function smokeTest(type, registeredAs, session) {
   try {

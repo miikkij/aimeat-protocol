@@ -37,6 +37,7 @@
  *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging; fix apiPatch import
  *   v5.0.0 — 2026-03-20 — Remove agent-related functions (replaced by OpenRouter autopilot)
  *   v5.1.0 — 2026-03-21 — Add saveProjectSettings/getProjectSettings for settings collection step
+ *   v5.1.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -487,7 +488,7 @@ function cleanYaml(text) {
   s = s.replace(/\\_/g, '_');
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   try {
     const parsed = parseYaml(s);
     return stringifyYaml(parsed, { lineWidth: 0 });

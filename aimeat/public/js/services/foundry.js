@@ -40,6 +40,7 @@
  *   v6.0.0 — 2026-03-26 — Add multi-pass data model: PASS_TYPES, MULTI_PASS_TYPES,
  *     createInitialPasses, createUnitPasses, extractUnitsFromSkeleton, getNextPass,
  *     isDuplicatePrescription; skeleton/unit/test/reflection storage functions
+ *   v6.0.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -716,7 +717,7 @@ function cleanYaml(text) {
   s = s.replace(/\\_/g, '_');
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   try {
     const parsed = parseYaml(s);
     return stringifyYaml(parsed, { lineWidth: 0 });
@@ -1050,8 +1051,8 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
         const locale = name.replace(/^.*i18n-/, '');
         if (locale) {
           // Find service slug from sibling extension/csm
-          const extSibling = comps.find(c => c.type === 'extension' && c.registeredAs);
-          const csmSibling = comps.find(c => c.type === 'csm' && c.registeredAs);
+          const extSibling = components.find(c => c.type === 'extension' && c.registeredAs);
+          const csmSibling = components.find(c => c.type === 'csm' && c.registeredAs);
           const svcSlug = extSibling?.registeredAs || csmSibling?.registeredAs?.split('/')?.pop() || '';
           const memKey = svcSlug ? `${svcSlug}.i18n.${locale}` : `i18n.${locale}`;
           try { await apiDelete(`/v1/memory/${encodeURIComponent(memKey)}`); } catch { /* best effort */ }

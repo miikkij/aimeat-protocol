@@ -8,6 +8,7 @@
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
  *   v1.0.0 — 2026-06-08 — Initial: header bell + dropdown + mark-read for the notification inbox.
+ *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -26,7 +27,7 @@ async function api(path, opts = {}) {
 
 function relTime(iso) {
   try {
-    const d = new Date(iso), now = new Date(), s = Math.round((now - d) / 1000);
+    const d = new Date(iso), now = new Date(), s = Math.round((+now - +d) / 1000);
     if (s < 60) return 'just now';
     if (s < 3600) return Math.floor(s / 60) + 'm ago';
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';

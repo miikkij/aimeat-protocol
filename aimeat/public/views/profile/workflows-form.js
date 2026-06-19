@@ -69,7 +69,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
   }, []);
 
   // Pre-load offers for steps that already name an agent (edit mode).
-  useEffect(() => { steps.forEach(s => s.agent && loadOffers(s.agent)); }, []); // eslint-disable-line
+  useEffect(() => { steps.forEach(s => s.agent && loadOffers(s.agent)); }, []);  
 
   const setStep = (i, patch) => setSteps(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
   const addStep = () => setSteps(prev => [...prev, blankStep()]);

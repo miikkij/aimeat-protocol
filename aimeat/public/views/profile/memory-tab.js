@@ -33,6 +33,7 @@
  *     group-share brought into Memory; "Create a group →" when none exist). Plus bulk edit:
  *     per-row checkboxes + a bulk bar (change visibility incl. group / delete with confirm /
  *     clear). The detail-row select and edit-modal select remain as alternate paths.
+ *   v2.2.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -279,7 +280,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = () => resolve(/** @type {string} */ (reader.result).split(',')[1]);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -287,13 +288,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   async function handleDownloadFile(key) {
     try {
-      const headers = {};
+      const headers = /** @type {Record<string,string>} */ ({});
       if (window.AIMEAT?.auth?.hasSession) {
         const session = window.AIMEAT.auth.getSession();
         if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
       }
       const resp = await fetch(`${NODE_URL}/v1/memory/files/${encodeURIComponent(key)}`, { headers });
-      if (!resp.ok) throw new Error(resp.status);
+      if (!resp.ok) throw new Error(String(resp.status));
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -433,9 +434,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     const sorted = [...entries];
     switch (sortBy) {
       case 'updated':
-        return sorted.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+        return sorted.sort((a, b) => +new Date(b.updated_at || 0) - +new Date(a.updated_at || 0));
       case 'created':
-        return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return sorted.sort((a, b) => +new Date(b.created_at || 0) - +new Date(a.created_at || 0));
       case 'alpha':
         return sorted.sort((a, b) => a.key.localeCompare(b.key));
       default:

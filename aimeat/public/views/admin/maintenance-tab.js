@@ -45,7 +45,7 @@ export default function MaintenanceTab({ data, reload }) {
         const reader = new FileReader();
         reader.onload = async () => {
           try {
-            const parsed = JSON.parse(reader.result);
+            const parsed = JSON.parse(/** @type {string} */ (reader.result));
             await apiRestore(parsed);
             setBackupResult({ ok: true, msg: t('dashboard.dataRestored') });
             reload();
