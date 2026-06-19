@@ -155,5 +155,12 @@ await test('8. Materialize flow (API path): a document filed into a new workspac
     assert(hit.space === 'pages', `expected space=pages, got ${hit.space}`);
 });
 
+await test('9. Partial term matches (prefix/substring): "qwopdoc" finds the "qwopdocterm" document', async () => {
+    const r = await json(`/v1/librarian/search?q=qwopdoc`, { headers: auth(A.token) });
+    assert(r.status === 200, `search ${r.status}`);
+    const hit = (r.body.data.hits || []).find((h: any) => h.workspaceId === 'ws-materialized');
+    assert(!!hit, `partial term must match the full word, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

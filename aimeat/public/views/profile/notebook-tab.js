@@ -44,6 +44,12 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+/** First non-empty line of a note (markdown heading marks stripped), for the collapsed one-line view. */
+function firstLine(text) {
+  const line = (text || '').split('\n').map(l => l.trim()).find(Boolean) || '';
+  return line.replace(/^#{1,6}\s+/, '').replace(/[*_`>#]/g, '').slice(0, 160);
+}
+
 /** Best-effort plain text of a note value for the inbox preview. */
 function noteText(value) {
   if (typeof value === 'string') return value;
@@ -60,6 +66,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [saving, setSaving] = useState(false);
   const [inbox, setInbox] = useState(null);
   const [orgNames, setOrgNames] = useState({});
+  const [inboxFilter, setInboxFilter] = useState('');
+  const [inboxSort, setInboxSort] = useState('new');      // 'new' | 'old'
+  const [noteView, setNoteView] = useState({});           // noteKey → 'line' | 'peek' | 'full' (default 'peek')
 
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState(null);   // null = not searched yet
@@ -146,6 +155,23 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
   function openInMemory() {
     window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'memory' } }));
+  }
+
+  // Collapse cycle for an inbox note: one line → peek → full → one line.
+  const cycleView = (key) => setNoteView(v => {
+    const cur = v[key] || 'peek';
+    const next = cur === 'line' ? 'peek' : cur === 'peek' ? 'full' : 'line';
+    return { ...v, [key]: next };
+  });
+
+  // Filter (text) + sort (date) the inbox for display.
+  function visibleInbox() {
+    const ft = inboxFilter.trim().toLowerCase();
+    const filtered = (inbox || []).filter(n => !ft || noteText(n.value).toLowerCase().includes(ft));
+    return filtered.sort((a, b) => {
+      const da = +new Date(a.updated_at || a.created_at || 0), db = +new Date(b.updated_at || b.created_at || 0);
+      return inboxSort === 'old' ? da - db : db - da;
+    });
   }
 
   // ── Slice B: classify → suggestion → materialize ──
@@ -358,12 +384,34 @@ export default function NotebookTab({ session, showToast, onStats }) {
       ? html`<${Spinner} text=${t('profile.notebook.inboxLoading')} />`
       : inbox.length === 0
         ? html`<div class="empty">${t('profile.notebook.inboxEmpty')}</div>`
-        : html`<div class="pf-nb-inbox">
-            ${inbox.map(note => html`
+        : html`
+          <div class="action-bar pf-nb-inbox-bar">
+            <div class="search-bar pf-nb-search">
+              <input type="text" class="input-field" placeholder=${t('profile.notebook.filterPlaceholder')}
+                value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)} />
+              ${inboxFilter && html`<button class="btn-ghost btn-sm" onClick=${() => setInboxFilter('')}>✕</button>`}
+            </div>
+            <select class="input-field pf-nb-sort" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)}>
+              <option value="new">${t('profile.notebook.sortNew')}</option>
+              <option value="old">${t('profile.notebook.sortOld')}</option>
+            </select>
+          </div>
+          ${visibleInbox().length === 0
+            ? html`<div class="empty">${t('profile.notebook.noMatch')}</div>`
+            : html`<div class="pf-nb-inbox">
+            ${visibleInbox().map(note => { const view = noteView[note.key] || 'peek'; return html`
               <div class="pf-nb-note" key=${note.key}>
-                <div class="pf-nb-note-text"><${Markdown} text=${noteText(note.value)} /></div>
+                <div class="pf-nb-note-text pf-nb-note-text--${view}">
+                  ${view === 'line'
+                    ? html`<span class="pf-nb-note-line">${escHtml(firstLine(noteText(note.value)))}</span>`
+                    : html`<${Markdown} text=${noteText(note.value)} />`}
+                </div>
                 <div class="pf-nb-note-foot">
-                  <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
+                  <div class="pf-nb-note-meta">
+                    <button class="btn-ghost btn-sm pf-nb-view-btn" title=${t('profile.notebook.toggleView')}
+                      onClick=${() => cycleView(note.key)}>${view === 'full' ? '⌃' : '⌄'}</button>
+                    <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
+                  </div>
                   <div class="pf-nb-note-btns">
                     <button class="btn-primary btn-sm" disabled=${sortingKey === note.key}
                       onClick=${() => handleSuggest(note)}>
@@ -395,8 +443,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
                   </div>`}
                 ${suggest?.noteKey === note.key && renderSuggestPanel()}
               </div>
-            `)}
-          </div>`
+            `; })}
+          </div>`}
+        `
     }
   `;
 }
