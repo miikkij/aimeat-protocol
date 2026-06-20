@@ -46,14 +46,18 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
     { channel: 'chrome', label: 'system Chrome' },
     { label: 'Playwright Chromium' },
   ];
+  let lastErr: unknown;
   for (const a of attempts) {
     try {
       const browser = await chromium.launch({ headless: true, channel: a.channel });
       logger.info(`Screenshot auto-capture: using ${a.label}.`);
       return browser;
-    } catch { /* try the next browser */ }
+    } catch (e) { lastErr = e; /* try the next browser */ }
   }
-  logger.info('Screenshot auto-capture: no browser found (run `npx playwright install chromium` to enable) — disabled.');
+  // Surface the real launch failure — a downloaded browser that can't start (missing Linux libs)
+  // looks identical to "not installed" otherwise. On Linux: `sudo npx playwright install-deps chromium`.
+  logger.info('Screenshot auto-capture: no usable browser — disabled. Install one with '
+    + '`npx playwright install --with-deps chromium`. Last error: ' + ((lastErr as Error)?.message ?? 'unknown'));
   return null;
 }
 
