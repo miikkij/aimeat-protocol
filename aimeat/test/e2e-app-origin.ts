@@ -106,12 +106,14 @@ async function main() {
             assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
         });
 
-        console.log('\nPhase 1: apex inline → 301 app origin');
-        await test('apex GET ?mode=inline 301-redirects to the app origin path form', async () => {
+        // The app auto-gets a per-app subdomain derived from its filename ("origin-demo.html").
+        const SUB = 'origin-demo';
+
+        console.log('\nPhase 1: apex inline → 301 to the AUTO-ASSIGNED per-app subdomain (no manual step)');
+        await test('apex GET ?mode=inline 301s to <auto-sub>.appHost', async () => {
             const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?mode=inline`, { redirect: 'manual' });
             assert(res.status === 301, `expected 301, got ${res.status}`);
-            const loc = res.headers.get('location') ?? '';
-            assert(loc === `http://${APP_HOST}:${PORT}/${owner}/${filename}`, `unexpected Location: ${loc}`);
+            assert((res.headers.get('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
         });
 
         await test('apex raw download (no mode) still serves on apex (attachment, not executed)', async () => {
@@ -121,11 +123,11 @@ async function main() {
             assert((await res.text()) === HTML, 'download body matches');
         });
 
-        console.log('\nPhase 2: app origin serves app HTML');
-        await test('app-origin path form (x-app-origin) serves the app HTML', async () => {
-            const res = await fetch(`${BASE}/${owner}/${filename}`, { headers: { 'x-app-origin': '1' } });
-            assert(res.status === 200, `expected 200, got ${res.status}`);
-            assert((await res.text()) === HTML, 'app-origin body matches');
+        console.log('\nPhase 2: bare-host path form auto-redirects to the per-app subdomain');
+        await test('app-origin path form (x-app-origin) 302-redirects to the auto-assigned subdomain', async () => {
+            const res = await fetch(`${BASE}/${owner}/${filename}`, { headers: { 'x-app-origin': '1' }, redirect: 'manual' });
+            assert(res.status === 302, `expected 302, got ${res.status}`);
+            assert((res.headers.get('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
         });
 
         await test('app-origin path form ignores non-.html paths (API still reachable)', async () => {
@@ -134,22 +136,10 @@ async function main() {
             assert(res.status === 200, `/v1/spec on app host should still 200, got ${res.status}`);
         });
 
-        console.log('\nPhase 3: assigned per-app subdomain');
-        await test('operator assigns a subdomain; apex inline then 301s to <sub>.appHost', async () => {
-            const create = await json('/v1/admin/subdomains', {
-                method: 'POST', headers: { Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ subdomain: 'demo', kind: 'app', target: `${owner}/${filename}` }),
-            });
-            assert(create.status === 201, `subdomain create failed: ${create.status} ${JSON.stringify(create.body)}`);
-            const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?mode=inline`, { redirect: 'manual' });
-            assert(res.status === 301, `expected 301, got ${res.status}`);
-            assert((res.headers.get('location') ?? '') === `http://demo.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
-        });
-
-        await test('app-origin subdomain form (x-app-origin + x-subdomain) serves the app HTML at /', async () => {
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'demo' } });
+        console.log('\nPhase 3: the per-app subdomain serves the app HTML with the SSO shim');
+        await test('subdomain form (x-app-origin + x-subdomain) serves the app HTML at / with the shim', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            // Body is the app HTML with the seamless-SSO shim injected (per-app subdomain).
             const body = await res.text();
             assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
             assert(body.includes('/app-login.js'), 'subdomain-served body has the SSO shim injected');

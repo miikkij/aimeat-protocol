@@ -41,6 +41,8 @@
  *   v1.7.0 -- 2026-06-20 -- Require a non-empty description when publishing a NEW app (so the
  *     catalogue + landing wall always have one); on an update, carry the existing description
  *     forward when omitted so a re-publish / restore never blanks it.
+ *   v1.8.0 -- 2026-06-20 -- appOriginUrl auto-assigns a per-app subdomain (ensureAppSubdomain) so the
+ *     apex inline 301 lands on the app's own origin → seamless SSO works with no manual subdomain step.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -56,6 +58,7 @@ import { resolveGhii } from '../utils/ghii-resolver.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
+import { ensureAppSubdomain } from './subdomains.js';
 
 /**
  * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
@@ -75,10 +78,10 @@ async function appOriginUrl(config: AimeatConfig, storage: Storage, owner: strin
     } catch { /* keep https, no port */ }
     const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
     try {
-        const sites = await storage.listSubdomainSites();
-        const match = sites.find(s => s.enabled && s.kind === 'app'
-            && (s.target === `${owner}/${filename}` || s.target === `${bareOwner}/${filename}`));
-        if (match) return `${scheme}://${match.subdomain}.${config.appHost}${portSuffix}/`;
+        // Auto-assign a per-app subdomain on first open so seamless SSO works with no manual step
+        // (existing apps migrate transparently); fall back to the shared path form only if none is free.
+        const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
+        if (sub) return `${scheme}://${sub}.${config.appHost}${portSuffix}/`;
     } catch { /* fall through to path form */ }
     return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
 }
