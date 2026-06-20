@@ -28,6 +28,39 @@ All notable changes to AIMEAT are documented in this file.
   `test/e2e-oauth-login.ts` (disabled-guard).
 - **Sign-in modal submits on Enter.** Pressing Enter in any sign-in field (username / password /
   display name) triggers Sign In / Register, unless a request is already in flight. `src/routes/libs.ts`.
+- **Value-first landing: a build-an-app hero + a live wall of real published apps.** The logged-out
+  landing (`/v1/portal`) now leads with *"Build a real app with your AI — in minutes, and it's yours"*
+  and a one-click **Copy the build prompt**; the gallery became a LIVE, manifest-driven wall of the
+  apps people actually published here — a fixed 3-up grid with a filter search, each card showing
+  name · description · author · publish date/time, plus a screenshot thumbnail when one exists.
+  `public/views/landing.js`, `public/css/views/landing.css`, EN+FI `landing.*` strings.
+- **App screenshots (auto-generated).** New `POST /v1/apps/:owner/:filename/screenshot` sets/replaces
+  an app's thumbnail without re-publishing — the app's **owner**, or a node **operator** for any app
+  (idempotent upsert, 2 MB cap, path-traversal guarded); served at the existing `GET …/screenshot` and
+  shown in the catalogue + on the landing wall. A new `aimeat screenshot-worker` command
+  (`pnpm screenshot:worker`, or `--watch N` as a self-contained daemon) renders every app that has no
+  screenshot and uploads a JPEG — full-fidelity headless **Chromium driven via the machine's own
+  Edge/Chrome** (`playwright-core` channel fallback, **no browser download** on Windows/desktop; a
+  headless server runs `npx playwright install chromium` once). Auth via a long-lived operator PAT.
+  Opt-in — the node runs fine without it. `src/routes/apps.ts`, `src/cli/screenshot-worker.ts`,
+  `src/index.ts`, `openapi.yaml`, new `playwright-core` dependency, `public/views/landing.js` +
+  `landing.css`, `test/e2e-apps.ts` (Phase 6), README.
+
+### Changed
+
+- **A description is now required when publishing a NEW app**, on both `POST /v1/apps` and the MCP
+  `aimeat_app_publish` — so the catalogue and the landing wall always have one. On an **update** the
+  existing description is **carried forward** when omitted, so a re-publish / restore never blanks it
+  (no breakage). The catalogue publish dialog gained a Description field; the landing build prompt and
+  both backend error messages tell the user the AI can write it. `src/routes/apps.ts`,
+  `src/mcp/apps.ts`, `src/static/app-catalog.html`, `public/views/landing.js`, `test/e2e-apps.ts`
+  (Phase 7).
+- **Plainer surface copy (less protocol jargon).** First-impression text no longer leads with raw
+  identifiers: the register / "what you get" copy says *"your own private space" / "your own digital
+  identity"* instead of **GHII**; **organism** is glossed as *"shared space (organism)"* at its
+  newcomer touchpoints (notebook, app-integration setup). Finnish heart-morsel wording normalised to
+  one brand form (`Muruset`→`Sydänmuruset`, `morselia`→`murusia`, `Morselisaldo`→`Murusaldo`).
+  Deep / operator surfaces keep the exact terms. `locales/en.json`, `locales/fi.json`.
 
 ### Fixed
 
@@ -81,11 +114,44 @@ Comprehensive security & vulnerability audit (findings + status tracked in
   flow persisted a private key into the `aimeat_session` `localStorage` object that nothing ever read
   — pure XSS-theft surface; removed (only the non-secret fields + JWT remain). `src/routes/admin.ts`.
   (The broader JWT-in-`localStorage` → httpOnly-cookie migration is deferred — see below.)
-- **App-origin isolation plan for H-2 (cross-user app session theft).** Design + phased plan to serve
-  all user apps from a dedicated `*.apps.aimeat.io` origin (so apps can't read `aimeat.io` storage or
-  receive the **host-only** auth cookie) plus an explicit OAuth-like scoped app-grant flow surfaced in
-  the profile Access tab. Verified the auth/admin cookies are host-only (no `Domain=`) — the invariant
-  the isolation depends on. `docs/internal/2026-06-20-app-origin-isolation-and-grants-design.md`.
+- **(High) App-origin isolation + explicit app grants — H-2 (cross-user app session theft) closed,
+  deployed live on aimeat.io.** A user-published app opened by a victim could run as a top-level
+  document on the **apex `aimeat.io` origin** (same origin as the authenticated SPA) and read the
+  victim's JWT from `localStorage` / mint their session via the refresh cookie — a stored-XSS-class
+  cross-user account takeover. Closed in phases (design + runbook:
+  `docs/internal/2026-06-20-app-origin-isolation-and-grants-design.md`,
+  `docs/internal/app-origin-deployment.md`):
+  - **Phase 0 (always-on, no infra):** every in-SPA app launch now runs in a **sandboxed,
+    opaque-origin iframe** (`sandbox` without `allow-same-origin`) instead of a top-level apex
+    document — closing the main vector for all nodes, including middle-/ctrl-click bypass. New shared
+    `public/js/app-sandbox.js` + `public/css/components/app-sandbox.css`; central app-link interceptor
+    in `public/spa.html`; `src/static/app-catalog.html` (`viewPublished`/`launchInTab`/`openExternal`
+    hardened); `public/views/{landing,how-it-works,business}.js` → `openAppSandboxed`. CI guard that
+    the `aimeat_rt` `Set-Cookie` stays **host-only** (no `Domain=`) — the invariant the whole fix
+    rests on — in `test/e2e-session-refresh.ts` (SQLite + MongoDB).
+  - **Phases 1–2 (serve apps off-origin, flag-gated `AIMEAT_APP_ORIGIN_ENABLED` + `AIMEAT_APP_HOST`):**
+    all user apps serve from a dedicated **`*.apps.<domain>`** origin; apex `?mode=inline` (runnable)
+    requests **301** to the app origin (port-aware, so it works on `:443` and locally on `:40050`),
+    while the raw download (attachment) stays on apex. `subdomain.ts` two-level host parsing +
+    `req.appOrigin`; `subdomains.ts` app-origin serve (subdomain + path form); `apps.ts` `appOriginUrl`;
+    `config.ts` (`appHost`/`appOriginEnabled`). CSP updated so the sandboxed viewer can frame the now
+    cross-origin app: SPA + app-catalog `frame-src` includes the app host (`static-files.ts`), and the
+    app response `frame-ancestors` allows the apex (`subdomains.ts` `appCsp`). Unit
+    `test/unit/subdomain-middleware.test.ts`; self-spawning E2E `test/e2e-app-origin.ts`.
+  - **Phases 3–4 (explicit scoped grants):** an app that needs the user's data requests an **OAuth-like,
+    PKCE-protected grant** (authorize → consent on the trusted apex → code → token) and receives a
+    short-lived **scoped, revocable** token (role `app`, only the approved agent scopes, `app_grant`
+    claim) + a rotating refresh token — **never the ambient session**; the blast radius is exactly the
+    granted scopes (enforced by `requireScope`). New `app-grants.ts` + `AppGrantRecord` storage
+    (SQLite + Mongo + Postgres), consent page `public/views/app-grant.js`, and a **Connected Apps**
+    list/revoke section in the profile **Access** tab. `src/auth/jwt.ts` (`app_grant` claim),
+    `src/auth/middleware.ts` (`app` as a scoped external principal). E2E `test/e2e-app-grants.ts`.
+  - **Out-of-the-box for desktop + self-host:** the Tauri desktop ships the isolation **by default**
+    via `apps.localhost` (resolves to loopback in the WebView — no DNS/TLS), set in
+    `aimeat-desktop/src-tauri/src/node_manager.rs` (fresh + backfilled installs); `aimeat init` now
+    prompts public nodes to enable the app origin (with a DNS/TLS warning). `openapi.yaml` + EN/FI
+    i18n synced. **Verified live end-to-end on aimeat.io / apps.aimeat.io** (apex 301, cross-origin
+    sandboxed framing with no CSP errors, app cannot read apex `localStorage` or refresh a session).
 
 ## [1.26.0] - 2026-06-19
 
