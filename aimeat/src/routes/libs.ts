@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.19.0 - 2026-06-20 - aimeat-auth.js seamless SSO on app origins (H-2): when the SDK runs on a
+ *   *.apps.<domain> host (where the host-only cookie is unreachable), AIMEAT.auth.login() + refresh()
+ *   pull a scoped grant token via the same-site silent bridge (hidden iframe → apex), so an app like
+ *   Sanomat is logged in with no separate login (isAppOrigin / silentAppToken / restoreSessionFromAppOrigin).
  * v1.18.0 - 2026-06-20 - Sign-in modal submits on Enter from any field (username/password/
  *   display name), unless the button is mid-request.
  * v1.17.0 - 2026-06-20 - Sign-in modal shows a "Continue with Google" button when the node
@@ -539,6 +543,65 @@ async function restoreSessionFromCookie() {
   }
 }
 
+// ── App-origin seamless SSO (H-2) ──────────────────────────────────────────────────────────
+// When this SDK runs on an APP ORIGIN (a *.apps.<domain> host, different from the node/apex), the
+// host-only session cookie can't be read directly (cross-origin + CORS *). Instead we use the
+// same-site silent bridge: a hidden iframe to the apex, where the cookie IS first-party, mints a
+// SCOPED, revocable grant token and posts it back — so the owner's own app is logged in with no
+// separate login, and never receives the ambient session.
+function isAppOrigin() {
+  try { return location.origin !== new URL(NODE_URL).origin; } catch (e) { return false; }
+}
+
+function silentAppToken() {
+  return new Promise(function (resolve) {
+    var apexOrigin;
+    try { apexOrigin = new URL(NODE_URL).origin; } catch (e) { resolve(null); return; }
+    if (location.origin === apexOrigin) { resolve(null); return; }
+    var settled = false, iframe = null, timer = null;
+    function finish(v) {
+      if (settled) return; settled = true;
+      window.removeEventListener('message', onMsg);
+      if (timer) clearTimeout(timer);
+      if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      resolve(v);
+    }
+    function onMsg(e) {
+      if (e.origin !== apexOrigin) return;
+      var d = e.data || {};
+      if (d.type !== 'aimeat_app_login') return;
+      var r = d.result || {};
+      finish((r && r.ok && r.access_token) ? r : null);
+    }
+    window.addEventListener('message', onMsg);
+    iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.src = apexOrigin + '/app-silent.html?scope=' + encodeURIComponent('memory:read memory:write');
+    (document.body || document.documentElement).appendChild(iframe);
+    timer = setTimeout(function () { finish(null); }, 8000);
+  });
+}
+
+async function restoreSessionFromAppOrigin() {
+  var r = await silentAppToken();
+  if (!r || !r.access_token) return null;
+  var payload = parseJwt(r.access_token) || {};
+  var ownerName = payload.owner || payload.sub;
+  if (!ownerName) return null;
+  var session = createSession({
+    owner: ownerName,
+    ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
+    gaii: null, jwt: r.access_token, roles: payload.roles || [], displayName: '',
+  });
+  session._appOrigin = true;
+  persistSession(session);
+  currentSession = session;
+  scheduleAutoRefresh(session);
+  emit('login', session);
+  return session;
+}
+
 function scheduleAutoRefresh(session) {
   if (refreshTimer) clearTimeout(refreshTimer);
   if (!session?.jwt) return;
@@ -598,6 +661,16 @@ function createSession(data) {
     // still re-sign with their IndexedDB key. Concurrent owner refreshes share one
     // in-flight request so they don't each rotate the cookie.
     async refresh() {
+      // App-origin sessions re-mint via the silent bridge (the apex cookie isn't reachable here).
+      if (session._appOrigin) {
+        var t = await silentAppToken();
+        if (!t || !t.access_token) throw new Error('App session expired — the owner is not logged in on the node.');
+        session.jwt = t.access_token;
+        session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        persistSession(session);
+        scheduleAutoRefresh(session);
+        return session;
+      }
       // Federated sessions can't self-refresh yet — user must re-login.
       if (session.federated) {
         throw new Error('Federated session expired. Please log in again.');
@@ -741,6 +814,9 @@ const auth = {
    * @returns {Promise<object|null>} Session or null if no stored credentials
    */
   async login(username) {
+    // On an app origin the host-only cookie is unreachable (cross-origin + CORS *); use the
+    // same-site silent bridge so the owner's own app is logged in with no separate login (H-2).
+    if (isAppOrigin()) return await restoreSessionFromAppOrigin();
     const stored = load('session');
     // No local metadata — but an httpOnly refresh cookie may exist (e.g. a browser an agent
     // authenticated with an owner access token). Restore the session from the cookie alone.
