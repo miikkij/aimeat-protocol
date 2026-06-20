@@ -51,8 +51,11 @@ function appCsp(apexOrigin: string): string {
   // The app frames the apex silent-SSO bridge (hidden iframe → apex/app-silent.html), so frame-src
   // must allow the apex origin explicitly (https://aimeat.io is also covered by `https:`, but an http
   // dev apex like http://localtest.me is not — include it so seamless SSO works there too).
-  const apexFrame = apexOrigin ? ' ' + apexOrigin : '';
-  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexFrame}; frame-ancestors ${ancestors}`;
+  // The app also fetches the apex directly for the H-2 grant token exchange (POST
+  // /v1/app-grants/token) and the silent bridge, so connect-src must allow the apex origin
+  // (https://aimeat.io is covered by `https:`; an http dev apex like http://localtest.me is not).
+  const apexAllow = apexOrigin ? ' ' + apexOrigin : '';
+  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
 }
 
 /**

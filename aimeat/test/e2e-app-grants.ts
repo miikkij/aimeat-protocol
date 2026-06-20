@@ -165,6 +165,33 @@ async function main() {
         assert(r.body?.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body?.error?.code}`);
     });
 
+    console.log('\nPhase 2b: web_message (popup) mode + Advanced scope subset');
+    await test('response_mode=web_message is echoed, and consent grants only the approved subset', async () => {
+        const q = new URLSearchParams({
+            app: `${owner}/${FILENAME}`, response_type: 'code', response_mode: 'web_message',
+            scope: 'memory:read storage:read storage:write', redirect_uri: REDIRECT,
+            state: 's2', code_challenge: codeChallenge, code_challenge_method: 'S256',
+        });
+        const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+        assert(res.status === 302, `authorize: ${res.status}`);
+        const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')![1]);
+        const det = await json(`/v1/app-grants/request/${rid}`);
+        assert(det.body.data.response_mode === 'web_message', `response_mode echoed, got ${det.body.data.response_mode}`);
+        assert(det.body.data.scopes.length === 3, `3 scopes requested, got ${det.body.data.scopes.length}`);
+        // Approve only a SUBSET (storage:read); an unrequested scope (operator:all) is filtered out.
+        const con = await json('/v1/app-grants/authorize-consent', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ request_id: rid, scopes: ['storage:read', 'operator:all'] }),
+        });
+        assert(con.status === 200, `consent: ${con.status} ${JSON.stringify(con.body)}`);
+        const code2 = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+        const tok = await json('/v1/app-grants/token', {
+            method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: code2, code_verifier: codeVerifier, redirect_uri: REDIRECT }),
+        });
+        assert(tok.status === 200 && tok.body.ok, `token: ${tok.status} ${JSON.stringify(tok.body)}`);
+        assert(tok.body.data.scope === 'storage:read', `granted subset only (storage:read), got "${tok.body.data.scope}"`);
+    });
+
     console.log('\nPhase 3: Refresh + manage + revoke');
     await test('refresh_token rotates and re-mints an access token', async () => {
         const r = await json('/v1/app-grants/token', {

@@ -63,6 +63,8 @@ interface PendingRequest {
   redirectUri: string;
   state: string;
   codeChallenge: string;
+  codeChallengeMethod: 'S256' | 'plain';
+  responseMode: 'query' | 'web_message'; // web_message → consent page postMessages the code to the popup-opener app
   expiresAt: number;
 }
 
@@ -77,6 +79,7 @@ interface AuthCode {
   redirectUri: string;
   state: string;
   codeChallenge: string;
+  codeChallengeMethod: 'S256' | 'plain';
   expiresAt: number;
 }
 
@@ -85,8 +88,10 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-/** PKCE S256 verification: base64url(sha256(verifier)) === challenge. */
-function verifyPkce(codeVerifier: string, codeChallenge: string): boolean {
+/** PKCE verification. S256 (default): base64url(sha256(verifier)) === challenge. plain: verifier ===
+ *  challenge (used only by non-secure-context clients without crypto.subtle; real app origins use S256). */
+function verifyPkce(codeVerifier: string, codeChallenge: string, method: 'S256' | 'plain' = 'S256'): boolean {
+  if (method === 'plain') return codeVerifier === codeChallenge;
   const computed = createHash('sha256').update(codeVerifier).digest('base64url');
   return computed === codeChallenge;
 }
@@ -136,8 +141,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (responseType !== 'code') {
       return res.status(400).json(error(config.nodeId, 'UNSUPPORTED_RESPONSE_TYPE', 'response_type must be "code"'));
     }
-    if (method !== 'S256' || !codeChallenge) {
-      return res.status(400).json(error(config.nodeId, 'PKCE_REQUIRED', 'code_challenge with code_challenge_method=S256 is required'));
+    if ((method !== 'S256' && method !== 'plain') || !codeChallenge) {
+      return res.status(400).json(error(config.nodeId, 'PKCE_REQUIRED', 'code_challenge with code_challenge_method S256 (or plain on non-secure-context clients) is required'));
     }
     const rd = validRedirect(redirectUri);
     if (!rd.ok) {
@@ -160,10 +165,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app "${app}"`));
     }
 
+    const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
+      codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode,
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -183,6 +190,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       app: pending.app,
       app_name: pending.appName,
       app_origin: pending.appOrigin,
+      response_mode: pending.responseMode,
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s] })),
     }));
   });
@@ -197,13 +205,21 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     pendingRequests.delete(requestId);
 
+    // Optional "Advanced" scope subset: the user may approve FEWER scopes than requested, never more.
+    const requestedSubset: unknown = req.body?.scopes;
+    let grantedScopes = pending.scopes;
+    if (Array.isArray(requestedSubset)) {
+      const subset = requestedSubset.filter((s): s is string => typeof s === 'string' && pending.scopes.includes(s));
+      if (subset.length) grantedScopes = subset;
+    }
+
     const gaii = resolveIdentity(req.auth!, config.nodeId); // owner GHII (alice@node)
     const owner = req.auth!.owner;
     const code = `agc-${randomBytes(24).toString('hex')}`;
     authCodes.set(code, {
       code, app: pending.app, appName: pending.appName, appOrigin: pending.appOrigin,
-      owner, gaii, scopes: pending.scopes, redirectUri: pending.redirectUri,
-      state: pending.state, codeChallenge: pending.codeChallenge,
+      owner, gaii, scopes: grantedScopes, redirectUri: pending.redirectUri,
+      state: pending.state, codeChallenge: pending.codeChallenge, codeChallengeMethod: pending.codeChallengeMethod,
       expiresAt: Date.now() + CODE_TTL_MS,
     });
 
@@ -276,7 +292,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     } else if (existing && requested.every(s => existing.scopes.includes(s))) {
       scopes = requested.length ? requested : existing.scopes;
     } else {
-      return reply({ ok: false, error: 'consent_required' });
+      // Surface what the app is + what it's asking for, so the SDK can launch the visible consent
+      // popup (the authorize flow) without a second round-trip to discover the app identity.
+      return reply({ ok: false, error: 'consent_required', app: site.target, app_name: appFile, scope: requested.join(' ') });
     }
 
     // Mint: reuse this owner's existing grant for the app, else create one.
@@ -314,7 +332,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       if (ac.redirectUri !== redirectUri) {
         return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'redirect_uri mismatch'));
       }
-      if (!verifier || !verifyPkce(verifier, ac.codeChallenge)) {
+      if (!verifier || !verifyPkce(verifier, ac.codeChallenge, ac.codeChallengeMethod)) {
         return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'PKCE verification failed'));
       }
 
