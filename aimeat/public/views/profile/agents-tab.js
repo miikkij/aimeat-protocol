@@ -73,6 +73,7 @@ import { listMessages } from '/js/services/agent-messages.js';
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
   { key: 'memory',    permissions: ['read', 'write', 'delete'] },
+  { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },
   { key: 'social',    permissions: ['read', 'write'] },
   { key: 'wallet',    permissions: ['read'] },
@@ -91,8 +92,8 @@ const SCOPE_DOMAINS = [
 ];
 
 const SCOPE_TEMPLATES = {
-  readonly:  ['memory:read', 'catalogue:read', 'social:read'],
-  standard:  ['memory:read', 'memory:write', 'catalogue:read', 'social:read', 'work:request', 'work:read'],
+  readonly:  ['memory:read', 'storage:read', 'catalogue:read', 'social:read'],
+  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read'],
   full:      ['*'],
 };
 
