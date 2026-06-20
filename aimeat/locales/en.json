@@ -3675,7 +3675,11 @@
     "realtimeMaxPeersPerRoom": "Maximum peers per room",
     "extensionsEnabled": "Enable V8 isolate extension system?",
     "extensionMaxMemoryMb": "Max memory per extension isolate (MB)",
-    "extensionTimeoutMs": "Extension execution timeout (ms)"
+    "extensionTimeoutMs": "Extension execution timeout (ms)",
+    "appOrigin": "Serve user apps from a separate app origin (*.apps.<domain>) to isolate them from your session? Requires DNS + a wildcard TLS cert (see docs/internal/app-origin-deployment.md). Defaults to off.",
+    "appHost": "App origin host (e.g. apps.example.com)",
+    "appHostHint": "Set up DNS (apps.<domain> + wildcard *.apps.<domain>) and a wildcard TLS cert first — see docs/internal/app-origin-deployment.md",
+    "appHostRequired": "App host is required when app origin isolation is enabled"
   },
   "join": {
     "title": "Join AIMEAT Federation",

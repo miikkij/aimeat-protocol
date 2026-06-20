@@ -3675,7 +3675,11 @@
     "realtimeMaxPeersPerRoom": "Enimmäismäärä osallistujia per huone",
     "extensionsEnabled": "Ota V8-eristetty laajennusjärjestelmä käyttöön?",
     "extensionMaxMemoryMb": "Enimmäismuisti per laajennus (MB)",
-    "extensionTimeoutMs": "Laajennuksen suorituksen aikakatkaisu (ms)"
+    "extensionTimeoutMs": "Laajennuksen suorituksen aikakatkaisu (ms)",
+    "appOrigin": "Tarjotaanko käyttäjien sovellukset erillisestä sovellusalkuperästä (*.apps.<domain>) niiden eristämiseksi istunnostasi? Vaatii DNS:n + jokerimerkki-TLS-varmenteen (katso docs/internal/app-origin-deployment.md). Oletuksena pois päältä.",
+    "appHost": "Sovellusalkuperän isäntä (esim. apps.example.com)",
+    "appHostHint": "Määritä ensin DNS (apps.<domain> + jokerimerkki *.apps.<domain>) ja jokerimerkki-TLS-varmenne — katso docs/internal/app-origin-deployment.md",
+    "appHostRequired": "Sovellusisäntä vaaditaan, kun sovellusalkuperän eristys on käytössä"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",

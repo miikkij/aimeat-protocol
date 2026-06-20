@@ -186,6 +186,14 @@ fn default_env(node_id: &str) -> String {
          AIMEAT_NODE_ID=\"{node_id}\"\n\
          AIMEAT_FEDERATION_ROLE=\"standalone\"\n\
          \n\
+         # App origin isolation (security finding H-2): user-published apps run on a\n\
+         # SEPARATE origin from the authenticated UI so they can never reach your session.\n\
+         # `*.localhost` resolves to loopback in the WebView automatically, so this needs\n\
+         # NO DNS and NO TLS on the desktop — it just works. (Hosted nodes on a real domain\n\
+         # use apps.<domain> + a wildcard cert instead — see docs/internal/app-origin-deployment.md.)\n\
+         AIMEAT_APP_HOST=\"apps.localhost\"\n\
+         AIMEAT_APP_ORIGIN_ENABLED=true\n\
+         \n\
          # Security keys — auto-generated once. Keep secret; do not share or regenerate.\n\
          # Enables encrypted storage of your OpenRouter API key and TOTP secrets.\n\
          AIMEAT_ENCRYPTION_KEY=\"{enc}\"\n\
@@ -266,6 +274,26 @@ fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
         updated.push_str(&additions);
         std::fs::write(&rt.env_file, updated)
             .map_err(|e| format!("Failed to update .env with security keys: {}", e))?;
+    }
+
+    // Backfill app-origin isolation (H-2) into older installs whose `.env` predates it, so they
+    // get the same out-of-the-box isolation as fresh installs. Only added when ABSENT — a value
+    // the user set themselves is left untouched. `apps.localhost` needs no DNS/TLS in the WebView.
+    let content = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
+    let vars = parse_env(&content);
+    if !vars.contains_key("AIMEAT_APP_ORIGIN_ENABLED") && !vars.contains_key("AIMEAT_APP_HOST") {
+        let mut updated = content;
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str(
+            "\n# App origin isolation (H-2): apps run on a separate origin so they can't reach\n\
+             # your session. `*.localhost` resolves to loopback in the WebView — no DNS/TLS needed.\n\
+             AIMEAT_APP_HOST=\"apps.localhost\"\n\
+             AIMEAT_APP_ORIGIN_ENABLED=true\n",
+        );
+        std::fs::write(&rt.env_file, updated)
+            .map_err(|e| format!("Failed to update .env with app origin: {}", e))?;
     }
     Ok(())
 }

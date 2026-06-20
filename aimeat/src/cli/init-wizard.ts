@@ -1,7 +1,11 @@
 /**
- * Interactive `aimeat init` wizard using @clack/prompts.
- * Guides users through node configuration with use-case-based defaults.
- * Reads existing .env / config values so users see their current settings.
+ * @file init-wizard.ts
+ * @description Interactive `aimeat init` wizard using @clack/prompts. Guides users
+ *   through node configuration with use-case-based defaults; reads existing .env /
+ *   config values so users see their current settings; writes .env / .ini / .json.
+ * @version-history v1.25.2 — 2026-06-20 — Add App Origin Isolation (H-2) prompt to
+ *   advanced settings (public/custom nodes with a real base URL): confirm + app-host
+ *   text, derives apps.<host>, sets AIMEAT_APP_HOST/AIMEAT_APP_ORIGIN_ENABLED.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -174,6 +178,8 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_EXT_INSTALL_ROLE: 'operator',
   AIMEAT_MAX_EXTENSIONS_PER_OWNER: '10',
   AIMEAT_GENERATOR_ENABLED: 'true',
+  AIMEAT_APP_HOST: '',
+  AIMEAT_APP_ORIGIN_ENABLED: 'false',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -450,6 +456,13 @@ function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_EXTENSIONS_ENABLED', comment: 'Enable sandboxed extension system' },
         { key: 'AIMEAT_EXT_MAX_MEMORY_MB', comment: 'Max memory per extension sandbox (MB)' },
         { key: 'AIMEAT_EXT_TIMEOUT_MS', comment: 'Extension execution timeout (ms)' },
+      ],
+    },
+    {
+      title: 'App Origin Isolation (H-2)',
+      vars: [
+        { key: 'AIMEAT_APP_ORIGIN_ENABLED', comment: 'Serve user apps from *.apps.<domain> to isolate them from your session. Requires DNS + wildcard TLS (see docs/internal/app-origin-deployment.md)' },
+        { key: 'AIMEAT_APP_HOST', comment: 'App origin host, e.g. apps.example.com (required when AIMEAT_APP_ORIGIN_ENABLED=true)' },
       ],
     },
   ];
@@ -1294,6 +1307,8 @@ async function askEconomySettings(
 async function askAllAdvancedSettings(
   t: TFunction,
   cfg: AimeatConfig,
+  useCase: UseCase,
+  baseUrl: string,
 ): Promise<Record<string, string>> {
   const settings = await askEconomySettings(t, cfg);
 
@@ -1721,6 +1736,43 @@ async function askAllAdvancedSettings(
     if (extTimeout !== '5000') settings.AIMEAT_EXT_TIMEOUT_MS = extTimeout;
   }
 
+  // ── App Origin Isolation (H-2) ──
+  // Only relevant for public/custom nodes that serve user-published apps from a
+  // real domain. Serving apps from *.apps.<domain> isolates them from the
+  // operator's session (they can't steal cookies). Requires DNS + wildcard TLS.
+  if ((useCase === 'public' || useCase === 'custom') && /^https?:\/\//.test(baseUrl)) {
+    const appOriginEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.appOrigin'),
+        initialValue: false,
+      }),
+      t,
+    );
+    if (appOriginEnabled) {
+      // Derive apps.<host-of-baseUrl> as the default app host.
+      let appHostDefault = '';
+      try {
+        appHostDefault = `apps.${new URL(baseUrl).hostname}`;
+      } catch {
+        appHostDefault = '';
+      }
+      const appHost = checkCancel(
+        await p.text({
+          message: t('init.appHost'),
+          placeholder: appHostDefault || 'apps.example.com',
+          ...(appHostDefault ? { defaultValue: appHostDefault } : {}),
+          validate: val => {
+            const v = val ?? appHostDefault;
+            if (!v?.trim()) return t('init.appHostRequired');
+          },
+        }),
+        t,
+      );
+      settings.AIMEAT_APP_HOST = appHost.trim();
+      settings.AIMEAT_APP_ORIGIN_ENABLED = 'true';
+    }
+  }
+
   return settings;
 }
 
@@ -1798,7 +1850,7 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
     if (advanced === 'economy') {
       Object.assign(settings, await askEconomySettings(t, config));
     } else if (advanced === 'all') {
-      Object.assign(settings, await askAllAdvancedSettings(t, config));
+      Object.assign(settings, await askAllAdvancedSettings(t, config, useCase, settings.AIMEAT_BASE_URL ?? ''));
     }
   }
 

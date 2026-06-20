@@ -95,6 +95,7 @@ USAGE
   aimeat connect refresh         Re-download skill bundle
   aimeat connect logout          Remove stored credentials
   aimeat seed                    Seed example packages (digital signage, etc.)
+  aimeat screenshot-worker [opts] Backfill missing app screenshots (operator; uses system Edge/Chrome)
   aimeat backup  [FILE]          Export all data to JSON
   aimeat restore <FILE>          Import data from JSON backup
 
@@ -416,6 +417,12 @@ if (subcommand === 'config') {
   console.log(formatValidationResults(results));
   const hasErrors = results.some(r => r.level === 'error');
   process.exit(hasErrors ? 1 : 0);
+} else if (subcommand === 'screenshot-worker') {
+  // Operator tool: backfill missing app screenshots by rendering each app headless via the
+  // machine's own Edge/Chrome (no browser download). One-shot, or --watch N to run as a daemon.
+  const { runScreenshotWorker } = await import('./cli/screenshot-worker.js');
+  await runScreenshotWorker();
+  process.exit(0);
 } else if (subcommand === 'join') {
   const { runFederationJoin } = await import('./cli/federation-join.js');
   await runFederationJoin(config, positionals[1] ?? config.genesisUrl ?? undefined);
