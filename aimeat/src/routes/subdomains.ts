@@ -106,6 +106,22 @@ function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
 }
 
 /**
+ * Inject a `<script src>` (the seamless-SSO shim) into HTML body bytes, returning a Buffer. Handles
+ * a Node Buffer (SQLite), a Uint8Array (MongoDB/Prisma `Bytes`), or a string — decoding bytes as
+ * UTF-8 first. (Using `String()` on a Uint8Array would stringify it to "60,33,..." byte values — the
+ * bug this guards against.)
+ */
+export function injectAppScript(data: Buffer | Uint8Array | string, src: string): Buffer {
+  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+  const tag = `<script src="${src}"></script>`;
+  let html: string;
+  if (/<\/head>/i.test(raw)) html = raw.replace(/<\/head>/i, tag + '</head>');
+  else if (/<body[^>]*>/i.test(raw)) html = raw.replace(/<body[^>]*>/i, (m) => m + tag);
+  else html = tag + raw;
+  return Buffer.from(html, 'utf-8');
+}
+
+/**
  * Write a published app's HTML body with the app CSP + cache/security headers. When `injectSrc`
  * is set and the body is HTML, the seamless-SSO shim (`<script src=injectSrc>`) is injected so the
  * app gets a scoped grant token without a separate login (H-2 seamless SSO).
@@ -118,13 +134,7 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
 
   if (injectSrc && /text\/html/i.test(app.mimeType)) {
-    const raw = Buffer.isBuffer(app.data) ? app.data.toString('utf-8') : String(app.data);
-    const tag = `<script src="${injectSrc}"></script>`;
-    let html: string;
-    if (/<\/head>/i.test(raw)) html = raw.replace(/<\/head>/i, tag + '</head>');
-    else if (/<body[^>]*>/i.test(raw)) html = raw.replace(/<body[^>]*>/i, (m) => m + tag);
-    else html = tag + raw;
-    const buf = Buffer.from(html, 'utf-8');
+    const buf = injectAppScript(app.data as Buffer | Uint8Array | string, injectSrc);
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
