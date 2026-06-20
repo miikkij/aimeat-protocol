@@ -10,6 +10,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-20 — initial: interval backfill writing straight to storage; channel-fallback
  *     browser via lazy playwright-core; graceful self-disable when no browser is present.
+ *   v1.1.0 — 2026-06-20 — render the app's STORED HTML directly (fulfill the main document) instead of
+ *     navigating to the inline URL, which 301s to the app origin under H-2 and 404s on a node with no
+ *     app host (local dev) → captured error pages. Export runScreenshotCapturePass for manual/one-shot.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -79,17 +82,42 @@ export async function runScreenshotCapturePass(config: AimeatConfig, storage: St
     }
     try {
       const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 }) as {
-        newPage(): Promise<{ goto(u: string, o: unknown): Promise<unknown>; waitForTimeout(ms: number): Promise<void>; screenshot(o: unknown): Promise<Buffer>; close(): Promise<void> }>;
+        newPage(): Promise<{
+          goto(u: string, o: unknown): Promise<unknown>;
+          waitForTimeout(ms: number): Promise<void>;
+          screenshot(o: unknown): Promise<Buffer>;
+          route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
+          close(): Promise<void>;
+        }>;
       };
       const base = config.baseUrl.replace(/\/+$/, '');
       for (const app of missing) {
         const page = await ctx.newPage();
         try {
-          // Open the app ANONYMOUSLY at its own public URL (H-2 redirect to the app origin is fine);
-          // 'load' (not networkidle) because polling/SSE apps never go idle.
+          // Render the app's STORED HTML directly (fulfill the main document) rather than navigating
+          // to the public inline URL: that URL 301-redirects to the app origin under H-2, which 404s
+          // on a node with no separate app host (e.g. local dev) and would capture an error page.
+          // Sub-resources (libs, images, API) still load against the node and the page URL stays the
+          // node URL so relative paths resolve. Opened anonymously; 'load' (not networkidle) since
+          // polling/SSE apps never go idle.
+          const full = await storage.getAppByOwnerName(app.ownerName, app.filename);
+          // storage returns `data` as a Uint8Array (Prisma 6 Bytes); a plain Uint8Array's
+          // .toString('utf8') comma-joins the byte values instead of decoding — wrap in Buffer.
+          const html = full?.data ? Buffer.from(full.data).toString('utf8') : null;
           const url = `${base}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
+          if (html) {
+            let fulfilled = false;
+            await page.route('**/*', (route) => {
+              if (!fulfilled && route.request().resourceType() === 'document') {
+                fulfilled = true;
+                route.fulfill({ status: 200, contentType: 'text/html', body: html });
+              } else {
+                route.continue();
+              }
+            });
+          }
           await page.goto(url, { waitUntil: 'load', timeout: PAGE_TIMEOUT });
-          await page.waitForTimeout(1200);
+          await page.waitForTimeout(2000);
           const jpeg = await page.screenshot({ type: 'jpeg', quality: 80 });
           await storage.createStorageFile({
             key: `apps/screenshots/${app.filename}`,
