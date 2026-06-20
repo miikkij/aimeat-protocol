@@ -20,7 +20,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { auditDataAccess } from '../services/consent.js';
@@ -116,7 +116,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // POST /v1/storage — upload file (agent auth)
-    router.post('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/storage', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
 
         // Accept raw body or JSON with base64 data
@@ -238,7 +238,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // GET /v1/storage — list storage items (agent auth)
-    router.get('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.get('/v1/storage', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
         const files = await storage.listStorageFiles(gaii);
 
@@ -258,7 +258,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // Mirrors PATCH /v1/memory/files/:key/visibility. `:key` (single segment) matches the dotted,
     // slash-free keys used for workspace images; registered before the wildcard {*key} routes.
     // Lets a document make its embedded images public so other viewers can load them.
-    router.patch('/v1/storage/:key/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.patch('/v1/storage/:key/visibility', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
         const key = req.params.key as string;
         const { visibility } = req.body ?? {};
@@ -285,7 +285,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // -----------------------------------------------
 
     // POST /v1/storage/upload/init — initiate chunked upload
-    router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/storage/upload/init', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = resolve(req);
         const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
 
@@ -384,7 +384,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // POST /v1/storage/upload/:id/complete — assemble chunks into final file
-    router.post('/v1/storage/upload/:id/complete', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/storage/upload/:id/complete', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const uploadId = req.params.id as string;
         const upload = await storage.getChunkedUpload(uploadId);
         if (!upload) {
@@ -468,7 +468,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // DELETE /v1/storage/upload/:id — abort chunked upload
-    router.delete('/v1/storage/upload/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.delete('/v1/storage/upload/:id', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const uploadId = req.params.id as string;
         const upload = await storage.getChunkedUpload(uploadId);
         if (!upload) {
@@ -566,7 +566,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // HEAD /v1/storage/{*key} — file metadata (agent auth)
     // Must be registered before GET to prevent Express auto-HEAD via GET handler
-    router.head('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.head('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
         const file = await storage.getStorageFile(gaii, key);
@@ -607,7 +607,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // GET /v1/storage/{*key} — download file (agent auth)
-    router.get('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.get('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
         const file = await storage.getStorageFile(gaii, key);
@@ -690,7 +690,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // DELETE /v1/storage/{*key} — delete file (agent auth)
-    router.delete('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.delete('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
 
