@@ -66,15 +66,26 @@ export default function AppGrant() {
           grant = (list.data?.grants || []).find((g) => g.app === res.data.app) || null;
         } catch { /* ignore */ }
         if (!live) return;
-        const granted = grant ? grant.scopes : (res.data.scopes || []).map((s) => s.scope);
+        const reqScopes = (res.data.scopes || []).map((s) => s.scope);
+        const granted = grant ? grant.scopes : reqScopes;
         setExistingGrant(grant);
         setSelected(new Set(granted));
-        if (grant) setAdvanced(true); // manage mode → show the per-scope checkboxes up front
+        // Pass-through: when NOT explicitly managing (the gear) and the app already holds a grant that
+        // covers what it's asking for, just approve silently — no second prompt for an app you trust.
+        const covers = grant && reqScopes.every((s) => grant.scopes.includes(s));
+        if (grant && !res.data.manage && covers) { setState({ status: 'autoapprove', request: res.data }); return; }
+        if (grant) setAdvanced(true); // manage / add-scopes → show the per-scope checkboxes up front
         setState({ status: 'ready', request: res.data });
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
     return () => { live = false; };
   }, [requestId, authed]);
+
+  // Pass-through approval (already-granted app, not managing): approve once, silently.
+  useEffect(() => {
+    if (state.status === 'autoapprove' && !submitting) approve();
+    // eslint-disable-next-line
+  }, [state.status]);
 
   async function revoke() {
     if (!existingGrant) return;
@@ -130,8 +141,9 @@ export default function AppGrant() {
     window.location.href = origin || '/v1/profile';
   }
 
-  if (state.status === 'loading') {
-    return html`<div class="agr-wrap"><p class="agr-muted">${tr('common.loading', 'Loading…')}</p></div>`;
+  if (state.status === 'loading' || state.status === 'autoapprove') {
+    const msg = state.status === 'autoapprove' ? tr('appGrant.signingIn', 'Signing you in…') : tr('common.loading', 'Loading…');
+    return html`<div class="agr-wrap"><p class="agr-muted">${msg}</p></div>`;
   }
   if (state.status === 'login') {
     return html`

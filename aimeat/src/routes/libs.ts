@@ -623,14 +623,17 @@ async function _pkce() {
   // (which is a secure context → S256). Prod always uses S256.
   return { verifier: verifier, challenge: verifier, method: 'plain' };
 }
-async function requestConsentPopup(app, scopeStr) {
+async function requestConsentPopup(app, scopeStr, manage) {
   var apexOrigin;
   try { apexOrigin = new URL(APEX_URL).origin; } catch (e) { return null; }
   var p = await _pkce();
   var state = _b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
   var redirectUri = location.origin + '/'; // app origin; never navigated in web_message mode (origin binding only)
   var scope = scopeStr || APP_DEFAULT_SCOPES;
+  // manage=1 → the consent page always shows the management screen (the gear). Without it, an app the
+  // user already granted just passes straight through (auto-approve) instead of prompting again.
   var url = apexOrigin + '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
+    + (manage ? '&manage=1' : '')
     + '&app=' + encodeURIComponent(app)
     + '&scope=' + encodeURIComponent(scope)
     + '&redirect_uri=' + encodeURIComponent(redirectUri)
@@ -1056,7 +1059,7 @@ const auth = {
   async manageGrant() {
     const s = currentSession || load('session');
     if (!s || !s._app) return null;
-    const res = await requestConsentPopup(s._app, (s.scopes || []).join(' '));
+    const res = await requestConsentPopup(s._app, (s.scopes || []).join(' '), true); // manage = always show the screen
     if (res && res.revoked) { await auth.logout(); return { revoked: true }; }
     if (res && res.access_token) return _buildAppSession(res.access_token, s._app, s._own);
     return null;

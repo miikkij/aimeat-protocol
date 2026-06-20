@@ -65,6 +65,7 @@ interface PendingRequest {
   codeChallenge: string;
   codeChallengeMethod: 'S256' | 'plain';
   responseMode: 'query' | 'web_message'; // web_message → consent page postMessages the code to the popup-opener app
+  manage: boolean; // true → consent page always shows the management screen (gear); false → may auto-approve an existing grant
   expiresAt: number;
 }
 
@@ -166,11 +167,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
+    const manage = String(req.query.manage ?? '') === '1';
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
-      codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode,
+      codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage,
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -191,6 +193,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       app_name: pending.appName,
       app_origin: pending.appOrigin,
       response_mode: pending.responseMode,
+      manage: pending.manage, // true → always show the management screen; false → may auto-approve an existing grant
       state: pending.state, // echoed back by the consent page in the web_message revoke postMessage
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s] })),
     }));
