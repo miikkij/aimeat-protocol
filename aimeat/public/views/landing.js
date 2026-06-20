@@ -3,7 +3,7 @@
  * @description Logged-out landing page: reward first, explanation second. Hero is the
  *   build-prompt pitch — copy one prompt and your AI builds you a real app on AIMEAT that you
  *   own and publish. Two CTAs (copy build prompt · get your own) → LIVE wall of the real apps
- *   people published here (manifest-driven, from the apps API) → live activity feed →
+ *   people published here (manifest-driven, from the apps API) → node totals panel →
  *   the 3-step build loop + build prompt → "ask your own AI" → today's node stats +
  *   ownership line (the sales close) → footer. Logged-in visitors are forwarded to the
  *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
@@ -30,6 +30,8 @@
  *     date/time. Hero subline adds "let your agents keep it running" (Sanomat as the example).
  *   v3.2.0 — 2026-06-20 — H-2: wall cards open published apps in a sandboxed opaque-origin
  *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline link.
+ *   v3.3.0 — 2026-06-20 — Replace PublicActivityFeed (read as broken when empty) with NodeTotals:
+ *     cumulative "this node has X" counters (apps/organisms/agents+online/knowledge/downloads).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -38,7 +40,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import PublicActivityFeed from './landing-activity.js';
+import NodeTotals from './landing-node-totals.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -459,8 +461,8 @@ export default function Landing({ navigate }) {
       <!-- 2. Live wall — the real apps people built with their AI and published here (yours goes here). -->
       <${Gallery} />
 
-      <!-- 3. Public activity feed — live proof it's happening right now. -->
-      <${PublicActivityFeed} />
+      <!-- 3. Node totals — cumulative "this node has X" counters; never empty, always proof it's alive. -->
+      <${NodeTotals} />
 
       <!-- 4. How building works: the 3-step loop + the copyable build prompt. -->
       <div class="ld-loop">

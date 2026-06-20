@@ -12056,6 +12056,36 @@ paths:
                       tasks_completed: { type: integer }
                       schedules_fired: { type: integer }
 
+  /v1/public/node-totals:
+    get:
+      operationId: publicNodeTotals
+      summary: Cumulative public counters for this node (public, cached 30 s)
+      description: |
+        Always-meaningful "this node has X" totals for the landing panel that replaced
+        the often-empty activity feed: public apps, public organisms, connected agents
+        (+ online now), public knowledge packages, and total app downloads. Aggregates
+        only; no per-user data. No auth; rate-limited. On very large nodes bounded
+        sweeps make a figure a floor, not a lie.
+      tags: [Public]
+      responses:
+        '200':
+          description: Cumulative public counters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      apps: { type: integer }
+                      organisms: { type: integer }
+                      agents: { type: integer }
+                      agents_online: { type: integer }
+                      knowledge_packages: { type: integer }
+                      downloads: { type: integer }
+
   /v1/public/activity-feed:
     get:
       operationId: publicActivityFeed
