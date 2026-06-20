@@ -327,6 +327,11 @@ const NODE_URL = (function() {
 // the only place the host-only session cookie lives. Used for the H-2 same-site silent SSO bridge.
 const APEX_URL = '${config.baseUrl}';
 
+// Default scopes an app asks for in the H-2 silent SSO / grant flow when it does not declare its own.
+// The common, foundational set: read/write the user's memory AND their stored files. (storage is a
+// SEPARATE scope domain from memory — saving an image goes to /v1/storage, not /v1/memory.)
+const APP_DEFAULT_SCOPES = 'memory:read memory:write storage:read storage:write';
+
 const NODE_ID = '${config.nodeId}';
 
 // Social login availability (baked in server-side from node config).
@@ -587,7 +592,7 @@ function silentAppToken() {
     iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.src = apexOrigin + '/app-silent.html?scope=' + encodeURIComponent('memory:read memory:write');
+    iframe.src = apexOrigin + '/app-silent.html?scope=' + encodeURIComponent(APP_DEFAULT_SCOPES);
     (document.body || document.documentElement).appendChild(iframe);
     timer = setTimeout(function () { finish(null); }, 8000);
   });

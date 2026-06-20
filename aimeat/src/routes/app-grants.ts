@@ -42,6 +42,8 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'memory:read': 'Read your stored memories and data',
   'memory:write': 'Create and update your memories and data',
   'memory:delete': 'Delete your memories and data',
+  'storage:read': 'Read your stored files (images, documents)',
+  'storage:write': 'Save and update your stored files (images, documents)',
   'catalogue:read': 'Read the public catalogue/directory',
   'social:read': 'Read boards you can access',
   'social:write': 'Post to boards on your behalf',
@@ -270,7 +272,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const existing = (await storage.listAppGrantsByOwner(owner)).find(g => !g.revoked && g.app === site.target);
     let scopes: string[];
     if (isOwnApp) {
-      scopes = requested.length ? requested : ['memory:read', 'memory:write'];
+      scopes = requested.length ? requested : ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
     } else if (existing && requested.every(s => existing.scopes.includes(s))) {
       scopes = requested.length ? requested : existing.scopes;
     } else {

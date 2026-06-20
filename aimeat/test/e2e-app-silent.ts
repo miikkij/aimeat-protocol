@@ -120,6 +120,23 @@ async function main() {
             const v = await json('/v1/memory?limit=1', { headers: { Authorization: `Bearer ${r0.access_token}` } });
             assert(v.status === 200, `memory read with app token should pass, got ${v.status}`);
         });
+        await test('app token with storage:write can POST /v1/storage (H-2: app role, not just agent)', async () => {
+            const r0 = await silent(ORIGIN_A, 'storage:write', A.rt);
+            assert(r0.ok && !!r0.access_token, `expected a storage token, got ${JSON.stringify(r0)}`);
+            const up = await json('/v1/storage', {
+                method: 'POST', headers: { Authorization: `Bearer ${r0.access_token}` },
+                body: JSON.stringify({ key: 'shot.png', mime_type: 'image/png', visibility: 'private', data: b64('PNGBYTES') }),
+            });
+            assert(up.status === 200 || up.status === 201, `app token storage write should pass, got ${up.status} ${JSON.stringify(up.body)}`);
+        });
+        await test('app token WITHOUT storage scope is refused at /v1/storage (scope still enforced)', async () => {
+            const r0 = await silent(ORIGIN_A, 'memory:read', A.rt); // memory-only token
+            const up = await json('/v1/storage', {
+                method: 'POST', headers: { Authorization: `Bearer ${r0.access_token}` },
+                body: JSON.stringify({ key: 'nope.png', mime_type: 'image/png', visibility: 'private', data: b64('X') }),
+            });
+            assert(up.status === 403, `memory-only token must be denied storage write, got ${up.status}`);
+        });
 
         console.log('\nPhase 2: Security — no cross-user / cross-app leakage');
         await test('owner A on ANOTHER owner\'s app (bbb) → consent_required (session NOT leaked)', async () => {
