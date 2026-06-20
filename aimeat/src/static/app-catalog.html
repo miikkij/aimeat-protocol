@@ -2157,6 +2157,11 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'common.loading': 'Loading…',
+      'consents.title': 'App permissions',
+      'consents.none': 'You haven’t granted this app access.',
+      'consents.granted': 'This app can:',
+      'consents.revoke': 'Revoke access',
       'ctx.details': '🔎 Details',
       'detail.launch': '▶ Launch',
       'detail.status': 'Status',
@@ -2372,6 +2377,11 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'common.loading': 'Ladataan…',
+      'consents.title': 'Appin oikeudet',
+      'consents.none': 'Et ole antanut tälle apille pääsyä.',
+      'consents.granted': 'Tämä appi voi:',
+      'consents.revoke': 'Peru pääsy',
       'ctx.details': '🔎 Tiedot',
       'detail.launch': '▶ Käynnistä',
       'detail.status': 'Tila',
@@ -3416,6 +3426,10 @@
               '<div class="app-actions">' +
                 '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'tab\')" title="Open in tab">\u25B6 Tab</button>' +
                 '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
+                // Consents: only for a catalogue app (has owner/filename) \u2014 manage the grant you gave it.
+                ((app.aimeatOwner && app.aimeatFilename)
+                  ? '<button onclick="event.stopPropagation(); window._launcher.openConsents(\'' + escapeHtml(app.aimeatOwner) + '\', \'' + escapeHtml(app.aimeatFilename) + '\', \'' + escapeHtml(app.name) + '\')" title="' + escapeHtml(t('consents.title')) + '">\uD83D\uDD11</button>'
+                  : '') +
               '</div>' +
               (app.favorite ? '<span class="fav-star visible">\u2B50</span>' : '') +
             '</div>';
@@ -4528,6 +4542,48 @@
         statusEl.style.color = '#ef4444';
         statusEl.textContent = err.message || String(err);
       });
+  }
+
+  // ── App grant consents (H-2) ─────────────────────
+  // Manage the scoped grant THIS user gave a (usually someone else's) app: see the granted scopes
+  // and revoke. Reuses the owner-authenticated /v1/app-grants list + delete; a tiny dynamic modal.
+  function closeConsents() { var o = document.getElementById('consents-overlay'); if (o) o.remove(); }
+  function openConsents(owner, filename, appName) {
+    var target = bareOwnerName(owner) + '/' + filename;
+    closeConsents();
+    var ov = document.createElement('div');
+    ov.id = 'consents-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+    ov.onclick = function (e) { if (e.target === ov) closeConsents(); };
+    var box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = '<div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">' + t('consents.title') + '</div>'
+      + '<div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + escapeHtml(appName || filename) + ' · ' + escapeHtml(target) + '</div>'
+      + '<div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t('common.loading') + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
+      + '<button type="button" class="modal-btn secondary" onclick="window._launcher.closeConsents()">' + t('common.close') + '</button></div>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    subdomainApiCall('GET', '/v1/app-grants').then(function (json) {
+      var grants = (json.data && json.data.grants) || [];
+      var g = grants.filter(function (x) { return x.app === target; })[0];
+      var body = document.getElementById('consents-body');
+      if (!body) return;
+      if (!g) { body.innerHTML = '<span style="color:var(--text-muted)">' + t('consents.none') + '</span>'; return; }
+      body.innerHTML = '<div style="margin-bottom:6px;color:var(--text)">' + t('consents.granted') + '</div>'
+        + '<ul style="margin:0 0 14px;padding-left:18px">'
+        + g.scopes.map(function (s) { return '<li><code>' + escapeHtml(s) + '</code></li>'; }).join('')
+        + '</ul>'
+        + '<button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent(\'' + escapeHtml(g.grant_id) + '\')">' + t('consents.revoke') + '</button>';
+    }).catch(function (e) {
+      var body = document.getElementById('consents-body');
+      if (body) { body.style.color = '#ef4444'; body.textContent = e.message || String(e); }
+    });
+  }
+  function revokeConsent(grantId) {
+    subdomainApiCall('DELETE', '/v1/app-grants/' + encodeURIComponent(grantId))
+      .then(function () { closeConsents(); })
+      .catch(function (e) { var b = document.getElementById('consents-body'); if (b) { b.style.color = '#ef4444'; b.textContent = e.message || String(e); } });
   }
 
   // ── Backup: export all + selective import ────────
@@ -6786,6 +6842,9 @@
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     showSubdomainModal: showSubdomainModal,
+    openConsents: openConsents,
+    closeConsents: closeConsents,
+    revokeConsent: revokeConsent,
     submitSubdomainAssign: submitSubdomainAssign,
     unassignSubdomain: unassignSubdomain,
     jsonImportSelectAll: jsonImportSelectAll,
