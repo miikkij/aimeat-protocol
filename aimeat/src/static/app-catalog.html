@@ -11,6 +11,9 @@
       remove apex top-level window.open(...?mode=inline) links (viewPublished + isSameOriginUrl).
     v1.2.0 — 2026-06-20 — H-2: when the app origin is live (window.__APP_ORIGIN_ENABLED), open
       published apps top-level on apps.<domain> (clean full page, no toolbar/X); sandbox is the fallback.
+    v2.0.0 — 2026-06-20 — Always open apps TOP-LEVEL (no opaque sandbox — it gave apps origin `null`
+      and forced a re-login). Server decides isolation: app origin OFF → inline on apex (session
+      inherited, apps "logged in"); ON → 301 to the isolated app origin.
 -->
 <html lang="en">
 <head>
@@ -3269,44 +3272,23 @@
 
   function launchInTab(app) {
     if (app.source === 'url' && app.url) {
-      if (isSameOriginUrl(app.url)) {
-        // Apex ?mode=inline app URL. With the app origin live it 301s to apps.<domain>, so a
-        // top-level open lands on a clean isolated page; otherwise it must run sandboxed.
-        if (window.__APP_ORIGIN_ENABLED) {
-          window.open(app.url, '_blank', 'noopener');
-        } else {
-          launchInIframe(app);
-        }
-      } else {
-        window.open(app.url, '_blank', 'noopener');
-      }
+      // Apex ?mode=inline URL → server serves inline (session inherited) or 301s to the
+      // isolated app origin. Either way it opens TOP-LEVEL as a clean full page.
+      window.open(app.url, '_blank', 'noopener');
     } else if (app.blob) {
-      // Blob: URLs inherit the apex origin → same-origin, and have no app-origin URL to 301 to.
-      // Always run sandboxed, never top-level.
-      launchInIframe(app);
+      var html = decodeURIComponent(escape(atob(app.blob)));
+      var blob = new Blob([html], { type: 'text/html' });
+      var blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener');
+      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 5000);
     }
   }
 
-  // View a published app. When the node has provisioned the app origin
-  // (window.__APP_ORIGIN_ENABLED), open it TOP-LEVEL in a new tab — the apex ?mode=inline URL
-  // 301s to apps.<domain>, so the app shows as a clean full page on its own isolated origin
-  // (its own storage + same-origin API work), no toolbar/X. Otherwise fall back to the
-  // opaque-origin sandbox iframe (the H-2-safe option when apps would run same-origin).
+  // View a published app: open it TOP-LEVEL in a new tab (clean full page, no toolbar/X). The
+  // url is the apex ?mode=inline URL; the server serves it inline (session inherited) when the
+  // app origin is OFF, or 301s it to the isolated app origin when ON.
   function viewPublished(url, name) {
-    if (window.__APP_ORIGIN_ENABLED) {
-      window.open(url, '_blank', 'noopener');
-      return;
-    }
-    var view = document.getElementById('iframe-view');
-    var iframe = document.getElementById('app-iframe');
-    var title = document.getElementById('iframe-title');
-    title.textContent = name || 'App';
-    delete iframe.dataset.appId;
-    iframe.removeAttribute('srcdoc');
-    iframe.src = url;
-    currentIframeUrl = '';   // never expose an apex URL to the top-level "open external" button
-    updateOpenExternalBtn();
-    view.hidden = false;
+    window.open(url, '_blank', 'noopener');
   }
 
   // Hide the "open in new tab" affordance whenever the framed content is same-origin

@@ -4663,6 +4663,27 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/auth/app-grant-silent:
+    get:
+      operationId: appGrantSilent
+      summary: Seamless SSO bridge — issue a scoped app token from the apex session (no visible login)
+      description: |
+        Mounted under `/v1/auth` so the **host-only** session cookie reaches it. Called credentialed
+        and same-origin by the apex bridge page (`/app-silent.html`) that an app embeds in a hidden
+        iframe (same-site → the cookie is first-party). The app is identified ONLY by its **per-app
+        subdomain** (the `origin` query, taken from `ancestorOrigins`, → the subdomain mapping → the
+        app), so a token is bound to exactly one app origin — apps cannot impersonate each other.
+        Auto-approves only the owner's **own** app (or one the owner already granted); anyone else →
+        `consent_required`. Returns the same scoped, revocable grant token as the code flow — never
+        the session. Response `data.error` ∈ {login_required, consent_required, bad_origin,
+        unknown_app, invalid_scope, app_origin_disabled}.
+      tags: [Auth]
+      parameters:
+        - { in: query, name: origin, required: true, schema: { type: string }, description: The embedding app's origin (a <sub>.apps.<host> origin) }
+        - { in: query, name: scope, required: false, schema: { type: string }, description: Space-separated grantable scopes }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
   /v1/app-grants/token:
     post:
       operationId: appGrantToken

@@ -152,6 +152,23 @@ Comprehensive security & vulnerability audit (findings + status tracked in
     prompts public nodes to enable the app origin (with a DNS/TLS warning). `openapi.yaml` + EN/FI
     i18n synced. **Verified live end-to-end on aimeat.io / apps.aimeat.io** (apex 301, cross-origin
     sandboxed framing with no CSP errors, app cannot read apex `localStorage` or refresh a session).
+  - **Clean full-screen launch + seamless secure SSO (the part that makes it usable).** Apps now open
+    **top-level** in a new tab (a clean full page on their own origin) — the opaque-sandbox in-SPA
+    viewer was removed because it gave apps origin `null`, breaking their own storage/`fetch` and
+    forcing a re-login. To restore "logged into aimeat.io ⇒ my own apps are logged in" **without**
+    sharing the session, a **same-site silent SSO** was added: each app on its own
+    `<sub>.apps.<domain>` auto-loads an injected shim (`src/static/app-login.js`) that embeds a hidden
+    iframe to the apex bridge (`app-silent.html`/`app-silent.js`); because `*.apps.<domain>` is the
+    **same site** as the apex, the host-only session cookie is first-party there, so
+    `GET /v1/auth/app-grant-silent` can mint a **scoped, revocable** grant token and `postMessage` it
+    back to that exact app origin. The token is **bound to one app's subdomain** (origin → subdomain →
+    app, so apps can't impersonate each other), auto-approved **only for the owner's own app** (others
+    → one-time visible consent), and the shim wires it into the app's `/v1/*` calls (+ shims the legacy
+    `/v1/auth/refresh`) so existing apps work nearly unchanged — never the ambient session. Bridge page
+    framable only by `*.apps.<domain>` (`frame-ancestors`, X-Frame-Options dropped). `src/routes/app-grants.ts`,
+    `src/routes/subdomains.ts` (shim injection), `src/server-bootstrap/static-files.ts`,
+    `public/js/app-sandbox.js` + `src/static/app-catalog.html` (top-level launch), `openapi.yaml`, E2E
+    `test/e2e-app-silent.ts` (own-app token from cookie, cross-user → consent_required, origin binding).
 
 ## [1.26.0] - 2026-06-19
 

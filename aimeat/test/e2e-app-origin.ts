@@ -149,7 +149,10 @@ async function main() {
         await test('app-origin subdomain form (x-app-origin + x-subdomain) serves the app HTML at /', async () => {
             const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'demo' } });
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            assert((await res.text()) === HTML, 'subdomain-served body matches');
+            // Body is the app HTML with the seamless-SSO shim injected (per-app subdomain).
+            const body = await res.text();
+            assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
+            assert(body.includes('/app-login.js'), 'subdomain-served body has the SSO shim injected');
         });
 
         console.log('\n─────────────────────────────────────');

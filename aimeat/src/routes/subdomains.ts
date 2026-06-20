@@ -18,6 +18,8 @@
  *     serveApp() helper.
  *   v1.2.0 — 2026-06-20 — H-2: app CSP `frame-ancestors` now allows the apex origin so the
  *     in-SPA sandboxed viewer can frame the app cross-origin (appCsp(apexOrigin)).
+ *   v1.3.0 — 2026-06-20 — H-2 seamless SSO: inject the app-login.js shim into per-app-subdomain
+ *     app HTML so the owner's own app authenticates via the apex silent bridge (no separate login).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -68,14 +70,31 @@ function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
   return false;
 }
 
-/** Write a published app's HTML body with the app CSP + cache/security headers. */
-function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string): void {
+/**
+ * Write a published app's HTML body with the app CSP + cache/security headers. When `injectSrc`
+ * is set and the body is HTML, the seamless-SSO shim (`<script src=injectSrc>`) is injected so the
+ * app gets a scoped grant token without a separate login (H-2 seamless SSO).
+ */
+function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, injectSrc?: string): void {
   res.setHeader('Content-Type', app.mimeType);
-  res.setHeader('Content-Length', app.size.toString());
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
+
+  if (injectSrc && /text\/html/i.test(app.mimeType)) {
+    const raw = Buffer.isBuffer(app.data) ? app.data.toString('utf-8') : String(app.data);
+    const tag = `<script src="${injectSrc}"></script>`;
+    let html: string;
+    if (/<\/head>/i.test(raw)) html = raw.replace(/<\/head>/i, tag + '</head>');
+    else if (/<body[^>]*>/i.test(raw)) html = raw.replace(/<body[^>]*>/i, (m) => m + tag);
+    else html = tag + raw;
+    const buf = Buffer.from(html, 'utf-8');
+    res.setHeader('Content-Length', buf.length.toString());
+    res.send(buf);
+    return;
+  }
+  res.setHeader('Content-Length', app.size.toString());
   res.send(app.data);
 }
 
@@ -91,6 +110,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   let apexOrigin = '';
   try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
   const csp = appCsp(apexOrigin);
+  // Seamless-SSO shim injected into per-app-subdomain apps so the owner's own app authenticates
+  // without a separate login (it pulls a scoped grant token via the apex bridge).
+  const shimSrc = apexOrigin ? `${apexOrigin}/app-login.js` : undefined;
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
@@ -118,7 +140,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    serveApp(res, storage, app, csp);
+    serveApp(res, storage, app, csp, shimSrc);  // per-app subdomain → inject the SSO shim
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` — serves apps that have no

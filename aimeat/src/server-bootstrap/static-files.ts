@@ -20,6 +20,9 @@
  *     (the apex inline URL 301s there); otherwise frame-src 'self' blocks the launch.
  *   v1.4.0 -- 2026-06-20 -- H-2: inject window.__APP_ORIGIN_ENABLED into app-catalog.html so
  *     it opens published apps top-level on the app origin (clean full page) when provisioned.
+ *   v1.5.0 -- 2026-06-20 -- H-2 seamless SSO: serve /app-silent.html (the silent bridge) framable
+ *     only by *.appHost (frame-ancestors + drop X-Frame-Options); /app-login.js + /app-silent.js
+ *     ride the normal static handler.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -176,6 +179,24 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
           "object-src 'none'",
           "base-uri 'self'",
         ].join('; '));
+        res.type('html').send(html);
+      });
+    }
+
+    // H-2 seamless SSO: the silent bridge page must be FRAMABLE by app origins (a hidden iframe
+    // inside an app), so override the global X-Frame-Options: SAMEORIGIN and pin frame-ancestors
+    // to the app host family only (*.appHost). Never framable by anything else.
+    const appSilentPath = join(pwaStaticDir, 'app-silent.html');
+    if (config.appHost && existsSync(appSilentPath)) {
+      let scheme = 'https';
+      try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
+      const h = config.appHost;
+      const ancestors = `${scheme}://*.${h} ${scheme}://*.${h}:*`;
+      app.get('/app-silent.html', (_req, res) => {
+        const html = readFileSync(appSilentPath, 'utf-8');
+        res.removeHeader('X-Frame-Options');
+        res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; frame-ancestors ${ancestors}; base-uri 'none'`);
+        res.setHeader('Cache-Control', 'no-store');
         res.type('html').send(html);
       });
     }
