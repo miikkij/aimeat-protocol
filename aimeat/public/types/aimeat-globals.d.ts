@@ -35,6 +35,10 @@ declare global {
     /** Preact bundle marker set by the vendored preact build. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     __B?: any;
+    /** H-2: true when the node serves apps from a separate app origin — set the launchers to
+     *  open published apps top-level (apex inline URL 301s to apps.<domain>) instead of the
+     *  opaque-sandbox iframe. Injected into spa.html / app-catalog.html by the server. */
+    __APP_ORIGIN_ENABLED?: boolean;
   }
 
   /**

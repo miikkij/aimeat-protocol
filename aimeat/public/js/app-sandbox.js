@@ -11,6 +11,9 @@
  * @usage import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js'
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 0).
+ *   v1.1.0 — 2026-06-20 — When the app origin is live (window.__APP_ORIGIN_ENABLED), open apps
+ *     top-level (apex inline URL 301s to apps.<domain>) — a clean full page on a real isolated
+ *     origin (own storage/API work), no overlay/X. Opaque-sandbox overlay is the off-state fallback.
  */
 
 /** Matches the published-app HTML route: /v1/apps/<owner>/<file> (optionally ?mode=inline). */
@@ -40,10 +43,18 @@ function closeOverlay() {
 }
 
 /**
- * Show `url` in a sandboxed (opaque-origin) iframe overlay. `name` labels the toolbar.
- * Any previously-open overlay is replaced.
+ * Open a published app for the user. When the node has provisioned the app origin
+ * (`window.__APP_ORIGIN_ENABLED`), open it TOP-LEVEL in a new tab: the apex inline URL
+ * 301s to `apps.<domain>`, giving a clean full page on a genuinely isolated origin (its own
+ * storage, same-origin API) — no overlay, no toolbar. Otherwise fall back to the opaque-origin
+ * sandbox overlay (the only safe option when apps would otherwise run same-origin as the SPA).
  */
 export function openAppSandboxed(url, name) {
+  if (window.__APP_ORIGIN_ENABLED) {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
   closeOverlay();
 
   const overlay = document.createElement('div');

@@ -30,6 +30,9 @@
  *   v1.7.0 — 2026-06-11 — Add /v1/start SPA route (diagnosis/onboarding page) and a
  *     /start → /v1/start redirect that preserves the ?from= entrance slug used in
  *     LinkedIn posts.
+ *   v1.8.0 — 2026-06-20 — Add /v1/app-grant SPA route (H-2 consent page) and inject
+ *     window.__APP_ORIGIN_ENABLED into the SPA shell so launchers open apps top-level when
+ *     the app origin is provisioned.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -134,7 +137,7 @@ const BUILD_ID = Date.now().toString(36);
  *    (static + dynamic imports from any view) get fresh URLs after restart
  *  - CSP nonce injected into all script and style tags
  */
-function serveSpa(res: import('express').Response, spaPath: string): void {
+function serveSpa(res: import('express').Response, spaPath: string, appOriginEnabled = false): void {
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
 
@@ -153,6 +156,10 @@ function serveSpa(res: import('express').Response, spaPath: string): void {
   const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
   const bootScript =
     `window.__B="${v}";` +
+    // H-2: when the app origin is provisioned, the frontend opens published apps TOP-LEVEL
+    // (the apex inline URL 301s to apps.<domain>) — a clean full page on an isolated origin,
+    // no opaque-sandbox overlay. Off → the Phase-0 sandboxed iframe is used instead.
+    `window.__APP_ORIGIN_ENABLED=${appOriginEnabled ? 'true' : 'false'};` +
     `(function(){var c="${BUILD_ID}";` +
     `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
     `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
@@ -342,7 +349,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/portal', (_req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath);
+      serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -460,7 +467,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/portfolio/:username', (_req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath);
+      serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -500,7 +507,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     router.get(path, (_req, res) => {
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) {
-        serveSpa(res, spaPath);
+        serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
       } else {
         res.redirect(302, '/spa.html');
       }

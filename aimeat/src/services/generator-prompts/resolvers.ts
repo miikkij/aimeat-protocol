@@ -9,6 +9,8 @@
  *
  * @version-history
  *   v1.0.0 — 2026-04-01 — Initial resolvers for DB-backed generator prompts
+ *   v1.1.0 — 2026-06-20 — App build: prepend H-2 app-origin isolation guidance to the
+ *     cortex_or_api_section (no ambient session; private data via the app-grant PKCE flow).
  */
 
 import type { Storage } from '../../storage/interface.js';
@@ -788,12 +790,31 @@ Total: ${sorted.length} keys available. If you need a label, find the closest ma
 
   // Build the conditional cortex-or-api section (browser has hasCortex conditional)
   const hasCortex = cortexComponents.length > 0;
-  let cortexOrApiSection: string;
+
+  // H-2 app-origin isolation — applies to EVERY generated app (cortex or not). The app runs on the
+  // isolated app origin (`*.apps.<domain>`), a different browser origin from the AIMEAT node, so it
+  // has NO ambient login session. Public data is fine same-origin; private data needs an app-grant.
+  const appOriginIsolationSection = `## CRITICAL: App origin isolation & data access (read this first)
+
+Your published app runs on an ISOLATED app origin (\`*.apps.<domain>\`, e.g. \`apps.aimeat.io\`) — a DIFFERENT browser origin from the AIMEAT node (\`aimeat.io\`). Consequences you MUST respect:
+- The app has NO access to the user's AIMEAT login session, cookie, or localStorage. There is no ambient/owner session.
+- NEVER call \`/v1/auth/refresh\` and NEVER fetch with \`credentials:'include'\` expecting the user's session — that was removed for security (H-2) and now returns 401/403.
+- PUBLIC data needs no auth: a same-origin \`fetch('/v1/...')\` (CORS \`*\`) works for public memory (\`getPublic\`), the catalogue, and public boards.
+- For the user's OWN/PRIVATE data, use the explicit, revocable **app-grant** flow (OAuth-style, PKCE):
+  1. Send the user to \`GET https://aimeat.io/v1/app-grants/authorize?app=<owner>/<file>&response_type=code&scope=<space-separated agent scopes>&redirect_uri=<your URL on the app origin>&state=<rnd>&code_challenge=<S256>&code_challenge_method=S256\`. Grantable scopes: memory:read, memory:write, memory:delete, catalogue:read, social:read, social:write, wallet:read, knowledge:read. The user approves on the trusted apex.
+  2. Exchange the returned \`code\` (with the PKCE \`code_verifier\`) at \`POST https://aimeat.io/v1/app-grants/token\` (\`{ grant_type:'authorization_code', code, code_verifier, redirect_uri }\`) for \`access_token\` + \`refresh_token\`. Store BOTH in YOUR OWN origin's localStorage.
+  3. Call APIs with \`Authorization: Bearer <access_token>\` — never the user's session. Refresh via \`{ grant_type:'refresh_token', refresh_token }\`.
+- Apps that use the user's OpenRouter key via cortex (\`AIMEAT.ai.complete()\`) are UNAFFECTED — that path is separate.
+The user manages/revokes app tokens in Profile → Access → "Connected Apps". Request the FEWEST scopes you need.
+
+`;
+
+  let cortexOrApiSection: string = appOriginIsolationSection;
   if (hasCortex) {
-    cortexOrApiSection = cortexInstructions;
+    cortexOrApiSection += cortexInstructions;
   } else {
     // Non-cortex path — verbatim from browser base.js lines 642-703
-    cortexOrApiSection = `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
+    cortexOrApiSection += `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
 \`\`\`javascript
 // Read YOUR OWN memory key — returns the stored value directly, or null
 const myData = await AIMEAT.data.get('my.settings');

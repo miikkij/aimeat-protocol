@@ -179,8 +179,12 @@ Comprehensive security & vulnerability audit (findings + status tracked in
   overwrites the working copy) → **Test draft** launches it in the sandboxed iframe → **Keep** persists
   it or **Discard** drops it. After Keep, a one-click **Publish as vN+1** opens the publish flow
   prefilled with the existing filename. Card click opens Details; a hover **▶** on each card preserves
-  launch-on-click. New EN+FI strings under `detail.*` / `ctx.details`. Frontend-only, all in
-  `src/static/app-catalog.html`. Design: `docs/internal/design-app-detail-view.md`.
+  launch-on-click. Each of **your own published apps** also gets a **🔎 Details** button — including ones
+  uploaded server-side (MCP / agent / VS Code) with **no local copy**: opening Details **materializes a
+  local copy on demand** (downloads the published HTML on that explicit click — not a page-load import),
+  so the app appears on the local side and becomes fully editable + republishable. New EN+FI strings under
+  `detail.*` / `ctx.details`. Frontend-only, all in `src/static/app-catalog.html`. Design:
+  `docs/internal/design-app-detail-view.md`.
 - **Federation book — a phone-book of the federation (operators + resources + versions + settings).**
   Every node can now see who runs the federation and what each node offers, with a consistent
   network-wide view. Built on one shared **node-card** (`GET /v1/federation/node-card`, public): a
