@@ -7,7 +7,10 @@
  * v1.19.0 - 2026-06-20 - aimeat-auth.js seamless SSO on app origins (H-2): when the SDK runs on a
  *   *.apps.<domain> host (where the host-only cookie is unreachable), AIMEAT.auth.login() + refresh()
  *   pull a scoped grant token via the same-site silent bridge (hidden iframe → apex), so an app like
- *   Sanomat is logged in with no separate login (isAppOrigin / silentAppToken / restoreSessionFromAppOrigin).
+ *   Sanomat is logged in with no separate login. The bridge targets the baked-in APEX_URL (NOT
+ *   NODE_URL, which is location.origin = the APP origin on http/https). mountLoginButton re-renders on
+ *   the 'login'/'logout' events so the button updates after the async silent login (no opts.onLogin to
+ *   avoid a reload loop). isAppOrigin / silentAppToken / restoreSessionFromAppOrigin.
  * v1.18.0 - 2026-06-20 - Sign-in modal submits on Enter from any field (username/password/
  *   display name), unless the button is mid-request.
  * v1.17.0 - 2026-06-20 - Sign-in modal shows a "Continue with Google" button when the node
@@ -317,6 +320,11 @@ const NODE_URL = (function() {
   return '${config.baseUrl}';
 })();
 
+// The node's canonical APEX origin, baked in server-side. Unlike NODE_URL (which is location.origin
+// on http/https, i.e. the APP origin when running inside a published app), this is always the apex —
+// the only place the host-only session cookie lives. Used for the H-2 same-site silent SSO bridge.
+const APEX_URL = '${config.baseUrl}';
+
 const NODE_ID = '${config.nodeId}';
 
 // Social login availability (baked in server-side from node config).
@@ -550,13 +558,13 @@ async function restoreSessionFromCookie() {
 // SCOPED, revocable grant token and posts it back — so the owner's own app is logged in with no
 // separate login, and never receives the ambient session.
 function isAppOrigin() {
-  try { return location.origin !== new URL(NODE_URL).origin; } catch (e) { return false; }
+  try { return location.origin !== new URL(APEX_URL).origin; } catch (e) { return false; }
 }
 
 function silentAppToken() {
   return new Promise(function (resolve) {
     var apexOrigin;
-    try { apexOrigin = new URL(NODE_URL).origin; } catch (e) { resolve(null); return; }
+    try { apexOrigin = new URL(APEX_URL).origin; } catch (e) { resolve(null); return; }
     if (location.origin === apexOrigin) { resolve(null); return; }
     var settled = false, iframe = null, timer = null;
     function finish(v) {
@@ -1080,6 +1088,12 @@ const auth = {
       }
     }
     render();
+    // Re-render when the session changes out-of-band — e.g. the H-2 silent SSO on an app origin
+    // logs in asynchronously AFTER this button first painted "Sign In". Only re-render (do NOT call
+    // opts.onLogin here — the interactive modal path already does, and apps often set onLogin to
+    // location.reload(), which would loop with the auto silent login).
+    auth.on('login', render);
+    auth.on('logout', render);
   },
 };
 
