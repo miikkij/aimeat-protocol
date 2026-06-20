@@ -5347,14 +5347,29 @@
     else if (detailDraftBlob) { syncClass = 'diff'; syncText = t('detail.localNewer'); }
     else { syncClass = 'ok'; syncText = t('detail.inSync'); }
 
+    // App thumbnail (right side of the Status card). Built from the published path; hides itself if
+    // the app has no screenshot yet. Cache-busted so a freshly (re)captured shot isn't shown stale.
+    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+    var shotUrl = (app.published && app.publishedUrl && aimeatBase)
+      ? (aimeatBase + app.publishedUrl + '/screenshot?t=' + Date.now())
+      : '';
+    var shotImg = shotUrl
+      ? '<img src="' + escapeHtml(shotUrl) + '" alt="App screenshot" loading="lazy" onerror="this.style.display=\'none\'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />'
+      : '';
+
     var statusHtml =
       '<div class="dtl-section">' +
         '<h3>' + t('detail.status') + '</h3>' +
-        '<div class="dtl-status-row">' +
-          '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusLocal') + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : (isUrlApp ? 'URL' : '—')) + '</span></div>' +
-          '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusPublished') + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div>' +
+        '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:200px">' +
+            '<div class="dtl-status-row">' +
+              '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusLocal') + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : (isUrlApp ? 'URL' : '—')) + '</span></div>' +
+              '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusPublished') + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div>' +
+            '</div>' +
+            '<span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + '</span>' +
+          '</div>' +
+          shotImg +
         '</div>' +
-        '<span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + '</span>' +
       '</div>';
 
     // ── ABOUT ──
@@ -6839,7 +6854,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     // ── Apply theme + language on load ──────────────
     applyTheme(loadConfig().theme);
-    currentLang = (loadConfig().language === 'fi') ? 'fi' : 'en';
+    // A ?lang= override (e.g. the portal "Build an app" link passes the language the
+    // user has selected) wins over saved config so the catalog opens in that language.
+    var _params = new URLSearchParams(location.search);
+    var _urlLang = _params.get('lang');
+    currentLang = (_urlLang === 'fi' || _urlLang === 'en')
+      ? _urlLang
+      : ((loadConfig().language === 'fi') ? 'fi' : 'en');
     applyI18n();
     updateModeToggle();
 
@@ -6847,6 +6868,11 @@
     loadPublishedApps();
     loadCortexExtensions();
     loadConfigFromServer();
+
+    // Deep link ?create=1 — open the AI prompt builder ("Build an app") right away.
+    if (_params.get('create') === '1') {
+      try { openPromptBuilder(null); } catch (e) { /* prompt builder optional */ }
+    }
 
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {

@@ -15,6 +15,12 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.5.0 — 2026-06-20 — NextSteps recut to a curated, value-first set (write self-organizing
+ *     notes → Notebook; create your portfolio → Portfolio; build an app → app-catalog create flow
+ *     with ?lang=&create=1; use agents others shared → Offers) — dropped the package-manager /
+ *     connect-agent steps. Browser Back now works INSIDE the profile: open()/close() push
+ *     /v1/profile?tab= history entries and a popstate handler restores the tab, so Back steps
+ *     through tabs to Home instead of leaving the profile (?tab= is also a working deep link now).
  *   v3.4.0 — 2026-06-20 — Home cleanup: removed the tier-'new' onboarding blocks (HeroOnboarding,
  *     KnowledgeCallout, GhostTiles) that flashed on every load (tier starts 'new' before stats land)
  *     then vanished for active/experienced users. Replaced with a state-aware <NextSteps> "suggested
@@ -126,6 +132,20 @@ function gotoOrganism(orgId, homeTab) {
 function gotoOrganismsList() {
   try { sessionStorage.removeItem('aimeat.ws.openId'); sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }
   openProfileTab('organisms');
+}
+
+/* Keep the URL + browser history in step with the open profile tab, so the browser
+ * Back button moves between tabs (and Home) INSIDE the profile instead of leaving
+ * /v1/profile entirely. Tab navigation is internal (no SPA route change), so without
+ * this a Back press popped straight out of the profile. `replace` is used on mount to
+ * reflect a restored tab without adding a spurious entry. */
+function syncTabHistory(tabId, replace) {
+  try {
+    const path = tabId ? `/v1/profile?tab=${encodeURIComponent(tabId)}` : '/v1/profile';
+    const state = { aimeatTab: tabId || null };
+    if (replace) history.replaceState(state, '', path);
+    else history.pushState(state, '', path);
+  } catch { /* history unavailable */ }
 }
 
 /* ───── Tier heuristic ───── */
@@ -692,35 +712,23 @@ function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   `;
 }
 
-/* "Suggested next steps" — a state-aware recommendation card that replaces the old
- * fixed four-path onboarding hero (which flashed for everyone because tier starts at
- * 'new' before stats load, then vanished for active/experienced users). Reads the
- * already-loaded stats and proposes up to three genuinely actionable steps, deduped
- * by destination, the first highlighted. New users get "build your first app / connect
- * an agent / install a service"; people with content get "keep building" variants —
- * never just a restatement of the stat chips above. */
-function NextSteps({ stats, switchTab }) {
-  const num = (v) => (typeof v === 'number' ? v : 0);
-  const loaded = stats.apps !== '-';   // don't say "your first app" before stats land
-  const apps = num(stats.apps);
-  const agents = num(stats.agents);
-
-  // Priority-ordered candidates; deduped by tabId, capped at three.
-  const candidates = [];
-  if (loaded && apps === 0) candidates.push({ icon: '\u{26A1}', key: 'buildFirst', tabId: 'generator' });
-  if (loaded && agents === 0) candidates.push({ icon: '\u{1F916}', key: 'connectAgent', tabId: 'agents' });
-  candidates.push({ icon: '\u{1F4E6}', key: 'installService', tabId: 'packages' });
-  if (apps > 0) candidates.push({ icon: '\u{26A1}', key: 'buildAnother', tabId: 'generator' });
-  if (agents > 0) candidates.push({ icon: '\u{1F916}', key: 'connectAgent2', tabId: 'agents' });
-
-  const seen = new Set();
-  const steps = [];
-  for (const c of candidates) {
-    if (seen.has(c.tabId)) continue;
-    seen.add(c.tabId);
-    steps.push(c);
-    if (steps.length === 3) break;
-  }
+/* "Suggested next steps" — a curated, value-first card pointing at the genuinely useful
+ * but under-used surfaces (replaces the old four-path onboarding hero that flashed for
+ * everyone because tier starts 'new' before stats load). Fixed set, first highlighted:
+ *   1. Write self-organizing notes → Notebook (the highest-value habit)
+ *   2. Create your portfolio → Portfolio (under-used; tell others who you are)
+ *   3. Build an app → the app catalog's create flow (prompt builder), in the portal's
+ *      current language (?lang=) with the builder auto-opened (?create=1)
+ *   4. Use agents others shared → the Offers "Do" surface
+ * Each step carries its own `go()` so a step can switch a tab OR open an external page. */
+function NextSteps({ switchTab }) {
+  const buildAppUrl = `/app-catalog.html?lang=${encodeURIComponent(getLocale())}&create=1`;
+  const steps = [
+    { icon: '\u{1F9E0}', key: 'writeNotes', go: () => switchTab('notebook') },
+    { icon: '\u{1F3A8}', key: 'portfolio', go: () => switchTab('portfolio') },
+    { icon: '\u{26A1}', key: 'buildApp', go: () => window.open(buildAppUrl, '_blank', 'noopener') },
+    { icon: '\u{1F91D}', key: 'useSharedAgents', go: () => switchTab('offers') },
+  ];
 
   return html`
     <div class="pf-next">
@@ -728,7 +736,7 @@ function NextSteps({ stats, switchTab }) {
       <div class="pf-next-grid">
         ${steps.map((s, i) => html`
           <button class=${'pf-next-card' + (i === 0 ? ' pf-next-card--primary' : '')} key=${s.key}
-            onClick=${() => switchTab(s.tabId)}>
+            onClick=${s.go}>
             <span class="pf-next-ico">${s.icon}</span>
             <span class="pf-next-body">
               <span class="pf-next-card-title">${t('profile.landing.next.' + s.key + 'Title')}</span>
@@ -922,9 +930,17 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
         const parsed = JSON.parse(saved);
         if (parsed && parsed.tabId && parsed.slot) return parsed;
       }
+      // Fall back to a ?tab= deep link (also how Back/Forward restores a tab).
+      const tabId = new URLSearchParams(window.location.search).get('tab');
+      if (tabId) return { tabId, slot: 'main' };
     } catch { /* ignore */ }
     return null;
   });
+  // openViewRef mirrors openView for the toggle logic in open(); fromPopRef suppresses
+  // history pushes while we are REACTING to a popstate (Back/Forward) event.
+  const openViewRef = useRef(null);
+  const fromPopRef = useRef(false);
+  openViewRef.current = openView;
   const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
@@ -960,15 +976,15 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
     // (sessionStorage restore, aimeat-open-tab events) can't open the views.
     // The underlying APIs enforce the role server-side regardless.
     if (INFRA_TAB_IDS.has(tabId) && !isOperator) return;
-    setOpenView(prev => {
-      const next = (prev?.tabId === tabId) ? null : { tabId, slot };
-      if (next) {
-        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
-      } else {
-        sessionStorage.removeItem('aimeat-profile-tab');
-      }
-      return next;
-    });
+    const prev = openViewRef.current;
+    const next = (prev?.tabId === tabId) ? null : { tabId, slot };
+    try {
+      if (next) sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
+      else sessionStorage.removeItem('aimeat-profile-tab');
+    } catch { /* noop */ }
+    // Push a history entry so Back returns here (skipped when reacting to popstate).
+    if (!fromPopRef.current) syncTabHistory(next?.tabId || null, false);
+    setOpenView(next);
   }, [isOperator]);
 
   /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
@@ -1004,8 +1020,39 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   };
 
   const close = useCallback(() => {
-    sessionStorage.removeItem('aimeat-profile-tab');
+    try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+    if (!fromPopRef.current) syncTabHistory(null, false);
     setOpenView(null);
+  }, []);
+
+  /* Browser Back/Forward: read the tab from the URL and apply it WITHOUT pushing a new
+   * history entry (fromPopRef guards open()/close()). This makes Back step through the
+   * tabs you opened and finally land on Home, instead of leaving the profile. */
+  useEffect(() => {
+    const onPop = () => {
+      const tabId = new URLSearchParams(window.location.search).get('tab');
+      fromPopRef.current = true;
+      try {
+        if (tabId && !(INFRA_TAB_IDS.has(tabId) && !isOperator)) {
+          const v = { tabId, slot: 'main' };
+          try { sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(v)); } catch { /* noop */ }
+          setOpenView(v);
+        } else {
+          try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+          setOpenView(null);
+        }
+      } finally {
+        fromPopRef.current = false;
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [isOperator]);
+
+  /* On first mount, reflect a sessionStorage/?tab=-restored tab in the URL via
+   * replaceState so there is a consistent /v1/profile?tab= entry for Back to return to. */
+  useEffect(() => {
+    if (openViewRef.current?.tabId) syncTabHistory(openViewRef.current.tabId, true);
   }, []);
 
   /* Cross-tab navigation: any tab component can dispatch
@@ -1115,7 +1162,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
           <${WaitingForYou} owner=${owner} />
-          <${NextSteps} stats=${stats} switchTab=${(id) => open(id, 'main')} />
+          <${NextSteps} switchTab=${(id) => open(id, 'main')} />
           <div class="pf-home-grid">
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
