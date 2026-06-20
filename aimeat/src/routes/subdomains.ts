@@ -48,7 +48,11 @@ export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
  */
 function appCsp(apexOrigin: string): string {
   const ancestors = apexOrigin ? `'self' ${apexOrigin}` : "'self'";
-  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors ${ancestors}`;
+  // The app frames the apex silent-SSO bridge (hidden iframe → apex/app-silent.html), so frame-src
+  // must allow the apex origin explicitly (https://aimeat.io is also covered by `https:`, but an http
+  // dev apex like http://localtest.me is not — include it so seamless SSO works there too).
+  const apexFrame = apexOrigin ? ' ' + apexOrigin : '';
+  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexFrame}; frame-ancestors ${ancestors}`;
 }
 
 /**
@@ -155,9 +159,6 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   let apexOrigin = '';
   try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
   const csp = appCsp(apexOrigin);
-  // Seamless-SSO shim injected into per-app-subdomain apps so the owner's own app authenticates
-  // without a separate login (it pulls a scoped grant token via the apex bridge).
-  const shimSrc = apexOrigin ? `${apexOrigin}/app-login.js` : undefined;
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
@@ -185,7 +186,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    serveApp(res, storage, app, csp, shimSrc);  // per-app subdomain → inject the SSO shim
+    serveApp(res, storage, app, csp);  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their

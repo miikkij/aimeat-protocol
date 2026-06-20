@@ -153,11 +153,9 @@ async function main() {
         });
 
         console.log('\nPhase 3: Wiring — shim injected, bridge framable only by app origins');
-        await test('app HTML on the per-app subdomain has the SSO shim injected', async () => {
+        await test('app HTML on the per-app subdomain is served (the SDK does the SSO itself)', async () => {
             const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa' } });
-            const html = await res.text();
             assert(res.status === 200, `subdomain serve: ${res.status}`);
-            assert(html.includes('/app-login.js'), 'app-login.js shim injected into app HTML');
         });
         await test('GET /app-silent.html is framable only by *.appHost (frame-ancestors, no X-Frame-Options)', async () => {
             const res = await fetch(`${BASE}/app-silent.html`);
