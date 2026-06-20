@@ -2196,6 +2196,7 @@
       'detail.aiUsage': 'AI spend today',
       'detail.aiTruncated': 'App is large; only part of it was sent to the AI.',
       'detail.actions': 'Actions',
+      'detail.setScreenshot': 'Set screenshot',
       'detail.publish': '🚀 Publish',
       'detail.publishAs': '🚀 Publish as',
       'detail.urlCantEdit': 'This is a URL-linked app — there is no local source to edit with AI.',
@@ -2409,6 +2410,7 @@
       'detail.aiUsage': 'Tekoälykulutus tänään',
       'detail.aiTruncated': 'Sovellus on suuri; vain osa siitä lähetettiin tekoälylle.',
       'detail.actions': 'Toiminnot',
+      'detail.setScreenshot': 'Aseta kuvakaappaus',
       'detail.publish': '🚀 Julkaise',
       'detail.publishAs': '🚀 Julkaise versiona',
       'detail.urlCantEdit': 'Tämä on URL-linkitetty sovellus — paikallista lähdekoodia ei voi muokata tekoälyllä.',
@@ -5421,12 +5423,61 @@
           (isUrlApp ? '' : '<button class="dtl-btn" onclick="window._launcher.detailImproveExternal()">' + t('ctx.improveAi') + '</button>') +
           '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t('ctx.sharePrompt') + '</button>' +
           (isUrlApp ? '' : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + '</button>') +
+          (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailSetScreenshot()" title="Upload a custom thumbnail for this app">📷 ' + t('detail.setScreenshot') + '</button>' : '') +
           '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t('ctx.delete') + '</button>' +
         '</div>' +
       '</div>';
 
     document.getElementById('detail-body').innerHTML =
       statusHtml + aboutHtml + aiHtml + versionsHtml + actionsHtml;
+  }
+
+  // Manual override: upload a custom image as this published app's thumbnail. (Bulk auto-capture is
+  // the server-side `aimeat screenshot-worker`; the browser can't grab the cross-origin sandboxed app
+  // itself, so this is a file picker, not an in-page capture.)
+  function detailSetScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || '';
+    var owner = '';
+    var pu = app.publishedUrl || app.viewUrl || '';
+    var m = pu.match(/\/v1\/apps\/([^/]+)\/([^/?]+)/);
+    if (m) { owner = decodeURIComponent(m[1]); if (!filename) filename = decodeURIComponent(m[2]); }
+    if (!owner && window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+      owner = window.AIMEAT.auth.getSession().owner || '';
+    }
+    var token = getCortexOwnerToken();
+    if (!owner || !filename) { alert('Publish the app first, then you can set a screenshot.'); return; }
+    if (!token) { alert('Sign in to set a screenshot.'); return; }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
+    if (!aimeatUrl) { alert('No server configured.'); return; }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function() {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { alert('Image too large (max 2 MB).'); return; }
+      var reader = new FileReader();
+      reader.onload = function() {
+        var s = String(reader.result);
+        var base64 = s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s;
+        fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ screenshot: base64, screenshot_mime_type: file.type || 'image/png' })
+        })
+          .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+          .then(function(res) {
+            if (res.ok) { alert('Screenshot set. It will show in the catalogue and on the landing wall.'); }
+            else { alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || ('HTTP error'))); }
+          })
+          .catch(function(e) { alert('Failed: ' + e.message); });
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   }
 
   function metaItem(label, val) {
@@ -6712,6 +6763,7 @@
     detailSharePrompt: detailSharePrompt,
     detailPublish: detailPublish,
     detailDelete: detailDelete,
+    detailSetScreenshot: detailSetScreenshot,
     openPublishedDetail: openPublishedDetail,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,

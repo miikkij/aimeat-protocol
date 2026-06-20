@@ -11,10 +11,15 @@
  *   - computeTier() — exported heuristic; now gates only the home onboarding content
  *   - tierLevel() — exported numeric tier comparison helper
  *   - SIDEBAR_GROUPS — grouped, always-visible tab list
- *   - ProfileCard, HeroOnboarding, KnowledgeCallout, GhostTiles, CortexSection,
- *     AppStrip — home/section sub-components
+ *   - ProfileCard (with PresencePill), NextSteps, CortexSection — home/section sub-components
+ *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.4.0 — 2026-06-20 — Home cleanup: removed the tier-'new' onboarding blocks (HeroOnboarding,
+ *     KnowledgeCallout, GhostTiles) that flashed on every load (tier starts 'new' before stats land)
+ *     then vanished for active/experienced users. Replaced with a state-aware <NextSteps> "suggested
+ *     next steps" card computed from stats. Presence moved off the home body into a compact status
+ *     pill in the ProfileCard header (<PresencePill>) that opens the settings <PresenceDialog>.
  *   v3.3.0 — 2026-06-19 — Add the PresenceControl card to the home dashboard (own availability:
  *     auto/manual status + who-can-see visibility), previewing the shared <PresenceDot>.
  *   v3.2.0 — 2026-06-10 — Sidebar reorg: groups follow the information-refinement pipeline
@@ -519,21 +524,91 @@ function AgentsCard({ owner }) {
   `;
 }
 
-/* "Presence" — the owner's own availability control: status source (auto/manual),
- * chosen status, and who-can-see visibility. One self-contained card; the dot it
- * previews is the same <PresenceDot> rendered next to people everywhere else. */
-function PresenceControl() {
+/* "Presence" — the owner's own availability control. Lives as a compact status
+ * pill in the ProfileCard header (<PresencePill>); clicking it opens the settings
+ * <PresenceDialog>. The dot the pill shows is the same <PresenceDot> rendered next
+ * to people everywhere else, kept live by the pill's own fetch + live-update wiring. */
+function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
+  const onOverlayClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+  return html`
+    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
+      <div class="pf-edit-modal pf-presence-modal">
+        <div class="pf-edit-header">
+          <h2 class="pf-edit-title">${t('presence.control.title')}</h2>
+          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
+        </div>
+        <div class="pf-edit-body">
+          <div class="pf-presence-head">
+            <div class="section-desc">${t('presence.control.desc')}</div>
+            <${PresenceDot} status=${status} size="md" label=${true} />
+          </div>
+
+          <div class="pf-presence-row">
+            <label class="pf-presence-label">${t('presence.control.modeLabel')}</label>
+            <div class="pf-presence-modes">
+              <button class=${'pf-presence-pill' + (cfg.mode === 'auto' ? ' pf-presence-pill--on' : '')}
+                disabled=${saving} onClick=${() => onSave({ mode: 'auto' })}>${t('presence.control.modeAuto')}</button>
+              <button class=${'pf-presence-pill' + (cfg.mode === 'manual' ? ' pf-presence-pill--on' : '')}
+                disabled=${saving} onClick=${() => onSave({ mode: 'manual' })}>${t('presence.control.modeManual')}</button>
+            </div>
+          </div>
+
+          ${cfg.mode === 'auto' ? html`
+            <div class="pf-presence-hint">${t('presence.control.modeAutoHint')}</div>
+          ` : html`
+            <div class="pf-presence-row">
+              <label class="pf-presence-label" for="pf-presence-status">${t('presence.control.statusLabel')}</label>
+              <select id="pf-presence-status" class="pf-edit-select" value=${cfg.status} disabled=${saving}
+                onChange=${(e) => onSave({ status: e.target.value })}>
+                <option value="available">${t('presence.status.available')}</option>
+                <option value="busy">${t('presence.status.busy')}</option>
+                <option value="away">${t('presence.status.away')}</option>
+                <option value="invisible">${t('presence.status.invisible')}</option>
+              </select>
+            </div>
+          `}
+
+          <div class="pf-presence-row">
+            <label class="pf-presence-label" for="pf-presence-vis">${t('presence.control.visibilityLabel')}</label>
+            <select id="pf-presence-vis" class="pf-edit-select" value=${cfg.visibility} disabled=${saving}
+              onChange=${(e) => onSave({ visibility: e.target.value })}>
+              <option value="everyone">${t('presence.control.visEveryone')}</option>
+              <option value="contacts">${t('presence.control.visContacts')}</option>
+              <option value="nobody">${t('presence.control.visNobody')}</option>
+            </select>
+          </div>
+          <div class="pf-presence-hint">
+            ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
+              : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
+          </div>
+        </div>
+        <div class="pf-edit-footer">
+          <button class="btn-primary" onClick=${onClose}>${t('profile.close')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function PresencePill() {
   const [cfg, setCfg] = useState(null);
   const [status, setStatus] = useState('unknown');
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const r = await getMyPresence();
       if (r?.data) { setCfg(r.data.config); setStatus(r.data.status || 'unknown'); }
-    } catch { /* control stays hidden until it loads */ }
+    } catch { /* pill stays hidden until it loads */ }
   }, []);
   useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
 
   const save = async (partial) => {
     if (!cfg) return;
@@ -548,56 +623,13 @@ function PresenceControl() {
   };
 
   if (!cfg) return null;
-
   return html`
-    <div class="pf-presence-card">
-      <div class="pf-presence-head">
-        <div>
-          <div class="section-title">${t('presence.control.title')}</div>
-          <div class="section-desc">${t('presence.control.desc')}</div>
-        </div>
-        <${PresenceDot} status=${status} size="md" label=${true} />
-      </div>
-
-      <div class="pf-presence-row">
-        <label class="pf-presence-label">${t('presence.control.modeLabel')}</label>
-        <div class="pf-presence-modes">
-          <button class=${'pf-presence-pill' + (cfg.mode === 'auto' ? ' pf-presence-pill--on' : '')}
-            disabled=${saving} onClick=${() => save({ mode: 'auto' })}>${t('presence.control.modeAuto')}</button>
-          <button class=${'pf-presence-pill' + (cfg.mode === 'manual' ? ' pf-presence-pill--on' : '')}
-            disabled=${saving} onClick=${() => save({ mode: 'manual' })}>${t('presence.control.modeManual')}</button>
-        </div>
-      </div>
-
-      ${cfg.mode === 'auto' ? html`
-        <div class="pf-presence-hint">${t('presence.control.modeAutoHint')}</div>
-      ` : html`
-        <div class="pf-presence-row">
-          <label class="pf-presence-label" for="pf-presence-status">${t('presence.control.statusLabel')}</label>
-          <select id="pf-presence-status" class="pf-edit-select" value=${cfg.status} disabled=${saving}
-            onChange=${(e) => save({ status: e.target.value })}>
-            <option value="available">${t('presence.status.available')}</option>
-            <option value="busy">${t('presence.status.busy')}</option>
-            <option value="away">${t('presence.status.away')}</option>
-            <option value="invisible">${t('presence.status.invisible')}</option>
-          </select>
-        </div>
-      `}
-
-      <div class="pf-presence-row">
-        <label class="pf-presence-label" for="pf-presence-vis">${t('presence.control.visibilityLabel')}</label>
-        <select id="pf-presence-vis" class="pf-edit-select" value=${cfg.visibility} disabled=${saving}
-          onChange=${(e) => save({ visibility: e.target.value })}>
-          <option value="everyone">${t('presence.control.visEveryone')}</option>
-          <option value="contacts">${t('presence.control.visContacts')}</option>
-          <option value="nobody">${t('presence.control.visNobody')}</option>
-        </select>
-      </div>
-      <div class="pf-presence-hint">
-        ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
-          : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
-      </div>
-    </div>
+    <button class="pf-presence-pill-btn" onClick=${() => setOpen(true)} title=${t('presence.control.title')}>
+      <${PresenceDot} status=${status} size="sm" label=${true} />
+      <span class="pf-presence-pill-caret" aria-hidden="true">⌄</span>
+    </button>
+    ${open ? html`<${PresenceDialog} cfg=${cfg} status=${status} saving=${saving}
+      onSave=${save} onClose=${() => setOpen(false)} />` : null}
   `;
 }
 
@@ -636,8 +668,11 @@ function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
               </div>`
           }
         </div>
-        <button class="btn-outline btn-sm pf-lp-profile-btn" onClick=${() => onEditProfile?.()}>
-          ${t('profile.landing.profileBtn') || 'Profile'}</button>
+        <div class="pf-lp-actions">
+          <${PresencePill} />
+          <button class="btn-outline btn-sm" onClick=${() => onEditProfile?.()}>
+            ${t('profile.landing.profileBtn') || 'Profile'}</button>
+        </div>
       </div>
       <div class="pf-lp-stats">
         ${isNew ? html`
@@ -657,89 +692,50 @@ function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   `;
 }
 
-function HeroOnboarding({ switchTab }) {
-  return html`
-    <div class="pf-hero-onboard">
-      <div class="pf-hero-ob-title">${t('profile.landing.heroTitle')} \u{1F44B}</div>
-      <div class="pf-hero-ob-subtitle">${t('profile.landing.heroSubtitle')}</div>
-      <div class="pf-onboard-grid">
-        <div class="pf-onboard-card highlight" onClick=${() => switchTab('packages')}>
-          <span class="pf-onboard-tag">${t('profile.landing.tagEasiest')}</span>
-          <span class="pf-onboard-icon">\u{1F4E6}</span>
-          <div class="pf-onboard-title">${t('profile.landing.onboardInstall')}</div>
-          <div class="pf-onboard-desc">${t('profile.landing.onboardInstallDesc')}</div>
-        </div>
-        <div class="pf-onboard-card" onClick=${() => switchTab('knowledge')}>
-          <span class="pf-onboard-icon">\u{1F4AC}</span>
-          <div class="pf-onboard-title">${t('profile.landing.onboardChat')}</div>
-          <div class="pf-onboard-desc">${t('profile.landing.onboardChatDesc')}</div>
-        </div>
-        <div class="pf-onboard-card" onClick=${() => switchTab('agents')}>
-          <span class="pf-onboard-icon">\u{1F916}</span>
-          <div class="pf-onboard-title">${t('profile.landing.onboardAgent')}</div>
-          <div class="pf-onboard-desc">${t('profile.landing.onboardAgentDesc')}</div>
-        </div>
-        <div class="pf-onboard-card" onClick=${() => switchTab('generator')}>
-          <span class="pf-onboard-tag pf-tag-later">${t('profile.landing.tagLater')}</span>
-          <span class="pf-onboard-icon">\u{26A1}</span>
-          <div class="pf-onboard-title">${t('profile.landing.onboardGenerator')}</div>
-          <div class="pf-onboard-desc">${t('profile.landing.onboardGeneratorDesc')}</div>
-        </div>
-      </div>
-    </div>
-  `;
-}
+/* "Suggested next steps" — a state-aware recommendation card that replaces the old
+ * fixed four-path onboarding hero (which flashed for everyone because tier starts at
+ * 'new' before stats load, then vanished for active/experienced users). Reads the
+ * already-loaded stats and proposes up to three genuinely actionable steps, deduped
+ * by destination, the first highlighted. New users get "build your first app / connect
+ * an agent / install a service"; people with content get "keep building" variants —
+ * never just a restatement of the stat chips above. */
+function NextSteps({ stats, switchTab }) {
+  const num = (v) => (typeof v === 'number' ? v : 0);
+  const loaded = stats.apps !== '-';   // don't say "your first app" before stats land
+  const apps = num(stats.apps);
+  const agents = num(stats.agents);
 
-function KnowledgeCallout({ switchTab }) {
-  return html`
-    <div class="pf-knowledge-callout" onClick=${() => switchTab('knowledge')}>
-      <div class="pf-knowledge-callout-icon">\u{1F9E0}</div>
-      <div class="pf-knowledge-callout-body">
-        <h3 class="pf-knowledge-callout-title">${t('profile.landing.knowledgeTitle')}</h3>
-        <p class="pf-knowledge-callout-desc">${t('profile.landing.knowledgeDesc')}</p>
-        <div class="pf-ai-pills">
-          <span class="pf-ai-pill">Claude</span>
-          <span class="pf-ai-pill">ChatGPT</span>
-          <span class="pf-ai-pill">Grok</span>
-          <span class="pf-ai-pill">Copilot</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
+  // Priority-ordered candidates; deduped by tabId, capped at three.
+  const candidates = [];
+  if (loaded && apps === 0) candidates.push({ icon: '\u{26A1}', key: 'buildFirst', tabId: 'generator' });
+  if (loaded && agents === 0) candidates.push({ icon: '\u{1F916}', key: 'connectAgent', tabId: 'agents' });
+  candidates.push({ icon: '\u{1F4E6}', key: 'installService', tabId: 'packages' });
+  if (apps > 0) candidates.push({ icon: '\u{26A1}', key: 'buildAnother', tabId: 'generator' });
+  if (agents > 0) candidates.push({ icon: '\u{1F916}', key: 'connectAgent2', tabId: 'agents' });
 
-function KnowledgeButton({ switchTab }) {
-  return html`
-    <div class="pf-knowledge-btn" onClick=${() => switchTab('knowledge')}>
-      <span class="pf-kb-icon">\u{1F9E0}</span>
-      <div class="pf-kb-text">
-        <div class="pf-kb-title">${t('profile.landing.knowledgeBtnTitle')}</div>
-        <div class="pf-kb-desc">${t('profile.landing.knowledgeBtnDesc')}</div>
-      </div>
-      <span class="pf-kb-arrow">\u2192</span>
-    </div>
-  `;
-}
+  const seen = new Set();
+  const steps = [];
+  for (const c of candidates) {
+    if (seen.has(c.tabId)) continue;
+    seen.add(c.tabId);
+    steps.push(c);
+    if (steps.length === 3) break;
+  }
 
-function GhostTiles({ switchTab }) {
-  /* Hardcoded popular services — matches wireframe. Names are Finnish product
-     names recognizable across locales; not i18n'd intentionally. */
-  const tiles = [
-    { icon: '\u26A1', name: 'Sähkön hinta' },
-    { icon: '\u{1F6A8}', name: 'Hälytyskartta' },
-    { icon: '\u{1F324}\uFE0F', name: 'Uloslähdinkö' },
-    { icon: '\u{1F3E2}', name: 'Yritystutka' },
-  ];
   return html`
-    <div class="pf-landing-section">
-      <div class="pf-menu-title">${t('profile.landing.ghostSectionTitle')}</div>
-      <div class="pf-ghost-grid">
-        ${tiles.map(tile => html`
-          <div class="pf-ghost-tile" onClick=${() => switchTab('packages')}>
-            <span class="pf-ghost-icon">${tile.icon}</span>
-            <span class="pf-ghost-name">${tile.name}</span>
-            <span class="pf-ghost-cta">${t('profile.landing.ghostInstall')} \u2192</span>
-          </div>
+    <div class="pf-next">
+      <div class="pf-next-title">${t('profile.landing.nextTitle')}</div>
+      <div class="pf-next-grid">
+        ${steps.map((s, i) => html`
+          <button class=${'pf-next-card' + (i === 0 ? ' pf-next-card--primary' : '')} key=${s.key}
+            onClick=${() => switchTab(s.tabId)}>
+            <span class="pf-next-ico">${s.icon}</span>
+            <span class="pf-next-body">
+              <span class="pf-next-card-title">${t('profile.landing.next.' + s.key + 'Title')}</span>
+              <span class="pf-next-card-desc">${t('profile.landing.next.' + s.key + 'Desc')}</span>
+            </span>
+            <span class="pf-next-arrow" aria-hidden="true">→</span>
+          </button>
         `)}
       </div>
     </div>
@@ -1037,10 +1033,6 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
 
   const isOpen = (tabId) => openView?.tabId === tabId;
 
-  const isNew = tier === 'new';
-  const isActive = tier === 'active';
-  const isExperienced = tier === 'experienced';
-
   return html`
     <div class="pf-shell${drawerOpen ? ' pf-shell--open' : ''}">
 
@@ -1122,11 +1114,8 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
-          <${PresenceControl} />
-          ${isNew ? html`<${HeroOnboarding} switchTab=${(id) => open(id, 'main')} />` : null}
-          ${(isNew || isActive) ? html`<${KnowledgeCallout} switchTab=${() => open('knowledge', 'main')} />` : null}
-          ${isNew ? html`<${GhostTiles} switchTab=${() => open('packages', 'main')} />` : null}
           <${WaitingForYou} owner=${owner} />
+          <${NextSteps} stats=${stats} switchTab=${(id) => open(id, 'main')} />
           <div class="pf-home-grid">
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />

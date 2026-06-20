@@ -45,6 +45,14 @@ All notable changes to AIMEAT are documented in this file.
   Opt-in — the node runs fine without it. `src/routes/apps.ts`, `src/cli/screenshot-worker.ts`,
   `src/index.ts`, `openapi.yaml`, new `playwright-core` dependency, `public/views/landing.js` +
   `landing.css`, `test/e2e-apps.ts` (Phase 6), README.
+  - **Zero-config variant: a node-internal scheduled capture** (`AIMEAT_SCREENSHOT_AUTO=true`,
+    `AIMEAT_SCREENSHOT_INTERVAL_MIN`). The node itself backfills missing thumbnails on an interval —
+    **no token, no CLI, no operator action** — writing JPEGs straight to storage (it self-authenticates
+    by running in-process) and self-disabling gracefully if no browser is present.
+    `src/services/screenshot-capture.ts`, `src/server-bootstrap/service-init.ts`, `src/config.ts`,
+    `src/utils/env-config.ts`, `.env.example`.
+  - **Manual override in the catalogue:** a **Set screenshot** button in the app detail view uploads a
+    custom thumbnail (owner-authed) via the endpoint. `src/static/app-catalog.html`.
 
 ### Changed
 
