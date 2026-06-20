@@ -20,6 +20,8 @@
  *     has_screenshot, 400 on empty body, 403 for a different non-operator owner.
  *   v1.3.0 — 2026-06-20 — add Phase 7 description requirement: new app without a
  *     description → 400; carried forward on update. Fork/owner-B publishes now send one.
+ *   v1.4.0 — 2026-06-20 — add Phase 8 clear-screenshot: owner DELETE flips has_screenshot
+ *     to false + GET 404s; a different non-operator owner gets 403.
  */
 
 import * as ed from '@noble/ed25519';
@@ -360,6 +362,29 @@ await test('Re-publishing WITHOUT a description keeps the existing one (carry-fo
     const { body } = await json('/v1/apps?limit=200');
     const mine = (body.data?.apps ?? []).find((a: any) => a.filename === DESC_FILE && a.owner === ownerName);
     assert(mine?.manifest?.description === 'now it has one', `description carried forward, got "${mine?.manifest?.description}"`);
+});
+
+// ── Phase 8: clear screenshot (queues a batch recapture) ──
+console.log('\nPhase 8: Clear screenshot');
+
+await test("A different non-operator owner cannot clear another owner's screenshot (403)", async () => {
+    const { status } = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, bAuthed({ method: 'DELETE' }));
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('Owner clears their screenshot; listing flips has_screenshot to false and GET 404s', async () => {
+    const set = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST', body: JSON.stringify({ screenshot: PNG_1x1 }),
+    }));
+    assert(set.status === 200, `precondition (set screenshot) status ${set.status}`);
+    const del = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({ method: 'DELETE' }));
+    assert(del.status === 200, `clear status ${del.status}: ${JSON.stringify(del.body)}`);
+    assert(del.body.data?.cleared === true, 'returns cleared:true');
+    const list = await json('/v1/apps?limit=200');
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === ownerName);
+    assert(!!mine && mine.has_screenshot === false, 'listing now reports has_screenshot=false');
+    const gone = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
+    assert(gone.status === 404, `screenshot GET now 404, got ${gone.status}`);
 });
 
 // ── Summary ──

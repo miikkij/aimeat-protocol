@@ -2197,6 +2197,7 @@
       'detail.aiTruncated': 'App is large; only part of it was sent to the AI.',
       'detail.actions': 'Actions',
       'detail.setScreenshot': 'Set screenshot',
+      'detail.refreshScreenshot': 'New screenshot',
       'detail.publish': '🚀 Publish',
       'detail.publishAs': '🚀 Publish as',
       'detail.urlCantEdit': 'This is a URL-linked app — there is no local source to edit with AI.',
@@ -2411,6 +2412,7 @@
       'detail.aiTruncated': 'Sovellus on suuri; vain osa siitä lähetettiin tekoälylle.',
       'detail.actions': 'Toiminnot',
       'detail.setScreenshot': 'Aseta kuvakaappaus',
+      'detail.refreshScreenshot': 'Ota uusi kuvakaappaus',
       'detail.publish': '🚀 Julkaise',
       'detail.publishAs': '🚀 Julkaise versiona',
       'detail.urlCantEdit': 'Tämä on URL-linkitetty sovellus — paikallista lähdekoodia ei voi muokata tekoälyllä.',
@@ -5424,6 +5426,7 @@
           '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t('ctx.sharePrompt') + '</button>' +
           (isUrlApp ? '' : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + '</button>') +
           (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailSetScreenshot()" title="Upload a custom thumbnail for this app">📷 ' + t('detail.setScreenshot') + '</button>' : '') +
+          (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailRefreshScreenshot()" title="Clear the screenshot; the node re-takes it on its next scheduled run">🔄 ' + t('detail.refreshScreenshot') + '</button>' : '') +
           '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t('ctx.delete') + '</button>' +
         '</div>' +
       '</div>';
@@ -5478,6 +5481,38 @@
       reader.readAsDataURL(file);
     };
     input.click();
+  }
+
+  // System-side refresh: clear the current screenshot so the node's scheduled batch job re-takes it
+  // on its next run. Clearing is cheap (no on-demand render), which is what keeps this DoS-safe.
+  function detailRefreshScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || '';
+    var owner = '';
+    var pu = app.publishedUrl || app.viewUrl || '';
+    var m = pu.match(/\/v1\/apps\/([^/]+)\/([^/?]+)/);
+    if (m) { owner = decodeURIComponent(m[1]); if (!filename) filename = decodeURIComponent(m[2]); }
+    if (!owner && window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+      owner = window.AIMEAT.auth.getSession().owner || '';
+    }
+    var token = getCortexOwnerToken();
+    if (!owner || !filename) { alert('Publish the app first, then you can refresh its screenshot.'); return; }
+    if (!token) { alert('Sign in to refresh the screenshot.'); return; }
+    if (!confirm('Clear the current screenshot? The node takes a fresh one on its next scheduled run.')) return;
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
+    if (!aimeatUrl) { alert('No server configured.'); return; }
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/screenshot', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (res.ok) { alert((res.j.data && res.j.data.note) || 'Screenshot cleared. A fresh one will be taken on the next scheduled run.'); }
+        else { alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'HTTP error')); }
+      })
+      .catch(function(e) { alert('Failed: ' + e.message); });
   }
 
   function metaItem(label, val) {
@@ -6764,6 +6799,7 @@
     detailPublish: detailPublish,
     detailDelete: detailDelete,
     detailSetScreenshot: detailSetScreenshot,
+    detailRefreshScreenshot: detailRefreshScreenshot,
     openPublishedDetail: openPublishedDetail,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
