@@ -13,6 +13,8 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-06-20 -- aimeat_app_publish requires a description for a NEW app (carried forward
+ *     on update when omitted), mirroring POST /v1/apps.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -108,9 +110,24 @@ export function registerAppsTools(
             const newVersion = existingVersion + 1;
             const isUpdate = existingVersion > 0;
 
+            // Description required for a NEW app; carried forward on an update when omitted (so a
+            // re-publish never blanks it). Mirrors POST /v1/apps.
+            let effectiveDescription = typeof description === 'string' ? description.trim() : '';
+            if (!effectiveDescription) {
+                if (isUpdate) {
+                    const existingApp = await storage.getApp(ownerGaii, filename);
+                    effectiveDescription = existingApp?.manifest?.description ?? '';
+                } else {
+                    return {
+                        content: [{ type: 'text' as const, text: 'A description is required when publishing a new app. Add a short "description" (1-2 sentences about what it does).' }],
+                        isError: true,
+                    };
+                }
+            }
+
             const manifest: AppManifest = {
                 name,
-                description: description ?? '',
+                description: effectiveDescription,
                 version: version ?? `1.0.${newVersion - 1}`,
                 category: category ?? 'tool',
                 tags: tags ?? [],

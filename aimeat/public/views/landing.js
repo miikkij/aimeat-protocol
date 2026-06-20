@@ -258,6 +258,7 @@ function buildLandingAppPrompt(nodeUrl) {
   p += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
   p += '### Important Rules\n';
   p += '- Return the COMPLETE HTML file, not fragments\n';
+  p += '- Also write a one-sentence description of what the app does - it is REQUIRED when publishing and shows in the catalogue and on the landing wall\n';
   p += '- Never use literal closing script tags in JS comments or strings\n';
   p += '- Keep it as a single self-contained HTML file\n';
   p += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';

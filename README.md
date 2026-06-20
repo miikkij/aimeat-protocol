@@ -346,6 +346,13 @@ npx aimeat seed     # seed example packages (in another terminal, server must be
 npx aimeat connect --url https://your-node --owner your-handle
 ```
 
+**App thumbnails (optional).** `aimeat screenshot-worker` renders each published app and stores a
+thumbnail shown in the App Catalogue and on the landing wall (`--watch N` keeps it backfilling). It
+drives your machine's installed **Chrome/Edge** via Playwright — **no browser download** on
+Windows/desktop; a headless server runs `npx playwright install chromium` once. Auth uses a
+long-lived operator token (mint one with `POST /v1/access/tokens`, `grant_operator: true`). The node
+runs fine without it — screenshots are an opt-in operator feature.
+
 ### From source
 
 Requires Node.js 24+ and pnpm 10+. MongoDB is optional.

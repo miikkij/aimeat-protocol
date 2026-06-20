@@ -1927,6 +1927,11 @@
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.filenameHint">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
       </div>
       <div class="form-group">
+        <label for="publish-description" data-i18n="publish.description">Description</label>
+        <textarea id="publish-description" class="modal-input" rows="2" placeholder="What does this app do? 1-2 sentences (your AI can write it)" data-i18n-ph="publish.descriptionPh" autocomplete="off"></textarea>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.descriptionHint">Shown in the catalogue and on the landing wall. Required for a new app.</div>
+      </div>
+      <div class="form-group">
         <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
         <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
@@ -4229,6 +4234,7 @@
       if (!/\.html?$/i.test(safeName)) safeName += '.html';
     }
     document.getElementById('publish-filename').value = safeName;
+    document.getElementById('publish-description').value = app.description || '';
     document.getElementById('publish-access-code').value = '';
     document.getElementById('publish-status').textContent = '';
     document.getElementById('publish-submit-btn').disabled = false;
@@ -4262,6 +4268,16 @@
       statusEl.style.color = 'var(--accent)';
       return;
     }
+
+    // Description is required for a NEW app (the server enforces it too); on a republish the server
+    // carries the existing one forward when omitted.
+    var description = document.getElementById('publish-description').value.trim();
+    if (!description && !app.published) {
+      statusEl.textContent = 'A description is required for a new app. Write 1-2 sentences (your AI can write it).';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+    app.description = description;
 
     // Get the HTML content
     var htmlContent = '';
