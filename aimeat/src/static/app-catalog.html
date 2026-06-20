@@ -1,4 +1,15 @@
 <!DOCTYPE html>
+<!--
+  @file src/static/app-catalog.html
+  @description Self-contained "My Apps" launcher SPA (IndexedDB-backed) for installing,
+    publishing, and running user apps. Runs published app HTML only inside a sandboxed,
+    opaque-origin iframe — never as a top-level document on the apex origin (H-2).
+  @structure Inline <style> theme; markup; large inline <script> exposing window._launcher.
+  @usage Served at GET /app-catalog.html (relaxed CSP) from server-bootstrap/static-files.ts.
+  @version-history
+    v1.1.0 — 2026-06-20 — H-2: route all in-SPA app launches through the sandboxed iframe;
+      remove apex top-level window.open(...?mode=inline) links (viewPublished + isSameOriginUrl).
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -1787,7 +1798,7 @@
     <div class="iframe-toolbar">
       <button class="icon-btn" onclick="window._launcher.closeIframe()" title="Close">&#x2715;</button>
       <span class="iframe-title" id="iframe-title"></span>
-      <button class="icon-btn" onclick="window._launcher.openExternal()" title="Open in new tab">&#x2197;</button>
+      <button class="icon-btn" id="iframe-external-btn" onclick="window._launcher.openExternal()" title="Open in new tab" style="display:none">&#x2197;</button>
     </div>
     <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
   </div>
@@ -3240,18 +3251,52 @@
     });
   }
 
+  // True only for URLs on the apex SPA origin (this page). Such URLs — and blob: URLs,
+  // which inherit the creator's origin — must NEVER run app HTML top-level: that is the
+  // H-2 cross-user session-theft vector. Genuinely external URLs are already cross-origin
+  // and safe to open in a new tab. See docs/internal/2026-06-20-app-origin-isolation-*.
+  function isSameOriginUrl(url) {
+    try { return new URL(url, window.location.href).origin === window.location.origin; }
+    catch (e) { return false; }
+  }
+
   function launchInTab(app) {
     if (app.source === 'url' && app.url) {
-      window.open(app.url, '_blank', 'noopener');
+      if (isSameOriginUrl(app.url)) {
+        // H-2: apex-hosted app HTML must run sandboxed (opaque origin), never top-level.
+        launchInIframe(app);
+      } else {
+        window.open(app.url, '_blank', 'noopener');
+      }
     } else if (app.blob) {
-      // Use blob URL instead of document.write to maintain browser sandbox
-      var html = decodeURIComponent(escape(atob(app.blob)));
-      var blob = new Blob([html], { type: 'text/html' });
-      var blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank', 'noopener');
-      // Revoke after a short delay to allow the tab to load
-      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 5000);
+      // Blob: URLs inherit the apex origin → same-origin. Run sandboxed, never top-level.
+      launchInIframe(app);
     }
+  }
+
+  // Load published app HTML (an apex ?mode=inline URL) into the sandboxed iframe. The
+  // iframe's `sandbox` has no `allow-same-origin`, so the document gets an opaque origin
+  // and cannot read aimeat.io localStorage or send credentialed same-origin requests —
+  // this is the H-2-safe replacement for top-level window.open(...?mode=inline).
+  function viewPublished(url, name) {
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    var title = document.getElementById('iframe-title');
+    title.textContent = name || 'App';
+    delete iframe.dataset.appId;
+    iframe.removeAttribute('srcdoc');
+    iframe.src = url;
+    currentIframeUrl = '';   // never expose an apex URL to the top-level "open external" button
+    updateOpenExternalBtn();
+    view.hidden = false;
+  }
+
+  // Hide the "open in new tab" affordance whenever the framed content is same-origin
+  // (apex-hosted or blob) — opening it top-level would re-introduce H-2.
+  function updateOpenExternalBtn() {
+    var btn = document.getElementById('iframe-external-btn');
+    if (!btn) return;
+    btn.style.display = (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) ? '' : 'none';
   }
 
   function launchInIframe(app) {
@@ -3273,6 +3318,7 @@
       currentIframeUrl = '';
     }
 
+    updateOpenExternalBtn();
     view.hidden = false;
   }
 
@@ -3427,17 +3473,11 @@
   }
 
   function openExternal() {
-    var iframe = document.getElementById('app-iframe');
-    var appId = iframe.dataset.appId;
-    if (currentIframeUrl) {
-      window.open(currentIframeUrl, '_blank');
-    } else if (appId) {
-      // Blob app — find it and launch in tab
-      var app = null;
-      for (var i = 0; i < allApps.length; i++) {
-        if (allApps[i].id === appId) { app = allApps[i]; break; }
-      }
-      if (app) launchInTab(app);
+    // H-2: only ever open genuinely cross-origin app URLs top-level. Same-origin (apex)
+    // or blob content stays sandboxed in the iframe — opening it top-level would let it
+    // read the visitor's aimeat.io session.
+    if (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) {
+      window.open(currentIframeUrl, '_blank', 'noopener');
     }
   }
 
@@ -5033,7 +5073,7 @@
             '<span style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
           '</div>' +
           '<div class="published-card-actions">' +
-            '<button onclick="window.open(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'_blank\')">' + t('card.view') + '</button>' +
+            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
             '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
           '</div>' +
         '</div>';
@@ -5126,7 +5166,7 @@
           '</div>' +
           subChipHtml +
           '<div class="published-card-actions">' +
-            (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">' + t('card.view') + '</button>' : '') +
+            (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
             (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
             subBtnHtml +
             (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
@@ -5429,7 +5469,7 @@
               '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
                 '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + '</span></div>' +
               '<div class="dtl-btn-row">' +
-                '<button class="dtl-btn" onclick="window.open(\'' + escapeHtml(viewU) + '\', \'_blank\')">' + t('card.view') + '</button>' +
+                '<button class="dtl-btn" onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + escapeHtml(filename) + '\')">' + t('card.view') + '</button>' +
                 (isLatest ? '' : '<button class="dtl-btn" onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.restore') + '</button>') +
                 '<button class="dtl-btn" onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.fork') + '</button>' +
               '</div>' +
@@ -5663,7 +5703,7 @@
                 '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + '</span>' +
               '</div>' +
               '<div class="version-actions">' +
-                '<button onclick="window.open(\'' + escapeHtml(viewU) + '\', \'_blank\')">' + t('card.view') + '</button>' +
+                '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + escapeHtml(filename) + '\')">' + t('card.view') + '</button>' +
                 (isLatest ? '' : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Re-publish this version as the new latest">' + t('card.restore') + '</button>') +
                 '<button onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Copy this version into a new app">' + t('card.fork') + '</button>' +
               '</div>' +
@@ -6541,6 +6581,7 @@
     launchApp: launchApp,
     launchInTab: launchInTab,
     launchInIframe: launchInIframe,
+    viewPublished: viewPublished,
     closeIframe: closeIframe,
     openExternal: openExternal,
     setCurrentIframeUrl: function (url) { currentIframeUrl = url; },

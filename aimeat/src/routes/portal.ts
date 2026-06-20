@@ -487,6 +487,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/how-it-works',
     '/v1/business',
     '/v1/start',
+    '/v1/app-grant',   // H-2 app-grant consent page (SPA)
   ];
 
   // Short link used in LinkedIn posts — preserve the ?from= entrance slug.

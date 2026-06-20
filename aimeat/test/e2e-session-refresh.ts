@@ -26,15 +26,27 @@ function assert(cond: boolean, msg: string) {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** Extract the aimeat_rt cookie value from a response's Set-Cookie header(s). */
-function extractRt(res: Response): string | null {
+/** All Set-Cookie header strings on a response (cross-runtime). */
+function setCookieHeaders(res: Response): string[] {
     const h: any = res.headers;
-    const cookies: string[] = typeof h.getSetCookie === 'function'
+    return typeof h.getSetCookie === 'function'
         ? h.getSetCookie()
         : [res.headers.get('set-cookie')].filter(Boolean) as string[];
-    for (const c of cookies) {
+}
+
+/** Extract the aimeat_rt cookie value from a response's Set-Cookie header(s). */
+function extractRt(res: Response): string | null {
+    for (const c of setCookieHeaders(res)) {
         const m = /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(c);
         if (m) return decodeURIComponent(m[1]);
+    }
+    return null;
+}
+
+/** The raw Set-Cookie header string that sets aimeat_rt (with all its attributes). */
+function rtSetCookieHeader(res: Response): string | null {
+    for (const c of setCookieHeaders(res)) {
+        if (/(?:^|;\s*)aimeat_rt=/.test(c)) return c;
     }
     return null;
 }
@@ -80,6 +92,23 @@ async function main() {
     await test('login sets aimeat_rt cookie + short access token', async () => {
         s = await login(username, password);
         assert(s.expiresIn > 0 && s.expiresIn <= 3600, `expires_in should be short, got ${s.expiresIn}`);
+    });
+
+    // H-2 invariant guard (design 2026-06-20-app-origin-isolation-and-grants §3/§7):
+    // the auth refresh cookie MUST stay host-only — never broadened to a parent Domain.
+    // A parent Domain=.aimeat.io would send aimeat_rt to *.apps.aimeat.io (same-site),
+    // letting any user-published app mint the visitor's token and collapsing the whole
+    // app-origin isolation. Catch any regression that adds a Domain attribute here.
+    await test('aimeat_rt Set-Cookie is host-only (no Domain= attribute)', async () => {
+        // call() discards the raw Set-Cookie header, so fetch directly to inspect attributes.
+        const raw = await fetch(`${BASE}/v1/ghii/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+        const setCookie = rtSetCookieHeader(raw);
+        assert(!!setCookie, 'login must set the aimeat_rt cookie');
+        assert(!/;\s*Domain=/i.test(setCookie!), `aimeat_rt cookie must be host-only (no Domain=), got: ${setCookie}`);
     });
 
     await test('access token works and session appears with device label', async () => {

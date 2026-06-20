@@ -8,6 +8,8 @@
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial (owner spec).
+ *   v1.1.0 — 2026-06-20 — H-2: the live-example app link opens in a sandboxed opaque-origin
+ *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline tab.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -15,6 +17,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { openAppSandboxed } from '/js/app-sandbox.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -144,7 +147,8 @@ export default function HowItWorks({ navigate }) {
         <div class="ld-stats-own">
           ${tr('hiw.exampleText', 'AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.')}
           ${paper && html`
-            <a class="ld-stats-cta" href=${`/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline`} target="_blank">
+            <a class="ld-stats-cta" href="#" role="button" onClick=${(e) => { e.preventDefault();
+                openAppSandboxed(`/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline`, paper.filename); }}>
               ${tr('hiw.exampleCta', "Read tonight's paper →")}</a>`}
         </div>
       </div>

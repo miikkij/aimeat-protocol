@@ -44,6 +44,8 @@
  *                          debitBalance/creditBalance/creditBalanceCapped/transferBalance
  *                          to prevent negative-amount morsel minting (0 still allowed —
  *                          free/0-cost work escrow).
+ *   v1.9.0 — 2026-06-20 — Add AppGrant CRUD (owner-issued app authorizations →
+ *                          agent tokens; refresh-hash lookup, list-by-owner, rotate/revoke).
  */
 
 import { execSync } from 'node:child_process';
@@ -89,6 +91,7 @@ import type {
     PersonalPushSubscriptionRecord, NotificationPreferences,
     AppRecord, AppListOptions, AppPurchaseRecord,
     SubdomainSiteRecord,
+    AppGrantRecord,
     NotificationTemplateRecord,
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
@@ -3982,6 +3985,90 @@ export class PrismaStorage implements Storage {
             createdBy: row.createdBy,
             createdAt: row.createdAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
+        };
+    }
+
+    // ── App grants (owner-issued app authorizations → agent tokens) ──
+
+    async createAppGrant(grant: AppGrantRecord): Promise<AppGrantRecord> {
+        this.ensureReady();
+        const row = await this.prisma.appGrant.create({
+            data: {
+                grantId: grant.grantId,
+                app: grant.app,
+                appName: grant.appName,
+                appOrigin: grant.appOrigin,
+                owner: grant.owner,
+                gaii: grant.gaii,
+                scopes: grant.scopes,
+                refreshTokenHash: grant.refreshTokenHash,
+                createdAt: new Date(grant.createdAt),
+                lastUsedAt: grant.lastUsedAt ? new Date(grant.lastUsedAt) : null,
+                revoked: grant.revoked,
+            },
+        });
+        return this.toAppGrantRecord(row);
+    }
+
+    async getAppGrant(grantId: string): Promise<AppGrantRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.appGrant.findUnique({ where: { grantId } });
+        return row ? this.toAppGrantRecord(row) : null;
+    }
+
+    async getAppGrantByRefreshHash(tokenHash: string): Promise<AppGrantRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.appGrant.findFirst({ where: { refreshTokenHash: tokenHash } });
+        return row ? this.toAppGrantRecord(row) : null;
+    }
+
+    async listAppGrantsByOwner(owner: string): Promise<AppGrantRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.appGrant.findMany({ where: { owner }, orderBy: { createdAt: 'desc' } });
+        return rows.map((r: unknown) => this.toAppGrantRecord(r));
+    }
+
+    async updateAppGrant(
+        grantId: string,
+        updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes'>>,
+    ): Promise<AppGrantRecord | null> {
+        this.ensureReady();
+        const data: Record<string, unknown> = {};
+        if (updates.refreshTokenHash !== undefined) data.refreshTokenHash = updates.refreshTokenHash;
+        if (updates.lastUsedAt !== undefined) data.lastUsedAt = updates.lastUsedAt ? new Date(updates.lastUsedAt) : null;
+        if (updates.revoked !== undefined) data.revoked = updates.revoked;
+        if (updates.scopes !== undefined) data.scopes = updates.scopes;
+        try {
+            const row = await this.prisma.appGrant.update({ where: { grantId }, data });
+            return this.toAppGrantRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteAppGrant(grantId: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.appGrant.delete({ where: { grantId } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private toAppGrantRecord(row: any): AppGrantRecord {
+        return {
+            grantId: row.grantId,
+            app: row.app,
+            appName: row.appName,
+            appOrigin: row.appOrigin,
+            owner: row.owner,
+            gaii: row.gaii,
+            scopes: row.scopes,
+            refreshTokenHash: row.refreshTokenHash ?? null,
+            createdAt: row.createdAt.toISOString(),
+            lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+            revoked: row.revoked,
         };
     }
 

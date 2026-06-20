@@ -26,6 +26,10 @@
  *   v3.0.0 — 2026-06-20 — Value-first hero: replace the Sanomat newspaper Hero with BuildHero
  *     (copy the build prompt → your AI builds you an app you own + publish); the gallery becomes a
  *     LIVE wall of the real apps people published here (manifest-driven from /v1/apps).
+ *   v3.1.0 — 2026-06-20 — Wall: fixed 3-up grid + filter search; cards show author + publish
+ *     date/time. Hero subline adds "let your agents keep it running" (Sanomat as the example).
+ *   v3.2.0 — 2026-06-20 — H-2: wall cards open published apps in a sandboxed opaque-origin
+ *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline link.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -33,6 +37,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { openAppSandboxed } from '/js/app-sandbox.js';
 import PublicActivityFeed from './landing-activity.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -70,33 +75,60 @@ function StatsPanel({ navigate }) {
 }
 
 /* ── Live wall — the REAL apps people built with their AI and published to this node (from the
-   apps API, manifest-driven). The proof the loop works: your creation lands on this same wall.
-   Friendly empty state if the node is brand new. ── */
+   apps API, manifest-driven). Three per row + a filter. Each card: name · description · who made
+   it · when. The proof the loop works: your creation lands on this same wall. ── */
+function fmtPublished(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
 function Gallery() {
   const [apps, setApps] = useState([]);
+  const [q, setQ] = useState('');
   useEffect(() => {
-    fetch('/v1/apps?sort=popular&limit=24').then(r => r.json())
+    fetch('/v1/apps?sort=popular&limit=60').then(r => r.json())
       .then(j => setApps(j?.data?.apps || []))
       .catch(() => { /* empty state renders */ });
   }, []);
 
+  const ql = q.trim().toLowerCase();
+  const shown = !ql ? apps : apps.filter((a) => {
+    const m = a.manifest || {};
+    return [m.name, m.description, m.authorDisplay, a.owner].some(v => (v || '').toLowerCase().includes(ql));
+  });
+
   return html`
     <div class="ld-section">
-      <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI — yours goes here')}</h2>
-      ${apps.length === 0
-        ? html`<p class="ld-app-desc">${tr('landing.wallEmpty', 'Be the first — copy the prompt above, build something, and it lands here.')}</p>`
+      <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI. Yours goes here too.')}</h2>
+      <input class="ld-wall-search" type="search" value=${q}
+        onInput=${(e) => setQ(e.target.value)}
+        placeholder=${tr('landing.wallSearch', 'Search apps…')}
+        aria-label=${tr('landing.wallSearch', 'Search apps')} />
+      ${shown.length === 0
+        ? html`<p class="ld-app-desc">${apps.length === 0
+            ? tr('landing.wallEmpty', 'Be the first — copy the prompt above, build something, and it lands here.')
+            : tr('landing.wallNoMatch', 'No apps match your search.')}</p>`
         : html`<div class="ld-gallery">
-            ${apps.map((a) => {
+            ${shown.map((a) => {
               const m = a.manifest || {};
+              // H-2: open published apps in a sandboxed (opaque-origin) iframe, never as a
+              // top-level apex document. Click-to-open instead of an apex href, so middle-/
+              // ctrl-click can't bypass it either.
               const href = `/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}?mode=inline`;
               const desc = (m.description || '').length > 140 ? m.description.slice(0, 140) + '…' : (m.description || '');
               const author = m.authorDisplay || a.owner || tr('landing.wallAnon', 'someone');
+              const when = a.created_at ? fmtPublished(a.created_at) : '';
+              const open = () => openAppSandboxed(href, m.name || a.filename);
               return html`
-                <a key=${a.owner + '/' + a.filename} class="ld-app-card" href=${href} target="_blank" rel="noopener">
+                <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
+                  onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
+                  ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt="" />` : ''}
                   <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
                   ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
-                  <div class="ld-app-meta">${escHtml(author)} · ${tr('landing.builtInChat', 'built in an AI chat session')}</div>
-                </a>`;
+                  <div class="ld-app-meta">${escHtml(author)}${when ? ' · ' + when : ''}</div>
+                </div>`;
             })}
           </div>`}
     </div>
@@ -388,8 +420,8 @@ function BuildHero() {
   return html`
     <section class="ld-hero2">
       <p class="ld-hero2-kicker">${tr('landing.buildHeroKicker', 'A safe place to build with AI.')}</p>
-      <h1 class="ld-hero2-title">${tr('landing.buildHeroTitle', 'Build a real app with your AI — in minutes, and it’s yours.')}</h1>
-      <p class="ld-hero2-sub">${tr('landing.buildHeroSub', 'Copy one prompt into Claude, ChatGPT or any AI. It interviews you, builds a working app on AIMEAT, and you publish it live — shareable, owned by you, no lock-in.')}</p>
+      <h1 class="ld-hero2-title">${tr('landing.buildHeroTitle', 'Build a real app with your AI in minutes, and it’s yours.')}</h1>
+      <p class="ld-hero2-sub">${tr('landing.buildHeroSub', 'Copy one prompt into Claude, ChatGPT or any AI. It builds you a working app on AIMEAT, published live and yours to keep. Then let your agents run it for you, the way AIMEAT Sanomat writes itself every evening.')}</p>
       <div class="ld-hero2-cta">
         <button class="btn-primary" type="button" onClick=${copy}>${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI') : tr('landing.buildHeroCopy', 'Copy the build prompt →')}</button>
         <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>

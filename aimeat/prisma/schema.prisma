@@ -1543,6 +1543,24 @@ model SubdomainSite {
   updatedAt DateTime @default(now())
 }
 
+model AppGrant {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  grantId          String    @unique
+  app              String
+  appName          String
+  appOrigin        String
+  owner            String
+  gaii             String
+  scopes           String[]
+  refreshTokenHash String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime?
+  revoked          Boolean   @default(false)
+
+  @@index([owner])
+  @@index([refreshTokenHash])
+}
+
 model AgentMessage {
   id           String    @id @map("_id")
   agentGaii    String

@@ -57,6 +57,7 @@ export interface JWTPayload {
   homeNode?: string;    // home node ID for federated sessions
   homeUrl?: string;     // home node base URL for federated sessions
   eco_app?: string;     // ecosystem app global name (e.g. "zendesk") for GEAI (role: ecosystem) sessions
+  app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app) — H-2
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -77,6 +78,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.homeNode ? { homeNode: payload.homeNode } : {}),
     ...(payload.homeUrl ? { homeUrl: payload.homeUrl } : {}),
     ...(payload.eco_app ? { eco_app: payload.eco_app } : {}),
+    ...(payload.app_grant ? { app_grant: payload.app_grant } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -105,6 +107,7 @@ export interface VerifiedToken {
   homeNode?: string;    // home node ID for federated sessions
   homeUrl?: string;     // home node base URL for federated sessions
   eco_app?: string;     // ecosystem app global name for GEAI (role: ecosystem) sessions
+  app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app)
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -127,6 +130,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       homeNode: payload.homeNode as string | undefined,
       homeUrl: payload.homeUrl as string | undefined,
       eco_app: payload.eco_app as string | undefined,
+      app_grant: payload.app_grant as string | undefined,
     };
   } catch {
     return null;

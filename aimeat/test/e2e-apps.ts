@@ -15,6 +15,9 @@
  *   v1.0.0 — 2026-06-05 — initial: versions, restore, fork, GHII fallback, 404
  *   v1.1.0 — 2026-06-09 — add Phase 5 cross-owner isolation: a second owner
  *     cannot delete into / overwrite the first owner's app namespace.
+ *   v1.2.0 — 2026-06-20 — add Phase 6 screenshots: owner sets/replaces an app's
+ *     screenshot via POST .../screenshot (no re-publish), listing flips
+ *     has_screenshot, 400 on empty body, 403 for a different non-operator owner.
  */
 
 import * as ed from '@noble/ed25519';
@@ -282,6 +285,47 @@ await test("Owner B publishing the same filename creates B's OWN record, not a w
     assert((aVersions.body.data?.versions ?? []).length === 3, `owner A's version history intact (3), got ${(aVersions.body.data?.versions ?? []).length}`);
     const bDownload = await fetch(`${BASE}/v1/apps/${ownerBName}/${FILENAME}`);
     assert((await bDownload.text()) === '<h1>owner B</h1>', "B's namespace serves B's content");
+});
+
+// ── Phase 6: screenshots (set/replace without re-publishing) ──
+// Backs the screenshot worker + manual override: an owner (or operator) sets an app's
+// screenshot via a dedicated endpoint, no re-publish; a different non-operator owner cannot.
+console.log('\nPhase 6: Screenshots');
+
+const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+await test('Owner sets a screenshot for their own app without re-publishing', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST',
+        body: JSON.stringify({ screenshot: PNG_1x1, screenshot_mime_type: 'image/png' }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(typeof body.data?.screenshot_url === 'string', 'returns screenshot_url');
+});
+
+await test('GET screenshot now serves the image and listing flips has_screenshot', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
+    assert(res.status === 200, `screenshot GET status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').startsWith('image/'), 'served as an image');
+    const list = await json('/v1/apps?limit=200');
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === ownerName);
+    assert(!!mine && mine.has_screenshot === true, 'listing now reports has_screenshot=true');
+});
+
+await test('Setting a screenshot with no image data is rejected (400)', async () => {
+    const { status } = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST',
+        body: JSON.stringify({}),
+    }));
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test("A different non-operator owner cannot set another owner's screenshot (403)", async () => {
+    const { status } = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, bAuthed({
+        method: 'POST',
+        body: JSON.stringify({ screenshot: PNG_1x1 }),
+    }));
+    assert(status === 403, `expected 403, got ${status}`);
 });
 
 // ── Summary ──

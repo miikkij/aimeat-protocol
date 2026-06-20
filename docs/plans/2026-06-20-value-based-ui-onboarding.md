@@ -22,9 +22,54 @@ yours, it goes live on the wall.*
   with authors. Gates green: lint 0 errors, typecheck:frontend clean, importmap in sync, locales
   6750/6750 parity. (The one console 401 is the pre-existing `/v1/auth/refresh`, unrelated.)
 
-**Next within this concept (not built):** anon/Google publish tiering (anon → anon-space limited,
-one-tap Google for owned/permanent), the "twist" gamification + per-creation private data, and
-folding the lower full build-prompt section into the hero to avoid duplication.
+**Wall v2 + hero refinement (2026-06-20, shipped & verified).** Per owner: the wall is a fixed
+**3-up grid with a filter search**; each card shows **name · description · author · publish
+date/time** (`manifest` + `created_at`). Hero subline now adds **"let your agents keep it running,
+the way AIMEAT Sanomat writes itself every evening"** — apps you build, agents maintain. Verified:
+filter narrows live (typing "weather" → 2 apps), meta shows author + date/time, gates green, locales
+6752/6752.
+
+**Direction change — anon dropped.** Owner: forget anonymous entirely. Auth = **Google one-click OR
+email registration**. The reward needs no twist/gamification — it is simply *publish a silly/fun/
+useful thing live to everyone in under 10 minutes*, which proves the power of AI + the platform;
+agents tuning + data collection come later. Config to enact (pending owner go-ahead + working SMTP):
+- `AIMEAT_ANONYMOUS=false` (currently `true`) — kill anonymous mode.
+- `AIMEAT_EMAIL_CONFIRMATION_REQUIRED=true` (currently unset) — force email on registration (also
+  good for password recovery). ⚠️ Requires SMTP configured or registration locks out — verify first.
+
+**Still open:** wire the hero CTA to the Google/email login when not signed in; fold the lower full
+build-prompt section into the hero to avoid duplication; later, agent-maintenance + data hooks.
+
+## 2026-06-20 — App screenshots + descriptions (owner direction)
+
+Findings: the apps API already supports screenshots (store at publish, serve, `has_screenshot`/
+`screenshot_url`) but **0/17 apps had one** (the catalog publish sends `screenshot: null`);
+**11/17 have a description** (AI fills `manifest.description`), not enforced. Auto-capture *on view*
+is impossible (H-2 sandbox = opaque origin, cross-origin canvas blocked). Owner chose the
+**screenshot-worker** approach (an operator-run agent backfills missing screenshots), and:
+screenshots + descriptions should be first-class; description required + AI-written.
+
+**Slice 1 (DONE + verified) — set-screenshot endpoint + wall renders images:**
+- New `POST /v1/apps/:owner/:filename/screenshot` ([apps.ts](../../aimeat/src/routes/apps.ts)):
+  set/replace an app's screenshot WITHOUT re-publishing. Auth = the app's **owner OR a node
+  operator** (so the worker can backfill any app). `createStorageFile` upserts → overwrites.
+  Path-traversal guarded, 2 MB cap, base64-validated.
+- OpenAPI: added the `/v1/apps/{owner}/{filename}/screenshot` path (GET + POST); `generate:types`
+  re-run. (The wider apps API remains undocumented in openapi.yaml — pre-existing gap, not touched.)
+- E2E ([e2e-apps.ts](../../aimeat/test/e2e-apps.ts) Phase 6): owner sets screenshot, GET serves the
+  image + listing flips `has_screenshot`, 400 on empty body, 403 for a different non-operator
+  owner. **21/21 pass on SQLite.**
+- Wall ([landing.js](../../aimeat/public/views/landing.js)): cards render a `.ld-app-shot`
+  thumbnail when `screenshot_url` is present. Gates green: lint 0 errors, typecheck (backend +
+  frontend) clean, importmap in sync.
+
+**Slice 2 (next) — the screenshot worker:** a Node + Playwright (already a dev-dep) tool, run as
+operator: list apps with `has_screenshot=false` → render each app headless → capture PNG → POST to
+the new endpoint. On-demand/scheduled. Manual override = owner uploads via the same endpoint.
+
+**Slice 3 — description required + AI-written:** enforce a description on publish (reject missing)
+and have the build prompt instruct the AI to write a good one. ⚠️ Behaviour change (only new
+publishes).
 
 ## 2026-06-20 — Phase 2 pixel-grid reverted; redesigned as "build-to-touch"
 

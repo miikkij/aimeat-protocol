@@ -20,6 +20,8 @@
  *     neutral (access-h3, emojis dropped) and Add Node / New Token / New Group de-accented;
  *     Token Budget value is click-to-edit and the empty-rules state shows an example rule;
  *     sharing-groups section accepts the Memory tab's deep link (aimeat.access.focus).
+ *   v1.5.0 -- 2026-06-20 -- Add Connected Apps section (H-2 app grants): list + revoke the
+ *     scoped, user-approved access tokens published apps hold (GET/DELETE /v1/app-grants).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -559,6 +561,78 @@ function AgentDefaultsSection({ showToast }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Connected Apps Section (H-2 app grants)
+   ═══════════════════════════════════════════════════════════════════ */
+
+// Apps the owner has explicitly granted scoped access to (the H-2 app-grant flow). Each
+// holds its OWN revocable token bound to a narrow scope set — never the login session.
+function ConnectedAppsSection({ showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  const [grants, setGrants] = useState(null);
+
+  const load = useCallback(async () => {
+    try { const r = await apiGet('/v1/app-grants'); setGrants(r.data?.grants || []); }
+    catch { setGrants([]); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const liveRef = useRef(load);
+  liveRef.current = load;
+  useEffect(() => {
+    const handler = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
+  const handleRevoke = useCallback((id, name) => {
+    confirm(
+      (t('profile.access.agConfirmRevoke') || 'Revoke access for "{name}"? It loses access immediately.').replace('{name}', name),
+      async () => {
+        try {
+          await apiDelete('/v1/app-grants/' + id);
+          showToast(t('profile.access.agRevoked') || 'App access revoked');
+          load();
+        } catch (e) { showToast(e.message); }
+      },
+      { danger: true },
+    );
+  }, [confirm, showToast, load]);
+
+  return html`
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.agTitle') || 'Connected Apps'}</h3>
+    <div class="section-desc">${t('profile.access.agDesc') || 'Published apps you have granted scoped access to your data. Each holds its own revocable token — never your login session.'}</div>
+
+    ${grants === null
+      ? html`<div class="empty">${t('profile.access.agLoading') || 'Loading...'}</div>`
+      : grants.length === 0
+        ? html`<div class="access-empty-row"><span class="text-meta-sm">${t('profile.access.agEmpty') || 'No apps have access to your data.'}</span></div>`
+        : grants.map(g => html`
+            <div class="card" key=${g.grant_id}>
+              <div class="flex-between">
+                <div class="card-title">${escHtml(g.app_name || g.app)}</div>
+                <span class="badge badge-info">${(g.scopes || []).length} ${t('profile.access.agScopes') || 'scopes'}</span>
+              </div>
+              <div class="card-subtitle access-mono">${escHtml(g.app_origin || '')}</div>
+              <div class="detail-grid">
+                <div class="detail-item"><span class="detail-label">${t('profile.access.agGrantedAt') || 'Granted'}</span><span class="detail-value">${g.granted_at ? new Date(g.granted_at).toLocaleDateString() : '-'}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.agLastUsed') || 'Last used'}</span><span class="detail-value">${g.last_used_at ? new Date(g.last_used_at).toLocaleString() : (t('profile.access.agNever') || 'never')}</span></div>
+              </div>
+              ${(g.scopes || []).length > 0 && html`
+                <div class="flex-row-wrap mt-half">
+                  ${g.scopes.map(s => html`<span class="badge badge-muted" key=${s}>${escHtml(s)}</span>`)}
+                </div>
+              `}
+              <div class="card-actions">
+                <button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(g.grant_id, g.app_name || g.app)}>${t('profile.access.agRevoke') || 'Revoke'}</button>
+              </div>
+            </div>
+          `)
+    }
+    <${ConfirmUI} />
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Agent Access Tokens Section
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -999,6 +1073,7 @@ export default function AccessTab({ session, showToast }) {
     </div>`;
     })()}
 
+    <${ConnectedAppsSection} showToast=${showToast} />
     <${AccessTokensSection} session=${session} showToast=${showToast} />
     <${SharingGroupsSection} showToast=${showToast} />
     <${AgentDefaultsSection} showToast=${showToast} />

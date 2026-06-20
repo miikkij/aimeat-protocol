@@ -807,6 +807,23 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt  TEXT NOT NULL
     );
 
+    -- ── App Grants (owner-issued app authorizations → agent tokens) ──
+    CREATE TABLE IF NOT EXISTS app_grants (
+      grantId          TEXT PRIMARY KEY,
+      app              TEXT NOT NULL,
+      appName          TEXT NOT NULL,
+      appOrigin        TEXT NOT NULL,
+      owner            TEXT NOT NULL,
+      gaii             TEXT NOT NULL,
+      scopes           TEXT NOT NULL DEFAULT '[]',
+      refreshTokenHash TEXT,
+      createdAt        TEXT NOT NULL,
+      lastUsedAt       TEXT,
+      revoked          INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_grants_owner ON app_grants(owner);
+    CREATE INDEX IF NOT EXISTS idx_app_grants_refreshTokenHash ON app_grants(refreshTokenHash);
+
     -- ── App Marketplace Purchases (immutable receipts) ──
     CREATE TABLE IF NOT EXISTS app_purchases (
       transactionId           TEXT PRIMARY KEY,

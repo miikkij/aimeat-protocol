@@ -4605,6 +4605,118 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/app-grants/authorize:
+    get:
+      operationId: appGrantAuthorize
+      summary: Start an app-grant authorization (OAuth-like, PKCE)
+      description: |
+        Entry point of the H-2 app-grant flow. A user-published app (running on the isolated
+        app origin `*.apps.<apex>`) sends the owner's browser here to request scoped access to
+        the owner's data. On valid params the node stores a short-lived pending request and
+        **302-redirects** to the trusted apex consent page (`/v1/app-grant?req=...`) where the
+        owner approves. `code_challenge_method` must be `S256`; `redirect_uri` must be on the
+        app origin (never the apex); `scope` must be drawn from the grantable scope set.
+      tags: [Auth]
+      parameters:
+        - { in: query, name: app, required: true, schema: { type: string }, description: '"owner/filename"' }
+        - { in: query, name: response_type, required: true, schema: { type: string, enum: [code] } }
+        - { in: query, name: redirect_uri, required: true, schema: { type: string } }
+        - { in: query, name: scope, required: true, schema: { type: string }, description: Space/comma-separated grantable scopes }
+        - { in: query, name: state, required: false, schema: { type: string } }
+        - { in: query, name: code_challenge, required: true, schema: { type: string } }
+        - { in: query, name: code_challenge_method, required: true, schema: { type: string, enum: [S256] } }
+      responses:
+        '302': { description: Redirect to the apex consent page }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/app-grants/request/{requestId}:
+    get:
+      operationId: appGrantRequest
+      summary: Read a pending app-grant request (for the consent page)
+      description: Returns the requesting app and the exact scopes (with descriptions) for the consent UI to render. Unguessable id; no auth.
+      tags: [Auth]
+      parameters:
+        - { in: path, name: requestId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/app-grants/authorize-consent:
+    post:
+      operationId: appGrantConsent
+      summary: Approve an app-grant request (owner)
+      description: |
+        The owner, authenticated on the apex SPA, approves a pending request. The node mints a
+        single-use authorization code and returns the app's `redirect_url` (carrying the code +
+        state) for the browser to navigate back to the app.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [request_id], properties: { request_id: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/app-grants/token:
+    post:
+      operationId: appGrantToken
+      summary: Exchange an app-grant code or refresh token for a scoped app token
+      description: |
+        Called by the app from its own origin (CORS `*`). With `grant_type=authorization_code`
+        (+ PKCE `code_verifier`) the node creates the persistent grant and returns a short-lived
+        **scoped** access JWT (role `app`, the granted scopes, an `app_grant` claim) + a rotating
+        refresh token — never the owner's session. With `grant_type=refresh_token` it rotates the
+        refresh token and re-mints the access JWT. A revoked grant yields `401`.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type: { type: string, enum: [authorization_code, refresh_token] }
+                code: { type: string }
+                code_verifier: { type: string }
+                redirect_uri: { type: string }
+                refresh_token: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/app-grants:
+    get:
+      operationId: listAppGrants
+      summary: List the apps the owner has granted access to
+      description: Returns active (non-revoked) app grants with their scopes, origin, and last-used time.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/app-grants/{grantId}:
+    delete:
+      operationId: revokeAppGrant
+      summary: Revoke an app's grant
+      description: Marks the grant revoked and drops its refresh token — the app can no longer refresh (its short access token expires shortly after).
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: grantId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/auth/token/exchange:
     post:
       operationId: exchangeAccessToken
@@ -10495,6 +10607,105 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/apps/{owner}/{filename}:
+    get:
+      operationId: getAppFile
+      summary: Download or render a published app
+      description: |
+        Returns the app's HTML. Default (no `mode`) responds with `Content-Disposition: attachment`
+        (programmatic download — never executed as a page). `mode=inline` returns runnable HTML.
+
+        **H-2 app origin:** when the app origin is provisioned (`AIMEAT_APP_ORIGIN_ENABLED`), an
+        `mode=inline` request arriving on the **apex** origin is **301-redirected** to the isolated
+        app origin (`https://<sub>.apps.<apex>/` or `https://apps.<apex>/<owner>/<file>`), so runnable
+        app HTML is never served same-origin as the authenticated SPA. Access-code/paid apps and the
+        raw download form are unaffected.
+      tags: [Apps]
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+        - { in: query, name: mode, required: false, schema: { type: string, enum: [inline] } }
+        - { in: query, name: version, required: false, schema: { type: integer } }
+        - { in: query, name: code, required: false, schema: { type: string }, description: Access code for protected apps }
+      responses:
+        '200': { description: App HTML (inline or attachment) }
+        '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/{owner}/{filename}/screenshot:
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Owner name (bare handle; a legacy owner@node segment is tolerated).
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+        description: App filename.
+    get:
+      operationId: getAppScreenshot
+      summary: Serve an app's screenshot image
+      description: Returns the stored screenshot for the app, or 404 if none. No auth.
+      tags: [App Store]
+      responses:
+        '200':
+          description: Screenshot image bytes
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: setAppScreenshot
+      summary: Set or replace an app's screenshot without re-publishing
+      description: >
+        Stores a base64-encoded image as the app's screenshot. The app's owner may set their
+        own; a node operator may set any app's, so the screenshot worker can backfill defaults
+        for apps that have none. Idempotent (overwrites any existing screenshot). Max 2 MB.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [screenshot]
+              properties:
+                screenshot:
+                  type: string
+                  description: Base64-encoded image data (PNG or JPEG).
+                screenshot_mime_type:
+                  type: string
+                  default: image/png
+      responses:
+        '200':
+          description: Screenshot stored
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: Screenshot exceeds the 2 MB limit
 
   /v1/apps/backup:
     get:
