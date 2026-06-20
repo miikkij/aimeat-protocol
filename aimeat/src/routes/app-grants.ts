@@ -277,7 +277,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const sessionValid = !!session && !session.revoked
       && !(session.idleExpiresAt && now >= Date.parse(session.idleExpiresAt))
       && !(session.absoluteExpiresAt && now >= Date.parse(session.absoluteExpiresAt));
-    if (!sessionValid) return reply({ ok: false, error: 'login_required' });
+    // Include the resolved app so the SDK can open the consent popup (which prompts apex login) even
+    // when no one is logged in — the user logs in there, then approves, in one flow.
+    if (!sessionValid) return reply({ ok: false, error: 'login_required', app: site.target, app_name: appFile });
     const owner = session!.owner;
 
     const requested = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
