@@ -18,6 +18,8 @@
  *   v1.2.0 — 2026-06-20 — add Phase 6 screenshots: owner sets/replaces an app's
  *     screenshot via POST .../screenshot (no re-publish), listing flips
  *     has_screenshot, 400 on empty body, 403 for a different non-operator owner.
+ *   v1.3.0 — 2026-06-20 — add Phase 7 description requirement: new app without a
+ *     description → 400; carried forward on update. Fork/owner-B publishes now send one.
  */
 
 import * as ed from '@noble/ed25519';
@@ -204,7 +206,7 @@ await test('Fork v2 into a new filename → fresh app at v1', async () => {
     const src = await (await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?version=2`)).text();
     const { status, body } = await json('/v1/apps', authed({
         method: 'POST',
-        body: JSON.stringify({ filename: FORK_NAME, content: b64(src), name: 'Versions Demo (fork)', category: 'utility', tags: ['demo'] }),
+        body: JSON.stringify({ filename: FORK_NAME, content: b64(src), name: 'Versions Demo (fork)', description: 'a fork of the demo', category: 'utility', tags: ['demo'] }),
     }));
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.version_number === 1, `fork is a new app at v1, got ${body.data.version_number}`);
@@ -276,7 +278,7 @@ await test("Owner B cannot delete owner A's app (404, not authorized into A's na
 await test("Owner B publishing the same filename creates B's OWN record, not a write into A's", async () => {
     const { status, body } = await json('/v1/apps', bAuthed({
         method: 'POST',
-        body: JSON.stringify({ filename: FILENAME, content: b64('<h1>owner B</h1>'), name: 'B copy', category: 'utility', tags: [] }),
+        body: JSON.stringify({ filename: FILENAME, content: b64('<h1>owner B</h1>'), name: 'B copy', description: 'owner B copy', category: 'utility', tags: [] }),
     }));
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.version_number === 1, `B's first publish is v1 in B's own bucket, got ${body.data.version_number}`);
@@ -326,6 +328,38 @@ await test("A different non-operator owner cannot set another owner's screenshot
         body: JSON.stringify({ screenshot: PNG_1x1 }),
     }));
     assert(status === 403, `expected 403, got ${status}`);
+});
+
+// ── Phase 7: description required on a NEW app; carried forward on update ──
+console.log('\nPhase 7: Description requirement');
+
+const DESC_FILE = 'desc-required.html';
+await test('Publishing a NEW app without a description is rejected (400)', async () => {
+    const { status, body } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: DESC_FILE, content: b64('<h1>no desc</h1>'), name: 'No Desc', category: 'utility', tags: [] }),
+    }));
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Same app publishes once a description is provided (201)', async () => {
+    const { status, body } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: DESC_FILE, content: b64('<h1>with desc</h1>'), name: 'No Desc', description: 'now it has one', category: 'utility', tags: [] }),
+    }));
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.version_number === 1, `first version, got ${body.data.version_number}`);
+});
+
+await test('Re-publishing WITHOUT a description keeps the existing one (carry-forward)', async () => {
+    const { status } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: DESC_FILE, content: b64('<h1>v2</h1>'), name: 'No Desc', category: 'utility', tags: [] }),
+    }));
+    assert(status === 201, `update without description should succeed via carry-forward, got ${status}`);
+    const { body } = await json('/v1/apps?limit=200');
+    const mine = (body.data?.apps ?? []).find((a: any) => a.filename === DESC_FILE && a.owner === ownerName);
+    assert(mine?.manifest?.description === 'now it has one', `description carried forward, got "${mine?.manifest?.description}"`);
 });
 
 // ── Summary ──

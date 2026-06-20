@@ -105,8 +105,19 @@ headless server runs one `npx playwright install chromium`. Screenshots stay an 
 feature — the node runs fine without a browser. Run: `AIMEAT_OP_TOKEN=<operator-pat> aimeat
 screenshot-worker --watch 600`.
 
-**Slice 3 (next) — description required + AI-written:** enforce a description on publish (reject
-missing) + build prompt asks the AI to write a good one. ⚠️ Behaviour change (only new publishes).
+**Slice 3 (DONE + verified) — description required + AI-written.** A description is now required when
+publishing a NEW app, on BOTH publish paths — `POST /v1/apps` ([apps.ts](../../aimeat/src/routes/apps.ts))
+and the MCP `aimeat_app_publish` ([mcp/apps.ts](../../aimeat/src/mcp/apps.ts)). On an UPDATE, the
+existing description is carried forward when omitted, so a re-publish / restore never blanks it (no
+breakage). The catalogue publish dialog ([app-catalog.html](../../aimeat/src/static/app-catalog.html))
+gained a Description field (defaulted, required for new, "your AI can write it" hint); the landing
+build prompt now tells the AI to write a one-sentence description. Error messages on both backend
+paths say "your AI can write it for you". E2E ([e2e-apps.ts](../../aimeat/test/e2e-apps.ts) Phase 7):
+new-without-description → 400, with → 201, update carry-forward keeps it; fork/owner-B publishes
+updated to send one. **24/24 pass.** Gates green (typecheck backend+frontend, lint, importmap).
+
+**README updated:** added an "App thumbnails (optional)" note under the npx quick-start covering the
+`aimeat screenshot-worker` command and its system-browser / `playwright install` requirement.
 
 ## 2026-06-20 — Phase 2 pixel-grid reverted; redesigned as "build-to-touch"
 

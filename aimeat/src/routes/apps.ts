@@ -38,6 +38,9 @@
  *   v1.6.0 -- 2026-06-20 -- Add POST /v1/apps/:owner/:filename/screenshot: set/replace an app's
  *     screenshot without re-publishing (owner OR operator). Backs the screenshot worker + manual
  *     override. createStorageFile upserts, so it overwrites any existing screenshot.
+ *   v1.7.0 -- 2026-06-20 -- Require a non-empty description when publishing a NEW app (so the
+ *     catalogue + landing wall always have one); on an update, carry the existing description
+ *     forward when omitted so a re-publish / restore never blanks it.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -491,10 +494,24 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const newVersion = existingVersion + 1;
         const isUpdate = existingVersion > 0;
 
+        // A description is REQUIRED for a NEW app, so the catalogue + the landing wall always have
+        // one (your AI can write it). On an UPDATE, carry the existing description forward when it
+        // is omitted, so a re-publish / restore never blanks it.
+        let effectiveDescription = typeof description === 'string' ? description.trim() : '';
+        if (!effectiveDescription) {
+            if (isUpdate) {
+                const existingApp = await storage.getApp(ownerGhii, filename);
+                effectiveDescription = existingApp?.manifest?.description ?? '';
+            } else {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A description is required when publishing a new app — write 1-2 sentences about what it does (your AI can write it for you).'));
+                return;
+            }
+        }
+
         const now = new Date().toISOString();
         const manifest: AppManifest = {
             name: typeof name === 'string' ? name : filename.replace(/\.html?$/i, ''),
-            description: typeof description === 'string' ? description : '',
+            description: effectiveDescription,
             version: typeof semver === 'string' ? semver : `1.0.${newVersion - 1}`,
             category: typeof category === 'string' ? category : 'utility',
             tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : [],
