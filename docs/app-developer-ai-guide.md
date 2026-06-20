@@ -47,6 +47,109 @@ and their AI.** Apps are tools.
 
 ---
 
+## Apps run on an isolated origin — no ambient session
+
+A published AIMEAT app runs on a **separate, isolated origin** — `*.apps.<domain>`
+(e.g. `apps.aimeat.io`), **not** the apex (`aimeat.io`). That is a different
+browser origin, by design (security finding H-2 — see
+[`docs/internal/app-origin-deployment.md`](internal/app-origin-deployment.md)
+for the origin setup). What this means for your app:
+
+- **No ambient login session.** The app **cannot** read the user's `aimeat.io`
+  cookie, session, or `localStorage`. There is no implicit "owner is logged in"
+  to ride on.
+- **Never call `/v1/auth/refresh`, and never `fetch(..., { credentials: 'include' })`
+  expecting the user's session.** There is no session on the app origin — those
+  calls fail with 401/403. (This is the exact pattern that was removed; apps
+  that read the owner's private memory directly now get rejected.)
+- **`AIMEAT.ai` / `AIMEAT.ai.complete()` (this guide) is unaffected** — the
+  OpenRouter relay is a separate path. Use it exactly as documented here.
+
+### Public data — just fetch it
+
+Data that needs no auth is a same-origin `fetch('/v1/...')` to the app origin
+(CORS is `*`): public memory (`getPublic`), the catalogue, public boards. No
+token needed.
+
+### Private data — use the app-grant flow (OAuth-style + PKCE)
+
+To touch the user's **own/private** data, request a **scoped, revocable** token
+via `/v1/app-grants`. Grantable scopes (the agent scopes): `memory:read`,
+`memory:write`, `memory:delete`, `catalogue:read`, `social:read`,
+`social:write`, `wallet:read`, `knowledge:read`. Minimal end-to-end:
+
+```js
+// --- 1. Send the user to the trusted apex to approve (PKCE S256) ---
+function b64url(bytes) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function startGrant() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  sessionStorage.setItem('aimeat_pkce', verifier);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = b64url(new Uint8Array(digest));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  sessionStorage.setItem('aimeat_state', state);
+  const redirectUri = location.origin + location.pathname; // your URL on the app origin
+  location.href = 'https://aimeat.io/v1/app-grants/authorize'
+    + '?app=' + encodeURIComponent('alice/comicland.html')      // your published <owner>/<file>
+    + '&response_type=code'
+    + '&scope=' + encodeURIComponent('memory:read memory:write') // fewest you need
+    + '&redirect_uri=' + encodeURIComponent(redirectUri)
+    + '&state=' + state
+    + '&code_challenge=' + challenge
+    + '&code_challenge_method=S256';
+}
+
+// --- 2. On return (?code=...&state=...), exchange the code for a scoped token ---
+async function completeGrant() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (!code) return;
+  if (params.get('state') !== sessionStorage.getItem('aimeat_state')) throw new Error('state mismatch');
+  const verifier = sessionStorage.getItem('aimeat_pkce');
+  const redirectUri = location.origin + location.pathname;
+  const res = await fetch('https://aimeat.io/v1/app-grants/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirectUri }),
+  }).then(r => r.json());
+  // Store the scoped token in YOUR OWN origin's storage — never the user's session.
+  localStorage.setItem('aimeat_token', res.data.access_token);
+  localStorage.setItem('aimeat_refresh', res.data.refresh_token);
+  history.replaceState({}, '', location.pathname); // strip ?code from the URL
+}
+
+// --- 3. Call AIMEAT APIs with the scoped Bearer token (refresh on 401) ---
+async function readMyData(key) {
+  const res = await fetch('https://aimeat.io/v1/memory/' + encodeURIComponent(key), {
+    headers: { Authorization: 'Bearer ' + localStorage.getItem('aimeat_token') },
+  }).then(r => r.json());
+  return res.data;
+}
+
+// Access token expired? Rotate it with the refresh token:
+async function refreshToken() {
+  const res = await fetch('https://aimeat.io/v1/app-grants/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: localStorage.getItem('aimeat_refresh') }),
+  }).then(r => r.json());
+  localStorage.setItem('aimeat_token', res.data.access_token);
+  localStorage.setItem('aimeat_refresh', res.data.refresh_token); // refresh tokens rotate (one-time use)
+}
+```
+
+The token is scoped to exactly the scopes the user approved and is **revocable**:
+the user reviews and revokes connected apps in **Profile → Access → "Connected
+Apps"**. Request the fewest scopes you need, and treat a 401 after a previously
+working token as "the user revoked us or the token expired" — refresh once, and
+if that fails, re-run the grant flow.
+
+> Source of truth for this flow: [`aimeat/src/routes/app-grants.ts`](../aimeat/src/routes/app-grants.ts).
+
+---
+
 ## When to use AI (and when not to)
 
 AI assist is at its best when:

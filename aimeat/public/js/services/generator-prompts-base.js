@@ -13,6 +13,8 @@
  *   import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES } from '/js/services/generator-prompts-base.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
+ *   v1.1.0 — 2026-06-20 — App-build prompt: teach H-2 app-origin isolation (no ambient session;
+ *     public data via /v1/..., private data via the app-grant PKCE flow + scoped Bearer token).
  */
 
 export const AIMEAT_CONTEXT = `
@@ -600,9 +602,44 @@ Create an AIMEAT App (HTML/JS) for: ${label}
 
 ${context}
 
-## CRITICAL: Authentication & API Calls
+## CRITICAL: App origin isolation & data access (read this first)
 
-The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g., "/v1/ext/..."), NOT absolute URLs.
+Your published app runs on an ISOLATED app origin (\`*.apps.<domain>\`, e.g. \`apps.aimeat.io\`) — a DIFFERENT browser origin from the AIMEAT node (\`aimeat.io\`). Consequences you MUST respect:
+- The app has NO access to the user's AIMEAT login session, cookie, or localStorage. There is no ambient/owner session.
+- NEVER call \`/v1/auth/refresh\` and NEVER fetch with \`credentials:'include'\` expecting the user's session — that pattern was removed for security (H-2) and now returns 401/403.
+- Same-origin \`fetch('/v1/...')\` to the app origin still works (CORS \`*\`) for PUBLIC data that needs no auth — public memory (\`getPublic\`), the catalogue, public boards.
+- For the user's OWN/PRIVATE data, you MUST use the explicit, revocable **app-grant** flow (OAuth-style, PKCE) below. The token you obtain is scoped and stored in YOUR OWN origin's localStorage; you call APIs with \`Authorization: Bearer <that token>\` — never the user's session.
+- Apps that use the user's OpenRouter key via cortex (\`AIMEAT.ai.complete()\`) are UNAFFECTED — that path is separate; use it as documented.
+
+### App-grant flow for private data (only when you need the user's own data)
+1. Send the user to the trusted apex to approve (PKCE \`code_challenge\` = base64url(SHA-256(verifier)), method S256):
+   \\\`\\\`\\\`javascript
+   // scope = space-separated agent scopes: memory:read memory:write memory:delete
+   //   catalogue:read social:read social:write wallet:read knowledge:read
+   const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+   sessionStorage.setItem('pkce', verifier);
+   const challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+   const url = 'https://aimeat.io/v1/app-grants/authorize'
+     + '?app=' + encodeURIComponent('<owner>/<file>')          // your published app id
+     + '&response_type=code&scope=' + encodeURIComponent('memory:read')
+     + '&redirect_uri=' + encodeURIComponent(location.origin + location.pathname)  // your URL on the app origin
+     + '&state=' + state + '&code_challenge=' + challenge + '&code_challenge_method=S256';
+   location.href = url;
+   \\\`\\\`\\\`
+2. On return, exchange the \`code\` for a scoped token (store it in YOUR localStorage):
+   \\\`\\\`\\\`javascript
+   const r = await fetch('https://aimeat.io/v1/app-grants/token', {
+     method: 'POST', headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: location.origin + location.pathname })
+   }).then(x => x.json());
+   localStorage.setItem('aimeat_token', r.data.access_token);      // scoped, revocable
+   localStorage.setItem('aimeat_refresh', r.data.refresh_token);    // re-exchange with grant_type:'refresh_token'
+   \\\`\\\`\\\`
+3. Call AIMEAT APIs with that Bearer token (NOT the user's session):
+   \\\`\\\`\\\`javascript
+   await fetch('https://aimeat.io/v1/memory/my.key', { headers: { Authorization: 'Bearer ' + localStorage.getItem('aimeat_token') } });
+   \\\`\\\`\\\`
+The user manages/revokes these tokens in Profile → Access → "Connected Apps". Request the FEWEST scopes you need.
 
 ### Library setup (copy this exactly — load BOTH libraries):
 \`\`\`javascript

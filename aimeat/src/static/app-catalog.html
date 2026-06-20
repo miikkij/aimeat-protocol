@@ -9,6 +9,8 @@
   @version-history
     v1.1.0 — 2026-06-20 — H-2: route all in-SPA app launches through the sandboxed iframe;
       remove apex top-level window.open(...?mode=inline) links (viewPublished + isSameOriginUrl).
+    v1.2.0 — 2026-06-20 — H-2: when the app origin is live (window.__APP_ORIGIN_ENABLED), open
+      published apps top-level on apps.<domain> (clean full page, no toolbar/X); sandbox is the fallback.
 -->
 <html lang="en">
 <head>
@@ -3268,22 +3270,33 @@
   function launchInTab(app) {
     if (app.source === 'url' && app.url) {
       if (isSameOriginUrl(app.url)) {
-        // H-2: apex-hosted app HTML must run sandboxed (opaque origin), never top-level.
-        launchInIframe(app);
+        // Apex ?mode=inline app URL. With the app origin live it 301s to apps.<domain>, so a
+        // top-level open lands on a clean isolated page; otherwise it must run sandboxed.
+        if (window.__APP_ORIGIN_ENABLED) {
+          window.open(app.url, '_blank', 'noopener');
+        } else {
+          launchInIframe(app);
+        }
       } else {
         window.open(app.url, '_blank', 'noopener');
       }
     } else if (app.blob) {
-      // Blob: URLs inherit the apex origin → same-origin. Run sandboxed, never top-level.
+      // Blob: URLs inherit the apex origin → same-origin, and have no app-origin URL to 301 to.
+      // Always run sandboxed, never top-level.
       launchInIframe(app);
     }
   }
 
-  // Load published app HTML (an apex ?mode=inline URL) into the sandboxed iframe. The
-  // iframe's `sandbox` has no `allow-same-origin`, so the document gets an opaque origin
-  // and cannot read aimeat.io localStorage or send credentialed same-origin requests —
-  // this is the H-2-safe replacement for top-level window.open(...?mode=inline).
+  // View a published app. When the node has provisioned the app origin
+  // (window.__APP_ORIGIN_ENABLED), open it TOP-LEVEL in a new tab — the apex ?mode=inline URL
+  // 301s to apps.<domain>, so the app shows as a clean full page on its own isolated origin
+  // (its own storage + same-origin API work), no toolbar/X. Otherwise fall back to the
+  // opaque-origin sandbox iframe (the H-2-safe option when apps would run same-origin).
   function viewPublished(url, name) {
+    if (window.__APP_ORIGIN_ENABLED) {
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
     var view = document.getElementById('iframe-view');
     var iframe = document.getElementById('app-iframe');
     var title = document.getElementById('iframe-title');
@@ -5119,6 +5132,7 @@
         viewUrl: aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(filename),
         source: source,
         localId: localMatch ? localMatch.id : null,
+        versionNumber: sa.version_number || null,
         isOwn: true
       });
     }
@@ -5136,7 +5150,9 @@
         date: lp.publishedAt ? new Date(lp.publishedAt).toLocaleDateString() : '',
         viewUrl: lpUrl,
         source: 'local',
-        localId: lp.id
+        localId: lp.id,
+        versionNumber: lp.publishedVersionNumber || null,
+        isOwn: true
       });
     }
 
@@ -5182,6 +5198,7 @@
           '</div>' +
           subChipHtml +
           '<div class="published-card-actions">' +
+            (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
             (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
             (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
             subBtnHtml +
@@ -5655,6 +5672,58 @@
       renderApps();
       loadPublishedApps();
     });
+  }
+
+  // Open Details for an OWN published card. If a local copy exists, open it
+  // directly. Otherwise the app was uploaded server-side (MCP/agent/VSCode) with
+  // no local copy — materialize one ON DEMAND (explicit user click, not a page-load
+  // import) by downloading the published HTML, so it shows up on the local side and
+  // becomes fully editable + republishable.
+  function openPublishedDetail(owner, filename, localId, versionNumber) {
+    if (localId) { openDetailView(localId); return; }
+    // Guard against a second materialize if one already maps to this filename.
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].publishedFilename === filename) { openDetailView(allApps[i].id); return; }
+    }
+    var config = loadConfig();
+    if (!config.aimeatUrl) { alert('Set the AIMEAT server URL in Settings first'); return; }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var meta = serverAppManifests[owner + '\n' + filename] || {};
+
+    fetchAppContentBase64(aimeatUrl, owner, filename)
+      .then(function(b64) {
+        var app = {
+          id: generateId(),
+          name: meta.name || filename.replace(/\.html?$/i, ''),
+          description: meta.description || '',
+          category: meta.category || 'utility',
+          tags: meta.tags || [],
+          usesCortex: meta.usesCortex || [],
+          icon: meta.icon || '\u{1F4DD}',
+          source: 'aimeat',
+          url: null,
+          blob: b64,
+          favorite: false,
+          openMode: 'tab',
+          addedAt: new Date().toISOString(),
+          lastOpenedAt: null,
+          published: true,
+          publishedFilename: filename,
+          publishedUrl: '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename),
+          publishedVersionNumber: versionNumber || 1,
+          publishedAt: new Date().toISOString(),
+          aimeatOwner: owner,
+          aimeatFilename: filename
+        };
+        removeImportIgnore(filename); // this app is now intentionally present locally
+        return saveApp(app).then(function() {
+          allApps.push(app);
+          renderApps();
+          loadPublishedApps();
+          openDetailView(app.id);
+        });
+      })
+      .catch(function(err) { alert('Could not load the published app: ' + (err.message || err)); });
   }
 
   // ── App Versions / Restore / Fork ─────────────────
@@ -6661,6 +6730,7 @@
     detailSharePrompt: detailSharePrompt,
     detailPublish: detailPublish,
     detailDelete: detailDelete,
+    openPublishedDetail: openPublishedDetail,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,

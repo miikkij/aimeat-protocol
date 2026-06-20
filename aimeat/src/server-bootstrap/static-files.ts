@@ -18,6 +18,8 @@
  *   v1.3.0 -- 2026-06-20 -- H-2: when the app origin is enabled, add it to the SPA +
  *     app-catalog `frame-src` so the sandboxed app viewer can frame the app origin
  *     (the apex inline URL 301s there); otherwise frame-src 'self' blocks the launch.
+ *   v1.4.0 -- 2026-06-20 -- H-2: inject window.__APP_ORIGIN_ENABLED into app-catalog.html so
+ *     it opens published apps top-level on the app origin (clean full page) when provisioned.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -155,8 +157,12 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     // Serve app-catalog.html with relaxed CSP — self-contained SPA with many inline event handlers
     const appCatalogPath = join(pwaStaticDir, 'app-catalog.html');
     if (existsSync(appCatalogPath)) {
+      const appOriginOn = config.appOriginEnabled && !!config.appHost;
       app.get('/app-catalog.html', (_req, res) => {
-        const html = readFileSync(appCatalogPath, 'utf-8');
+        let html = readFileSync(appCatalogPath, 'utf-8');
+        // H-2: tell the catalog whether the app origin is live, so it opens published apps
+        // TOP-LEVEL on apps.<domain> (clean full page) instead of the opaque-sandbox iframe.
+        html = html.replace('</head>', `<script>window.__APP_ORIGIN_ENABLED=${appOriginOn ? 'true' : 'false'};</script>\n</head>`);
         // Override CSP: app-catalog hosts user-generated apps that load arbitrary CDN resources.
         // Uses same permissive policy as apps.ts inline mode — allows any HTTPS script/style source.
         res.setHeader('Content-Security-Policy', [
