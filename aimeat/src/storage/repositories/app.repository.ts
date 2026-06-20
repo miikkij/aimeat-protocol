@@ -16,6 +16,8 @@
  *   v1.2.0 — 2026-06-09 — Add mergeForkedAppBuckets() to consolidate ownerGaii
  *     buckets forked across an owner's identity forms (dashboard bare name vs
  *     MCP/PAT full GHII) into one canonical record with a unified version line.
+ *   v1.3.0 — 2026-06-20 — Add setAppParked() for the parked-app state (hide from
+ *     public listings while keeping the app usable by its owner).
  */
 import type { AppRecord, AppListOptions } from '../interface.js';
 
@@ -28,6 +30,13 @@ export interface AppRepository {
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;
     updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean>;
+    /**
+     * Park or unpark an app: set the `parked` flag on EVERY version row of
+     * (ownerGaii, filename). Parked apps drop out of the public catalogue,
+     * gallery, and search but remain fully usable by the owner. Returns true if
+     * any row was updated.
+     */
+    setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean>;
     getAppDownloads(ownerGaii: string, filename: string): Promise<number>;
     incrementAppDownloads(ownerGaii: string, filename: string): Promise<void>;
     /**

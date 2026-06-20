@@ -22,6 +22,10 @@
  *     description → 400; carried forward on update. Fork/owner-B publishes now send one.
  *   v1.4.0 — 2026-06-20 — add Phase 8 clear-screenshot: owner DELETE flips has_screenshot
  *     to false + GET 404s; a different non-operator owner gets 403.
+ *   v1.5.0 — 2026-06-20 — add Phase 9 parked apps: PATCH { parked } hides an app from the
+ *     anonymous catalogue while the owner still sees it (and a different owner does not); direct
+ *     download still works; re-publish inherits parked; cross-owner park 404s; parked-only PATCH
+ *     preserves the access code; unpark restores public visibility.
  */
 
 import * as ed from '@noble/ed25519';
@@ -385,6 +389,103 @@ await test('Owner clears their screenshot; listing flips has_screenshot to false
     assert(!!mine && mine.has_screenshot === false, 'listing now reports has_screenshot=false');
     const gone = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
     assert(gone.status === 404, `screenshot GET now 404, got ${gone.status}`);
+});
+
+// ── Phase 9: parked apps (hide from the public catalogue, stay owner-usable) ──
+// Parking sets a flag that drops the app out of the public listing/search while
+// keeping it visible to its owner (and downloadable by direct URL — hide-only scope).
+console.log('\nPhase 9: Parked apps');
+
+const PARK_FILE = 'park-demo.html';
+
+await test('Owner publishes an app to park', async () => {
+    const { status } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: PARK_FILE, content: b64('<h1>park me</h1>'), name: 'Park Demo', description: 'will be parked', category: 'utility', tags: [] }),
+    }));
+    assert(status === 201, `publish status ${status}`);
+    // Visible in the anonymous catalogue before parking.
+    const list = await json('/v1/apps?limit=200');
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!!mine, 'app present in public listing before parking');
+    assert(mine.parked === false, `parked flag false before parking, got ${mine.parked}`);
+});
+
+await test('PATCH { parked: true } parks the app (200, parked=true)', async () => {
+    const { status, body } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ parked: true }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.parked === true, `response parked=true, got ${body.data?.parked}`);
+});
+
+await test('Parked app is HIDDEN from the anonymous public catalogue', async () => {
+    const list = await json('/v1/apps?limit=200');
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!mine, 'parked app must not appear in the anonymous listing');
+});
+
+await test('Parked app IS still visible to its owner (authenticated listing)', async () => {
+    const list = await json('/v1/apps?limit=200', authed());
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!!mine, "owner's own parked app appears in their authenticated listing");
+    assert(mine.parked === true, `owner sees parked=true, got ${mine.parked}`);
+});
+
+await test("Parked app is NOT visible to a DIFFERENT authenticated owner", async () => {
+    const list = await json('/v1/apps?limit=200', bAuthed());
+    const seen = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!seen, "another owner must not see A's parked app");
+});
+
+await test('Parked app is still downloadable by direct URL (hide-only scope)', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${PARK_FILE}`);
+    assert(res.status === 200, `direct download still works, got ${res.status}`);
+    assert((await res.text()) === '<h1>park me</h1>', 'serves the parked app content');
+});
+
+await test('Re-publishing a parked app KEEPS it parked (inherited state)', async () => {
+    const { status } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: PARK_FILE, content: b64('<h1>park me v2</h1>'), name: 'Park Demo', category: 'utility', tags: [] }),
+    }));
+    assert(status === 201, `re-publish status ${status}`);
+    const anon = await json('/v1/apps?limit=200');
+    assert(!(anon.body.data?.apps ?? []).some((a: any) => a.filename === PARK_FILE && a.owner === ownerName), 'still hidden from anonymous listing after update');
+    const own = await json('/v1/apps?limit=200', authed());
+    const mine = (own.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(mine?.parked === true, 'owner still sees it parked after a re-publish');
+});
+
+await test("Another owner cannot park A's app (PATCH → 404)", async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, bAuthed({
+        method: 'PATCH', body: JSON.stringify({ parked: true }),
+    }));
+    assert(status === 404, `cross-owner park must 404, got ${status}`);
+});
+
+await test('PATCH { parked: false } unparks → app reappears in the public catalogue', async () => {
+    const { status, body } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ parked: false }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.parked === false, `response parked=false, got ${body.data?.parked}`);
+    const list = await json('/v1/apps?limit=200');
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!!mine, 'unparked app is back in the anonymous listing');
+    assert(mine.parked === false, 'reported as not parked');
+});
+
+await test('A parked-only PATCH does not clear an existing access code', async () => {
+    // Set an access code, then park with a parked-only body, and confirm protection survives.
+    const code = await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ access_code: 'secret123' }) }));
+    assert(code.status === 200 && code.body.data?.protected === true, 'access code set');
+    const park = await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: true }) }));
+    assert(park.status === 200, `park status ${park.status}`);
+    assert(park.body.data?.protected === true, 'access code preserved through a parked-only PATCH');
+    assert(park.body.data?.parked === true, 'app is parked');
+    // Clean up: unpark + remove the code so later reads are unaffected.
+    await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: false, access_code: '' }) }));
 });
 
 // ── Summary ──

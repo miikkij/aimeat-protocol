@@ -2,6 +2,8 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.2.0 — 2026-06-20 — Add Park/Unpark control + Parked badge/hint to My Apps (hide an app
+ *     from the public catalogue while keeping it usable by its owner)
  *   v1.1.0 — 2026-03-19 — Add launch button to My Apps list
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, text-caption, etc.)
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
@@ -74,6 +76,17 @@ export default function AppsTab({ session, showToast, onStats }) {
     setEditCode('');
   }
 
+  async function handleTogglePark(app) {
+    const next = !app.parked;
+    const resp = await patchApp(app.filename || app.name, { parked: next });
+    if (resp.ok !== false) {
+      showToast(next ? (t('profile.apps.parked') || 'App parked') : (t('profile.apps.unparked') || 'App published'));
+      loadData();
+    } else {
+      showToast(resp?.error?.message || t('profile.apps.updateFailed') || 'Update failed', true);
+    }
+  }
+
   async function handleSaveAccessCode(filename) {
     const body = editCode.trim() ? { access_code: editCode.trim() } : { access_code: null };
     const resp = await patchApp(filename, body);
@@ -123,8 +136,10 @@ export default function AppsTab({ session, showToast, onStats }) {
               ${a.version_number > 1 ? html`<span class="badge badge-dim">${'#' + a.version_number}</span>` : ''}
               <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
+              ${a.parked ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('profile.apps.parkedBadge') || 'Parked'}</span>` : ''}
             </div>
           </div>
+          ${a.parked ? html`<div class="text-meta-sm mb-half">${t('profile.apps.parkedHint') || 'Only you can see and use this — hidden from the public catalogue.'}</div>` : ''}
           ${a.manifest?.description ? html`<div class="text-meta mb-half">${escHtml(a.manifest.description)}</div>` : ''}
           <div class="card-subtitle">
             <a href="${NODE_URL}/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}" target="_blank">${t('profile.apps.download')}</a>
@@ -140,6 +155,7 @@ export default function AppsTab({ session, showToast, onStats }) {
               window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank');
             }}>${t('profile.apps.launch') || 'Launch'}</button>
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
+            <button class=${a.parked ? 'btn-success btn-sm' : 'btn-outline btn-sm'} onClick=${() => handleTogglePark(a)}>${a.parked ? (t('profile.apps.unpark') || 'Unpark') : (t('profile.apps.park') || 'Park')}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
           ${editingApp === a.filename ? html`
@@ -177,6 +193,7 @@ export default function AppsTab({ session, showToast, onStats }) {
                     ${a.manifest?.version ? ' \u2022 v' + escHtml(a.manifest.version) : ''}
                     ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
                     ${a.protected ? ' \u2022 \u{1F512} ' + t('profile.apps.protected') : ''}
+                    ${a.parked ? ' \u2022 \u{1F17F}\ufe0f ' + (t('profile.apps.parkedBadge') || 'Parked') : ''}
                   </div>
                   <div class="mb-half"><a href="${NODE_URL + (a.download_url || '/v1/apps/' + encodeURIComponent(a.owner) + '/' + encodeURIComponent(a.filename))}" class="btn-sm pf-no-underline pf-inline-block">${t('profile.apps.download')}</a></div>
                 </div>

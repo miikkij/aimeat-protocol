@@ -470,6 +470,10 @@ export interface AppRecord {
   data: Buffer;
   accessCode?: string;
   createdAt: string;
+  // Parked apps are hidden from the public catalogue/gallery/search but stay fully
+  // usable by their owner (and the owner's agents). A property of the app
+  // (owner+filename), mirrored onto every version row. Default false = published.
+  parked?: boolean;
 }
 
 export interface AppListOptions {
@@ -481,6 +485,10 @@ export interface AppListOptions {
   limit?: number;
   offset?: number;
   freeOnly?: boolean;
+  // When set, parked apps are excluded UNLESS they belong to this GHII, so an
+  // owner sees their own parked apps in listings while everyone else does not.
+  // Omitted = exclude every parked app (anonymous/public view).
+  viewerGhii?: string;
 }
 
 // Subdomain → published-app / redirect mapping (operator-managed).

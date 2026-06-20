@@ -2025,7 +2025,13 @@
       "updateFailed": "Update failed",
       "save": "Save",
       "removeProtectionHint": "Save empty to remove access code protection",
-      "launch": "Launch"
+      "launch": "Launch",
+      "park": "Park",
+      "unpark": "Unpark",
+      "parkedBadge": "Parked",
+      "parkedHint": "Only you can see and use this — hidden from the public catalogue.",
+      "parked": "App parked",
+      "unparked": "App published"
     },
     "v8ext": {
       "title": "Server Extensions",
