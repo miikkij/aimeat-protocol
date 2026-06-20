@@ -10,7 +10,9 @@
  *   Sanomat is logged in with no separate login. The bridge targets the baked-in APEX_URL (NOT
  *   NODE_URL, which is location.origin = the APP origin on http/https). mountLoginButton re-renders on
  *   the 'login'/'logout' events so the button updates after the async silent login (no opts.onLogin to
- *   avoid a reload loop). isAppOrigin / silentAppToken / restoreSessionFromAppOrigin.
+ *   avoid a reload loop), and on an app origin with no session it kicks off the silent bridge ITSELF
+ *   (so an app that only calls mountLoginButton, never auth.login(), still auto-logs-in). Concurrent
+ *   callers share one in-flight bridge. isAppOrigin / silentAppToken / restoreSessionFromAppOrigin.
  * v1.18.0 - 2026-06-20 - Sign-in modal submits on Enter from any field (username/password/
  *   display name), unless the button is mid-request.
  * v1.17.0 - 2026-06-20 - Sign-in modal shows a "Continue with Google" button when the node
@@ -591,23 +593,32 @@ function silentAppToken() {
   });
 }
 
-async function restoreSessionFromAppOrigin() {
-  var r = await silentAppToken();
-  if (!r || !r.access_token) return null;
-  var payload = parseJwt(r.access_token) || {};
-  var ownerName = payload.owner || payload.sub;
-  if (!ownerName) return null;
-  var session = createSession({
-    owner: ownerName,
-    ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
-    gaii: null, jwt: r.access_token, roles: payload.roles || [], displayName: '',
-  });
-  session._appOrigin = true;
-  persistSession(session);
-  currentSession = session;
-  scheduleAutoRefresh(session);
-  emit('login', session);
-  return session;
+// Shared in-flight promise so concurrent callers (an app that runs BOTH mountLoginButton's auto
+// trigger AND its own auth.login()) reuse a single silent bridge instead of opening two iframes.
+let _appOriginLoginInFlight = null;
+function restoreSessionFromAppOrigin() {
+  if (currentSession) return Promise.resolve(currentSession);
+  if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
+  _appOriginLoginInFlight = (async function () {
+    var r = await silentAppToken();
+    if (!r || !r.access_token) return null;
+    var payload = parseJwt(r.access_token) || {};
+    var ownerName = payload.owner || payload.sub;
+    if (!ownerName) return null;
+    var session = createSession({
+      owner: ownerName,
+      ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
+      gaii: null, jwt: r.access_token, roles: payload.roles || [], displayName: '',
+    });
+    session._appOrigin = true;
+    persistSession(session);
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit('login', session);
+    return session;
+  })();
+  _appOriginLoginInFlight.finally(function () { _appOriginLoginInFlight = null; });
+  return _appOriginLoginInFlight;
 }
 
 function scheduleAutoRefresh(session) {
@@ -1094,6 +1105,14 @@ const auth = {
     // location.reload(), which would loop with the auto silent login).
     auth.on('login', render);
     auth.on('logout', render);
+    // Seamless SSO: on an app origin (*.apps.<domain>) with no session yet, attempt the silent
+    // bridge ourselves so the owner's own app is logged in even if it never calls auth.login()
+    // explicitly. Best-effort + idempotent: if the bridge yields a session it fires 'login' (→ the
+    // button re-renders); if it returns null (anonymous visitor / not the owner) the button stays
+    // "Sign In". currentSession guards against racing an explicit login() the app may also run.
+    if (isAppOrigin() && !currentSession && !load('session')) {
+      restoreSessionFromAppOrigin().catch(() => {});
+    }
   },
 };
 
