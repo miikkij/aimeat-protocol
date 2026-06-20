@@ -2277,6 +2277,24 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    AppSummary:
+      type: object
+      description: Catalogue/publish view of an app (latest version), as returned by the apps endpoints.
+      properties:
+        owner: { type: string }
+        filename: { type: string }
+        version_number: { type: integer }
+        manifest: { type: object }
+        size: { type: integer }
+        mime_type: { type: string }
+        protected: { type: boolean, description: True when an access code gates downloads }
+        parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
+        has_screenshot: { type: boolean }
+        downloads: { type: integer }
+        download_url: { type: string }
+        screenshot_url: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
     # === Package & Template Schemas ===
     PackageComponent:
       type: object
@@ -10637,6 +10655,175 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/apps:
+    get:
+      operationId: listApps
+      summary: List published apps (catalogue)
+      description: |
+        Returns the latest version of every published app, with search/filter/pagination.
+        Authentication is optional: when the caller is authenticated, their OWN parked apps are
+        included in the results (every app carries a `parked` flag); parked apps owned by anyone
+        else are hidden. Anonymous callers see only published (non-parked) apps.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - { in: query, name: category, required: false, schema: { type: string } }
+        - { in: query, name: q, required: false, schema: { type: string }, description: Search query }
+        - { in: query, name: tag, required: false, schema: { type: string } }
+        - { in: query, name: sort, required: false, schema: { type: string, enum: [newest, popular] } }
+        - { in: query, name: limit, required: false, schema: { type: integer, default: 50, maximum: 200 } }
+        - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
+        - { in: query, name: free_only, required: false, schema: { type: boolean } }
+        - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
+      responses:
+        '200':
+          description: Catalogue listing
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          apps:
+                            type: array
+                            items: { $ref: '#/components/schemas/AppSummary' }
+                          total: { type: integer }
+                          offset: { type: integer }
+                          limit: { type: integer }
+    post:
+      operationId: publishApp
+      summary: Publish or update an app
+      description: |
+        Publishes a single-file HTML app (or updates an existing one, auto-incrementing the version).
+        Supply `content` (base64) inline, or set `mode: presigned` to receive an upload URL for larger
+        files. Re-publishing an app inherits its current `parked` state, so an update never silently
+        re-exposes a parked app.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename: { type: string }
+                content: { type: string, description: Base64-encoded file content (omit when mode=presigned) }
+                mode: { type: string, enum: [presigned], description: Request a presigned upload URL instead of inline content }
+                mime_type: { type: string, default: text/html }
+                name: { type: string }
+                description: { type: string, description: Required for a NEW app }
+                version: { type: string }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+                icon: { type: string }
+                access_code: { type: string, description: 4-64 chars; gates downloads }
+                screenshot: { type: string, description: Base64 image }
+                screenshot_mime_type: { type: string }
+                price_morsels: { type: number }
+                license_type: { type: string, enum: [single, lifetime] }
+      responses:
+        '201':
+          description: App published or updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AppSummary' }
+        '200':
+          description: Presigned upload URL (when mode=presigned)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413': { description: File too large }
+        '429': { description: Per-owner app quota exceeded }
+
+  /v1/apps/{filename}:
+    patch:
+      operationId: updateApp
+      summary: Update an app you own (access code and/or parked state)
+      description: |
+        Update metadata on an app you own. Each field is independent and applied only when present
+        in the body, so a `parked`-only request never clears the access code (and vice-versa).
+        Parking hides the app from the public catalogue/gallery/search while keeping it fully usable
+        by you (and your agents); unparking restores it to the catalogue.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_code:
+                  type: string
+                  nullable: true
+                  description: 4-64 chars to set protection; empty/null removes it
+                parked:
+                  type: boolean
+                  description: true hides the app from the public catalogue; false republishes it
+      responses:
+        '200':
+          description: App updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          protected: { type: boolean }
+                          parked: { type: boolean }
+                          download_url: { type: string }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteApp
+      summary: Delete an app you own
+      description: Removes an app you own. Supply `?version=N` to delete a single version; otherwise all versions are removed.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: filename, required: true, schema: { type: string } }
+        - { in: query, name: version, required: false, schema: { type: integer } }
+      responses:
+        '200':
+          description: App (or version) deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 

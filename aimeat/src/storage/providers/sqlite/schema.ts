@@ -785,6 +785,7 @@ export function initializeSchema(db: Database.Database): void {
       size           INTEGER NOT NULL DEFAULT 0,
       data           BLOB,
       accessCode     TEXT,
+      parked         INTEGER NOT NULL DEFAULT 0,
       createdAt      TEXT NOT NULL,
       PRIMARY KEY (ownerGaii, filename, versionNumber)
     );
@@ -1699,6 +1700,10 @@ export function initializeSchema(db: Database.Database): void {
   // none and the portal shows a graceful "re-connect to load one" fallback.
   safeAddColumn('eco_auth', 'setup', 'TEXT');
   safeAddColumn('ecosystem_apps', 'setup', 'TEXT');
+
+  // Parked-app state: hides an app from the public catalogue/gallery/search while it
+  // stays usable by its owner. Additive/nullable-default; pre-existing apps are published (0).
+  safeAddColumn('apps', 'parked', 'INTEGER NOT NULL DEFAULT 0');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the

@@ -14,6 +14,9 @@
     v2.0.0 — 2026-06-20 — Always open apps TOP-LEVEL (no opaque sandbox — it gave apps origin `null`
       and forced a re-login). Server decides isolation: app origin OFF → inline on apex (session
       inherited, apps "logged in"); ON → 301 to the isolated app origin.
+    v2.1.0 — 2026-06-20 — Add Park/Unpark to own published-app cards (+ PARKED badge/hint, dimmed
+      card). Parking hides an app from the public catalogue while keeping it usable by its owner;
+      toggleParkApp PATCHes /v1/apps/:filename { parked }.
 -->
 <html lang="en">
 <head>
@@ -1509,6 +1512,18 @@
       border: 1px solid rgba(245, 158, 11, .25);
     }
 
+    .published-source-badge.parked {
+      background: rgba(148, 163, 184, .12);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, .3);
+    }
+
+    /* A parked app is hidden from the public catalogue — dim its card to signal that. */
+    .published-card.parked {
+      opacity: .72;
+      border-style: dashed;
+    }
+
     /* Operator-only subdomain chip on own published cards */
     .subdomain-chip {
       display: inline-flex;
@@ -2157,6 +2172,10 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'card.park': '🅿 Park',
+      'card.unpark': '🅿 Unpark',
+      'card.parkedBadge': 'PARKED',
+      'card.parkedHint': 'Only you can see and use this — hidden from the public catalogue.',
       'common.loading': 'Loading…',
       'consents.title': 'App permissions',
       'consents.none': 'You haven’t granted this app access.',
@@ -2377,6 +2396,10 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'card.park': '🅿 Parkkiin',
+      'card.unpark': '🅿 Julkaise',
+      'card.parkedBadge': 'PARKISSA',
+      'card.parkedHint': 'Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.',
       'common.loading': 'Ladataan…',
       'consents.title': 'Appin oikeudet',
       'consents.none': 'Et ole antanut tälle apille pääsyä.',
@@ -5178,6 +5201,7 @@
         source: source,
         localId: localMatch ? localMatch.id : null,
         versionNumber: sa.version_number || null,
+        parked: !!sa.parked,
         isOwn: true
       });
     }
@@ -5232,20 +5256,31 @@
         }
       }
 
+      // Park/Unpark is only meaningful for an app that actually exists on the server
+      // (source 'server' or 'both'); a purely-local published entry has nothing to hide.
+      var onServer = app.isOwn && app.filename && (app.source === 'server' || app.source === 'both');
+      var parkBtnHtml = onServer
+        ? '<button onclick="window._launcher.toggleParkApp(\'' + escapeHtml(app.filename) + '\', ' + (app.parked ? 'false' : 'true') + ')">' + (app.parked ? t('card.unpark') : t('card.park')) + '</button>'
+        : '';
+      var parkedBadgeHtml = app.parked ? ' <span class="published-source-badge parked" title="' + escapeHtml(t('card.parkedHint')) + '">' + t('card.parkedBadge') + '</span>' : '';
+      var parkedHintHtml = app.parked ? '<div class="published-card-meta" style="margin-top:2px"><span style="opacity:.7">' + escapeHtml(t('card.parkedHint')) + '</span></div>' : '';
+
       html +=
-        '<div class="published-card">' +
+        '<div class="published-card' + (app.parked ? ' parked' : '') + '">' +
           '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
-            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' + parkedBadgeHtml +
           '</div>' +
           '<div class="published-card-meta">' +
             '<span>' + escapeHtml(app.filename) + '</span>' +
             '<span>' + app.date + '</span>' +
           '</div>' +
+          parkedHintHtml +
           subChipHtml +
           '<div class="published-card-actions">' +
             (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
             (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
             (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
+            parkBtnHtml +
             subBtnHtml +
             (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
              app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
@@ -5293,6 +5328,30 @@
       .catch(function(err) {
         alert('Error: ' + (err.message || err));
       });
+  }
+
+  // Park / unpark a server-published app. Parked apps drop out of the public
+  // catalogue/gallery/search but stay fully usable by the owner (and the owner's
+  // agents). PATCH /v1/apps/:filename { parked } toggles the state.
+  function toggleParkApp(filename, parked) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parked: !!parked })
+    })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          loadPublishedApps();
+        } else {
+          alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
   function deleteServerApp(filename) {
@@ -6841,6 +6900,7 @@
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
+    toggleParkApp: toggleParkApp,
     showSubdomainModal: showSubdomainModal,
     openConsents: openConsents,
     closeConsents: closeConsents,

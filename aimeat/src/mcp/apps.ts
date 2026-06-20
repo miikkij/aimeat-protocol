@@ -136,6 +136,14 @@ export function registerAppsTools(
             };
             if (icon) manifest.icon = icon;
 
+            // Carry the parked state forward across re-publishes (a parked app stays
+            // hidden when updated). Mirrors POST /v1/apps.
+            let parkedState = false;
+            if (isUpdate) {
+                const existingApp = await storage.getApp(ownerGaii, filename);
+                parkedState = !!existingApp?.parked;
+            }
+
             try {
                 await storage.createApp({
                     ownerGaii,
@@ -146,6 +154,7 @@ export function registerAppsTools(
                     mimeType: 'text/html',
                     size: data.length,
                     data,
+                    parked: parkedState,
                     createdAt: new Date().toISOString(),
                 });
 
@@ -187,6 +196,7 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_list'),
         async ({ category, search, tag, own }) => {
             const agentGaii = getAgentGaii();
+            const ownerGhii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
 
             const opts = {
                 category,
@@ -195,7 +205,10 @@ export function registerAppsTools(
                 sort: 'newest' as const,
                 limit: 50,
                 offset: 0,
-                ...(own ? { ownerGaii: `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}` } : {}),
+                // Browsing the full catalogue still surfaces the caller's OWN parked apps
+                // (hidden from everyone else), so an owner's agent can act on them.
+                viewerGhii: ownerGhii,
+                ...(own ? { ownerGaii: ownerGhii } : {}),
             };
 
             const { apps, total } = await storage.listApps(opts);
@@ -213,6 +226,7 @@ export function registerAppsTools(
                     tags: app.manifest.tags,
                     icon: app.manifest.icon,
                     size: app.size,
+                    parked: !!app.parked,
                     downloads,
                     download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                     created_at: app.createdAt,

@@ -2025,7 +2025,13 @@
       "updateFailed": "Päivitys epäonnistui",
       "save": "Tallenna",
       "removeProtectionHint": "Tallenna tyhjänä poistaaksesi pääsykoodisuojauksen",
-      "launch": "Käynnistä"
+      "launch": "Käynnistä",
+      "park": "Parkkiin",
+      "unpark": "Julkaise",
+      "parkedBadge": "Parkissa",
+      "parkedHint": "Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.",
+      "parked": "Sovellus parkissa",
+      "unparked": "Sovellus julkaistu"
     },
     "v8ext": {
       "title": "Palvelinlaajennukset",

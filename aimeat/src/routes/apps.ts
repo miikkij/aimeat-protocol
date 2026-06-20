@@ -46,6 +46,10 @@
  *   v1.9.0 -- 2026-06-20 -- Add DELETE /v1/apps/:owner/:filename/screenshot: clear a screenshot
  *     (owner OR operator) without rendering a new one — the scheduled auto-capture job recaptures it
  *     on its next scan (DoS-safe "refresh thumbnail", no on-demand render).
+ *   v1.10.0 -- 2026-06-20 -- Parked-app state: GET /v1/apps takes optionalAuth and includes the
+ *     caller's own parked apps (hidden from everyone else); responses carry `parked`; PATCH accepts
+ *     a `parked` boolean (now field-aware so it no longer clears access_code on a parked-only call);
+ *     a re-publish inherits the existing parked state.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -108,7 +112,15 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     };
 
     // GET /v1/apps — Catalogue listing with search/filter/pagination
-    router.get('/v1/apps', async (req, res) => {
+    router.get('/v1/apps', optionalAuth(), async (req, res) => {
+        // Parked apps are hidden from the public listing but must still show in
+        // their owner's own catalogue. Resolve the authenticated caller's owner
+        // GHII (if any) so listApps can include the caller's own parked apps.
+        let viewerGhii: string | undefined;
+        if (req.auth) {
+            const { ownerGhii } = await canonicalOwner(req);
+            viewerGhii = ownerGhii;
+        }
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -117,6 +129,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             limit: Math.min(parseInt(req.query.limit as string) || 50, 200),
             offset: parseInt(req.query.offset as string) || 0,
             freeOnly: req.query.free_only === 'true',
+            viewerGhii,
         };
 
         const { apps, total } = await storage.listApps(opts);
@@ -133,6 +146,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
+                parked: !!app.parked,
                 has_screenshot: hasScreenshot,
                 downloads,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
@@ -557,6 +571,15 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             }
         }
 
+        // Carry the parked state forward across re-publishes: a parked app stays
+        // parked (hidden) when updated, so an update never silently re-exposes it.
+        // New apps are published (not parked) by default.
+        let parkedState = false;
+        if (isUpdate) {
+            const existingApp = await storage.getApp(ownerGhii, filename);
+            parkedState = !!existingApp?.parked;
+        }
+
         const now = new Date().toISOString();
         const manifest: AppManifest = {
             name: typeof name === 'string' ? name : filename.replace(/\.html?$/i, ''),
@@ -581,6 +604,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             size: data.length,
             data,
             accessCode,
+            parked: parkedState,
             createdAt: now,
         });
 
@@ -645,6 +669,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             size: data.length,
             mime_type: mimeType,
             protected: !!accessCode,
+            parked: parkedState,
             has_screenshot: hasScreenshot,
             download_url: downloadUrl,
             versions_url: `${downloadUrl}/versions`,
@@ -666,7 +691,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }).catch(() => { /* feed is best-effort */ });
     });
 
-    // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
+    // PATCH /v1/apps/:filename — Update an app you own (requires auth). Accepts
+    // `access_code` (set/remove protection) and/or `parked` (hide from / restore to
+    // the public catalogue). Fields are independent: each is applied only when present.
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);
@@ -694,22 +721,50 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        const { access_code } = req.body ?? {};
-        const newCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
-        if (newCode && (newCode.length < 4 || newCode.length > 64)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'access_code must be 4-64 characters'));
+        const body = req.body ?? {};
+
+        // Each field is independent and only touched when present in the body, so a
+        // parked-only PATCH never clears the access code (and vice-versa).
+        const notes: string[] = [];
+
+        if ('access_code' in body) {
+            const access_code = body.access_code;
+            const newCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
+            if (newCode && (newCode.length < 4 || newCode.length > 64)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'access_code must be 4-64 characters'));
+                return;
+            }
+            await storage.updateAppAccessCode(effectiveGaii, filename, newCode);
+            notes.push(newCode
+                ? 'Access code updated. Share the new code with recipients.'
+                : 'Access code removed. The app is now publicly downloadable.');
+        }
+
+        if ('parked' in body) {
+            if (typeof body.parked !== 'boolean') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'parked must be a boolean'));
+                return;
+            }
+            await storage.setAppParked(effectiveGaii, filename, body.parked);
+            notes.push(body.parked
+                ? 'App parked. It is now hidden from the public catalogue but stays usable by you.'
+                : 'App unparked. It is published in the public catalogue again.');
+        }
+
+        if (notes.length === 0) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (access_code or parked).'));
             return;
         }
 
-        await storage.updateAppAccessCode(effectiveGaii, filename, newCode);
+        // Re-read so the response reflects the app's current state after the update(s).
+        const updated = await storage.getApp(effectiveGaii, filename);
 
         res.json(success(config.nodeId, {
             filename,
-            protected: !!newCode,
+            protected: !!updated?.accessCode,
+            parked: !!updated?.parked,
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
-            note: newCode
-                ? 'Access code updated. Share the new code with recipients.'
-                : 'Access code removed. The app is now publicly downloadable.',
+            note: notes.join(' '),
         }));
         emitChange('apps');
     });

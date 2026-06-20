@@ -136,6 +136,14 @@ async function handleAppUpload(
     };
     if (meta.icon) manifest.icon = meta.icon as string;
 
+    // Carry the parked state forward across re-publishes (a parked app stays hidden
+    // when updated). Mirrors POST /v1/apps.
+    let parkedState = false;
+    if (isUpdate) {
+        const existingApp = await storage.getApp(ownerGaii, filename);
+        parkedState = !!existingApp?.parked;
+    }
+
     await storage.createApp({
         ownerGaii,
         ownerName,
@@ -145,6 +153,7 @@ async function handleAppUpload(
         mimeType: 'text/html',
         size: data.length,
         data,
+        parked: parkedState,
         createdAt: new Date().toISOString(),
     });
 

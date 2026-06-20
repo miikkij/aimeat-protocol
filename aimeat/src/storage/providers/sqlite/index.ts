@@ -4182,12 +4182,12 @@ export class SqliteStorage implements Storage {
 
   async createApp(record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
-      record.accessCode ?? null, record.createdAt,
+      record.accessCode ?? null, record.parked ? 1 : 0, record.createdAt,
     );
     return record;
   }
@@ -4243,6 +4243,17 @@ export class SqliteStorage implements Storage {
     }
     if (opts?.freeOnly) {
       conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
+    }
+    // Parked apps are hidden from everyone EXCEPT their owner (viewerGhii). An
+    // explicit ownerGaii filter already scopes to one owner, so skip the clause
+    // there (the owner's "my apps" view must include their own parked apps).
+    if (!opts?.ownerGaii) {
+      if (opts?.viewerGhii) {
+        conditions.push(`(a.parked = 0 OR a.ownerGaii = ?)`);
+        params.push(opts.viewerGhii);
+      } else {
+        conditions.push(`a.parked = 0`);
+      }
     }
 
     if (conditions.length > 0) {
@@ -4302,6 +4313,13 @@ export class SqliteStorage implements Storage {
     // Update access code on all versions
     const result = this.db.prepare('UPDATE apps SET accessCode = ? WHERE ownerGaii = ? AND filename = ?')
       .run(accessCode ?? null, ownerGaii, filename);
+    return result.changes > 0;
+  }
+
+  async setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean> {
+    // Park/unpark applies to the whole app — flag every version row.
+    const result = this.db.prepare('UPDATE apps SET parked = ? WHERE ownerGaii = ? AND filename = ?')
+      .run(parked ? 1 : 0, ownerGaii, filename);
     return result.changes > 0;
   }
 
@@ -4555,6 +4573,7 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
+    if (row.parked) record.parked = true;
     return record;
   }
 

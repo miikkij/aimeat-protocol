@@ -3778,6 +3778,7 @@ export class PrismaStorage implements Storage {
             size: row.size,
             data: row.data,
             accessCode: row.accessCode ?? undefined,
+            parked: row.parked ? true : undefined,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
         };
     }
@@ -3795,6 +3796,7 @@ export class PrismaStorage implements Storage {
                 size: record.size,
                 data: record.data,
                 accessCode: record.accessCode,
+                parked: record.parked ?? false,
                 createdAt: new Date(record.createdAt),
             },
         });
@@ -3852,6 +3854,12 @@ export class PrismaStorage implements Storage {
             apps = apps.filter((a: AppRecord) => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
         }
         if (opts?.freeOnly) apps = apps.filter((a: AppRecord) => !a.manifest.priceMorsels);
+        // Parked apps are hidden from everyone EXCEPT their owner. A scoped
+        // ownerGaii query already returns only that owner's apps (their "my apps"
+        // view, which should include parked), so only filter the unscoped listing.
+        if (!opts?.ownerGaii) {
+            apps = apps.filter((a: AppRecord) => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
+        }
         const total = apps.length;
         apps.sort((a: AppRecord, b: AppRecord) => b.createdAt.localeCompare(a.createdAt));
         const offset = opts?.offset ?? 0;
@@ -3896,6 +3904,16 @@ export class PrismaStorage implements Storage {
         const result = await this.prisma.app.updateMany({
             where: { ownerGaii, filename },
             data: { accessCode: accessCode ?? null },
+        });
+        return result.count > 0;
+    }
+
+    async setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean> {
+        this.ensureReady();
+        // Park/unpark applies to the whole app — flag every version row.
+        const result = await this.prisma.app.updateMany({
+            where: { ownerGaii, filename },
+            data: { parked },
         });
         return result.count > 0;
     }

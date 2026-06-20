@@ -932,6 +932,7 @@ model App {
   size          Int
   data          Bytes
   accessCode    String?
+  parked        Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@unique([ownerGaii, filename, versionNumber])
