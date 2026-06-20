@@ -32,6 +32,12 @@
  *     owner's app into two buckets with independent version counters. The
  *     startup mergeForkedAppBuckets() migration consolidates pre-existing forks.
  *   v1.4.0 -- 2026-06-16 -- Record a public-activity-feed event on publish/update.
+ *   v1.5.0 -- 2026-06-20 -- H-2: when the app origin is provisioned (config.appOriginEnabled),
+ *     301-redirect apex inline (runnable) app requests to the isolated app origin
+ *     (appOriginUrl: assigned subdomain, else apps.<apex>/<owner>/<file>).
+ *   v1.6.0 -- 2026-06-20 -- Add POST /v1/apps/:owner/:filename/screenshot: set/replace an app's
+ *     screenshot without re-publishing (owner OR operator). Backs the screenshot worker + manual
+ *     override. createStorageFile upserts, so it overwrites any existing screenshot.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -47,6 +53,25 @@ import { resolveGhii } from '../utils/ghii-resolver.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
+
+/**
+ * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
+ * assigned per-app subdomain (`https://<sub>.apps.<apex>/`, which also isolates the
+ * app from other apps), falling back to the shared path form
+ * (`https://apps.<apex>/<owner>/<filename>`). Caller guarantees config.appHost is set.
+ */
+async function appOriginUrl(config: AimeatConfig, storage: Storage, owner: string, filename: string): Promise<string> {
+    const scheme = config.baseUrl.startsWith('https://') ? 'https' : 'http';
+    const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
+    try {
+        const sites = await storage.listSubdomainSites();
+        const match = sites.find(s => s.enabled && s.kind === 'app'
+            && (s.target === `${owner}/${filename}` || s.target === `${bareOwner}/${filename}`));
+        if (match) return `${scheme}://${match.subdomain}.${config.appHost}/`;
+    } catch { /* fall through to path form */ }
+    return `${scheme}://${config.appHost}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
+}
+
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
@@ -209,6 +234,73 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Screenshot not found for app "${filename}"`));
     });
 
+    // POST /v1/apps/:owner/:filename/screenshot — set/replace an app's screenshot WITHOUT
+    // re-publishing it. The app's owner can set their own; a node operator can set any app's,
+    // so the screenshot worker can backfill defaults for apps that have none. createStorageFile
+    // upserts, so this overwrites an existing screenshot.
+    router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const decodedFn = decodeURIComponent(filename);
+        if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
+            || decodedFn.includes('%2f') || decodedFn.includes('%2F')
+            || decodedFn.includes('%5c') || decodedFn.includes('%5C')
+            || decodedFn.includes('\0')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+            return;
+        }
+
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        // Ownership: the app's owner, or a node operator (the screenshot worker runs as operator).
+        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        const { owner: callerOwner } = await canonicalOwner(req);
+        if (!isOperator && callerOwner !== app.ownerName) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only set the screenshot for your own apps'));
+            return;
+        }
+
+        const { screenshot, screenshot_mime_type } = req.body ?? {};
+        if (!screenshot || typeof screenshot !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot (base64 image) is required'));
+            return;
+        }
+        const screenshotData = decodeStrictBase64(screenshot);
+        if (!screenshotData) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot must be base64-encoded image data'));
+            return;
+        }
+        const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024;
+        if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
+            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
+            return;
+        }
+        const screenshotMime = typeof screenshot_mime_type === 'string' ? screenshot_mime_type : 'image/png';
+
+        await storage.createStorageFile({
+            key: `apps/screenshots/${filename}`,
+            ownerGaii: app.ownerGaii,   // match the app row's bucket so the GET route finds it
+            visibility: 'public',
+            mimeType: screenshotMime,
+            size: screenshotData.length,
+            data: screenshotData,
+            createdAt: new Date().toISOString(),
+        });
+
+        emitChange('apps');
+        res.json(success(config.nodeId, {
+            filename,
+            owner: app.ownerName,
+            screenshot_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(filename)}/screenshot`,
+        }));
+    });
+
     // GET /v1/apps/:owner/:filename — Download app (supports ?version=N)
     router.get('/v1/apps/:owner/:filename', optionalAuth(), async (req, res) => {
         const owner = req.params.owner as string;
@@ -263,10 +355,26 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             }
         }
 
+        const mode = req.query.mode as string | undefined;
+
+        // H-2: never serve RUNNABLE app HTML from the apex (authenticated SPA) origin.
+        // When the app origin is provisioned (flag on) and this request arrived on the
+        // apex, 301 inline (runnable) requests to the isolated app origin. The raw
+        // download form (attachment, not executed) and access-code/paid apps stay on
+        // apex for now. Requests already on the app origin (req.appOrigin) serve normally.
+        if (mode === 'inline' && config.appOriginEnabled && config.appHost && !req.appOrigin) {
+            const restricted = !!app.accessCode
+                || (config.marketplaceEnabled && !!app.manifest.priceMorsels && app.manifest.priceMorsels > 0);
+            if (!restricted) {
+                const target = await appOriginUrl(config, storage, owner, filename);
+                res.redirect(301, target);
+                return;
+            }
+        }
+
         res.setHeader('Content-Type', app.mimeType);
         res.setHeader('Content-Length', app.size.toString());
 
-        const mode = req.query.mode as string | undefined;
         if (mode === 'inline') {
             res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
             // Force browsers to always validate with the server (ETag round-trip).

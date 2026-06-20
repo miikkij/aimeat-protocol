@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-06-16 — Add public activity feed styles (pa- prefix).
  *   v1.2.0 — 2026-06-16 — Add reward-first Hero v2 styles (ld-hero2-*): newspaper-framed
  *     Sanomat teaser (designed masthead card; real screenshot when one exists), mobile-first, two CTAs.
+ *   v1.3.0 — 2026-06-20 — Live wall: .ld-gallery is now a fixed 3-up grid (2-up tablet, 1-up phone)
+ *     + .ld-wall-search filter box, for the real published-apps wall.
  */
 .ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
 
@@ -59,9 +61,13 @@
 .ld-loop-arrow { color: var(--text-dim); }
 .ld-section { margin: 2rem 0; }
 .ld-h2 { font-size: 1.3rem; margin: 0 0 1rem; }
-.ld-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .9rem; }
-.ld-app-card { display: block; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); }
+.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .55rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-size: .9rem; }
+.ld-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
+@media (max-width: 900px) { .ld-gallery { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .ld-gallery { grid-template-columns: 1fr; } }
+.ld-app-card { display: block; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); cursor: pointer; }
 .ld-app-card:hover { border-color: var(--accent); }
+.ld-app-shot { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .55rem; background: var(--bg-dim); }
 .ld-app-name { font-weight: 700; margin-bottom: .25rem; }
 .ld-app-desc { font-size: .82rem; color: var(--text-dim); margin-bottom: .4rem; }
 .ld-app-meta { font-size: .72rem; color: var(--muted); }

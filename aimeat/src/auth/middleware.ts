@@ -314,10 +314,14 @@ export function requireExternalPrincipal() {
       return;
     }
     const roles = req.auth.roles;
+    // `app` is a third scoped external-principal class (H-2 app grants): a user-published app
+    // holding an explicit, scoped grant token. Like agent/ecosystem it is scope-enforced by
+    // requireScope() (no owner bypass — its role is not 'owner'), so widening here only lets a
+    // granted app reach the same data CRUD an agent/GEAI uses, never escalating its scopes.
     const ok = roles.includes('agent') || roles.includes('ecosystem') ||
-      roles.includes('owner') || roles.includes('operator');
+      roles.includes('app') || roles.includes('owner') || roles.includes('operator');
     if (!ok) {
-      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Agent or ecosystem-app principal required'));
+      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Agent, ecosystem-app, or app principal required'));
       return;
     }
     next();

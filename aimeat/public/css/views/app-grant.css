@@ -1,0 +1,51 @@
+/**
+ * @file public/css/views/app-grant.css
+ * @description Styles for the app-grant consent page (agr- prefix) — the trusted apex approval
+ *   screen where an owner reviews a published app's requested scopes (H-2 Phase 3).
+ * @version-history
+ *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
+ */
+
+.agr-wrap { max-width: 540px; margin: 3rem auto; padding: 0 1.25rem; }
+
+.agr-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 1.75rem 1.6rem;
+}
+
+.agr-title { font-size: 1.4rem; font-weight: 800; margin: 0 0 1rem; color: var(--text); }
+
+.agr-app {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-dim);
+  margin-bottom: 1rem;
+}
+.agr-app-name { font-weight: 700; color: var(--text); }
+.agr-app-origin { font-size: 0.82rem; color: var(--text-dim); font-family: var(--font-mono, monospace); }
+
+.agr-muted { color: var(--text-dim); font-size: 0.92rem; margin: 0 0 1rem; }
+
+.agr-scopes-label { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text); }
+
+.agr-scopes { list-style: none; margin: 0 0 1.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.agr-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, var(--bg-dim));
+}
+.agr-scope-name { font-family: var(--font-mono, monospace); font-size: 0.82rem; color: var(--accent); }
+.agr-scope-desc { font-size: 0.88rem; color: var(--text); }
+
+.agr-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+.agr-btn { min-width: 8rem; text-align: center; }

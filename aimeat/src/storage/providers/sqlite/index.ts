@@ -17,6 +17,8 @@
  *   v1.3.1 — 2026-06-19 — Security (CR-1): reject negative/non-finite amounts in
  *     debitBalance/creditBalance/creditBalanceCapped/transferBalance to prevent
  *     negative-amount morsel minting (0 still allowed — free/0-cost work escrow).
+ *   v1.4.0 — 2026-06-20 — Add app_grants CRUD (owner-issued app authorizations →
+ *     agent tokens; refresh-hash lookup, list-by-owner, rotate/revoke).
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
@@ -42,6 +44,7 @@ import type {
   PersonalPushSubscriptionRecord, NotificationPreferences,
   AppRecord, AppListOptions, AppPurchaseRecord,
   SubdomainSiteRecord,
+  AppGrantRecord,
   NotificationTemplateRecord,
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
@@ -4372,6 +4375,77 @@ export class SqliteStorage implements Storage {
       createdBy: row.createdBy as string,
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
+    };
+  }
+
+  // ── App grants (owner-issued app authorizations → agent tokens) ──
+
+  async createAppGrant(grant: AppGrantRecord): Promise<AppGrantRecord> {
+    this.db.prepare(
+      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, refreshTokenHash, createdAt, lastUsedAt, revoked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      grant.grantId, grant.app, grant.appName, grant.appOrigin, grant.owner, grant.gaii,
+      JSON.stringify(grant.scopes), grant.refreshTokenHash, grant.createdAt, grant.lastUsedAt,
+      grant.revoked ? 1 : 0,
+    );
+    return grant;
+  }
+
+  async getAppGrant(grantId: string): Promise<AppGrantRecord | null> {
+    const row = this.db.prepare('SELECT * FROM app_grants WHERE grantId = ?')
+      .get(grantId) as Record<string, unknown> | undefined;
+    return row ? this.deserializeAppGrant(row) : null;
+  }
+
+  async getAppGrantByRefreshHash(tokenHash: string): Promise<AppGrantRecord | null> {
+    const row = this.db.prepare('SELECT * FROM app_grants WHERE refreshTokenHash = ?')
+      .get(tokenHash) as Record<string, unknown> | undefined;
+    return row ? this.deserializeAppGrant(row) : null;
+  }
+
+  async listAppGrantsByOwner(owner: string): Promise<AppGrantRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM app_grants WHERE owner = ? ORDER BY createdAt DESC')
+      .all(owner) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeAppGrant(r));
+  }
+
+  async updateAppGrant(
+    grantId: string,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes'>>,
+  ): Promise<AppGrantRecord | null> {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (updates.refreshTokenHash !== undefined) { sets.push('refreshTokenHash = ?'); params.push(updates.refreshTokenHash); }
+    if (updates.lastUsedAt !== undefined) { sets.push('lastUsedAt = ?'); params.push(updates.lastUsedAt); }
+    if (updates.revoked !== undefined) { sets.push('revoked = ?'); params.push(updates.revoked ? 1 : 0); }
+    if (updates.scopes !== undefined) { sets.push('scopes = ?'); params.push(JSON.stringify(updates.scopes)); }
+    if (sets.length === 0) return this.getAppGrant(grantId);
+    params.push(grantId);
+    const result = this.db.prepare(`UPDATE app_grants SET ${sets.join(', ')} WHERE grantId = ?`)
+      .run(...params);
+    if (result.changes === 0) return null;
+    return this.getAppGrant(grantId);
+  }
+
+  async deleteAppGrant(grantId: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM app_grants WHERE grantId = ?').run(grantId);
+    return result.changes > 0;
+  }
+
+  private deserializeAppGrant(row: Record<string, unknown>): AppGrantRecord {
+    return {
+      grantId: row.grantId as string,
+      app: row.app as string,
+      appName: row.appName as string,
+      appOrigin: row.appOrigin as string,
+      owner: row.owner as string,
+      gaii: row.gaii as string,
+      scopes: JSON.parse(row.scopes as string) as string[],
+      refreshTokenHash: (row.refreshTokenHash as string | null) ?? null,
+      createdAt: row.createdAt as string,
+      lastUsedAt: (row.lastUsedAt as string | null) ?? null,
+      revoked: (row.revoked as number) === 1,
     };
   }
 

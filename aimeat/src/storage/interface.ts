@@ -302,6 +302,22 @@ export interface OAuthApprovalRecord {
   approvedAt: string;
 }
 
+// App grant — a long-lived authorization issued to an in-page app so it can
+// obtain agent tokens that resolve to the granting owner's GHII.
+export interface AppGrantRecord {
+  grantId: string;            // PK — e.g. "appgrant-<hex>"
+  app: string;                // app identity, "owner/filename"
+  appName: string;            // display name
+  appOrigin: string;          // origin the app runs on (for display/redirect validation)
+  owner: string;              // bare owner name who granted
+  gaii: string;               // owner GHII (alice@node) the issued token resolves to
+  scopes: string[];           // granted agent scopes (JSON array)
+  refreshTokenHash: string | null;  // SHA-256 of current refresh token; null once revoked
+  createdAt: string;          // ISO
+  lastUsedAt: string | null;  // ISO
+  revoked: boolean;
+}
+
 export interface DeviceAuthorizationRecord {
   deviceCode: string;
   userCode: string;
@@ -2183,6 +2199,7 @@ import type { PatRepository } from './repositories/pat.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
 import type { SubdomainSiteRepository } from './repositories/subdomain-site.repository.js';
+import type { AppGrantRepository } from './repositories/app-grant.repository.js';
 import type { ConfigRepository } from './repositories/config.repository.js';
 import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
@@ -2215,7 +2232,7 @@ export interface Storage extends
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository, PatRepository,
-  AppRepository, AppMarketplaceRepository, SubdomainSiteRepository, ConfigRepository,
+  AppRepository, AppMarketplaceRepository, SubdomainSiteRepository, AppGrantRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,

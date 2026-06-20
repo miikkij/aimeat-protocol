@@ -21,6 +21,7 @@ import { bootstrapRouter } from '../routes/bootstrap.js';
 import { wellknownRouter } from '../routes/wellknown.js';
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
+import { appGrantsRouter } from '../routes/app-grants.js';
 import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
 import { ecosystemAppsRouter } from '../routes/ecosystem-apps.js';
@@ -213,6 +214,7 @@ export async function mountRoutes(
 
   app.use(authRouter(config, storage));
   app.use(accessTokensRouter(config, storage));
+  app.use(appGrantsRouter(config, storage));   // H-2: explicit scoped app grants (OAuth-like)
   app.use(sseRouter(config, storage));
   app.use(presenceRouter(config, storage));
 

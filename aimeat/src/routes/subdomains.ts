@@ -13,6 +13,9 @@
  *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
+ *   v1.1.0 — 2026-06-20 — H-2: serve apps on the app origin — `<sub>.apps.<apex>` (existing
+ *     GET / path) + path form `apps.<apex>/<owner>/<file>` (req.appOrigin-guarded); shared
+ *     serveApp() helper.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -55,6 +58,17 @@ function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
   return false;
 }
 
+/** Write a published app's HTML body with the app CSP + cache/security headers. */
+function serveApp(res: Response, storage: Storage, app: AppRecord): void {
+  res.setHeader('Content-Type', app.mimeType);
+  res.setHeader('Content-Length', app.size.toString());
+  res.setHeader('Content-Security-Policy', APP_CSP);
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
+  res.send(app.data);
+}
+
 /**
  * Serves mapped subdomains at their root. Mounted BEFORE bootstrapRouter so a
  * subdomain request never reaches the apex GET / handler; requests without a
@@ -90,13 +104,27 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    res.setHeader('Content-Type', app.mimeType);
-    res.setHeader('Content-Length', app.size.toString());
-    res.setHeader('Content-Security-Policy', APP_CSP);
-    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
-    res.send(app.data);
+    serveApp(res, storage, app);
+  });
+
+  // App-origin path form: `apps.<apex>/<owner>/<filename>` — serves apps that have no
+  // assigned subdomain. Only active on the app origin (req.appOrigin); on every other
+  // host it falls through untouched, and an unmatched lookup also falls through so the
+  // normal /v1 API routes still work on the app host (apps call them cross-origin).
+  router.get('/:owner/:filename', async (req: Request, res: Response, next) => {
+    if (!req.appOrigin) return next();
+    const owner = req.params.owner as string;
+    const filename = req.params.filename as string;
+    // Only treat genuine app HTML filenames as app requests; anything else (API
+    // segments like /v1/..., assets) falls through to normal routing.
+    if (!/\.html?$/i.test(filename) || filename.includes('..')) return next();
+    const app = await resolveAppTarget(storage, `${owner}/${filename}`);
+    if (!app) return next();
+    if (appIsRestricted(config, app)) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
+      return;
+    }
+    serveApp(res, storage, app);
   });
 
   return router;

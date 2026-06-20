@@ -67,6 +67,8 @@
   <!-- Canonical styles for the shared <Markdown> component — load before views so it styles
        rendered markdown everywhere the component is used (no per-view re-definition). -->
   <link rel="stylesheet" href="/css/components/markdown.css">
+  <link rel="stylesheet" href="/css/components/app-sandbox.css">
+  <link rel="stylesheet" href="/css/views/app-grant.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/portal.css">
@@ -105,6 +107,7 @@
       "/js/i18n.js": "/js/i18n.js",
       "/js/theme.js": "/js/theme.js",
       "/js/utils.js": "/js/utils.js",
+      "/js/app-sandbox.js": "/js/app-sandbox.js",
       "/js/format.js": "/js/format.js",
       "/js/api.js": "/js/api.js",
       "/js/hooks.js": "/js/hooks.js",
@@ -276,6 +279,7 @@
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { initThemeSystem, getTheme, toggleTheme, onThemeChange } from '/js/theme.js';
     import { NotificationBell } from '/components/NotificationBell.js';
+    import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
     // generateStars no longer needed for light theme
 
     const html = htm.bind(h);
@@ -325,6 +329,7 @@
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
+      '/v1/app-grant':   () => import('/views/app-grant.js' + B),
       '/v1/guides':      () => import('/views/guides.js' + B),
       '/v1/hobbies':     () => import('/views/hobbies.js' + B),
       '/v1/marketplace': () => import('/views/marketplace.js' + B),
@@ -412,6 +417,16 @@
           const a = e.target.closest('a[href]');
           if (!a) return;
           const href = a.getAttribute('href');
+          // H-2: a published-app HTML link must NEVER open as a top-level document on the
+          // apex origin (same origin as this authenticated SPA) — it could read the
+          // visitor's session. Force it into a sandboxed, opaque-origin iframe instead,
+          // regardless of target=_blank / modifier keys.
+          if (isAppHtmlUrl(href)) {
+            e.preventDefault();
+            const label = (a.textContent || '').trim() || 'App';
+            openAppSandboxed(href, label);
+            return;
+          }
           // Only intercept internal /v1/ links
           if (!href || !href.startsWith('/v1/')) return;
           if (e.ctrlKey || e.metaKey || e.shiftKey) return;

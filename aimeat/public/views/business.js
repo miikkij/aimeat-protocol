@@ -9,6 +9,8 @@
  * @usage routed at /v1/business by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial (owner spec).
+ *   v1.1.0 — 2026-06-20 — H-2: published-app proof links open in a sandboxed opaque-origin
+ *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline tab.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -17,6 +19,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { ContactCard } from '/components/ContactCard.js';
+import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const CONTACT = 'mailto:jouni.miikki@aimeat.io';
@@ -42,7 +45,11 @@ export default function Business({ navigate }) {
       <p class="ld-case-text">${text}</p>
       ${quote && html`<blockquote class="ld-case-quote">“${quote}”<footer>— ${quoteBy}</footer></blockquote>`}
       ${proofHref
-        ? html`<a class="ld-case-proof" href=${proofHref} target="_blank" rel="noopener">${proofLabel}</a>`
+        // H-2: published-app proof links open in a sandboxed opaque-origin iframe, never a
+        // top-level apex document. Non-app evidence (public viewers, external sites) opens normally.
+        ? (isAppHtmlUrl(proofHref)
+          ? html`<a class="ld-case-proof" href="#" role="button" onClick=${(e) => { e.preventDefault(); openAppSandboxed(proofHref, proofLabel); }}>${proofLabel}</a>`
+          : html`<a class="ld-case-proof" href=${proofHref} target="_blank" rel="noopener">${proofLabel}</a>`)
         : proofNote && html`<div class="ld-case-proofnote">${proofNote}</div>`}
       <a class="ld-path-cta" href=${ctaHref}>${ctaLabel}</a>
     </div>

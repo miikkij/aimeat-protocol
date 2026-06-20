@@ -115,6 +115,19 @@ export interface OperatorConfig {
 export interface AimeatConfig {
   port: number;
   baseUrl: string;
+  /**
+   * Dedicated origin for serving user-published apps, isolating them from the
+   * authenticated apex SPA (closes H-2). Host form, e.g. `apps.aimeat.io`; apps
+   * resolve at `<sub>.apps.aimeat.io` or `apps.aimeat.io/<owner>/<file>`. Empty
+   * when unset (no usable app origin → apex serving stays as-is).
+   */
+  appHost: string;
+  /**
+   * Feature flag gating the app-origin behaviour (apex app HTML → 301 to the app
+   * origin; app-origin serve router active). OFF until DNS/TLS/nginx for
+   * `*.appHost` are provisioned, so enabling it without infra can't break app serving.
+   */
+  appOriginEnabled: boolean;
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;
@@ -488,6 +501,18 @@ export interface LoadConfigResult {
   fileName: string | null;
 }
 
+/**
+ * Derive the app-origin host (`apps.<apexHost>`) from a baseUrl. Returns '' for
+ * localhost / IP / host-less baseUrls where a public app subdomain makes no sense
+ * (the operator can still set AIMEAT_APP_HOST explicitly, e.g. for local testing).
+ */
+function deriveAppHost(baseUrl: string): string {
+  let host: string;
+  try { host = new URL(baseUrl).hostname.toLowerCase(); } catch { return ''; }
+  if (!host || host === 'localhost' || /^[\d.]+$/.test(host) || host.endsWith('.localhost')) return '';
+  return `apps.${host}`;
+}
+
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};
 
@@ -553,6 +578,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const config: AimeatConfig = {
     port,
     baseUrl: (process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, ''),
+    // App origin: explicit AIMEAT_APP_HOST wins; otherwise derive `apps.<apexHost>`
+    // from the baseUrl. Left empty for host-less baseUrls (so nothing breaks in dev).
+    appHost: (process.env.AIMEAT_APP_HOST ?? deriveAppHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
+    appOriginEnabled: process.env.AIMEAT_APP_ORIGIN_ENABLED === 'true',
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,

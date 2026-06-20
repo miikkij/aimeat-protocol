@@ -37,6 +37,56 @@ All notable changes to AIMEAT are documented in this file.
   advertises `authorization_response_iss_parameter_supported`. Also fixes the FTN callback path.
   `src/services/oidc-client.ts`.
 
+### Security
+
+Comprehensive security & vulnerability audit (findings + status tracked in
+`docs/internal/security-audit-2026-06-19.md`). Fixes from that pass:
+
+- **(Critical) Negative-amount morsel minting closed.** `wallet.consume` and the storage balance
+  mutators rejected nothing below zero, so an extension calling `ctx.wallet.consume(-N, …)` *minted*
+  morsels (`balance - (-N) = balance + N`, and the `>= amount` guard was always true). Both `consume`
+  wrappers now reject `<= 0`/non-finite, and `debitBalance`/`creditBalance`/`creditBalanceCapped`/
+  `transferBalance` (SQLite **and** MongoDB/Prisma) reject `< 0`/non-finite as defense-in-depth (`0`
+  stays a legitimate no-op — free/0-cost work escrow relies on it). `src/mcp/extensions.ts`,
+  `src/routes/extensions.ts`, both `src/storage/providers/*/index.ts`, E2E `test/e2e-extensions.ts`
+  (negative + zero rejected & no mint, positive debits).
+- **(High) Unauthenticated path-traversal file read closed.** The unauthenticated screenshot routes
+  validated only `filename`, not `projectId`, so an encoded `..%2f…` in `projectId` escaped the temp
+  screenshot dir → arbitrary file read. Both routes now validate `projectId` against `^[A-Za-z0-9_-]+$`.
+  `src/routes/foundry.ts`, `src/routes/generator.ts`, regression test in `test/e2e-generator.ts`.
+- **(High) SSRF redirect / DNS-rebind bypass closed on low-privilege paths.** `validateOutboundUrl`
+  rewritten to check **all** resolved DNS records, normalise IPv4-mapped IPv6, and block CGNAT
+  (100.64/10) + alternate IP encodings; new `safeFetch` fetches with `redirect: 'manual'` and
+  re-validates every `Location` hop so an allowed host can't 3xx-bounce to an internal target.
+  Migrated the agent-reachable fetches: extension `ctx.fetch` (REST **and** the previously
+  **unvalidated** MCP path), webhook dispatcher, the webhook **test** route (which had no SSRF check
+  at all), and hooks. `src/utils/url-validator.ts` (+ `test/unit/url-validator.test.ts`),
+  `src/mcp/extensions.ts`, `src/routes/extensions.ts`, `src/routes/agent-webhook.ts`,
+  `src/services/webhook-dispatcher.ts`, `src/services/hooks.ts`. (Federation outbound paths + the AI
+  provider-URL validator still pending — see the audit doc.)
+- **(High) Extension memory-quota bypass closed.** `ctx.memory.set` wrote via storage directly,
+  bypassing the per-value-size and per-key-count limits the REST handler enforces (disk/DB exhaustion
+  vector). New `enforceExtensionMemoryLimits()` is now applied in all three extension `set` wrappers.
+  `src/services/quota.ts`, `src/routes/extensions.ts`, `src/mcp/extensions.ts`, E2E `test/e2e-extensions.ts`.
+- **(High) Owner-supplied `testCode` execution restricted to operator.** The foundry/generator test
+  routes run AI-generated `testCode` via `new Function` in the host process (RCE as the caller); they
+  now require `requireRole('operator')`, so on a multi-owner node a non-operator owner can no longer
+  reach the unsandboxed execution. `src/routes/foundry.ts`, `src/routes/generator.ts`.
+- **(High, partial) Rate-limit IP key hardened.** IPv6 keys are aggregated to their /64 so host-bit
+  rotation can't mint fresh buckets, and `AIMEAT_TRUST_PROXY=true` now logs a boot warning that
+  `X-Forwarded-For` is spoofable unless a trusted proxy overwrites it. (The bucket store is still
+  per-process — a shared store is still required before a multi-replica deploy.) `src/middleware/rate-limit.ts`,
+  `src/server.ts`.
+- **(Medium, partial) Removed a dead private key from browser storage.** The admin password-login
+  flow persisted a private key into the `aimeat_session` `localStorage` object that nothing ever read
+  — pure XSS-theft surface; removed (only the non-secret fields + JWT remain). `src/routes/admin.ts`.
+  (The broader JWT-in-`localStorage` → httpOnly-cookie migration is deferred — see below.)
+- **App-origin isolation plan for H-2 (cross-user app session theft).** Design + phased plan to serve
+  all user apps from a dedicated `*.apps.aimeat.io` origin (so apps can't read `aimeat.io` storage or
+  receive the **host-only** auth cookie) plus an explicit OAuth-like scoped app-grant flow surfaced in
+  the profile Access tab. Verified the auth/admin cookies are host-only (no `Domain=`) — the invariant
+  the isolation depends on. `docs/internal/2026-06-20-app-origin-isolation-and-grants-design.md`.
+
 ## [1.26.0] - 2026-06-19
 
 ### Added
