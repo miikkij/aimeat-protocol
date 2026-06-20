@@ -180,6 +180,12 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           defaultVal: '15',
         },
         {
+          envVar: 'AIMEAT_SCREENSHOT_SETTLE_MS',
+          description: 'Ms to wait after page load before capturing (lets late-rendering apps finish)',
+          value: String(config.screenshotSettleMs),
+          defaultVal: '6000',
+        },
+        {
           envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS',
           description: 'Allowed CORS origins (comma-separated, or * for all)',
           value: config.corsAllowedOrigins.join(', '),

@@ -13,6 +13,8 @@
  *   v1.1.0 — 2026-06-20 — render the app's STORED HTML directly (fulfill the main document) instead of
  *     navigating to the inline URL, which 301s to the app origin under H-2 and 404s on a node with no
  *     app host (local dev) → captured error pages. Export runScreenshotCapturePass for manual/one-shot.
+ *   v1.2.0 — 2026-06-20 — configurable post-load settle wait (AIMEAT_SCREENSHOT_SETTLE_MS, default 6s)
+ *     so apps that fetch/render after load aren't captured blank; surface the real launch error on disable.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -121,7 +123,9 @@ export async function runScreenshotCapturePass(config: AimeatConfig, storage: St
             });
           }
           await page.goto(url, { waitUntil: 'load', timeout: PAGE_TIMEOUT });
-          await page.waitForTimeout(2000);
+          // Settle wait: many apps fetch data / render after 'load', so capturing immediately yields a
+          // blank page. Default 6s; tune with AIMEAT_SCREENSHOT_SETTLE_MS.
+          await page.waitForTimeout(Math.max(0, config.screenshotSettleMs));
           const jpeg = await page.screenshot({ type: 'jpeg', quality: 80 });
           await storage.createStorageFile({
             key: `apps/screenshots/${app.filename}`,
