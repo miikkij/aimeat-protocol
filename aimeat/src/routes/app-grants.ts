@@ -191,6 +191,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       app_name: pending.appName,
       app_origin: pending.appOrigin,
       response_mode: pending.responseMode,
+      state: pending.state, // echoed back by the consent page in the web_message revoke postMessage
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s] })),
     }));
   });
@@ -314,7 +315,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       });
     }
     const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId });
-    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId });
+    // Include `app` (owner/filename) + `own` so the SDK can offer in-app grant management (the gear on
+    // the login pill re-opens the consent screen for exactly this app).
+    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId, app: site.target, own: isOwnApp });
   });
 
   // ── POST /v1/app-grants/token ── the app (cross-origin, CORS *) exchanges code / refreshes.

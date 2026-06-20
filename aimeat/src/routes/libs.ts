@@ -521,6 +521,10 @@ function persistSession(session) {
     federated: session.federated || false,
     homeNode: session.homeNode || '',
     homeUrl: session.homeUrl || '',
+    // H-2 app-origin grant session metadata (drives the consent gear on the login pill).
+    _appOrigin: session._appOrigin || false,
+    _app: session._app || null,
+    _own: session._own || false,
   });
 }
 
@@ -638,27 +642,50 @@ async function requestConsentPopup(app, scopeStr) {
   var top = (window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0);
   var popup = window.open(url, 'aimeat_consent', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
   if (!popup) return null; // popup blocked
-  var code = await new Promise(function (resolve) {
+  var msg = await new Promise(function (resolve) {
     var done = false, iv = null;
     function onMsg(e) {
       if (e.origin !== apexOrigin) return;
       var d = e.data || {};
       if (d.type !== 'aimeat_app_grant' || d.state !== state) return;
-      done = true; cleanup(); resolve(d.code || null);
+      done = true; cleanup(); resolve(d);
     }
     function cleanup() { window.removeEventListener('message', onMsg); if (iv) clearInterval(iv); }
     window.addEventListener('message', onMsg);
     iv = setInterval(function () { if (popup.closed && !done) { cleanup(); resolve(null); } }, 500);
   });
-  if (!code) return null;
+  if (msg && msg.revoked) return { revoked: true };       // user revoked from the consent screen
+  if (!msg || !msg.code) return null;                     // denied / closed
   try {
     var resp = await fetch(apexOrigin + '/v1/app-grants/token', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ grant_type: 'authorization_code', code: code, code_verifier: p.verifier, redirect_uri: redirectUri }),
+      body: JSON.stringify({ grant_type: 'authorization_code', code: msg.code, code_verifier: p.verifier, redirect_uri: redirectUri }),
     });
     var j = await resp.json();
     return (j && j.ok && j.data && j.data.access_token) ? j.data : null;
   } catch (e) { return null; }
+}
+
+// Build + install an app-origin session from a freshly issued grant access token (shared by the
+// silent/consent login and the in-app "manage grant" re-issue). appId = owner/filename, own = the
+// user's own app (no consent gear needed).
+function _buildAppSession(accessToken, appId, own) {
+  var payload = parseJwt(accessToken) || {};
+  var ownerName = payload.owner || payload.sub;
+  if (!ownerName) return null;
+  var session = createSession({
+    owner: ownerName,
+    ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
+    gaii: null, jwt: accessToken, roles: payload.roles || [], displayName: '',
+  });
+  session._appOrigin = true;
+  session._app = appId || null;
+  session._own = !!own;
+  persistSession(session);
+  currentSession = session;
+  scheduleAutoRefresh(session);
+  emit('login', session);
+  return session;
 }
 
 // Shared in-flight promise so concurrent callers (an app that runs BOTH mountLoginButton's auto
@@ -670,26 +697,17 @@ function restoreSessionFromAppOrigin(interactive) {
   _appOriginLoginInFlight = (async function () {
     var r = await silentAppToken();
     var grant = (r && r.ok && r.access_token) ? r : null;
+    var appId = (r && r.app) || null;
+    var own = !!(r && r.own);
     // Not own / not yet granted → consent_required. Open the visible popup ONLY on a user gesture
     // (interactive); the on-mount auto-trigger passes interactive=false so a blocked popup never fires.
     if (!grant && interactive && r && r.error === 'consent_required') {
+      appId = r.app || appId;
       grant = await requestConsentPopup(r.app, r.scope);
+      own = false; // the consent flow only runs for apps the user does NOT own
     }
     if (!grant || !grant.access_token) return null;
-    var payload = parseJwt(grant.access_token) || {};
-    var ownerName = payload.owner || payload.sub;
-    if (!ownerName) return null;
-    var session = createSession({
-      owner: ownerName,
-      ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
-      gaii: null, jwt: grant.access_token, roles: payload.roles || [], displayName: '',
-    });
-    session._appOrigin = true;
-    persistSession(session);
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit('login', session);
-    return session;
+    return _buildAppSession(grant.access_token, appId, own);
   })();
   _appOriginLoginInFlight.finally(function () { _appOriginLoginInFlight = null; });
   return _appOriginLoginInFlight;
@@ -1028,6 +1046,24 @@ const auth = {
     emit('logout');
   },
 
+  /**
+   * Re-open the consent screen for the current app (H-2 in-app grant management). Lets the user
+   * review/adjust the permissions this app holds, or revoke it. Resolves to { revoked:true } if the
+   * user revoked (the app is then logged out), the refreshed session if re-approved, else null.
+   * Only meaningful on an app origin where a grant session exists.
+   */
+  async manageGrant() {
+    const s = currentSession || load('session');
+    if (!s || !s._app) return null;
+    const res = await requestConsentPopup(s._app, (s.scopes || []).join(' '));
+    if (res && res.revoked) { await auth.logout(); return { revoked: true }; }
+    if (res && res.access_token) return _buildAppSession(res.access_token, s._app, s._own);
+    return null;
+  },
+
+  /** True when running inside a published app on its isolated origin (not the apex). */
+  isAppOrigin() { return isAppOrigin(); },
+
   /** Check if there are stored credentials */
   get hasSession() { return !!load('session'); },
 
@@ -1126,7 +1162,9 @@ const auth = {
     const i = opts.i18n || {};
 
     function render() {
-      const stored = load('session');
+      // Prefer the live session (carries the H-2 _app/_own grant metadata for the gear) over the
+      // persisted copy, but fall back to localStorage on first paint before login completes.
+      const stored = currentSession || load('session');
       if (stored) {
         container.innerHTML = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
           + 'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);'
@@ -1146,6 +1184,14 @@ const auth = {
           + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;'
             + 'background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">'
             + '\\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')
+          // Permissions gear — only for an EXTERNAL app (a grant the user gave, not their own app).
+          // Click re-opens the consent screen to review/adjust the permissions or revoke.
+          + ((stored._appOrigin && stored._app && !stored._own)
+            ? '<button id="aimeat-grant-gear" title="' + escHtml(i.manageAccess || 'Manage permissions') + '" '
+              + 'aria-label="' + escHtml(i.manageAccess || 'Manage permissions') + '" style="'
+              + 'background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);'
+              + 'border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">\\u2699\\uFE0F</button>'
+            : '')
           + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="'
           + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
           + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
@@ -1157,6 +1203,13 @@ const auth = {
           auth.logout();
           render();
           if (opts.onLogout) opts.onLogout();
+        });
+        var gearBtn = document.getElementById('aimeat-grant-gear');
+        if (gearBtn) gearBtn.addEventListener('click', () => {
+          auth.manageGrant().then((res) => {
+            render(); // reflect revoke (→ Sign In) or a re-grant
+            if (res && res.revoked && opts.onLogout) opts.onLogout();
+          }).catch(() => {});
         });
       } else {
         container.innerHTML = '<style>.aimeat-sign-btn{'

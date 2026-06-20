@@ -257,6 +257,9 @@
     "advancedShow": "⚙ Lisäasetukset — valitse oikeudet",
     "advancedHide": "▲ Piilota lisäasetukset",
     "trustCta": "❤ Luotan — anna pääsy",
+    "manageTitle": "Hallitse tämän appin oikeuksia",
+    "revoke": "Peru pääsy",
+    "saveCta": "Tallenna muutokset",
     "nextNote": "Ensi kerralla tämä appi kirjaa sinut sisään automaattisesti — ilman kyselyä.",
     "loginTitle": "Kirjaudu jatkaaksesi",
     "loginBody": "Kirjaudu sisään aimeat.io-palveluun ja avaa sitten sovelluksen linkki uudelleen hyväksyäksesi pääsyn.",
@@ -3193,11 +3196,11 @@
       "nextTitle": "Ehdotetut seuraavat askeleet",
       "next": {
         "writeNotesTitle": "Kirjoita itseorganisoituvia muistiinpanoja",
-        "writeNotesDesc": "Kirjoita mitä vain — se järjestyy itse muistiisi ja löytyy haulla.",
+        "writeNotesDesc": "Kirjoita vain ylös. Tekoäly lajittelee jokaisen muistiinpanon oikeaan työtilaan puolestasi, ja ehdottaa yhteistä tilaa kun muistiinpano kuuluu sellaiseen jonka jäsen olet.",
         "portfolioTitle": "Luo portfoliosi",
         "portfolioDesc": "Siisti sivu joka kertoo muille kuka olet ja mitä teet.",
         "buildAppTitle": "Rakenna sovellus",
-        "buildAppDesc": "Avaa katalogi ja kuvaile ideasi — tekoälysi rakentaa sen promptista.",
+        "buildAppDesc": "Avaa katalogi ja kuvaile ideasi, niin tekoälysi rakentaa sen promptista.",
         "useSharedAgentsTitle": "Käytä muiden jakamia agentteja",
         "useSharedAgentsDesc": "Selaa valmiita agentteja joita muut ovat julkaisseet ja valjasta ne käyttöösi."
       },

@@ -165,7 +165,10 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         let html = readFileSync(appCatalogPath, 'utf-8');
         // H-2: tell the catalog whether the app origin is live, so it opens published apps
         // TOP-LEVEL on apps.<domain> (clean full page) instead of the opaque-sandbox iframe.
-        html = html.replace('</head>', `<script>window.__APP_ORIGIN_ENABLED=${appOriginOn ? 'true' : 'false'};</script>\n</head>`);
+        // Also expose the app host (apps.<domain>) so subdomain chips show the real app URL
+        // (<sub>.apps.<domain>) instead of the bare apex — JSON-encoded to be injection-safe.
+        const appHostJs = JSON.stringify(appOriginOn ? config.appHost : '');
+        html = html.replace('</head>', `<script>window.__APP_ORIGIN_ENABLED=${appOriginOn ? 'true' : 'false'};window.__APP_HOST=${appHostJs};</script>\n</head>`);
         // Override CSP: app-catalog hosts user-generated apps that load arbitrary CDN resources.
         // Uses same permissive policy as apps.ts inline mode — allows any HTTPS script/style source.
         res.setHeader('Content-Security-Policy', [
