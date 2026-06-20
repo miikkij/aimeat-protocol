@@ -21,6 +21,11 @@
       Community / Local), not as a badge inside Published. Park moves an app out of Published into
       Parked; the Parked card's primary action is Publish (unpark). The /v1/apps fetch now sends the
       owner token so the server returns the caller's own parked apps for that section.
+    v2.3.0 — 2026-06-20 — Detail screenshot actions (set/refresh) and the thumbnail <img> now resolve
+      the owner via detailServerOwner() instead of the owner baked into the stored publishedUrl, which
+      goes stale for apps re-owned away from the "anonymous" bucket (screenshot calls 404'd as
+      "not found for owner anonymous"). Signed-in owner wins for own/anonymous-bucket apps; the stored
+      owner is kept only when browsing another user's published app.
 -->
 <html lang="en">
 <head>
@@ -5501,6 +5506,23 @@
     return null;
   }
 
+  // The owner to use for server calls on a detail app. The owner baked into publishedUrl/aimeatOwner
+  // can be STALE — e.g. an app re-owned away from the legacy "anonymous" bucket keeps "anonymous" in
+  // the locally-stored copy, which then 404s screenshot/version calls. So: prefer the signed-in owner
+  // when it already owns the app, or when the stored owner is the "anonymous" bucket (re-owned to you);
+  // otherwise keep the stored owner so browsing ANOTHER user's published app still resolves.
+  function detailServerOwner(app) {
+    var sess = currentOwnerName();
+    var stored = (app && app.aimeatOwner) || '';
+    if (!stored) {
+      var pu = (app && (app.publishedUrl || app.viewUrl)) || '';
+      var mm = pu.match(/\/v1\/apps\/([^/]+)\//);
+      stored = mm ? decodeURIComponent(mm[1]) : '';
+    }
+    if (sess && (!stored || stored === 'anonymous' || stored === sess)) return sess;
+    return stored;
+  }
+
   function blobToHtml(blob) {
     try { return decodeURIComponent(escape(atob(blob))); } catch (e) { return ''; }
   }
@@ -5575,8 +5597,10 @@
     // App thumbnail (right side of the Status card). Built from the published path; hides itself if
     // the app has no screenshot yet. Cache-busted so a freshly (re)captured shot isn't shown stale.
     var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
-    var shotUrl = (app.published && app.publishedUrl && aimeatBase)
-      ? (aimeatBase + app.publishedUrl + '/screenshot?t=' + Date.now())
+    var shotOwner = detailServerOwner(app);
+    var shotFile = app.publishedFilename || '';
+    var shotUrl = (app.published && shotOwner && shotFile && aimeatBase)
+      ? (aimeatBase + '/v1/apps/' + encodeURIComponent(shotOwner) + '/' + encodeURIComponent(shotFile) + '/screenshot?t=' + Date.now())
       : '';
     var shotImg = shotUrl
       ? '<img src="' + escapeHtml(shotUrl) + '" alt="App screenshot" loading="lazy" onerror="this.style.display=\'none\'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />'
@@ -5682,13 +5706,12 @@
     var app = detailGetApp();
     if (!app) return;
     var filename = app.publishedFilename || '';
-    var owner = '';
-    var pu = app.publishedUrl || app.viewUrl || '';
-    var m = pu.match(/\/v1\/apps\/([^/]+)\/([^/?]+)/);
-    if (m) { owner = decodeURIComponent(m[1]); if (!filename) filename = decodeURIComponent(m[2]); }
-    if (!owner && window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-      owner = window.AIMEAT.auth.getSession().owner || '';
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || '';
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
     }
+    var owner = detailServerOwner(app);
     var token = getCortexOwnerToken();
     if (!owner || !filename) { alert('Publish the app first, then you can set a screenshot.'); return; }
     if (!token) { alert('Sign in to set a screenshot.'); return; }
@@ -5729,13 +5752,12 @@
     var app = detailGetApp();
     if (!app) return;
     var filename = app.publishedFilename || '';
-    var owner = '';
-    var pu = app.publishedUrl || app.viewUrl || '';
-    var m = pu.match(/\/v1\/apps\/([^/]+)\/([^/?]+)/);
-    if (m) { owner = decodeURIComponent(m[1]); if (!filename) filename = decodeURIComponent(m[2]); }
-    if (!owner && window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-      owner = window.AIMEAT.auth.getSession().owner || '';
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || '';
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
     }
+    var owner = detailServerOwner(app);
     var token = getCortexOwnerToken();
     if (!owner || !filename) { alert('Publish the app first, then you can refresh its screenshot.'); return; }
     if (!token) { alert('Sign in to refresh the screenshot.'); return; }
