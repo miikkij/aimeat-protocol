@@ -4429,10 +4429,13 @@
       .catch(function () { subdomainsByTarget = null; });
   }
 
+  // The host where subdomain apps are actually served: apps.<domain>, NOT the bare apex. A subdomain
+  // chip must read "<sub>.apps.aimeat.io" (the real, reachable app URL), not "<sub>.aimeat.io".
   function apexHostLabel() {
+    if (window.__APP_HOST) return window.__APP_HOST;            // node-injected app host (authoritative)
     try {
-      var config = loadConfig();
-      return new URL(config.aimeatUrl || window.location.origin).host;
+      var apexHost = new URL(loadConfig().aimeatUrl || window.location.origin).host;
+      return 'apps.' + apexHost;                                 // derive apps.<apex> when not injected
     } catch (e) { return window.location.host; }
   }
 

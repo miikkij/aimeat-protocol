@@ -257,6 +257,9 @@
     "advancedShow": "⚙ Advanced — choose permissions",
     "advancedHide": "▲ Hide advanced",
     "trustCta": "❤ Trust — allow access",
+    "manageTitle": "Manage this app’s access",
+    "revoke": "Revoke access",
+    "saveCta": "Save changes",
     "nextNote": "Next time this app logs you in automatically — no prompt.",
     "loginTitle": "Log in to continue",
     "loginBody": "Log in on aimeat.io, then re-open the app’s link to approve access.",
@@ -3193,11 +3196,11 @@
       "nextTitle": "Suggested next steps",
       "next": {
         "writeNotesTitle": "Write self-organizing notes",
-        "writeNotesDesc": "Jot down anything — it sorts itself into your memory and stays searchable.",
+        "writeNotesDesc": "Just write things down. The AI sorts each note into the right workspace for you, and suggests a shared space when a note belongs to one you're part of.",
         "portfolioTitle": "Create your portfolio",
         "portfolioDesc": "A polished page that tells others who you are and what you do.",
         "buildAppTitle": "Build an app",
-        "buildAppDesc": "Open the catalog and describe your idea — your AI builds it from a prompt.",
+        "buildAppDesc": "Open the catalog, describe your idea, and your AI builds it from a prompt.",
         "useSharedAgentsTitle": "Use agents others shared",
         "useSharedAgentsDesc": "Browse ready agents people published and put them to work for you."
       },

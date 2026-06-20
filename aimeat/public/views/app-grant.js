@@ -33,6 +33,7 @@ export default function AppGrant() {
   const [submitting, setSubmitting] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
+  const [existingGrant, setExistingGrant] = useState(null); // the grant this app already holds (manage mode)
 
   const requestId = new URLSearchParams(window.location.search).get('req') || '';
   const loggedIn = !!window.AIMEAT?.auth?.hasSession;
@@ -42,14 +43,42 @@ export default function AppGrant() {
     if (!loggedIn) { setState({ status: 'login' }); return; }
     let live = true;
     api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`)
-      .then((res) => {
+      .then(async (res) => {
         if (!live) return;
-        setSelected(new Set((res.data.scopes || []).map((s) => s.scope))); // default: all requested granted
+        // If this app already holds a grant, this is "manage mode": pre-check the currently granted
+        // scopes and offer Revoke. Best-effort — a failed lookup just falls back to first-consent.
+        let grant = null;
+        try {
+          const list = await api('/v1/app-grants');
+          grant = (list.data?.grants || []).find((g) => g.app === res.data.app) || null;
+        } catch { /* ignore */ }
+        if (!live) return;
+        const granted = grant ? grant.scopes : (res.data.scopes || []).map((s) => s.scope);
+        setExistingGrant(grant);
+        setSelected(new Set(granted));
+        if (grant) setAdvanced(true); // manage mode → show the per-scope checkboxes up front
         setState({ status: 'ready', request: res.data });
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
     return () => { live = false; };
   }, [requestId, loggedIn]);
+
+  async function revoke() {
+    if (!existingGrant) return;
+    setSubmitting(true);
+    try {
+      await api(`/v1/app-grants/${encodeURIComponent(existingGrant.grant_id)}`, { method: 'DELETE' });
+      if (state.request?.response_mode === 'web_message' && window.opener) {
+        window.opener.postMessage({ type: 'aimeat_app_grant', revoked: true, state: state.request.state }, state.request.app_origin);
+        window.close();
+        return;
+      }
+      window.location.href = state.request?.app_origin || '/v1/profile';
+    } catch (e) {
+      setState((s) => ({ ...s, status: 'error', error: e.message || 'Failed to revoke.' }));
+      setSubmitting(false);
+    }
+  }
 
   function toggle(scope) {
     setSelected((prev) => { const n = new Set(prev); if (n.has(scope)) n.delete(scope); else n.add(scope); return n; });
@@ -117,7 +146,7 @@ export default function AppGrant() {
     <div class="agr-wrap">
       <div class="agr-card">
         <span class="agr-badge">${tr('appGrant.externalBadge', 'External app')}</span>
-        <h1 class="agr-title">${tr('appGrant.trustTitle', 'Trust this app?')}</h1>
+        <h1 class="agr-title">${existingGrant ? tr('appGrant.manageTitle', 'Manage this app’s access') : tr('appGrant.trustTitle', 'Trust this app?')}</h1>
         <div class="agr-app">
           <div class="agr-app-name">${escHtml(req.app_name)}</div>
           <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
@@ -143,12 +172,14 @@ export default function AppGrant() {
         </button>
 
         <div class="agr-actions">
-          <button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.deny', 'Don’t trust')}</button>
+          ${existingGrant
+            ? html`<button class="btn-danger agr-btn" onClick=${revoke} disabled=${submitting}>${tr('appGrant.revoke', 'Revoke access')}</button>`
+            : html`<button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.deny', 'Don’t trust')}</button>`}
           <button class="btn-primary agr-btn" onClick=${approve} disabled=${submitting || selected.size === 0}>
-            ${submitting ? tr('appGrant.approving', 'Allowing…') : tr('appGrant.trustCta', '❤ Trust — allow access')}
+            ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.trustCta', '❤ Trust — allow access'))}
           </button>
         </div>
-        <p class="agr-next">${tr('appGrant.nextNote', 'Next time this app logs you in automatically — no prompt.')}</p>
+        ${!existingGrant && html`<p class="agr-next">${tr('appGrant.nextNote', 'Next time this app logs you in automatically — no prompt.')}</p>`}
       </div>
     </div>`;
 }
