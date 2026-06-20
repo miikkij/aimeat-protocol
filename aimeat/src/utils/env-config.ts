@@ -1,6 +1,9 @@
 /**
- * CLI config display — shows all settings with current values, defaults, and descriptions.
- * Usage: aimeat config
+ * @file env-config.ts
+ * @description CLI config display — shows all settings with current values, defaults,
+ *   and descriptions. Usage: aimeat config
+ * @version-history v1.0.1 — 2026-06-20 — Add App Origin Isolation (H-2) section
+ *   (AIMEAT_APP_ORIGIN_ENABLED, AIMEAT_APP_HOST).
  */
 
 import { existsSync } from 'node:fs';
@@ -1130,6 +1133,23 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           description: 'Show Generator tab in profile view',
           value: String(config.generatorEnabled),
           defaultVal: 'true',
+        },
+      ],
+    },
+    {
+      title: 'App Origin Isolation (H-2)',
+      entries: [
+        {
+          envVar: 'AIMEAT_APP_ORIGIN_ENABLED',
+          description: 'Serve user apps from a separate *.apps.<domain> origin to isolate them from the operator session. Requires DNS + wildcard TLS.',
+          value: config.appOriginEnabled ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_APP_HOST',
+          description: 'App origin host (e.g. apps.example.com) used when app origin isolation is enabled.',
+          value: config.appHost,
+          defaultVal: '',
         },
       ],
     },

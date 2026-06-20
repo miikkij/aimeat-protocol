@@ -15,6 +15,9 @@
  *     {{placeholder}}-tokenised raw templates are never served directly.
  *   v1.2.0 -- 2026-05-29 -- Add /terms.html, /terms.fi.html to the redirect map
  *     for the new Terms of Service template pages.
+ *   v1.3.0 -- 2026-06-20 -- H-2: when the app origin is enabled, add it to the SPA +
+ *     app-catalog `frame-src` so the sandboxed app viewer can frame the app origin
+ *     (the apex inline URL 301s there); otherwise frame-src 'self' blocks the launch.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -36,6 +39,18 @@ function resolveServerDir(): string {
  */
 export function setupStaticFiles(app: express.Express, config: AimeatConfig): void {
   const __dirname = resolveServerDir();
+
+  // H-2: when apps are served from a separate app origin, the SPA + app-catalog must be
+  // allowed to FRAME that origin (the sandboxed opaque-origin app viewer loads it), otherwise
+  // `frame-src 'self'` blocks the in-app launch. Allow the app host (bare + per-app subdomain,
+  // with/without an explicit port) — scheme inherited from baseUrl. Empty when not enabled.
+  let appFrameSrc = '';
+  if (config.appOriginEnabled && config.appHost) {
+    let scheme = 'https';
+    try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
+    const h = config.appHost;
+    appFrameSrc = ` ${scheme}://${h} ${scheme}://*.${h} ${scheme}://${h}:* ${scheme}://*.${h}:*`;
+  }
 
   // Try multiple paths: relative to src/ (dev via tsx) and relative to dist/ (compiled)
   const publicCandidates = [
@@ -93,7 +108,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self' https://fonts.gstatic.com",
-        "frame-src 'self' blob: data:",
+        `frame-src 'self' blob: data:${appFrameSrc}`,
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));
@@ -151,7 +166,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
           "connect-src 'self' https: http://localhost:* wss: ws: data:",
           "img-src * data: blob:",
           "font-src 'self' data: https:",
-          "frame-src 'self' blob: data:",
+          `frame-src 'self' blob: data:${appFrameSrc}`,
           "object-src 'none'",
           "base-uri 'self'",
         ].join('; '));

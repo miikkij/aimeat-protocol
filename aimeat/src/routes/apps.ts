@@ -61,15 +61,23 @@ import { decodeStrictBase64 } from '../utils/base64.js';
  * (`https://apps.<apex>/<owner>/<filename>`). Caller guarantees config.appHost is set.
  */
 async function appOriginUrl(config: AimeatConfig, storage: Storage, owner: string, filename: string): Promise<string> {
-    const scheme = config.baseUrl.startsWith('https://') ? 'https' : 'http';
+    // Inherit scheme + port from the apex baseUrl and only swap the host, so the redirect is
+    // correct both in prod (https://apps.aimeat.io) and locally (http://apps.localhost:40050).
+    let scheme = 'https';
+    let portSuffix = '';
+    try {
+        const base = new URL(config.baseUrl);
+        scheme = base.protocol.replace(':', '');
+        portSuffix = base.port ? `:${base.port}` : '';
+    } catch { /* keep https, no port */ }
     const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
     try {
         const sites = await storage.listSubdomainSites();
         const match = sites.find(s => s.enabled && s.kind === 'app'
             && (s.target === `${owner}/${filename}` || s.target === `${bareOwner}/${filename}`));
-        if (match) return `${scheme}://${match.subdomain}.${config.appHost}/`;
+        if (match) return `${scheme}://${match.subdomain}.${config.appHost}${portSuffix}/`;
     } catch { /* fall through to path form */ }
-    return `${scheme}://${config.appHost}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
+    return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
 }
 
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {

@@ -239,6 +239,12 @@ async function startServer(): Promise<ChildProcess> {
         // Short refresh-token rotation grace so e2e-session-refresh can exercise
         // reuse-detection (prev-token-after-grace) without a 60s wait.
         AIMEAT_REFRESH_GRACE_MS: process.env.AIMEAT_REFRESH_GRACE_MS ?? '1500',
+        // Pin the H-2 app origin OFF on the shared server so suites are deterministic even when
+        // the dev .env enables it (the server loads .env; a stray apps.<host> would 301 apex
+        // app URLs and reject localhost grant redirect_uris). e2e-app-origin self-spawns its
+        // own flag-ON server, so it is unaffected.
+        AIMEAT_APP_ORIGIN_ENABLED: 'false',
+        AIMEAT_APP_HOST: '',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];

@@ -16,6 +16,8 @@
  *   v1.1.0 — 2026-06-20 — H-2: serve apps on the app origin — `<sub>.apps.<apex>` (existing
  *     GET / path) + path form `apps.<apex>/<owner>/<file>` (req.appOrigin-guarded); shared
  *     serveApp() helper.
+ *   v1.2.0 — 2026-06-20 — H-2: app CSP `frame-ancestors` now allows the apex origin so the
+ *     in-SPA sandboxed viewer can frame the app cross-origin (appCsp(apexOrigin)).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -34,8 +36,16 @@ export const RESERVED_SUBDOMAINS = new Set([
 /** Valid subdomain label: lowercase alphanumeric + hyphens, 2–63 chars, no edge hyphens. */
 export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
 
-/** Same CSP as the /v1/apps inline mode — the subdomain root IS the app. */
-const APP_CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'";
+/**
+ * CSP for an app served on the app origin. Same as /v1/apps inline mode, but `frame-ancestors`
+ * also allows the apex origin: the in-SPA sandboxed viewer (on the apex) frames the app
+ * cross-origin (H-2), so without the apex here the browser would block it. `'self'` keeps the
+ * app frameable within its own origin; we do NOT open it to `*` (clickjacking).
+ */
+function appCsp(apexOrigin: string): string {
+  const ancestors = apexOrigin ? `'self' ${apexOrigin}` : "'self'";
+  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors ${ancestors}`;
+}
 
 /** Resolve an "owner/filename" app target to its latest published record. */
 async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
@@ -59,10 +69,10 @@ function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
 }
 
 /** Write a published app's HTML body with the app CSP + cache/security headers. */
-function serveApp(res: Response, storage: Storage, app: AppRecord): void {
+function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string): void {
   res.setHeader('Content-Type', app.mimeType);
   res.setHeader('Content-Length', app.size.toString());
-  res.setHeader('Content-Security-Policy', APP_CSP);
+  res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
@@ -77,6 +87,10 @@ function serveApp(res: Response, storage: Storage, app: AppRecord): void {
  */
 export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  // Apex origin allowed to frame app-origin apps (the in-SPA sandboxed viewer).
+  let apexOrigin = '';
+  try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
+  const csp = appCsp(apexOrigin);
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
@@ -104,7 +118,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    serveApp(res, storage, app);
+    serveApp(res, storage, app, csp);
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` — serves apps that have no
@@ -124,7 +138,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
       return;
     }
-    serveApp(res, storage, app);
+    serveApp(res, storage, app, csp);
   });
 
   return router;

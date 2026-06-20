@@ -63,13 +63,50 @@ screenshots + descriptions should be first-class; description required + AI-writ
   thumbnail when `screenshot_url` is present. Gates green: lint 0 errors, typecheck (backend +
   frontend) clean, importmap in sync.
 
-**Slice 2 (next) — the screenshot worker:** a Node + Playwright (already a dev-dep) tool, run as
-operator: list apps with `has_screenshot=false` → render each app headless → capture PNG → POST to
-the new endpoint. On-demand/scheduled. Manual override = owner uploads via the same endpoint.
+**Slice 2 (DONE — worker built, capture verified) — the screenshot worker.** Owner chose Playwright
+over browser self-capture (full fidelity for ALL apps incl. WebGL/canvas + existing apps, one pass,
+beats html2canvas which can't read canvas/WebGL). Built
+[scripts/screenshot-worker.ts](../../aimeat/scripts/screenshot-worker.ts) (`pnpm screenshot:worker`):
+lists apps with `has_screenshot=false` → renders each headless (Chromium via `@playwright/test`,
+binaries already installed) → captures JPEG (q80, stays under the 2 MB cap) → POSTs to the new
+endpoint as operator. Flags: `--base --token --limit --force --dry-run --width --height`. Per-app
+isolation; manual override unchanged. Auth = `AIMEAT_OP_TOKEN` (operator role to cover others'
+apps). **Verified live (2026-06-20):** after the dev restart, ran the worker as operator (happyadmin,
+token via `POST /v1/ghii/login`) → **17/17 apps captured + uploaded, 0 failed**, including apps owned
+by OTHER users (confirms operator-can-set-any). `/v1/apps` now reports `has_screenshot` for all 17;
+fetching one returns a real `image/jpeg` (~19 KB). The wall renders the thumbnails (img code
+verified earlier; couldn't drive the browser this run — MCP locked — but the data + GET prove it).
+Worker fix during the run: `goto` uses `waitUntil: 'load'` (not `networkidle`) since polling/SSE apps
+never go idle. Capture is full-fidelity Chromium (canvas/WebGL included), the reason Playwright was
+chosen over browser self-capture. Apps are opened ANONYMOUSLY (no per-app login — a login-gated app
+just yields a screenshot of its login screen, still a fine thumbnail).
 
-**Slice 3 — description required + AI-written:** enforce a description on publish (reject missing)
-and have the build prompt instruct the AI to write a good one. ⚠️ Behaviour change (only new
-publishes).
+**Automatic backfill (DONE + verified).** Two pieces made it run unattended:
+- **Auth = a long-lived operator PAT** (`POST /v1/access/tokens` with `grant_operator: true`, operator
+  only) as `AIMEAT_OP_TOKEN` — no expiring hand-pasted JWT. Verified: the PAT set a NON-owner app's
+  screenshot (200), so one operator PAT covers every app.
+- **Trigger = `--watch N`** (worker v1.2.0): the scan is refactored into `runOnce()` and looped every
+  N seconds — start `pnpm screenshot:worker --watch 600` once and the wall stays auto-filled.
+- End-to-end demo: published a new app with no screenshot → a single worker run reported
+  "1 need a screenshot" and captured ONLY it (`image/jpeg`, 10 KB) → cleaned up. So a new publish is
+  picked up automatically on the next scan. (On-publish *instant* capture remains a future option;
+  watch-interval is the current mechanism.)
+
+**npm/npx packaging (DONE + verified).** The worker now ships to npm users as the
+`aimeat screenshot-worker` subcommand (logic moved to
+[src/cli/screenshot-worker.ts](../../aimeat/src/cli/screenshot-worker.ts), compiled into `dist/`
+which is already in `files`; `pnpm screenshot:worker` kept as a thin dev wrapper). Instead of
+bundling a 300 MB Playwright browser, it adds **`playwright-core`** (small, Apache-2.0, no binary
+download, 0 new audit vulns) and drives the machine's OWN browser via a **channel fallback**
+(`msedge` → `chrome` → a Playwright-installed Chromium), with an install hint if none is found.
+Verified: `aimeat screenshot-worker --force --dry-run` logged **"Browser: system Edge"** and captured
+JPEGs — so on Windows/desktop it works straight after `npm install aimeat` with zero download; a
+headless server runs one `npx playwright install chromium`. Screenshots stay an opt-in operator
+feature — the node runs fine without a browser. Run: `AIMEAT_OP_TOKEN=<operator-pat> aimeat
+screenshot-worker --watch 600`.
+
+**Slice 3 (next) — description required + AI-written:** enforce a description on publish (reject
+missing) + build prompt asks the AI to write a good one. ⚠️ Behaviour change (only new publishes).
 
 ## 2026-06-20 — Phase 2 pixel-grid reverted; redesigned as "build-to-touch"
 

@@ -111,7 +111,7 @@ async function main() {
             const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?mode=inline`, { redirect: 'manual' });
             assert(res.status === 301, `expected 301, got ${res.status}`);
             const loc = res.headers.get('location') ?? '';
-            assert(loc === `http://${APP_HOST}/${owner}/${filename}`, `unexpected Location: ${loc}`);
+            assert(loc === `http://${APP_HOST}:${PORT}/${owner}/${filename}`, `unexpected Location: ${loc}`);
         });
 
         await test('apex raw download (no mode) still serves on apex (attachment, not executed)', async () => {
@@ -143,7 +143,7 @@ async function main() {
             assert(create.status === 201, `subdomain create failed: ${create.status} ${JSON.stringify(create.body)}`);
             const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?mode=inline`, { redirect: 'manual' });
             assert(res.status === 301, `expected 301, got ${res.status}`);
-            assert((res.headers.get('location') ?? '') === `http://demo.${APP_HOST}/`, `unexpected Location: ${res.headers.get('location')}`);
+            assert((res.headers.get('location') ?? '') === `http://demo.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
         });
 
         await test('app-origin subdomain form (x-app-origin + x-subdomain) serves the app HTML at /', async () => {

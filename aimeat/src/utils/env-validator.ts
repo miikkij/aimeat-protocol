@@ -1,7 +1,10 @@
 /**
- * CLI config validator — checks environment, file configs, and DB for errors, warnings, and info.
- * Usage: aimeat validate (or aimeat check)
- * Exit 0 = pass (warnings/info only), Exit 1 = errors found
+ * @file env-validator.ts
+ * @description CLI config validator — checks environment, file configs, and DB for
+ *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
+ *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
+ * @version-history v1.0.1 — 2026-06-20 — Validate App Origin Isolation (H-2):
+ *   AIMEAT_APP_ORIGIN_ENABLED must be true/false; if true, AIMEAT_APP_HOST required.
  */
 
 import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config-schema.js';
@@ -281,6 +284,15 @@ export function validateEnv(): ValidationResult[] {
   const extRole = env.AIMEAT_EXT_INSTALL_ROLE;
   if (extRole !== undefined && !['operator', 'owner'].includes(extRole)) {
     results.push({ level: 'error', variable: 'AIMEAT_EXT_INSTALL_ROLE', message: `Invalid value "${extRole}". Must be "operator" or "owner"` });
+  }
+
+  // ── App Origin Isolation (H-2) ──
+  const appOriginEnabled = env.AIMEAT_APP_ORIGIN_ENABLED;
+  if (appOriginEnabled !== undefined && appOriginEnabled !== 'true' && appOriginEnabled !== 'false') {
+    results.push({ level: 'error', variable: 'AIMEAT_APP_ORIGIN_ENABLED', message: `Invalid value "${appOriginEnabled}". Must be "true" or "false".` });
+  }
+  if (appOriginEnabled === 'true' && !env.AIMEAT_APP_HOST?.trim()) {
+    results.push({ level: 'error', variable: 'AIMEAT_APP_HOST', message: 'App origin isolation is enabled (AIMEAT_APP_ORIGIN_ENABLED=true) but AIMEAT_APP_HOST is empty. Set the app origin host (e.g. apps.example.com); it requires DNS + a wildcard TLS cert.' });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────

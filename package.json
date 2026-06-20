@@ -21,6 +21,7 @@
     "typecheck": "cd aimeat && pnpm typecheck",
     "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
     "check:importmap": "cd aimeat && pnpm check:importmap",
+    "screenshot:worker": "cd aimeat && pnpm screenshot:worker",
     "lint": "cd aimeat && pnpm lint",
     "test": "cd aimeat && pnpm test",
     "test:unit": "cd aimeat && pnpm test",
