@@ -36,11 +36,24 @@ export default function AppGrant() {
   const [existingGrant, setExistingGrant] = useState(null); // the grant this app already holds (manage mode)
 
   const requestId = new URLSearchParams(window.location.search).get('req') || '';
-  const loggedIn = !!window.AIMEAT?.auth?.hasSession;
+  const [authed, setAuthed] = useState(() => !!window.AIMEAT?.auth?.hasSession);
+
+  // Become reactive to login: the consent popup may open with no one logged in (login_required), and
+  // the user signs in right here (auth.showLoginModal) — flip to the consent view on success.
+  useEffect(() => {
+    const onLogin = () => setAuthed(true);
+    window.AIMEAT?.auth?.on?.('login', onLogin);
+    return () => window.AIMEAT?.auth?.off?.('login', onLogin);
+  }, []);
+
+  function doLogin() {
+    if (window.AIMEAT?.auth?.showLoginModal) window.AIMEAT.auth.showLoginModal({ onLogin: () => setAuthed(true) });
+    else window.location.href = '/v1/profile';
+  }
 
   useEffect(() => {
     if (!requestId) { setState({ status: 'error', error: tr('appGrant.missing', 'No authorization request.') }); return; }
-    if (!loggedIn) { setState({ status: 'login' }); return; }
+    if (!authed) { setState({ status: 'login' }); return; }
     let live = true;
     api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`)
       .then(async (res) => {
@@ -61,7 +74,7 @@ export default function AppGrant() {
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
     return () => { live = false; };
-  }, [requestId, loggedIn]);
+  }, [requestId, authed]);
 
   async function revoke() {
     if (!existingGrant) return;
@@ -126,7 +139,7 @@ export default function AppGrant() {
         <div class="agr-card">
           <h1 class="agr-title">${tr('appGrant.loginTitle', 'Log in to continue')}</h1>
           <p class="agr-muted">${tr('appGrant.loginBody', 'Log in on aimeat.io, then re-open the app’s link to approve access.')}</p>
-          <a class="btn-primary agr-btn" href="/v1/profile">${tr('appGrant.loginCta', 'Log in')}</a>
+          <button class="btn-primary agr-btn" onClick=${doLogin}>${tr('appGrant.loginCta', 'Log in')}</button>
         </div>
       </div>`;
   }

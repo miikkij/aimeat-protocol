@@ -699,10 +699,11 @@ function restoreSessionFromAppOrigin(interactive) {
     var grant = (r && r.ok && r.access_token) ? r : null;
     var appId = (r && r.app) || null;
     var own = !!(r && r.own);
-    // Not own / not yet granted → consent_required. Open the visible popup ONLY on a user gesture
-    // (interactive); the on-mount auto-trigger passes interactive=false so a blocked popup never fires.
-    if (!grant && interactive && r && r.error === 'consent_required') {
-      appId = r.app || appId;
+    // consent_required → not yet granted; login_required → not logged into the apex at all. BOTH are
+    // resolved by the visible popup (the consent page prompts apex login first, then consent), but
+    // ONLY on a user gesture (interactive) — the on-mount auto-trigger never opens a blocked popup.
+    if (!grant && interactive && r && (r.error === 'consent_required' || r.error === 'login_required') && r.app) {
+      appId = r.app;
       grant = await requestConsentPopup(r.app, r.scope);
       own = false; // the consent flow only runs for apps the user does NOT own
     }
@@ -1064,6 +1065,13 @@ const auth = {
   /** True when running inside a published app on its isolated origin (not the apex). */
   isAppOrigin() { return isAppOrigin(); },
 
+  /**
+   * Open the sign-in modal (password + Google if configured). For apex pages that must prompt login
+   * outside mountLoginButton — e.g. the app-grant consent page when no one is logged in yet. Fires
+   * the normal 'login' event on success (listen via auth.on('login', ...)).
+   */
+  showLoginModal(opts) { showLoginModal(opts || {}, function () {}); },
+
   /** Check if there are stored credentials */
   get hasSession() { return !!load('session'); },
 
@@ -1242,10 +1250,15 @@ const auth = {
     // Seamless SSO: on an app origin (*.apps.<domain>) with no session yet, attempt the silent
     // bridge ourselves so the owner's own app is logged in even if it never calls auth.login()
     // explicitly. Best-effort + idempotent: if the bridge yields a session it fires 'login' (→ the
-    // button re-renders); if it returns null (anonymous visitor / not the owner) the button stays
-    // "Sign In". currentSession guards against racing an explicit login() the app may also run.
-    if (isAppOrigin() && !currentSession && !load('session')) {
-      restoreSessionFromAppOrigin(false).catch(() => {});
+    // button re-renders). On an app origin the persisted session is only a UI CACHE: the grant token
+    // is short-lived, the apex session may have ended (logout), or the grant may have been revoked. So
+    // ALWAYS re-confirm via the silent bridge on load — even when a cached session exists. That is how
+    // the _app/gear metadata refreshes, and how a stale "logged in" clears after the user logs out of
+    // aimeat.io. If the bridge cannot re-establish a session, drop the stale cache (no phantom login).
+    if (isAppOrigin() && !currentSession) {
+      restoreSessionFromAppOrigin(false).then((s) => {
+        if (!s && load('session')) { remove('session'); emit('logout'); }
+      }).catch(() => {});
     }
   },
 };
