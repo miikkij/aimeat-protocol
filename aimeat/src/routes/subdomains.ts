@@ -20,6 +20,8 @@
  *     in-SPA sandboxed viewer can frame the app cross-origin (appCsp(apexOrigin)).
  *   v1.3.0 — 2026-06-20 — H-2 seamless SSO: inject the app-login.js shim into per-app-subdomain
  *     app HTML so the owner's own app authenticates via the apex silent bridge (no separate login).
+ *   v1.4.0 — 2026-06-20 — Auto-assign a per-app subdomain on first open (ensureAppSubdomain); the
+ *     bare-host path form now 302-redirects to it, so seamless SSO works with NO manual subdomain step.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -47,6 +49,39 @@ export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
 function appCsp(apexOrigin: string): string {
   const ancestors = apexOrigin ? `'self' ${apexOrigin}` : "'self'";
   return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors ${ancestors}`;
+}
+
+/**
+ * Ensure an app has a per-app subdomain (creating one if needed) and return its label. This makes
+ * the per-app origin — and therefore seamless SSO — work WITHOUT the operator assigning subdomains
+ * by hand: the first time an app is opened it auto-gets a `<sub>.apps.<domain>` from its filename
+ * (collision-handled), so existing apps migrate transparently. Returns null when the app origin is
+ * not configured or no valid name is free. Idempotent + race-safe.
+ */
+export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig, ownerBare: string, filename: string): Promise<string | null> {
+  if (!config.appHost) return null;
+  const target = `${ownerBare}/${filename}`;
+  const sites = await storage.listSubdomainSites();
+  const existing = sites.find(s => s.enabled && s.kind === 'app' && s.target === target);
+  if (existing) return existing.subdomain;
+
+  const taken = new Set(sites.map(s => s.subdomain));
+  const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !taken.has(n);
+  let base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+  if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
+  const candidates = [base, `${ownerBare}-${base}`.replace(/^-+|-+$/g, '').slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
+  const name = candidates.find(free);
+  if (!name) return null;
+
+  const now = new Date().toISOString();
+  try {
+    await storage.createSubdomainSite({ subdomain: name, kind: 'app', target, enabled: true, createdBy: `${ownerBare}@${config.nodeId}`, createdAt: now, updatedAt: now });
+    return name;
+  } catch {
+    // Race: a concurrent request created the mapping — re-resolve.
+    const after = (await storage.listSubdomainSites()).find(s => s.enabled && s.kind === 'app' && s.target === target);
+    return after?.subdomain ?? null;
+  }
 }
 
 /** Resolve an "owner/filename" app target to its latest published record. */
@@ -143,10 +178,10 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     serveApp(res, storage, app, csp, shimSrc);  // per-app subdomain → inject the SSO shim
   });
 
-  // App-origin path form: `apps.<apex>/<owner>/<filename>` — serves apps that have no
-  // assigned subdomain. Only active on the app origin (req.appOrigin); on every other
-  // host it falls through untouched, and an unmatched lookup also falls through so the
-  // normal /v1 API routes still work on the app host (apps call them cross-origin).
+  // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
+  // OWN per-app origin for seamless SSO (the silent bridge binds a token to one subdomain), so this
+  // REDIRECTS to the app's auto-assigned `<sub>.apps.<apex>` rather than serving on the shared host.
+  // Only active on the app origin (req.appOrigin); falls through elsewhere so /v1 API still works.
   router.get('/:owner/:filename', async (req: Request, res: Response, next) => {
     if (!req.appOrigin) return next();
     const owner = req.params.owner as string;
@@ -154,13 +189,22 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // Only treat genuine app HTML filenames as app requests; anything else (API
     // segments like /v1/..., assets) falls through to normal routing.
     if (!/\.html?$/i.test(filename) || filename.includes('..')) return next();
-    const app = await resolveAppTarget(storage, `${owner}/${filename}`);
+    const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
+    const app = await resolveAppTarget(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
     if (appIsRestricted(config, app)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
       return;
     }
-    serveApp(res, storage, app, csp);
+    const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
+    if (sub) {
+      let scheme = 'https', portSuffix = '';
+      try { const b = new URL(config.baseUrl); scheme = b.protocol.replace(':', ''); portSuffix = b.port ? `:${b.port}` : ''; } catch { /* keep https */ }
+      res.setHeader('Cache-Control', 'no-store');
+      res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
+      return;
+    }
+    serveApp(res, storage, app, csp); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;
