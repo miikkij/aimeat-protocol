@@ -62,7 +62,7 @@ async function main() {
         ownerToken = tok.body.data.token;
         const pub = await json('/v1/apps', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ filename: FILENAME, content: b64('<!DOCTYPE html><html><body>grant</body></html>'), name: 'Grant Demo', category: 'utility' }),
+            body: JSON.stringify({ filename: FILENAME, content: b64('<!DOCTYPE html><html><body>grant</body></html>'), name: 'Grant Demo', description: 'grant demo app', category: 'utility' }),
         });
         assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
     });

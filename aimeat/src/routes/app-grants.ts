@@ -18,6 +18,9 @@
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3: explicit scoped app grants).
+ *   v1.1.0 — 2026-06-20 — Add silent SSO bridge GET /v1/auth/app-grant-silent: when the owner is
+ *     logged into the apex, their own app (bound by its per-app subdomain origin) gets a scoped
+ *     grant token with no visible login (same-site iframe + postMessage). Others → consent_required.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -28,6 +31,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
+import { readRefreshCookie } from '../services/owner-session.js';
 
 /**
  * Scopes an app may request, each with a short description key for the consent UI. Drawn from the
@@ -215,6 +219,83 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     );
     return { token, expiresIn: config.accessTtlSeconds };
   }
+
+  // ── GET /v1/auth/app-grant-silent ── seamless SSO bridge (no visible login). Mounted under
+  // /v1/auth so the host-only refresh cookie reaches it. Called credentialed + same-origin by the
+  // apex bridge page (app-silent.html) that an app embeds in a hidden iframe. Security model:
+  //   • The app is identified ONLY by its per-app subdomain (origin → subdomain → mapped app), so a
+  //     token is bound to exactly one app origin — apps cannot impersonate each other. Per-app
+  //     subdomain REQUIRED (path-form apps share one origin → not eligible for silent SSO).
+  //   • Auto-approve ONLY the owner's OWN app, or an app the owner already granted (remembered).
+  //     Anyone else → consent_required (the visible code flow).
+  //   • Issues the same scoped, revocable grant token as the code flow — NEVER the session.
+  router.get('/v1/auth/app-grant-silent', async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const reply = (data: Record<string, unknown>) => res.json(success(config.nodeId, data));
+
+    const appHost = (config.appHost || '').toLowerCase();
+    if (!appHost) return reply({ ok: false, error: 'app_origin_disabled' });
+
+    // The app's real origin (the apex bridge passes it from window.location.ancestorOrigins).
+    let host: string;
+    try { host = new URL(String(req.query.origin ?? '')).hostname.toLowerCase(); } catch { return reply({ ok: false, error: 'bad_origin' }); }
+    if (host === appHost || !host.endsWith('.' + appHost)) return reply({ ok: false, error: 'bad_origin' });
+    const sub = host.slice(0, -(appHost.length + 1));
+    if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' }); // single-label per-app subdomain only
+
+    // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
+    const site = await storage.getSubdomainSite(sub);
+    if (!site || !site.enabled || site.kind !== 'app') return reply({ ok: false, error: 'unknown_app' });
+    const slash = site.target.indexOf('/');
+    if (slash <= 0) return reply({ ok: false, error: 'unknown_app' });
+    const appOwner = site.target.slice(0, slash);
+    const appFile = site.target.slice(slash + 1);
+
+    // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation.
+    const raw = readRefreshCookie(req);
+    const session = raw ? await storage.getSessionByRefreshHash(hashToken(raw)) : null;
+    const now = Date.now();
+    const sessionValid = !!session && !session.revoked
+      && !(session.idleExpiresAt && now >= Date.parse(session.idleExpiresAt))
+      && !(session.absoluteExpiresAt && now >= Date.parse(session.absoluteExpiresAt));
+    if (!sessionValid) return reply({ ok: false, error: 'login_required' });
+    const owner = session!.owner;
+
+    const requested = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+    if (requested.some(s => !APP_GRANTABLE_SCOPES[s])) return reply({ ok: false, error: 'invalid_scope' });
+
+    // Policy: own app → auto-approve requested scopes; otherwise require a prior non-revoked grant
+    // that already covers them (remembered approval). Anything else needs the visible consent.
+    const isOwnApp = owner === appOwner;
+    const existing = (await storage.listAppGrantsByOwner(owner)).find(g => !g.revoked && g.app === site.target);
+    let scopes: string[];
+    if (isOwnApp) {
+      scopes = requested.length ? requested : ['memory:read', 'memory:write'];
+    } else if (existing && requested.every(s => existing.scopes.includes(s))) {
+      scopes = requested.length ? requested : existing.scopes;
+    } else {
+      return reply({ ok: false, error: 'consent_required' });
+    }
+
+    // Mint: reuse this owner's existing grant for the app, else create one.
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const rawRefresh = randomBytes(32).toString('hex');
+    const ts = new Date().toISOString();
+    let grantId: string;
+    if (existing) {
+      grantId = existing.grantId;
+      await storage.updateAppGrant(grantId, { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: ts, scopes });
+    } else {
+      grantId = `appgrant-${randomBytes(16).toString('hex')}`;
+      await storage.createAppGrant({
+        grantId, app: site.target, appName: appFile, appOrigin: `https://${host}`,
+        owner, gaii: ownerGhii, scopes, refreshTokenHash: hashToken(rawRefresh),
+        createdAt: ts, lastUsedAt: ts, revoked: false,
+      });
+    }
+    const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId });
+    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId });
+  });
 
   // ── POST /v1/app-grants/token ── the app (cross-origin, CORS *) exchanges code / refreshes.
   router.post('/v1/app-grants/token', async (req: Request, res: Response) => {

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<!--
+  @file src/static/app-silent.html
+  @description Hidden-iframe silent SSO bridge page (apex origin). An app on its own
+    `<sub>.apps.<domain>` origin embeds this; it asks the apex for a scoped grant token for that
+    app and postMessages it back (see app-silent.js). Served with `frame-ancestors *.apps.<domain>`
+    (and no X-Frame-Options) so only app origins can frame it.
+  @version-history
+    v1.0.0 — 2026-06-20 — Initial (H-2 seamless secure app SSO).
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>AIMEAT</title></head>
+<body><script src="/app-silent.js"></script></body>
+</html>

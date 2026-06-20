@@ -29,6 +29,7 @@ const ALL_SUITES = [
     // OFF), so it owns its lifecycle rather than running against BASE_URL.
     'test/e2e-app-origin.ts',
     'test/e2e-app-grants.ts',
+    'test/e2e-app-silent.ts',
     'test/e2e-apps-backup.ts',
     'test/e2e-board-access.ts',
     'test/e2e-board-ttl.ts',

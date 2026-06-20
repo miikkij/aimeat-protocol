@@ -1,19 +1,22 @@
 /**
  * @file public/js/app-sandbox.js
- * @description Open a user-published app's HTML inside a full-screen, sandboxed,
- *   opaque-origin iframe overlay — the H-2-safe way to "view" an app from anywhere in
- *   the SPA. The iframe's `sandbox` deliberately omits `allow-same-origin`, so even
- *   apex-hosted (`/v1/apps/...?mode=inline`) content runs with an opaque origin and can
- *   neither read aimeat.io localStorage nor send credentialed same-origin requests
- *   (e.g. POST /v1/auth/refresh). Replaces every top-level `window.open(...?mode=inline)`
- *   / `<a target="_blank">` app link that previously ran app HTML on the apex origin.
- * @structure isAppHtmlUrl() route matcher · openAppSandboxed() overlay builder.
+ * @description Open a user-published app from anywhere in the SPA. Apps always open TOP-LEVEL
+ *   in a new tab via the apex `?mode=inline` URL — a clean, full-screen page (no overlay/X).
+ *   The server decides isolation:
+ *     - app origin OFF → the app is served inline on the apex (same host as the SPA), so the
+ *       user's session carries into the app (it can refresh + read its own data — "logged in");
+ *     - app origin ON  → the apex 301s to `apps.<domain>`, an isolated origin with no ambient
+ *       session (apps then use the explicit grant flow).
+ *   So "logged into aimeat.io ⇒ apps are logged in" is the OFF (default) behaviour; ON is the
+ *   opt-in hardened mode for multi-user/public nodes.
+ * @structure isAppHtmlUrl() route matcher · openAppSandboxed() top-level opener.
  * @usage import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js'
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 0).
- *   v1.1.0 — 2026-06-20 — When the app origin is live (window.__APP_ORIGIN_ENABLED), open apps
- *     top-level (apex inline URL 301s to apps.<domain>) — a clean full page on a real isolated
- *     origin (own storage/API work), no overlay/X. Opaque-sandbox overlay is the off-state fallback.
+ *   v1.1.0 — 2026-06-20 — App origin live → open apps top-level; opaque-sandbox overlay fallback.
+ *   v2.0.0 — 2026-06-20 — Always open apps TOP-LEVEL (the opaque sandbox gave apps origin `null`,
+ *     breaking their storage/API and forcing a re-login). Isolation is now the server's job via
+ *     the app origin; with it off, apps run on the apex and inherit the user's session.
  */
 
 /** Matches the published-app HTML route: /v1/apps/<owner>/<file> (optionally ?mode=inline). */
@@ -30,65 +33,10 @@ export function isAppHtmlUrl(href) {
   return /^\/v1\/apps\/[^/]+\/[^/]+$/.test(path);
 }
 
-let escHandler = null;
-
-/** Remove the overlay (if present) and detach the Escape handler. */
-function closeOverlay() {
-  const existing = document.getElementById('app-sandbox-overlay');
-  if (existing) existing.remove();
-  if (escHandler) {
-    document.removeEventListener('keydown', escHandler);
-    escHandler = null;
-  }
-}
-
 /**
- * Open a published app for the user. When the node has provisioned the app origin
- * (`window.__APP_ORIGIN_ENABLED`), open it TOP-LEVEL in a new tab: the apex inline URL
- * 301s to `apps.<domain>`, giving a clean full page on a genuinely isolated origin (its own
- * storage, same-origin API) — no overlay, no toolbar. Otherwise fall back to the opaque-origin
- * sandbox overlay (the only safe option when apps would otherwise run same-origin as the SPA).
+ * Open a published app in a new top-level tab. `url` is the apex `?mode=inline` URL; the server
+ * either serves it inline (session inherited) or 301s it to the isolated app origin.
  */
-export function openAppSandboxed(url, name) {
-  if (window.__APP_ORIGIN_ENABLED) {
-    window.open(url, '_blank', 'noopener');
-    return;
-  }
-
-  closeOverlay();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'app-sandbox-overlay';
-  overlay.className = 'app-sandbox-overlay';
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'app-sandbox-toolbar';
-
-  const title = document.createElement('span');
-  title.className = 'app-sandbox-title';
-  title.textContent = name || 'App';
-
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'app-sandbox-close';
-  close.setAttribute('aria-label', 'Close');
-  close.textContent = '✕';
-  close.addEventListener('click', closeOverlay);
-
-  toolbar.appendChild(title);
-  toolbar.appendChild(close);
-
-  const iframe = document.createElement('iframe');
-  iframe.className = 'app-sandbox-frame';
-  // No allow-same-origin → opaque origin. This is the entire H-2 protection.
-  iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
-  iframe.setAttribute('referrerpolicy', 'no-referrer');
-  iframe.src = url;
-
-  overlay.appendChild(toolbar);
-  overlay.appendChild(iframe);
-  document.body.appendChild(overlay);
-
-  escHandler = (e) => { if (e.key === 'Escape') closeOverlay(); };
-  document.addEventListener('keydown', escHandler);
+export function openAppSandboxed(url, _name) {
+  window.open(url, '_blank', 'noopener');
 }
