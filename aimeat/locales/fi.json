@@ -925,6 +925,7 @@
         "alwaysOn": "Aina käytössä (Taso 0)",
         "readOnlyView": "Nykyiset oikeutesi",
         "domainMemory": "Muisti",
+        "domainStorage": "Tallennustila (tiedostot)",
         "domainWork": "Työ",
         "domainSocial": "Sosiaalinen",
         "domainWallet": "Lompakko",
