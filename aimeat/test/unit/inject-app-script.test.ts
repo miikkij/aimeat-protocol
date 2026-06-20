@@ -7,7 +7,9 @@
  *   v1.0.0 — 2026-06-20 — Initial (guards the H-2 SSO shim byte-handling bug).
  */
 import { describe, it, expect } from 'vitest';
-import { injectAppScript } from '../../src/routes/subdomains.js';
+import { injectAppScript, relaxAppCspMeta } from '../../src/routes/subdomains.js';
+
+const APEX = 'https://aimeat.io';
 
 const SRC = 'https://aimeat.io/app-login.js';
 const HTML = '<!DOCTYPE html><html><head><title>x</title></head><body><h1>hi</h1></body></html>';
@@ -43,5 +45,39 @@ describe('injectAppScript', () => {
     const fi = '<!DOCTYPE html><head></head><body>Sää: 24 °C — Sanomat ää</body>';
     const out = injectAppScript(new Uint8Array(Buffer.from(fi, 'utf-8')), SRC).toString('utf-8');
     expect(out).toContain('Sää: 24 °C — Sanomat ää');
+  });
+});
+
+describe('relaxAppCspMeta', () => {
+  it('adds the apex to frame-src + connect-src when the app sets default-src \'self\' (no frame-src)', () => {
+    const html = `<head><meta http-equiv="Content-Security-Policy" content="default-src 'self'"></head><body>x</body>`;
+    const out = relaxAppCspMeta(html, APEX).toString('utf-8');
+    expect(out).toMatch(new RegExp(`frame-src[^;"]*${APEX}`));
+    expect(out).toMatch(new RegExp(`connect-src[^;"]*${APEX}`));
+    expect(out).toContain("default-src 'self'");            // original directive preserved
+    expect(out).toMatch(/frame-src 'self'/);                // derived from default-src
+  });
+
+  it('appends the apex to an existing frame-src without dropping its sources', () => {
+    const html = `<meta http-equiv="content-security-policy" content="default-src 'self'; frame-src 'self' https://x.com">`;
+    const out = relaxAppCspMeta(html, APEX).toString('utf-8');
+    expect(out).toMatch(new RegExp(`frame-src 'self' https://x.com ${APEX}`));
+  });
+
+  it('does not duplicate the apex if already present', () => {
+    const html = `<meta http-equiv="Content-Security-Policy" content="frame-src 'self' ${APEX}; connect-src ${APEX}">`;
+    const out = relaxAppCspMeta(html, APEX).toString('utf-8');
+    expect(out.match(new RegExp(APEX.replace(/[.]/g, '\\.'), 'g'))!.length).toBe(2); // one per directive, not 4
+  });
+
+  it('leaves HTML without a CSP meta unchanged', () => {
+    const html = '<!DOCTYPE html><head><title>x</title></head><body>hi</body>';
+    expect(relaxAppCspMeta(html, APEX).toString('utf-8')).toBe(html);
+  });
+
+  it('handles a Uint8Array body (Prisma/Mongo) and tolerates attribute order', () => {
+    const html = `<meta content="default-src 'self'" http-equiv="Content-Security-Policy">`;
+    const out = relaxAppCspMeta(new Uint8Array(Buffer.from(html, 'utf-8')), APEX).toString('utf-8');
+    expect(out).toMatch(new RegExp(`frame-src[^;"]*${APEX}`));
   });
 });

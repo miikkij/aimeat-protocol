@@ -17,6 +17,10 @@
     v2.1.0 — 2026-06-20 — Add Park/Unpark to own published-app cards (+ PARKED badge/hint, dimmed
       card). Parking hides an app from the public catalogue while keeping it usable by its owner;
       toggleParkApp PATCHes /v1/apps/:filename { parked }.
+    v2.2.0 — 2026-06-20 — Parked apps now live in their OWN "Parked Apps" section (peer of Published /
+      Community / Local), not as a badge inside Published. Park moves an app out of Published into
+      Parked; the Parked card's primary action is Publish (unpark). The /v1/apps fetch now sends the
+      owner token so the server returns the caller's own parked apps for that section.
 -->
 <html lang="en">
 <head>
@@ -1520,8 +1524,15 @@
 
     /* A parked app is hidden from the public catalogue — dim its card to signal that. */
     .published-card.parked {
-      opacity: .72;
+      opacity: .82;
       border-style: dashed;
+    }
+
+    .parked-blurb {
+      margin: 0 24px 10px;
+      font-size: .82rem;
+      color: var(--text-muted);
+      opacity: .85;
     }
 
     /* Operator-only subdomain chip on own published cards */
@@ -1707,6 +1718,16 @@
       <span class="arrow open" id="published-arrow">&#x25BC;</span>
     </div>
     <div id="published-grid" class="published-grid"></div>
+  </div>
+
+  <!-- Parked Apps Section (own, hidden from the public catalogue) -->
+  <div id="parked-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.toggleParked()">
+      <h2><span data-i18n="sec.parked">&#x1F17F;&#xFE0F; Parked Apps</span> <span id="parked-count"></span></h2>
+      <span class="arrow open" id="parked-arrow">&#x25BC;</span>
+    </div>
+    <div class="parked-blurb" data-i18n="sec.parkedBlurb">Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.</div>
+    <div id="parked-grid" class="published-grid"></div>
   </div>
 
   <!-- Community Apps Section (other users) -->
@@ -2093,6 +2114,8 @@
       'cortex.saveReinstall': 'Save & Re-install',
       'sec.published': '🚀 Published Apps',
       'sec.community': '🌍 Community Apps',
+      'sec.parked': '🅿️ Parked Apps',
+      'sec.parkedBlurb': 'Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.',
       'sec.recent': '🕒 Recently Opened',
       'sec.local': '💾 Local Apps',
       'stats.apps': 'apps',
@@ -2173,7 +2196,9 @@
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
       'card.park': '🅿 Park',
-      'card.unpark': '🅿 Unpark',
+      'card.unpark': '🚀 Publish',
+      'card.parkHint': 'Hide from the public catalogue — moves to Parked Apps (still usable by you).',
+      'card.unparkHint': 'Publish again — moves back to Published Apps, visible to everyone.',
       'card.parkedBadge': 'PARKED',
       'card.parkedHint': 'Only you can see and use this — hidden from the public catalogue.',
       'common.loading': 'Loading…',
@@ -2317,6 +2342,8 @@
       'cortex.saveReinstall': 'Tallenna & asenna uudelleen',
       'sec.published': '🚀 Julkaistut sovellukset',
       'sec.community': '🌍 Yhteisön sovellukset',
+      'sec.parked': '🅿️ Parkissa olevat sovellukset',
+      'sec.parkedBlurb': 'Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.',
       'sec.recent': '🕒 Viimeksi avatut',
       'sec.local': '💾 Paikalliset sovellukset',
       'stats.apps': 'sovellusta',
@@ -2397,7 +2424,9 @@
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
       'card.park': '🅿 Parkkiin',
-      'card.unpark': '🅿 Julkaise',
+      'card.unpark': '🚀 Julkaise',
+      'card.parkHint': 'Piilota julkisesta katalogista — siirtyy Parkissa-osioon (sinä voit yhä käyttää).',
+      'card.unparkHint': 'Julkaise uudelleen — siirtyy takaisin Julkaistuihin, näkyy kaikille.',
       'card.parkedBadge': 'PARKISSA',
       'card.parkedHint': 'Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.',
       'common.loading': 'Ladataan…',
@@ -4410,6 +4439,15 @@
     arrow.classList.toggle('open', communityVisible);
   }
 
+  var parkedVisible = true;
+  function toggleParked() {
+    parkedVisible = !parkedVisible;
+    var grid = document.getElementById('parked-grid');
+    var arrow = document.getElementById('parked-arrow');
+    grid.style.display = parkedVisible ? '' : 'none';
+    arrow.classList.toggle('open', parkedVisible);
+  }
+
   // Owner-match: an app belongs to the logged-in user when the bare owner names
   // match, regardless of whether either side carries a `@node` suffix. Legacy
   // publish paths stored ownerName as the full GHII, so an exact string compare
@@ -5070,6 +5108,9 @@
     var communitySection = document.getElementById('community-section');
     var communityGrid = document.getElementById('community-grid');
     var communityCountEl = document.getElementById('community-count');
+    var parkedSection = document.getElementById('parked-section');
+    var parkedGrid = document.getElementById('parked-grid');
+    var parkedCountEl = document.getElementById('parked-count');
 
     var currentOwner = null;
     try {
@@ -5098,10 +5139,16 @@
       if (!aimeatUrl) {
         renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
         if (communitySection) communitySection.style.display = 'none';
+        if (parkedSection) parkedSection.style.display = 'none';
         return;
       }
 
-      fetch(aimeatUrl + '/v1/apps')
+      // Send the owner token when we have one: the server only returns the caller's OWN
+      // parked apps to an authenticated request, so the Parked Apps section needs it.
+      var listHeaders = {};
+      var listTok = getCortexOwnerToken();
+      if (listTok) listHeaders['Authorization'] = 'Bearer ' + listTok;
+      fetch(aimeatUrl + '/v1/apps', { headers: listHeaders })
         .then(function(resp) {
           if (!resp.ok) throw new Error('Server returned ' + resp.status);
           return resp.json();
@@ -5123,18 +5170,38 @@
             ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
             : serverApps;
 
+          // Parked apps live in their OWN section, not in Published Apps. Split the
+          // owner's server apps so a parked app moves out of Published and into Parked.
+          var ownPublished = ownApps.filter(function(a) { return !a.parked; });
+          var ownParked = ownApps.filter(function(a) { return !!a.parked; });
+
+          // A parked app published via BOTH portal + MCP also has a local (IndexedDB)
+          // twin. renderPublishedApps re-adds any local-only entry once its server copy
+          // is filtered out, which would resurrect the parked app in Published. Drop the
+          // local twin of every parked app so it shows ONLY in the Parked section.
+          var parkedFilenames = {};
+          for (var pk = 0; pk < ownParked.length; pk++) {
+            if (ownParked[pk].filename) parkedFilenames[ownParked[pk].filename] = true;
+          }
+          var localForPublished = localPublished.filter(function(lp) {
+            return !(lp.publishedFilename && parkedFilenames[lp.publishedFilename]);
+          });
+
           return loadSubdomainSites().then(function () {
-            renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
+            renderPublishedApps(localForPublished, ownPublished, localByFilename, aimeatUrl, section, grid, countEl);
+            renderParkedApps(ownParked, aimeatUrl, parkedSection, parkedGrid, parkedCountEl);
             renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
             // Server-published own apps missing from the local catalog are
             // NEVER imported automatically — the banner offers a review modal
-            // where the user picks exactly which ones to import.
-            updateServerImportState(ownApps, localByFilename, aimeatUrl);
+            // where the user picks exactly which ones to import. (Parked apps are
+            // already on the server, so they never trigger the import banner.)
+            updateServerImportState(ownPublished, localByFilename, aimeatUrl);
           });
         })
         .catch(function() {
           renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
           if (communitySection) communitySection.style.display = 'none';
+          if (parkedSection) parkedSection.style.display = 'none';
         });
     });
   }
@@ -5172,6 +5239,47 @@
           '<div class="published-card-actions">' +
             '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
             '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
+          '</div>' +
+        '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
+  // Render the owner's PARKED apps in their own section. A parked app is hidden from
+  // the public catalogue but stays fully usable by the owner; the primary action here
+  // is Publish (unpark), which moves it back into Published Apps.
+  function renderParkedApps(parkedApps, aimeatUrl, section, grid, countEl) {
+    if (!section || !grid || !countEl) return;
+    if (!parkedApps || parkedApps.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    countEl.textContent = '(' + parkedApps.length + ')';
+
+    var html = '';
+    for (var i = 0; i < parkedApps.length; i++) {
+      var sa = parkedApps[i];
+      var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : (sa.filename || '');
+      var version = sa.version_number ? 'v' + sa.version_number : '';
+      var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
+      var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
+      html +=
+        '<div class="published-card parked">' +
+          '<div class="published-card-name">' + escapeHtml(name) +
+            (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
+            ' <span class="published-source-badge parked">' + t('card.parkedBadge') + '</span>' +
+          '</div>' +
+          '<div class="published-card-meta">' +
+            '<span>' + escapeHtml(sa.filename || '') + '</span>' +
+            '<span>' + date + '</span>' +
+          '</div>' +
+          '<div class="published-card-actions">' +
+            '<button class="primary" onclick="window._launcher.toggleParkApp(\'' + escapeHtml(sa.filename || '') + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>' +
+            '<button onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">' + t('ctx.details') + '</button>' +
+            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
+            '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">' + t('card.versions') + '</button>' +
+            '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(sa.filename || '') + '\')" class="danger">' + t('card.remove') + '</button>' +
           '</div>' +
         '</div>';
     }
@@ -5256,25 +5364,24 @@
         }
       }
 
-      // Park/Unpark is only meaningful for an app that actually exists on the server
+      // Park is only meaningful for an app that actually exists on the server
       // (source 'server' or 'both'); a purely-local published entry has nothing to hide.
+      // Parking moves the app into the separate Parked Apps section (it is filtered out
+      // of this Published list), so this button always parks.
       var onServer = app.isOwn && app.filename && (app.source === 'server' || app.source === 'both');
       var parkBtnHtml = onServer
-        ? '<button onclick="window._launcher.toggleParkApp(\'' + escapeHtml(app.filename) + '\', ' + (app.parked ? 'false' : 'true') + ')">' + (app.parked ? t('card.unpark') : t('card.park')) + '</button>'
+        ? '<button onclick="window._launcher.toggleParkApp(\'' + escapeHtml(app.filename) + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>'
         : '';
-      var parkedBadgeHtml = app.parked ? ' <span class="published-source-badge parked" title="' + escapeHtml(t('card.parkedHint')) + '">' + t('card.parkedBadge') + '</span>' : '';
-      var parkedHintHtml = app.parked ? '<div class="published-card-meta" style="margin-top:2px"><span style="opacity:.7">' + escapeHtml(t('card.parkedHint')) + '</span></div>' : '';
 
       html +=
-        '<div class="published-card' + (app.parked ? ' parked' : '') + '">' +
+        '<div class="published-card">' +
           '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
-            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' + parkedBadgeHtml +
+            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
           '</div>' +
           '<div class="published-card-meta">' +
             '<span>' + escapeHtml(app.filename) + '</span>' +
             '<span>' + app.date + '</span>' +
           '</div>' +
-          parkedHintHtml +
           subChipHtml +
           '<div class="published-card-actions">' +
             (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
@@ -6897,6 +7004,7 @@
     loadPublishedApps: loadPublishedApps,
     togglePublished: togglePublished,
     toggleCommunity: toggleCommunity,
+    toggleParked: toggleParked,
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
