@@ -22,6 +22,7 @@ import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
+import { startScreenshotAutoCapture } from '../services/screenshot-capture.js';
 import { presence } from '../services/presence.js';
 import { assembleBook, pullBook } from '../services/federation-book.js';
 import { performKeyExchange } from '../routes/federation.js';
@@ -191,6 +192,10 @@ export async function initializeServices(
 
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
   startHeartbeatJob(config, storage, peers, networkDirectory);
+
+  // Node-internal auto-screenshot job — backfills app thumbnails with no token/operator action
+  // (no-op unless config.screenshotAutoCapture is on; self-disables if no browser is available).
+  startScreenshotAutoCapture(config, storage);
 
   // Presence tracker — local online state (from SSE) + federated remote cache, with a
   // change-driven push loop (≤1/min) to active peers. Reads always resolve locally.

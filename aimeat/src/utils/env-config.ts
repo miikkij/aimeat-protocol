@@ -168,6 +168,18 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           defaultVal: 'false',
         },
         {
+          envVar: 'AIMEAT_SCREENSHOT_AUTO',
+          description: 'Auto-generate app thumbnails for apps with none (needs a headless browser)',
+          value: config.screenshotAutoCapture ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_SCREENSHOT_INTERVAL_MIN',
+          description: 'Minutes between auto-screenshot scans',
+          value: String(config.screenshotIntervalMin),
+          defaultVal: '15',
+        },
+        {
           envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS',
           description: 'Allowed CORS origins (comma-separated, or * for all)',
           value: config.corsAllowedOrigins.join(', '),

@@ -137,6 +137,10 @@ export interface AimeatConfig {
   devMode: boolean;
   testMode: boolean;
   anonymousMode: boolean;
+  /** Node auto-generates thumbnails for published apps that have none (needs a headless browser). */
+  screenshotAutoCapture: boolean;
+  /** Minutes between auto-screenshot scans (default 15). */
+  screenshotIntervalMin: number;
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
   ecoJwtTtlSeconds: number; // GEAI (ecosystem app) credential lifetime
@@ -594,6 +598,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
     testMode: process.env.AIMEAT_TEST_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
+    screenshotAutoCapture: process.env.AIMEAT_SCREENSHOT_AUTO === 'true',
+    screenshotIntervalMin: parseInt(process.env.AIMEAT_SCREENSHOT_INTERVAL_MIN ?? '15', 10),
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
     agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days
     ecoJwtTtlSeconds: parseInt(process.env.AIMEAT_ECO_JWT_TTL ?? '7776000', 10),     // 90 days
