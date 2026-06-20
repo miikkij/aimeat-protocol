@@ -51,8 +51,11 @@ All notable changes to AIMEAT are documented in this file.
     by running in-process) and self-disabling gracefully if no browser is present.
     `src/services/screenshot-capture.ts`, `src/server-bootstrap/service-init.ts`, `src/config.ts`,
     `src/utils/env-config.ts`, `.env.example`.
-  - **Manual override in the catalogue:** a **Set screenshot** button in the app detail view uploads a
-    custom thumbnail (owner-authed) via the endpoint. `src/static/app-catalog.html`.
+  - **Catalogue detail buttons:** **Set screenshot** uploads a custom thumbnail (owner-authed), and
+    **New screenshot** clears the current one via `DELETE /v1/apps/:owner/:filename/screenshot` so the
+    scheduled job re-takes it on its next run — clearing is cheap (no on-demand render), which keeps it
+    DoS-safe. `src/static/app-catalog.html`, `src/routes/apps.ts`, `openapi.yaml`,
+    `test/e2e-apps.ts` (Phase 8).
 
 ### Changed
 

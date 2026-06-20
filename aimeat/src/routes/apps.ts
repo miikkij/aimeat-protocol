@@ -43,6 +43,9 @@
  *     forward when omitted so a re-publish / restore never blanks it.
  *   v1.8.0 -- 2026-06-20 -- appOriginUrl auto-assigns a per-app subdomain (ensureAppSubdomain) so the
  *     apex inline 301 lands on the app's own origin → seamless SSO works with no manual subdomain step.
+ *   v1.9.0 -- 2026-06-20 -- Add DELETE /v1/apps/:owner/:filename/screenshot: clear a screenshot
+ *     (owner OR operator) without rendering a new one — the scheduled auto-capture job recaptures it
+ *     on its next scan (DoS-safe "refresh thumbnail", no on-demand render).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -312,6 +315,49 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             filename,
             owner: app.ownerName,
             screenshot_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(filename)}/screenshot`,
+        }));
+    });
+
+    // DELETE /v1/apps/:owner/:filename/screenshot — clear an app's screenshot WITHOUT rendering a new
+    // one. The node's scheduled auto-capture job regenerates it on its next scan. This is the
+    // "refresh thumbnail" action: clearing is cheap and queues a batch recapture, so there is no
+    // on-demand server render to hammer (DoS-safe). The app's owner, or a node operator, may clear.
+    router.delete('/v1/apps/:owner/:filename/screenshot', requireAuth(), async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const decodedFn = decodeURIComponent(filename);
+        if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
+            || decodedFn.includes('%2f') || decodedFn.includes('%2F')
+            || decodedFn.includes('%5c') || decodedFn.includes('%5C')
+            || decodedFn.includes('\0')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+            return;
+        }
+
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        const { owner: callerOwner } = await canonicalOwner(req);
+        if (!isOperator && callerOwner !== app.ownerName) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only clear the screenshot for your own apps'));
+            return;
+        }
+
+        await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`);
+        emitChange('apps');
+        res.json(success(config.nodeId, {
+            filename,
+            owner: app.ownerName,
+            cleared: true,
+            note: config.screenshotAutoCapture
+                ? 'Screenshot cleared. The node will capture a fresh one on its next scheduled scan.'
+                : 'Screenshot cleared. Auto-capture is off on this node — set a new one manually, or enable AIMEAT_SCREENSHOT_AUTO.',
         }));
     });
 

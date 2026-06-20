@@ -10727,6 +10727,31 @@ paths:
           $ref: '#/components/responses/NotFound'
         '413':
           description: Screenshot exceeds the 2 MB limit
+    delete:
+      operationId: clearAppScreenshot
+      summary: Clear an app's screenshot (queues a batch recapture)
+      description: >
+        Removes the stored screenshot without rendering a new one. The node's scheduled auto-capture
+        job regenerates it on its next scan when AIMEAT_SCREENSHOT_AUTO is enabled — clearing is cheap
+        and DoS-safe (no on-demand server render). The app's owner, or a node operator, may clear.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Screenshot cleared
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/apps/backup:
     get:
