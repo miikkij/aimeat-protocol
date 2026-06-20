@@ -128,20 +128,57 @@ export function injectAppScript(data: Buffer | Uint8Array | string, src: string)
   return Buffer.from(html, 'utf-8');
 }
 
+/** Add `value` to a CSP directive's source list (deriving from default-src when the directive is
+ *  absent), without duplicating it. Returns the new source-list array. */
+function cspEnsure(dirs: Map<string, string[]>, dir: string, value: string): void {
+  const base = dirs.get(dir) ?? dirs.get('default-src') ?? ["'self'"];
+  const vals = [...base];
+  if (!vals.includes(value)) vals.push(value);
+  dirs.set(dir, vals);
+}
+
 /**
- * Write a published app's HTML body with the app CSP + cache/security headers. When `injectSrc`
- * is set and the body is HTML, the seamless-SSO shim (`<script src=injectSrc>`) is injected so the
- * app gets a scoped grant token without a separate login (H-2 seamless SSO).
+ * If a published app's HTML carries its OWN `<meta http-equiv="Content-Security-Policy">`, ensure its
+ * `frame-src` AND `connect-src` allow the apex origin. Otherwise a strict app-author CSP (e.g.
+ * `default-src 'self'`) blocks the H-2 silent-SSO bridge (a hidden iframe → apex) and the apex grant
+ * token exchange, so seamless sign-in silently fails. Only those two directives gain the apex; every
+ * other protection the author set is preserved. Apps with no CSP meta are returned unchanged (the
+ * response-header CSP governs them).
  */
-function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, injectSrc?: string): void {
+export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: string): Buffer {
+  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+  if (!apexOrigin) return Buffer.from(raw, 'utf-8');
+  const out = raw.replace(/<meta\b[^>]*>/gi, (tag) => {
+    if (!/http-equiv\s*=\s*["']content-security-policy["']/i.test(tag)) return tag;
+    const cm = /content\s*=\s*(["'])([\s\S]*?)\1/i.exec(tag);
+    if (!cm) return tag;
+    const dirs = new Map<string, string[]>();
+    for (const part of cm[2].split(';').map((s) => s.trim()).filter(Boolean)) {
+      const [name, ...vals] = part.split(/\s+/);
+      dirs.set(name.toLowerCase(), vals);
+    }
+    cspEnsure(dirs, 'frame-src', apexOrigin);
+    cspEnsure(dirs, 'connect-src', apexOrigin);
+    const rebuilt = [...dirs.entries()].map(([n, v]) => (v.length ? `${n} ${v.join(' ')}` : n)).join('; ');
+    return tag.replace(cm[0], cm[0].replace(cm[2], rebuilt));
+  });
+  return Buffer.from(out, 'utf-8');
+}
+
+/**
+ * Write a published app's HTML body with the app CSP + cache/security headers. For HTML apps the
+ * author's own CSP meta is relaxed (frame-src/connect-src → allow the apex) so the H-2 silent-SSO
+ * bridge + token exchange work even when the app sets `default-src 'self'`.
+ */
+function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string): void {
   res.setHeader('Content-Type', app.mimeType);
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
 
-  if (injectSrc && /text\/html/i.test(app.mimeType)) {
-    const buf = injectAppScript(app.data as Buffer | Uint8Array | string, injectSrc);
+  if (apexOrigin && /text\/html/i.test(app.mimeType)) {
+    const buf = relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin);
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
@@ -189,7 +226,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    serveApp(res, storage, app, csp);  // the SDK (aimeat-auth.js) does the silent SSO itself
+    serveApp(res, storage, app, csp, apexOrigin);  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
@@ -218,7 +255,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
       return;
     }
-    serveApp(res, storage, app, csp); // no subdomain available → serve on the shared host (no SSO)
+    serveApp(res, storage, app, csp, apexOrigin); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;
