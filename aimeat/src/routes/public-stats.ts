@@ -9,6 +9,9 @@
  *   v1.0.0 — 2026-06-10 — Initial: landing redesign (live ticker + today's counters).
  *   v1.1.0 — 2026-06-16 — Exclude synthetic 'activity/' public-activity-feed entries from
  *     both the ticker and today's public_writes count (they have their own feed).
+ *   v1.2.0 — 2026-06-20 — Add GET /v1/public/node-totals: cumulative public counters
+ *     (apps, organisms, agents+online, knowledge packages, downloads) for the landing
+ *     panel that replaced the often-empty activity feed.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -22,6 +25,7 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
   const router = Router();
   const tickerCache: CacheSlot<unknown> = { at: 0, value: null };
   const statsCache: CacheSlot<unknown> = { at: 0, value: null };
+  const totalsCache: CacheSlot<unknown> = { at: 0, value: null };
 
   const agentNameOf = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[0] : gaii.split('@')[0]);
   const isToday = (iso?: string) => !!iso && iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
@@ -91,6 +95,49 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
     const payload = { public_writes: publicWrites, tasks_completed: tasksCompleted, schedules_fired: schedulesFired };
     statsCache.at = Date.now();
     statsCache.value = payload;
+    res.json(success(config.nodeId, payload));
+  });
+
+  // GET /v1/public/node-totals — cumulative public counters for the landing panel.
+  // Always-meaningful "this node has X" figures so the landing never reads as broken-empty.
+  // All real numbers; on very large nodes the bounded sweeps make a figure a floor, not a lie.
+  router.get('/v1/public/node-totals', rateLimit({ windowMs: 60_000, max: 60 }), async (_req, res) => {
+    if (Date.now() - totalsCache.at < 30_000 && totalsCache.value) {
+      res.json(success(config.nodeId, totalsCache.value));
+      return;
+    }
+    let apps = 0, downloads = 0, organisms = 0, agents = 0, agentsOnline = 0, knowledgePackages = 0;
+    try {
+      // No ownerGaii/viewerGhii → public, latest-version, non-parked apps only.
+      const { apps: list, total } = await storage.listApps({ limit: 1000 });
+      apps = total || list.length;
+      const counts = await Promise.all(
+        list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(() => 0)),
+      );
+      downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
+    } catch { /* 0 */ }
+    try {
+      const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000 });
+      organisms = orgs.length;
+    } catch { /* 0 */ }
+    try {
+      const all = await storage.listAgents();
+      agents = all.length;
+      const cutoff = Date.now() - 10 * 60 * 1000;
+      agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
+    } catch { /* 0 */ }
+    try {
+      // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
+      const mem = await storage.listAllMemory({ visibility: 'public', limit: 1000 });
+      knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
+    } catch { /* 0 */ }
+    const payload = {
+      apps, downloads, organisms,
+      agents, agents_online: agentsOnline,
+      knowledge_packages: knowledgePackages,
+    };
+    totalsCache.at = Date.now();
+    totalsCache.value = payload;
     res.json(success(config.nodeId, payload));
   });
 

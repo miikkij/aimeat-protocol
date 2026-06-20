@@ -148,3 +148,11 @@
 .pa-detail-actor { margin: 0 0 .4rem; color: var(--muted); font-size: .78rem; }
 .pa-detail-link { color: var(--accent); font-weight: 700; text-decoration: none; font-size: .85rem; }
 .pa-detail-link:hover { text-decoration: underline; }
+
+/* ── Node totals panel (nt- prefix) — cumulative counters replacing the activity feed ── */
+.nt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; }
+.nt-card { display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: 1rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: center; }
+.nt-icon { font-size: 1.4rem; line-height: 1; }
+.nt-value { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.nt-label { font-size: .8rem; color: var(--text-dim); }
+.nt-sub { font-size: .72rem; font-weight: 600; color: var(--accent); }

@@ -102,7 +102,7 @@ console.log('\nPhase 1: Apps');
 
 const appFile = `pac-app-${stamp}.html`;
 await test('Publishing an app records an "apps" feed event', async () => {
-  const r = await json('/v1/apps', ownerAuth({ method: 'POST', body: JSON.stringify({ filename: appFile, content: b64('<h1>pac</h1>'), name: `PAC App ${stamp}`, category: 'utility', tags: ['pac'] }) }));
+  const r = await json('/v1/apps', ownerAuth({ method: 'POST', body: JSON.stringify({ filename: appFile, content: b64('<h1>pac</h1>'), name: `PAC App ${stamp}`, description: 'A tiny fixture app for the public-activity E2E suite.', category: 'utility', tags: ['pac'] }) }));
   assert(r.status === 201, `publish status ${r.status}: ${JSON.stringify(r.body)}`);
   const hit = await waitForFeed('apps', it => typeof it.summary === 'string' && it.summary.includes(`PAC App ${stamp}`));
   assert(hit.category === 'apps', 'event category is apps');
