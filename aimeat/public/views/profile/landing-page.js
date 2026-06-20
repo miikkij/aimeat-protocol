@@ -18,7 +18,10 @@
  *   v3.5.0 — 2026-06-20 — NextSteps recut to a curated, value-first set (write self-organizing
  *     notes → Notebook; create your portfolio → Portfolio; build an app → app-catalog create flow
  *     with ?lang=&create=1; use agents others shared → Offers) — dropped the package-manager /
- *     connect-agent steps. Browser Back now works INSIDE the profile: open()/close() push
+ *     connect-agent steps. The portfolio step shows only when no portfolio is published yet, and
+ *     the build-an-app step only when the user has no app of their own (both gated on KNOWN-missing
+ *     data so an existing user never sees them flash). Browser Back now works INSIDE the profile:
+ *     open()/close() push
  *     /v1/profile?tab= history entries and a popstate handler restores the tab, so Back steps
  *     through tabs to Home instead of leaving the profile (?tab= is also a working deep link now).
  *   v3.4.0 — 2026-06-20 — Home cleanup: removed the tier-'new' onboarding blocks (HeroOnboarding,
@@ -79,6 +82,7 @@ import { listRecents } from '/js/recents.js';
 import { getMemory, createMemory } from '/js/services/memory.js';
 import { listInbox } from '/js/services/messages.js';
 import { getMyPresence, setMyPresence } from '/js/services/presence.js';
+import { apiGet } from '/js/api.js';
 import { Spinner } from './shared.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
@@ -714,21 +718,36 @@ function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
 
 /* "Suggested next steps" — a curated, value-first card pointing at the genuinely useful
  * but under-used surfaces (replaces the old four-path onboarding hero that flashed for
- * everyone because tier starts 'new' before stats load). Fixed set, first highlighted:
- *   1. Write self-organizing notes → Notebook (the highest-value habit)
- *   2. Create your portfolio → Portfolio (under-used; tell others who you are)
+ * everyone because tier starts 'new' before stats load). First item highlighted:
+ *   1. Write self-organizing notes → Notebook (always; the highest-value habit)
+ *   2. Create your portfolio → Portfolio — ONLY if the user hasn't published one yet
+ *      (under-used; tell others who you are)
  *   3. Build an app → the app catalog's create flow (prompt builder), in the portal's
- *      current language (?lang=) with the builder auto-opened (?create=1)
- *   4. Use agents others shared → the Offers "Do" surface
- * Each step carries its own `go()` so a step can switch a tab OR open an external page. */
-function NextSteps({ switchTab }) {
+ *      current language (?lang=) with the builder auto-opened (?create=1) — ONLY if the
+ *      user has no app of their own yet
+ *   4. Use agents others shared → the Offers "Do" surface (always)
+ * The two conditional steps render only once their data is KNOWN to be "missing" (apps
+ * loaded → 0; portfolio config fetched → not enabled), so an existing user never sees a
+ * step flash in then disappear. Each step carries its own `go()` so it can switch a tab
+ * OR open an external page. */
+function NextSteps({ switchTab, hasApps }) {
+  // hasPortfolio: undefined = loading, true = published config exists, false = none yet.
+  const [hasPortfolio, setHasPortfolio] = useState(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    apiGet('/v1/portfolio/config')
+      .then(r => { if (!cancelled) setHasPortfolio(!!(r?.data?.config?.enabled)); })
+      .catch(() => { if (!cancelled) setHasPortfolio(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const buildAppUrl = `/app-catalog.html?lang=${encodeURIComponent(getLocale())}&create=1`;
   const steps = [
     { icon: '\u{1F9E0}', key: 'writeNotes', go: () => switchTab('notebook') },
-    { icon: '\u{1F3A8}', key: 'portfolio', go: () => switchTab('portfolio') },
-    { icon: '\u{26A1}', key: 'buildApp', go: () => window.open(buildAppUrl, '_blank', 'noopener') },
-    { icon: '\u{1F91D}', key: 'useSharedAgents', go: () => switchTab('offers') },
   ];
+  if (hasPortfolio === false) steps.push({ icon: '\u{1F3A8}', key: 'portfolio', go: () => switchTab('portfolio') });
+  if (hasApps === false) steps.push({ icon: '\u{26A1}', key: 'buildApp', go: () => window.open(buildAppUrl, '_blank', 'noopener') });
+  steps.push({ icon: '\u{1F91D}', key: 'useSharedAgents', go: () => switchTab('offers') });
 
   return html`
     <div class="pf-next">
@@ -917,6 +936,7 @@ const DEFAULT_PINS = ['organisms', 'agents', 'memory', 'scheduler'];
 
 export default function LandingPage({ tier, stats, session, navigate, showToast, locale, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
+  const [appsLoaded, setAppsLoaded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   // Which inline view is open (and under which slot), restored on F5. Stored in
@@ -955,6 +975,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
       const list = await listApps();
       setApps(Array.isArray(list) ? list.filter(a => a.owner === owner) : []);
     } catch { setApps([]); }
+    finally { setAppsLoaded(true); }
   }, [owner]);
 
   useEffect(() => { loadApps(); }, [loadApps]);
@@ -1162,7 +1183,8 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
           <${WaitingForYou} owner=${owner} />
-          <${NextSteps} switchTab=${(id) => open(id, 'main')} />
+          <${NextSteps} switchTab=${(id) => open(id, 'main')}
+            hasApps=${appsLoaded ? apps.length > 0 : undefined} />
           <div class="pf-home-grid">
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
