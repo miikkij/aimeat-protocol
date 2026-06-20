@@ -4614,8 +4614,11 @@ paths:
         app origin `*.apps.<apex>`) sends the owner's browser here to request scoped access to
         the owner's data. On valid params the node stores a short-lived pending request and
         **302-redirects** to the trusted apex consent page (`/v1/app-grant?req=...`) where the
-        owner approves. `code_challenge_method` must be `S256`; `redirect_uri` must be on the
-        app origin (never the apex); `scope` must be drawn from the grantable scope set.
+        owner approves. `code_challenge_method` is `S256` (or `plain` for non-secure-context clients
+        without crypto.subtle — real app origins are https/S256); `redirect_uri` must be on the
+        app origin (never the apex); `scope` must be drawn from the grantable scope set. With
+        `response_mode=web_message` the consent page postMessages the code back to the app
+        popup-opener (so the user stays in the app); the default `query` mode full-redirects.
       tags: [Auth]
       parameters:
         - { in: query, name: app, required: true, schema: { type: string }, description: '"owner/filename"' }
@@ -4624,7 +4627,8 @@ paths:
         - { in: query, name: scope, required: true, schema: { type: string }, description: Space/comma-separated grantable scopes }
         - { in: query, name: state, required: false, schema: { type: string } }
         - { in: query, name: code_challenge, required: true, schema: { type: string } }
-        - { in: query, name: code_challenge_method, required: true, schema: { type: string, enum: [S256] } }
+        - { in: query, name: code_challenge_method, required: true, schema: { type: string, enum: [S256, plain] } }
+        - { in: query, name: response_mode, required: false, schema: { type: string, enum: [query, web_message] }, description: 'web_message → consent page postMessages the code to the popup-opener' }
       responses:
         '302': { description: Redirect to the apex consent page }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -4649,7 +4653,9 @@ paths:
       description: |
         The owner, authenticated on the apex SPA, approves a pending request. The node mints a
         single-use authorization code and returns the app's `redirect_url` (carrying the code +
-        state) for the browser to navigate back to the app.
+        state) for the browser to navigate back to the app. The optional `scopes` array grants a
+        SUBSET of the requested scopes (the "Advanced" picker) — values not in the request are
+        ignored; omit to grant everything requested.
       tags: [Auth]
       security:
         - BearerAuth: []
@@ -4657,7 +4663,12 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [request_id], properties: { request_id: { type: string } } }
+            schema:
+              type: object
+              required: [request_id]
+              properties:
+                request_id: { type: string }
+                scopes: { type: array, items: { type: string }, description: 'Optional subset of the requested scopes to grant' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }

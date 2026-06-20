@@ -3,13 +3,20 @@
  * @description Trusted consent page (apex origin) for the H-2 app-grant flow. An app on the
  *   isolated app origin sends the owner here (GET /v1/app-grants/authorize → 302 → /v1/app-grant
  *   ?req=...). The owner, authenticated on aimeat.io, reviews the requesting app + the exact
- *   scopes and Approves or Denies. Approve POSTs to /v1/app-grants/authorize-consent and the
- *   server returns the app's redirect_url (carrying the one-time code) which we navigate to —
- *   the app never sees the session, only the scoped grant token it then exchanges.
- * @structure default export AppGrant() — loads the pending request, renders scopes + actions.
+ *   scopes and Allows or Denies. On Allow we POST /v1/app-grants/authorize-consent and get back the
+ *   app's redirect_url carrying a one-time code. Two delivery modes:
+ *     • web_message (popup): postMessage { type:'aimeat_app_grant', code, state } to the app
+ *       popup-opener (targeted at the exact app origin) and close — the user stays in the app.
+ *     • query (full redirect, legacy): navigate to redirect_url.
+ *   The app never sees the session, only the scoped, revocable grant token it then exchanges.
+ *   "Advanced" lets the owner grant a SUBSET of the requested scopes (never more).
+ * @structure default export AppGrant() — loads the pending request, renders the trust prompt +
+ *   scopes (+ advanced per-scope checkboxes), Allow/Deny.
  * @usage routed at /v1/app-grant?req=<id> by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3: consent page).
+ *   v1.1.0 — 2026-06-20 — Popup (web_message) delivery + "trust this app" reframe + Advanced
+ *     per-scope subset selection (consent flow wired to apps via the SDK).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -24,6 +31,8 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 export default function AppGrant() {
   const [state, setState] = useState({ status: 'loading', request: null, error: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
 
   const requestId = new URLSearchParams(window.location.search).get('req') || '';
   const loggedIn = !!window.AIMEAT?.auth?.hasSession;
@@ -33,16 +42,36 @@ export default function AppGrant() {
     if (!loggedIn) { setState({ status: 'login' }); return; }
     let live = true;
     api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`)
-      .then((res) => { if (live) setState({ status: 'ready', request: res.data }); })
+      .then((res) => {
+        if (!live) return;
+        setSelected(new Set((res.data.scopes || []).map((s) => s.scope))); // default: all requested granted
+        setState({ status: 'ready', request: res.data });
+      })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
     return () => { live = false; };
   }, [requestId, loggedIn]);
 
+  function toggle(scope) {
+    setSelected((prev) => { const n = new Set(prev); if (n.has(scope)) n.delete(scope); else n.add(scope); return n; });
+  }
+
   async function approve() {
+    if (selected.size === 0) return;
     setSubmitting(true);
     try {
-      const res = await api('/v1/app-grants/authorize-consent', { method: 'POST', body: JSON.stringify({ request_id: requestId }) });
-      window.location.href = res.data.redirect_url; // back to the app, carrying the one-time code
+      const res = await api('/v1/app-grants/authorize-consent', {
+        method: 'POST', body: JSON.stringify({ request_id: requestId, scopes: [...selected] }),
+      });
+      const url = new URL(res.data.redirect_url);
+      const code = url.searchParams.get('code');
+      const st = url.searchParams.get('state');
+      // Popup mode: hand the code back to the app (popup-opener) at its exact origin, then close.
+      if (state.request?.response_mode === 'web_message' && window.opener) {
+        window.opener.postMessage({ type: 'aimeat_app_grant', code, state: st }, state.request.app_origin);
+        window.close();
+        return;
+      }
+      window.location.href = res.data.redirect_url; // legacy full-redirect mode
     } catch (e) {
       setState((s) => ({ ...s, status: 'error', error: e.message || 'Failed to approve.' }));
       setSubmitting(false);
@@ -50,8 +79,13 @@ export default function AppGrant() {
   }
 
   function deny() {
+    if (state.request?.response_mode === 'web_message' && window.opener) {
+      window.opener.postMessage({ type: 'aimeat_app_grant', code: null, state: null }, state.request.app_origin);
+      window.close();
+      return;
+    }
     const origin = state.request?.app_origin;
-    if (origin) window.location.href = origin; else window.location.href = '/v1/profile';
+    window.location.href = origin || '/v1/profile';
   }
 
   if (state.status === 'loading') {
@@ -73,7 +107,7 @@ export default function AppGrant() {
         <div class="agr-card">
           <h1 class="agr-title">${tr('appGrant.errorTitle', 'Cannot grant access')}</h1>
           <p class="agr-muted">${escHtml(state.error)}</p>
-          <a class="btn-outline agr-btn" href="/v1/profile">${tr('common.back', 'Back')}</a>
+          <button class="btn-outline agr-btn" onClick=${deny}>${tr('common.back', 'Back')}</button>
         </div>
       </div>`;
   }
@@ -82,26 +116,39 @@ export default function AppGrant() {
   return html`
     <div class="agr-wrap">
       <div class="agr-card">
-        <h1 class="agr-title">${tr('appGrant.title', 'Allow this app to access your data?')}</h1>
+        <span class="agr-badge">${tr('appGrant.externalBadge', 'External app')}</span>
+        <h1 class="agr-title">${tr('appGrant.trustTitle', 'Trust this app?')}</h1>
         <div class="agr-app">
           <div class="agr-app-name">${escHtml(req.app_name)}</div>
           <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
         </div>
-        <p class="agr-muted">${tr('appGrant.intro', 'It will receive its own scoped, revocable token — never your login session. You can revoke it anytime in Profile › Access.')}</p>
-        <div class="agr-scopes-label">${tr('appGrant.scopesLabel', 'Requested access')}</div>
+        <p class="agr-muted">${tr('appGrant.trustIntro', 'This app is not yours. It gets its OWN scoped, revocable key — never your login session. You can revoke it anytime in Profile › Access.')}</p>
+
+        <div class="agr-scopes-label">${tr('appGrant.needsLabel', 'This app needs:')}</div>
         <ul class="agr-scopes">
           ${req.scopes.map((s) => html`
             <li class="agr-scope" key=${s.scope}>
-              <span class="agr-scope-name">${escHtml(s.scope)}</span>
-              <span class="agr-scope-desc">${escHtml(s.description || '')}</span>
+              ${advanced && html`
+                <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
+                  onChange=${() => toggle(s.scope)} aria-label=${s.scope} />`}
+              <span class="agr-scope-text">
+                <span class="agr-scope-desc">${escHtml(s.description || s.scope)}</span>
+                <span class="agr-scope-name">${escHtml(s.scope)}</span>
+              </span>
             </li>`)}
         </ul>
+
+        <button class="agr-advanced-toggle" onClick=${() => setAdvanced((v) => !v)}>
+          ${advanced ? tr('appGrant.advancedHide', '▲ Hide advanced') : tr('appGrant.advancedShow', '⚙ Advanced — choose permissions')}
+        </button>
+
         <div class="agr-actions">
-          <button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.deny', 'Deny')}</button>
-          <button class="btn-primary agr-btn" onClick=${approve} disabled=${submitting}>
-            ${submitting ? tr('appGrant.approving', 'Approving…') : tr('appGrant.approve', 'Allow access')}
+          <button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.deny', 'Don’t trust')}</button>
+          <button class="btn-primary agr-btn" onClick=${approve} disabled=${submitting || selected.size === 0}>
+            ${submitting ? tr('appGrant.approving', 'Allowing…') : tr('appGrant.trustCta', '❤ Trust — allow access')}
           </button>
         </div>
+        <p class="agr-next">${tr('appGrant.nextNote', 'Next time this app logs you in automatically — no prompt.')}</p>
       </div>
     </div>`;
 }

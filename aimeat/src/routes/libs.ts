@@ -585,8 +585,9 @@ function silentAppToken() {
       if (e.origin !== apexOrigin) return;
       var d = e.data || {};
       if (d.type !== 'aimeat_app_login') return;
-      var r = d.result || {};
-      finish((r && r.ok && r.access_token) ? r : null);
+      // Return the FULL result (token on success, or { error:'consent_required', app, scope } so the
+      // caller can launch the visible consent popup). null only when the bridge produced nothing.
+      finish(d.result || null);
     }
     window.addEventListener('message', onMsg);
     iframe = document.createElement('iframe');
@@ -598,22 +599,90 @@ function silentAppToken() {
   });
 }
 
+// ── App-grant consent popup (H-2): for an app the user does NOT own and has not yet granted, the
+// silent bridge returns consent_required. The user approves ONCE in a visible popup (the PKCE code
+// flow); thereafter the silent bridge auto-issues a token (remembered grant). Popups need a user
+// gesture, so this only runs from auth.login() (a click), never the on-mount auto-trigger.
+function _b64url(buf) {
+  var bytes = new Uint8Array(buf), s = '';
+  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+}
+async function _pkce() {
+  var verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+  if (crypto.subtle && crypto.subtle.digest) {
+    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    return { verifier: verifier, challenge: _b64url(digest), method: 'S256' };
+  }
+  // Non-secure context (http on a non-localhost host): crypto.subtle is unavailable. Fall back to
+  // PKCE "plain". Acceptable — such transport is already non-confidential; real app origins are https
+  // (which is a secure context → S256). Prod always uses S256.
+  return { verifier: verifier, challenge: verifier, method: 'plain' };
+}
+async function requestConsentPopup(app, scopeStr) {
+  var apexOrigin;
+  try { apexOrigin = new URL(APEX_URL).origin; } catch (e) { return null; }
+  var p = await _pkce();
+  var state = _b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+  var redirectUri = location.origin + '/'; // app origin; never navigated in web_message mode (origin binding only)
+  var scope = scopeStr || APP_DEFAULT_SCOPES;
+  var url = apexOrigin + '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
+    + '&app=' + encodeURIComponent(app)
+    + '&scope=' + encodeURIComponent(scope)
+    + '&redirect_uri=' + encodeURIComponent(redirectUri)
+    + '&code_challenge=' + encodeURIComponent(p.challenge)
+    + '&code_challenge_method=' + encodeURIComponent(p.method)
+    + '&state=' + encodeURIComponent(state);
+  var w = 460, h = 660;
+  var left = (window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0);
+  var top = (window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0);
+  var popup = window.open(url, 'aimeat_consent', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+  if (!popup) return null; // popup blocked
+  var code = await new Promise(function (resolve) {
+    var done = false, iv = null;
+    function onMsg(e) {
+      if (e.origin !== apexOrigin) return;
+      var d = e.data || {};
+      if (d.type !== 'aimeat_app_grant' || d.state !== state) return;
+      done = true; cleanup(); resolve(d.code || null);
+    }
+    function cleanup() { window.removeEventListener('message', onMsg); if (iv) clearInterval(iv); }
+    window.addEventListener('message', onMsg);
+    iv = setInterval(function () { if (popup.closed && !done) { cleanup(); resolve(null); } }, 500);
+  });
+  if (!code) return null;
+  try {
+    var resp = await fetch(apexOrigin + '/v1/app-grants/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grant_type: 'authorization_code', code: code, code_verifier: p.verifier, redirect_uri: redirectUri }),
+    });
+    var j = await resp.json();
+    return (j && j.ok && j.data && j.data.access_token) ? j.data : null;
+  } catch (e) { return null; }
+}
+
 // Shared in-flight promise so concurrent callers (an app that runs BOTH mountLoginButton's auto
 // trigger AND its own auth.login()) reuse a single silent bridge instead of opening two iframes.
 let _appOriginLoginInFlight = null;
-function restoreSessionFromAppOrigin() {
+function restoreSessionFromAppOrigin(interactive) {
   if (currentSession) return Promise.resolve(currentSession);
   if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
   _appOriginLoginInFlight = (async function () {
     var r = await silentAppToken();
-    if (!r || !r.access_token) return null;
-    var payload = parseJwt(r.access_token) || {};
+    var grant = (r && r.ok && r.access_token) ? r : null;
+    // Not own / not yet granted → consent_required. Open the visible popup ONLY on a user gesture
+    // (interactive); the on-mount auto-trigger passes interactive=false so a blocked popup never fires.
+    if (!grant && interactive && r && r.error === 'consent_required') {
+      grant = await requestConsentPopup(r.app, r.scope);
+    }
+    if (!grant || !grant.access_token) return null;
+    var payload = parseJwt(grant.access_token) || {};
     var ownerName = payload.owner || payload.sub;
     if (!ownerName) return null;
     var session = createSession({
       owner: ownerName,
       ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
-      gaii: null, jwt: r.access_token, roles: payload.roles || [], displayName: '',
+      gaii: null, jwt: grant.access_token, roles: payload.roles || [], displayName: '',
     });
     session._appOrigin = true;
     persistSession(session);
@@ -840,7 +909,9 @@ const auth = {
   async login(username) {
     // On an app origin the host-only cookie is unreachable (cross-origin + CORS *); use the
     // same-site silent bridge so the owner's own app is logged in with no separate login (H-2).
-    if (isAppOrigin()) return await restoreSessionFromAppOrigin();
+    // Non-interactive (no popup) — login() is commonly called on boot, not from a user gesture; the
+    // visible consent popup for a non-owned app is reserved for the Sign In button click.
+    if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
     const stored = load('session');
     // No local metadata — but an httpOnly refresh cookie may exist (e.g. a browser an agent
     // authenticated with an owner access token). Restore the session from the cookie alone.
@@ -1100,7 +1171,12 @@ const auth = {
           + '</style>'
           + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
           + (opts.buttonText || i.signInBtn || '\\u2764\\ufe0f Sign In') + '</button>';
-        document.getElementById('aimeat-login-btn').addEventListener('click', () => showLoginModal(opts, render));
+        document.getElementById('aimeat-login-btn').addEventListener('click', () => {
+          // On an app origin, the Sign In click is the user gesture that opens the consent popup
+          // for a non-owned app (interactive). On the apex it's the normal owner login modal.
+          if (isAppOrigin()) { restoreSessionFromAppOrigin(true).then((s) => { if (s) render(); }).catch(() => {}); }
+          else { showLoginModal(opts, render); }
+        });
       }
     }
     render();
@@ -1116,7 +1192,7 @@ const auth = {
     // button re-renders); if it returns null (anonymous visitor / not the owner) the button stays
     // "Sign In". currentSession guards against racing an explicit login() the app may also run.
     if (isAppOrigin() && !currentSession && !load('session')) {
-      restoreSessionFromAppOrigin().catch(() => {});
+      restoreSessionFromAppOrigin(false).catch(() => {});
     }
   },
 };
