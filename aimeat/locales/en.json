@@ -6306,6 +6306,10 @@
   "mindmap": {
     "titleOrg": "Organism map",
     "titleWs": "Workspace map",
+    "chart": "Chart",
+    "chartMindmap": "Mindmap",
+    "chartLr": "Flowchart →",
+    "chartTd": "Flowchart ↓",
     "level": "Level",
     "levelWs": "Workspaces",
     "levelSpaces": "+ Spaces",

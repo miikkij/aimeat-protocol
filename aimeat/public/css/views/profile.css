@@ -2560,13 +2560,19 @@
 .pj-mm-opt select { width: auto; }
 .pj-mm-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-dim); cursor: pointer; }
 .pj-mindmap-canvas { overflow: auto; max-height: 36rem; }
-.pj-mindmap-canvas .node { cursor: pointer; }
-.pj-mindmap-canvas .node:hover { opacity: 0.82; }
+.pj-mindmap-canvas .node, .pj-mindmap-canvas .mindmap-node { cursor: pointer; }
+.pj-mindmap-canvas .node:hover, .pj-mindmap-canvas .mindmap-node:hover { opacity: 0.82; }
 .pj-mindmap-hint { margin-top: 0.4rem; }
+/* Mindmap heatmap: `:::heatN` attaches the class to the node; colour its shape from theme vars
+   (flowchart modes colour via Mermaid classDef with the same theme-derived values). */
+.pj-mindmap-canvas .heat1 rect, .pj-mindmap-canvas .heat1 path, .pj-mindmap-canvas .heat1 circle { fill: var(--success-bg); stroke: var(--success-fg); }
+.pj-mindmap-canvas .heat2 rect, .pj-mindmap-canvas .heat2 path, .pj-mindmap-canvas .heat2 circle { fill: var(--warn-bg); stroke: var(--warn-fg); }
+.pj-mindmap-canvas .heat3 rect, .pj-mindmap-canvas .heat3 path, .pj-mindmap-canvas .heat3 circle { fill: var(--danger-bg); stroke: var(--danger-fg); }
 
 /* ── Structure timeline / development (Osa D) ── */
 .pj-timeline { margin: 0.4rem 0 0.9rem; }
 .pj-timeline-body { margin-top: 0.4rem; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.pj-timeline-diagram { overflow: auto; max-height: 22rem; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
 .pj-timeline-grid { display: grid; grid-template-columns: minmax(14rem, 22rem) 1fr; gap: 1rem; align-items: start; }
 .pj-timeline-list { list-style: none; margin: 0; padding: 0; max-height: 30rem; overflow: auto; }
 .pj-timeline-item { margin: 0; }

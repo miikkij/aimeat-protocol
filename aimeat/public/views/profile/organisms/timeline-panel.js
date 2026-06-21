@@ -9,6 +9,8 @@
  * @usage import { TimelinePanel } from '/views/profile/organisms/timeline-panel.js';
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: structure timeline view over trackable-memory history (Osa D3).
+ *   v1.1.0 — 2026-06-22 — Add a Mermaid `timeline` diagram of the changes; the selected-snapshot map
+ *     honours the chart type the user picked for this organism's mindmap (localStorage).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -39,6 +41,30 @@ function totals(fp) {
   const docs = ws.reduce((n, w) => n + (w.totalDocuments || 0), 0);
   const recs = ws.reduce((n, w) => n + (w.totalRecords || 0), 0);
   return { workspaces: ws.length, documents: docs, records: recs, members: fp.memberCount || 0 };
+}
+
+/** The chart type the user picked for THIS organism's mindmap (shared with the snapshot map below). */
+function readChartType(orgId) {
+  try {
+    const raw = localStorage.getItem(`aimeat.mm.org.${orgId}`);
+    return (raw && JSON.parse(raw).chartType) || 'mindmap';
+  } catch { return 'mindmap'; }
+}
+
+/** A Mermaid `timeline` diagram of the structural changes (chronological). `:` is the timeline
+ *  separator, so it is stripped from event text; multiple events on one day share a row. */
+function buildTimelineDiagram(rows) {
+  const chron = rows.slice().reverse();   // rows are newest-first → oldest-first for the time axis
+  const byDate = new Map();
+  for (const r of chron) {
+    const d = String(r.at).slice(0, 10) || '—';
+    const ev = String(r.event || '').replace(/[:\n\r]/g, ' ').replace(/[<>|{}]/g, '').trim().slice(0, 60) || 'muutos';
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d).push(ev);
+  }
+  const lines = ['timeline'];
+  for (const [d, evs] of byDate) lines.push(`  ${d} : ${evs.join(' : ')}`);
+  return lines.join('\n');
 }
 
 export function TimelinePanel({ orgId }) {
@@ -79,6 +105,9 @@ export function TimelinePanel({ orgId }) {
             : (!rows.length
               ? html`<div class="section-desc">${t('timeline.empty') || 'No structural history yet.'}</div>`
               : html`
+                <div class="pj-timeline-diagram">
+                  <${Mermaid} chart=${buildTimelineDiagram(rows)} />
+                </div>
                 <div class="pj-timeline-grid">
                   <ul class="pj-timeline-list">
                     ${rows.map(r => {
@@ -95,7 +124,7 @@ export function TimelinePanel({ orgId }) {
                   </ul>
                   <div class="pj-timeline-map">
                     ${selected
-                      ? html`<${Mermaid} chart=${buildOrganismMindmap({ name: t('timeline.snapshot') || 'Snapshot', workspaces: selected.workspaces || [], members: [], agents: [] }, { level: 'counts', showUsers: false, showActivity: true, heatmap: true })} />`
+                      ? html`<${Mermaid} chart=${buildOrganismMindmap({ name: t('timeline.snapshot') || 'Snapshot', workspaces: selected.workspaces || [], members: [], agents: [] }, { chartType: readChartType(orgId), level: 'counts', showUsers: false, showActivity: true, heatmap: true })} />`
                       : html`<div class="section-desc">${t('timeline.pick') || 'Pick a point to see the structure then.'}</div>`}
                   </div>
                 </div>`)}
