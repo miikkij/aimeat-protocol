@@ -4,6 +4,8 @@
  *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian + inbox (slice A).
+ *   v1.1.0 — 2026-06-21 — Enrich (plan) panel: plan steps, run controls, enriched preview.
+ *   v1.2.0 — 2026-06-21 — Phase 3: trust-toggle settings strip + distribute (chunk) panel.
  */
 
 .pf-nb-capture {
@@ -193,3 +195,90 @@
 }
 .pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
 .pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }
+
+/* ── Enrich (plan) panel ── */
+.pf-nb-enrich {
+  margin-top: var(--space-sm, 0.75rem);
+  padding: var(--space-md, 1rem);
+  background: var(--surface, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-enrich-summary { font-style: italic; }
+.pf-nb-plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-plan-step {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-plan-step.done { opacity: 0.75; }
+.pf-nb-plan-step.skipped { opacity: 0.5; }
+.pf-nb-plan-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  flex-wrap: wrap;
+}
+.pf-nb-plan-step-title { font-weight: 600; color: var(--text); }
+.pf-nb-plan-tag { color: var(--success, var(--text)); font-size: 0.85em; }
+.pf-nb-plan-why { font-style: italic; }
+.pf-nb-plan-step-btns {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-enrich-preview {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm, 0.75rem);
+}
+.pf-nb-enrich-preview-body {
+  max-height: 24rem;
+  overflow: auto;
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+
+/* ── Trust toggles (settings strip) ── */
+.pf-nb-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+}
+.pf-nb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  cursor: pointer;
+}
+
+/* ── Distribute (chunk) panel ── */
+.pf-nb-chunk-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.pf-nb-chunk-body {
+  max-height: 14rem;
+  margin-top: var(--space-xs, 0.4rem);
+}

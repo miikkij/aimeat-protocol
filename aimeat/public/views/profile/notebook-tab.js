@@ -1,14 +1,17 @@
 /**
  * @file notebook-tab.js
- * @description Profile "Notebook" tab — slice A: free-text CAPTURE (saved to the notebook inbox) +
- *   the LIBRARIAN read-head (GET /v1/librarian/search, ranked full-text across every organism you
- *   have contributed to plus your personal notes). Classify → disambiguate → materialize-document
- *   is slice B. See docs/internal/design-organism-notebook-and-librarian.md.
+ * @description Profile "Notebook" tab — free-text CAPTURE (saved to the notebook inbox), the LIBRARIAN
+ *   read-head (GET /v1/librarian/search, ranked full-text across every organism you have contributed to
+ *   plus your personal notes), and the per-owner trust toggles. Each captured note's organize workflow
+ *   (suggest → enrich → distribute) lives in the NoteCard child (notebook-card.js); shared helpers in
+ *   notebook-helpers.js. See docs/internal/design-organism-notebook-and-librarian.md.
  * @structure
- *   - NotebookTab (default export) — capture box, inbox list, librarian search
+ *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
+ *   v1.1.0 — 2026-06-21 — Enrich stage (Phase 1) + delegate (Phase 2) + distribute & trust toggles (Phase 3).
+ *   v1.2.0 — 2026-06-21 — Split per-note organize workflow into NoteCard; tab keeps capture/search/inbox.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -18,47 +21,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
-import { classifyNote, materializeDocument } from '/js/services/notebook.js';
+import { getNotebookSettings, saveNotebookSettings } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
-import { Markdown } from '/components/Markdown.js';
-import { OpenRouterSettings } from './generator-settings.js';
-
-const NEW = '__new__';
-
-// Stages shown while the (slow) AI classify call runs, so the user sees what is happening. The
-// timer advances to (and dwells on) the AI step — that is genuinely where the wait is spent.
-const NB_STEPS = ['profile.notebook.step1', 'profile.notebook.step2'];
-
-const INBOX_PREFIX = 'notebook.inbox.';
-
-function relTime(iso) {
-  if (!iso) return '';
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return t('profile.memory.timeJustNow') || 'just now';
-  if (mins < 60) return (t('profile.memory.timeMinsAgo') || '{n}m ago').replace('{n}', String(mins));
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return (t('profile.memory.timeHoursAgo') || '{n}h ago').replace('{n}', String(hrs));
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return (t('profile.memory.timeDaysAgo') || '{n}d ago').replace('{n}', String(days));
-  return new Date(iso).toLocaleDateString();
-}
-
-/** First non-empty line of a note (markdown heading marks stripped), for the collapsed one-line view. */
-function firstLine(text) {
-  const line = (text || '').split('\n').map(l => l.trim()).find(Boolean) || '';
-  return line.replace(/^#{1,6}\s+/, '').replace(/[*_`>#]/g, '').slice(0, 160);
-}
-
-/** Best-effort plain text of a note value for the inbox preview. */
-function noteText(value) {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object') {
-    if (typeof value.text === 'string') return value.text;
-    return JSON.stringify(value);
-  }
-  return String(value ?? '');
-}
+import NoteCard from './notebook-card.js';
+import { INBOX_PREFIX, noteText } from './notebook-helpers.js';
 
 export default function NotebookTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -68,24 +35,28 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [orgNames, setOrgNames] = useState({});
   const [inboxFilter, setInboxFilter] = useState('');
   const [inboxSort, setInboxSort] = useState('new');      // 'new' | 'old'
-  const [noteView, setNoteView] = useState({});           // noteKey → 'line' | 'peek' | 'full' (default 'peek')
 
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState(null);   // null = not searched yet
   const [searching, setSearching] = useState(false);
   const [searchScope, setSearchScope] = useState('own');   // 'own' | 'public'
 
-  // Slice B — placement suggestion for one note at a time.
-  const [sortingKey, setSortingKey] = useState(null);   // note key being classified (loading)
-  const [sortStep, setSortStep] = useState(0);          // progress stage index during classify
-  const [sortError, setSortError] = useState(null);     // { noteKey, message } — persistent inline error
-  const [suggest, setSuggest] = useState(null);         // { noteKey, result, edit }
-  const [materializing, setMaterializing] = useState(false);
-  const stepTimer = useRef(null);
-  function stopStepTimer() { if (stepTimer.current) { clearInterval(stepTimer.current); stepTimer.current = null; } }
-  useEffect(() => stopStepTimer, []);
+  const [settings, setSettings] = useState({ autoDetectIntent: false, autoRunPlan: false, autoDistribute: false });
+  const [autoEnrichKey, setAutoEnrichKey] = useState(null); // the just-captured note to auto-enrich (trust mode)
 
-  useEffect(() => { if (session) { loadInbox(); loadOrgNames(); } }, [session]);
+  useEffect(() => { if (session) { loadInbox(); loadOrgNames(); loadSettings(); } }, [session]);
+
+  async function loadSettings() {
+    try {
+      const s = await getNotebookSettings();
+      setSettings({ autoDetectIntent: !!s.autoDetectIntent, autoRunPlan: !!s.autoRunPlan, autoDistribute: !!s.autoDistribute });
+    } catch { /* defaults stand */ }
+  }
+  async function toggleSetting(key) {
+    const next = { ...settings, [key]: !settings[key] };
+    setSettings(next);
+    try { await saveNotebookSettings(next); } catch { showToast(t('profile.error'), true); }
+  }
 
   // Re-fetch the inbox on live updates (a capture elsewhere, a sync) — Rule from the frontend guide.
   const liveRef = useRef(() => loadInbox());
@@ -126,6 +97,8 @@ export default function NotebookTab({ session, showToast, onStats }) {
       if (resp?.ok === false) { showToast(resp.error?.message || t('profile.notebook.saveFailed'), true); return; }
       showToast(t('profile.notebook.saved'));
       setDraft('');
+      // Trust mode: flag this note so its card auto-runs the planner once it mounts.
+      if (settings.autoDetectIntent) setAutoEnrichKey(key);
       await loadInbox();
     } catch (e) {
       showToast(e.message || t('profile.notebook.saveFailed'), true);
@@ -199,13 +172,6 @@ export default function NotebookTab({ session, showToast, onStats }) {
     return String(gaii || '').split('@')[0];
   }
 
-  // Collapse cycle for an inbox note: one line → peek → full → one line.
-  const cycleView = (key) => setNoteView(v => {
-    const cur = v[key] || 'peek';
-    const next = cur === 'line' ? 'peek' : cur === 'peek' ? 'full' : 'line';
-    return { ...v, [key]: next };
-  });
-
   // Filter (text) + sort (date) the inbox for display.
   function visibleInbox() {
     const ft = inboxFilter.trim().toLowerCase();
@@ -215,158 +181,6 @@ export default function NotebookTab({ session, showToast, onStats }) {
       return inboxSort === 'old' ? da - db : db - da;
     });
   }
-
-  // ── Slice B: classify → suggestion → materialize ──
-
-  /** Build the initial editable plan from a classify result. */
-  function initEdit(result) {
-    const s = result.suggestion || {};
-    const cn = result.createNew || {};
-    const organismId = s.organismId || (cn.suggest ? NEW : NEW);
-    const workspaceId = organismId === NEW ? NEW : (s.workspaceId || NEW);
-    return {
-      organismId,
-      organismName: cn.organismName || '',
-      workspaceId,
-      workspaceName: cn.workspaceName || '',
-      space: workspaceId === NEW ? '' : (s.space || ''),
-      title: s.title || '',
-      markdown: s.markdown || '',
-    };
-  }
-
-  async function handleSuggest(note) {
-    setSuggest(null);
-    setSortError(null);
-    setSortingKey(note.key);
-    setSortStep(0);
-    stopStepTimer();
-    // Walk the user through the expected stages while the AI thinks (the call can take ~30s).
-    stepTimer.current = setInterval(() => setSortStep(s => Math.min(s + 1, NB_STEPS.length - 1)), 2500);
-    try {
-      const result = await classifyNote(noteText(note.value));
-      if (!result) throw new Error(t('profile.error'));
-      setSuggest({ noteKey: note.key, result, edit: initEdit(result) });
-    } catch (e) {
-      setSortError({ noteKey: note.key, message: e.message || t('profile.error'), code: e.code });
-    } finally { stopStepTimer(); setSortingKey(null); }
-  }
-
-  function patchEdit(patch) {
-    setSuggest(s => s ? { ...s, edit: { ...s.edit, ...patch } } : s);
-  }
-
-  function onOrganismChange(organismId) {
-    if (organismId === NEW) { patchEdit({ organismId: NEW, workspaceId: NEW, space: '' }); return; }
-    const org = suggest.result.context.organisms.find(o => o.id === organismId);
-    const firstWs = org?.workspaces?.[0];
-    patchEdit({ organismId, workspaceId: firstWs ? firstWs.id : NEW, space: firstWs?.documentSpaces?.[0]?.namespace || '' });
-  }
-
-  function onWorkspaceChange(workspaceId) {
-    if (workspaceId === NEW) { patchEdit({ workspaceId: NEW, space: '' }); return; }
-    const org = suggest.result.context.organisms.find(o => o.id === suggest.edit.organismId);
-    const ws = org?.workspaces?.find(w => w.id === workspaceId);
-    patchEdit({ workspaceId, space: ws?.documentSpaces?.[0]?.namespace || '' });
-  }
-
-  function applyAlternative(alt) {
-    const org = suggest.result.context.organisms.find(o => o.id === alt.organismId);
-    const ws = org?.workspaces?.find(w => w.id === alt.workspaceId);
-    patchEdit({
-      organismId: alt.organismId || NEW,
-      workspaceId: alt.workspaceId || NEW,
-      space: alt.space || ws?.documentSpaces?.[0]?.namespace || '',
-    });
-  }
-
-  async function handleMaterialize() {
-    if (!suggest) return;
-    const e = suggest.edit;
-    if (!e.title.trim()) { showToast(t('profile.notebook.titleRequired'), true); return; }
-    if (e.organismId === NEW && !e.organismName.trim()) { showToast(t('profile.notebook.orgNameRequired'), true); return; }
-    setMaterializing(true);
-    try {
-      await materializeDocument({
-        organismId: e.organismId === NEW ? null : e.organismId,
-        organismName: e.organismName,
-        workspaceId: (e.organismId === NEW || e.workspaceId === NEW) ? null : e.workspaceId,
-        workspaceName: e.workspaceName,
-        space: (e.organismId === NEW || e.workspaceId === NEW || !e.space) ? null : e.space,
-        title: e.title.trim(),
-        markdown: e.markdown,
-        sourceKey: suggest.noteKey,
-      });
-      showToast(t('profile.notebook.materialized'));
-      setSuggest(null);
-      await loadInbox();
-      loadOrgNames();   // a just-created organism's name should resolve in subsequent search badges
-    } catch (err) {
-      showToast(err.message || t('profile.error'), true);
-    } finally { setMaterializing(false); }
-  }
-
-  const renderSuggestPanel = () => {
-    const { result, edit } = suggest;
-    const orgs = result.context?.organisms || [];
-    const org = orgs.find(o => o.id === edit.organismId);
-    const workspaces = org?.workspaces || [];
-    const ws = workspaces.find(w => w.id === edit.workspaceId);
-    const docSpaces = ws?.documentSpaces || [];
-    const conf = result.suggestion ? Math.round((result.suggestion.confidence || 0) * 100) : null;
-    return html`
-      <div class="pf-nb-suggest">
-        ${result.suggestion?.reason && html`<div class="text-meta-sm pf-nb-suggest-reason">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}</div>`}
-
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldOrganism')}</label>
-        <select class="input-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
-          ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name)}</option>`)}
-          <option value=${NEW}>➕ ${t('profile.notebook.newOrganism')}</option>
-        </select>
-        ${edit.organismId === NEW && html`
-          <input type="text" class="input-field" placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
-            value=${edit.organismName} onInput=${e => patchEdit({ organismName: e.target.value })} />`}
-
-        ${edit.organismId !== NEW && html`
-          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldWorkspace')}</label>
-          <select class="input-field" value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}>
-            ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name)}</option>`)}
-            <option value=${NEW}>➕ ${t('profile.notebook.newWorkspace')}</option>
-          </select>`}
-        ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
-          <input type="text" class="input-field" placeholder=${t('profile.notebook.newWsNamePlaceholder')}
-            value=${edit.workspaceName} onInput=${e => patchEdit({ workspaceName: e.target.value })} />`}
-
-        ${edit.organismId !== NEW && edit.workspaceId !== NEW && docSpaces.length > 0 && html`
-          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldSpace')}</label>
-          <select class="input-field" value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}>
-            ${docSpaces.map(s => html`<option key=${s.namespace} value=${s.namespace}>${escHtml(s.name)}</option>`)}
-          </select>`}
-
-        ${result.alternatives?.length > 0 && html`
-          <div class="pf-nb-suggest-alts">
-            <span class="text-meta-sm">${t('profile.notebook.alternatives')}</span>
-            ${result.alternatives.map((alt, i) => html`
-              <button key=${i} class="btn-ghost btn-sm" onClick=${() => applyAlternative(alt)}>
-                ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` ▸ ${escHtml(alt.workspaceName)}` : ''}
-              </button>`)}
-          </div>`}
-
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldTitle')}</label>
-        <input type="text" class="input-field" value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldBody')}</label>
-        <textarea class="input-field pf-nb-suggest-body" rows="6" value=${edit.markdown}
-          onInput=${e => patchEdit({ markdown: e.target.value })}></textarea>
-
-        <div class="pf-nb-suggest-actions">
-          <button class="btn-primary" disabled=${materializing} onClick=${handleMaterialize}>
-            ${materializing ? '…' : t('profile.notebook.materializeBtn')}
-          </button>
-          <button class="btn-ghost btn-sm" onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}</button>
-        </div>
-      </div>
-    `;
-  };
 
   const renderHit = (hit) => html`
     <div class="pf-nb-hit" key=${hit.key}>
@@ -401,6 +215,12 @@ export default function NotebookTab({ session, showToast, onStats }) {
           ${saving ? '…' : t('profile.notebook.captureBtn')}
         </button>
         <span class="text-meta-sm">${t('profile.notebook.captureHint')}</span>
+      </div>
+      <div class="pf-nb-settings">
+        <span class="text-meta-sm">${t('profile.notebook.trustTitle')}</span>
+        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} /> ${t('profile.notebook.autoDetect')}</label>
+        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} /> ${t('profile.notebook.autoRun')}</label>
+        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} /> ${t('profile.notebook.autoDistribute')}</label>
       </div>
     </div>
 
@@ -448,52 +268,12 @@ export default function NotebookTab({ session, showToast, onStats }) {
           ${visibleInbox().length === 0
             ? html`<div class="empty">${t('profile.notebook.noMatch')}</div>`
             : html`<div class="pf-nb-inbox">
-            ${visibleInbox().map(note => { const view = noteView[note.key] || 'peek'; return html`
-              <div class="pf-nb-note" key=${note.key}>
-                <div class="pf-nb-note-text pf-nb-note-text--${view}">
-                  ${view === 'line'
-                    ? html`<span class="pf-nb-note-line">${escHtml(firstLine(noteText(note.value)))}</span>`
-                    : html`<${Markdown} text=${noteText(note.value)} />`}
-                </div>
-                <div class="pf-nb-note-foot">
-                  <div class="pf-nb-note-meta">
-                    <button class="btn-ghost btn-sm pf-nb-view-btn" title=${t('profile.notebook.toggleView')}
-                      onClick=${() => cycleView(note.key)}>${view === 'full' ? '⌃' : '⌄'}</button>
-                    <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
-                  </div>
-                  <div class="pf-nb-note-btns">
-                    <button class="btn-primary btn-sm" disabled=${sortingKey === note.key}
-                      onClick=${() => handleSuggest(note)}>
-                      ${sortingKey === note.key ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
-                    </button>
-                    <button class="btn-danger btn-sm" onClick=${() => handleDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
-                  </div>
-                </div>
-                ${sortingKey === note.key && html`
-                  <div class="pf-nb-suggest pf-nb-progress">
-                    <${Spinner} text=${t(NB_STEPS[sortStep])} />
-                    <ol class="pf-nb-steps">
-                      ${NB_STEPS.map((s, i) => html`
-                        <li key=${i} class="pf-nb-step ${i < sortStep ? 'done' : i === sortStep ? 'active' : ''}">
-                          ${i < sortStep ? '✓' : i === sortStep ? '→' : '·'} ${t(s)}
-                        </li>`)}
-                    </ol>
-                  </div>`}
-                ${sortError?.noteKey === note.key && html`
-                  <div class="pf-nb-suggest pf-nb-progress">
-                    <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.sortErrorTitle')}: ${escHtml(sortError.message)}</span></div>
-                    ${sortError.code === 'NO_OPENROUTER_KEY' && html`
-                      <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
-                      <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
-                    <div class="pf-nb-suggest-actions">
-                      <button class="btn-primary btn-sm" onClick=${() => handleSuggest(note)}>${t('profile.notebook.tryAgain')}</button>
-                      <button class="btn-ghost btn-sm" onClick=${() => setSortError(null)}>${t('profile.notebook.dismiss')}</button>
-                    </div>
-                  </div>`}
-                ${suggest?.noteKey === note.key && renderSuggestPanel()}
-              </div>
-            `; })}
-          </div>`}
+              ${visibleInbox().map(note => html`
+                <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
+                  settings=${settings} autoEnrich=${settings.autoDetectIntent && autoEnrichKey === note.key}
+                  onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />
+              `)}
+            </div>`}
         `
     }
   `;

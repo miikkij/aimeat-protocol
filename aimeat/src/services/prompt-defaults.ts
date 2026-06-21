@@ -39,6 +39,8 @@ export interface PromptSeedEntry {
 // Generator-specific seeds are in a separate file to keep this file manageable
 import { GENERATOR_PROMPT_SEEDS } from './generator-prompt-seeds.js';
 import { NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
+import { NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';
+import { NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
 
@@ -53,6 +55,24 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
     content: NOTEBOOK_CLASSIFY_TEMPLATE,
     variables: ['structure', 'note'],
     usedIn: ['/v1/librarian/classify'],
+  },
+  {
+    id: 'notebook-plan',
+    group: 'builders',
+    name: 'Notebook Enrichment Planner',
+    description: 'Reasons over a free-text notebook note and proposes an ordered plan of enrichment steps (reason / assess own material) to expand it before filing. Used by POST /v1/librarian/plan.',
+    content: NOTEBOOK_PLAN_TEMPLATE,
+    variables: ['structure', 'note'],
+    usedIn: ['/v1/librarian/plan'],
+  },
+  {
+    id: 'notebook-distribute',
+    group: 'builders',
+    name: 'Notebook Distributor',
+    description: 'Splits a (typically enriched) notebook note into self-contained chunks and files each into its own best organism → workspace → document space. Used by POST /v1/librarian/distribute.',
+    content: NOTEBOOK_DISTRIBUTE_TEMPLATE,
+    variables: ['structure', 'note'],
+    usedIn: ['/v1/librarian/distribute'],
   },
 
   // ═══════════════════════════════════════════════════════════════════

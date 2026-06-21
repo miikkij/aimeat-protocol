@@ -18,7 +18,9 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { librarianSearch } from '../services/librarian.js';
-import { classifyNote, ClassifyError } from '../services/notebook-classify.js';
+import { classifyNote, distributeNote } from '../services/notebook-classify.js';
+import { NotebookAiError } from '../services/notebook-ai.js';
+import { planNote } from '../services/notebook-plan.js';
 
 const MAX_LIMIT = 100;
 
@@ -83,11 +85,71 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       });
       res.json(success(config.nodeId, result));
     } catch (e) {
-      if (e instanceof ClassifyError) {
+      if (e instanceof NotebookAiError) {
         res.status(e.status).json(error(config.nodeId, e.code, e.message));
         return;
       }
       res.status(500).json(error(config.nodeId, 'CLASSIFY_FAILED', (e as Error).message));
+    }
+  });
+
+  // POST /v1/librarian/plan — AI enrichment-plan generation for a free-text note (notebook stage 2).
+  // Owner-scoped: decrypts the caller's own OpenRouter key. Multistep reasoning produces an ordered
+  // plan of enrichment steps (reason about the note / assess the user's own material via the
+  // librarian); the steps are then executed client-side. No writes happen here.
+  router.post('/v1/librarian/plan', requireAuth(), requireRole('owner'), async (req, res) => {
+    const { text, catalogue } = req.body as { text?: string; catalogue?: unknown };
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
+      return;
+    }
+    req.setTimeout(600_000);
+    res.setTimeout(600_000);
+    try {
+      const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+      const result = await planNote(storage, config, {
+        gaii: viewerGaii,
+        ownerName: req.auth!.owner as string,
+        viewerGaii,
+        text,
+        catalogue,
+      });
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof NotebookAiError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      res.status(500).json(error(config.nodeId, 'PLAN_FAILED', (e as Error).message));
+    }
+  });
+
+  // POST /v1/librarian/distribute — split a note into chunks, each with a suggested home (notebook
+  // stage 3). Owner-scoped (decrypts the caller's own OpenRouter key). The per-chunk materialize runs
+  // client-side over the generic memory/organism APIs; nothing is written here.
+  router.post('/v1/librarian/distribute', requireAuth(), requireRole('owner'), async (req, res) => {
+    const { text } = req.body as { text?: string };
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
+      return;
+    }
+    req.setTimeout(600_000);
+    res.setTimeout(600_000);
+    try {
+      const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+      const result = await distributeNote(storage, config, {
+        gaii: viewerGaii,
+        ownerName: req.auth!.owner as string,
+        viewerGaii,
+        text,
+      });
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof NotebookAiError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      res.status(500).json(error(config.nodeId, 'DISTRIBUTE_FAILED', (e as Error).message));
     }
   });
 
