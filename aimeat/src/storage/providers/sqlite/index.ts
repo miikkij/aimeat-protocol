@@ -89,7 +89,7 @@ import * as agentMessageRepo from './repos/agent-message.js';
 import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
 import { searchTextMemory, countMemory as countMemoryRepo } from './repos/memory.js';
-import type { MemoryTextHit, MemoryTextSearchOpts } from '../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../repositories/memory.repository.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -527,23 +527,40 @@ export class SqliteStorage implements Storage {
 
   async setMemory(record: MemoryRecord): Promise<MemoryRecord> {
     const existing = await this.getMemory(record.ownerGaii, record.key);
+    // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
+    // a generic rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
+    const trackable = record.trackable ?? existing?.trackable ?? false;
+    record.trackable = trackable || undefined;
     if (existing) {
+      if (existing.trackable) {
+        // Archive the about-to-be-overwritten version into the separate history table (append-only).
+        this.db.prepare(
+          `INSERT OR IGNORE INTO memory_history (ownerGaii, key, version, value, actor, event, recordedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          existing.ownerGaii, existing.key, existing.version,
+          JSON.stringify(existing.value),
+          this.memoryAnnotation(existing.value, '_actor'), this.memoryAnnotation(existing.value, '_event'),
+          existing.updatedAt,
+        );
+      }
       record.version = existing.version + 1;
       this.db.prepare(
         `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
-         createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ? WHERE ownerGaii = ? AND key = ?`
+         createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ? WHERE ownerGaii = ? AND key = ?`
       ).run(
         JSON.stringify(record.value), record.visibility,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+        trackable ? 1 : 0,
         record.ownerGaii, record.key,
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
         JSON.stringify(record.value), record.visibility,
@@ -551,9 +568,26 @@ export class SqliteStorage implements Storage {
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+        trackable ? 1 : 0,
       );
     }
     return record;
+  }
+
+  async listMemoryHistory(ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]> {
+    const limit = opts?.limit ?? 200;
+    const rows = this.db.prepare(
+      'SELECT * FROM memory_history WHERE ownerGaii = ? AND key = ? ORDER BY version DESC LIMIT ?'
+    ).all(ownerGaii, key, limit) as Record<string, unknown>[];
+    return rows.map(r => ({
+      ownerGaii: r.ownerGaii as string,
+      key: r.key as string,
+      version: r.version as number,
+      value: JSON.parse(r.value as string),
+      actor: (r.actor as string | null) ?? null,
+      event: (r.event as string | null) ?? null,
+      recordedAt: r.recordedAt as string,
+    }));
   }
 
   async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
@@ -730,7 +764,18 @@ export class SqliteStorage implements Storage {
     }
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.groupId) record.groupId = row.groupId as string;
+    if (row.trackable) record.trackable = true;
     return record;
+  }
+
+  /** Read an optional `_actor` / `_event` annotation off a record value (the convention the structure
+   *  timeline uses) so archived history rows carry who/why. Best-effort. */
+  private memoryAnnotation(value: unknown, field: '_actor' | '_event'): string | null {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const v = (value as Record<string, unknown>)[field];
+      if (typeof v === 'string' && v) return v;
+    }
+    return null;
   }
 
   // ══════════════════════════════════════════════════════════

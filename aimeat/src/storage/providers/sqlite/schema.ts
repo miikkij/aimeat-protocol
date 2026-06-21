@@ -72,8 +72,25 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt      TEXT NOT NULL,
       flagCount      INTEGER DEFAULT 0,
       allowedOrigins TEXT,
+      trackable      INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (ownerGaii, key)
     );
+
+    -- ── Memory version history ──
+    -- When a TRACKABLE memory key is overwritten, the PREVIOUS value is appended here before the
+    -- update so memory keeps only the latest version (stays light) while the full history lives in a
+    -- separate table queried only when needed (e.g. the organism structure timeline). Append-only.
+    CREATE TABLE IF NOT EXISTS memory_history (
+      ownerGaii    TEXT NOT NULL,
+      key          TEXT NOT NULL,
+      version      INTEGER NOT NULL,
+      value        TEXT,
+      actor        TEXT,
+      event        TEXT,
+      recordedAt   TEXT NOT NULL,
+      PRIMARY KEY (ownerGaii, key, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_memory_history_key ON memory_history (ownerGaii, key, version DESC);
 
     -- ── Actions ──
     CREATE TABLE IF NOT EXISTS actions (
@@ -1585,6 +1602,11 @@ export function initializeSchema(db: Database.Database): void {
 
   // Phase 4 CORS — Memory-level allowed origins
   safeAddColumn('memory', 'allowedOrigins', 'TEXT');
+
+  // Trackable memory versioning — opt-in flag; previous versions of a trackable key are appended to
+  // the memory_history table (created in the DDL above) on overwrite. Default 0 → no behaviour change
+  // for existing keys. No index needed on this column (filter happens at write time, not query time).
+  safeAddColumn('memory', 'trackable', 'INTEGER NOT NULL DEFAULT 0');
 
   // MCP session tracking — agent and OAuth client binding
   safeAddColumn('chat_instances', 'agentGaii', 'TEXT');

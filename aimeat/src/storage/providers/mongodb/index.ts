@@ -129,7 +129,7 @@ import type {
 
 import { matchesRecipient } from '../../../services/consent.js';
 import { parseGaiiLoose } from '../../../utils/gaii.js';
-import type { MemoryTextHit, MemoryTextSearchOpts } from '../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../repositories/memory.repository.js';
 
 // Prisma client will be imported dynamically at runtime
 // import { PrismaClient } from '@prisma/client';
@@ -586,6 +586,25 @@ export class PrismaStorage implements Storage {
 
     async setMemory(record: MemoryRecord): Promise<MemoryRecord> {
         this.ensureReady();
+        const existing = await this.getMemory(record.ownerGaii, record.key);
+        // Trackable is a property of the key: inherit the existing setting if unspecified so a generic
+        // rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
+        const trackable = record.trackable ?? existing?.trackable ?? false;
+        record.trackable = trackable || undefined;
+        if (existing?.trackable) {
+            // Archive the about-to-be-overwritten version into the separate MemoryVersion collection.
+            await this.prisma.memoryVersion.upsert({
+                where: { ownerGaii_key_version: { ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version } },
+                create: {
+                    ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version,
+                    value: existing.value as any,
+                    actor: this.memoryAnnotation(existing.value, '_actor'),
+                    event: this.memoryAnnotation(existing.value, '_event'),
+                    recordedAt: new Date(existing.updatedAt),
+                },
+                update: {},
+            });
+        }
         const row = await this.prisma.memory.upsert({
             where: { ownerGaii_key: { ownerGaii: record.ownerGaii, key: record.key } },
             create: {
@@ -599,6 +618,7 @@ export class PrismaStorage implements Storage {
                 version: record.version,
                 flagCount: record.flagCount ?? 0,
                 allowedOrigins: record.allowedOrigins ?? [],
+                trackable,
                 searchBlob: this.buildSearchBlob(record),
                 createdAt: new Date(record.createdAt),
                 updatedAt: new Date(record.updatedAt),
@@ -612,11 +632,30 @@ export class PrismaStorage implements Storage {
                 version: record.version,
                 flagCount: record.flagCount ?? 0,
                 allowedOrigins: record.allowedOrigins ?? [],
+                trackable,
                 searchBlob: this.buildSearchBlob(record),
                 updatedAt: new Date(record.updatedAt),
             },
         });
         return this.toMemoryRecord(row);
+    }
+
+    async listMemoryHistory(ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.memoryVersion.findMany({
+            where: { ownerGaii, key },
+            orderBy: { version: 'desc' },
+            take: opts?.limit ?? 200,
+        });
+        return rows.map((r: any) => ({
+            ownerGaii: r.ownerGaii,
+            key: r.key,
+            version: r.version,
+            value: r.value,
+            actor: r.actor ?? null,
+            event: r.event ?? null,
+            recordedAt: r.recordedAt.toISOString(),
+        }));
     }
 
     async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
@@ -1648,7 +1687,17 @@ export class PrismaStorage implements Storage {
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined };
+    }
+
+    /** Read an optional `_actor` / `_event` annotation off a record value (the structure-timeline
+     *  convention) so archived history rows carry who/why. Best-effort. */
+    private memoryAnnotation(value: unknown, field: '_actor' | '_event'): string | null {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const v = (value as Record<string, unknown>)[field];
+            if (typeof v === 'string' && v) return v;
+        }
+        return null;
     }
 
     private toActionRecord(row: any): ActionRecord {

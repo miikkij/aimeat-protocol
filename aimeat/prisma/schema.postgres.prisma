@@ -82,11 +82,28 @@ model Memory {
   // librarian full-text search. SQLite indexes the value directly via FTS5, so this field is
   // MongoDB/Postgres-only. See docs/internal/design-organism-notebook-and-librarian.md §4.
   searchBlob String?
+  // Opt-in version tracking: previous value archived to MemoryVersion on overwrite. Default false.
+  trackable  Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([ownerGaii, key])
   @@index([ownerGaii])
+}
+
+// Archived prior versions of TRACKABLE memory keys. Append-only; latest value lives in Memory.
+model MemoryVersion {
+  id         String   @id @default(cuid())
+  ownerGaii  String
+  key        String
+  version    Int
+  value      Json?
+  actor      String?
+  event      String?
+  recordedAt DateTime @default(now())
+
+  @@unique([ownerGaii, key, version])
+  @@index([ownerGaii, key])
 }
 
 model Action {

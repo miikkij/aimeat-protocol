@@ -1572,6 +1572,76 @@ components:
           description: Timestamp of the most recent flag
 
     # === Phase 2.2: Organisms ===
+    SpaceGraphNode:
+      type: object
+      description: One space (records or documents) within a workspace, for the mindmap.
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        mode:
+          type: string
+          enum: [records, document]
+        count:
+          type: integer
+          description: Number of published instances in the space
+        lastActivity:
+          type: string
+          nullable: true
+          description: ISO timestamp of the most-recently-updated instance, or null
+    WorkspaceGraphNode:
+      type: object
+      description: A workspace node for the interactive mindmap (root of the workspace-level graph).
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        readable:
+          type: boolean
+          description: False when the caller lacks read access (spaces omitted)
+        totalRecords:
+          type: integer
+        totalDocuments:
+          type: integer
+        lastActivity:
+          type: string
+          nullable: true
+        spaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpaceGraphNode'
+    OrganismGraph:
+      type: object
+      description: Deterministic graph of an organism for the interactive mindmap.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceGraphNode'
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              role:
+                type: string
+        agents:
+          type: array
+          items:
+            type: object
+            properties:
+              gaii:
+                type: string
+              name:
+                type: string
     OrganismRecord:
       type: object
       properties:
@@ -13843,6 +13913,13 @@ paths:
                 description:
                   type: string
                   maxLength: 2000
+                readme:
+                  type: string
+                  description: |
+                    Free-form markdown README (mermaid allowed) describing the organism, shown at the
+                    top of the organism home. Stored as the creator-owned memory key
+                    `organism.{id}.meta.readme`; distinct from the short `description` tagline and the
+                    deterministic structure overview. Returned (as `readme`) by GET /v1/organisms/{id}.
                 location:
                   type: object
                   properties:
@@ -14375,6 +14452,154 @@ paths:
                 type: string
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/graph:
+    get:
+      operationId: getOrganismGraph
+      summary: Structured graph of an organism (for the interactive mindmap)
+      description: |
+        Deterministic JSON describing the organism's shape — its workspaces, each workspace's spaces
+        (records/documents) with counts and last-activity, plus active members and organism agents.
+        The client turns this into a clickable Mermaid mindmap (the offers "Kartta" pattern: strict
+        Mermaid + node-id parsing). A projection of live state, never persisted; distinct from the
+        README and from the OKF structure overview. Membership-gated; workspaces the caller cannot
+        read appear with `readable:false` (name only).
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: The organism graph
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          graph:
+                            $ref: '#/components/schemas/OrganismGraph'
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/workspace/graph:
+    get:
+      operationId: getWorkspaceGraph
+      summary: Structured graph of ONE workspace (for the interactive mindmap)
+      description: |
+        Deterministic JSON for a single workspace (root = the workspace) with its spaces, counts and
+        last-activity — the same shape as a workspace node in `GET /v1/organisms/{id}/graph`. Same
+        workspace-level read gate as `GET /v1/organisms/{id}/workspace`.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: ws
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace id
+      responses:
+        '200':
+          description: The workspace graph node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          graph:
+                            $ref: '#/components/schemas/WorkspaceGraphNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/structure/history:
+    get:
+      operationId: getOrganismStructureHistory
+      summary: Organism structure timeline (how its shape grew over time)
+      description: |
+        The current structural fingerprint plus its archived prior versions (newest first) — the
+        organism's growth timeline. Backed by the trackable memory key `organism.{id}.meta.structure`
+        and the memory_history table (general trackable-memory versioning). Each history entry carries
+        the `_event`/`_diff`/`_recordedAt` that version held, and its fingerprint so a client can draw
+        the mindmap as it was at that point. Captures the current state on read (dedup → no churn) as a
+        safety net, then returns the timeline. Membership-gated.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: The structure timeline
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          current:
+                            type: object
+                            nullable: true
+                            description: The latest structure snapshot (version, value, recordedAt)
+                          history:
+                            type: array
+                            description: Archived prior versions, newest first
+                            items:
+                              type: object
+                              properties:
+                                version:
+                                  type: integer
+                                value:
+                                  type: object
+                                actor:
+                                  type: string
+                                  nullable: true
+                                event:
+                                  type: string
+                                  nullable: true
+                                recordedAt:
+                                  type: string
         '403':
           description: Not an active member of this organism
         '404':

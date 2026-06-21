@@ -9,6 +9,8 @@
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — Add the free-form README panel + the interactive workspace mindmap; rename
+ *     the structure overview to "table of contents" (Osa A/C).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -29,6 +31,8 @@ import { recordRecent } from '/js/recents.js';
 import { OpenRouterSettings } from '/views/profile/generator-settings.js';
 import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
+import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
+import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
 import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
 import { SchemaForm } from '/views/profile/organisms/schema-form.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
@@ -160,6 +164,35 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   }, [orgId, wsId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Workspace structure GRAPH (mindmap data) + the OKF table-of-contents (AI-fill prompt seed) —
+  // loaded alongside, refreshed on live updates.
+  const [wsGraph, setWsGraph] = useState(null);
+  const [wsTocSeed, setWsTocSeed] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    const loadGraph = async () => {
+      const [g, toc] = await Promise.all([
+        orgService.getWorkspaceGraph(orgId, wsId).catch(() => null),
+        orgService.getWorkspaceOverview(orgId, wsId).catch(() => ''),
+      ]);
+      if (cancelled) return;
+      setWsGraph(g); setWsTocSeed(toc || '');
+    };
+    loadGraph();
+    const off = onLiveUpdate(['organisms'], loadGraph);
+    return () => { cancelled = true; off(); };
+  }, [orgId, wsId]);
+
+  // README edit permission: the org creator/admin (server enforces the full rule incl. ws creator).
+  // creatorGhii/admins are BARE owner names; getGhii() is a full GHII — compare the bare owner.
+  const wsCanEdit = (() => { const me = String(getGhii() || '').split('@')[0]; return !!me && (org.creatorGhii === me || (org.admins || []).includes(me)); })();
+  const saveWsReadme = async (md) => {
+    await orgService.saveWorkspaceReadme(orgId, wsId, md);
+    setWs(prev => (prev ? { ...prev, readme: md } : prev));
+    showToast?.(t('readme.saved') || 'README saved', 'success');
+  };
+  const onWsMapNav = (target) => { if (target?.type === 'space' && target.space) setTab('space:' + target.space); };
 
   // Deep-link from the librarian "Open" button: aimeat.ws.{org}.{ws}.openDoc = { namespace, id }.
   // Once the manifest is loaded we resolve the namespace → object-type name, open that space tab and
@@ -1039,7 +1072,12 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       </div>
       ${ws.manifest?.summary ? html`<div class="section-desc">${(ws.manifest.summary)}</div>` : null}
 
-      <${StructureOverview} label=${t('organisms.structureOverviewWs') || 'Workspace structure overview'}
+      <${ReadmePanel} markdown=${ws.readme || ''} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'}
+        aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />
+
+      <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} />
+
+      <${StructureOverview} label=${t('organisms.structureOverviewWs') || 'Workspace structure — table of contents'}
         load=${() => orgService.getWorkspaceOverview(orgId, wsId)} />
 
       ${approvals.length > 0 && activeTab !== 'review' ? html`

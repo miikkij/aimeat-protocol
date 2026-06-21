@@ -167,7 +167,7 @@ export async function collectWorkspaceSummary(
 
 /** Read the organism's workspace registry, aggregated across every member's record (a workspace is
  *  registered under its creator's own GHII), deduped by id. */
-async function listWorkspaces(storage: Storage, orgId: string): Promise<Array<{ id: string; name?: string }>> {
+export async function listWorkspaces(storage: Storage, orgId: string): Promise<Array<{ id: string; name?: string }>> {
   const regKey = `organism.${orgId}.meta.workspaces`;
   const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
   const seen = new Map<string, { id: string; name?: string }>();

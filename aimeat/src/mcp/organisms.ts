@@ -18,6 +18,8 @@
  *   v1.4.0 -- 2026-06-10 -- organism_members lists each member's agents (implicit same-owner access
  *     made enumerable — audit gap: join answered ALREADY_MEMBER but no surface showed which agents
  *     can act in the organism). Active-member callers only; matches the REST members route.
+ *   v1.5.0 -- 2026-06-22 -- Add aimeat_organism_update (creator/admin): edit name/description/interests/
+ *     join_policy/visibility and the free-form README (organism.{id}.meta.readme). Mirrors PUT /v1/organisms/:id.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -33,6 +35,8 @@ import { importOrganism } from '../services/organism-import.js';
 import { notify } from '../services/notify.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
+import { setOrganismReadme } from '../services/organism-readme.js';
+import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 
@@ -609,6 +613,45 @@ export function registerOrganismsTools(
     );
 
     const ownerOf = () => { const p = parseGAII(agentGaii); return p ? p.owner : agentGaii; };
+
+    // ── Tool: aimeat_organism_update ──
+    // Mirrors PUT /v1/organisms/:id. Creator/admin updates meta fields and/or the free-form README
+    // (a markdown body stored as organism.{id}.meta.readme, shown at the top of the organism home).
+    // The README is the primary agent-fill target — distinct from the short description and the
+    // deterministic structure overview/mindmap.
+    mcp.tool(
+        'aimeat_organism_update',
+        descriptionFor('aimeat_organism_update'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            name: z.string().optional().describe('New organism name'),
+            description: z.string().optional().describe('Short tagline shown under the name'),
+            readme: z.string().optional().describe('Free-form markdown README (mermaid allowed); shown at the top of the organism home'),
+            interests: z.array(z.string()).optional().describe('Interest tags'),
+            join_policy: z.string().optional().describe('open | approval_required | invite_only'),
+            visibility: z.string().optional().describe('public | listed | private'),
+        },
+        annotationsFor('aimeat_organism_update'),
+        async ({ organism_id, name, description, readme, interests, join_policy, visibility }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
+                return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can update this organism' }], isError: true };
+            }
+            const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+            if (name !== undefined) updates.name = name;
+            if (description !== undefined) updates.description = description;
+            if (interests !== undefined) updates.interests = interests;
+            if (join_policy !== undefined && ['open', 'approval_required', 'invite_only'].includes(join_policy)) updates.joinPolicy = join_policy;
+            if (visibility !== undefined && ['public', 'listed', 'private'].includes(visibility)) updates.visibility = visibility;
+            if (typeof readme === 'string') await setOrganismReadme(storage, config, organism_id, readme, organism.creatorGhii);
+            const updated = await storage.updateOrganism(organism_id, updates);
+            emitChange('organisms');
+            emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ updated: true, organism_id, name: updated?.name ?? organism.name, readme_set: typeof readme === 'string' }, null, 2) }] };
+        },
+    );
 
     // ── Tool 7: aimeat_organism_export ──
     mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'),

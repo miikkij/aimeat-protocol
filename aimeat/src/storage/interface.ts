@@ -190,6 +190,9 @@ export interface MemoryRecord {
   updatedAt: string;
   flagCount?: number;   // Phase 1.5 — moderation flag counter
   allowedOrigins?: string[];  // CORS — per-key origin restrictions (Phase 4)
+  /** Opt-in version tracking: when true, the PREVIOUS value is archived to the memory_history table on
+   *  overwrite (latest stays here, history queried via listMemoryHistory). Default/absent = false. */
+  trackable?: boolean;
 }
 
 export interface ActionRecord {

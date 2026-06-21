@@ -4,6 +4,42 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Organisms & workspaces now lead with a human story, a living map, and a growth timeline.** Three
+  new things sit at the top of every organism (and workspace) page, on top of the existing
+  deterministic structure outline:
+  - **Free-form README** — a Markdown description (Mermaid diagrams allowed) that explains what the
+    organism / workspace actually *is*, kept up to date and shown immediately. It is distinct from the
+    short tagline and from the auto-generated outline: the README is *authored*. The primary way to
+    fill it is an agent over MCP (`aimeat_organism_update` is new; `aimeat_workspace_update` already
+    carried `readme`), but it can also be written by hand or via a one-click **"Generate with AI"**
+    that copies a ready prompt (seeded with the structure table of contents) to run in any AI chat and
+    paste back. REST: `GET /v1/organisms/:id` now returns `readme`; `PUT /v1/organisms/:id` accepts it.
+  - **Interactive structure mindmap** — a deterministic, clickable map of the whole organism
+    (workspaces → their record/document spaces, with counts and last-activity, plus members and
+    agents) and, on the workspace page, of that one workspace. Toggle the **detail level**
+    (workspaces → + spaces → + counts), whether to **show users**, **show activity**, and a
+    **heatmap** that shades nodes by how much is in them — each toggle re-renders the map. Clicking a
+    node jumps straight to that workspace / space / the members tab. Generated from new
+    `GET /v1/organisms/:id/graph` + `GET /v1/organisms/:id/workspace/graph` (a projection of live
+    state, never persisted); it is separate from the README and from the OKF outline.
+  - **Development timeline** — see *when and how* an organism grew. A snapshot of its structural shape
+    is recorded whenever the shape changes (a workspace, space, document/record, or member is added or
+    removed), and the **Kehitys / Development** panel lists those changes chronologically with a diff
+    summary; picking a point redraws the mindmap *as it was then*. Served by
+    `GET /v1/organisms/:id/structure/history`.
+  - The existing "structure overview" panel is renamed **"structure — table of contents"** /
+    *"rakenne sisällysluettelona"* (the OKF outline itself is unchanged).
+
+- **Trackable memory — opt-in version history for memory keys.** A memory key can be marked
+  `trackable`: its latest value still lives in the `memory` table (so reads stay fast and the table
+  stays light), while each previous value is archived to a separate **`memory_history`** table
+  (`MemoryVersion` on MongoDB/Postgres) on overwrite, queryable via `listMemoryHistory`. Existing keys
+  default to non-trackable, so behaviour is unchanged. The organism structure timeline above is the
+  first consumer (one trackable key per organism); the mechanism is generic for any key that wants a
+  history without bloating the hot table.
+
 ## [1.28.0] - 2026-06-22
 
 ### Added

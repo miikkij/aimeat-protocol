@@ -1,6 +1,19 @@
+/**
+ * @file repos/memory.ts
+ * @description SQLite (better-sqlite3) memory repository helpers: get/set/list/search memory rows and
+ *   the FTS5 full-text path. Includes the trackable-memory versioning: when a key marked `trackable`
+ *   is overwritten, its previous value is archived to the `memory_history` table (append-only) before
+ *   the update, and listMemoryHistory() reads it back newest-first. NOTE: SqliteStorage (../index.ts)
+ *   carries its own inline copies of the core memory methods; this module is the parallel repo layer —
+ *   keep the two in sync when changing memory behaviour.
+ * @structure getMemory/setMemory/listMemory/listAllMemory/deleteMemory/searchMemory/searchTextMemory/listMemoryHistory
+ * @usage import { setMemory, listMemoryHistory } from './repos/memory.js';
+ * @version-history
+ *   v1.1.0 — 2026-06-22 — Trackable-memory versioning: archive prior versions to memory_history (Osa D1).
+ */
 import type Database from 'better-sqlite3';
 import type { MemoryRecord } from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 
 /**
  * Turn a free-text query into an FTS5 MATCH expression: extract unicode word/number tokens,
@@ -30,7 +43,32 @@ function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
     record.flagCount = row.flagCount as number;
   }
   if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
+  if (row.trackable) record.trackable = true;
   return record;
+}
+
+/** Read an optional `_actor` / `_event` annotation off a record value (the convention the structure
+ *  timeline uses to attribute a version) — best-effort, so archived history rows carry who/why. */
+function annotationOf(value: unknown, field: '_actor' | '_event'): string | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = (value as Record<string, unknown>)[field];
+    if (typeof v === 'string' && v) return v;
+  }
+  return null;
+}
+
+/** Archive the PREVIOUS version of a trackable key before it is overwritten. Append-only; INSERT OR
+ *  IGNORE guards against re-archiving the same (owner,key,version). */
+function appendHistory(db: Database.Database, prev: MemoryRecord): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO memory_history (ownerGaii, key, version, value, actor, event, recordedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    prev.ownerGaii, prev.key, prev.version,
+    JSON.stringify(prev.value),
+    annotationOf(prev.value, '_actor'), annotationOf(prev.value, '_event'),
+    prev.updatedAt,
+  );
 }
 
 function isMemoryExpired(record: MemoryRecord): boolean {
@@ -52,23 +90,30 @@ export function getMemory(db: Database.Database, ownerGaii: string, key: string)
 
 export function setMemory(db: Database.Database, record: MemoryRecord): MemoryRecord {
   const existing = getMemory(db, record.ownerGaii, record.key);
+  // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
+  // a generic rewrite never silently turns tracking off. Archiving is gated on the EXISTING (previous)
+  // record being trackable — that's the version we keep.
+  const trackable = record.trackable ?? existing?.trackable ?? false;
+  record.trackable = trackable || undefined;
   if (existing) {
+    if (existing.trackable) appendHistory(db, existing);   // keep the previous version before overwrite
     record.version = existing.version + 1;
     db.prepare(
       `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
-       createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ? WHERE ownerGaii = ? AND key = ?`
+       createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ? WHERE ownerGaii = ? AND key = ?`
     ).run(
       JSON.stringify(record.value), record.visibility,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.createdAt, record.updatedAt,
       record.flagCount ?? 0,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+      trackable ? 1 : 0,
       record.ownerGaii, record.key,
     );
   } else {
     db.prepare(
-      `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.key,
       JSON.stringify(record.value), record.visibility,
@@ -76,9 +121,27 @@ export function setMemory(db: Database.Database, record: MemoryRecord): MemoryRe
       record.version, record.createdAt, record.updatedAt,
       record.flagCount ?? 0,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+      trackable ? 1 : 0,
     );
   }
   return record;
+}
+
+/** Archived prior versions of a trackable key, newest version first. Empty for non-trackable keys. */
+export function listMemoryHistory(db: Database.Database, ownerGaii: string, key: string, opts?: { limit?: number }): MemoryVersionRecord[] {
+  const limit = opts?.limit ?? 200;
+  const rows = db.prepare(
+    'SELECT * FROM memory_history WHERE ownerGaii = ? AND key = ? ORDER BY version DESC LIMIT ?'
+  ).all(ownerGaii, key, limit) as Record<string, unknown>[];
+  return rows.map(r => ({
+    ownerGaii: r.ownerGaii as string,
+    key: r.key as string,
+    version: r.version as number,
+    value: JSON.parse(r.value as string),
+    actor: (r.actor as string | null) ?? null,
+    event: (r.event as string | null) ?? null,
+    recordedAt: r.recordedAt as string,
+  }));
 }
 
 export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): number {

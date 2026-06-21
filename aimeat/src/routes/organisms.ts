@@ -50,6 +50,14 @@
  *     services/structure-overview.ts.
  *   v1.14.0 -- 2026-06-16 -- Record public-activity-feed events: on public organism
  *     create, and on the private→public edge of a workspace share (whole/space/doc).
+ *   v1.15.0 -- 2026-06-22 -- Organism-level free-form README: GET /:id returns `readme` and PUT /:id
+ *     accepts `readme` (creator-owned memory key organism.{id}.meta.readme). See services/organism-readme.ts.
+ *   v1.16.0 -- 2026-06-22 -- Interactive mindmap data: GET /:id/graph (organism → workspaces → spaces +
+ *     members/agents) and GET /:id/workspace/graph?ws= (one workspace). Deterministic JSON the client
+ *     renders as a clickable Mermaid diagram. See services/structure-graph.ts.
+ *   v1.17.0 -- 2026-06-22 -- Structure timeline: GET /:id/structure/history returns the trackable
+ *     structure fingerprint's history (organism growth over time). Structural mutations (create,
+ *     workspace create/update/delete, publish) record a snapshot via services/structure-snapshot.ts.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -76,6 +84,9 @@ import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
+import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
+import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
+import { updateOrganismStructure } from '../services/structure-snapshot.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -158,6 +169,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'List members', method: 'GET', url: `/v1/organisms/${id}/members` },
     ]));
     emitChange('organisms');
+    void updateOrganismStructure(storage, config, id, { event: 'organism created', actor: ghii }).catch(() => { /* timeline best-effort */ });
     // Public landing feed — only public organisms are discoverable, so only they announce.
     if (vis === 'public') {
       void recordPublicActivity(storage, config, {
@@ -219,10 +231,12 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const members = await storage.listMembers(id, { status: 'active' });
+    const readme = await getOrganismReadme(storage, id);
 
     res.json(success(config.nodeId, {
       organism,
       member_count: members.length,
+      readme,
     }));
   });
 
@@ -243,7 +257,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const { name, description, type, location, interests, join_policy, max_members, visibility } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, readme } = req.body ?? {};
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
     if (name !== undefined) updates.name = name;
@@ -255,8 +269,13 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (max_members !== undefined) updates.maxMembers = max_members;
     if (visibility !== undefined) updates.visibility = visibility;
 
+    // README is a free-form markdown body stored as a creator-owned memory key (not an OrganismRecord
+    // column) — written separately. Owned by the organism's creator so it stays stable across admins.
+    if (typeof readme === 'string') await setOrganismReadme(storage, config, id, readme, organism.creatorGhii);
+
     const updated = await storage.updateOrganism(id, updates);
-    res.json(success(config.nodeId, { organism: updated }));
+    const readmeOut = await getOrganismReadme(storage, id);
+    res.json(success(config.nodeId, { organism: updated, readme: readmeOut }));
     emitChange('organisms');
   });
 
@@ -1150,6 +1169,76 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     ]));
   });
 
+  /* ── GET /v1/organisms/:id/graph — structured graph for the interactive mindmap ──
+   * Deterministic JSON (organism → workspaces → spaces + members/agents) the client renders as a
+   * clickable Mermaid diagram. Membership-gated like the overview; unreadable workspaces appear with
+   * readable:false (name only). Generic projection of live state, never persisted. */
+  router.get('/v1/organisms/:id/graph', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const graph = await collectOrganismGraph(storage, config, { orgId: id, viewerGaii });
+    res.json(success(config.nodeId, { graph }, [
+      { description: 'Graph one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/graph?ws=<ws>` },
+    ]));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/graph — graph of ONE workspace (root = workspace) ──
+   * Same workspace-level read gate as GET /:id/workspace. Registered before the bare /:id/workspace
+   * so Express matches the literal `/workspace/graph` first. */
+  router.get('/v1/organisms/:id/workspace/graph', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    if (!ws) { res.status(400).json(error(config.nodeId, 'MISSING_WS', 'Provide ?ws=<workspace id>')); return; }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const node = await collectWorkspaceGraph(storage, config, { orgId: id, ws, viewerGaii });
+    res.json(success(config.nodeId, { graph: node }));
+  });
+
+  /* ── GET /v1/organisms/:id/structure/history — the structure TIMELINE ──
+   * The current structural fingerprint + its archived prior versions (newest first), each with the
+   * `_event`/`_diff`/`_recordedAt` it carried. Backed by the trackable memory key
+   * organism.{id}.meta.structure + memory_history (Osa D). Captures the current state first (safety
+   * net for any structural change that no explicit trigger recorded), then returns the timeline. */
+  router.get('/v1/organisms/:id/structure/history', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    // Safety net: record the current structure if it changed since the last snapshot (no-op via dedup).
+    await updateOrganismStructure(storage, config, id, { event: 'viewed', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
+
+    const creatorGhii = organism.creatorGhii.includes('@') ? organism.creatorGhii : `${organism.creatorGhii}@${config.nodeId}`;
+    const key = `organism.${id}.meta.structure`;
+    const curRec = (await storage.listAllMemory({ prefix: key, limit: 5 })).items.find(r => r.key === key) ?? null;
+    const owner = curRec?.ownerGaii ?? creatorGhii;
+    const history = await storage.listMemoryHistory(owner, key, { limit: 500 });
+    const current = curRec
+      ? { version: curRec.version, value: curRec.value, recordedAt: curRec.updatedAt }
+      : null;
+    res.json(success(config.nodeId, { current, history }));
+  });
+
   /* ── GET /v1/organisms/:id/search — Search organism / workspace content ──
    * Full-text-ish (case-insensitive substring) search across the records + documents of every
    * workspace the caller can read (or one workspace if ?ws=). Returns matches with the workspace,
@@ -1860,6 +1949,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       });
       emitChange('organisms');
       res.json(success(config.nodeId, result));
+      // Manifest/space/name edits change the structure → record a timeline snapshot (dedup handles no-ops).
+      void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
     } catch (e) {
       if (e instanceof WorkspaceMetaError) {
         const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' ? 403 : 400;
@@ -2107,6 +2198,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
     res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));
     emitChange('organisms');
+    if (ws) void updateOrganismStructure(storage, config, id, { event: 'workspace deleted', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* timeline best-effort */ });
   });
 
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
@@ -2244,6 +2336,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'List version history', method: 'GET', url: `/v1/memory?prefix=${encodeURIComponent(`organism.${id}.${namespace}.${instance}.version.`)}` },
     ]));
     emitChange('organisms');
+    // Content growth changes the structure fingerprint (doc/record counts) → record a timeline snapshot.
+    void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(() => { /* best-effort */ });
   });
 
   // POST /v1/organisms/:id/revert — reopen a published record for editing (copy .latest → .draft).
