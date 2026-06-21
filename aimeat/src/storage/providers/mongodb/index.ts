@@ -783,11 +783,12 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): Promise<MemoryRecord[]> {
+    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): Promise<MemoryRecord[]> {
         this.ensureReady();
         // MongoDB text search — search keys and string values
         const where: any = { ownerGaii };
         if (opts?.visibility) where.visibility = opts.visibility;
+        if (opts?.prefix) where.key = { startsWith: opts.prefix };
 
         const rows = await this.prisma.memory.findMany({ where });
         const q = query.toLowerCase();

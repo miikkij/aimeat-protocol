@@ -504,6 +504,10 @@ components:
         key:
           type: string
         value: {}
+        bytes:
+          type: integer
+          minimum: 0
+          description: Serialized size of the value in bytes — returned in place of `value` when listed with `include=meta`.
         visibility:
           $ref: '#/components/schemas/Visibility'
         group_id:
@@ -6609,6 +6613,12 @@ paths:
             type: integer
             minimum: 0
           description: Exclude entries with flagCount exceeding this value
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [meta]
+          description: 'When "meta", omit each entry''s `value` and report its size in `bytes` instead — fast for listing thousands of keys (values fetched per-key on demand).'
       responses:
         '200':
           description: Memory listing with quota info
@@ -6774,11 +6784,140 @@ paths:
             type: integer
             minimum: 0
           description: Exclude entries with flagCount exceeding this value (Phase 1.5 data quality filter)
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Scope the search to keys beginning with this prefix (e.g. a namespace/group like "organism.{id}.")
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/memory/export:
+    get:
+      operationId: exportMemory
+      summary: Export memory (JSON backup)
+      description: >
+        Download all of the caller's memory entries (full values) as a JSON backup. Owner sessions
+        export across their GHII + agents + ecosystem apps; agent sessions export their own keyspace.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: agent
+          in: query
+          schema:
+            type: string
+          description: GAII of a specific agent to export (owner sessions only)
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Restrict the export to keys beginning with this prefix
+      responses:
+        '200':
+          description: 'JSON backup: { exported_at, node_id, count, entries[] }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/memory/import:
+    post:
+      operationId: importMemory
+      summary: Import memory (restore/merge a backup)
+      description: >
+        Restore or merge a JSON backup produced by GET /v1/memory/export. Per-entry validation, quota,
+        and schema checks mirror POST /v1/memory; one invalid entry does not abort the run.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [key, value]
+                    properties:
+                      key: { type: string }
+                      value: {}
+                      visibility:
+                        type: string
+                        enum: [private, owner, group, public]
+                      tags:
+                        type: array
+                        items: { type: string }
+                      ttl_hours: { type: number }
+                mode:
+                  type: string
+                  enum: [skip, overwrite, rename]
+                  default: skip
+                  description: How to resolve a key that already exists
+                agent:
+                  type: string
+                  description: Import under a specific agent GAII (owner sessions only)
+      responses:
+        '200':
+          description: 'Import summary: { created, updated, skipped, failed[] }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: entries array missing
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/memory/bulk-delete:
+    post:
+      operationId: bulkDeleteMemory
+      summary: Bulk-delete memory entries
+      description: >
+        Delete many entries at once by prefix and/or an explicit key list — avoids firing thousands of
+        individual DELETE requests when clearing a whole namespace. Owner sessions delete across their
+        owner-scope; agent sessions delete from their own keyspace.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prefix:
+                  type: string
+                  description: Delete all keys beginning with this prefix
+                keys:
+                  type: array
+                  items: { type: string }
+                  description: Delete these specific keys (intersected with prefix if both given)
+                agent:
+                  type: string
+                  description: Delete under a specific agent GAII (owner sessions only)
+      responses:
+        '200':
+          description: 'Result: { deleted }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: prefix or keys required
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/librarian/search:
     get:

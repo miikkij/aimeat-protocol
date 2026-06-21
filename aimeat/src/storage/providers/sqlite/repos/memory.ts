@@ -244,7 +244,7 @@ export function incrementMemoryFlagCount(db: Database.Database, ownerGaii: strin
   ).run(ownerGaii, key);
 }
 
-export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): MemoryRecord[] {
+export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): MemoryRecord[] {
   const q = query.toLowerCase();
   let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
   const params: unknown[] = [ownerGaii];
@@ -252,6 +252,11 @@ export function searchMemory(db: Database.Database, ownerGaii: string, query: st
   if (opts?.visibility) {
     sql += ' AND visibility = ?';
     params.push(opts.visibility);
+  }
+
+  if (opts?.prefix) {
+    sql += ' AND key LIKE ?';
+    params.push(opts.prefix + '%');
   }
 
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];

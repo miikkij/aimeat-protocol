@@ -5,6 +5,8 @@
  *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).
  *   v1.2.0 — 2026-06-21 — getMemory(key, { soft }) — optional ?soft=1 read returning 200/null
  *                          for keys that may not exist yet (kills browser-console 404 noise).
+ *   v1.3.0 — 2026-06-22 — Scalable Memory tab helpers: listMemoriesMeta (include=meta, values omitted),
+ *                          searchMemory prefix arg, exportMemory/importMemory/bulkDeleteMemory.
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -14,6 +16,19 @@ export async function listMemories(agentGaii) {
   const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return Array.isArray(list) ? list : [];
+}
+
+/**
+ * List memory metadata only — keys/tags/visibility/timestamps + per-entry `bytes`, NO values
+ * (include=meta). Fast for thousands of keys; values are fetched per-key on expand via getMemory().
+ * Returns { items, quota } so the tab can render the storage-usage bar.
+ */
+export async function listMemoriesMeta(agentGaii) {
+  let url = '/v1/memory?include=meta';
+  if (agentGaii) url += `&agent=${encodeURIComponent(agentGaii)}`;
+  const data = await apiGet(url);
+  const list = data?.data?.items || data?.data?.entries || [];
+  return { items: Array.isArray(list) ? list : [], quota: data?.data?.quota || null };
 }
 
 /** Cheap count of owner-scope memory entries (no values transferred). For stat displays. */
@@ -29,17 +44,60 @@ export async function countMemories() {
  * instead of a 404, avoiding browser-console 404 noise.
  */
 export async function getMemory(key, opts) {
-  const q = opts && opts.soft ? '?soft=1' : '';
-  return apiGet(`/v1/memory/${encodeURIComponent(key)}${q}`);
+  const params = new URLSearchParams();
+  if (opts && opts.soft) params.set('soft', '1');
+  if (opts && opts.agent) params.set('agent', opts.agent);
+  const q = params.toString();
+  return apiGet(`/v1/memory/${encodeURIComponent(key)}${q ? '?' + q : ''}`);
 }
 
-/** Search memory by query string. Returns array. Optional agentGaii. */
-export async function searchMemory(query, agentGaii) {
+/**
+ * Search memory by query string (server-side: matches key, value, and tags). Returns array.
+ * @param {string} [agentGaii] Owner-session: restrict to one agent's keyspace.
+ * @param {string} [prefix] Scope the search to a namespace/group (keys beginning with prefix).
+ */
+export async function searchMemory(query, agentGaii, prefix) {
   let url = `/v1/memory/search?q=${encodeURIComponent(query)}`;
   if (agentGaii) url += `&agent=${encodeURIComponent(agentGaii)}`;
+  if (prefix) url += `&prefix=${encodeURIComponent(prefix)}`;
   const data = await apiGet(url);
   const list = data?.data?.results || data?.data || [];
   return Array.isArray(list) ? list : [];
+}
+
+/**
+ * Export all of the caller's memory entries (full values) as a JSON backup object
+ * ({ exported_at, node_id, count, entries }). Optional agentGaii / prefix scope.
+ */
+export async function exportMemory(agentGaii, prefix) {
+  const params = new URLSearchParams();
+  if (agentGaii) params.set('agent', agentGaii);
+  if (prefix) params.set('prefix', prefix);
+  const qs = params.toString();
+  const data = await apiGet('/v1/memory/export' + (qs ? '?' + qs : ''));
+  return data?.data || { entries: [], count: 0 };
+}
+
+/**
+ * Import (restore/merge) a backup's entries. mode = 'skip' | 'overwrite' | 'rename'.
+ * Returns the summary envelope ({ data: { created, updated, skipped, failed } }).
+ */
+export async function importMemory(entries, mode, agentGaii) {
+  const body = { entries, mode: mode || 'skip' };
+  if (agentGaii) body.agent = agentGaii;
+  return apiPost('/v1/memory/import', body);
+}
+
+/**
+ * Bulk-delete memory entries by prefix and/or an explicit key list. Returns envelope ({ data: { deleted } }).
+ * @param {{ prefix?: string, keys?: string[], agentGaii?: string }} [opts]
+ */
+export async function bulkDeleteMemory({ prefix, keys, agentGaii } = {}) {
+  const body = {};
+  if (prefix) body.prefix = prefix;
+  if (keys && keys.length) body.keys = keys;
+  if (agentGaii) body.agent = agentGaii;
+  return apiPost('/v1/memory/bulk-delete', body);
 }
 
 /**
