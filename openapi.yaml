@@ -6802,6 +6802,46 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/living/author:
+    post:
+      operationId: livingAuthor
+      summary: Author a living-document template from a description
+      description: >
+        Owner-scoped. Given a plain-language need (+ optionally the owner's agent-offer catalogue for
+        grounding), the caller's own OpenRouter model designs a reusable living-document template
+        (title, description, charter, and 2–6 scoped sections, each with a suggested agent). Returns
+        `{ template, model }`; nothing is written — the client saves/edits the template. Template
+        storage, deploy, and rendering are client-orchestrated over the generic memory/organism APIs.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [need]
+              properties:
+                need:
+                  type: string
+                  description: Plain-language description of what the living document should track
+                catalogue:
+                  type: array
+                  description: Optional compact agent-offer list (agent, offerId, title, ask) for grounding
+                  items:
+                    type: object
+                    properties:
+                      agent: { type: string }
+                      offerId: { type: string }
+                      title: { type: string }
+                      ask: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

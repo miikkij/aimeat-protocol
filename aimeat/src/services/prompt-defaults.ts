@@ -41,6 +41,7 @@ import { GENERATOR_PROMPT_SEEDS } from './generator-prompt-seeds.js';
 import { NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 import { NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
+import { LIVING_AUTHOR_TEMPLATE } from './living-author-prompt.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
 
@@ -73,6 +74,15 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
     content: NOTEBOOK_DISTRIBUTE_TEMPLATE,
     variables: ['structure', 'note'],
     usedIn: ['/v1/librarian/distribute'],
+  },
+  {
+    id: 'living-author',
+    group: 'builders',
+    name: 'Living Document Author',
+    description: 'Designs a reusable living-document template (title + charter + sections, with suggested agents) from a user\'s plain-language need. Used by POST /v1/living/author.',
+    content: LIVING_AUTHOR_TEMPLATE,
+    variables: ['need', 'capabilities'],
+    usedIn: ['/v1/living/author'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
