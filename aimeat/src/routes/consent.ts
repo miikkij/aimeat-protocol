@@ -8,6 +8,8 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { auditDataAccess } from '../services/consent.js';
+import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -69,6 +71,10 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         });
 
         stats?.increment('consent_grants');
+
+        // Audit the consent mutation (buffered, off the request path). Mutations + denials
+        // are the only things the audit trail keeps now (allowed reads are no longer logged).
+        await auditDataAccess(storage, consent.id, ownerGaii, consent.recipient, consent.dataPattern, 'grant', true);
 
         // Notify directory of federation consent changes (Phase 1.4 — event-driven refresh)
         if (consent.scope === 'federation' && onDirectoryChange) {
@@ -139,7 +145,13 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             opts.consentId = req.query.consent_id as string;
         }
 
-        const entries = await storage.listConsentAudit(ownerGaii, opts);
+        // Merge not-yet-flushed buffer entries (newest first) ahead of the persisted rows so
+        // a just-made denial/mutation is visible immediately (writes are batched off the
+        // request path — see consent-audit-buffer.ts).
+        const pending = getPendingConsentAudit(ownerGaii, opts)
+            .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
+        const stored = await storage.listConsentAudit(ownerGaii, opts);
+        const entries = [...pending, ...stored];
 
         res.json(success(config.nodeId, {
             entries: entries.map(e => ({
@@ -207,6 +219,9 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         await storage.updateConsent(id, { status: 'revoked', revokedAt: now });
 
         stats?.increment('consent_revocations');
+
+        // Audit the consent mutation (buffered, off the request path).
+        await auditDataAccess(storage, id, consent.ownerGaii, consent.recipient, consent.dataPattern, 'revoke', true);
 
         // Notify directory of federation consent revocation (Phase 1.4 — event-driven refresh)
         if (consent.scope === 'federation' && onDirectoryChange) {

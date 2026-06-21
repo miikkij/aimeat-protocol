@@ -332,9 +332,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
           const consentResult = await checkConsentForRead(
             storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
           );
-          await auditDataAccess(storage, consentResult.consentId ?? null,
-            board.ownerGaii, gaii, `board:${boardId}`, 'read', consentResult.allowed);
           if (!consentResult.allowed) {
+            // Audit denials only (allowed reads are no longer logged — see consent-audit-buffer).
+            await auditDataAccess(storage, consentResult.consentId ?? null,
+              board.ownerGaii, gaii, `board:${boardId}`, 'read', false);
             res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
             return;
           }
@@ -446,9 +447,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
           const consentResult = await checkConsentForRead(
             storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
           );
-          await auditDataAccess(storage, consentResult.consentId ?? null,
-            board.ownerGaii, gaii, `board:${boardId}`, 'read', consentResult.allowed);
           if (!consentResult.allowed) {
+            // Audit denials only (allowed reads are no longer logged — see consent-audit-buffer).
+            await auditDataAccess(storage, consentResult.consentId ?? null,
+              board.ownerGaii, gaii, `board:${boardId}`, 'read', false);
             res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
             return;
           }

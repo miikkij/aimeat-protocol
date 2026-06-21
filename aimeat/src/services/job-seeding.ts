@@ -24,6 +24,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   if (config.consentEnabled) {
     jobs.push({ id: 'core:consent-expiry', name: 'Consent Expiry', coreHandler: 'consent-expiry', cron: '*/10 * * * *' });
+    // Prune consent-audit entries past the retention window (config.consentAuditRetentionDays). Daily at 03:30.
+    jobs.push({ id: 'core:consent-audit-prune', name: 'Consent Audit Prune', coreHandler: 'consent-audit-prune', cron: '30 3 * * *' });
   }
 
   if (config.personalNodesEnabled) {

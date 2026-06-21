@@ -12,10 +12,15 @@ All notable changes to AIMEAT are documented in this file.
   **Inbox**, any message gets two per-message actions: **⭐ Important** (a lightweight "needs a reply"
   flag) and **🔗 Track a response** — turn the message into an actionable workspace **record** (e.g. a
   `bug`) bound to a *contract* that owes a reply to the original sender. The **intent is formed by your
-  own AI** (the notebook classifier picks the organism + workspace and writes a title + content; no
-  OpenRouter/Ollama key → the feature is unavailable, never a static guess), and the record is written
-  through the proper workspace **draft → publish** flow (the workspace's real record type, schema-aware
-  value, activity feed, and publish gate) — not a raw memory write. When the watched
+  own AI** (a records triage picks the organism + workspace + the **record TYPE** generically — bug /
+  feature / task / decision, from whatever each workspace actually offers, not hard-coded — and, at
+  integration time, **builds the record value to conform to that type's actual schema** — which is
+  itself AI-authored per workspace and can be any shape (real field names + enums, e.g. `headline` /
+  `state: [backlog|shipped]` / `resolution_notes`, not a fixed `title`/`status`/`description`),
+  validated before writing — and derives the completion condition + the field to quote back FROM that
+  schema; no OpenRouter/Ollama key → the feature is unavailable, never a static guess). The record is
+  written through the proper workspace **draft → publish** flow (real record type, activity feed,
+  publish gate) — not a raw memory write. When the watched
   record reaches its condition (e.g. `status: done`, set by an AI over MCP or the API), the reply is
   composed from a template (injecting a field from the record, e.g. `resolution`) and sent back —
   **automatically**, or after you **approve/edit** a pre-filled draft in the composer — across the
@@ -26,8 +31,9 @@ All notable changes to AIMEAT are documented in this file.
   replied / error) with open · approve-now · cancel; a per-message **badge** marks an already-tracked
   message (clicking 🔗 again surfaces it instead of creating a duplicate).
   New routes `POST/GET /v1/tracked-responses`, `/:id` (+ `/draft`, `/evaluate`, `/replied`, `/cancel`),
-  `/evaluate-due`, and an open `/spec`. `src/services/tracked-response.ts`,
-  `src/services/track-registry.ts`, `src/services/message-send.ts` (extracted from the messages route
+  `/classify` (AI records triage), `/evaluate-due`, and an open `/spec`. `src/services/tracked-response.ts`,
+  `src/services/tracked-classify.ts`, `src/services/track-registry.ts`,
+  `src/services/message-send.ts` (extracted from the messages route
   and shared), `src/routes/tracked-responses.ts`, `src/routes/messages.ts`, `src/routes/memory.ts`,
   `src/routes/organisms.ts`, `src/mcp/workspaces.ts`, `src/services/event-bus.ts`,
   `src/server-bootstrap/routes-loader.ts`, `public/js/services/tracked-responses.js`,

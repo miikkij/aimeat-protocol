@@ -16,6 +16,8 @@
  *     write an audit entry; /v1/pub authenticated-but-denied returns 403 (was 404).
  *   v1.3.0 -- 2026-06-08 -- PATCH /v1/storage/:key/visibility (mirrors the memory-files route) so a
  *     document can make its embedded images public for other viewers.
+ *   v1.4.0 -- 2026-06-21 -- Drop the presigned-download audit write: allowed reads are no longer
+ *     audited (consent audit now records only denials + grant/revoke mutations).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -23,7 +25,6 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { auditDataAccess } from '../services/consent.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../utils/base64.js';
@@ -86,12 +87,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Audit the out-of-band fetch. The presigned token IS the capability (already
-        // owner-authorized), so we don't re-run consent — but the access is now logged
-        // like every other storage/memory read when the consent layer is enabled.
-        if (config.consentEnabled) {
-            await auditDataAccess(storage, null, file.ownerGaii, verified.sub, `storage:${verified.key}`, 'read', true);
-        }
+        // The presigned token IS the capability (already owner-authorized). Allowed reads
+        // are no longer audited (only denials + consent mutations — see consent-audit-buffer).
 
         const rangeHeader = req.headers.range;
         if (rangeHeader) {

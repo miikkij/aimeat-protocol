@@ -595,8 +595,9 @@ await test('35. Upload without auth → 401', async () => {
 
 // ─── Phase 10: Group Visibility + Audit Parity (storage ↔ memory) ───
 // Cross-owner/group file reads flow through GET /v1/pub/:gaii/{key}. These verify the
-// access-guard parity fix: group files are membership-checked, presigned + public reads
-// are audited, and authenticated-but-denied returns 403 (matching memory).
+// access-guard parity fix: group files are membership-checked, authenticated-but-denied
+// returns 403 (matching memory), and the consent-audit log records ONLY denials (allowed
+// reads — presigned + public — are no longer audited; see consent-audit-buffer.ts).
 console.log('\nPhase 10 — Group Visibility & Audit Parity');
 
 const groupFileKey = `group-file-${Date.now()}`;
@@ -652,17 +653,25 @@ await test('39. Group member (agent-C) downloads the group file → 200', async 
     assert(data === testContent, `data mismatch: got ${data.length} bytes`);
 });
 
-await test('40. Non-member (agent-D) downloads the group file → 403', async () => {
+await test('40. Non-member (agent-D) downloads the group file → 403, denial is audited', async () => {
     // Pre-fix this returned 404 — file.groupId was never threaded into the consent check,
     // so visibility:'group' resolved to missing_group_id for everyone (members included).
     const { status } = await json(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(groupFileKey)}`, {
         headers: { Authorization: `Bearer ${agentDToken}` },
     });
     assert(status === 403, `expected 403, got ${status}`);
+
+    // The DENIAL is recorded in the file owner's consent-audit log (allowed:false). The audit
+    // endpoint merges the not-yet-flushed buffer, so it shows up immediately.
+    const { status: aStatus, body: aBody } = await json('/v1/consent/audit?days=1', {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(aStatus === 200, `audit status ${aStatus}: ${JSON.stringify(aBody)}`);
+    const found = (aBody.data?.entries as any[]).some(e => e.memory_key === `storage:${groupFileKey}` && e.allowed === false);
+    assert(found, `no denial audit entry for storage:${groupFileKey}`);
 });
 
-await test('41. Presigned download writes a consent-audit entry', async () => {
-    // Get an out-of-band download handle for agent-A's own private file
+await test('41. Presigned download (allowed read) is NOT audited', async () => {
     const { status: hStatus, body: hBody } = await json(`/v1/storage/${encodeURIComponent(privateKey)}?mode=handle`, {
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
@@ -670,20 +679,19 @@ await test('41. Presigned download writes a consent-audit entry', async () => {
     const downloadUrl = hBody.data?.download_url as string;
     assert(typeof downloadUrl === 'string' && downloadUrl.includes('/v1/download/'), `download_url: ${downloadUrl}`);
 
-    // Fetch the bytes via the presigned URL (no auth — the token is the capability)
     const dlRes = await fetch(downloadUrl);
     assert(dlRes.status === 200, `presigned download status ${dlRes.status}`);
 
-    // The fetch must now appear in the file owner's consent-audit log
+    // Allowed reads are no longer audited — there must be NO entry for this key.
     const { status: aStatus, body: aBody } = await json('/v1/consent/audit?days=1', {
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
     assert(aStatus === 200, `audit status ${aStatus}: ${JSON.stringify(aBody)}`);
-    const found = (aBody.data?.entries as any[]).some(e => e.memory_key === `storage:${privateKey}` && e.allowed === true);
-    assert(found, `no audit entry for storage:${privateKey}`);
+    const found = (aBody.data?.entries as any[]).some(e => e.memory_key === `storage:${privateKey}`);
+    assert(!found, `unexpected audit entry for allowed read storage:${privateKey}`);
 });
 
-await test('42. Public file download via /v1/pub is audited', async () => {
+await test('42. Public file download (allowed read) is NOT audited', async () => {
     const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(publicKey)}`, {
         headers: { Authorization: `Bearer ${agentCToken}` },
     });
@@ -692,8 +700,8 @@ await test('42. Public file download via /v1/pub is audited', async () => {
     const { body } = await json('/v1/consent/audit?days=1', {
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
-    const found = (body.data?.entries as any[]).some(e => e.memory_key === `storage:${publicKey}` && e.allowed === true);
-    assert(found, `no audit entry for storage:${publicKey}`);
+    const found = (body.data?.entries as any[]).some(e => e.memory_key === `storage:${publicKey}`);
+    assert(!found, `unexpected audit entry for allowed public read storage:${publicKey}`);
 });
 
 // ─── Cleanup ───

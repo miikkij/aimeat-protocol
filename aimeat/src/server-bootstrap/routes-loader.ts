@@ -140,6 +140,7 @@ import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
 import { onMemoryWrittenEvent } from '../services/event-bus.js';
 import { initStats } from '../services/stats.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
+import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { statsMiddleware } from '../middleware/stats.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
@@ -193,6 +194,9 @@ export async function mountRoutes(
   // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
   // flushed to storage on an interval instead of per request.
   initTelemetryBuffer(storage);
+
+  // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
+  initConsentAuditBuffer(storage);
 
   // Prometheus metrics registry (opt-in)
   const metricsRegistry = config.metricsEnabled

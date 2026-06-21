@@ -2171,6 +2171,12 @@ export class PrismaStorage implements Storage {
         return entry;
     }
 
+    async pruneConsentAudit(beforeIso: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.consentAudit.deleteMany({ where: { timestamp: { lt: new Date(beforeIso) } } });
+        return result.count;
+    }
+
     async listConsentAudit(ownerGaii: string, opts?: { days?: number; consentId?: string; accessorGaii?: string }): Promise<ConsentAuditEntry[]> {
         this.ensureReady();
         const where: any = { ownerGaii };

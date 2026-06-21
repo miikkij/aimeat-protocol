@@ -38,12 +38,12 @@ export interface AuthorizeReadArgs {
  * Decide whether a non-owner-scoped read is allowed and write the matching audit entry.
  *
  * Semantics (kept identical to memory's reference read path):
- * - `public`            → always allowed; audited as `allowed:true` ONLY when the consent
- *                         layer is enabled (mirrors memory, which skips audit when off).
+ * - `public`            → always allowed; NOT audited (auditing access to public data has no
+ *                         consent value and was a large share of the unbounded audit growth).
  * - consent layer off   → non-public denied with reason `consent_disabled`, NOT audited
  *                         (the caller decides the HTTP mapping, e.g. 404 vs 403).
- * - otherwise           → delegate to `checkConsentForRead` (owner/owner-scope/group/private
- *                         + organism resolution) and audit the outcome.
+ * - otherwise           → delegate to `checkConsentForRead`; audit ONLY when the read is
+ *                         DENIED. Allowed reads are no longer audited (see consent-audit-buffer).
  *
  * The caller owns the HTTP status mapping. This function never throws on a denial.
  */
@@ -55,9 +55,6 @@ export async function authorizeRead(
   const { ownerGaii, accessorGaii, resourceKey, visibility, groupId, action } = args;
 
   if (visibility === 'public') {
-    if (config.consentEnabled) {
-      await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, true);
-    }
     return { allowed: true, reason: 'public_data' };
   }
 
@@ -66,6 +63,8 @@ export async function authorizeRead(
   }
 
   const result = await checkConsentForRead(storage, resourceKey, ownerGaii, accessorGaii, visibility, groupId);
-  await auditDataAccess(storage, result.consentId ?? null, ownerGaii, accessorGaii, resourceKey, action, result.allowed);
+  if (!result.allowed) {
+    await auditDataAccess(storage, result.consentId ?? null, ownerGaii, accessorGaii, resourceKey, action, false);
+  }
   return result;
 }

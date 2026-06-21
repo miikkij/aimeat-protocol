@@ -700,10 +700,10 @@ export interface ConsentAuditEntry {
   consentId: string;          // References ConsentRecord.id
   ownerGaii: string;          // Whose data was accessed
   accessorGaii: string;       // Who accessed the data
-  memoryKey: string;          // Which key was read
-  action: 'read' | 'list' | 'search';  // What was done
+  memoryKey: string;          // Which key was read (or the consent dataPattern for grant/revoke)
+  action: 'read' | 'list' | 'search' | 'grant' | 'revoke';  // What was done
   timestamp: string;          // ISO timestamp
-  allowed: boolean;           // Did consent allow this?
+  allowed: boolean;           // Did consent allow this? (always true for grant/revoke)
 }
 
 export interface CsmRecord {

@@ -33,6 +33,8 @@ import {
   markReplied, evaluateOwnerTrackedResponses, evaluateTrackedKey, TRACKED_RESPONSE_SPEC,
   type TrackedResponseState, type CreateTrackedResponseInput,
 } from '../services/tracked-response.js';
+import { triageMessage, fillRecord } from '../services/tracked-classify.js';
+import { NotebookAiError } from '../services/notebook-ai.js';
 
 export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -42,6 +44,50 @@ export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, p
   // GET /v1/tracked-responses/spec — self-description (open; any honoring system can fetch it).
   router.get('/v1/tracked-responses/spec', (_req, res) => {
     res.json(success(config.nodeId, TRACKED_RESPONSE_SPEC));
+  });
+
+  // POST /v1/tracked-responses/classify — AI triage: form the INTENT for a message as an actionable
+  // record (which organism/workspace + record TYPE + title/content + completion condition). Owner-scoped
+  // (decrypts the caller's own model key). No AI key → 4xx (the feature is gated on AI).
+  router.post('/v1/tracked-responses/classify', requireAuth(), requireRole('owner'), async (req, res) => {
+    const { text } = req.body as { text?: string };
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
+      return;
+    }
+    req.setTimeout(600_000);
+    res.setTimeout(600_000);
+    try {
+      const viewerGaii = resolve(req);
+      const result = await triageMessage(storage, config, { gaii: viewerGaii, ownerName: req.auth!.owner as string, viewerGaii, text });
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof NotebookAiError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      res.status(500).json(error(config.nodeId, 'TRIAGE_FAILED', (e as Error).message));
+    }
+  });
+
+  // POST /v1/tracked-responses/fill — produce a record value conforming to the chosen record type's
+  // ACTUAL schema (AI-authored per workspace, any shape), plus the schema-correct completion condition
+  // + inject field. Validated against the schema before returning. Owner-scoped.
+  router.post('/v1/tracked-responses/fill', requireAuth(), requireRole('owner'), async (req, res) => {
+    const b = req.body as { organism_id?: string; ws?: string; namespace?: string; record_id?: string; message?: string; title?: string; content?: string };
+    if (!b.organism_id || !b.ws || !b.namespace || !b.record_id || !b.message) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'organism_id, ws, namespace, record_id and message are required'));
+      return;
+    }
+    req.setTimeout(600_000);
+    res.setTimeout(600_000);
+    try {
+      const result = await fillRecord(storage, config, {
+        gaii: resolve(req), organismId: b.organism_id, wsId: b.ws, namespace: b.namespace,
+        recordId: b.record_id, message: b.message, title: b.title || '', content: b.content || '',
+      });
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof NotebookAiError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      res.status(500).json(error(config.nodeId, 'FILL_FAILED', (e as Error).message));
+    }
   });
 
   // POST /v1/tracked-responses/evaluate-due — evaluate the caller's own contracts now (test/manual).
