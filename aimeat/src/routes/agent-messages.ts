@@ -151,7 +151,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
       { description: 'View thread', method: 'GET', url: `/v1/agents/${agentName}/messages?thread_id=${threadId}` },
       { description: 'View inbox', method: 'GET', url: `/v1/agents/${agentName}/messages/inbox` },
     ]));
-    emitChange('agent-messages');
+    emitChange('agent-messages', resolve(req));
   });
 
   /* ── GET /v1/agents/:name/messages/inbox -- Pending inbound messages ── */
@@ -256,7 +256,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     }
 
     res.json(success(config.nodeId, { message: updated }));
-    emitChange('agent-messages');
+    emitChange('agent-messages', resolve(req));
   });
 
   return router;

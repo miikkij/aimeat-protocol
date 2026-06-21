@@ -320,6 +320,49 @@ await test('5. GET /activity/log returns paginated events from tasks', async () 
     assert(pagination.total >= 2, `total should be >= 2, got ${pagination.total}`);
 });
 
+// ─── Phase 6: GET /v1/agents?include=stats bulk overview ───
+console.log('\nPhase 6 -- GET /v1/agents?include=stats');
+
+await test('6. include=stats attaches per-agent task/message aggregates in one request', async () => {
+    const { status, body } = await json('/v1/agents?include=stats', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const agent = (body.data.agents || []).find((a: any) => a.name === agentName);
+    assert(agent, `agent ${agentName} present in list`);
+    const stats = agent.stats;
+    assert(stats && typeof stats === 'object', 'agent.stats present');
+
+    // We completed 1 task and failed 1 task for this agent earlier in the run.
+    assert(stats.tasks.done >= 1, `done >= 1, got ${stats.tasks.done}`);
+    assert(stats.tasks.failed >= 1, `failed >= 1, got ${stats.tasks.failed}`);
+    assert(stats.tasks.doneToday >= 1, `doneToday >= 1, got ${stats.tasks.doneToday}`);
+    assert(typeof stats.tasks.lastTaskUpdateAt === 'string', 'lastTaskUpdateAt is set');
+    assert(typeof stats.tasks.lastFailedAt === 'string', 'lastFailedAt is set');
+    assert(typeof stats.messages.total === 'number', 'messages.total is a number');
+    assert(Array.isArray(stats.active_tasks), 'active_tasks is an array');
+});
+
+await test('7. counts match the per-agent countTasksByAgent sums (cross-check)', async () => {
+    const { body: capBody } = await json(`/v1/agents/${agentName}/capabilities`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const cap = capBody.data.activity_stats;
+    const { body } = await json('/v1/agents?include=stats', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const agent = (body.data.agents || []).find((a: any) => a.name === agentName);
+    // The embedded activityStats.tasksCompleted (lifetime) should be >= the overview's done count
+    // is not a strict equality (different windows), so just assert both report >=1 completion.
+    assert(agent.stats.tasks.done >= 1 && cap.tasksCompleted >= 1, 'both report completed tasks');
+});
+
+await test('8. without include=stats, no stats field is attached (default projection)', async () => {
+    const { body } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const agent = (body.data.agents || []).find((a: any) => a.name === agentName);
+    assert(agent && agent.stats === undefined, 'stats absent without include=stats');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

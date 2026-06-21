@@ -70,7 +70,13 @@ export function refreshAll() {
 function bindLive() {
   if (liveBound) return;
   liveBound = true;
-  window.addEventListener('aimeat-live-update', refreshAll);
+  // Refresh presence only when the 'presence' domain actually changed (or on a legacy
+  // "everything changed" payload), not on every unrelated live update.
+  window.addEventListener('aimeat-live-update', (e) => {
+    const d = /** @type {CustomEvent} */ (e).detail?.domains;
+    if (d && !d.has('presence')) return;
+    refreshAll();
+  });
 }
 
 /**

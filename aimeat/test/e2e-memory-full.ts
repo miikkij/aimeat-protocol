@@ -273,6 +273,14 @@ await test('GET non-existent key returns 404', async () => {
     assert(status === 404, `expected 404 for missing key, got ${status}`);
 });
 
+await test('GET non-existent key with ?soft=1 returns 200 value:null', async () => {
+    const { status, body } = await json('/v1/memory/test.does.not.exist?soft=1', { headers: auth1() });
+    assert(status === 200, `expected 200 for soft read, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.value === null, `value should be null: ${JSON.stringify(body.data)}`);
+    assert(body.data?.exists === false, `exists should be false: ${body.data?.exists}`);
+});
+
 await test('GET list with prefix filter', async () => {
     const { status, body } = await json('/v1/memory?prefix=test.', { headers: auth1() });
     assert(status === 200, `status ${status}`);

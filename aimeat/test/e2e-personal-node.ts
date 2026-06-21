@@ -308,6 +308,16 @@ await test('GET /v1/personal/status — 404 after deregister', async () => {
     assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
 });
 
+await test('GET /v1/personal/status?soft=1 — 200 anchored:false when no node', async () => {
+    const { status, body } = await json('/v1/personal/status?soft=1', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.anchored === false, `anchored should be false: ${JSON.stringify(body.data)}`);
+    assert(body.data?.node_id === null, `node_id should be null: ${body.data?.node_id}`);
+});
+
 // ─── Phase 10: Cleanup — Delete owner ───
 console.log('Phase 10 — Cleanup');
 

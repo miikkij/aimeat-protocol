@@ -4,9 +4,16 @@
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
 
-/** List agents owned by the given owner. Returns array. */
-export async function listAgents(owner) {
-  const data = await apiGet('/v1/agents');
+/**
+ * List agents owned by the given owner. Returns array.
+ * @param {string} [owner] filter to this owner
+ * @param {{ include?: string }} [opts] `include:'stats'` attaches a per-agent `stats` projection
+ *   (task/message counts + latest timestamps + active_tasks + onboarding) in ONE request,
+ *   replacing the old N+1 per-agent fan-out.
+ */
+export async function listAgents(owner, opts = {}) {
+  const qs = opts.include ? `?include=${encodeURIComponent(opts.include)}` : '';
+  const data = await apiGet(`/v1/agents${qs}`);
   const list = data?.data?.agents || data?.data || [];
   return owner ? list.filter(a => a.owner === owner) : list;
 }

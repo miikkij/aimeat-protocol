@@ -3,6 +3,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.16.0 -- 2026-06-21 -- Unseen-change badges are now has-unseen DOTS (no count) — the
+ *     bulk overview supplies latest-activity timestamps, not exact since-seen counts; the
+ *     dot still clears on tab-open and goes red for unseen failed tasks.
  *   v1.15.0 -- 2026-06-10 -- Glance round: collapsed bar drops the repeated mode/platform/
  *     readiness badges (detail-only now); capabilities collapse to a "N tools · N skills"
  *     summary (CapabilitiesSummary); tab badges only on Tasks/Messages, neutral gray with
@@ -271,7 +274,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
                         if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
                       }}>
                 ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
-                ${count > 0 ? html`<span class="pf-agd-tab-badge ${failed ? 'pf-agd-tab-badge--failed' : ''}">${count > 99 ? '99+' : count}</span>` : ''}
+                ${count > 0 ? html`<span class="pf-agd-tab-badge pf-agd-tab-badge--dot ${failed ? 'pf-agd-tab-badge--failed' : ''}"></span>` : ''}
               </button>
             `;
           })}
@@ -357,12 +360,12 @@ function renderChangeBadge(changes) {
   const total = totalChanges(changes);
   if (total <= 0) return null;
   const parts = [];
-  if (changes.tasks) parts.push(`${t('profile.agents.detail.tabs.tasks')}: ${changes.tasks}`);
-  if (changes.messages) parts.push(`${t('profile.agents.detail.tabs.messages')}: ${changes.messages}`);
+  if (changes.tasks) parts.push(t('profile.agents.detail.tabs.tasks'));
+  if (changes.messages) parts.push(t('profile.agents.detail.tabs.messages'));
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
-  // Neutral gray; red is reserved for unseen FAILED tasks.
+  // Has-unseen indicator (a dot, not an exact count). Neutral gray; red ONLY for unseen FAILED tasks.
   const failed = (changes.tasksFailed || 0) > 0;
-  return html`<span class="pf-agd-change-badge ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}>${total > 99 ? '99+' : total}</span>`;
+  return html`<span class="pf-agd-change-badge pf-agd-change-badge--dot ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}></span>`;
 }
 
 function renderDeliveryIndicator(agent) {

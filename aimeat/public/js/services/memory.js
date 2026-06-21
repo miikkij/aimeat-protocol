@@ -3,6 +3,8 @@
  * @description AIMEAT Memory Service — key-value memory CRUD, search, file management.
  * @version-history
  *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).
+ *   v1.2.0 — 2026-06-21 — getMemory(key, { soft }) — optional ?soft=1 read returning 200/null
+ *                          for keys that may not exist yet (kills browser-console 404 noise).
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -14,9 +16,15 @@ export async function listMemories(agentGaii) {
   return Array.isArray(list) ? list : [];
 }
 
-/** Read a single memory entry. Returns the envelope ({ data: { key, value, version, ... } }); throws/404s if missing. */
-export async function getMemory(key) {
-  return apiGet(`/v1/memory/${encodeURIComponent(key)}`);
+/**
+ * Read a single memory entry. Returns the envelope ({ data: { key, value, version, ... } }).
+ * By default throws/404s if missing. Pass { soft: true } for optional keys (UI prefs, config)
+ * that may legitimately not exist yet: the server returns a 200 with { value: null, exists: false }
+ * instead of a 404, avoiding browser-console 404 noise.
+ */
+export async function getMemory(key, opts) {
+  const q = opts && opts.soft ? '?soft=1' : '';
+  return apiGet(`/v1/memory/${encodeURIComponent(key)}${q}`);
 }
 
 /** Search memory by query string. Returns array. Optional agentGaii. */

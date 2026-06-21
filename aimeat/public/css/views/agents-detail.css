@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.11.0 -- 2026-06-21 -- Add has-unseen DOT badge modifier (.pf-agd-*-badge--dot): a small
+ *     round indicator replacing the old numeric change-count badge.
  *   v1.10.0 -- 2026-06-03 -- Add fleet "running now" panel styles (.pf-agd-active,
  *     -head, -empty, -list, -row, -dot, -agent, -title, -time) for the cross-agent
  *     active-tasks list between the board and the agent list. All colors tokenized
@@ -1999,6 +2001,15 @@
   background: var(--danger-bg, #FEE2E2);
   color: var(--danger-fg, #DC2626);
   border-color: var(--danger-border, #FECACA);
+}
+/* Has-unseen DOT (no count): a small round indicator replacing the old number badge. */
+.pf .pf-agd-change-badge--dot,
+.pf .pf-agd-tab-badge--dot {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 /* ── Board legend (filter pills), capability summary, inline misc (2026-06-10 round) ── */

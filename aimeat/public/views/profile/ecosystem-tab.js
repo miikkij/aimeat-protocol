@@ -109,6 +109,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
@@ -1092,12 +1093,10 @@ export default function EcosystemTab({ onStats, showToast }) {
         if (openApp) loadAppData(openApp.app, openApp.geai);
       }
     };
-    window.addEventListener('aimeat-live-update', handler);
-    // A slow timer only keeps the app list + pending onboarding requests fresh; it does NOT
-    // re-fetch the written-data section (that is event-driven above), so a viewed entry never
-    // collapses under a poll.
-    const poller = setInterval(() => loadRef.current(), 10000);
-    return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
+    // Push-only (no steady-state poll): react to ecosystem/app, agent, onboarding, and
+    // memory (written-data) changes. The open card's written data updates on these events,
+    // without collapsing the entry. Reconnect catch-up (live-updates.js) backstops gaps.
+    return onLiveUpdate(['ecosystem-apps', 'agents', 'agent-onboarding', 'memory'], handler);
   }, []);
 
   async function onApprove(userCode) {
