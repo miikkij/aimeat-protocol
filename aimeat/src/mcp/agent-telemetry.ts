@@ -13,13 +13,15 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-06-21 -- Route through the in-memory telemetry buffer (no per-call DB
+ *                            write); also feed activity counters like the REST path.
  */
 
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import { emitChange } from '../services/event-bus.js';
+import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -57,8 +59,11 @@ export function registerAgentTelemetryTools(
             createdAt: new Date().toISOString(),
         };
 
-        await storage.appendTelemetry(event);
-        emitChange('agents');
+        // Buffered in-memory + batched flush (see telemetry-buffer.ts). Unlike the prior
+        // append-only path this also feeds the activity counters, so MCP-reported telemetry
+        // now shows up in the Activity tab consistently with the REST path.
+        pushTelemetry(event);
+        recordTelemetryActivity(agentGaii, { type, data: data ?? {} });
 
         return { content: [{ type: 'text' as const, text: JSON.stringify({ id: event.id }, null, 2) }] };
     });

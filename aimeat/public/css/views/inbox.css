@@ -314,6 +314,10 @@
 .inbox-form-label { font-size: 12px; color: var(--text-dim); }
 .inbox-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .inbox-track-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; align-items: center; }
+.inbox-track-classify { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 16px; text-align: center; }
+.inbox-track-classify-step { font-weight: 600; }
+.inbox-track-classify-sub { font-size: 13px; color: var(--text-dim); }
+.inbox-track-content { resize: vertical; font-family: inherit; }
 
 /* Spinner shown on the create button while a tracked response is being created. */
 .inbox-spinner {

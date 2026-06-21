@@ -1093,6 +1093,8 @@ if (subcommand === 'config') {
     logger.info(`Received ${signal}, shutting down...`);
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
+    const { shutdownTelemetryBuffer } = await import('./services/telemetry-buffer.js');
+    await shutdownTelemetryBuffer();
     if (tunnelManager) await tunnelManager.shutdown();
     if (connectTunnelManager) await connectTunnelManager.shutdown();
     if (realtimeManager) await realtimeManager.shutdown();

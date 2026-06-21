@@ -18,6 +18,7 @@ import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { bufferedTelemetryCount } from './telemetry-buffer.js';
 
 export interface StepValidationResult {
   passed: boolean;
@@ -155,12 +156,21 @@ async function validateDelivery(agentGaii: string, storage: Storage): Promise<St
 }
 
 async function validateTelemetry(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
-  const events = await storage.listTelemetry(agentGaii, { limit: 1 });
-  const passed = events.length > 0;
+  // Fresh telemetry lives in the in-memory ring (raw events are no longer persisted);
+  // fall back to the persisted activity series for telemetry reported in an earlier
+  // process lifetime (the daily 'telemetry_events' counter survives restarts/flush).
+  let count = bufferedTelemetryCount(agentGaii);
+  if (count === 0) {
+    const history = await storage.getActivityHistory(agentGaii, { days: 30 });
+    count = history
+      .filter(r => r.metric === 'telemetry_events')
+      .reduce((sum, r) => sum + r.value, 0);
+  }
+  const passed = count > 0;
   return {
     passed,
     validationMethod: 'automatic',
-    details: { eventCount: events.length },
+    details: { eventCount: count },
     failureReason: passed ? undefined : 'No telemetry events received. Report telemetry via POST /v1/agents/me/telemetry',
   };
 }
