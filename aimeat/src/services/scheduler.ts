@@ -106,6 +106,11 @@ export class Scheduler {
     this.pushService = pushService;
   }
 
+  /** Expose the notify services (push + email) for core handlers that send owner alerts. */
+  getNotifyServices(): { push?: PushService; email?: EmailService } {
+    return { push: this.pushService, email: this.emailService };
+  }
+
   /**
    * Register a core handler function that can be referenced by scheduled jobs.
    * Must be called before start().

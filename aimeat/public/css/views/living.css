@@ -9,7 +9,28 @@
  *   v1.2.0 — 2026-06-21 — Phase 2: pulse status + change ledger.
  *   v1.3.0 — 2026-06-21 — Phase 3: status line + pause + cadence control.
  *   v1.4.0 — 2026-06-21 — Phase 4: automation controls (trust/triggers) + gated pending review.
+ *   v1.5.0 — 2026-06-21 — Phase 5: per-section timeline + snapshot + aggregate chart.
  */
+
+.pf-ld-timeline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-ld-aggregate {
+  margin-top: var(--space-xs, 0.4rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-chart {
+  display: block;
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+}
+.pf-ld-chart rect { fill: var(--accent, var(--text)); }
 
 .pf-ld-automation {
   display: flex;

@@ -40,6 +40,7 @@ export default function LivingTab({ session, showToast }) {
   const [pulsing, setPulsing] = useState(false);
   const [pulseStatus, setPulseStatus] = useState({}); // slotId → phase
   const [ledger, setLedger] = useState([]);
+  const [picked, setPicked] = useState({});           // slotId → chosen history version (timeline)
 
   useEffect(() => { if (session) loadAll(); }, [session]);
 
@@ -198,6 +199,40 @@ export default function LivingTab({ session, showToast }) {
     try { await living.rejectPending(opened.loc, slotId); showToast(t('profile.living.rejected')); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
   }
+  async function handleSaveSnapshot() {
+    try { await living.saveSnapshot(opened.loc, opened.config, picked); showToast(t('profile.living.snapshotSaved')); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+  async function addDataPoint(slotId, label, value) {
+    const v = parseFloat(value);
+    if (!Number.isFinite(v)) return;
+    try { await living.addSource(opened.loc, slotId, { text: `${label || ''}: ${value}`, data: { label: label || '', value: v } }); await reopen(); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+  /** @param {string} id @returns {HTMLInputElement|null} */
+  const dpEl = (id) => /** @type {HTMLInputElement|null} */ (document.getElementById(id));
+  async function submitDp(slot) {
+    const l = dpEl('dp-l-' + slot), val = dpEl('dp-v-' + slot);
+    if (!val || !val.value) return;
+    await addDataPoint(slot, l?.value || '', val.value);
+    if (l) l.value = ''; if (val) val.value = '';
+  }
+  const pickVersion = (slotId, idx) => setPicked(p => {
+    const next = { ...p };
+    if (idx === '') delete next[slotId]; else next[slotId] = opened.history?.[slotId]?.[Number(idx)];
+    return next;
+  });
+
+  /** Tiny dependency-free inline bar chart for an aggregate slot's numeric series. */
+  const renderChart = (series) => {
+    if (!series.length) return null;
+    const W = 280, Hh = 56, n = series.length;
+    const max = Math.max(...series.map(d => d.value), 1), min = Math.min(...series.map(d => d.value), 0);
+    const range = (max - min) || 1, bw = W / n;
+    return html`<svg class="pf-ld-chart" viewBox="0 0 ${W} ${Hh}" width="100%" height=${Hh} preserveAspectRatio="none">
+      ${series.map((d, i) => { const h = ((d.value - min) / range) * (Hh - 8) + 4; return html`<rect key=${i} x=${i * bw + 1} y=${Hh - h} width=${Math.max(1, bw - 2)} height=${h}><title>${escHtml(d.label)}: ${d.value}</title></rect>`; })}
+    </svg>`;
+  };
 
   function orgName(id) { return orgs.find(o => o.id === id)?.name || id; }
 
@@ -290,6 +325,7 @@ export default function LivingTab({ session, showToast }) {
           <div class="pf-ld-card-btns">
             <button class="btn-primary btn-sm" disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}</button>
             <button class="btn-outline btn-sm" onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}</button>
+            <button class="btn-outline btn-sm" onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setOpened(null)}>${t('profile.living.backToList')}</button>
           </div>
         </div>
@@ -314,6 +350,9 @@ export default function LivingTab({ session, showToast }) {
           const der = opened.slots[sec.slot];
           const slotSources = opened.sources.filter(s => s.slot === sec.slot);
           const phase = pulseStatus[sec.slot];
+          const versions = opened.history?.[sec.slot] || [];
+          const pickedVer = picked[sec.slot];
+          const series = sec.kind === 'aggregate' ? living.aggregateData(opened.sources, sec.slot) : [];
           return html`
             <div class="pf-ld-slot-edit" key=${sec.slot}>
               <div class="pf-ld-slot-edit-head">
@@ -322,6 +361,25 @@ export default function LivingTab({ session, showToast }) {
                 ${sec.agent && html`<span class="badge badge-info">→ ${escHtml(String(sec.agent).split('/')[0])}</span>`}
                 ${phase && html`<span class="text-meta-sm pf-ld-phase">${escHtml(phase)}</span>`}
               </div>
+              ${versions.length > 1 && html`
+                <div class="pf-ld-timeline">
+                  <span class="text-meta-sm">${t('profile.living.timeline')}:</span>
+                  <select class="pf-ld-cadence" value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''} onChange=${e => pickVersion(sec.slot, e.target.value)}>
+                    <option value="">${t('profile.living.versionCurrent')}</option>
+                    ${versions.map((v, i) => html`<option key=${i} value=${i}>${new Date(v.producedAt).toLocaleString()} · ${escHtml(v.producedBy || '')}</option>`)}
+                  </select>
+                </div>
+                ${pickedVer && html`<div class="pf-ld-charter-box"><${Markdown} text=${pickedVer.markdown} /></div>`}`}
+              ${sec.kind === 'aggregate' && html`
+                <div class="pf-ld-aggregate">
+                  ${series.length ? renderChart(series) : html`<span class="text-meta-sm">${t('profile.living.noData')}</span>`}
+                  <div class="pf-ld-slot-sources">
+                    <input class="input-field" placeholder=${t('profile.living.dpLabel')} id=${'dp-l-' + sec.slot} />
+                    <input class="input-field pf-ld-num" type="number" placeholder=${t('profile.living.dpValue')} id=${'dp-v-' + sec.slot}
+                      onKeyDown=${e => { if (e.key === 'Enter') submitDp(sec.slot); }} />
+                    <button class="btn-ghost btn-sm" onClick=${() => submitDp(sec.slot)}>${t('profile.living.addPoint')}</button>
+                  </div>
+                </div>`}
               <textarea class="input-field" rows="3" placeholder=${t('profile.living.sectionContentPh')}
                 value=${der?.markdown || ''} onChange=${e => saveSlot(sec.slot, e.target.value)}></textarea>
               ${opened.pending?.[sec.slot] && html`

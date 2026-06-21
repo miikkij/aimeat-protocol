@@ -21,6 +21,12 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
+import type { PushService } from './push.js';
+import type { EmailService } from './email.js';
+
+/** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
+ *  are written regardless; these are the extra out-of-app nudges. */
+export interface LivingNotify { push?: PushService; email?: EmailService }
 
 interface Loc { orgId: string; wsId: string; docId: string }
 const CONFIG_RE = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/;
@@ -31,7 +37,18 @@ const DERIVE_SYSTEM =
 const wsRoot = (l: Loc) => `organism.${l.orgId}.w.${l.wsId}`;
 const slotKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-slot.${l.docId}__${slot}.latest`;
 const pendingKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-pending.${l.docId}__${slot}.latest`;
+const histKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-hist.${l.docId}__${slot}.latest`;
 const taskStateKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-task.${l.docId}__${slot}.latest`;
+const HIST_CAP = 20;
+
+/** Append a version to a slot's capped history (newest first). Best-effort. */
+async function appendHistory(storage: Storage, ownerGaii: string, loc: Loc, slot: string, entry: Record<string, unknown>): Promise<void> {
+  try {
+    const cur = await storage.getMemory(ownerGaii, histKey(loc, slot));
+    const prev = ((cur?.value as { versions?: unknown[] })?.versions) || [];
+    await upsert(storage, ownerGaii, histKey(loc, slot), { slot, versions: [entry, ...prev].slice(0, HIST_CAP) });
+  } catch { /* history best-effort */ }
+}
 const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id}.latest`;
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;
 const configKey = (l: Loc) => `${wsRoot(l)}.living.${l.docId}.latest`;
@@ -48,6 +65,23 @@ async function upsert(storage: Storage, ownerGaii: string, key: string, value: u
 
 async function addLedger(storage: Storage, ownerGaii: string, loc: Loc, event: Record<string, unknown>): Promise<void> {
   try { await upsert(storage, ownerGaii, ledgerKey(loc), { ...event, at: new Date().toISOString() }); } catch { /* best-effort */ }
+}
+
+/** Web-push + email when a living document retires (best-effort; in addition to the UI retired badge). */
+async function notifyStop(services: LivingNotify | undefined, storage: Storage, ownerGaii: string, title: string, reason: string): Promise<void> {
+  if (!services) return;
+  const body = `"${title}" stopped refreshing: ${reason}`;
+  try {
+    if (services.push?.enabled) {
+      await services.push.sendNotification(ownerGaii.split('@')[0], { title: 'Living document retired', body, url: '/v1/profile?tab=living', tag: 'living:retired' });
+    }
+  } catch { /* push best-effort */ }
+  try {
+    if (services.email?.enabled) {
+      const to = (await storage.getGHII(ownerGaii) as { notificationEmail?: string } | null)?.notificationEmail;
+      if (to) await services.email.sendNotification(to, 'Living document retired', body);
+    }
+  } catch { /* email best-effort */ }
 }
 
 function cadenceMs(charter: Record<string, unknown> | undefined): number {
@@ -178,6 +212,7 @@ async function handleAgentSection(
 /** Pulse one instance: self-fulfilled sections + agent sections (dispatch → fold next pulse). */
 export async function pulseInstanceServer(
   storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc, cfg: Record<string, unknown>,
+  services?: LivingNotify,
 ): Promise<{ derived: number; costUsd: number; retired: boolean }> {
   const ownerName = ownerGaii.split('@')[0];
   const charter = (cfg.charter as { scope?: string; trust?: { derive?: string } }) || {};
@@ -221,6 +256,7 @@ export async function pulseInstanceServer(
       const md = (r.content || '').trim();
       const der = { slot, markdown: md, derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: gated };
       await upsert(storage, ownerGaii, gated ? pendingKey(loc, slot) : slotKey(loc, slot), der);
+      if (!gated) await appendHistory(storage, ownerGaii, loc, slot, { markdown: md, producedAt: der.producedAt, producedBy: 'pulse', derivedFrom: der.derivedFrom });
       await addLedger(storage, ownerGaii, loc, { event: gated ? 'pending' : 'slot-derived', slot, sources: active.length });
       rendered.push(`## ${sec.section}\n\n${md}`);
       derived++;
@@ -245,7 +281,10 @@ export async function pulseInstanceServer(
   if (stopReason) nextStatus.retired_reason = stopReason;
   await upsert(storage, ownerGaii, configKey(loc), { ...cfg, status: nextStatus });
   await addLedger(storage, ownerGaii, loc, { event: 'pulse', slots: derived, costUsd: Number(costUsd.toFixed(4)) });
-  if (stopReason) await addLedger(storage, ownerGaii, loc, { event: 'retired', reason: stopReason });
+  if (stopReason) {
+    await addLedger(storage, ownerGaii, loc, { event: 'retired', reason: stopReason });
+    await notifyStop(services, storage, ownerGaii, String(cfg.title || 'Living document'), stopReason);
+  }
   return { derived, costUsd, retired: !!stopReason };
 }
 
@@ -281,7 +320,7 @@ function pulseRecord(rec: MemoryRecord): Loc | null {
 }
 
 /** Scan ALL owners' living instances and pulse the due ones (scheduler entrypoint). */
-export async function scanAllDue(storage: Storage, config: AimeatConfig): Promise<void> {
+export async function scanAllDue(storage: Storage, config: AimeatConfig, services?: LivingNotify): Promise<void> {
   const { items } = await storage.listAllMemory({ prefix: 'organism.', limit: 10_000 });
   let pulsed = 0;
   for (const rec of items) {
@@ -291,14 +330,14 @@ export async function scanAllDue(storage: Storage, config: AimeatConfig): Promis
     if (!loc || !cfg || cfg.type !== 'living-config') continue;
     const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
     if (!evaluateDue(cfg, wsItems)) continue;
-    try { await pulseInstanceServer(storage, config, rec.ownerGaii, loc, cfg); pulsed++; }
+    try { await pulseInstanceServer(storage, config, rec.ownerGaii, loc, cfg, services); pulsed++; }
     catch (e) { logger.warn(`living pulse failed for ${rec.key}: ${String((e as Error).message || e)}`); }
   }
   if (pulsed > 0) logger.info(`Living-document pulse: refreshed ${pulsed} due instance(s)`);
 }
 
 /** Pulse the owner's OWN due instances now (manual trigger via POST /v1/living/pulse-due). */
-export async function scanOwnerDue(storage: Storage, config: AimeatConfig, ownerGaii: string): Promise<{ pulsed: number }> {
+export async function scanOwnerDue(storage: Storage, config: AimeatConfig, ownerGaii: string, services?: LivingNotify): Promise<{ pulsed: number }> {
   const items = await storage.listMemory(ownerGaii);
   let pulsed = 0;
   for (const rec of items) {
@@ -307,7 +346,7 @@ export async function scanOwnerDue(storage: Storage, config: AimeatConfig, owner
     if (!loc || !cfg || cfg.type !== 'living-config') continue;
     const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
     if (!evaluateDue(cfg, wsItems)) continue;
-    await pulseInstanceServer(storage, config, ownerGaii, loc, cfg);
+    await pulseInstanceServer(storage, config, ownerGaii, loc, cfg, services);
     pulsed++;
   }
   return { pulsed };
