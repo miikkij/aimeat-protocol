@@ -6306,6 +6306,10 @@
   "mindmap": {
     "titleOrg": "Organismin kartta",
     "titleWs": "Työtilan kartta",
+    "chart": "Kaavio",
+    "chartMindmap": "Mindmap",
+    "chartLr": "Vuokaavio →",
+    "chartTd": "Vuokaavio ↓",
     "level": "Taso",
     "levelWs": "Työtilat",
     "levelSpaces": "+ Spacet",

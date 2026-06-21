@@ -1075,7 +1075,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       <${ReadmePanel} markdown=${ws.readme || ''} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'}
         aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />
 
-      <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} />
+      <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} />
 
       <${StructureOverview} label=${t('organisms.structureOverviewWs') || 'Workspace structure — table of contents'}
         load=${() => orgService.getWorkspaceOverview(orgId, wsId)} />

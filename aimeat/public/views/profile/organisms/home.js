@@ -326,7 +326,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       <${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name}
         aiPromptSeed=${tocSeed} onSave=${saveReadme} />
 
-      <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} />
+      <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} />
 
       <${StructureOverview} label=${t('organisms.structureOverviewOrg') || 'Organism structure — table of contents'}
         load=${() => orgService.getOrganismOverview(org.id)} />
