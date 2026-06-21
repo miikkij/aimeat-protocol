@@ -6842,6 +6842,26 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/living/pulse-due:
+    post:
+      operationId: livingPulseDue
+      summary: Run the unattended (self-fulfilled) pulse for the caller's due living documents
+      description: >
+        Owner-scoped. Runs the server-side self-fulfilled pulse NOW for each of the caller's living
+        documents that are due per their charter cadence (skipping paused/retired ones) — the same
+        logic the scheduler runs across all owners. Per non-agent section it gathers from the owner's
+        own material (librarian) and AI re-derives via the owner's key, writing a versioned derivation
+        + ledger + cost/last_pulse. Returns `{ pulsed }`. Agent-backed sections are left to the manual
+        client pulse.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

@@ -40,6 +40,11 @@ export function registerCoreHandlers(
     await detectStalledTasks(storage, config);
     await detectAgentStallConditions(storage);
   });
+  // Living Documents — unattended self-fulfilled pulse of due instances
+  scheduler.registerCoreHandler('living-pulse', async () => {
+    const { scanAllDue } = await import('./living-pulse.js');
+    await scanAllDue(storage, config);
+  });
 }
 
 // ── Core Job Handlers (pure async, no setInterval) ─────────────────

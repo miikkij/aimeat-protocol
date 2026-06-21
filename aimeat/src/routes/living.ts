@@ -19,6 +19,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { authorLivingTemplate } from '../services/living-author.js';
+import { scanOwnerDue } from '../services/living-pulse.js';
 
 export function livingRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -43,6 +44,21 @@ export function livingRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       res.status(500).json(error(config.nodeId, 'AUTHOR_FAILED', (e as Error).message));
+    }
+  });
+
+  // POST /v1/living/pulse-due — run the unattended (self-fulfilled) pulse NOW for the caller's own
+  // due living documents. Same logic the scheduler runs across all owners; exposed so the owner can
+  // refresh on demand and to make the unattended path testable.
+  router.post('/v1/living/pulse-due', requireAuth(), requireRole('owner'), async (req, res) => {
+    req.setTimeout(1_800_000);
+    res.setTimeout(1_800_000);
+    try {
+      const ownerGaii = resolveIdentity(req.auth!, config.nodeId);
+      const result = await scanOwnerDue(storage, config, ownerGaii);
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      res.status(500).json(error(config.nodeId, 'PULSE_FAILED', (e as Error).message));
     }
   });
 
