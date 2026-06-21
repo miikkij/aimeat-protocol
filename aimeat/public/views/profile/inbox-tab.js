@@ -11,6 +11,11 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.6.2 -- 2026-06-21 -- Fix live-update request storm: the SSE payload's `domains` is a Set, but
+ *     the handler tested `Array.isArray(domains)` (always false) so the domain filter never matched and
+ *     the inbox re-fetched its whole state on EVERY change (memory/organism/task churn from dozens of
+ *     agents). Now branch on the Set: 'messages' → full refresh, 'agent-messages' → tracked-responses
+ *     only (1 request, not 5).
  *   v1.6.1 -- 2026-06-21 -- Approve-mode fixes: the "reply ready" suggestion now renders as a dashed
  *     draft bubble (Open record · Reject · Approve & edit) and "Approve & edit" actually seeds the
  *     composer (the rich editor was initialising empty). Single header badge (no confusing double "1"),
@@ -278,6 +283,16 @@ export default function InboxTab({ showToast }) {
     setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
 
+  // Cheap, single-request refresh of ONLY the Tracked Responses list. Used for 'agent-messages'
+  // live events: on a busy node 40+ agents emit agent-message changes every second, and those only
+  // affect tracked responses — reloading the whole inbox (conversations + flags + open thread +
+  // requests = 5 requests) on each is the request storm. Direct-message changes ('messages') still
+  // do the full refresh below.
+  const loadTrackedOnly = useCallback(async () => {
+    const trs = await tracked.listTrackedResponses().catch(() => []);
+    setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
+  }, []);
+
   // Tracked Responses for the open conversation that are awaiting the owner's approval to reply.
   const awaitingForConv = activeConv
     ? trackedList.filter(tr => tr.state === 'awaiting-approval' && tr.source?.conversationId === activeConv.conversationId)
@@ -380,21 +395,30 @@ export default function InboxTab({ showToast }) {
 
   const liveRef = useRef(null);
   liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
-  // Coalesce a burst of SSE 'change' events into one refresh — on a busy node these arrive rapidly
-  // and uncoalesced re-fetches both flicker AND hammer the server. Also IGNORE domains the inbox
-  // doesn't care about: refresh only on MESSAGE changes (conversations + tracked-response replies
-  // arrive as message events). Deliberately NOT subscribed to 'memory' — message-flag/tracked
-  // records are memory-backed, but the whole node's constant memory churn was waking the inbox
-  // every 700ms and re-pulling conversations/tracked-responses (a request storm). Flags update on
-  // the local star action; tracked responses refresh when the actual reply lands as a message.
-  const RELEVANT = ['messages', 'agent-messages'];
+  // Selective live refresh. `e.detail.domains` is a Set<string> (or null = "everything changed",
+  // e.g. a reconnect catch-up). IMPORTANT: it is a Set, not an Array — an earlier `Array.isArray`
+  // check silently never matched, so the inbox re-fetched on EVERY change (memory/organism/task
+  // churn from dozens of agents → a request storm). We branch by domain:
+  //   • 'messages'        (a direct message changed)  → full refresh (conversations + flags +
+  //                                                      open thread + requests)
+  //   • 'agent-messages'  (agent activity)            → ONLY the tracked-responses list (1 request)
+  // Everything else (memory, organisms, agent-tasks, …) is ignored. A burst is coalesced into one
+  // refresh; if any 'messages' event lands in the window we do the full refresh.
   const liveTimerRef = useRef(null);
+  const pendingFullRef = useRef(false);
   useEffect(() => {
     const handler = (e) => {
-      const domains = e?.detail?.domains;
-      if (Array.isArray(domains) && !domains.some(d => RELEVANT.includes(d))) return;   // not for us
-      if (liveTimerRef.current) return;
-      liveTimerRef.current = setTimeout(() => { liveTimerRef.current = null; liveRef.current?.(); }, 700);
+      const domains = e?.detail?.domains;                  // Set<string> | null
+      const full = !domains || domains.has('messages');         // direct-message change
+      const agentOnly = !domains || domains.has('agent-messages'); // agent activity → tracked only
+      if (!full && !agentOnly) return;                     // not for us
+      if (full) pendingFullRef.current = true;
+      if (liveTimerRef.current) return;                    // coalesce a burst into one refresh
+      liveTimerRef.current = setTimeout(() => {
+        liveTimerRef.current = null;
+        if (pendingFullRef.current) { pendingFullRef.current = false; liveRef.current?.(); }
+        else loadTrackedOnly();
+      }, 700);
     };
     window.addEventListener('aimeat-live-update', handler);
     return () => { window.removeEventListener('aimeat-live-update', handler); if (liveTimerRef.current) clearTimeout(liveTimerRef.current); };
