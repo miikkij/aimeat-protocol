@@ -9,6 +9,8 @@
  *   v1.1.0 — 2026-05-28 — Expect missing memory reads to return 404 without auto-creating records
  *   v1.2.0 — 2026-05-31 — Add owner-session cross-agent DELETE coverage (owner can delete a key stored under their agent; truly-missing key still 404s)
  *   v1.3.0 — 2026-05-31 — Add owner-session POST agent-targeting coverage (owner can create a key under their agent's GAII via `agent`; foreign-agent target rejected)
+ *   v1.4.0 — 2026-06-22 — Cover the scalable Memory tab: include=meta (value omitted + bytes),
+ *     search?prefix scoping, export, import (skip/overwrite/rename), and bulk-delete by prefix.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -755,6 +757,77 @@ await test('POST is idempotent on same key (upsert)', async () => {
 
     const { body: readBody } = await json(`/v1/memory/${key}`, { headers: auth1() });
     assert(readBody.data?.value === 'second', `value after upsert: ${readBody.data?.value}`);
+});
+
+// ═══════════════════════════════════════════════════════
+// Scalable Memory tab (v2.3): meta listing, scoped search, export/import, bulk-delete
+// ═══════════════════════════════════════════════════════
+console.log('\n9. Scalable Memory tab — meta / search prefix / export / import / bulk-delete');
+
+await test('include=meta omits value and reports bytes', async () => {
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'meta.demo', value: { big: 'x'.repeat(50) }, visibility: 'private' }) });
+    const { status, body } = await json('/v1/memory?include=meta', { headers: auth1() });
+    assert(status === 200, `status ${status}`);
+    const item = (body.data?.items || []).find((i: any) => i.key === 'meta.demo');
+    assert(!!item, 'meta.demo present in meta listing');
+    assert(item.value === undefined, 'value omitted in meta mode');
+    assert(typeof item.bytes === 'number' && item.bytes > 0, `bytes reported, got ${item.bytes}`);
+});
+
+await test('search?prefix scopes to a namespace', async () => {
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'proj.one', value: { note: 'needlexyz' }, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'other.one', value: { note: 'needlexyz' }, visibility: 'private' }) });
+    const { body } = await json('/v1/memory/search?q=needlexyz&prefix=proj.', { headers: auth1() });
+    const keys = (body.data?.results || []).map((r: any) => r.key);
+    assert(keys.includes('proj.one'), 'proj.one matched');
+    assert(!keys.includes('other.one'), 'other.one excluded by prefix');
+});
+
+await test('export returns entries with full values', async () => {
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'exp.a', value: { v: 1 }, visibility: 'private' }) });
+    const { status, body } = await json('/v1/memory/export?prefix=exp.', { headers: auth1() });
+    assert(status === 200, `status ${status}`);
+    const entry = (body.data?.entries || []).find((e: any) => e.key === 'exp.a');
+    assert(!!entry && entry.value?.v === 1, 'exp.a exported with value');
+});
+
+await test('import mode=skip creates new then skips existing', async () => {
+    const r1 = await json('/v1/memory/import', { method: 'POST', headers: auth1(), body: JSON.stringify({ mode: 'skip', entries: [{ key: 'imp.a', value: 1 }] }) });
+    assert(r1.body.data?.created === 1, `created 1, got ${JSON.stringify(r1.body.data)}`);
+    const r2 = await json('/v1/memory/import', { method: 'POST', headers: auth1(), body: JSON.stringify({ mode: 'skip', entries: [{ key: 'imp.a', value: 2 }] }) });
+    assert(r2.body.data?.skipped === 1, `skipped 1, got ${JSON.stringify(r2.body.data)}`);
+    const read = await json('/v1/memory/imp.a', { headers: auth1() });
+    assert(read.body.data?.value === 1, 'value unchanged after skip');
+});
+
+await test('import mode=overwrite replaces existing value', async () => {
+    const r = await json('/v1/memory/import', { method: 'POST', headers: auth1(), body: JSON.stringify({ mode: 'overwrite', entries: [{ key: 'imp.a', value: 3 }] }) });
+    assert(r.body.data?.updated === 1, `updated 1, got ${JSON.stringify(r.body.data)}`);
+    const read = await json('/v1/memory/imp.a', { headers: auth1() });
+    assert(read.body.data?.value === 3, 'value overwritten');
+});
+
+await test('import mode=rename keeps original and creates a new key', async () => {
+    const r = await json('/v1/memory/import', { method: 'POST', headers: auth1(), body: JSON.stringify({ mode: 'rename', entries: [{ key: 'imp.a', value: 4 }] }) });
+    assert(r.body.data?.created === 1, `created 1 (renamed), got ${JSON.stringify(r.body.data)}`);
+    const orig = await json('/v1/memory/imp.a', { headers: auth1() });
+    assert(orig.body.data?.value === 3, 'original imp.a unchanged');
+    const renamed = await json('/v1/memory/imp.a-imported', { headers: auth1() });
+    assert(renamed.body.data?.value === 4, 'renamed copy created');
+});
+
+await test('bulk-delete by prefix removes all matching keys', async () => {
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'del.x', value: 1, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'del.y', value: 1, visibility: 'private' }) });
+    const r = await json('/v1/memory/bulk-delete', { method: 'POST', headers: auth1(), body: JSON.stringify({ prefix: 'del.' }) });
+    assert(r.body.data?.deleted === 2, `deleted 2, got ${JSON.stringify(r.body.data)}`);
+    const list = await json('/v1/memory?prefix=del.', { headers: auth1() });
+    assert((list.body.data?.items || []).length === 0, 'no del.* keys remain');
+});
+
+await test('bulk-delete requires prefix or keys', async () => {
+    const { status } = await json('/v1/memory/bulk-delete', { method: 'POST', headers: auth1(), body: JSON.stringify({}) });
+    assert(status === 400, `expected 400, got ${status}`);
 });
 
 // ═══════════════════════════════════════════════════════

@@ -712,7 +712,7 @@ export class SqliteStorage implements Storage {
     ).run(ownerGaii, key);
   }
 
-  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): Promise<MemoryRecord[]> {
+  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): Promise<MemoryRecord[]> {
     const q = query.toLowerCase();
     let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
     const params: unknown[] = [ownerGaii];
@@ -720,6 +720,11 @@ export class SqliteStorage implements Storage {
     if (opts?.visibility) {
       sql += ' AND visibility = ?';
       params.push(opts.visibility);
+    }
+
+    if (opts?.prefix) {
+      sql += ' AND key LIKE ?';
+      params.push(opts.prefix + '%');
     }
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];

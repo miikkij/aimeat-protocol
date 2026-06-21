@@ -34,6 +34,10 @@
  *     per-row checkboxes + a bulk bar (change visibility incl. group / delete with confirm /
  *     clear). The detail-row select and edit-modal select remain as alternate paths.
  *   v2.2.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v2.3.0 — 2026-06-22 — Scale to thousands of keys: default load is metadata-only (include=meta,
+ *     no values) with per-key lazy value fetch on expand + "Load all contents"; server-side content
+ *     search (key/value/tags) with per-group scoping; storage-usage bar; value-size column + "largest
+ *     first" sort; bulk-delete a whole group; JSON export/import (skip/overwrite/rename).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -92,6 +96,19 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [browseError, setBrowseError] = useState(null);
   const [pullingKeys, setPullingKeys] = useState(new Set());
   const [sortBy, setSortBy] = useState('updated');
+  // Scalable Memory tab (v2.3): the list loads metadata-only by default (no values) so thousands of
+  // keys open fast; values are fetched per-key on expand. memQuota drives the storage-usage bar.
+  const [memQuota, setMemQuota] = useState(null);
+  const [fullLoaded, setFullLoaded] = useState(false);   // true once "Load all contents" pulls values
+  const [valueCache, setValueCache] = useState({});       // key → value (lazy-fetched in meta mode)
+  const [loadingValueKeys, setLoadingValueKeys] = useState(new Set());
+  // Server-side content search (matches key + value + tags) — separate from the instant client filter.
+  const [searchInput, setSearchInput] = useState('');
+  const [searchResults, setSearchResults] = useState(null);  // null = not searching; array = results
+  const [searchScopePrefix, setSearchScopePrefix] = useState('');  // optional namespace/group scope
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [importMode, setImportMode] = useState('skip');   // skip | overwrite | rename
+  const [importing, setImporting] = useState(false);
   const [discoverEntries, setDiscoverEntries] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState(null);
@@ -206,13 +223,149 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { /* ignore */ }
   }
 
+  // Refresh the list in whatever mode is active: metadata-only by default (fast for thousands of
+  // keys), or full values once the user pressed "Load all contents".
   async function loadMemories() {
     try {
       const agentGaii = selectedAgent || undefined;
-      const list = await memoryService.listMemories(agentGaii);
-      setMemories(Array.isArray(list) ? list : []);
-      onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
+      if (fullLoaded) {
+        const list = await memoryService.listMemories(agentGaii);
+        setMemories(Array.isArray(list) ? list : []);
+        onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
+      } else {
+        const { items, quota } = await memoryService.listMemoriesMeta(agentGaii);
+        setMemories(items);
+        setMemQuota(quota);
+        setValueCache({});
+        onStats?.({ memory: items.length });
+      }
     } catch { setMemories([]); }
+  }
+
+  // "Load all contents" — pull every entry's value so the instant client filter can search values too.
+  async function loadFullContents() {
+    setFullLoaded(true);
+    try {
+      const list = await memoryService.listMemories(selectedAgent || undefined);
+      setMemories(Array.isArray(list) ? list : []);
+    } catch { /* keep the meta list we already have */ }
+  }
+
+  // Lazy value fetch (meta mode): on row expand, fetch the value once and cache it.
+  async function ensureValue(key) {
+    if (fullLoaded || valueCache[key] !== undefined) return;
+    setLoadingValueKeys(prev => new Set(prev).add(key));
+    try {
+      const resp = await memoryService.getMemory(key, { soft: true, agent: selectedAgent || undefined });
+      setValueCache(prev => ({ ...prev, [key]: resp?.data?.value ?? null }));
+    } catch {
+      setValueCache(prev => ({ ...prev, [key]: null }));
+    } finally {
+      setLoadingValueKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }
+
+  // The effective value for a row: from the full list, the lazy cache, or undefined (still loading).
+  const valueOf = (m) => (fullLoaded ? m.value : valueCache[m.key]);
+
+  // Server-side content search (key + value + tags), optionally scoped to a namespace/group prefix.
+  async function runServerSearch(query, prefix) {
+    const q = (query ?? searchInput).trim();
+    setSearchScopePrefix(prefix || '');
+    if (!q) { setSearchResults(null); return; }
+    setSearchLoading(true);
+    try {
+      const results = await memoryService.searchMemory(q, selectedAgent || undefined, prefix || undefined);
+      const list = Array.isArray(results) ? results : [];
+      setSearchResults(list);
+      // Search results carry their values — cache them so expanding a result shows the value at once.
+      setValueCache(prev => { const next = { ...prev }; for (const r of list) next[r.key] = r.value; return next; });
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+      setSearchResults([]);
+    } finally { setSearchLoading(false); }
+  }
+
+  function clearServerSearch() {
+    setSearchInput('');
+    setSearchResults(null);
+    setSearchScopePrefix('');
+  }
+
+  // Export all (or a prefix) of the caller's memory as a downloaded JSON backup.
+  async function handleExport(prefix) {
+    try {
+      const data = await memoryService.exportMemory(selectedAgent || undefined, prefix || undefined);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `aimeat-memory-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast((t('profile.memory.exportDone') || 'Exported {n} entries').replace('{n}', String(data.count ?? (data.entries || []).length)));
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+
+  // Import a JSON backup; the user picks a conflict mode (skip/overwrite/rename) before it runs.
+  const importFileRef = useRef(null);
+  function triggerImport() { importFileRef.current?.click(); }
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';   // allow re-picking the same file
+    if (!file) return;
+    let parsed;
+    try {
+      const text = await file.text();
+      parsed = JSON.parse(text);
+    } catch { showToast(t('profile.memory.importBadJson') || 'Not a valid JSON backup', true); return; }
+    const entries = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.entries) ? parsed.entries : null);
+    if (!entries || entries.length === 0) { showToast(t('profile.memory.importEmpty') || 'No entries found in file', true); return; }
+
+    const modeLabel = (m) => t('profile.memory.importMode.' + m) || m;
+    confirm(
+      (t('profile.memory.importConfirm') || 'Import {n} entries? Existing keys are handled by mode: {mode}.')
+        .replace('{n}', String(entries.length)).replace('{mode}', modeLabel(importMode)),
+      async () => {
+        setImporting(true);
+        try {
+          const resp = await memoryService.importMemory(entries, importMode, selectedAgent || undefined);
+          if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+          const s = resp.data || {};
+          showToast((t('profile.memory.importDone') || 'Imported: {c} new, {u} updated, {s} skipped')
+            .replace('{c}', String(s.created || 0)).replace('{u}', String(s.updated || 0)).replace('{s}', String(s.skipped || 0))
+            + ((s.failed && s.failed.length) ? ` · ${s.failed.length} ${t('profile.error') || 'failed'}` : ''),
+            !!(s.failed && s.failed.length));
+          loadMemories();
+        } catch (e) { showToast(e.message || t('profile.error'), true); }
+        finally { setImporting(false); }
+      },
+    );
+  }
+
+  // Delete a whole namespace/group at once (server-side bulk-delete by prefix).
+  function deleteGroup(g, count) {
+    const prefix = g.kind === 'organism' ? 'organism.' + g.uuid + '.'
+      : g.kind === 'plain' ? g.id + '.'
+      : null;
+    if (!prefix) { showToast(t('profile.memory.deleteGroupUnsupported') || 'This group cannot be bulk-deleted', true); return; }
+    confirm(
+      (t('profile.memory.deleteGroupConfirm') || 'Delete all {n} entries under "{g}"? This cannot be undone.')
+        .replace('{n}', String(count)).replace('{g}', groupLabel(g)),
+      async () => {
+        try {
+          const resp = await memoryService.bulkDeleteMemory({ prefix, agentGaii: selectedAgent || undefined });
+          if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+          showToast((t('profile.memory.bulkDeleted') || '{n} deleted').replace('{n}', String(resp.data?.deleted ?? 0)));
+          setExpandedMem(null);
+          loadMemories();
+        } catch (e) { showToast(e.message || t('profile.error'), true); }
+      },
+      { danger: true },
+    );
   }
 
   async function loadFiles() {
@@ -412,6 +565,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }
   }
 
+  function formatBytes(n) {
+    if (n == null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
   function formatRelativeTime(isoStr) {
     if (!isoStr) return '';
     const d = new Date(isoStr);
@@ -436,6 +596,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
         return sorted.sort((a, b) => +new Date(b.created_at || 0) - +new Date(a.created_at || 0));
       case 'alpha':
         return sorted.sort((a, b) => a.key.localeCompare(b.key));
+      case 'size':
+        return sorted.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
       default:
         return sorted;
     }
@@ -492,7 +654,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
       if (!ft) return true;
       if (m.key.toLowerCase().includes(ft)) return true;
       if (m.tags && m.tags.some(tag => tag.toLowerCase().includes(ft))) return true;
-      try { return JSON.stringify(m.value).toLowerCase().includes(ft); } catch { return false; }
+      const v = valueOf(m);   // undefined in meta mode (value not loaded) → key/tag filter only
+      if (v === undefined) return false;
+      try { return JSON.stringify(v).toLowerCase().includes(ft); } catch { return false; }
     }));
 
     const toggleMemTag = (tag) => {
@@ -517,10 +681,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
     const renderRow = (m, g) => html`
       <div key=${m.key}>
-        <div class="mem-item mem-item--grouped" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
+        <div class="mem-item mem-item--grouped" onClick=${() => { const opening = expandedMem !== m.key; setExpandedMem(opening ? m.key : null); if (opening) ensureValue(m.key); }}>
           <input type="checkbox" class="mem-row-check" checked=${selectedKeys.has(m.key)}
             onClick=${(e) => e.stopPropagation()} onChange=${() => toggleSelected(m.key)} />
           <span class="mem-key" title=${m.key}>${escHtml(displayRemainder(m.key, g))}</span>
+          ${typeof m.bytes === 'number' && html`<span class="pf-mem-size" title=${t('profile.memory.sizeLabel') || 'Value size'}>${formatBytes(m.bytes)}</span>`}
           <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
             ${formatRelativeTime(m.updated_at || m.created_at)}
           </span>
@@ -549,8 +714,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
         ${expandedMem === m.key && html`
           <div class="mem-detail">
             <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
-            ${(() => { const im = detectImage(m.value, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
-            <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
+            ${(!fullLoaded && valueOf(m) === undefined)
+              ? html`<div class="text-meta-sm">${loadingValueKeys.has(m.key) ? (t('profile.memory.loadingValue') || 'Loading value…') : '…'}</div>`
+              : html`
+                ${(() => { const v = valueOf(m); const im = detectImage(v, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
+                <pre>${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}</pre>
+              `}
             <div class="mem-detail-visrow mb-half">
               <span class="text-meta-sm">${t('profile.memory.visLabel')}</span>
               <select class="input-field mem-vis-select" value=${m.visibility || 'private'}
@@ -592,7 +761,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
               </div>
             `}
             <div class="mem-actions">
-              <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof m.value === 'object' })}>${t('profile.memory.editBtn')}</button>
+              <button class="btn-sm" onClick=${() => { const v = valueOf(m); setEditModal({ key: m.key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null }); }}>${t('profile.memory.editBtn')}</button>
               ${fedConsents[m.key]
                 ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
                     onClick=${() => handleStopSharing(m.key)}>
@@ -618,7 +787,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
       </div>
     `;
 
+    const quotaPct = memQuota && memQuota.max_bytes ? Math.min(100, Math.round((memQuota.used_bytes / memQuota.max_bytes) * 100)) : 0;
+
     return html`
+      ${memQuota && html`
+        <div class="pf-mem-quota">
+          <div class="pf-mem-quota-row">
+            <span class="text-meta-sm">${t('profile.memory.storageUsed') || 'Storage'}: ${memQuota.used_keys}/${memQuota.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${formatBytes(memQuota.used_bytes)} / ${formatBytes(memQuota.max_bytes)}</span>
+          </div>
+          <div class="pf-mem-quota-bar"><div class="pf-mem-quota-fill ${quotaPct >= 90 ? 'pf-mem-quota-fill--danger' : ''}" style=${`width:${quotaPct}%`}></div></div>
+        </div>
+      `}
       <div class="action-bar">
         <div class="search-bar">
           <input type="text" class="input-field" placeholder=${t('profile.memory.filterType')}
@@ -631,9 +810,30 @@ export default function MemoryTab({ session, showToast, onStats }) {
             <option value="updated">${t('profile.memory.sortUpdated')}</option>
             <option value="created">${t('profile.memory.sortCreated')}</option>
             <option value="alpha">${t('profile.memory.sortAlpha')}</option>
+            <option value="size">${t('profile.memory.sortSize') || 'Largest first'}</option>
           </select>
         </div>
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
+      </div>
+      <div class="action-bar mem-tools-bar">
+        <div class="search-bar">
+          <input type="text" class="input-field" placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
+            value=${searchInput} onInput=${e => setSearchInput(e.target.value)}
+            onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, searchScopePrefix); }} />
+          <button class="btn-sm" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
+          ${searchResults !== null && html`<button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕</button>`}
+        </div>
+        ${!fullLoaded && html`<button class="btn-outline btn-sm" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button>`}
+        <button class="btn-outline btn-sm" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button>
+        <span class="mem-import-group">
+          <select class="input-field mem-vis-select" value=${importMode} onChange=${e => setImportMode(e.target.value)} title=${t('profile.memory.importModeLabel') || 'Conflict handling'}>
+            <option value="skip">${t('profile.memory.importMode.skip') || 'Skip existing'}</option>
+            <option value="overwrite">${t('profile.memory.importMode.overwrite') || 'Overwrite'}</option>
+            <option value="rename">${t('profile.memory.importMode.rename') || 'Import as new'}</option>
+          </select>
+          <button class="btn-outline btn-sm" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button>
+          <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} />
+        </span>
       </div>
       <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
       ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
@@ -649,22 +849,39 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <button class="btn-ghost btn-sm" onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}</button>
         </div>
       `}
-      ${filtered.length === 0
-        ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
-        : groupsOrdered.map(g => {
-            const collapsed = !filtering && collapsedGroups.has(g.id);
-            return html`
-              <div class="mem-group" key=${g.id}>
-                <button class="mem-group-header" onClick=${() => toggleGroupCollapsed(g.id)}>
-                  <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
-                  <span class="mem-group-name">${escHtml(groupLabel(g))}</span>
-                  <span class="mem-group-count">${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}</span>
-                  ${g.kind === 'organism' && orgNames[g.uuid] && html`<span class="mem-group-sub">${shortTok(g.uuid)}</span>`}
-                </button>
-                ${!collapsed && g.items.map(m => renderRow(m, g))}
-              </div>
-            `;
-          })
+      ${searchResults !== null
+        ? html`
+            <div class="mem-search-summary">
+              <span class="text-meta-sm">${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${escHtml(searchScopePrefix)}` : ''}</span>
+              <button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕ ${t('profile.memory.searchClear') || 'Clear search'}</button>
+            </div>
+            ${searchResults.length === 0
+              ? html`<div class="empty">${t('profile.memory.searchEmpty') || 'No matches'}</div>`
+              : sortEntries(searchResults).map(m => renderRow(m, groupOfKey(m.key)))}
+          `
+        : filtered.length === 0
+          ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
+          : groupsOrdered.map(g => {
+              const collapsed = !filtering && collapsedGroups.has(g.id);
+              const groupPrefix = g.kind === 'organism' ? 'organism.' + g.uuid + '.' : g.kind === 'plain' ? g.id + '.' : null;
+              return html`
+                <div class="mem-group" key=${g.id}>
+                  <div class="mem-group-header" role="button" tabindex="0" onClick=${() => toggleGroupCollapsed(g.id)}>
+                    <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
+                    <span class="mem-group-name">${escHtml(groupLabel(g))}</span>
+                    <span class="mem-group-count">${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}</span>
+                    ${g.kind === 'organism' && orgNames[g.uuid] && html`<span class="mem-group-sub">${shortTok(g.uuid)}</span>`}
+                    <span class="mem-group-actions">
+                      ${groupPrefix && html`<button class="btn-ghost btn-sm" title=${t('profile.memory.searchInGroup') || 'Search in this group'}
+                        onClick=${(e) => { e.stopPropagation(); setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}>🔍</button>`}
+                      ${groupPrefix && html`<button class="btn-ghost btn-sm" title=${t('profile.memory.deleteGroup') || 'Delete group'}
+                        onClick=${(e) => { e.stopPropagation(); deleteGroup(g, g.items.length); }}>🗑️</button>`}
+                    </span>
+                  </div>
+                  ${!collapsed && g.items.map(m => renderRow(m, g))}
+                </div>
+              `;
+            })
       }`;
   };
 
@@ -1056,7 +1273,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <div class="agent-selector mb-half">
           <label class="text-meta pf-mr-half">${t('profile.memory.agent') || 'Agent'}:</label>
           <select class="input-field pf-select-inline"
-            value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); }}>
+            value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); setFullLoaded(false); clearServerSearch(); }}>
             <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
             ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
           </select>
