@@ -293,6 +293,10 @@ export default function InboxTab({ showToast }) {
     if (!cur || (cur.state === 'replied' && tr.state !== 'replied')) trackedByMsg[mid] = tr;
   }
   const awaitingCount = trackedList.filter(tr => tr.state === 'awaiting-approval').length;
+  // A replied contract is DONE — drop it from the active dashboard + counts (the message keeps its
+  // "Replied" badge as the record). A small footer notes how many were completed.
+  const activeTracked = trackedList.filter(tr => tr.state !== 'replied');
+  const doneCount = trackedList.length - activeTracked.length;
 
   // Clicking 🔗: if the message already has an ACTIVE tracked response, surface it (don't make a
   // duplicate); a finished (replied) one may be tracked again as a fresh task.
@@ -328,11 +332,14 @@ export default function InboxTab({ showToast }) {
     setReplyingTrId(tr.id);
   };
 
-  // Open the workspace record this tracked response watches (so you can jump straight to the bug).
+  // Open the workspace record this tracked response watches (so you can jump straight to the bug). Set
+  // BOTH the saved-tab (so the profile loads straight onto Organisms) and the workspace deep-link
+  // (so the Organisms tab opens that exact workspace), then hard-navigate.
   const openRecord = (tr) => {
     const r = tr.references || {};
     if (!r.organismId || !r.workspaceId) { showToast?.(t('inbox.trackNoRecord'), true); return; }
     try {
+      sessionStorage.setItem('aimeat-profile-tab', 'organisms');
       sessionStorage.setItem('aimeat.ws.openId', r.organismId);
       sessionStorage.setItem('aimeat.ws.openWs', r.workspaceId);
     } catch { /* noop */ }
@@ -564,11 +571,11 @@ export default function InboxTab({ showToast }) {
   const renderTrackedList = () => html`
     <div class="inbox-panel">
       <div class="inbox-thread-head">
-        <div class="inbox-name">🔗 ${t('inbox.trackedTitle')} <span class="inbox-count">${trackedList.length}</span></div>
+        <div class="inbox-name">🔗 ${t('inbox.trackedTitle')} ${activeTracked.length ? html`<span class="inbox-count">${activeTracked.length}</span>` : ''}</div>
       </div>
       <div class="inbox-tracked-list">
-        ${trackedList.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.trackedEmpty')}</div>` : null}
-        ${trackedList.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(tr => {
+        ${activeTracked.length === 0 ? html`<div class="inbox-empty-sm">${doneCount ? t('inbox.trackedAllDone') : t('inbox.trackedEmpty')}</div>` : null}
+        ${activeTracked.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(tr => {
           const trk = trackStateLabel(tr.state);
           return html`
             <div class="inbox-tracked-row" key=${tr.id}>
@@ -585,14 +592,15 @@ export default function InboxTab({ showToast }) {
                 </div>
               </div>
               <div class="inbox-tracked-actions">
-                ${tr.references?.organismId ? html`<button class="btn-ghost btn-sm" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>📄</button>` : null}
+                ${tr.references?.organismId ? html`<button class="btn-outline btn-sm" onClick=${() => openRecord(tr)}>📄 ${t('inbox.trackOpenRecord')}</button>` : null}
                 ${tr.state === 'awaiting-approval'
                   ? html`<button class="btn-primary btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackApprove')}</button>`
-                  : html`<button class="btn-outline btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackedOpen')}</button>`}
-                ${tr.state !== 'replied' ? html`<button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>` : null}
+                  : html`<button class="btn-ghost btn-sm" onClick=${() => openTracked(tr)} title=${t('inbox.trackedOpenConvo')}>💬</button>`}
+                <button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>
               </div>
             </div>`;
         })}
+        ${doneCount ? html`<div class="inbox-tracked-done">✓ ${(t('inbox.trackedDoneCount') || '{n} completed').replace('{n}', String(doneCount))}</div>` : null}
       </div>
     </div>`;
 
@@ -606,7 +614,7 @@ export default function InboxTab({ showToast }) {
         <div class="inbox-head-actions">
           <button class=${`btn-outline${mode === 'tracked' ? ' btn-outline--active' : ''}${awaitingCount ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}
             title=${awaitingCount ? t('inbox.trackReady') : ''}>
-            🔗 ${t('inbox.trackedTitle')}${trackedList.length ? html` <span class="inbox-count">${trackedList.length}</span>` : ''}
+            🔗 ${t('inbox.trackedTitle')}${activeTracked.length ? html` <span class="inbox-count">${activeTracked.length}</span>` : ''}
           </button>
           <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
         </div>
