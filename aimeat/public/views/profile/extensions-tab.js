@@ -28,6 +28,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -379,11 +380,7 @@ export default function ExtensionsTab({ session, showToast }) {
   }, [session]);
 
   // Auto-refresh on SSE live updates (extension install/activate/etc)
-  useEffect(() => {
-    const handler = () => { loadExtensions(); loadServerExtensions(); };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['extensions', 'admin-extensions'], () => { loadExtensions(); loadServerExtensions(); }), []);
 
   async function loadExtensions() {
     try {

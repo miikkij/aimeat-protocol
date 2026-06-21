@@ -16,6 +16,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
@@ -136,9 +137,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     // full-tab "Loading..." overlay. Showing the spinner on every tick
     // (the SSE bus debounces to ~500ms but still fires often) made the
     // whole panel flash blank every time anything changed server-side.
-    const handler = () => loadRef.current({ showSpinner: false });
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['memory', 'agents'], () => loadRef.current({ showSpinner: false }));
   }, []);
 
   async function handleAddTag() {

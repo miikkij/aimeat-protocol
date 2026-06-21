@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -43,11 +44,7 @@ export default function MessagesTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const hh = () => load();
-    window.addEventListener('aimeat-live-update', hh);
-    return () => window.removeEventListener('aimeat-live-update', hh);
-  }, [load]);
+  useEffect(() => onLiveUpdate(['messages', 'agent-messages'], () => load()), [load]);
 
   if (err) return html`<div class="adm-section"><div class="adm-error">${escHtml(err)}</div></div>`;
   if (!data) return html`<div class="adm-section">${t('common.loading') || 'Loading…'}</div>`;

@@ -13,6 +13,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
@@ -89,9 +90,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
 
   useEffect(() => {
     // Silent refetch on live-update so the tab doesn't flash blank.
-    const handler = () => { loadServices({ showSpinner: false }); };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agents'], () => loadServices({ showSpinner: false }));
   }, [agentName]);
 
   if (loading) {

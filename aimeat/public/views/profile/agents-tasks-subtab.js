@@ -78,6 +78,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
@@ -461,9 +462,7 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   // loading state on every tick.
   useEffect(() => {
     if (!expanded) return;
-    const handler = () => fetchEvents({ silent: true });
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agent-tasks'], () => fetchEvents({ silent: true }));
   }, [expanded, task.id, agentName]);
 
   // Deep-link from the fleet "running now" panel: when autoOpen bumps to a new
@@ -894,11 +893,7 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
 
   const loadRef = useRef(loadTasks);
   loadRef.current = loadTasks;
-  useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['agent-tasks'], () => loadRef.current()), []);
 
   // Deep-link (from the fleet "running now" panel): a target task may live in a
   // bucket/filter that isn't currently shown. Reset to the default Recent view

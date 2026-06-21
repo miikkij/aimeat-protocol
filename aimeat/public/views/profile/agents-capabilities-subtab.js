@@ -15,6 +15,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getCapabilities } from '/js/services/agent-capabilities.js';
@@ -145,8 +146,7 @@ export default function AgentCapabilitiesSubtab({ agentName, session, showToast,
         setLanguages(resp?.data?.languages ?? []);
       } catch { /* ignore */ }
     };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agents', 'cortex'], handler);
   }, [agentName]);
 
   if (loading) {

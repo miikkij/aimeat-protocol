@@ -11,6 +11,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -50,11 +51,7 @@ export default function AgentTasksTab({ data, reload, session }) {
   useEffect(() => { loadTasks(1); }, [loadTasks]);
 
   // Listen for live updates
-  useEffect(() => {
-    const handler = () => { loadTasks(page, { showSpinner: false }); }; // silent: no flash
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadTasks, page]);
+  useEffect(() => onLiveUpdate(['agent-tasks'], () => loadTasks(page, { showSpinner: false })), [loadTasks, page]);
 
   function handleFilterChange(e) {
     setStatusFilter(e.target.value);

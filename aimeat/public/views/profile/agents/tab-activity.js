@@ -18,6 +18,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
@@ -119,9 +120,7 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   useEffect(() => {
     // Live-update refetch must NOT show the spinner -- it fires often and would
     // flash the whole tab blank. First mount still shows the spinner.
-    const handler = () => loadRef.current({ showSpinner: false });
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agent-tasks', 'agents'], () => loadRef.current({ showSpinner: false }));
   }, []);
 
   async function handleLoadMore() {

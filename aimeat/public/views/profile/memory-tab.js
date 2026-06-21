@@ -38,6 +38,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -188,11 +189,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // Live update listener — refresh both memories and files
   const liveRef = useRef(() => { loadMemories(); loadFiles(); loadFedConsents(); });
   liveRef.current = () => { loadMemories(); loadFiles(); loadFedConsents(); };
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['memory', 'files', 'federation'], () => liveRef.current()), []);
 
   async function loadAgents() {
     try {

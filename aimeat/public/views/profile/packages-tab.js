@@ -21,6 +21,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -180,11 +181,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
   useEffect(() => { loadData(); }, [loadData]);
 
   // Live updates
-  useEffect(() => {
-    const handler = () => { loadData({ showSpinner: false }); }; // silent: don't flash blank
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadData]);
+  useEffect(() => onLiveUpdate(['packages'], () => loadData({ showSpinner: false })), [loadData]);
 
   const handleInstall = async (groupId) => {
     const label = prompt(t('packages.labelPrompt') || 'Instance label (optional):');
