@@ -14,6 +14,10 @@
  *   v1.2.0 — 2026-06-22 — Batch + debounce: one /comments/batch covers all visible threads (records +
  *     open doc) instead of per-thread fetches; the main load + comments refresh are debounced (1.5s)
  *     so an agent-driven 'organisms'/'memory' event burst is a single reload.
+ *   v1.3.0 — 2026-06-22 — Record readability: fields render label-on-top, left-aligned, wrapping, with
+ *     markdown for text / lists for arrays / pretty JSON for objects (was a right-aligned one-liner);
+ *     editing happens INLINE in the record's own card (one editor at a time) instead of a form at the
+ *     top of the space; each record is a separated card with breathing room.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -24,9 +28,8 @@ import { t, getLocale } from '/js/i18n.js';
 import { Spinner, KebabMenu } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { EmptyState } from '/components/EmptyState.js';
-import { KeyValueRow } from '/components/KeyValueRow.js';
 import { Mermaid } from '/components/Mermaid.js';
-import { slugifyHeading } from '/components/Markdown.js';
+import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -373,12 +376,33 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     const lang = getLocale();
     return (m[lang] && m[lang][key]) || (m.en && m.en[key]) || '';
   }, [ws]);
+  // Render ONE field value, type-aware + left-aligned + wrapping. Strings that look like markdown (or
+  // are multi-line) render through the safe Markdown component; plain strings wrap as text; arrays
+  // become a bullet list; objects pretty-print in a wrapped <pre>. (Was a right-aligned KeyValueRow
+  // with everything String()'d onto one line — unreadable for real record data.)
+  const looksMarkdown = (s) => /\n/.test(s) || /(^|\s)[-*]\s/.test(s) || /[#`>|]|\[[^\]]+\]\(|\*\*/.test(s);
+  const renderFieldVal = (v) => {
+    if (Array.isArray(v)) {
+      return html`<ul class="pj-rec-field-list">${v.map((it, i) => html`<li key=${i}>${
+        (it && typeof it === 'object') ? html`<pre class="pj-rec-json">${JSON.stringify(it, null, 2)}</pre>` : String(it)
+      }</li>`)}</ul>`;
+    }
+    if (v && typeof v === 'object') return html`<pre class="pj-rec-json">${JSON.stringify(v, null, 2)}</pre>`;
+    if (typeof v === 'string') {
+      return looksMarkdown(v)
+        ? html`<div class="pj-rec-md"><${Markdown} text=${v} /></div>`
+        : html`<span class="pj-rec-field-text">${v}</span>`;
+    }
+    return html`<span class="pj-rec-field-text">${String(v)}</span>`;
+  };
   const recordFields = (ot, rec) => {
     const rows = Object.entries(rec || {}).filter(([k, v]) =>
       !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
     if (!rows.length) return html`<div class="pj-muted pj-rec-empty">${t('organisms.noFields') || 'No fields'}</div>`;
-    return rows.map(([k, v]) => html`<${KeyValueRow} key=${k} label=${wsT(`${ot.namespace}.${k}`) || k}
-      value=${Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v))} />`);
+    return rows.map(([k, v]) => html`<div class="pj-rec-field" key=${k}>
+      <div class="pj-rec-field-label">${wsT(`${ot.namespace}.${k}`) || k}</div>
+      <div class="pj-rec-field-val">${renderFieldVal(v)}</div>
+    </div>`);
   };
 
   const saveDraft = useCallback(async (ot, value) => {
@@ -855,10 +879,10 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       </div>
       ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
 
-      ${adding === ot.name && (addingSchema
-        ? html`<${SchemaForm} key=${'sf-' + (addingId || 'new')} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+      ${adding === ot.name && !addingId && (addingSchema
+        ? html`<div class="pj-rec-edit pj-rec-edit-new">${html`<${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
             idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
-            onSave=${(v) => saveDraft(ot, addingId ? { ...v, id: addingId } : v)} onCancel=${cancelForm} />`
+            onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} />`}</div>`
         : html`<${Spinner} />`)}
 
       ${draftsFor(ot.name).map((d, i) => html`
@@ -870,7 +894,13 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
             <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
           </div>
-          ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null}
+          ${adding === ot.name && addingId === d.id
+            ? html`<div class="pj-rec-edit">${addingSchema
+                ? html`<${SchemaForm} key=${'sf-' + d.id} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+                    idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
+                    onSave=${(v) => saveDraft(ot, { ...v, id: addingId })} onCancel=${cancelForm} />`
+                : html`<${Spinner} />`}</div>`
+            : (expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null)}
         </div>
       `)}
 

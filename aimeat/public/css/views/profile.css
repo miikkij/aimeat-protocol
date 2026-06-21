@@ -4,6 +4,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.6.0 — 2026-06-22 — Scalable Memory tab: .pf-mem-quota* (storage-usage bar), .pf-mem-size
+ *     (value-size column), .mem-tools-bar/.mem-import-group (server search + export/import row),
+ *     .mem-group-actions (hover search/delete on group headers), .mem-search-summary.
  *   v2.5.0 — 2026-06-16 — Grouped workspace nav: .pj-org-groups/.pj-org-group/.pj-org-group-cap
  *     (clickable group caption, -static variant)/.pj-org-group-tabs cluster the tab row, with a
  *     vertical divider (border-left) between groups; stacked-group content .pj-group-view/
@@ -273,6 +276,18 @@
 .pf .mem-vis{font-size:.7rem}
 .pf .shield-icon{font-size:.85rem;cursor:pointer;opacity:.6;transition:opacity .2s}
 .pf .shield-icon:hover{opacity:1}
+/* ── Scalable Memory tab (2026-06-22): storage bar, size column, tools bar, group actions ── */
+.pf .pf-mem-quota{margin:.25rem 0 .6rem}
+.pf .pf-mem-quota-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}
+.pf .pf-mem-quota-bar{height:6px;border-radius:999px;background:var(--bg-dim);overflow:hidden}
+.pf .pf-mem-quota-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
+.pf .pf-mem-quota-fill--danger{background:var(--danger)}
+.pf .pf-mem-size{font-size:.68rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.pf .mem-tools-bar{flex-wrap:wrap;gap:.5rem}
+.pf .mem-import-group{display:inline-flex;align-items:center;gap:.35rem}
+.pf .mem-group-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.15rem;opacity:0;transition:opacity .15s}
+.pf .mem-group-header:hover .mem-group-actions{opacity:1}
+.pf .mem-search-summary{display:flex;justify-content:space-between;align-items:center;padding:.35rem .2rem;border-bottom:1px solid var(--border);margin-bottom:.25rem}
 .pf .key-rules-box{background:var(--bg-surface);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
 .pf .mem-detail{background:rgba(0,0,0,.04);border:1px solid rgba(232,86,74,.1);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
 .pf .mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family:monospace;color:var(--text,#1A1A2E);font-size:.8rem}
@@ -2152,10 +2167,14 @@
 .pj-item .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-item .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
 .pj-item-text { flex: 1; font-size: 0.9rem; }
-.pj-rec { border-radius: 6px; }
+/* Each record is its own card with air around it, so stacked records read as separate units. */
+.pj-rec { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 0.4rem 0.7rem; margin: 0.5rem 0; }
 .pj-rec-title { flex: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text); padding: 0; }
 .pj-rec-title:hover { color: var(--accent); }
-.pj-rec-fields { margin: 0.1rem 0 0.4rem 0.6rem; padding: 0.2rem 0.6rem; border-left: 2px solid var(--border); background: var(--bg-dim); border-radius: 0 6px 6px 0; }
+.pj-rec-fields { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: 6px; }
+/* Inline editor — replaces the field view in the SAME card while editing (one editor at a time). */
+.pj-rec-edit { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: 6px; }
+.pj-rec-edit-new { border-top: none; }
 /* Comment thread on a workspace object (record/document) */
 .pj-comments { margin: 0.5rem 0 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
 .pj-comment { padding: 0.4rem 0.5rem; margin: 0.3rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
@@ -2165,12 +2184,20 @@
 .pj-comment-actions { display: flex; gap: 0.3rem; }
 .pj-comment-compose { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; }
 .pj-comment-compose textarea { resize: vertical; }
-/* Dotted leader between each field label and its value — ties the two ends of a
-   long row together so you can follow which value belongs to which key. */
-.pj-rec-fields .kv-row { align-items: baseline; gap: 0; }
-.pj-rec-fields .kv-label { flex: 1 1 auto; display: flex; align-items: baseline; min-width: 0; color: var(--muted); }
-.pj-rec-fields .kv-label::after { content: ""; flex: 1 1 auto; height: 0; margin: 0 0.45rem; border-bottom: 1px dotted var(--border); transform: translateY(-0.18em); }
-.pj-rec-fields .kv-value { flex: 0 1 auto; text-align: right; }
+/* Record fields: label ON TOP (small, muted), value below at full width, LEFT-aligned and wrapping
+   — natural left-to-right reading (was a right-aligned single line that ran off and didn't wrap). */
+.pj-rec-field { margin: 0 0 0.6rem; }
+.pj-rec-field:last-child { margin-bottom: 0; }
+.pj-rec-field-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 0.12rem; }
+.pj-rec-field-val { font-size: 0.88rem; color: var(--text); text-align: left; overflow-wrap: anywhere; }
+.pj-rec-field-text { white-space: pre-wrap; }
+.pj-rec-field-list { margin: 0.1rem 0 0; padding-left: 1.1rem; }
+.pj-rec-field-list li { margin: 0.1rem 0; }
+.pj-rec-json { margin: 0.1rem 0 0; padding: 0.4rem 0.55rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.78rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; }
+/* Markdown inside a record field — tighten the first/last margins so it sits flush in the field. */
+.pj-rec-md .md-body { font-size: 0.88rem; line-height: 1.5; }
+.pj-rec-md .md-body > :first-child { margin-top: 0; }
+.pj-rec-md .md-body > :last-child { margin-bottom: 0; }
 .pj-rec-empty { font-size: 0.82rem; padding: 0.2rem 0; }
 .pj-empty { color: var(--muted); font-size: 0.85rem; padding: 0.2rem 0; }
 .pj-decision { font-size: 0.85rem; color: var(--muted); }
