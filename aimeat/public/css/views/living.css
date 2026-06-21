@@ -1,0 +1,132 @@
+/**
+ * @file living.css
+ * @description Styles for the profile Living Documents tab (pf-ld-* prefix): template cards, the
+ *   template editor (slot rows), the deploy panel, and the deployed-instance viewer. Dark-theme only —
+ *   all colors/spacing via theme.css variables. Reuses several pf-nb-* helpers from notebook.css.
+ * @version-history
+ *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + instance viewer.
+ *   v1.1.0 — 2026-06-21 — Phase 1: AI-author panel + charter Readable/YAML views.
+ *   v1.2.0 — 2026-06-21 — Phase 2: pulse status + change ledger.
+ */
+
+.pf-ld-phase {
+  color: var(--accent, var(--text));
+  font-style: italic;
+}
+.pf-ld-ledger {
+  list-style: none;
+  margin: var(--space-xs, 0.4rem) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pf-ld-ledger li { color: var(--text-dim, var(--text)); }
+
+.pf-ld-author {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+  margin: var(--space-sm, 0.75rem) 0;
+}
+.pf-ld-author textarea { width: 100%; resize: vertical; font-family: inherit; }
+.pf-ld-author button { align-self: flex-start; }
+
+.pf-ld-charter-views {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-ld-cv-active { color: var(--text); font-weight: 600; }
+.pf-ld-charter-box {
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-ld-yaml {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  color: var(--text-dim, var(--text));
+  overflow-x: auto;
+}
+
+.pf-ld-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+}
+.pf-ld-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-ld-card-btns {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+  flex-wrap: wrap;
+}
+
+.pf-ld-editor {
+  margin-top: var(--space-sm, 0.75rem);
+  padding: var(--space-md, 1rem);
+  background: var(--surface, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-slot-row {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+  align-items: center;
+}
+.pf-ld-slot-row .input-field { flex: 1; }
+.pf-ld-slot-id { max-width: 9rem; font-family: var(--font-mono, monospace); }
+
+.pf-ld-opened-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-ld-preview {
+  margin: var(--space-sm, 0.75rem) 0;
+  max-height: 28rem;
+}
+.pf-ld-slot-edit {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-slot-edit-head { display: flex; align-items: baseline; gap: var(--space-sm, 0.75rem); }
+.pf-ld-slot-edit textarea { width: 100%; resize: vertical; font-family: inherit; }
+.pf-ld-slot-sources {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-ld-slot-sources .input-field { flex: 1; }
