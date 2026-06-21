@@ -17,4 +17,6 @@ export interface ConsentRepository {
     consentId?: string;
     accessorGaii?: string;
   }): Promise<ConsentAuditEntry[]>;
+  /** Delete consent-audit entries with timestamp strictly before the given ISO date. Returns the count removed. */
+  pruneConsentAudit(beforeIso: string): Promise<number>;
 }

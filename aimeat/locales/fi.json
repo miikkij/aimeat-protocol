@@ -80,6 +80,7 @@
   "inbox.trackContent": "Sisältö",
   "inbox.trackNoTypes": "Tällä työtilalla ei ole tietuetyyppejä",
   "inbox.trackCreatedGated": "Seurattu vastaus luotu — tietue lähetettiin hyväksyttäväksi.",
+  "inbox.trackFillNote": "Luotaessa tekoälysi täyttää tietueen kentät tämän tyypin scheman mukaan ja asettaa valmis-ehdon automaattisesti.",
   "inbox.status.queued": "jonossa",
   "inbox.status.sent": "lähetetty",
   "inbox.status.delivered": "toimitettu",

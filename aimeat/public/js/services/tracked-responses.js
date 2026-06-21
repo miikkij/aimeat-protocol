@@ -26,6 +26,28 @@ export async function createTrackedResponse({ messageId, watch, response, refere
   return resp?.data?.trackedResponse || null;
 }
 
+/** AI triage: form the intent for a message as an actionable record (organism/workspace + record TYPE
+ *  + title/content + completion condition). Slow AI call — full timeout, no retry. Returns
+ *  { suggestion, context:{organisms:[{id,name,workspaces:[{id,name,recordTypes:[{namespace,name}]}]}]} }. */
+export async function triageMessage(text) {
+  const resp = await api('/v1/tracked-responses/classify', { method: 'POST', body: JSON.stringify({ text }), timeoutMs: 1_800_000, retries: 0 });
+  if (resp?.ok === false) { const e = new Error(resp.error?.message || 'Triage failed'); e.code = resp.error?.code; throw e; }
+  return resp?.data || null;
+}
+
+/** AI fill: produce a record value conforming to the chosen record type's ACTUAL schema (any shape,
+ *  AI-authored per workspace) + the schema-correct completion condition + inject field. Validated
+ *  server-side before returning. Slow AI call. Returns { value, condition, inject }. */
+export async function fillRecord({ organismId, ws, namespace, recordId, message, title, content } = /** @type {{ organismId?: any, ws?: any, namespace?: any, recordId?: any, message?: any, title?: any, content?: any }} */ ({})) {
+  const resp = await api('/v1/tracked-responses/fill', {
+    method: 'POST',
+    body: JSON.stringify({ organism_id: organismId, ws, namespace, record_id: recordId, message, title, content }),
+    timeoutMs: 1_800_000, retries: 0,
+  });
+  if (resp?.ok === false) { const e = new Error(resp.error?.message || 'Fill failed'); e.code = resp.error?.code; throw e; }
+  return resp?.data || null;
+}
+
 export async function listTrackedResponses(state) {
   const r = await apiGet(`/v1/tracked-responses${state ? `?state=${enc(state)}` : ''}`);
   return r?.data?.trackedResponses || [];

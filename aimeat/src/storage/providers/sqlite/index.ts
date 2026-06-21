@@ -2216,6 +2216,11 @@ export class SqliteStorage implements Storage {
     return entry;
   }
 
+  async pruneConsentAudit(beforeIso: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM consent_audit WHERE timestamp < ?').run(beforeIso);
+    return result.changes;
+  }
+
   async listConsentAudit(ownerGaii: string, opts?: {
     days?: number;
     consentId?: string;

@@ -19,6 +19,7 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(storage));
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
+    scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
   }
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
@@ -212,4 +213,12 @@ async function runExecutionLogPruneJob(storage: Storage): Promise<void> {
   const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
   const pruned = await storage.pruneExecutionLogs(cutoff);
   if (pruned > 0) logger.info(`Pruned ${pruned} execution log entries older than 30 days`);
+}
+
+async function runConsentAuditPruneJob(config: AimeatConfig, storage: Storage): Promise<void> {
+  const days = config.consentAuditRetentionDays;
+  if (!days || days <= 0) return; // 0/disabled = keep forever
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const pruned = await storage.pruneConsentAudit(cutoff);
+  if (pruned > 0) logger.info(`Pruned ${pruned} consent-audit entries older than ${days} days`);
 }

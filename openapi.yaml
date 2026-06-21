@@ -6939,6 +6939,68 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/tracked-responses/classify:
+    post:
+      operationId: classifyTrackedResponse
+      summary: AI triage — form the intent for a message as an actionable record
+      description: >
+        Owner-scoped (decrypts the caller's own model key). Given a message `text`, the caller's AI
+        chooses which organism → workspace → RECORD TYPE best fits (generically, from what each
+        workspace offers), drafts a title + content, and infers the completion condition + the field to
+        quote back. Returns `{ suggestion, context:{organisms:[{id,name,workspaces:[{id,name,recordTypes}]}]} }`.
+        No model key → 4xx (the feature is gated on AI).
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties: { text: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/tracked-responses/fill:
+    post:
+      operationId: fillTrackedResponseRecord
+      summary: AI fill — build a record value conforming to the chosen type's actual schema
+      description: >
+        Owner-scoped. Given the chosen organism/workspace/record-type and the source message, the
+        caller's AI produces a record value that conforms to that record type's ACTUAL (AI-authored,
+        any-shape) JSON Schema, plus the schema-correct completion condition and the field to quote back.
+        Validated against the schema server-side (one repair retry). Returns `{ value, condition, inject }`.
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organism_id, ws, namespace, record_id, message]
+              properties:
+                organism_id: { type: string }
+                ws: { type: string }
+                namespace: { type: string }
+                record_id: { type: string }
+                message: { type: string }
+                title: { type: string }
+                content: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: Could not build a value matching the record type's schema
+
   /v1/tracked-responses/evaluate-due:
     post:
       operationId: evaluateTrackedResponsesDue

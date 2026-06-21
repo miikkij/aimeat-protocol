@@ -9,7 +9,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { auditDataAccess } from '../services/consent.js';
 import { emitChange } from '../services/event-bus.js';
 
 function param(p: string | string[]): string {
@@ -64,9 +63,7 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
               );
               if (matchConsent) {
                 partnerConsentActive = true;
-                // Audit the data access
-                await auditDataAccess(storage, matchConsent.id, agent.gaii,
-                  req.auth!.sub, `match:${m.id}`, 'read', true);
+                // Allowed reads are no longer audited (only denials + consent mutations).
                 break;
               }
             }

@@ -450,7 +450,7 @@ await test('Non-member reads owner-1 analysis.solar → 403', async () => {
   assert(status === 403, `Expected 403, got ${status}`);
 });
 
-await test('Member read is audited as organism_member_consent (allowed)', async () => {
+await test('Non-member read is audited as a denial; allowed member read is NOT audited', async () => {
   const { status, body } = await json('/v1/consent/audit?days=1', {
     headers: { Authorization: `Bearer ${agentToken}` },
   });
@@ -458,8 +458,9 @@ await test('Member read is audited as organism_member_consent (allowed)', async 
   const entries = (body.data?.entries as any[]) ?? [];
   const allowed = entries.some(e => e.memory_key === analysisKey && e.allowed === true);
   const denied = entries.some(e => e.memory_key === analysisKey && e.allowed === false);
-  assert(allowed, `expected an allowed audit entry for ${analysisKey}`);
+  // Policy: only denials + consent mutations are audited (allowed reads are not).
   assert(denied, `expected a denied audit entry for ${analysisKey} (non-member)`);
+  assert(!allowed, `allowed reads should NOT be audited, but found one for ${analysisKey}`);
 });
 
 // ── G13: contributed knowledge package readable by a fellow organism member ──

@@ -14,11 +14,14 @@
  * @version-history
  *   v1.1.0 -- 2026-06-07 -- Resolve organism.{id} grants via active-membership lookup in
  *     checkConsentForRead (previously matchesRecipient returned false with no resolver).
+ *   v1.2.0 -- 2026-06-21 -- auditDataAccess now enqueues into the in-memory consent-audit
+ *     buffer (batched off the request path) instead of a synchronous per-read DB write.
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { globMatchSimple, consentMatchPattern } from '../storage/pattern-utils.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { bufferConsentAudit } from './consent-audit-buffer.js';
 
 /**
  * Check whether a consent record's recipient field matches a given accessor.
@@ -180,18 +183,24 @@ export async function checkConsentForRead(
 }
 
 /**
- * Record an audit entry for data access.
+ * Record an audit entry for data access or a consent mutation. Enqueues into the in-memory
+ * consent-audit buffer (flushed in batches off the request path) rather than writing to
+ * storage synchronously. The `storage` param is kept for signature stability but unused.
+ *
+ * Policy (see consent-audit-buffer.ts): callers only audit what is worth keeping — access
+ * DENIALS (allowed:false) and consent MUTATIONS (grant/revoke). Allowed reads are no longer
+ * audited; that was the bulk of the unbounded growth and the per-read write that slowed reads.
  */
 export async function auditDataAccess(
-  storage: Storage,
+  _storage: Storage,
   consentId: string | null,
   ownerGaii: string,
   accessorGaii: string,
   memoryKey: string,
-  action: 'read' | 'list' | 'search',
+  action: ConsentAuditEntry['action'],
   allowed: boolean,
 ): Promise<void> {
-  const entry: ConsentAuditEntry = {
+  bufferConsentAudit({
     id: uuidv4(),
     consentId: consentId ?? 'none',
     ownerGaii,
@@ -200,9 +209,7 @@ export async function auditDataAccess(
     action,
     timestamp: new Date().toISOString(),
     allowed,
-  };
-
-  await storage.addConsentAuditEntry(entry);
+  });
 }
 
 /**
