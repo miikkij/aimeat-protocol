@@ -58,6 +58,17 @@ export default function LivingTab({ session, showToast }) {
 
   function newTemplate() { setCharterView(null); setEditing(living.blankTemplate()); }
 
+  function activityThreshold(e) { return (e?.charter?.triggers || []).find(tr => tr.kind === 'activity')?.changed_gte || ''; }
+  function setActivityTrigger(v) {
+    const n = parseInt(v, 10);
+    setEditing(e => {
+      const triggers = [{ kind: 'cadence' }];
+      if (Number.isFinite(n) && n > 0) triggers.push({ kind: 'activity', changed_gte: n });
+      return { ...e, charter: { ...e.charter, triggers } };
+    });
+  }
+  function setTrust(derive) { setEditing(e => ({ ...e, charter: { ...e.charter, trust: { ...(e.charter?.trust || {}), derive } } })); }
+
   async function handleAuthor() {
     if (!need.trim() || authoring) return;
     setAuthoring(true);
@@ -179,6 +190,14 @@ export default function LivingTab({ session, showToast }) {
     try { await living.deriveSlotFromSources(opened.loc, slotId, opened.sources); showToast(t('profile.living.composed')); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
   }
+  async function approveSlot(slotId) {
+    try { await living.approvePending(opened.loc, slotId, opened.pending?.[slotId]); showToast(t('profile.living.approved')); await reopen(); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+  async function rejectSlot(slotId) {
+    try { await living.rejectPending(opened.loc, slotId); showToast(t('profile.living.rejected')); await reopen(); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
 
   function orgName(id) { return orgs.find(o => o.id === id)?.name || id; }
 
@@ -202,6 +221,19 @@ export default function LivingTab({ session, showToast }) {
       </div>
       ${charterView === 'readable' && html`<div class="pf-ld-charter-box"><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /></div>`}
       ${charterView === 'yaml' && html`<pre class="pf-ld-charter-box pf-ld-yaml">${escHtml(living.charterToYaml(editing.charter || {}))}</pre>`}
+
+      <div class="pf-nb-suggest-label">${t('profile.living.automation')}</div>
+      <div class="pf-ld-automation">
+        <label class="text-meta-sm">${t('profile.living.trust')}:
+          <select class="pf-ld-cadence" value=${editing.charter?.trust?.derive || 'auto'} onChange=${e => setTrust(e.target.value)}>
+            <option value="auto">${t('profile.living.trustAuto')}</option>
+            <option value="gated">${t('profile.living.trustGated')}</option>
+          </select>
+        </label>
+        <label class="text-meta-sm">${t('profile.living.activityTrigger')}:
+          <input type="number" min="0" class="input-field pf-ld-num" value=${activityThreshold(editing)} onInput=${e => setActivityTrigger(e.target.value)} />
+        </label>
+      </div>
 
       <div class="pf-nb-suggest-label">${t('profile.living.sections')}</div>
       <div class="pf-ld-slots">
@@ -266,6 +298,7 @@ export default function LivingTab({ session, showToast }) {
           · ${t('profile.living.lastPulse')}: ${lastPulse}
           · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
           ${st.paused && html`· <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
+          ${st.health === 'retired' && html`· <span class="badge badge-danger">${t('profile.living.retired')}: ${escHtml(st.retired_reason || '')}</span>`}
           · ${t('profile.living.cadence')}:
           <select class="pf-ld-cadence" value=${opened.config.charter?.cadence || 'daily'} onChange=${e => changeCadence(e.target.value)}>
             <option value="hourly">${t('profile.living.cadenceHourly')}</option>
@@ -291,6 +324,15 @@ export default function LivingTab({ session, showToast }) {
               </div>
               <textarea class="input-field" rows="3" placeholder=${t('profile.living.sectionContentPh')}
                 value=${der?.markdown || ''} onChange=${e => saveSlot(sec.slot, e.target.value)}></textarea>
+              ${opened.pending?.[sec.slot] && html`
+                <div class="pf-ld-pending">
+                  <div class="text-meta-sm">⏳ ${t('profile.living.pendingTitle')}</div>
+                  <div class="pf-nb-enrich-preview-body pf-ld-pending-body"><${Markdown} text=${opened.pending[sec.slot].markdown} /></div>
+                  <div class="pf-ld-card-btns">
+                    <button class="btn-success btn-sm" onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}</button>
+                    <button class="btn-danger btn-sm" onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}</button>
+                  </div>
+                </div>`}
               <div class="pf-ld-slot-sources">
                 <input class="input-field" placeholder=${t('profile.living.addSourcePh')}
                   onKeyDown=${e => { if (e.key === 'Enter') { addSourceTo(sec.slot, e.target.value); e.target.value = ''; } }} />

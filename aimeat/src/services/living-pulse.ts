@@ -15,7 +15,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-21 — Phase 3: unattended self-fulfilled pulse + cadence/guards.
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { randomUUID } from 'node:crypto';
+import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { completeForOwner, AiCompletionError } from './ai-completion.js';
@@ -29,6 +30,8 @@ const DERIVE_SYSTEM =
 
 const wsRoot = (l: Loc) => `organism.${l.orgId}.w.${l.wsId}`;
 const slotKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-slot.${l.docId}__${slot}.latest`;
+const pendingKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-pending.${l.docId}__${slot}.latest`;
+const taskStateKey = (l: Loc, slot: string) => `${wsRoot(l)}.living-task.${l.docId}__${slot}.latest`;
 const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id}.latest`;
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;
 const configKey = (l: Loc) => `${wsRoot(l)}.living.${l.docId}.latest`;
@@ -54,42 +57,156 @@ function cadenceMs(charter: Record<string, unknown> | undefined): number {
   return ({ hourly: 60, daily: 1440, weekly: 10080 }[named] ?? 1440) * 60_000;
 }
 
-/** Is this instance due for an unattended pulse right now? */
-function isDue(cfg: Record<string, unknown>): boolean {
-  const status = (cfg.status as Record<string, unknown>) || {};
-  if (status.paused === true) return false;
-  if (status.health === 'retired') return false;
-  const last = status.last_pulse ? new Date(status.last_pulse as string).getTime() : 0;
-  return (Date.now() - last) >= cadenceMs(cfg.charter as Record<string, unknown>);
+/** Count workspace activity (user content changed) since `lastMs`, ignoring living-doc machinery. */
+function workspaceActivity(wsItems: MemoryRecord[], lastMs: number): { changedSince: number; lastActivityMs: number } {
+  let changedSince = 0, lastActivityMs = 0;
+  for (const r of wsItems) {
+    if (/\.living(-src|-slot|-ledger)?\./.test(r.key) || /\.meta\./.test(r.key)) continue;
+    const u = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+    if (u > lastActivityMs) lastActivityMs = u;
+    if (u > lastMs) changedSince++;
+  }
+  return { changedSince, lastActivityMs };
 }
 
-/** Pulse one instance, self-fulfilled (no agent delegation). Returns sections derived. */
+/**
+ * Is this instance due for an unattended pulse right now? Honours the charter's triggers + guards:
+ *   triggers: { kind:'schedule'|'cadence' } | { kind:'activity', changed_gte, since_last_pulse_h_gte? }
+ *   guards:   { cadence_floor_h } | { no_workspace_activity_for_h }
+ * With no `triggers` declared it falls back to the cadence. `wsItems` = the instance's workspace memory.
+ */
+function evaluateDue(cfg: Record<string, unknown>, wsItems: MemoryRecord[], now = Date.now()): boolean {
+  const status = (cfg.status as Record<string, unknown>) || {};
+  if (status.paused === true || status.health === 'retired') return false;
+  const charter = (cfg.charter as Record<string, unknown>) || {};
+  const lastMs = status.last_pulse ? new Date(status.last_pulse as string).getTime() : 0;
+  const hoursSince = lastMs ? (now - lastMs) / 3.6e6 : Infinity;
+  const { changedSince, lastActivityMs } = workspaceActivity(wsItems, lastMs);
+  const hoursSinceActivity = lastActivityMs ? (now - lastActivityMs) / 3.6e6 : Infinity;
+
+  // Guards suppress even when a trigger matches.
+  const guards = Array.isArray(charter.guards) ? charter.guards as Array<Record<string, unknown>> : [];
+  for (const g of guards) {
+    if (typeof g.cadence_floor_h === 'number' && hoursSince < g.cadence_floor_h) return false;
+    if (typeof g.no_workspace_activity_for_h === 'number' && hoursSinceActivity > g.no_workspace_activity_for_h) return false;
+  }
+
+  const triggers = Array.isArray(charter.triggers) ? charter.triggers as Array<Record<string, unknown>> : null;
+  if (!triggers || !triggers.length) return (now - lastMs) >= cadenceMs(charter);   // cadence fallback
+  for (const tr of triggers) {
+    if (tr.kind === 'schedule' || tr.kind === 'cadence') {
+      if ((now - lastMs) >= cadenceMs(charter)) return true;
+    } else if (tr.kind === 'activity') {
+      const n = Number(tr.changed_gte) || 1;
+      const ageH = Number(tr.since_last_pulse_h_gte) || 0;
+      if (changedSince >= n && hoursSince >= ageH) return true;
+    }
+  }
+  return false;
+}
+
+async function addSrc(storage: Storage, ownerGaii: string, loc: Loc, slot: string, src: { text: string; origin?: string; producer?: string | null }): Promise<void> {
+  const id = 's-' + Math.random().toString(36).slice(2, 10);
+  await upsert(storage, ownerGaii, srcKey(loc, id), { id, slot, text: src.text, origin: src.origin || '', producer: src.producer ?? null, active: true, addedAt: new Date().toISOString() });
+}
+
+/** Create a queued offer task for a section's agent (fire-and-forget; the running crew picks it up). */
+async function dispatchAgentTask(storage: Storage, config: AimeatConfig, ownerGaii: string, agentName: string, offerId: string, query: string): Promise<string> {
+  const ownerName = ownerGaii.split('@')[0];
+  const agentGaii = `${agentName}#${ownerName}@${config.nodeId}`;
+  const now = new Date().toISOString();
+  const record: AgentTaskRecord = {
+    id: randomUUID(), agentGaii, ownerGaii,
+    title: query.length > 80 ? query.slice(0, 80) + '…' : query,
+    description: query,
+    scope: [{ name: 'kind', value: 'offer', type: 'text' }, { name: 'offer_id', value: offerId, type: 'text' }],
+    rules: [], verification: { userExpects: '', technicalChecks: [] }, resources: {}, todos: [],
+    status: 'queued', createdAt: now, updatedAt: now,
+  };
+  await storage.createAgentTask(record);
+  return record.id;
+}
+
+/** Read a completed task's deliverable from the agent's memory (deliverableKey, then task tag, then
+ *  longest *output value) — mirrors the client getDeliverableContent. */
+async function readDeliverable(storage: Storage, task: AgentTaskRecord): Promise<string | null> {
+  if (task.deliverableKey) {
+    const m = await storage.getMemory(task.agentGaii, task.deliverableKey);
+    if (m?.value != null) return typeof m.value === 'string' ? m.value : JSON.stringify(m.value, null, 2);
+  }
+  const items = await storage.listMemory(task.agentGaii);
+  const tag = `task:${task.id}`;
+  const cand = items.filter(i => (i.tags || []).includes(tag) || /latest_output$/.test(i.key));
+  const pick = cand.sort((a, b) => (typeof b.value === 'string' ? b.value.length : 0) - (typeof a.value === 'string' ? a.value.length : 0))[0];
+  if (!pick?.value) return null;
+  return typeof pick.value === 'string' ? pick.value : JSON.stringify(pick.value, null, 2);
+}
+
+/** Handle an agent-backed section across pulses: dispatch a task, wait, then fold its deliverable.
+ *  Returns 'folded' when a deliverable was just added (so the caller re-derives), else dispatched/
+ *  waiting/failed (caller skips derive this pulse). */
+async function handleAgentSection(
+  storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc,
+  sec: Record<string, unknown>, slot: string, charter: { scope?: string },
+): Promise<'dispatched' | 'waiting' | 'failed' | 'folded'> {
+  const [agentName, offerId] = String(sec.agent).split('/');
+  const stateRec = await storage.getMemory(ownerGaii, taskStateKey(loc, slot));
+  const taskId = (stateRec?.value as { taskId?: string } | undefined)?.taskId;
+  const clear = () => upsert(storage, ownerGaii, taskStateKey(loc, slot), { taskId: null });
+
+  if (taskId) {
+    const task = await storage.getAgentTask(taskId);
+    if (!task) { await clear(); return 'failed'; }
+    if (task.status === 'done') {
+      const content = await readDeliverable(storage, task);
+      if (content) await addSrc(storage, ownerGaii, loc, slot, { text: content, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
+      await addLedger(storage, ownerGaii, loc, { event: 'agent-folded', slot });
+      await clear();
+      return content ? 'folded' : 'failed';
+    }
+    if (task.status === 'failed' || task.status === 'stalled') { await addLedger(storage, ownerGaii, loc, { event: 'agent-failed', slot }); await clear(); return 'failed'; }
+    return 'waiting';   // queued / active
+  }
+
+  const query = `${sec.section}. ${sec.desc || ''} Context: ${charter.scope || ''}`.trim();
+  const newId = await dispatchAgentTask(storage, config, ownerGaii, agentName, offerId, query);
+  await upsert(storage, ownerGaii, taskStateKey(loc, slot), { taskId: newId, agent: agentName, offerId, createdAt: new Date().toISOString() });
+  await addLedger(storage, ownerGaii, loc, { event: 'agent-dispatched', slot, agent: agentName });
+  return 'dispatched';
+}
+
+/** Pulse one instance: self-fulfilled sections + agent sections (dispatch → fold next pulse). */
 export async function pulseInstanceServer(
   storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc, cfg: Record<string, unknown>,
-): Promise<{ derived: number; costUsd: number }> {
+): Promise<{ derived: number; costUsd: number; retired: boolean }> {
   const ownerName = ownerGaii.split('@')[0];
-  const charter = (cfg.charter as { scope?: string }) || {};
+  const charter = (cfg.charter as { scope?: string; trust?: { derive?: string } }) || {};
+  const gated = charter.trust?.derive === 'gated';
   const sections = Array.isArray(cfg.template) ? cfg.template as Array<Record<string, unknown>> : [];
   let costUsd = 0, derived = 0;
+  const rendered: string[] = [];
 
   for (const sec of sections) {
     const slot = String(sec.slot);
-    if (sec.agent) { await addLedger(storage, ownerGaii, loc, { event: 'agent-skipped', slot }); continue; }
-
-    // 1. Gather from the owner's own material.
-    try {
-      const { hits } = await librarianSearch(storage, config, {
-        ownerName, isOwnerSession: true, viewerGaii: ownerGaii,
-        query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
-      });
-      const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
-      const seen = new Set(items.map(i => (i.value as { origin?: string })?.origin).filter(Boolean));
-      for (const h of hits) {
-        if (h.key === configKey(loc) || seen.has(h.key)) continue;
-        const id = 's-' + Math.random().toString(36).slice(2, 10);
-        await upsert(storage, ownerGaii, srcKey(loc, id), { id, slot, text: h.snippet || h.title || h.key, origin: h.key, producer: h.producer || null, active: true, addedAt: new Date().toISOString() });
-      }
-    } catch { /* gather best-effort */ }
+    if (sec.agent) {
+      // Agent-backed section: dispatch a task, then fold its deliverable on a later pulse.
+      const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter);
+      if (r !== 'folded') continue;   // dispatched / waiting / failed → nothing new to derive this pulse
+    } else {
+      // 1. Gather from the owner's own material.
+      try {
+        const { hits } = await librarianSearch(storage, config, {
+          ownerName, isOwnerSession: true, viewerGaii: ownerGaii,
+          query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
+        });
+        const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
+        const seen = new Set(items.map(i => (i.value as { origin?: string })?.origin).filter(Boolean));
+        for (const h of hits) {
+          if (h.key === configKey(loc) || seen.has(h.key)) continue;
+          await addSrc(storage, ownerGaii, loc, slot, { text: h.snippet || h.title || h.key, origin: h.key, producer: h.producer || null });
+        }
+      } catch { /* gather best-effort */ }
+    }
 
     // 2. Re-derive from active sources.
     const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
@@ -101,8 +218,11 @@ export async function pulseInstanceServer(
       const prompt = `Section: ${sec.section}\nScope: ${sec.desc || ''}\nDocument scope: ${charter.scope || ''}\n\nSources:\n${srcList}\n\nWrite the section.`;
       const r = await completeForOwner(storage, config, ownerGaii, { prompt, systemPrompt: DERIVE_SYSTEM, appId: 'living' });
       costUsd += r.usage.costUsd || 0;
-      await upsert(storage, ownerGaii, slotKey(loc, slot), { slot, markdown: (r.content || '').trim(), derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse' });
-      await addLedger(storage, ownerGaii, loc, { event: 'slot-derived', slot, sources: active.length });
+      const md = (r.content || '').trim();
+      const der = { slot, markdown: md, derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: gated };
+      await upsert(storage, ownerGaii, gated ? pendingKey(loc, slot) : slotKey(loc, slot), der);
+      await addLedger(storage, ownerGaii, loc, { event: gated ? 'pending' : 'slot-derived', slot, sources: active.length });
+      rendered.push(`## ${sec.section}\n\n${md}`);
       derived++;
     } catch (e) {
       await addLedger(storage, ownerGaii, loc, { event: 'derive-failed', slot, error: String((e as Error).message || e) });
@@ -110,14 +230,49 @@ export async function pulseInstanceServer(
     }
   }
 
-  // 3. Update status.
+  // 3. Update status (+ evaluate stop conditions → retire).
   const status = (cfg.status as Record<string, unknown>) || {};
-  await upsert(storage, ownerGaii, configKey(loc), {
-    ...cfg,
-    status: { ...status, version: (Number(status.version) || 1) + 1, last_pulse: new Date().toISOString(), health: 'green', cost: Number(((Number(status.cost) || 0) + costUsd).toFixed(4)) },
-  });
+  const pulses = (Number(status.pulses) || 0) + 1;
+  const stopReason = await evaluateStop(storage, config, ownerGaii, charter as Record<string, unknown>, rendered.join('\n\n'), pulses);
+  const nextStatus: Record<string, unknown> = {
+    ...status,
+    version: (Number(status.version) || 1) + 1,
+    pulses,
+    last_pulse: new Date().toISOString(),
+    health: stopReason ? 'retired' : 'green',
+    cost: Number(((Number(status.cost) || 0) + costUsd).toFixed(4)),
+  };
+  if (stopReason) nextStatus.retired_reason = stopReason;
+  await upsert(storage, ownerGaii, configKey(loc), { ...cfg, status: nextStatus });
   await addLedger(storage, ownerGaii, loc, { event: 'pulse', slots: derived, costUsd: Number(costUsd.toFixed(4)) });
-  return { derived, costUsd };
+  if (stopReason) await addLedger(storage, ownerGaii, loc, { event: 'retired', reason: stopReason });
+  return { derived, costUsd, retired: !!stopReason };
+}
+
+/** Evaluate the charter's stop conditions after a pulse. Returns a reason string if the document
+ *  should retire, else null. Supports deterministic stops (max_pulses, until) + an optional
+ *  natural-language `stop_when` judged by the owner's AI ("good enough"). */
+async function evaluateStop(
+  storage: Storage, config: AimeatConfig, ownerGaii: string,
+  charter: Record<string, unknown>, renderedDoc: string, pulses: number,
+): Promise<string | null> {
+  const stop = Array.isArray(charter.stop) ? charter.stop as Array<Record<string, unknown>> : [];
+  for (const s of stop) {
+    if (typeof s.max_pulses === 'number' && pulses >= s.max_pulses) return `reached max pulses (${s.max_pulses})`;
+    if (typeof s.until === 'string' && Date.now() > new Date(s.until).getTime()) return `reached end date (${s.until})`;
+  }
+  const stopWhen = typeof charter.stop_when === 'string' ? charter.stop_when.trim() : '';
+  if (stopWhen && renderedDoc.trim()) {
+    try {
+      const r = await completeForOwner(storage, config, ownerGaii, {
+        prompt: `Stop condition: ${stopWhen}\n\nCurrent document:\n${renderedDoc.slice(0, 12000)}\n\nIs the stop condition met? Answer only YES or NO.`,
+        systemPrompt: 'You judge whether a living document has met its stop condition. Answer with only YES or NO.',
+        appId: 'living',
+      });
+      if (/^\s*yes\b/i.test(r.content || '')) return `condition met: ${stopWhen}`;
+    } catch { /* judge best-effort; do not retire on error */ }
+  }
+  return null;
 }
 
 function pulseRecord(rec: MemoryRecord): Loc | null {
@@ -133,7 +288,9 @@ export async function scanAllDue(storage: Storage, config: AimeatConfig): Promis
     if (pulsed >= MAX_PER_SCAN) break;
     const loc = pulseRecord(rec);
     const cfg = rec.value as Record<string, unknown> | null;
-    if (!loc || !cfg || cfg.type !== 'living-config' || !isDue(cfg)) continue;
+    if (!loc || !cfg || cfg.type !== 'living-config') continue;
+    const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
+    if (!evaluateDue(cfg, wsItems)) continue;
     try { await pulseInstanceServer(storage, config, rec.ownerGaii, loc, cfg); pulsed++; }
     catch (e) { logger.warn(`living pulse failed for ${rec.key}: ${String((e as Error).message || e)}`); }
   }
@@ -147,7 +304,9 @@ export async function scanOwnerDue(storage: Storage, config: AimeatConfig, owner
   for (const rec of items) {
     const loc = pulseRecord(rec);
     const cfg = rec.value as Record<string, unknown> | null;
-    if (!loc || !cfg || cfg.type !== 'living-config' || !isDue(cfg)) continue;
+    if (!loc || !cfg || cfg.type !== 'living-config') continue;
+    const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
+    if (!evaluateDue(cfg, wsItems)) continue;
     await pulseInstanceServer(storage, config, ownerGaii, loc, cfg);
     pulsed++;
   }
