@@ -1,5 +1,20 @@
 import type { MemoryRecord } from '../interface.js';
 
+/** One archived prior version of a TRACKABLE memory key — appended to the history table when the key
+ *  is overwritten, so memory keeps only the latest version while history is queried on demand. */
+export interface MemoryVersionRecord {
+  ownerGaii: string;
+  key: string;
+  version: number;
+  value: unknown;
+  /** Who/what caused the change that retired this version (optional, set by the writer). */
+  actor?: string | null;
+  /** A short label for the change (e.g. a structure-diff summary), optional. */
+  event?: string | null;
+  /** ISO timestamp this version was archived (the retired version's updatedAt). */
+  recordedAt: string;
+}
+
 /** A single ranked full-text hit from {@link MemoryRepository.searchText}. */
 export interface MemoryTextHit {
   record: MemoryRecord;
@@ -45,4 +60,10 @@ export interface MemoryRepository {
   searchText(query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]>;
   /** List all memory across all owners with optional filtering and pagination (admin). */
   listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }>;
+  /**
+   * List archived prior versions of a TRACKABLE memory key, newest version first. Only keys marked
+   * `trackable` accumulate history (the latest value always lives in `getMemory`). Empty for keys that
+   * were never trackable or never overwritten. Backs the organism structure timeline (Osa D).
+   */
+  listMemoryHistory(ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]>;
 }

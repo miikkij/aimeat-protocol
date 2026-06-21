@@ -8,6 +8,8 @@
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — Add the free-form README panel, the interactive structure mindmap, and the
+ *     development timeline; rename the structure overview to "table of contents" (Osa A/C/D).
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
@@ -22,6 +24,9 @@ import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
 import { fmtDate, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
+import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
+import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
+import { TimelinePanel } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
 import { OrgMemberManager } from '/views/profile/organisms/members.js';
 import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
@@ -46,6 +51,42 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const isMember = org.members?.includes(ghii);
   const canEdit = isCreator || isAdmin;
   const typeLabel = t(`organisms.types.${org.type}`) || org.type;
+
+  // README (free-form description), structure GRAPH (mindmap data), and the OKF table-of-contents
+  // markdown (seed for the AI-fill prompt). Loaded together and refreshed on live updates.
+  const [readme, setReadme] = useState(org.readme || '');
+  const [graph, setGraph] = useState(null);
+  const [tocSeed, setTocSeed] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    const loadExtras = async () => {
+      const [g, full, toc] = await Promise.all([
+        orgService.getOrganismGraph(org.id),
+        orgService.getOrganism(org.id),
+        orgService.getOrganismOverview(org.id),
+      ]);
+      if (cancelled) return;
+      setGraph(g);
+      setReadme(full?.data?.readme || '');
+      setTocSeed(toc || '');
+    };
+    loadExtras();
+    const off = onLiveUpdate(['organisms'], loadExtras);
+    return () => { cancelled = true; off(); };
+  }, [org.id]);
+
+  const saveReadme = async (md) => {
+    await orgService.updateOrganism(org.id, { readme: md });
+    setReadme(md);
+    showToast?.(t('readme.saved') || 'README saved', 'success');
+  };
+
+  // Mindmap node click → navigate: a workspace/space node opens that workspace; a user node jumps to
+  // the Members tab. (Deep-linking to a specific space tab is deferred — open the workspace for now.)
+  const onMapNav = (target) => {
+    if (target?.type === 'members') { setShowSettings(false); setTab('members'); }
+    else if (target?.wsId) onOpenWs(target.wsId);
+  };
 
   useEffect(() => {
     if (!canEdit) return undefined;
@@ -282,8 +323,15 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         </div>
       </div>
 
-      <${StructureOverview} label=${t('organisms.structureOverviewOrg') || 'Organism structure overview'}
+      <${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name}
+        aiPromptSeed=${tocSeed} onSave=${saveReadme} />
+
+      <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} />
+
+      <${StructureOverview} label=${t('organisms.structureOverviewOrg') || 'Organism structure — table of contents'}
         load=${() => orgService.getOrganismOverview(org.id)} />
+
+      <${TimelinePanel} orgId=${org.id} />
 
       <div class="pj-org-tabs" role="tablist">
         ${tabs.map(tb => html`

@@ -70,6 +70,7 @@ import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
+import { updateOrganismStructure } from '../services/structure-snapshot.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -391,6 +392,7 @@ export function registerWorkspaceTools(
             // Memory Contracts (reactive): publishing a watched record (e.g. a bug → status:done)
             // fires Tracked Response evaluation. Gated O(1) on the track-registry in the subscriber.
             emitMemoryWritten(existingLatest?.ownerGaii ?? writerGaii, `${base}.latest`);
+            void updateOrganismStructure(storage, config, organism_id, { event: 'content published', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
             return ok({ published: base, version: n });
         });
 
@@ -437,6 +439,7 @@ export function registerWorkspaceTools(
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                 });
                 emitChange('organisms');
+                void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
                 return ok(result);
             } catch (e) {
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
@@ -538,6 +541,7 @@ export function registerWorkspaceTools(
             const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
             await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec, ownerGhii);
             emitChange('organisms');
+            void updateOrganismStructure(storage, config, organism_id, { event: 'workspace created', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
 

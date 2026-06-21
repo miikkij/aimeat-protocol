@@ -1129,6 +1129,21 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_organism_update',
+        description: 'Update an ORGANISM in place (creator/admin only): its name, description (the short tagline), interests, join policy, visibility, and/or its free-form README — a markdown body (mermaid allowed) shown at the top of the organism home that explains what the organism is about and is kept up to date. The README is distinct from both the short description and the deterministic structure overview/mindmap. Pass only the fields you want to change.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            name: { type: 'string', required: false, description: 'New organism name.' },
+            description: { type: 'string', required: false, description: 'Short tagline shown under the name.' },
+            readme: { type: 'string', required: false, description: 'Free-form markdown README (mermaid allowed) describing the organism; shown at the top of the organism home. Replaces the current one.' },
+            interests: { type: 'array', required: false, description: 'Interest tags.' },
+            join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
+            visibility: { type: 'string', required: false, description: 'public | listed | private.' },
+        },
+    },
+    {
         name: 'aimeat_workspace_create',
         description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write_draft / _add_document and publish. Member-only.',
         caller: 'agent',

@@ -444,6 +444,7 @@
     "somethingWentWrong": "Something went wrong",
     "retry": "Retry",
     "save": "Save",
+    "saving": "Saving…",
     "close": "Close",
     "loading": "Loading...",
     "search": "Search...",
@@ -6290,6 +6291,38 @@
       "submitReview": "Submit Review"
     }
   },
+  "readme": {
+    "editTitle": "Edit README",
+    "edit": "Edit README",
+    "write": "Write",
+    "preview": "Preview",
+    "generateAi": "Generate with AI",
+    "copied": "Copied!",
+    "pasteBack": "Prompt copied — run it in your AI chat, then paste the Markdown result here.",
+    "placeholder": "# Title\n\nDescribe what this is about. Mermaid diagrams are allowed.",
+    "emptyHint": "No description yet. Add a README so people (and agents) know what this is about.",
+    "saved": "README saved"
+  },
+  "mindmap": {
+    "titleOrg": "Organism map",
+    "titleWs": "Workspace map",
+    "level": "Level",
+    "levelWs": "Workspaces",
+    "levelSpaces": "+ Spaces",
+    "levelCounts": "+ Counts",
+    "showUsers": "Users",
+    "showActivity": "Activity",
+    "heatmap": "Heatmap",
+    "clickHint": "Click a node to open it."
+  },
+  "timeline": {
+    "title": "Development timeline",
+    "empty": "No structural history yet.",
+    "now": "now",
+    "snapshot": "Snapshot",
+    "pick": "Pick a point to see the structure then.",
+    "changed": "structure changed"
+  },
   "organisms": {
     "title": "Organisms",
     "backToList": "All organisms",
@@ -6546,8 +6579,8 @@
     "moreActions": "More actions",
     "policyLabel": "Join policy",
     "tabWorkspaces": "Workspaces",
-    "structureOverviewOrg": "Organism structure overview",
-    "structureOverviewWs": "Workspace structure overview",
+    "structureOverviewOrg": "Organism structure — table of contents",
+    "structureOverviewWs": "Workspace structure — table of contents",
     "structEmpty": "No structure to show yet.",
     "tabMembers": "Members",
     "tabAgents": "Agents",

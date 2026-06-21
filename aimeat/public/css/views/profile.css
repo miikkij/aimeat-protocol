@@ -2543,6 +2543,42 @@
 .pj-struct-body .md-body strong { font-weight: 600; }
 .pj-struct-body .md-body em { color: var(--muted); font-style: normal; }
 
+/* ── README panel (free-form description, Osa A) ── */
+.pj-readme { margin: 0.4rem 0 0.9rem; padding: 0.85rem 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.pj-readme-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; }
+.pj-readme-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.pj-readme-actions { display: inline-flex; gap: 0.4rem; flex-wrap: wrap; }
+.pj-readme-body .md-body { font-size: 0.9rem; color: var(--text); line-height: 1.55; }
+.pj-readme-body .md-body > :first-child { margin-top: 0; }
+.pj-readme-textarea { width: 100%; font-family: var(--font-mono, monospace); font-size: 0.82rem; line-height: 1.5; resize: vertical; }
+
+/* ── Interactive mindmap (Osa C) — reuses .of-mapwrap--clickable cursor/hover from offers.css ── */
+.pj-mindmap { margin: 0.4rem 0 0.9rem; }
+.pj-mindmap-body { margin-top: 0.4rem; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.pj-mindmap-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; margin-bottom: 0.6rem; }
+.pj-mm-opt { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-dim); }
+.pj-mm-opt select { width: auto; }
+.pj-mm-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-dim); cursor: pointer; }
+.pj-mindmap-canvas { overflow: auto; max-height: 36rem; }
+.pj-mindmap-canvas .node { cursor: pointer; }
+.pj-mindmap-canvas .node:hover { opacity: 0.82; }
+.pj-mindmap-hint { margin-top: 0.4rem; }
+
+/* ── Structure timeline / development (Osa D) ── */
+.pj-timeline { margin: 0.4rem 0 0.9rem; }
+.pj-timeline-body { margin-top: 0.4rem; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.pj-timeline-grid { display: grid; grid-template-columns: minmax(14rem, 22rem) 1fr; gap: 1rem; align-items: start; }
+.pj-timeline-list { list-style: none; margin: 0; padding: 0; max-height: 30rem; overflow: auto; }
+.pj-timeline-item { margin: 0; }
+.pj-timeline-entry { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; text-align: left; background: none; border: none; border-left: 2px solid var(--border); padding: 0.4rem 0.6rem; cursor: pointer; color: var(--text); }
+.pj-timeline-entry:hover { background: var(--bg-dim); }
+.pj-timeline-item.is-active .pj-timeline-entry { border-left-color: var(--accent); background: var(--bg-dim); }
+.pj-timeline-date { font-size: 0.75rem; color: var(--muted); }
+.pj-timeline-event { font-size: 0.84rem; }
+.pj-timeline-counts { font-size: 0.72rem; }
+.pj-timeline-map { overflow: auto; max-height: 30rem; }
+@media (max-width: 720px) { .pj-timeline-grid { grid-template-columns: 1fr; } }
+
 /* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
 .pj-ws-head-actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
 .pj-ws-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-left: 3px solid var(--warn, var(--accent)); border-radius: 10px; background: var(--card); padding: 0.55rem 0.75rem; margin: 0.6rem 0 0.2rem; }

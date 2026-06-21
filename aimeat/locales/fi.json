@@ -444,6 +444,7 @@
     "somethingWentWrong": "Jokin meni pieleen",
     "retry": "Yritä uudelleen",
     "save": "Tallenna",
+    "saving": "Tallennetaan…",
     "close": "Sulje",
     "loading": "Ladataan...",
     "search": "Haku...",
@@ -6290,6 +6291,38 @@
       "submitReview": "Lähetä arviointi"
     }
   },
+  "readme": {
+    "editTitle": "Muokkaa README:ta",
+    "edit": "Muokkaa README:ta",
+    "write": "Kirjoita",
+    "preview": "Esikatselu",
+    "generateAi": "Luo tekoälyllä",
+    "copied": "Kopioitu!",
+    "pasteBack": "Prompti kopioitu — aja se AI-chatissa ja liitä Markdown-tulos tähän.",
+    "placeholder": "# Otsikko\n\nKuvaa mistä tässä on kyse. Mermaid-kaaviot ovat sallittuja.",
+    "emptyHint": "Ei vielä kuvausta. Lisää README, jotta ihmiset (ja agentit) tietävät mistä on kyse.",
+    "saved": "README tallennettu"
+  },
+  "mindmap": {
+    "titleOrg": "Organismin kartta",
+    "titleWs": "Työtilan kartta",
+    "level": "Taso",
+    "levelWs": "Työtilat",
+    "levelSpaces": "+ Spacet",
+    "levelCounts": "+ Määrät",
+    "showUsers": "Käyttäjät",
+    "showActivity": "Aktiviteetti",
+    "heatmap": "Lämpökartta",
+    "clickHint": "Klikkaa solmua avataksesi sen."
+  },
+  "timeline": {
+    "title": "Kehityksen aikajana",
+    "empty": "Ei vielä rakennehistoriaa.",
+    "now": "nyt",
+    "snapshot": "Tilannekuva",
+    "pick": "Valitse kohta nähdäksesi rakenteen silloin.",
+    "changed": "rakenne muuttui"
+  },
   "organisms": {
     "title": "Organismit",
     "backToList": "Kaikki organismit",
@@ -6546,8 +6579,8 @@
     "moreActions": "Lisätoiminnot",
     "policyLabel": "Liittymiskäytäntö",
     "tabWorkspaces": "Työtilat",
-    "structureOverviewOrg": "Organismin rakenteen yleiskuva",
-    "structureOverviewWs": "Työtilan rakenteen yleiskuva",
+    "structureOverviewOrg": "Organismin rakenne sisällysluettelona",
+    "structureOverviewWs": "Työtilan rakenne sisällysluettelona",
     "structEmpty": "Ei vielä rakennetta näytettäväksi.",
     "tabMembers": "Jäsenet",
     "tabAgents": "Agentit",

@@ -518,6 +518,37 @@ export async function getWorkspaceOverview(orgId, wsId) {
   } catch { return ''; }
 }
 
+/** Deterministic GRAPH of the whole organism (workspaces → spaces + counts/last-activity, members,
+ *  agents) — the data behind the interactive mindmap. Returns null on failure. */
+export async function getOrganismGraph(orgId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/graph`);
+    return r?.data?.graph || null;
+  } catch { return null; }
+}
+
+/** Deterministic GRAPH of ONE workspace (root = workspace, with its spaces). Returns null on failure. */
+export async function getWorkspaceGraph(orgId, wsId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/graph?ws=${encodeURIComponent(wsId)}`);
+    return r?.data?.graph || null;
+  } catch { return null; }
+}
+
+/** Organism STRUCTURE TIMELINE: { current, history } — the trackable structure fingerprint's current
+ *  value + archived prior versions (newest first). Returns { current: null, history: [] } on failure. */
+export async function getStructureHistory(orgId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/structure/history`);
+    return r?.data || { current: null, history: [] };
+  } catch { return { current: null, history: [] }; }
+}
+
+/** Save a workspace's free-form README (markdown). Creator/admin only (enforced server-side). */
+export async function saveWorkspaceReadme(orgId, wsId, readme) {
+  return apiPut(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`, { ws: wsId, readme });
+}
+
 /** Overwrite a workspace's manifest (e.g. edited name/summary/policy from Settings). */
 export async function saveManifest(orgId, wsId, manifest) {
   return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.manifest`, value: manifest, visibility: 'private' });
