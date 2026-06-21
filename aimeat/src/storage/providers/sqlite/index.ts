@@ -6393,6 +6393,10 @@ export class SqliteStorage implements Storage {
     return agentTaskRepo.countTasksByAgent(this.db, agentGaii);
   }
 
+  async countTasksByOwner(ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
+    return agentTaskRepo.countTasksByOwner(this.db, ownerGaii);
+  }
+
   async findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]> {
     return agentTaskRepo.findStalledTasks(this.db, thresholdMinutes);
   }
@@ -6487,6 +6491,10 @@ export class SqliteStorage implements Storage {
 
   async updateMessageStatus(id: string, status: string, processedAt?: string): Promise<AgentMessageRecord | null> {
     return agentMessageRepo.updateMessageStatus(this.db, id, status, processedAt);
+  }
+
+  async countMessagesByAgents(agentGaiis: string[]): Promise<Record<string, { total: number; lastMessageAt: string | null }>> {
+    return agentMessageRepo.countMessagesByAgents(this.db, agentGaiis);
   }
 
   async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {

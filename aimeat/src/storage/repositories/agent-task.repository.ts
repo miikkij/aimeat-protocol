@@ -31,5 +31,15 @@ export interface AgentTaskRepository {
   }): Promise<{ events: AgentTaskEventRecord[]; total: number }>;
 
   countTasksByAgent(agentGaii: string): Promise<{ queued: number; active: number; done: number; failed: number }>;
+  /**
+   * Aggregate task counts for ALL of an owner's agents in one grouped query (for the bulk
+   * `GET /v1/agents?include=stats` overview — avoids N per-agent round trips). Keyed by agentGaii.
+   * `doneToday` = done tasks whose completedAt is on the current UTC day. `lastTaskUpdateAt` =
+   * MAX(updatedAt) across the agent's tasks; `lastFailedAt` = MAX(updatedAt) of failed tasks.
+   */
+  countTasksByOwner(ownerGaii: string): Promise<Record<string, {
+    queued: number; active: number; done: number; failed: number;
+    doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null;
+  }>>;
   findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]>;
 }

@@ -9,6 +9,9 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.4.0 -- 2026-06-21 -- Typed + owner-scoped events: accumulate a Set of changed domains
+ *     per window and send `data: {"domains":[...]}` (client re-fetches only affected views);
+ *     filter owner-private events by the connected owner segment (owner-less = global).
  *   v1.3.0 -- 2026-06-19 -- Mark the owner online/offline in the PresenceTracker on stream
  *     open/close (presence feature); ticket carries the resolved presence GHII.
  *   v1.1.0 -- 2026-05-31 -- Flush after each write; SSE is now excluded from the
@@ -26,7 +29,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent } from '../services/event-bus.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 
 interface Ticket {
@@ -103,30 +106,38 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       flush();
     }, 30_000);
 
-    // Forward change events to this client — COALESCED. The node fires a change
-    // event on virtually every write (~400 emit sites); a busy node (e.g. a
-    // many-agent fleet) is tens of changes/sec, and EVERY connected browser got
-    // EVERY one. The client ignores the payload and just debounces a re-fetch
-    // (public/lib/live-updates.js), so blasting one message per change was pure
-    // waste. Throttle to at most one signal per COALESCE_MS per client: the
-    // first change in a quiet window goes out immediately (low latency), the
-    // rest of the burst collapse into one trailing flush. Same UX, a fraction of
-    // the bytes. The payload is a fixed marker since no consumer reads it.
+    // Forward change events to this client — COALESCED + SCOPED + TYPED. The node fires a
+    // change event on virtually every write (~400 emit sites); a busy node (a many-agent
+    // fleet) is tens/sec. Two reductions:
+    //  1. OWNER SCOPE — an event carrying `ownerGaii` is forwarded ONLY to streams owned by
+    //     that owner (compared on the owner SEGMENT, uniform across GHII `owner@node` and
+    //     GAII `agent#owner@node`). Owner-less events stay global (shared data: organisms,
+    //     boards, public activity, …). So owner B's agent churn no longer wakes owner A.
+    //  2. TYPED COALESCE — accumulate the SET of changed domains during the window and flush
+    //     `data: {"domains":[...]}`, so the client re-fetches only the affected views instead
+    //     of everything. Leading-edge: the first change in a quiet window goes immediately.
+    const ownerKey = parseGaiiLoose(t.presenceGhii).owner;
     const COALESCE_MS = 1000;
     let lastSent = 0;
     let trailingTimer: ReturnType<typeof setTimeout> | null = null;
-    const sendChange = (): void => {
+    const pending = new Set<string>();
+    const flushChange = (): void => {
       lastSent = Date.now();
-      res.write('data: {"t":"change"}\n\n');
+      const domains = [...pending];
+      pending.clear();
+      res.write(`data: ${JSON.stringify({ domains })}\n\n`);
       flush();
     };
-    const handler = (_evt: ChangeEvent): void => {
+    const handler = (evt: ChangeEvent): void => {
+      // Owner-private events for a different owner are not this client's business.
+      if (evt.ownerGaii && parseGaiiLoose(evt.ownerGaii).owner !== ownerKey) return;
+      pending.add(evt.domain);
       if (trailingTimer) return; // a flush is already scheduled; it covers this event
       const since = Date.now() - lastSent;
       if (since >= COALESCE_MS) {
-        sendChange(); // leading edge — first change in a quiet window goes now
+        flushChange(); // leading edge — first change in a quiet window goes now
       } else {
-        trailingTimer = setTimeout(() => { trailingTimer = null; sendChange(); }, COALESCE_MS - since);
+        trailingTimer = setTimeout(() => { trailingTimer = null; flushChange(); }, COALESCE_MS - since);
       }
     };
     onChangeEvent(handler);

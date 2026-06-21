@@ -267,6 +267,38 @@ export function countTasksByAgent(
   return counts;
 }
 
+export function countTasksByOwner(
+  db: Database.Database,
+  ownerGaii: string,
+): Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> {
+  const dayStart = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  const rows = db.prepare(
+    `SELECT agentGaii,
+       SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) AS queued,
+       SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active,
+       SUM(CASE WHEN status='done'   THEN 1 ELSE 0 END) AS done,
+       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
+       SUM(CASE WHEN status='done' AND completedAt >= ? THEN 1 ELSE 0 END) AS doneToday,
+       MAX(updatedAt) AS lastTaskUpdateAt,
+       MAX(CASE WHEN status='failed' THEN updatedAt END) AS lastFailedAt
+     FROM agent_tasks WHERE ownerGaii = ? GROUP BY agentGaii`
+  ).all(dayStart, ownerGaii) as Array<Record<string, unknown>>;
+
+  const out: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+  for (const r of rows) {
+    out[r.agentGaii as string] = {
+      queued: (r.queued as number) ?? 0,
+      active: (r.active as number) ?? 0,
+      done: (r.done as number) ?? 0,
+      failed: (r.failed as number) ?? 0,
+      doneToday: (r.doneToday as number) ?? 0,
+      lastTaskUpdateAt: (r.lastTaskUpdateAt as string) ?? null,
+      lastFailedAt: (r.lastFailedAt as string) ?? null,
+    };
+  }
+  return out;
+}
+
 export function findStalledTasks(
   db: Database.Database,
   thresholdMinutes: number,

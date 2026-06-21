@@ -236,11 +236,12 @@ export default function Profile({ navigate, locale }) {
     });
   }, [session]);
 
-  // SSE live updates — broadcast custom event so tabs can re-fetch
+  // SSE live updates — broadcast a custom event carrying WHICH domains changed so tabs can
+  // re-fetch selectively (detail.domains is a Set<string>, or null = everything changed).
   useEffect(() => {
     if (!session) return;
-    const notifyTabs = () => {
-      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+    const notifyTabs = (domains) => {
+      window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domains } }));
     };
     connect(() => getSession()?.jwt);
     onUpdate(notifyTabs);

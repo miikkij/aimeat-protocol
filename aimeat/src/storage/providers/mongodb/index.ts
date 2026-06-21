@@ -6629,6 +6629,40 @@ export class PrismaStorage implements Storage {
         return counts;
     }
 
+    async countTasksByOwner(ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
+        this.ensureReady();
+        const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() : (d as string | null) ?? null);
+        const dayStart = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+        const grouped = await this.prisma.agentTask.groupBy({
+            by: ['agentGaii', 'status'],
+            where: { ownerGaii },
+            _count: true,
+            _max: { updatedAt: true },
+        });
+        const doneTodayRows = await this.prisma.agentTask.groupBy({
+            by: ['agentGaii'],
+            where: { ownerGaii, status: 'done', completedAt: { gte: dayStart } },
+            _count: true,
+        });
+        const out: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+        const ensure = (g: string) => out[g] ?? (out[g] = { queued: 0, active: 0, done: 0, failed: 0, doneToday: 0, lastTaskUpdateAt: null, lastFailedAt: null });
+        for (const row of grouped as Array<{ agentGaii: string; status: string; _count: number; _max: { updatedAt: Date | null } }>) {
+            const e = ensure(row.agentGaii);
+            const cnt = typeof row._count === 'number' ? row._count : 0;
+            if (row.status === 'queued') e.queued = cnt;
+            else if (row.status === 'active') e.active = cnt;
+            else if (row.status === 'done') e.done = cnt;
+            else if (row.status === 'failed') e.failed = cnt;
+            const upd = iso(row._max?.updatedAt);
+            if (upd && (!e.lastTaskUpdateAt || upd > e.lastTaskUpdateAt)) e.lastTaskUpdateAt = upd;
+            if (row.status === 'failed' && upd) e.lastFailedAt = upd;
+        }
+        for (const row of doneTodayRows as Array<{ agentGaii: string; _count: number }>) {
+            ensure(row.agentGaii).doneToday = typeof row._count === 'number' ? row._count : 0;
+        }
+        return out;
+    }
+
     async findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]> {
         this.ensureReady();
         const threshold = new Date(Date.now() - thresholdMinutes * 60 * 1000);
@@ -6965,6 +6999,26 @@ export class PrismaStorage implements Storage {
             this.prisma.agentMessage.count({ where }),
         ]);
         return { messages: rows.map((r: any) => this.toMessageRecord(r)), total };
+    }
+
+    async countMessagesByAgents(agentGaiis: string[]): Promise<Record<string, { total: number; lastMessageAt: string | null }>> {
+        this.ensureReady();
+        const out: Record<string, { total: number; lastMessageAt: string | null }> = {};
+        if (agentGaiis.length === 0) return out;
+        const grouped = await this.prisma.agentMessage.groupBy({
+            by: ['agentGaii'],
+            where: { agentGaii: { in: agentGaiis }, direction: { not: 'inbound' } },
+            _count: true,
+            _max: { createdAt: true },
+        });
+        for (const row of grouped as Array<{ agentGaii: string; _count: number; _max: { createdAt: Date | null } }>) {
+            const last = row._max?.createdAt;
+            out[row.agentGaii] = {
+                total: typeof row._count === 'number' ? row._count : 0,
+                lastMessageAt: last instanceof Date ? last.toISOString() : ((last as string | null) ?? null),
+            };
+        }
+        return out;
     }
 
     async listPendingMessages(agentGaii: string): Promise<AgentMessageRecord[]> {

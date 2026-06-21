@@ -308,6 +308,14 @@
 }
 .inbox-track-banner-txt { flex: 1; }
 
+/* A "reply ready" suggested-reply shown as a dashed draft bubble with approve/reject. */
+.inbox-bubble--draft {
+  border: 1px dashed var(--accent-border) !important;
+  background: var(--accent-subtle) !important;
+}
+.inbox-draft-label { font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+.inbox-draft-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+
 .inbox-track-form { display: flex; flex-direction: column; gap: 10px; }
 .inbox-track-hint { color: var(--text-dim); font-size: 13px; margin: 0; }
 .inbox-form-row { display: flex; flex-direction: column; gap: 4px; }
