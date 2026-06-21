@@ -18,6 +18,9 @@
  *   v1.3.0 — 2026-06-21 — `change` events carry an optional `ownerGaii` so the SSE
  *     transport can scope owner-private domains per connected owner (hot agent paths);
  *     omitted owner = global broadcast (shared data stays visible to all owners).
+ *   v1.4.0 — 2026-06-22 — `MemoryWriteEvent` carries an optional `op` ('created'|'updated') so the
+ *     connector record-push (ConnectTunnelManager) can label workspace.record wakes; best-effort,
+ *     set by the generic memory route, defaulted to 'updated' by consumers when absent.
  */
 import { EventEmitter } from 'node:events';
 
@@ -127,11 +130,17 @@ export interface MemoryWriteEvent {
   ownerGaii: string;
   /** The full memory key that was written. */
   key: string;
+  /**
+   * Whether this write CREATED the key or UPDATED an existing one. Best-effort: set by the generic
+   * memory route (which already knows from its existing-record lookup); omitted by the publish paths
+   * (a publish updates the published `.latest` view) — consumers default to 'updated' when absent.
+   */
+  op?: 'created' | 'updated';
   timestamp: number;
 }
 
-export function emitMemoryWritten(ownerGaii: string, key: string): void {
-  bus.emit('memoryWritten', { ownerGaii, key, timestamp: Date.now() } satisfies MemoryWriteEvent);
+export function emitMemoryWritten(ownerGaii: string, key: string, op?: 'created' | 'updated'): void {
+  bus.emit('memoryWritten', { ownerGaii, key, ...(op ? { op } : {}), timestamp: Date.now() } satisfies MemoryWriteEvent);
 }
 
 export function onMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): void {

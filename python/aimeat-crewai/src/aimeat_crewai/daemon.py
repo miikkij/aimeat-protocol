@@ -14,6 +14,16 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.7.0 -- Workspace record push (P1). `run_crew_daemon` gains listen_for="records":
+    given `record_spaces` (lists of {organism_id, ws, space}), it subscribes them with
+    the serve daemon (POST /local/subscribe -> a `subscribe` frame over the tunnel, re-sent
+    on reconnect) and acts on each pushed `workspace.record` event drained from the new
+    /local/records/next long-poll -- via an `on_record(event)` callback, or wrapped into a
+    synthetic task -> build_crew. The idle wait parks on the record long-poll, so a
+    records-only contract agent makes ZERO periodic node calls. A tunnel reconnect (tracked
+    via /local/status `reconnects`) fires one synthetic catch-up event (op="catchup") per
+    space so the handler re-scans for writes missed while disconnected. Requires an AIMEAT
+    node + connector that support record push; older serve daemons simply return 204/no subs.
   0.6.0 -- Directory-scoped connector home. The connector home (serve.json,
     agent tokens, per-agent config, the serve daemon) now defaults to
     `<cwd>/.aimeat` instead of the global `~/.aimeat`, resolved by the new
@@ -107,6 +117,7 @@ in the supervisor should prevent crash loops.
 from __future__ import annotations
 
 import signal
+import sys
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -387,18 +398,20 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
         return []
 
 
-def _wait_for_work(api: _Api, use_push: bool, seconds: float, stop: dict[str, Any]) -> None:
+def _wait_for_work(
+    api: _Api, use_push: bool, seconds: float, stop: dict[str, Any],
+    wake_path: str = "/local/tasks/next",
+) -> None:
     """Idle wait between poll cycles.
 
     With `use_push` (the agent's serve transport is 'tunnel'), this long-polls
-    the serve daemon's push surface (`GET /local/tasks/next`) in <=5s chunks:
-    a task queued on the node answers the long-poll the instant the tunnel
-    delivers it, so the next cycle starts immediately (true push, zero
-    upstream traffic) while SIGINT/SIGTERM handlers still get a look-in every
-    few seconds. The handed-out item is ONLY a wake signal -- the cycle that
-    follows re-lists tasks from the store via `_poll_tasks` (storage is the
-    source of truth; serve hands each pushed task out once per daemon
-    lifetime, which is fine for a wake-up).
+    the serve daemon's push surface (`wake_path`, default `/local/tasks/next`;
+    a record-driven contract agent watches `/local/records/next` instead) in
+    <=5s chunks: an event answers the long-poll the instant the tunnel delivers
+    it, so the next cycle starts immediately (true push, zero upstream traffic)
+    while SIGINT/SIGTERM handlers still get a look-in every few seconds. The
+    handed-out item is ONLY a wake signal -- the cycle that follows re-lists
+    work from the store (storage is the source of truth).
 
     Without push (transport 'direct'/'auth_failed' -- node tunnel off or too
     old), the serve long-poll would always time out, so this falls back to the
@@ -413,7 +426,7 @@ def _wait_for_work(api: _Api, use_push: bool, seconds: float, stop: dict[str, An
             wait_ms = int(min(remaining, 5.0) * 1000)
             try:
                 r = api.get(
-                    "/local/tasks/next",
+                    wake_path,
                     params={"wait": wait_ms, "agent": api.agent_name},
                     timeout=wait_ms / 1000 + 10,
                 )
@@ -424,6 +437,51 @@ def _wait_for_work(api: _Api, use_push: bool, seconds: float, stop: dict[str, An
                 time.sleep(min(1.0, max(remaining, 0.1)))
         else:
             time.sleep(min(1.0, remaining))
+
+
+def _subscribe_records(api: _Api, spaces: list[dict[str, Any]]) -> int:
+    """Register record-push subscriptions with the serve daemon. Returns the count it accepted
+    (which it forwards over the tunnel and re-sends on every reconnect), or 0 on error."""
+    try:
+        r = api.post("/local/subscribe", json={"spaces": spaces}, timeout=10)
+        if r.status_code != 200:
+            return 0
+        return int(r.json().get("data", {}).get("subscribed", 0))
+    except Exception:
+        return 0
+
+
+def _drain_records(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
+    """Pull all immediately-available record events off the serve daemon's record queue (wait=0,
+    non-blocking), up to `max_items`. Each is a `workspace.record` envelope. [] when none/on error."""
+    out: list[dict[str, Any]] = []
+    for _ in range(max_items):
+        try:
+            r = api.get("/local/records/next", params={"wait": 0, "agent": api.agent_name}, timeout=10)
+            if r.status_code != 200:
+                break
+            event = r.json().get("data", {}).get("event")
+            if not isinstance(event, dict):
+                break
+            out.append(event)
+        except Exception:
+            break
+    return out
+
+
+def _serve_agent_status(api: _Api) -> dict[str, Any]:
+    """This agent's serve-daemon status entry (transport, reconnects, ...) from `/local/status`, or {}
+    on error. Loopback-only -- NOT a node call -- so polling it per cycle keeps an idle agent quiet."""
+    try:
+        r = api.get("/local/status", timeout=10)
+        if r.status_code != 200:
+            return {}
+        for a in r.json().get("data", {}).get("agents", []):
+            if a.get("agent") == api.agent_name:
+                return a
+    except Exception:
+        return {}
+    return {}
 
 
 # Type alias: function the caller provides to build a Crew for one task.
@@ -544,6 +602,8 @@ def run_crew_daemon(
     poll_interval_seconds: int = 30,
     max_concurrent_tasks: int | None = None,
     listen_for: Iterable[str] = ("tasks",),
+    record_spaces: Iterable[dict[str, Any]] | None = None,
+    on_record: Callable[[dict[str, Any]], None] | None = None,
     on_idle: Callable[[], None] | None = None,
     on_error: Callable[[Exception], None] | None = None,
     one_shot: bool = False,
@@ -620,10 +680,26 @@ def run_crew_daemon(
             liaison. The value is read once at startup -- restart to apply a
             change. Mind LLM rate limits: N parallel crews fan out further
             internally, so start conservative (3-5).
-        listen_for: Iterable of "tasks" and/or "messages". Default
-            ("tasks",). When "messages" is included, inbox messages also
-            become triggers: they're wrapped into a synthetic task dict
-            with the message body as description.
+        listen_for: Iterable of "tasks", "messages" and/or "records".
+            Default ("tasks",). When "messages" is included, inbox messages
+            also become triggers (wrapped into a synthetic task dict with the
+            message body as description). When "records" is included, workspace
+            record-change events PUSHED over the connector tunnel become
+            triggers -- the daemon subscribes the `record_spaces` and acts on
+            each event instead of idle-polling the served spaces. With push
+            active the idle wait long-polls `/local/records/next`, so a
+            records-only contract agent makes ZERO periodic node calls.
+        record_spaces: With "records" in listen_for, the list of spaces to
+            subscribe to -- each a dict {"organism_id", "ws", "space"} where
+            `space` is the workspace records-space key segment (the manifest
+            objectType's namespace, e.g. "task"). The serve daemon holds these
+            and re-subscribes on every tunnel reconnect.
+        on_record: With "records" in listen_for, a callback invoked with each
+            record event envelope {type, organism_id, ws, space, id, op, ts}.
+            A reconnect (or startup) fires one synthetic catch-up event per
+            subscribed space (op="catchup") so the handler re-scans for writes
+            missed while disconnected. When omitted, each event is wrapped into
+            a synthetic task dict and routed to build_crew (like messages).
         on_idle: Optional callback fired once per poll cycle when no work
             arrived. Useful for heartbeat logging.
         on_error: Optional callback fired with any unhandled exception
@@ -647,6 +723,12 @@ def run_crew_daemon(
     listen_set = set(listen_for)
     serve_opts = dict(serve_options or {})
 
+    # Normalise the record-push spaces (only meaningful with "records" in listen_for).
+    record_space_list: list[dict[str, Any]] = []
+    for s in (record_spaces or ()):
+        if isinstance(s, dict) and s.get("organism_id") and s.get("ws") and s.get("space"):
+            record_space_list.append({"organism_id": s["organism_id"], "ws": s["ws"], "space": s["space"]})
+
     # Discover (or auto-start) the shared loopback serve daemon, then bind the
     # shared Session to it. The daemon proxies /v1/* over its tunnel and holds
     # the bearer token itself; X-Aimeat-Agent routes to the right identity.
@@ -663,6 +745,17 @@ def run_crew_daemon(
         "direct",
     )
     push_wake = agent_transport == "tunnel"
+
+    # Record push (P1): subscribe the served spaces with the serve daemon (it forwards a `subscribe`
+    # frame over the tunnel and re-sends on reconnect). A records-driven contract agent parks its idle
+    # wait on the record long-poll. `last_reconnects` tracks the tunnel (re)connect count so a reconnect
+    # triggers one catch-up scan. Initialised so startup itself counts as the first catch-up.
+    records_on = "records" in listen_set and bool(record_space_list)
+    wake_path = "/local/records/next" if records_on else "/local/tasks/next"
+    last_reconnects = -1
+    if records_on:
+        n = _subscribe_records(api, record_space_list)
+        print(f"[daemon:{agent_name}] subscribed {n}/{len(record_space_list)} record space(s) for push")
 
     stop = {"flag": False}
 
@@ -724,6 +817,7 @@ def run_crew_daemon(
     # cover the small remaining churn surface.
     proposed_ids: set[str] = set()
     done_ids: set[str] = set()
+    auth_failed = False  # set True if the serve tunnel reports the bearer was revoked/expired (P2)
 
     # Concurrent-EXECUTE state (only used when effective_max > 1). Mutated by the
     # MAIN thread only: workers just run and return, the main thread reaps their
@@ -845,8 +939,53 @@ def run_crew_daemon(
     ) as liaison:
         print(f"[daemon:{agent_name}] liaison ready, entering poll loop")
 
+        def _handle_record(event: dict[str, Any]) -> None:
+            """Act on one record event: the caller's on_record, else wrap as a synthetic task -> crew."""
+            if on_record is not None:
+                try:
+                    on_record(event)
+                except Exception as inner:
+                    print(f"[daemon:{agent_name}] on_record handler crashed: {inner}")
+                    if on_error:
+                        try:
+                            on_error(inner)
+                        except Exception:
+                            pass
+                return
+            rid = f"record-{event.get('ws')}-{event.get('space')}-{event.get('id')}"
+            synthetic_task = {
+                "id": rid,
+                "title": f"Workspace record {event.get('op', 'updated')}",
+                "description": (
+                    f"A record was {event.get('op', 'updated')} in "
+                    f"{event.get('organism_id')}/{event.get('ws')}/{event.get('space')} (id: {event.get('id')}). "
+                    f"Read it and run your contract handler for that space."
+                ),
+                "_source": "record",
+                "_original": event,
+            }
+            try:
+                build_crew(synthetic_task, liaison).kickoff()
+            except Exception as inner:
+                print(f"[daemon:{agent_name}] record {rid} crashed: {inner}")
+                if on_error:
+                    try:
+                        on_error(inner)
+                    except Exception:
+                        pass
+
         while not stop["flag"]:
             dispatched_this_cycle = False
+
+            # P2: a revoked/expired bearer degrades the serve tunnel to 'auth_failed' (the node pushes
+            # `auth_revoked`, the connector stops the socket). Detect it via the loopback status (free,
+            # not a node call) and exit so the supervisor re-auths instead of looping forever. Replaces
+            # the old periodic node auth-liveness probe.
+            agent_status = _serve_agent_status(api) if (push_wake or records_on) else {}
+            if agent_status.get("transport") == "auth_failed":
+                print(f"[daemon:{agent_name}] tunnel auth revoked/expired -- run `aimeat connect` to re-auth. Exiting.")
+                auth_failed = True
+                break
 
             try:
                 if "tasks" in listen_set:
@@ -966,6 +1105,26 @@ def run_crew_daemon(
                             done_ids.add(msg_id)
                         dispatched_this_cycle = True
 
+                if records_on:
+                    # Catch-up on (re)connect: a change in the tunnel connect count (or the very first
+                    # cycle, last_reconnects = -1) fires one synthetic catch-up event per subscribed
+                    # space so the handler re-scans for writes missed while the socket was down.
+                    cur_reconnects = int(agent_status.get("reconnects", 0))
+                    if cur_reconnects != last_reconnects:
+                        last_reconnects = cur_reconnects
+                        for sp in record_space_list:
+                            if stop["flag"]:
+                                break
+                            _handle_record({"type": "workspace.record", **sp, "id": None, "op": "catchup"})
+                            dispatched_this_cycle = True
+
+                    # Drain any pushed record events that arrived since the last cycle.
+                    for event in _drain_records(api):
+                        if stop["flag"]:
+                            break
+                        _handle_record(event)
+                        dispatched_this_cycle = True
+
             except Exception as outer:
                 # The poll itself failed (e.g. network blip). Don't exit;
                 # let the supervisor decide if a restart is warranted.
@@ -992,7 +1151,7 @@ def run_crew_daemon(
             # parks on the serve long-poll and wakes instantly on a delivered
             # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            _wait_for_work(api, push_wake, cycle_sleep, stop)
+            _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
 
@@ -1004,3 +1163,8 @@ def run_crew_daemon(
             print(f"[daemon:{agent_name}] waiting for {len(in_flight)} in-flight task(s) to finish...")
         executor.shutdown(wait=True)
         _reap_finished()
+
+    # P2: a revoked/expired bearer is a distinct, human-actionable exit (not a crash) -- exit 2 so a
+    # supervisor stops restarting and prompts re-auth, instead of crash-looping on a dead credential.
+    if auth_failed and not one_shot:
+        sys.exit(2)

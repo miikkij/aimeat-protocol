@@ -31,6 +31,10 @@
  *   v1.0.0 — 2026-06-10 — Phase 3: initial tunnel client (forward correlation,
  *     heartbeat + dead-conn detection, reconnect backoff, deliver/backlog,
  *     proactive pre-expiry token reconnect, auth-failure stop).
+ *   v1.1.0 — 2026-06-22 — P1 record push: subscribe() sends a `subscribe` frame; onConnect fires
+ *     after each (re)connect so the serve daemon re-subscribes (per-socket subscriptions) and the
+ *     consumer catches up; `subscribed` ack logged. workspace.record delivers ride the existing
+ *     onDeliver path (auto-acked like any deliver).
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
@@ -81,6 +85,12 @@ export interface ConnectTunnelClientOptions {
   onDeliver?: (kind: string, payload: unknown, id: string) => void;
   /** On-connect snapshot of queued tasks + pending messages. */
   onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
+  /**
+   * Fired after each (re)connect is welcomed — used to RE-SEND subscriptions (which die with the
+   * old socket) and to drive a catch-up read on the consumer. `connectCount` is 1 on first connect,
+   * incrementing per reconnect.
+   */
+  onConnect?: (connectCount: number) => void;
   /** Fired once when the client stops due to an auth failure. */
   onAuthFailure?: (message: string) => void;
   onStatusChange?: (status: TunnelStatus) => void;
@@ -211,6 +221,18 @@ export class ConnectTunnelClient {
       this.pending.set(id, { resolve, timer });
       this.ws!.send(JSON.stringify(frame));
     });
+  }
+
+  /**
+   * Send a `subscribe` frame for workspace record push. Fire-and-forget (the server replies with a
+   * `subscribed` frame surfaced via onDeliver-adjacent logging). No-op if the socket is not open —
+   * the caller re-subscribes on the next `onConnect`. `spaces` are (organism_id, ws, space) tuples.
+   */
+  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'online') return;
+    if (!spaces.length) return;
+    try { this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), spaces })); }
+    catch (err) { console.error(`[${this.label}] subscribe send failed: ${(err as Error).message}`); }
   }
 
   /** Graceful shutdown: `disconnect` frame + socket close + timers cleared. */
@@ -377,6 +399,8 @@ export class ConnectTunnelClient {
     this.setStatus('online');
     this.startHeartbeat();
     this.scheduleTokenRefresh();
+    // Subscriptions are per-socket on the server — re-send them now, then let the consumer catch up.
+    try { this.opts.onConnect?.(this.connectCount); } catch (err) { console.error(`[${this.label}] onConnect handler error: ${(err as Error).message}`); }
   }
 
   private handleFrame(frame: TunnelFrame): void {
@@ -413,6 +437,19 @@ export class ConnectTunnelClient {
         const p = (frame.payload ?? {}) as { tasks?: unknown[]; messages?: unknown[] };
         try { this.opts.onBacklog?.({ tasks: p.tasks ?? [], messages: p.messages ?? [] }); }
         catch (err) { console.error(`[${this.label}] onBacklog handler error: ${(err as Error).message}`); }
+        break;
+      }
+      case 'subscribed': {
+        const p = (frame.payload ?? {}) as { accepted?: unknown[]; rejected?: unknown[] };
+        const acc = p.accepted?.length ?? 0;
+        const rej = p.rejected?.length ?? 0;
+        if (rej > 0) console.error(`[${this.label}] Record subscribe: ${acc} accepted, ${rej} rejected (access)`);
+        break;
+      }
+      case 'auth_revoked': {
+        // Server revoked the pinned bearer — stop + surface re-auth guidance (same path as a
+        // forwarded 401). Removes the client's periodic auth-liveness probe.
+        this.authFailure(frame.message ?? 'Token revoked by server');
         break;
       }
       case 'error': {

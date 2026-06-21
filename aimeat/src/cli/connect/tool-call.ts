@@ -246,6 +246,15 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
+        // P3: the agent's OWN performance + per-context review rollups. Exposed as a connect-call tool
+        // so a crew's periodic reputation rollup rides the existing tunnel (one loopback POST over the
+        // open WS) instead of a direct node GET — removing the last periodic node call for an idle crew.
+        name: 'aimeat_agent_statistics',
+        description: "Get this agent's own performance + per-context review rollups (recomputed from its tasks).",
+        input: {},
+        handler: ({ client, agentPath }) => client.get(`/v1/agents/${agentPath}/statistics`),
+    },
+    {
         name: 'aimeat_agent_tags_set',
         description: "Owner-only. Replace the tag list on an agent. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
         input: {

@@ -57,6 +57,10 @@ export class TunnelClient {
   readonly invokes: TunnelFrame[] = [];
   /** All inbound backlog frames, in arrival order. */
   readonly backlogs: TunnelFrame[] = [];
+  /** All inbound `subscribed` (record-subscribe ack) frames, in arrival order. */
+  readonly subscribeds: TunnelFrame[] = [];
+  /** All inbound `auth_revoked` frames, in arrival order. */
+  readonly authRevokeds: TunnelFrame[] = [];
   /** All inbound error frames, in arrival order. */
   readonly errors: TunnelFrame[] = [];
   welcome: TunnelFrame | null = null;
@@ -102,6 +106,8 @@ export class TunnelClient {
             }
             break;
           case 'backlog': this.backlogs.push(frame); break;
+          case 'subscribed': this.subscribeds.push(frame); break;
+          case 'auth_revoked': this.authRevokeds.push(frame); break;
           case 'error': this.errors.push(frame); break;
           default: break;
         }
@@ -138,6 +144,11 @@ export class TunnelClient {
   /** Send an ack for a delivered item. */
   ack(id: string): void { this.ws.send(JSON.stringify({ type: 'ack', id })); }
 
+  /** Subscribe to workspace record push for the given (organism_id, ws, space) tuples. */
+  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>): void {
+    this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), spaces }));
+  }
+
   /** Auto-answer every server-initiated `invoke` frame with the given handler's result. */
   onInvoke(fn: (f: TunnelFrame) => { ok: boolean; result: unknown }): void { this.autoInvokeReply = fn; }
 
@@ -158,10 +169,18 @@ export class TunnelClient {
   private deliverCursor = 0;
   private backlogCursor = 0;
   private errorCursor = 0;
+  private subscribedCursor = 0;
+  private authRevokedCursor = 0;
 
   /** Return the next unconsumed deliver frame, waiting up to timeoutMs for one. */
   async waitForDeliver(timeoutMs = 1000): Promise<TunnelFrame | null> {
     return this.nextFrame(this.delivers, () => this.deliverCursor, (n) => { this.deliverCursor = n; }, timeoutMs);
+  }
+  async waitForSubscribed(timeoutMs = 1000): Promise<TunnelFrame | null> {
+    return this.nextFrame(this.subscribeds, () => this.subscribedCursor, (n) => { this.subscribedCursor = n; }, timeoutMs);
+  }
+  async waitForAuthRevoked(timeoutMs = 1000): Promise<TunnelFrame | null> {
+    return this.nextFrame(this.authRevokeds, () => this.authRevokedCursor, (n) => { this.authRevokedCursor = n; }, timeoutMs);
   }
   async waitForError(timeoutMs = 1000): Promise<TunnelFrame | null> {
     return this.nextFrame(this.errors, () => this.errorCursor, (n) => { this.errorCursor = n; }, timeoutMs);
