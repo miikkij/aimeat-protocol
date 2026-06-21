@@ -35,7 +35,7 @@ function isAnonymousGaii(gaii: string): boolean {
 }
 import type { StatsCollector } from '../services/stats.js';
 import { authorizeRead } from '../services/access-guard.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
@@ -212,6 +212,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     stats?.increment('memory_writes');
+
+    // Memory Contracts (reactive): a write to a watched key fires Tracked Response evaluation. The
+    // subscriber gates on the track-registry (O(1)) so non-watched writes do no work.
+    emitMemoryWritten(gaii, key);
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,

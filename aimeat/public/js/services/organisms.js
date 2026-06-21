@@ -6,6 +6,9 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.2.1 — 2026-06-21 — Decode HTML entities in workspace names on read (listWorkspaces +
+ *     discoverWorkspaces) so legacy double-escaped registry names (e.g. "STT &amp; Voice") render
+ *     as plain text in the list + breadcrumb.
  *   v1.2.0 — 2026-06-16 — Generator prompt: each objectType gets a one-line "description" and a
  *     matching "type.<name>.desc" i18n key, so generated workspaces are self-describing (the
  *     workspace UI shows the description under each space's title).
@@ -15,6 +18,7 @@
  *     "{ns}.{field}.hint" and "type.{name}" labels the workspace UI renders.
  */
 import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
+import { decodeEntities } from '/js/utils.js';
 
 /** Does this space's data live in workspace memory keys (records/documents the workspace view can
  *  show)? Missing backing counts as memory. Mirrors the server's isMemoryBackedSpace — THE one
@@ -529,7 +533,9 @@ export async function listWorkspaces(orgId) {
   try {
     const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
     const item = (resp?.data?.items || []).find(i => i.key === key);
-    return Array.isArray(item?.value?.workspaces) ? item.value.workspaces : [];
+    const list = Array.isArray(item?.value?.workspaces) ? item.value.workspaces : [];
+    // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
+    return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
   } catch { return []; }
 }
 
@@ -546,7 +552,9 @@ export async function saveWorkspaceRegistry(orgId, workspaces) {
 export async function discoverWorkspaces(orgId) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces`);
-    return Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
+    const list = Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
+    // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
+    return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
   } catch { return []; }
 }
 

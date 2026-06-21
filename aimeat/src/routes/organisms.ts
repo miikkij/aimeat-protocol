@@ -57,7 +57,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
@@ -1351,6 +1351,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       version: (existingLatest?.version ?? 0) + 1,
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
     });
+    // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
+    // (gated O(1) on the track-registry in the subscriber).
+    emitMemoryWritten(publisher, `${base}.latest`);
     // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.)

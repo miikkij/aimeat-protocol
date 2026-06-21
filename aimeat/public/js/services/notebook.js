@@ -15,6 +15,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: classify + materialize-document orchestration (slice B).
  *   v1.1.0 — 2026-06-21 — Phase 3: distribute (split → many homes) + notebook.settings trust toggles.
+ *   v1.2.0 — 2026-06-21 — Add materializeRecord (records-space sibling) + patchRecord for the Tracked
+ *     Response flow (inbox message → actionable workspace record, source preserved).
  */
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
@@ -147,6 +149,81 @@ export async function materializeDocument(plan) {
   if (plan.sourceKey) await deleteMemory(plan.sourceKey).catch(() => {});
 
   return { organismId, workspaceId, space, docId };
+}
+
+/** A records-space objectType (mode:'records') for a memory-backed workspace — the sibling of the
+ *  document space, used by materializeRecord (e.g. a `bug` space). */
+function recordSpaceObjectType(namespace, name) {
+  return { name: name || namespace, namespace, mode: 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
+}
+
+/**
+ * Materialize a note into a workspace RECORD (mode:'records'), the actionable sibling of
+ * materializeDocument. Unlike documents it does NOT delete any source — the Tracked Response that
+ * binds this record needs the originating inbox message to persist. Returns the record's `.latest`
+ * memory key so a Tracked Response can watch it.
+ * @param {object} plan
+ * @param {string|null} plan.organismId   Existing organism id, or null to create one.
+ * @param {string} [plan.organismName]    Name for a new organism.
+ * @param {string|null} plan.workspaceId  Existing workspace id, or null to create one.
+ * @param {string} [plan.workspaceName]   Name for a new workspace.
+ * @param {string} plan.space             Records-space namespace (e.g. 'bug').
+ * @param {string} [plan.spaceName]       Display name for a newly-created space.
+ * @param {object} plan.record            The record value (e.g. { title, markdown, status, severity }).
+ * @param {string} [plan.recordId]
+ * @returns {Promise<{organismId:string, workspaceId:string, space:string, recordId:string, key:string}>}
+ */
+export async function materializeRecord(plan) {
+  let { organismId, workspaceId } = plan;
+  const namespace = plan.space || 'note';
+
+  // 1. Organism — create if needed.
+  if (!organismId) {
+    const resp = await createOrganism({
+      name: (plan.organismName || 'Notebook').trim(),
+      description: 'Created from the notebook',
+      type: 'project', join_policy: 'approval_required', visibility: 'private',
+    });
+    if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not create organism');
+    organismId = resp?.data?.organism?.id;
+    if (!organismId) throw new Error('Organism creation returned no id');
+  }
+
+  // 2. Workspace — create if needed (registry + manifest with the records space).
+  if (!workspaceId) {
+    workspaceId = rid('ws-');
+    const manifest = { manifestVersion: '1.0', id: organismId, name: plan.workspaceName || 'Notebook', kind: 'project', status: 'active', objectTypes: [recordSpaceObjectType(namespace, plan.spaceName)] };
+    await saveManifest(organismId, workspaceId, manifest);
+    await apiPost('/v1/memory', { key: `${wsRoot(organismId, workspaceId)}.meta.readme`, value: `# ${manifest.name}\n\nCreated from the notebook.`, visibility: 'private' });
+    const existing = await listWorkspaces(organismId);
+    await saveWorkspaceRegistry(organismId, [...existing, { id: workspaceId, name: manifest.name, createdAt: new Date().toISOString() }]);
+  } else {
+    // Ensure the records space exists on the chosen workspace (additive — never replace the manifest).
+    const manifest = await readManifest(organismId, workspaceId);
+    if (manifest && !(manifest.objectTypes || []).some(ot => ot.namespace === namespace)) {
+      const updated = { ...manifest, objectTypes: [...(manifest.objectTypes || []), recordSpaceObjectType(namespace, plan.spaceName)] };
+      await saveManifest(organismId, workspaceId, updated).catch(() => {});
+    }
+  }
+
+  // 3. Write the record at its .latest key (the key a Tracked Response watches).
+  const recordId = plan.recordId || rid('rec-');
+  const key = `${wsRoot(organismId, workspaceId)}.${namespace}.${recordId}.latest`;
+  const value = { id: recordId, ...(plan.record || {}) };
+  const resp = await createMemory(key, value, 'private');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not write record');
+
+  return { organismId, workspaceId, space: namespace, recordId, key };
+}
+
+/** Best-effort merge a patch onto an existing memory record value (e.g. stamp a trackedResponse
+ *  back-ref onto a freshly-materialized record). Reads current value, shallow-merges, rewrites. */
+export async function patchRecord(key, patch) {
+  try {
+    const r = await getMemory(key);
+    const cur = (r?.data?.value && typeof r.data.value === 'object') ? r.data.value : {};
+    await createMemory(key, { ...cur, ...patch }, 'private');
+  } catch { /* best-effort back-ref */ }
 }
 
 /**

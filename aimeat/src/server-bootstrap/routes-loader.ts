@@ -107,6 +107,7 @@ import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { messagesRouter } from '../routes/messages.js';
+import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
@@ -134,6 +135,9 @@ import { createGenesisSyncService } from '../services/genesis-sync.js';
 import { startCacheCleanupJob } from '../services/cache-cleanup.js';
 import { startSyncScheduler } from '../services/sync-scheduler.js';
 import { startMessageRetryJob } from '../services/message-delivery.js';
+import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/tracked-response.js';
+import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
+import { onMemoryWrittenEvent } from '../services/event-bus.js';
 import { initStats } from '../services/stats.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { statsMiddleware } from '../middleware/stats.js';
@@ -266,6 +270,7 @@ export async function mountRoutes(
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
   app.use(messagesRouter(config, storage, peers));
+  app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));
@@ -529,6 +534,16 @@ export async function mountRoutes(
 
   // Direct-message federation retry — re-attempts queued cross-node messages (DECISION #6)
   startMessageRetryJob(config, storage, peers);
+
+  // Memory Contracts — Tracked Responses: rebuild the reactive watched-key registry from live
+  // contracts, react to writes on watched keys (event-driven), and run the safety-net reconciler.
+  rebuildTrackRegistry(storage).catch(err => logger.error('Track registry rebuild failed', { error: String(err) }));
+  onMemoryWrittenEvent(evt => {
+    if (!isTracked(evt.key)) return;   // O(1) gate — only watched keys do any work
+    evaluateTrackedKey({ config, storage, peers }, evt.key)
+      .catch(err => logger.warn('tracked-response reactive evaluate failed', { error: String(err) }));
+  });
+  startTrackedResponseReconciler(config, storage, peers);
 
   app.use(specRouter());
 

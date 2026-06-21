@@ -104,3 +104,30 @@ export function onPublicActivityEvent(handler: (evt: PublicActivityEvent) => voi
 export function offPublicActivityEvent(handler: (evt: PublicActivityEvent) => void): void {
   bus.off('publicActivity', handler);
 }
+
+// ── Memory-write channel (reactive Memory Contracts) ────────────────────────
+// The Memory Contract pattern (docs/coding-guidelines/memory-contracts.md) reacts to changes in a
+// specific memory key. Central write paths (the generic memory-write route, the workspace publish
+// path) emit `memoryWritten` with the written key; the contract subscriber checks the track-registry
+// (O(1)) and evaluates only contracts watching that key. This is the event-driven trigger; a
+// reconciler sweep is the safety net. Generic on purpose — the bus knows nothing about contracts.
+
+export interface MemoryWriteEvent {
+  /** The owner GAII the memory record was written under. */
+  ownerGaii: string;
+  /** The full memory key that was written. */
+  key: string;
+  timestamp: number;
+}
+
+export function emitMemoryWritten(ownerGaii: string, key: string): void {
+  bus.emit('memoryWritten', { ownerGaii, key, timestamp: Date.now() } satisfies MemoryWriteEvent);
+}
+
+export function onMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): void {
+  bus.on('memoryWritten', handler);
+}
+
+export function offMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): void {
+  bus.off('memoryWritten', handler);
+}
