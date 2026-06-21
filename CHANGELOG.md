@@ -4,6 +4,31 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-06-22
+
+### Added
+
+- **Event-driven crew agents — push workspace records, token revocation, and stats over the connector
+  tunnel.** Idle agents on the connector forward tunnel no longer poll the node for the things they
+  used to check on a timer; the node pushes them over the one persistent WebSocket the tunnel already
+  holds open. **(1) Workspace record push** — an agent `subscribe`s to one or more `(organism, ws,
+  space)` it serves; any record written there (created or updated, a publish or a bare write) is
+  pushed as a lightweight `workspace.record` wake `{organism_id, ws, space, id, op, ts}` — drafts and
+  version history are skipped, and **no record value travels** (the agent does its own authorized
+  read). Read access is gated by the **exact same `canReadWorkspace()` check as the REST workspace
+  read** and re-validated at push time, so a pushed record never reaches an agent that couldn't read
+  it via the API, and a mid-session consent revocation stops delivery immediately. **(2)
+  Token-revocation push** — revoking a token pushes `auth_revoked` to its live socket and closes it,
+  so the agent re-auths at once instead of probing for liveness. **(3) Agent statistics over the
+  tunnel** — the agent's own `GET /v1/agents/:name/statistics` is exposed as the
+  `aimeat_agent_statistics` connect-call tool so a crew's reputation rollup rides the tunnel instead
+  of a direct node GET. The `aimeat connect serve --http` loopback gains `POST /local/subscribe` +
+  `GET /local/records/next` (a queue kept separate from tasks) and reports subscriptions + a reconnect
+  count on `/local/status` (the consumer's catch-up signal). Net effect: a records-only contract agent
+  makes **zero periodic node calls**. Fully additive — old clients ignore the new frame types;
+  existing crews and connectors are unchanged. The Python `aimeat-crewai` connector (0.7.0) consumes
+  it via `listen_for="records"` + `record_spaces` + an `on_record(event)` callback.
+
 ## [1.27.1] - 2026-06-21
 
 ### Added
