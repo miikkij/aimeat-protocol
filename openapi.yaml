@@ -12228,6 +12228,59 @@ paths:
         '503':
           description: Too many open activity streams; retry shortly
 
+  /v1/ghii/password/change:
+    post:
+      operationId: ghiiPasswordChange
+      summary: Change or set the authenticated owner's password
+      description: |
+        Sets a new password for the authenticated owner.
+
+        If the account already has a password, `current_password` is required and must
+        match. If the account has no password yet (e.g. it was created via OAuth such as
+        Google sign-in), `current_password` is not required and this sets the initial
+        password — enabling username + password sign-in alongside the OAuth provider.
+        Callers can detect this case via the `has_password` field on `GET /v1/ghii/me`.
+      tags: [GHII]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                current_password:
+                  type: string
+                  description: Required only when the account already has a password set.
+                new_password:
+                  type: string
+                  description: The new password. Must meet strength requirements (min 8 chars, uppercase, lowercase, number).
+      responses:
+        '200':
+          description: Password changed or set successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      message:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/ghii/me:
     get:
       operationId: ghiiMe
@@ -12274,6 +12327,9 @@ paths:
                       email_verified_at:
                         type: string
                         nullable: true
+                      has_password:
+                        type: boolean
+                        description: Whether a password has been set. False for accounts created via OAuth (e.g. Google sign-in) that have never set one.
                       public_key:
                         type: string
                         nullable: true
