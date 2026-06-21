@@ -282,6 +282,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
     }
 
+    // ?count=true — return ONLY the count (no items, no values). A profile stats bar needs the
+    // number "🧠 N Muistit", not 4 MB of memory values; this avoids transferring every record.
+    if (req.query.count === 'true') {
+      res.json(success(config.nodeId, { count: records.length }));
+      return;
+    }
+
     // Calculate total size for quota reporting
     let totalBytes = 0;
     for (const r of records) {
@@ -1019,6 +1026,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       }
     } else {
       files = await storage.listStorageFiles(req.auth!.sub);
+    }
+
+    if (req.query.count === 'true') {
+      res.json(success(config.nodeId, { count: files.length }));
+      return;
     }
 
     res.json(success(config.nodeId, {

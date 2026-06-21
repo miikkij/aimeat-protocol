@@ -692,6 +692,16 @@ await test('Prefix query with deep nesting', async () => {
     assert(items.length >= 1, `expected >=1 items with prefix app.config.theme., got ${items.length}`);
 });
 
+await test('?count=true returns only the count (no items), matching the full list length', async () => {
+    const { body: full } = await json('/v1/memory', { headers: auth1() });
+    const fullLen = (full.data?.items || []).length;
+    const { status, body } = await json('/v1/memory?count=true', { headers: auth1() });
+    assert(status === 200, `count status ${status}`);
+    assert(typeof body.data?.count === 'number', 'count is a number');
+    assert(body.data.items === undefined, 'count mode omits items (no values transferred)');
+    assert(body.data.count === fullLen, `count ${body.data.count} should equal full list length ${fullLen}`);
+});
+
 // ═══════════════════════════════════════════════════════
 // PUT/POST semantics contract
 // ═══════════════════════════════════════════════════════

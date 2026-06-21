@@ -82,6 +82,7 @@ import { listApps } from '/js/services/apps.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules } from '/js/services/schedules.js';
 import * as orgService from '/js/services/organisms.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { listRecents } from '/js/recents.js';
 import { getMemory, createMemory } from '/js/services/memory.js';
 import { listInbox } from '/js/services/messages.js';
@@ -465,11 +466,10 @@ function WaitingForYou({ owner }) {
   }, [owner]);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  // Only re-run the per-organism approvals/join-requests fan-out when ORGANISMS actually
+  // change — not on every unrelated event (agent churn, memory, etc.), which on an account in
+  // many organisms turned into a hundreds-of-requests storm.
+  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
 
   if (!items || items.length === 0) return null;
   return html`
@@ -545,11 +545,7 @@ function AgentsCard({ owner }) {
   }, [owner]);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['agents', 'agent-tasks', 'schedules'], () => liveRef.current()), []);
 
   if (!agents || (agents.length === 0 && !nextJob)) return null;
   const todayStr = new Date().toDateString();
@@ -661,11 +657,7 @@ function PresencePill() {
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['presence'], () => liveRef.current()), []);
 
   const save = async (partial) => {
     if (!cfg) return;
@@ -870,11 +862,7 @@ function InboxNavButton({ active, onClick }) {
   }, []);
   useEffect(() => { load(); }, [load]);
   const ref = useRef(load); ref.current = load;
-  useEffect(() => {
-    const h = () => ref.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['messages'], () => ref.current()), []);
   return html`
     <button class="pf-side-item${active ? ' pf-side-item--active' : ''}" onClick=${onClick}>
       <span class="pf-side-ico">${'\u{1F4EC}'}</span>
@@ -1017,11 +1005,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   /* SSE live updates */
   const loadRef = useRef(loadApps);
   loadRef.current = loadApps;
-  useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['apps'], () => loadRef.current()), []);
 
   /* Open a tab inline below a specific slot. Toggle if same tab clicked again. */
   const isOperator = (session?.roles || []).includes('operator');

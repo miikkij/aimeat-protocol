@@ -16,6 +16,12 @@ export async function listMemories(agentGaii) {
   return Array.isArray(list) ? list : [];
 }
 
+/** Cheap count of owner-scope memory entries (no values transferred). For stat displays. */
+export async function countMemories() {
+  const data = await apiGet('/v1/memory?count=true');
+  return data?.data?.count ?? 0;
+}
+
 /**
  * Read a single memory entry. Returns the envelope ({ data: { key, value, version, ... } }).
  * By default throws/404s if missing. Pass { soft: true } for optional keys (UI prefs, config)
@@ -117,6 +123,12 @@ export async function listFiles() {
   const data = await apiGet('/v1/memory/files');
   const list = data?.data?.files || data?.data || [];
   return Array.isArray(list) ? list : [];
+}
+
+/** Cheap count of files (no metadata transferred). For stat displays. */
+export async function countFiles() {
+  const data = await apiGet('/v1/memory/files?count=true');
+  return data?.data?.count ?? 0;
 }
 
 /** Upload a file (base64). */
