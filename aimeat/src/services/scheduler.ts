@@ -354,9 +354,15 @@ export class Scheduler {
       updatedAt: new Date().toISOString(),
     }).catch(() => { /* don't let update failure mask original error */ });
 
-    await this.writeLog(job, trigger, result, {
-      errorMessage, durationMs, reads: run.reads, writes: run.writes, taskId: run.taskId,
-    });
+    // Core jobs run every 1-5 minutes; a successful (usually no-op) tick carries no
+    // information and would dominate the execution log. Skip success rows for core jobs —
+    // errors are still logged, and the per-job last-run status is persisted on the
+    // ScheduledJob record above. User schedules keep full per-run logging.
+    if (!(result === 'success' && job.type === 'core')) {
+      await this.writeLog(job, trigger, result, {
+        errorMessage, durationMs, reads: run.reads, writes: run.writes, taskId: run.taskId,
+      });
+    }
 
     if (result === 'error') {
       logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });

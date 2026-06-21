@@ -12,6 +12,9 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.1.0 — 2026-06-21 — Notes parked from an inbox message (Track a response → "put in notebook for
+ *     later") show a banner + "Track a response" action that re-opens the shared modal seeded with the
+ *     original message, so the reply still binds back to the sender; the note is removed once tracked.
  *   v1.0.0 — 2026-06-21 — Extracted from notebook-tab.js (suggest + enrich + distribute per note).
  */
 import { h } from 'preact';
@@ -21,8 +24,9 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { createMemory } from '/js/services/memory.js';
+import { createMemory, deleteMemory } from '/js/services/memory.js';
 import { classifyNote, materializeDocument, distributeNote, distributeChunks } from '/js/services/notebook.js';
+import { TrackResponseModal } from './track-response-modal.js';
 import { generatePlan, runStep, composeEnrichedMarkdown, buildCatalogue } from '/js/services/notebook-plan.js';
 import * as offersService from '/js/services/offers.js';
 import { Markdown } from '/components/Markdown.js';
@@ -52,6 +56,17 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   const [distrib, setDistrib] = useState(null);           // { chunks[], busy, filedCount }
 
   const baseText = () => noteText(note.value);
+
+  // A note parked from an inbox message (Track a response → "put in notebook for later") carries its
+  // source link + reply intent. Surface a banner + a "Track a response" action that re-opens the same
+  // modal seeded with the original message — so the reply still binds back to the sender.
+  const trackedIntent = note.value?.trackedResponseIntent;
+  const trackSource = note.value?.source;
+  const [trackOpen, setTrackOpen] = useState(false);
+  const trackMsg = (trackedIntent?.owes && trackSource?.messageId)
+    ? { id: trackSource.messageId, body: baseText(), conversationId: trackSource.conversationId }
+    : null;
+  const trackPeer = (trackSource?.peerGhii || '').split('@')[0].split('#').pop() || (trackSource?.peerGhii || '');
 
   // Trust mode: auto-detect intent on a just-captured note (parent flags exactly one card).
   const triggeredAuto = useRef(false);
@@ -420,6 +435,12 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
 
   return html`
     <div class="pf-nb-note">
+      ${trackMsg && html`
+        <div class="inbox-track-banner">
+          <span class="inbox-track-banner-ico">🔗</span>
+          <span class="inbox-track-banner-txt">${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', escHtml(trackPeer))}</span>
+          <button class="btn-primary btn-sm" onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}</button>
+        </div>`}
       <div class="pf-nb-note-text pf-nb-note-text--${view}">
         ${view === 'line'
           ? html`<span class="pf-nb-note-line">${escHtml(firstLine(baseText()))}</span>`
@@ -484,6 +505,11 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
 
       ${distributing && html`<div class="pf-nb-suggest pf-nb-progress"><${Spinner} text=${t('profile.notebook.splitting')} /></div>`}
       ${distrib && renderDistributePanel()}
+
+      ${trackOpen && trackMsg && html`<${TrackResponseModal} open=${true} msg=${trackMsg}
+        defaultMode=${trackedIntent?.mode || 'approve'} allowPark=${false}
+        onClose=${() => setTrackOpen(false)} showToast=${showToast}
+        onDone=${() => { setTrackOpen(false); deleteMemory(note.key).catch(() => {}).finally(() => onChanged?.()); }} />`}
     </div>
   `;
 }
