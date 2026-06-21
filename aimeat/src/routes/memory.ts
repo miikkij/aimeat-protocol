@@ -11,6 +11,9 @@
  *     memory and file storage share one access decision + audit path.
  *   v1.5.0 -- 2026-06-15 -- Fire ecosystem-app automation recipes (feature B4) on a successful
  *     memory write — a data publish on a matching key glob materialises an agent task per agent.
+ *   v1.6.0 -- 2026-06-22 -- Scalable Memory tab: GET /v1/memory?include=meta (omit values, report
+ *     per-entry bytes), GET /v1/memory/search?prefix= (scope to a namespace), and new bulk routes
+ *     GET /v1/memory/export, POST /v1/memory/import (skip/overwrite/rename), POST /v1/memory/bulk-delete.
  */
 
 import { Router } from 'express';
@@ -40,7 +43,7 @@ import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../services/ecosystem-access.js';
-import { listOwnerScopeMemory } from '../services/owner-memory.js';
+import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -231,6 +234,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
     emitChange('memory');
+    // Organism content lives in memory under organism.{id}.*; also emit 'organisms' so organism
+    // views refresh WITHOUT having to subscribe to the global 'memory' firehose (every agent's
+    // every memory write). The workspace/organism views listen to 'organisms' only.
+    if (key.startsWith('organism.')) emitChange('organisms');
     // Event-triggered workflows: a write to an owner key may start a workflow (engine matches the
     // owner-GHII namespace, so agent-namespace writes don't fire owner-keyed triggers).
     getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
@@ -272,6 +279,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const tags = tagsParam ? tagsParam.split(',') : undefined;
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
+    // ?include=meta — omit the (heavy) `value` from every item and report each entry's size in
+    // `bytes` instead. The profile Memory tab uses this so opening the tab with thousands of keys
+    // stays fast (groups + filtering work on metadata; values are fetched per-row on expand). The
+    // default response keeps `value` inline — MCP tools and agents rely on it.
+    const metaOnly = req.query.include === 'meta';
 
     // ?count=true — return ONLY the count (no items/values). Uses a cheap COUNT(DISTINCT key)
     // server-side (no record values loaded or transferred) for the common no-filter case (e.g. a
@@ -308,17 +320,20 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // Calculate total size for quota reporting
+    // Calculate total size for quota reporting (and per-record bytes when meta-only)
     let totalBytes = 0;
+    const recordBytes = new Map<MemoryRecord, number>();
     for (const r of records) {
-      totalBytes += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
+      const b = Buffer.byteLength(JSON.stringify(r.value), 'utf8');
+      totalBytes += b;
+      if (metaOnly) recordBytes.set(r, b);
     }
 
     res.json(success(config.nodeId, {
       items: records.map(r => ({
         key: r.key,
         owner_gaii: r.ownerGaii,
-        value: r.value,
+        ...(metaOnly ? { bytes: recordBytes.get(r) ?? 0 } : { value: r.value }),
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
@@ -368,6 +383,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const visibility = req.query.visibility as string | undefined;
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
+    // Optional prefix — scopes the content search to one namespace/group (e.g. "organism.{id}.")
+    // so the profile Memory tab can search within an expanded group.
+    const prefix = req.query.prefix as string | undefined;
+    const searchOpts = { visibility, maxFlags, prefix };
 
     let results: MemoryRecord[];
     if (isOwnerSession && !agentParam) {
@@ -377,15 +396,15 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       const agents = await storage.getAgentsByOwner(callerOwner);
       const ecoApps = await storage.getEcosystemAppsByOwner(callerOwner);
       results = [];
-      results.push(...await storage.searchMemory(ownerGhii, q, { visibility, maxFlags }));
+      results.push(...await storage.searchMemory(ownerGhii, q, searchOpts));
       for (const agent of agents) {
-        results.push(...await storage.searchMemory(agent.gaii, q, { visibility, maxFlags }));
+        results.push(...await storage.searchMemory(agent.gaii, q, searchOpts));
       }
       for (const app of ecoApps) {
-        results.push(...await storage.searchMemory(app.geai, q, { visibility, maxFlags }));
+        results.push(...await storage.searchMemory(app.geai, q, searchOpts));
       }
     } else {
-      results = await storage.searchMemory(gaii, q, { visibility, maxFlags });
+      results = await storage.searchMemory(gaii, q, searchOpts);
     }
 
     res.json(success(config.nodeId, {
@@ -403,6 +422,179 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       total: results.length,
       query: q,
     }));
+  });
+
+  // GET /v1/memory/export — download all of the caller's memory entries (full values) as a JSON
+  // backup. Owner sessions export across their GHII + agents + ecosystem apps (owner-scope); agent
+  // sessions export their own keyspace. Optional ?prefix= scopes the export to one namespace.
+  router.get('/v1/memory/export', requireAuth(), async (req, res) => {
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let gaii = req.auth!.sub;
+    const agentParam = req.query.agent as string | undefined;
+    if (agentParam && agentParam !== gaii) {
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only export memory of your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+    const prefix = req.query.prefix as string | undefined;
+
+    let records: MemoryRecord[];
+    if (isOwnerSession && !agentParam) {
+      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix });
+    } else {
+      records = await storage.listMemory(gaii, { prefix });
+    }
+
+    res.json(success(config.nodeId, {
+      exported_at: new Date().toISOString(),
+      node_id: config.nodeId,
+      count: records.length,
+      entries: records.map(r => ({
+        key: r.key,
+        value: r.value,
+        visibility: r.visibility,
+        tags: r.tags,
+        ...(r.ttlHours != null ? { ttl_hours: r.ttlHours } : {}),
+      })),
+    }));
+  });
+
+  // POST /v1/memory/import — restore/merge a JSON backup produced by /v1/memory/export.
+  // body: { entries: [{ key, value, visibility?, tags?, ttl_hours? }], mode?, agent? }
+  //   mode = 'skip' (default) | 'overwrite' | 'rename' — how to resolve a key that already exists.
+  // Per-entry validation/quota/schema mirror POST /v1/memory; one bad entry doesn't abort the run.
+  router.post('/v1/memory/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const body = req.body ?? {};
+    const entries = Array.isArray(body.entries) ? body.entries : null;
+    const mode = (['skip', 'overwrite', 'rename'].includes(body.mode) ? body.mode : 'skip') as 'skip' | 'overwrite' | 'rename';
+    if (!entries) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'entries array is required'));
+      return;
+    }
+
+    // Resolve target identity (owner sessions may target one of their agents via ?agent / body.agent)
+    let gaii = resolve(req);
+    const agentParam = body.agent as string | undefined;
+    if (agentParam && agentParam !== gaii) {
+      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      if (!isOwnerSession) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may import under a specific agent'));
+        return;
+      }
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only import memory to your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+
+    const MAX_KEYS_PER_AGENT = config.memoryMaxKeysPerAgent;
+    const MAX_VALUE_SIZE = config.memoryMaxValueSizeKb * 1024;
+    let keyCount = (await storage.listMemory(gaii)).length;
+
+    const summary = { created: 0, updated: 0, skipped: 0, failed: [] as { key: string; reason: string }[] };
+
+    for (const entry of entries) {
+      const key = entry?.key;
+      if (typeof key !== 'string' || !key) { summary.failed.push({ key: String(key), reason: 'missing key' }); continue; }
+      try {
+        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
+          summary.failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue;
+        }
+        const valueSize = Buffer.byteLength(JSON.stringify(entry.value), 'utf8');
+        if (valueSize > MAX_VALUE_SIZE) { summary.failed.push({ key, reason: 'value too large' }); continue; }
+
+        let targetKey = key;
+        const existing = await storage.getMemory(gaii, key);
+        if (existing) {
+          if (mode === 'skip') { summary.skipped++; continue; }
+          if (mode === 'rename') {
+            let n = 1;
+            while (await storage.getMemory(gaii, `${key}-imported${n > 1 ? '-' + n : ''}`)) n++;
+            targetKey = `${key}-imported${n > 1 ? '-' + n : ''}`;
+          }
+          // mode === 'overwrite' falls through with targetKey === key
+        }
+
+        const isNewKey = targetKey === key ? !existing : true;
+        if (isNewKey && keyCount >= MAX_KEYS_PER_AGENT) { summary.failed.push({ key, reason: 'key quota reached' }); continue; }
+
+        const validation = await validateMemoryWrite(targetKey, entry.value, storage);
+        if (!validation.valid) { summary.failed.push({ key: targetKey, reason: 'schema validation failed' }); continue; }
+
+        const now = new Date().toISOString();
+        const prior = targetKey === key ? existing : null;
+        await storage.setMemory({
+          key: targetKey,
+          ownerGaii: gaii,
+          value: entry.value,
+          visibility: (['private', 'owner', 'group', 'public'].includes(entry.visibility) ? entry.visibility : 'private') as MemoryRecord['visibility'],
+          tags: Array.isArray(entry.tags) ? entry.tags : [],
+          ttlHours: typeof entry.ttl_hours === 'number' ? entry.ttl_hours : null,
+          version: prior ? prior.version + 1 : 1,
+          createdAt: prior?.createdAt ?? now,
+          updatedAt: now,
+        });
+        if (prior) summary.updated++; else { summary.created++; keyCount++; }
+        emitMemoryWritten(gaii, targetKey, prior ? 'updated' : 'created');
+      } catch (e) {
+        summary.failed.push({ key, reason: String(e instanceof Error ? e.message : e) });
+      }
+    }
+
+    emitResourceListChanged(gaii);
+    emitChange('memory');
+    res.json(success(config.nodeId, summary));
+  });
+
+  // POST /v1/memory/bulk-delete — delete many entries at once by { prefix } and/or { keys }.
+  // Avoids firing 1000+ individual DELETE requests when clearing a whole namespace (e.g. an old
+  // organism). Owner sessions delete across their owner-scope (records keep their writer's gaii);
+  // agent sessions delete from their own keyspace.
+  router.post('/v1/memory/bulk-delete', requireAuth(), requireScope('memory:delete'), async (req, res) => {
+    const body = req.body ?? {};
+    const prefix = typeof body.prefix === 'string' && body.prefix ? body.prefix : undefined;
+    const keys = Array.isArray(body.keys) ? new Set(body.keys.filter((k: unknown): k is string => typeof k === 'string')) : undefined;
+    if (!prefix && (!keys || keys.size === 0)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'prefix or keys is required'));
+      return;
+    }
+
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let gaii = resolve(req);
+    const agentParam = body.agent as string | undefined;
+    if (agentParam && agentParam !== gaii) {
+      if (!isOwnerSession) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may bulk-delete under a specific agent'));
+        return;
+      }
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only delete memory of your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+
+    // Gather candidate records (owner-scope keeps each record's writer gaii so we delete from the right keyspace).
+    const records = (isOwnerSession && !agentParam)
+      ? await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix })
+      : await storage.listMemory(gaii, { prefix });
+
+    let deleted = 0;
+    for (const r of records) {
+      if (keys && !keys.has(r.key)) continue;
+      if (await storage.deleteMemory(r.ownerGaii, r.key)) {
+        deleted++;
+        emitResourceUpdated(r.ownerGaii, `aimeat://memory/${encodeURIComponent(r.key)}`);
+      }
+    }
+    if (deleted > 0) { emitResourceListChanged(gaii); emitChange('memory'); }
+    res.json(success(config.nodeId, { deleted }));
   });
 
   // GET /v1/memory/discover — browse public memory entries across all users on this node
@@ -1107,15 +1299,32 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/:key — read a memory entry
   router.get('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), workspaceAccess, async (req, res) => {
-    const gaii = resolve(req);
+    let gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
-    let record = await storage.getMemory(gaii, key);
+    // Owner may target one of their own agents' keyspace via ?agent= (mirrors list/search).
+    const agentParam = req.query.agent as string | undefined;
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (agentParam && agentParam !== gaii) {
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only read memory of your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+
+    // Owner sessions read across their owner-scope (GHII + agents + ecosystem apps), GHII-first —
+    // the same broadening list/search use, so the profile Memory tab can lazy-load any listed key's
+    // value (many are written under an agent's GAII, not the owner's GHII).
+    let record = (isOwnerSession && !agentParam)
+      ? await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key)
+      : await storage.getMemory(gaii, key);
     // On-read TTL check: if TTL has expired, treat as not found and delete
     if (record && record.ttlHours && record.ttlHours > 0) {
       const expiresAt = new Date(record.createdAt).getTime() + record.ttlHours * 3_600_000;
       if (Date.now() > expiresAt) {
-        await storage.deleteMemory(gaii, key);
+        await storage.deleteMemory(record.ownerGaii, key);
         record = null;
       }
     }
