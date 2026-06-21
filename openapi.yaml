@@ -6517,6 +6517,11 @@ paths:
           schema:
             type: string
           description: Filter keys by prefix (e.g. "shared:" returns all shared:* keys)
+        - name: count
+          in: query
+          schema:
+            type: boolean
+          description: 'When true, return only `{ count }` (no items/values) — cheap for stat displays.'
         - name: agent
           in: query
           schema:
@@ -7475,6 +7480,12 @@ paths:
       tags: [Memory]
       security:
         - BearerAuth: []
+      parameters:
+        - name: count
+          in: query
+          schema:
+            type: boolean
+          description: 'When true, return only `{ count }` (no file list) — cheap for stat displays.'
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

@@ -373,11 +373,14 @@ export default function InboxTab({ showToast }) {
 
   const liveRef = useRef(null);
   liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
-  // Coalesce a burst of SSE 'change' events into one refresh — on a multi-node node these arrive
-  // rapidly and uncoalesced re-fetches both flicker AND hammer the server. Also IGNORE domains the
-  // inbox doesn't care about (agent/work/notification background churn): only refresh when the change
-  // touches messages or the owner's memory (where conversations + tracked responses live).
-  const RELEVANT = ['messages', 'memory'];
+  // Coalesce a burst of SSE 'change' events into one refresh — on a busy node these arrive rapidly
+  // and uncoalesced re-fetches both flicker AND hammer the server. Also IGNORE domains the inbox
+  // doesn't care about: refresh only on MESSAGE changes (conversations + tracked-response replies
+  // arrive as message events). Deliberately NOT subscribed to 'memory' — message-flag/tracked
+  // records are memory-backed, but the whole node's constant memory churn was waking the inbox
+  // every 700ms and re-pulling conversations/tracked-responses (a request storm). Flags update on
+  // the local star action; tracked responses refresh when the actual reply lands as a message.
+  const RELEVANT = ['messages', 'agent-messages'];
   const liveTimerRef = useRef(null);
   useEffect(() => {
     const handler = (e) => {

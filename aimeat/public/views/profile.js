@@ -191,8 +191,8 @@ export default function Profile({ navigate, locale }) {
     Promise.allSettled([
       listAgents(owner),
       getWallet(),
-      memoryService.listMemories(),
-      memoryService.listFiles(),
+      memoryService.countMemories(),   // cheap count, not the full 4 MB memory dump
+      memoryService.countFiles(),
       listMyServices(owner),
       listInbox(),
       listApps(),
@@ -209,12 +209,10 @@ export default function Profile({ navigate, locale }) {
         s.balance = w.balance ?? '-';
       }
       if (memories.status === 'fulfilled') {
-        const list = memories.value;
-        s.memory = Array.isArray(list) ? list.length : 0;
+        s.memory = typeof memories.value === 'number' ? memories.value : 0;
       }
       if (files.status === 'fulfilled') {
-        const list = files.value;
-        s.files = Array.isArray(list) ? list.length : 0;
+        s.files = typeof files.value === 'number' ? files.value : 0;
       }
       if (services.status === 'fulfilled') {
         const list = services.value;
