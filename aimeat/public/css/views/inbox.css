@@ -284,3 +284,33 @@
 .inbox-attach-btn:hover { border-color: var(--accent); }
 .inbox-file-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .inbox-file-chip { font-size: 12px; color: var(--text-dim); background: var(--card-bg-alt); padding: 3px 8px; border-radius: var(--radius-full); }
+
+/* ── Tracked Responses: per-message actions, approval banner, track modal ── */
+.inbox-bubble { position: relative; }
+.inbox-bubble-actions {
+  position: absolute; top: 4px; right: 6px;
+  display: flex; gap: 2px; opacity: 0; transition: opacity .12s ease;
+}
+.inbox-row:hover .inbox-bubble-actions { opacity: 1; }
+.inbox-bubble-act {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 2px 3px; border-radius: var(--radius-xs);
+  color: var(--text-dim);
+}
+.inbox-bubble-act:hover { background: var(--card-bg-alt); color: var(--accent); }
+.inbox-bubble-act--on { color: var(--accent); }
+
+.inbox-track-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin: 6px 0;
+  background: var(--accent-subtle); border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm); font-size: 13px;
+}
+.inbox-track-banner-txt { flex: 1; }
+
+.inbox-track-form { display: flex; flex-direction: column; gap: 10px; }
+.inbox-track-hint { color: var(--text-dim); font-size: 13px; margin: 0; }
+.inbox-form-row { display: flex; flex-direction: column; gap: 4px; }
+.inbox-form-label { font-size: 12px; color: var(--text-dim); }
+.inbox-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.inbox-track-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

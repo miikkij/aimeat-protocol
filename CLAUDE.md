@@ -90,6 +90,7 @@ All standards live in `docs/coding-guidelines/`:
 | [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, licenses, audits |
 | [Environment Configs](docs/coding-guidelines/environment-configs.md) | Node type configs (full, personal, relay, mirror) |
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync, adding fields/tables |
+| [Memory Contracts](docs/coding-guidelines/memory-contracts.md) | Reactive self-describing memory records for automation/coordination — prefer extending the memory system over new tables/handlers |
 | [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs |
 | [Init Wizard](docs/coding-guidelines/init-wizard.md) | `aimeat init` maintenance checklist |
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, cache-busting, SSE, admin conventions |

@@ -69,7 +69,7 @@ import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -388,6 +388,9 @@ export function registerWorkspaceTools(
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: existingLatest?.ownerGaii ?? writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');
+            // Memory Contracts (reactive): publishing a watched record (e.g. a bug → status:done)
+            // fires Tracked Response evaluation. Gated O(1) on the track-registry in the subscriber.
+            emitMemoryWritten(existingLatest?.ownerGaii ?? writerGaii, `${base}.latest`);
             return ok({ published: base, version: n });
         });
 

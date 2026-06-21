@@ -19,21 +19,23 @@
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
  *   v1.0.0 -- 2026-06-16 -- Initial creation: local (same-node) direct messaging + first-contact gate.
+ *   v1.1.0 -- 2026-06-21 -- Extract the send/deliver core into services/message-send.ts (shared with
+ *     Tracked Response replies); the route is now a thin caller. Behaviour unchanged.
  */
 
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
+import type { Storage, DirectMessageAttachment } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview } from '../utils/messaging.js';
-import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
-import { deliverDirectMessage, propagateReadReceipt, logDelivery } from '../services/message-delivery.js';
+import { propagateReadReceipt } from '../services/message-delivery.js';
+import { sendDirectMessage } from '../services/message-send.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -91,101 +93,24 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       return;
     }
 
-    const recipientNode = parseGaiiLoose(recipientGhii).node;
-    const isLocal = recipientNode === config.nodeId;
-
-    const id = randomUUID();
-    const now = new Date().toISOString();
-    const conversationId = conversationIdFor(senderGhii, recipientGhii);
     const attachments = input.attachments ? mapAttachments(input.attachments, senderGhii) : undefined;
 
-    // For a local recipient, enforce the first-contact gate (block) BEFORE materialising delivery.
-    if (isLocal) {
-      const recipientOwner = parseGaiiLoose(recipientGhii).owner;
-      const ownerRec = await storage.getOwner(recipientOwner);
-      if (!ownerRec) {
+    // Core create + deliver (local inline / cross-node federation + first-contact gate). Shared with
+    // the Tracked Response evaluator, which sends automated replies server-side via the same helper.
+    const result = await sendDirectMessage(deliveryCtx, {
+      senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
+    });
+    if (!result.ok) {
+      if (result.code === 'RECIPIENT_NOT_FOUND') {
         res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${recipientGhii}`));
         return;
       }
-      const contact = await storage.getContact(recipientGhii, senderGhii);
-      if (contact?.state === 'blocked') {
-        // Record the sender's own copy as undeliverable; do not deliver to the recipient.
-        await storage.createDirectMessage({
-          id, ownerGhii: senderGhii, conversationId, senderGhii, recipientGhii,
-          body: input.body, attachments, status: 'undeliverable', direction: 'outbound',
-          replyToId: input.reply_to, origin: 'local', originNodeId: config.nodeId,
-          error: 'blocked', createdAt: now,
-        });
-        res.status(403).json(error(config.nodeId, 'BLOCKED', 'The recipient is not accepting messages from you'));
-        return;
-      }
+      res.status(403).json(error(config.nodeId, 'BLOCKED', 'The recipient is not accepting messages from you'));
+      return;
     }
 
-    // Sender's outbound copy.
-    const senderCopy: DirectMessageRecord = {
-      id, ownerGhii: senderGhii, conversationId, senderGhii, recipientGhii,
-      body: input.body, attachments,
-      status: isLocal ? 'delivered' : 'queued',
-      direction: 'outbound', replyToId: input.reply_to,
-      origin: 'local', originNodeId: config.nodeId,
-      createdAt: now, deliveredAt: isLocal ? now : undefined,
-    };
-    await storage.createDirectMessage(senderCopy);
-
-    // Sending implies the sender accepts this contact on their OWN side, so the recipient's
-    // replies flow back freely (no spurious request gate on the initiator). Never overrides a block.
-    const senderContact = await storage.getContact(senderGhii, recipientGhii);
-    if (senderContact?.state !== 'blocked') {
-      await storage.setContactState(senderGhii, recipientGhii, 'accepted');
-    }
-
-    if (isLocal) {
-      // Resolve / seed the recipient-side contact state (first-contact gate).
-      let contact = await storage.getContact(recipientGhii, senderGhii);
-      if (!contact) {
-        // Auto-accept the recipient's own agents/apps; everyone else becomes a pending request.
-        const autoAccept = isSameOwner(senderGhii, recipientGhii);
-        contact = await storage.setContactState(recipientGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
-      }
-      const isRequest = contact.state === 'pending';
-
-      // Recipient's inbound copy.
-      await storage.createDirectMessage({
-        id, ownerGhii: recipientGhii, conversationId, senderGhii, recipientGhii,
-        body: input.body, attachments, status: 'delivered', direction: 'inbound',
-        replyToId: input.reply_to, origin: 'local', originNodeId: config.nodeId,
-        createdAt: now, deliveredAt: now,
-      });
-
-      // Duplicate attachments into the recipient's storage now (accepted contacts only; a pending
-      // request keeps them as reference until accepted — DECISION #3).
-      if (!isRequest && attachments?.length) {
-        const recCopy = await storage.getDirectMessage(id, recipientGhii);
-        if (recCopy) {
-          const dup = await duplicateMessageAttachments(deliveryCtx, recipientGhii, recCopy);
-          if (dup.changed) await storage.updateMessageAttachments(id, recipientGhii, dup.attachments);
-        }
-      }
-
-      await notify(storage, recipientGhii, {
-        type: isRequest ? 'direct_message_request' : 'direct_message',
-        title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
-        body: messagePreview(input.body),
-        link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
-      });
-      await logDelivery(deliveryCtx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
-      emitChange('messages');
-    } else {
-      // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued
-      // and the retry job will deliver it later. deliverDirectMessage updates the stored status.
-      const outcome = await deliverDirectMessage(deliveryCtx, senderCopy);
-      senderCopy.status = outcome;
-      if (outcome === 'delivered') senderCopy.deliveredAt = new Date().toISOString();
-      emitChange('messages');
-    }
-
-    res.status(201).json(success(config.nodeId, { message: senderCopy }, [
-      { description: 'View conversation', method: 'GET', url: `/v1/messages/conversations/${conversationId}` },
+    res.status(201).json(success(config.nodeId, { message: result.message }, [
+      { description: 'View conversation', method: 'GET', url: `/v1/messages/conversations/${result.message.conversationId}` },
       { description: 'View inbox', method: 'GET', url: '/v1/messages/inbox' },
     ]));
   });

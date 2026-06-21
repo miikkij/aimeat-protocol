@@ -6862,6 +6862,175 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/tracked-responses:
+    post:
+      operationId: createTrackedResponse
+      summary: Create a Tracked Response from an inbox message
+      description: >
+        Owner-scoped. A Tracked Response is a Memory Contract (see
+        docs/coding-guidelines/memory-contracts.md) that owes a (possibly federated) reply to an inbox
+        message once a watched memory key satisfies a condition. The reply target is derived
+        authoritatively from the stored message (`message_id`); the client supplies `watch` (key +
+        condition), the `response` policy (`mode` auto|approve, optional template + inject field),
+        optional `references` and `title`. When the watched record reaches the condition, the reply is
+        sent (auto) or drafted for approval (approve).
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_id, watch]
+              properties:
+                message_id: { type: string }
+                title: { type: string }
+                tier: { type: string }
+                watch:
+                  type: object
+                  required: [key, condition]
+                  properties:
+                    key: { type: string }
+                    condition:
+                      type: object
+                      required: [field, equals]
+                      properties:
+                        field: { type: string }
+                        equals: {}
+                response:
+                  type: object
+                  properties:
+                    mode: { type: string, enum: [auto, approve] }
+                    template: { type: string }
+                    inject:
+                      type: object
+                      properties: { from: { type: string }, field: { type: string } }
+                references: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: No such message in the caller's mailbox
+    get:
+      operationId: listTrackedResponses
+      summary: List the caller's Tracked Responses
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [watching, sent, replied, awaiting-approval, error, cancelled] }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/tracked-responses/spec:
+    get:
+      operationId: trackedResponseSpec
+      summary: Self-description of the Tracked Response contract
+      description: Returns the contract type, the rules systems must honor, and the state list. Open (no auth).
+      tags: [Tracked Responses]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/tracked-responses/evaluate-due:
+    post:
+      operationId: evaluateTrackedResponsesDue
+      summary: Evaluate the caller's own Tracked Responses now
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/tracked-responses/{id}:
+    get:
+      operationId: getTrackedResponse
+      summary: Get one Tracked Response
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/tracked-responses/{id}/draft:
+    get:
+      operationId: getTrackedResponseDraft
+      summary: Get the suggested reply draft (approve mode)
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/tracked-responses/{id}/evaluate:
+    post:
+      operationId: evaluateTrackedResponse
+      summary: Evaluate one Tracked Response's watched key now
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/tracked-responses/{id}/replied:
+    post:
+      operationId: markTrackedResponseReplied
+      summary: Mark replied after the owner sent the (edited) draft
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { sent_message_id: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/tracked-responses/{id}/cancel:
+    post:
+      operationId: cancelTrackedResponse
+      summary: Cancel a Tracked Response and deregister its watch
+      tags: [Tracked Responses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

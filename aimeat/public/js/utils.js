@@ -13,6 +13,21 @@ export function escHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+/** Decode the common HTML entities back to plain text. Some names (e.g. workspace registry names)
+ *  were HTML-escaped at write by older import paths, so a literal "STT & Voice" reached storage as
+ *  "STT &amp; Voice" and then double-escaped on render. Names are plain text — decode them for
+ *  display. HTM re-escapes on render, so this stays XSS-safe. Decode &amp; LAST so "&amp;lt;"
+ *  resolves to "&lt;", not "<". */
+export function decodeEntities(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 /** Attribute-escape a string (for use inside HTML attributes). */
 export function escAttr(s) {
   if (!s) return '';

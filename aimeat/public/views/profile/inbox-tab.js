@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.4.0 -- 2026-06-21 -- Two-tier message follow-up: ⭐ Important flag (Tier 1) + "Track a response"
+ *     (Tier 2 — materialize a workspace record + bind a Tracked Response that replies when the work is
+ *     done) + an approve-mode banner that pre-fills the composer with the suggested reply.
  *   v1.3.0 -- 2026-06-19 -- Show a presence dot next to peers (request rows, conversation list,
  *     thread header) via the shared <PresenceDot>.
  *   v1.2.0 -- 2026-06-16 -- Composer upgraded to the shared Toast UI editor (parity with the
@@ -28,7 +31,11 @@ import { escHtml } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { Modal } from '/components/Modal.js';
 import * as messages from '/js/services/messages.js';
+import * as tracked from '/js/services/tracked-responses.js';
+import { materializeRecord, patchRecord } from '/js/services/notebook.js';
+import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
  * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
@@ -97,13 +104,19 @@ function prepareBody(body, urlMap, expiredIds) {
   return out;
 }
 
-function MessageBubble({ msg, mine, urlMap }) {
+function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   return html`
     <div class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
       ${!mine ? html`<${Avatar} seed=${msg.senderGhii} size=${28} />` : null}
       <div class=${`inbox-bubble ${mine ? 'inbox-bubble--mine' : 'inbox-bubble--theirs'}`}>
+        <div class="inbox-bubble-actions">
+          <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
+            onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
+          <button class="inbox-bubble-act" title=${t('inbox.trackResponse')}
+            onClick=${() => onTrack?.(msg)}>🔗</button>
+        </div>
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
         ${nonInline.length > 0 && html`
           <div class="inbox-attach-row">
@@ -128,9 +141,9 @@ function MessageBubble({ msg, mine, urlMap }) {
  * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
  * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
  * the draft doesn't leak between threads. */
-function Composer({ recipient, sendLabel, sending, onSend }) {
+function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
   const [mode, setMode] = useState('rich');     // 'rich' = Toast UI; 'markdown' = fallback textarea
-  const [md, setMd] = useState('');
+  const [md, setMd] = useState(initialText);
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
   const editorRef = useRef(null);
@@ -167,6 +180,13 @@ function Composer({ recipient, sendLabel, sending, onSend }) {
     };
   }, [mode]);
 
+  // Seed the rich editor with an initial draft (e.g. a Tracked Response suggested reply) once it mounts.
+  useEffect(() => {
+    if (mode === 'rich' && initialText && editorRef.current) {
+      try { editorRef.current.setMarkdown(initialText); } catch { /* noop */ }
+    }
+  }, [mode, initialText]);
+
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
     try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
@@ -197,6 +217,139 @@ function Composer({ recipient, sendLabel, sending, onSend }) {
     </div>`;
 }
 
+/* Track-a-response modal: turn an inbox message into a workspace record (the actionable follow-up)
+ * bound to a Tracked Response contract. The user picks where the record lands (organism → workspace →
+ * record type), the reply mode (auto vs approve), and the completion condition. On submit it
+ * materializes the record, creates the contract, and stamps a back-ref on the record. */
+function TrackResponseModal({ open, msg, peerGhii, onClose, onDone, showToast }) {
+  const [orgs, setOrgs] = useState([]);
+  const [wss, setWss] = useState([]);
+  const [orgId, setOrgId] = useState('');
+  const [wsId, setWsId] = useState('');
+  const [space, setSpace] = useState('bug');
+  const [title, setTitle] = useState('');
+  const [severity, setSeverity] = useState('critical');
+  const [body, setBody] = useState('');
+  const [mode, setMode] = useState('approve');
+  const [field, setField] = useState('status');
+  const [equals, setEquals] = useState('done');
+  const [inject, setInject] = useState('resolution');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setBody(String(msg?.body || ''));
+    setTitle((String(msg?.body || '').split('\n')[0] || '').slice(0, 80));
+    (async () => {
+      // List the caller's OWN organisms (the `member` filter takes the bare owner name, as the
+      // Organisms tab does); fall back to the visible set if the session owner isn't available.
+      const owner = (typeof window !== 'undefined' && window.AIMEAT?.auth?.getSession?.()?.owner) || '';
+      const r = await (owner ? listOrganisms({ member: owner }) : listOrganisms()).catch(() => null);
+      const list = r?.data?.organisms || r?.data?.items || [];
+      setOrgs(list);
+    })();
+  }, [open, msg]);
+
+  useEffect(() => {
+    if (!orgId) { setWss([]); setWsId(''); return; }
+    (async () => {
+      const list = await listWorkspaces(orgId).catch(() => []);
+      setWss(list);
+      setWsId(list[0]?.id || '');
+    })();
+  }, [orgId]);
+
+  const submit = async () => {
+    if (busy || !msg) return;
+    if (!orgId || !wsId) { showToast?.(t('inbox.trackPickTarget'), true); return; }
+    setBusy(true);
+    try {
+      const mat = await materializeRecord({
+        organismId: orgId, workspaceId: wsId, space: space.trim() || 'bug',
+        record: { title: title.trim() || space, markdown: body, status: 'open', severity, source: 'inbox' },
+      });
+      const contract = await tracked.createTrackedResponse({
+        messageId: msg.id,
+        title: title.trim() || undefined,
+        watch: { key: mat.key, condition: { field: field.trim() || 'status', equals: equals.trim() || 'done' } },
+        response: { mode, inject: inject.trim() ? { from: 'watch.value', field: inject.trim() } : undefined },
+        references: { organismId: orgId, workspaceId: wsId, records: [{ namespace: mat.space, id: mat.recordId }] },
+      });
+      await patchRecord(mat.key, { trackedResponse: { id: contract?.id, owedTo: peerGhii, replyState: 'watching' } });
+      showToast?.(t('inbox.trackCreated'));
+      onDone?.();
+      onClose?.();
+    } catch (e) {
+      showToast?.(e?.message || t('inbox.trackFailed'), true);
+    }
+    setBusy(false);
+  };
+
+  return html`
+    <${Modal} open=${open} onClose=${onClose} title=${t('inbox.trackResponse')} className="inbox-track-modal">
+      <div class="inbox-track-form">
+        <p class="inbox-track-hint">${t('inbox.trackHint')}</p>
+        <label class="inbox-form-row">
+          <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
+          <select class="inbox-input" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
+            <option value="">${t('inbox.trackChoose')}</option>
+            ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
+          </select>
+        </label>
+        <label class="inbox-form-row">
+          <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
+          <select class="inbox-input" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
+            ${wss.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
+          </select>
+        </label>
+        <div class="inbox-form-grid">
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackType')}</span>
+            <input class="inbox-input" type="text" value=${space} onInput=${(e) => setSpace(e.target.value)} />
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackSeverity')}</span>
+            <select class="inbox-input" value=${severity} onChange=${(e) => setSeverity(e.target.value)}>
+              <option value="critical">critical</option>
+              <option value="high">high</option>
+              <option value="normal">normal</option>
+              <option value="low">low</option>
+            </select>
+          </label>
+        </div>
+        <label class="inbox-form-row">
+          <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
+          <input class="inbox-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
+        </label>
+        <label class="inbox-form-row">
+          <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
+          <select class="inbox-input" value=${mode} onChange=${(e) => setMode(e.target.value)}>
+            <option value="approve">${t('inbox.trackModeApprove')}</option>
+            <option value="auto">${t('inbox.trackModeAuto')}</option>
+          </select>
+        </label>
+        <div class="inbox-form-grid">
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackWhenField')}</span>
+            <input class="inbox-input" type="text" value=${field} onInput=${(e) => setField(e.target.value)} />
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackWhenEquals')}</span>
+            <input class="inbox-input" type="text" value=${equals} onInput=${(e) => setEquals(e.target.value)} />
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackInject')}</span>
+            <input class="inbox-input" type="text" value=${inject} onInput=${(e) => setInject(e.target.value)} />
+          </label>
+        </div>
+        <div class="inbox-track-actions">
+          <button class="btn-ghost" onClick=${onClose}>${t('common.cancel')}</button>
+          <button class="btn-primary" disabled=${busy} onClick=${submit}>${busy ? t('inbox.trackCreating') : t('inbox.trackCreate')}</button>
+        </div>
+      </div>
+    </${Modal}>`;
+}
+
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -206,16 +359,44 @@ export default function InboxTab({ showToast }) {
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
   const [sending, setSending] = useState(false);
+  const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
+  const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
+  const [trackMsg, setTrackMsg] = useState(null);         // message being tracked (opens modal)
+  const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply seeded into the composer
+  const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
   const msgsRef = useRef(null);
 
   const loadLists = useCallback(async () => {
-    const [reqs, convs] = await Promise.all([
+    const [reqs, convs, impIds, trs] = await Promise.all([
       messages.listRequests().catch(() => []),
       messages.listConversations().catch(() => []),
+      tracked.listImportantMessageIds().catch(() => []),
+      tracked.listTrackedResponses().catch(() => []),
     ]);
     setRequests(reqs);
     setConversations(convs);
+    setImportant(new Set(impIds));
+    setTrackedList(trs.filter(tr => tr.state !== 'cancelled'));
   }, []);
+
+  // Tracked Responses for the open conversation that are awaiting the owner's approval to reply.
+  const awaitingForConv = activeConv
+    ? trackedList.filter(tr => tr.state === 'awaiting-approval' && tr.source?.conversationId === activeConv.conversationId)
+    : [];
+
+  const toggleImportant = async (msg) => {
+    const next = new Set(important);
+    const on = !next.has(msg.id);
+    if (on) next.add(msg.id); else next.delete(msg.id);
+    setImportant(next);
+    await tracked.setMessageImportant(msg.id, on).catch(() => {});
+  };
+
+  const useSuggestedReply = async (tr) => {
+    const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
+    setDraftPrefill(d?.draft?.body || '');
+    setReplyingTrId(tr.id);
+  };
 
   const loadThread = useCallback(async (conv) => {
     if (!conv) return;
@@ -245,6 +426,7 @@ export default function InboxTab({ showToast }) {
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
+    setDraftPrefill(''); setReplyingTrId(null);   // don't leak a suggested reply across threads
     await loadThread(conv);
     loadLists();
   };
@@ -296,6 +478,11 @@ export default function InboxTab({ showToast }) {
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();
+        // If this send fulfils a Tracked Response awaiting approval, mark it replied.
+        if (replyingTrId) {
+          await tracked.markTrackedResponseReplied(replyingTrId, resp?.data?.message?.id).catch(() => {});
+          setReplyingTrId(null); setDraftPrefill('');
+        }
         const conv = activeConv || { conversationId: resp?.data?.message?.conversationId, peerGhii: recipient };
         setActiveConv(conv); setMode('thread');
         await loadThread(conv);
@@ -365,11 +552,18 @@ export default function InboxTab({ showToast }) {
             const showDay = dk !== lastDay; lastDay = dk;
             return html`
               ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
-              <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap} />`;
+              <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
+                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${setTrackMsg} />`;
           })}
         </div>
-        <${Composer} key=${'c-' + activeConv.conversationId} recipient=${activeConv.peerGhii}
-          sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} />
+        ${awaitingForConv.map(tr => html`
+          <div class="inbox-track-banner" key=${tr.id}>
+            <span class="inbox-track-banner-ico">✅</span>
+            <span class="inbox-track-banner-txt">${t('inbox.trackReady')} — ${escHtml(tr.title || '')}</span>
+            <button class="btn-primary btn-sm" onClick=${() => useSuggestedReply(tr)}>${t('inbox.trackUseSuggested')}</button>
+          </div>`)}
+        <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
+          sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill} />
       </div>`;
   };
 
@@ -407,5 +601,8 @@ export default function InboxTab({ showToast }) {
             </div>
           </div>` : null}
       </div>
+
+      <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg} peerGhii=${activeConv?.peerGhii}
+        onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
     </div>`;
 }
