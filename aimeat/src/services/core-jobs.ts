@@ -16,7 +16,7 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('memory-ttl-cleanup', () => runMemoryTtlCleanupJob(storage));
   scheduler.registerCoreHandler('board-post-ttl-cleanup', () => runBoardPostTtlCleanupJob(storage));
   scheduler.registerCoreHandler('dispute-timeout', () => runDisputeTimeoutJob(config, storage));
-  scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(storage));
+  scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(config, storage));
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
     scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
@@ -209,10 +209,11 @@ async function runNonceCleanupJob(storage: Storage): Promise<void> {
   if (cleaned > 0) logger.info(`Nonce cleanup: removed ${cleaned} expired verification nonces`);
 }
 
-async function runExecutionLogPruneJob(storage: Storage): Promise<void> {
-  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+async function runExecutionLogPruneJob(config: AimeatConfig, storage: Storage): Promise<void> {
+  const days = config.executionLogRetentionDays > 0 ? config.executionLogRetentionDays : 30;
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
   const pruned = await storage.pruneExecutionLogs(cutoff);
-  if (pruned > 0) logger.info(`Pruned ${pruned} execution log entries older than 30 days`);
+  if (pruned > 0) logger.info(`Pruned ${pruned} execution log entries older than ${days} days`);
 }
 
 async function runConsentAuditPruneJob(config: AimeatConfig, storage: Storage): Promise<void> {

@@ -236,6 +236,7 @@ export interface AimeatConfig {
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
   consentAuditRetentionDays: number;
+  executionLogRetentionDays: number;
   consentMaxPerUser: number;
 
   // TOTP / 2FA (Phase 0.5)
@@ -683,6 +684,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     consentEnabled: process.env.AIMEAT_CONSENT_ENABLED !== 'false',
     consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),
+    executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
     consentMaxPerUser: parseInt(process.env.AIMEAT_CONSENT_MAX_PER_USER ?? '100', 10),
     totpEnabled: process.env.AIMEAT_TOTP_ENABLED !== 'false',
     totpIssuer: process.env.AIMEAT_TOTP_ISSUER ?? 'AIMEAT',

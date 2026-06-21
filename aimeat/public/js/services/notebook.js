@@ -57,6 +57,28 @@ export async function distributeNote(text) {
   return resp?.data || null;
 }
 
+/**
+ * Park an inbox message into the notebook for later processing, preserving the link back to the
+ * original message and the "owes a reply" intent (so when the note is later turned into a tracked
+ * response, the binding re-attaches to the source message). Stored as a normal notebook inbox entry.
+ * @param {object} msg  The inbox message ({ id, body, conversationId, direction, senderGhii, recipientGhii }).
+ * @param {{ title?: string, content?: string, mode?: 'auto'|'approve' }} [opts]
+ */
+export async function parkMessageToNotebook(msg, opts = {}) {
+  const key = 'notebook.inbox.' + Date.now();
+  const peerGhii = msg?.direction === 'outbound' ? (msg?.recipientGhii || '') : (msg?.senderGhii || '');
+  const value = {
+    text: (opts.content && opts.content.trim()) || msg?.body || '',
+    title: opts.title || '',
+    capturedAt: new Date().toISOString(),
+    source: { kind: 'message', messageId: msg?.id, conversationId: msg?.conversationId, peerGhii, originNodeId: (peerGhii.split('@')[1] || '') },
+    trackedResponseIntent: { owes: true, mode: opts.mode || 'approve' },
+  };
+  const resp = await createMemory(key, value, 'private');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not park to notebook');
+  return { key };
+}
+
 /** The per-owner notebook trust toggles ({ autoDetectIntent, autoRunPlan, autoDistribute }). */
 export async function getNotebookSettings() {
   try { const r = await getMemory('notebook.settings'); return (r?.data?.value) || {}; }

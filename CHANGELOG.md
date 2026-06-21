@@ -29,7 +29,10 @@ All notable changes to AIMEAT are documented in this file.
   sweep** as the safety net so nothing fires-once-and-fails-silently; idempotent (never double-sends).
   A **Tracked responses** dashboard lists every contract and its state (watching / reply-ready /
   replied / error) with open · approve-now · cancel; a per-message **badge** marks an already-tracked
-  message (clicking 🔗 again surfaces it instead of creating a duplicate).
+  message (clicking 🔗 again surfaces it instead of creating a duplicate). When nothing fits (or you're
+  not ready), **"Put in notebook for later"** parks the message as a notebook entry that keeps its
+  **source link + reply intent** — the Notebook shows it with a "Track a response" action that re-opens
+  the same flow seeded with the original message, so the reply still binds back to the sender.
   New routes `POST/GET /v1/tracked-responses`, `/:id` (+ `/draft`, `/evaluate`, `/replied`, `/cancel`),
   `/classify` (AI records triage), `/evaluate-due`, and an open `/spec`. `src/services/tracked-response.ts`,
   `src/services/tracked-classify.ts`, `src/services/track-registry.ts`,

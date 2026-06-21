@@ -12148,20 +12148,31 @@ paths:
       operationId: consentAuditLog
       summary: View consent audit log
       description: |
-        Retrieve the audit log of consent-related events (grants, revocations,
-        access checks) for the authenticated agent.
+        Retrieve the consent audit log for the authenticated owner. To keep the log bounded
+        and off the read hot path, only ACCESS DENIALS (`allowed: false`) and consent
+        MUTATIONS (`grant`/`revoke`) are recorded; allowed reads are not audited. Entries are
+        written via a batched buffer, but just-made entries appear here immediately. Old
+        entries are pruned past the configured retention window (consentAuditRetentionDays).
       tags: [Consent]
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
-        - name: action
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Look-back window in days
+        - name: accessor_gaii
           in: query
           schema:
             type: string
-            enum: [grant, revoke, access_check, denied]
-          description: Filter by audit event type
+          description: Filter by the accessor GAII
+        - name: consent_id
+          in: query
+          schema:
+            type: string
+          description: Filter by a specific consent record id
       responses:
         '200':
           description: Consent audit log
@@ -12173,26 +12184,33 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            id:
-                              type: string
-                            action:
-                              type: string
-                              enum: [grant, revoke, access_check, denied]
-                            consent_id:
-                              type: string
-                            data_pattern:
-                              type: string
-                            recipient:
-                              type: string
-                            timestamp:
-                              type: string
-                              format: date-time
-                            details:
+                        type: object
+                        properties:
+                          entries:
+                            type: array
+                            items:
                               type: object
+                              properties:
+                                id:
+                                  type: string
+                                consent_id:
+                                  type: string
+                                accessor_gaii:
+                                  type: string
+                                memory_key:
+                                  type: string
+                                action:
+                                  type: string
+                                  enum: [read, list, search, grant, revoke]
+                                timestamp:
+                                  type: string
+                                  format: date-time
+                                allowed:
+                                  type: boolean
+                          total:
+                            type: integer
+                          period_days:
+                            type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
 
