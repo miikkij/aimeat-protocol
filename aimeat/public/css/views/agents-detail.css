@@ -4,6 +4,9 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.12.0 -- 2026-06-22 -- Add .pf-agd-capwrap rule so the capabilities summary
+ *     ("N tools · N skills · N langs") gets the card content inset (1rem) instead of
+ *     sitting flush against the edge, plus a small top gap from the tag/badge strip.
  *   v1.11.0 -- 2026-06-21 -- Add has-unseen DOT badge modifier (.pf-agd-*-badge--dot): a small
  *     round indicator replacing the old numeric change-count badge.
  *   v1.10.0 -- 2026-06-03 -- Add fleet "running now" panel styles (.pf-agd-active,
@@ -1794,6 +1797,14 @@
   margin-left: auto;
   font-size: 0.75rem;
   color: var(--text-dim, #6B7280);
+}
+
+/* Capabilities summary (collapsed one-liner "N tools · N skills · N langs").
+   The wrapper carries the card's content inset (1rem) so the summary doesn't sit
+   flush against the card edge, plus a little top gap to separate it from the
+   tag/badge strip above. */
+.pf .pf-agd-capwrap {
+  padding: 0.4rem 1rem 0.1rem;
 }
 
 /* Capabilities badges */
