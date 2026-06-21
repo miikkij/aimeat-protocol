@@ -11,6 +11,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
@@ -51,8 +52,8 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     let cancelled = false;
     const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
     fetchIt();
-    window.addEventListener('aimeat-live-update', fetchIt);
-    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
+    const off = onLiveUpdate(['organisms'], fetchIt);
+    return () => { cancelled = true; off(); };
   }, [orgId, wsId]);
   const isManager = !!(data && (data.nodes || []).some(n => (n.owners || []).some(o => o.isSelf && o.isCreator)));
   const loadAccess = () => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {});

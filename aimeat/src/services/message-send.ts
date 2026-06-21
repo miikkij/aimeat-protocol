@@ -10,11 +10,14 @@
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
  *   v1.0.0 — 2026-06-21 — Extracted from routes/messages.ts for reuse by Tracked Response replies.
+ *   v1.1.0 — 2026-06-21 — Allow replying to an AGENT/eco identity that messaged you: the stored copy +
+ *     conversation keep the agent GAII (so the thread is intact), but delivery is routed to the agent's
+ *     OWNER human inbox (the owner reads + acts on their agent's DMs) — works on un-upgraded peers too.
  */
 import { randomUUID } from 'node:crypto';
 import type { DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview } from '../utils/messaging.js';
+import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
@@ -42,7 +45,10 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   const { config, storage } = ctx;
   const { senderGhii, recipientGhii, body, replyToId, attachments } = input;
 
-  const recipientNode = parseGaiiLoose(recipientGhii).node;
+  // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
+  // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
+  const deliveryGhii = deliveryTargetFor(recipientGhii);
+  const recipientNode = parseGaiiLoose(deliveryGhii).node;
   const isLocal = recipientNode === config.nodeId;
 
   const id = randomUUID();
@@ -51,10 +57,10 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
 
   // For a local recipient, enforce the first-contact gate (block) BEFORE materialising delivery.
   if (isLocal) {
-    const recipientOwner = parseGaiiLoose(recipientGhii).owner;
+    const recipientOwner = parseGaiiLoose(deliveryGhii).owner;
     const ownerRec = await storage.getOwner(recipientOwner);
     if (!ownerRec) return { ok: false, code: 'RECIPIENT_NOT_FOUND' };
-    const contact = await storage.getContact(recipientGhii, senderGhii);
+    const contact = await storage.getContact(deliveryGhii, senderGhii);
     if (contact?.state === 'blocked') {
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
       await storage.createDirectMessage({
@@ -86,17 +92,18 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   }
 
   if (isLocal) {
-    // Resolve / seed the recipient-side contact state (first-contact gate).
-    let contact = await storage.getContact(recipientGhii, senderGhii);
+    // Resolve / seed the recipient-side contact state (first-contact gate) under the OWNER's inbox.
+    let contact = await storage.getContact(deliveryGhii, senderGhii);
     if (!contact) {
-      const autoAccept = isSameOwner(senderGhii, recipientGhii);
-      contact = await storage.setContactState(recipientGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
+      const autoAccept = isSameOwner(senderGhii, deliveryGhii);
+      contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
     }
     const isRequest = contact.state === 'pending';
 
-    // Recipient's inbound copy.
+    // Recipient's inbound copy — owned by the OWNER's inbox, but recipientGhii still names the agent/eco
+    // identity the thread is with (so it threads with the message they sent you).
     await storage.createDirectMessage({
-      id, ownerGhii: recipientGhii, conversationId, senderGhii, recipientGhii,
+      id, ownerGhii: deliveryGhii, conversationId, senderGhii, recipientGhii,
       body, attachments, status: 'delivered', direction: 'inbound',
       replyToId, origin: 'local', originNodeId: config.nodeId,
       createdAt: now, deliveredAt: now,
@@ -105,14 +112,14 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     // Duplicate attachments into the recipient's storage now (accepted contacts only; a pending request
     // keeps them as reference until accepted — DECISION #3).
     if (!isRequest && attachments?.length) {
-      const recCopy = await storage.getDirectMessage(id, recipientGhii);
+      const recCopy = await storage.getDirectMessage(id, deliveryGhii);
       if (recCopy) {
-        const dup = await duplicateMessageAttachments(ctx, recipientGhii, recCopy);
-        if (dup.changed) await storage.updateMessageAttachments(id, recipientGhii, dup.attachments);
+        const dup = await duplicateMessageAttachments(ctx, deliveryGhii, recCopy);
+        if (dup.changed) await storage.updateMessageAttachments(id, deliveryGhii, dup.attachments);
       }
     }
 
-    await notify(storage, recipientGhii, {
+    await notify(storage, deliveryGhii, {
       type: isRequest ? 'direct_message_request' : 'direct_message',
       title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
       body: messagePreview(body),
@@ -122,8 +129,9 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     emitChange('messages');
   } else {
     // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued and the
-    // retry job will deliver it later. deliverDirectMessage updates the stored status.
-    const outcome = await deliverDirectMessage(ctx, senderCopy);
+    // retry job will deliver it later. Delivery targets the owner's human GHII (deliveryGhii) so the
+    // peer node accepts it; the payload keeps the agent-based conversationId for threading.
+    const outcome = await deliverDirectMessage(ctx, senderCopy, deliveryGhii);
     senderCopy.status = outcome;
     if (outcome === 'delivered') senderCopy.deliveredAt = new Date().toISOString();
     emitChange('messages');

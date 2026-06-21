@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
@@ -39,11 +40,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
 
   const load = useCallback(async () => { setSources(await orgService.getWorkspaceSources(orgId, wsId)); }, [orgId, wsId]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const h = () => load();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, [load]);
+  useEffect(() => onLiveUpdate(['organisms'], () => load()), [load]);
 
   const persist = async (next) => {
     setSources(next);

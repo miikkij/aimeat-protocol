@@ -16,6 +16,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -32,12 +33,11 @@ export default function NodeTotals() {
         .catch(() => { /* keep last value — panel renders a graceful placeholder */ });
     };
     load();
-    const onLive = () => load();
-    window.addEventListener('aimeat-live-update', onLive);
+    const off = onLiveUpdate(['agents', 'apps', 'organisms'], () => load());
     const iv = setInterval(load, 60_000);
     return () => {
       alive = false;
-      window.removeEventListener('aimeat-live-update', onLive);
+      off();
       clearInterval(iv);
     };
   }, []);

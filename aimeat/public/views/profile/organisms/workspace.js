@@ -13,6 +13,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { Spinner, KebabMenu } from '/views/profile/shared.js';
@@ -183,11 +184,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   }, [activeDoc, docKey]);
 
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['organisms', 'memory'], () => liveRef.current()), []);
 
   // Clicking a single space inside a stacked group view opens that group, then scrolls to (and
   // expands) the clicked space's section. The anchor wrapper is id="ws-sec-<name>"; a short timeout

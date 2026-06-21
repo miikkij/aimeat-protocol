@@ -31,7 +31,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview } from '../utils/messaging.js';
+import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
@@ -45,11 +45,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  /** Validate a recipient string is a well-formed human GHII (owner@node, never agent/eco). */
-  function isHumanGhii(id: string): boolean {
-    if (id.includes('#') || id.startsWith('eco:')) return false;
+  /** A recipient must resolve to an owner@node — a human GHII, an agent GAII (agent#owner@node) or an
+   *  ecosystem app (eco:app#owner@node). Agents/eco have no inbox of their own, so a reply addressed to
+   *  one is delivered to the owner's human inbox (deliveryTargetFor); the thread keeps the agent/eco
+   *  identity. This is what lets you reply to an agent that messaged you. */
+  function isAddressableRecipient(id: string): boolean {
     const p = parseGaiiLoose(id);
-    return !!p.owner && !!p.node && !p.agent;
+    return !!p.owner && !!p.node;
   }
 
   function mapAttachments(
@@ -84,11 +86,12 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const senderGhii = resolve(req);
     const recipientGhii = input.to.trim();
 
-    if (!isHumanGhii(recipientGhii)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Recipient must be a human GHII (owner@node)'));
+    if (!isAddressableRecipient(recipientGhii)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Recipient must be a GHII (owner@node), an agent (agent#owner@node) or an app (eco:app#owner@node)'));
       return;
     }
-    if (recipientGhii === senderGhii) {
+    // Block messaging yourself — including a reply to your own agent (which would deliver to your inbox).
+    if (recipientGhii === senderGhii || deliveryTargetFor(recipientGhii) === senderGhii) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Cannot send a message to yourself'));
       return;
     }
