@@ -27,6 +27,12 @@ export interface MemoryRepository {
   setMemoryIfVersion?(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]>;
+  /**
+   * Count DISTINCT memory keys across the given owner identities (GHII + agents + GEAIs) — cheap
+   * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
+   * (e.g. "N Muistit") that need only the number, not the records.
+   */
+  countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number>;
   deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;

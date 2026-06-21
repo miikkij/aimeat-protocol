@@ -16,8 +16,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { authorizeRead } from './access-guard.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { canReadWorkspace } from './workspace-access.js';
 
 export interface CommentAnchor { section?: string; quote?: string }
 export interface WorkspaceComment {
@@ -29,27 +28,16 @@ export interface WorkspaceComment {
 export const commentPrefix = (id: string, ws: string, space: string, instanceId: string): string =>
   `organism.${id}.w.${ws}.meta.comments.${space}~${instanceId}.`;
 
-/** Membership (active member or org agent) AND can read the workspace (manifest gate). */
+/**
+ * Membership (active member or org agent) AND can read the workspace (manifest gate).
+ * Thin alias over the shared {@link canReadWorkspace} gate — comment read/write require the SAME
+ * workspace-level read authorization as the content, so the two never drift.
+ */
 export async function canAccessWorkspaceComments(
   storage: Storage, config: AimeatConfig, organism: OrganismRecord,
   callerSub: string | undefined, callerOwner: string | undefined, callerGaii: string, ws: string,
 ): Promise<boolean> {
-  let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-  if (!isMember && callerOwner) {
-    const m = await storage.getMembership(organism.id, callerOwner);
-    isMember = !!m && m.status === 'active';
-  }
-  if (!isMember) return false;
-  const manKey = `organism.${organism.id}.w.${ws}.meta.manifest`;
-  const scan = await storage.listAllMemory({ prefix: manKey, limit: 5 });
-  const manRec = scan.items.find(r => r.key === manKey);
-  if (!manRec) return false;
-  if (manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) return true;
-  const decision = await authorizeRead(storage, config, {
-    ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
-    visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
-  });
-  return decision.allowed;
+  return canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws);
 }
 
 function normaliseAnchor(anchor: unknown): CommentAnchor | null {

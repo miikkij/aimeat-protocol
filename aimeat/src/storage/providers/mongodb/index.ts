@@ -682,6 +682,18 @@ export class PrismaStorage implements Storage {
             });
     }
 
+    async countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
+        this.ensureReady();
+        if (ownerGaiis.length === 0) return 0;
+        const where: any = { ownerGaii: { in: ownerGaiis } };
+        if (opts?.prefix) where.key = { startsWith: opts.prefix };
+        if (opts?.visibility) where.visibility = opts.visibility;
+        // DISTINCT keys (mirrors listOwnerScopeMemory's cross-identity key-dedup); loads only the
+        // key column, not values — far cheaper than materializing every record for a count.
+        const rows = await this.prisma.memory.findMany({ where, distinct: ['key'], select: { key: true } });
+        return rows.length;
+    }
+
     async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
         this.ensureReady();
         const where: any = {};

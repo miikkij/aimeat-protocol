@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { KebabMenu } from '/views/profile/shared.js';
@@ -61,11 +62,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
 
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
 
   // Per-member workspace access (best effort): workspace creators from discovery + access lists of
   // the workspaces the viewer created. Keyed by bare owner name (memberships use bare names too).

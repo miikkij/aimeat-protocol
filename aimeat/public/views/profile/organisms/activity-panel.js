@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
@@ -69,8 +70,8 @@ export function ActivityPanel({ orgId, wsId }) {
     let cancelled = false;
     const fetchIt = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
     fetchIt();
-    window.addEventListener('aimeat-live-update', fetchIt);
-    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
+    const off = onLiveUpdate(['organisms'], fetchIt);
+    return () => { cancelled = true; off(); };
   }, [orgId, wsId]);
   if (!data || !(data.events || []).length) return null;
   const events = data.events;

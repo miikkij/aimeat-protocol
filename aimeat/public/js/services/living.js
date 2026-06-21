@@ -334,7 +334,7 @@ function awaitTask(agentName, taskId, onStatus) {
       if (st === 'failed' || st === 'stalled') { settled = true; cleanup(); reject(new Error('agent ' + st)); return; }
       if (Date.now() > deadline) { settled = true; cleanup(); reject(new Error('TIMEOUT')); }
     }
-    const onLive = () => check();
+    const onLive = (e) => { const d = e.detail?.domains; if (d && !d.has('agent-tasks')) return; check(); };
     const timer = setInterval(check, 5000);
     window.addEventListener('aimeat-live-update', onLive);
     check();

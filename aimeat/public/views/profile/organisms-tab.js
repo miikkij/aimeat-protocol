@@ -28,6 +28,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
@@ -174,11 +175,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // Live update listener
   const liveRef = useRef(loadData);
   liveRef.current = loadData;
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
 
   const handleCreate = useCallback(async () => {
     if (!formName.trim()) {

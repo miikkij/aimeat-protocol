@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { TagInput } from '/views/profile/shared.js';
@@ -53,8 +54,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       .then(r => { if (!cancelled) setPendingJoin(((r?.data?.join_requests) || []).filter(x => x.status === 'pending').length); })
       .catch(() => {});
     fetchIt();
-    window.addEventListener('aimeat-live-update', fetchIt);
-    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
+    const off = onLiveUpdate(['organisms'], fetchIt);
+    return () => { cancelled = true; off(); };
   }, [org.id, canEdit]);
 
   // Feed the home page's "Continue" list (only once the real name is known, not the {id} stub).

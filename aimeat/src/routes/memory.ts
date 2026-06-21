@@ -273,6 +273,26 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
 
+    // ?count=true — return ONLY the count (no items/values). Uses a cheap COUNT(DISTINCT key)
+    // server-side (no record values loaded or transferred) for the common no-filter case (e.g. a
+    // profile stats bar "🧠 N Muistit"). Tag/maxFlags filters fall through to the list-based count
+    // below (countMemory supports prefix + visibility only).
+    if (req.query.count === 'true' && !tags?.length && maxFlags === undefined) {
+      let count: number;
+      if (ownerScope && !agentParam) {
+        const ownerName = req.auth!.owner;
+        const ghii = `${ownerName}@${config.nodeId}`;
+        const ownerAgents = await storage.getAgentsByOwner(ownerName);
+        const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+        const gaiis = [ghii, ...ownerAgents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+        count = await storage.countMemory(gaiis, { prefix, visibility });
+      } else {
+        count = await storage.countMemory([gaii], { prefix, visibility });
+      }
+      res.json(success(config.nodeId, { count }));
+      return;
+    }
+
     let records: MemoryRecord[];
     if (ownerScope && !agentParam) {
       // Owner-scope: GHII + all the owner's agents (deduped, GHII first). Shared helper so the
@@ -282,8 +302,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
     }
 
-    // ?count=true — return ONLY the count (no items, no values). A profile stats bar needs the
-    // number "🧠 N Muistit", not 4 MB of memory values; this avoids transferring every record.
+    // ?count=true with tag/maxFlags filters — count from the materialized list (rare path).
     if (req.query.count === 'true') {
       res.json(success(config.nodeId, { count: records.length }));
       return;

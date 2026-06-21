@@ -257,5 +257,28 @@ await test('15. Cannot message yourself', async () => {
     assert(status === 400, `status ${status}`);
 });
 
+console.log('\nPhase 7 -- Reply to an agent is delivered to the agent\'s owner inbox');
+await test('16. Replying to an agent GAII delivers to the owner (thread keeps the agent)', async () => {
+    const agentGaii = `someagent#${bobName}@${NODE_ID}`;   // bob's agent (need not exist) — reply lands in bob's inbox
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: agentGaii, body: 'Done — homma hoidettu, omnituinen-agent!' }),
+    });
+    assert(send.status === 201, `agent send should be 201, got ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(send.body.data.message.recipientGhii === agentGaii, `thread keeps the agent GAII, got ${send.body.data.message.recipientGhii}`);
+    // Bob (the owner) is an accepted contact of Alice (phases 1–6) → the agent-addressed reply lands in his inbox.
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const m = inbox.body.data.messages.find((x: any) => x.senderGhii === alice.ghii && x.recipientGhii === agentGaii && /homma hoidettu/.test(x.body));
+    assert(m !== undefined, 'owner bob received the agent-addressed reply in his inbox');
+});
+
+await test('17. Cannot reply to your OWN agent (delivers to yourself)', async () => {
+    const { status } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: `myagent#${aliceName}@${NODE_ID}`, body: 'to my own agent' }),
+    });
+    assert(status === 400, `self-delivery should be 400, got ${status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

@@ -11,6 +11,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
@@ -38,11 +39,7 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
   }, [orgId, ws, space, instanceId]);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
 
   const submit = async () => {
     const text = body.trim();

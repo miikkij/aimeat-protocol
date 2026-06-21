@@ -88,7 +88,7 @@ import * as agentActivityRepo from './repos/agent-activity.js';
 import * as agentMessageRepo from './repos/agent-message.js';
 import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
-import { searchTextMemory } from './repos/memory.js';
+import { searchTextMemory, countMemory as countMemoryRepo } from './repos/memory.js';
 import type { MemoryTextHit, MemoryTextSearchOpts } from '../../repositories/memory.repository.js';
 
 export class SqliteStorage implements Storage {
@@ -618,6 +618,10 @@ export class SqliteStorage implements Storage {
       results.push(record);
     }
     return results;
+  }
+
+  async countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
+    return countMemoryRepo(this.db, ownerGaiis, opts);
   }
 
   async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {

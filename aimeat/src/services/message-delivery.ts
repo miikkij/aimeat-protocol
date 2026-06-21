@@ -19,6 +19,7 @@ import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../storag
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
 import { sweepReferenceAttachments } from './attachment-duplication.js';
 
@@ -28,15 +29,17 @@ export interface DeliveryCtx {
   peers: Map<string, PeerInfo>;
 }
 
-/** Build the canonical signed payload for a message delivery. Key order MUST match the receiver. */
-function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord) {
+/** Build the canonical signed payload for a message delivery. Key order MUST match the receiver.
+ *  `deliveryGhii` is the human GHII the peer node accepts as recipient (the owner of an agent/eco
+ *  recipient, or the recipient itself for a human); the conversationId still threads with the agent. */
+function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord, deliveryGhii: string) {
   return {
     source_node: config.nodeId,
     message: {
       id: record.id,
       conversationId: record.conversationId,
       senderGhii: record.senderGhii,
-      recipientGhii: record.recipientGhii,
+      recipientGhii: deliveryGhii,
       body: record.body,
       attachments: record.attachments ?? null,
       replyToId: record.replyToId ?? null,
@@ -54,9 +57,9 @@ function peerForNode(peers: Map<string, PeerInfo>, nodeId: string): PeerInfo | u
  * Attempt to deliver a queued outbound message to its recipient node. Updates the sender's copy
  * status and returns the outcome. Never throws.
  */
-export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessageRecord): Promise<'delivered' | 'queued' | 'undeliverable'> {
+export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessageRecord, deliveryGhii: string = record.recipientGhii): Promise<'delivered' | 'queued' | 'undeliverable'> {
   const { config, storage, peers } = ctx;
-  const targetNode = parseGaiiLoose(record.recipientGhii).node;
+  const targetNode = parseGaiiLoose(deliveryGhii).node;
   const started = Date.now();
 
   // Operator telemetry — never carries content or participant identities, only routing/outcome.
@@ -73,7 +76,7 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
   const nodeKey = await storage.getNodeKey();
   if (!nodeKey) { await log('queued', { errorMessage: 'no_node_key' }); return 'queued'; }
 
-  const payload = buildMessagePayload(config, record);
+  const payload = buildMessagePayload(config, record, deliveryGhii);
   const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
 
   try {
@@ -163,7 +166,7 @@ export function startMessageRetryJob(config: AimeatConfig, storage: Storage, pee
         await storage.updateMessageDeliveryStatus(msg.id, 'undeliverable', { error: 'retry_ttl_expired' });
         continue;
       }
-      await deliverDirectMessage(ctx, msg);
+      await deliverDirectMessage(ctx, msg, deliveryTargetFor(msg.recipientGhii));
     }
     // Also re-attempt / expire held (reference) attachments on the recipient side (DECISION #10).
     await sweepReferenceAttachments(ctx).catch(err => logger.error('attachment sweep failed', { error: (err as Error).message }));

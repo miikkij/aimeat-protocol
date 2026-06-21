@@ -81,6 +81,19 @@ export function setMemory(db: Database.Database, record: MemoryRecord): MemoryRe
   return record;
 }
 
+export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): number {
+  if (ownerGaiis.length === 0) return 0;
+  const placeholders = ownerGaiis.map(() => '?').join(',');
+  let sql = `SELECT COUNT(DISTINCT key) AS c FROM memory WHERE ownerGaii IN (${placeholders})`;
+  const params: unknown[] = [...ownerGaiis];
+  if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+  if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+  // NB: does not subtract not-yet-pruned TTL-expired rows (a stat-display approximation); the
+  // value-loading list path prunes those lazily. Negligible for a "N Muistit" counter.
+  const row = db.prepare(sql).get(...params) as { c: number };
+  return row.c;
+}
+
 export function listMemory(db: Database.Database, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): MemoryRecord[] {
   let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
   const params: unknown[] = [ownerGaii];
