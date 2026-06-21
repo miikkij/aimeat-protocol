@@ -313,4 +313,39 @@
 .inbox-form-row { display: flex; flex-direction: column; gap: 4px; }
 .inbox-form-label { font-size: 12px; color: var(--text-dim); }
 .inbox-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.inbox-track-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.inbox-track-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; align-items: center; }
+
+/* Spinner shown on the create button while a tracked response is being created. */
+.inbox-spinner {
+  display: inline-block; width: 12px; height: 12px; vertical-align: -1px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: var(--radius-full); animation: inbox-spin 0.7s linear infinite;
+}
+@keyframes inbox-spin { to { transform: rotate(360deg); } }
+
+/* Per-message "is tracked" badge + the tracked-responses dashboard. */
+.inbox-head-actions { display: flex; align-items: center; gap: 8px; }
+.btn-outline--active { border-color: var(--accent); color: var(--accent); }
+.inbox-track-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; padding: 1px 7px; border-radius: var(--radius-full);
+  border: 1px solid var(--border); color: var(--text-dim); white-space: nowrap;
+}
+.inbox-track-badge--watch { border-color: var(--accent-border); color: var(--accent); }
+.inbox-track-badge--ready { border-color: var(--accent-border); color: var(--accent); background: var(--accent-subtle); }
+.inbox-track-badge--done  { border-color: var(--border); color: var(--text-dim); }
+.inbox-track-badge--err   { border-color: var(--danger); color: var(--danger); }
+
+.inbox-tracked-list { display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow-y: auto; }
+.inbox-tracked-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+  background: var(--card-bg);
+}
+.inbox-tracked-main { min-width: 0; flex: 1; }
+.inbox-tracked-line1 { display: flex; align-items: center; gap: 8px; }
+.inbox-tracked-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-tracked-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+.inbox-tracked-sub code { font-size: 11px; background: var(--card-bg-alt); padding: 1px 5px; border-radius: var(--radius-xs); }
+.inbox-tracked-err { color: var(--danger); }
+.inbox-tracked-actions { display: flex; gap: 6px; flex-shrink: 0; }
