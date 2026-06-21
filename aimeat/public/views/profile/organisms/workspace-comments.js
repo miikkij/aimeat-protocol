@@ -7,6 +7,9 @@
  * @usage import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — Optional BATCHED mode (batched/initialComments/onReload): the parent fetches
+ *     all visible threads in one /comments/batch request instead of each thread self-fetching +
+ *     self-subscribing to 'organisms' events (which was the per-document comments request storm).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -23,8 +26,12 @@ import * as orgService from '/js/services/organisms.js';
  * (comment on a specific passage) and threaded replies (parentId). Backend: /v1/organisms/:id/comments.
  * Agents use the same endpoints via aimeat_workspace_comment(s).
  */
-export function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
-  const [comments, setComments] = useState(null);
+export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, batched, initialComments, onReload }) {
+  // BATCHED mode (parent owns the fetch): the container fetches every visible thread in one
+  // /comments/batch request and passes this thread's slice via `initialComments`; we don't self-fetch
+  // or self-subscribe (that per-thread fan-out was the comments request storm). STANDALONE mode
+  // (no `batched`): unchanged — self-fetch on mount + refresh on 'organisms' events.
+  const [comments, setComments] = useState(batched ? (initialComments ?? null) : null);
   const [body, setBody] = useState('');
   const [anchorQuote, setAnchorQuote] = useState('');
   const [replyTo, setReplyTo] = useState(null);   // { id, body } of the comment being replied to
@@ -33,13 +40,16 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
   const mine = (author) => author && (author === me.gaii || author === me.ghii);
 
   const load = useCallback(async () => {
+    if (batched) { await onReload?.(); return; }   // parent re-runs the batch → flows back via initialComments
     if (!ws || !space || !instanceId) return;
     const r = await orgService.listComments(orgId, ws, space, instanceId).catch(() => null);
     setComments(r?.data?.comments || []);
-  }, [orgId, ws, space, instanceId]);
-  useEffect(() => { load(); }, [load]);
+  }, [orgId, ws, space, instanceId, batched, onReload]);
+  // Batched: keep local view in sync with the prop (undefined = still loading → null). Standalone: self-fetch.
+  useEffect(() => { if (batched) setComments(initialComments ?? null); }, [batched, initialComments]);
+  useEffect(() => { if (!batched) load(); }, [load, batched]);
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
+  useEffect(() => { if (batched) return undefined; return onLiveUpdate(['organisms'], () => liveRef.current()); }, [batched]);
 
   const submit = async () => {
     const text = body.trim();

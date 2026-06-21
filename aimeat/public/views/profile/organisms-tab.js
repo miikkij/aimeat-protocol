@@ -17,6 +17,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.1.0 — 2026-06-22 — Workspace counts come inline via listOrganisms({include:'counts'}) instead
+ *     of a per-organism discoverWorkspaces fan-out.
  *   v1.31.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking.
  *   v2.0.0 — 2026-06-19 — Split the ~3825-line module into cohesive sub-modules under ./organisms/*
  *     (no behaviour/visual change). This file keeps only OrganismsTab + the list-row renderers.
@@ -73,7 +75,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const loadData = useCallback(async () => {
     try {
       const [myResp, pubResp] = await Promise.all([
-        ghii ? orgService.listOrganisms({ member: ghii }) : Promise.resolve({ data: { organisms: [] } }),
+        ghii ? orgService.listOrganisms({ member: ghii, include: 'counts' }) : Promise.resolve({ data: { organisms: [] } }),
         orgService.listOrganisms({ visibility: 'public' }),
       ]);
       const mine = myResp?.data?.organisms || [];
@@ -82,10 +84,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       setMyOrganisms(mine);
       setPublicOrganisms(discover);
       onStats?.({ organisms: mine.length });
-      // Workspace counts for the 📁 row stat (member-gated endpoint, so own orgs only).
-      Promise.all(mine.map(async (o) => [o.id, (await orgService.discoverWorkspaces(o.id)).length]))
-        .then(entries => setWsCounts(Object.fromEntries(entries)))
-        .catch(() => {});
+      // Workspace counts for the 📁 row stat come inline via ?include=counts (no per-org fan-out).
+      setWsCounts(Object.fromEntries(mine.map(o => [o.id, o.workspace_count ?? 0])));
     } catch {
       setMyOrganisms([]);
       setPublicOrganisms([]);

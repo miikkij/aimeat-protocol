@@ -10,6 +10,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split; the hidden file
  *     input uses the .pj-hidden-input class instead of an inline style (Rule 8).
+ *   v1.1.0 — 2026-06-22 — Kill the per-workspace fetch storm: one discoverWorkspaces({include:'enrichment'})
+ *     replaces the 1 + 3N (getWorkspace+activity+participants) fan-out; pending-review counts come inline;
+ *     the 'organisms' live refresh is debounced (1.5s) so an agent-driven event burst is one reload.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -48,32 +51,33 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   // Discovery: every workspace in the org (membership-gated) with this user's access status. A member
   // sees workspaces they can't yet read (access:'none') so they can request access. Row enrichment
   // (record/doc counts, last event, review counter) loads per workspace afterwards, best effort.
+  // ONE enriched request replaces the old discover + per-row getWorkspace+activity+participants
+  // fan-out (1 + 3N requests, each re-scanning the same workspace memory). The server computes the
+  // same recs/docs/lastEvent/participants + pending-review counts and returns them inline.
   const load = useCallback(async () => {
-    const l = await orgService.discoverWorkspaces(orgId);
+    const l = await orgService.discoverWorkspaces(orgId, { include: 'enrichment' });
     setList(l);
     onCount?.(Array.isArray(l) ? l.length : 0);
-    orgService.listApprovals(orgId, 'pending').then(aps => {
-      const by = {};
-      for (const a of (aps || [])) { const w = a.arguments?.ws; if (w) by[w] = (by[w] || 0) + 1; }
-      setApprByWs(by);
-    }).catch(() => {});
-    for (const w of (l || []).filter(x => x.access !== 'none')) {
-      Promise.all([
-        orgService.getWorkspace(orgId, w.id).catch(() => null),
-        orgService.getWorkspaceActivity(orgId, w.id),
-        orgService.getWorkspaceParticipants(orgId, w.id).catch(() => null),
-      ]).then(([wsData, act, parts]) => {
-        let recs = 0, docs = 0;
-        for (const ot of (wsData?.manifest?.objectTypes || []).filter(orgService.isMemorySpace)) {
-          const n = new Set([...(wsData.drafts?.[ot.name] || []), ...(wsData.objects?.[ot.name] || [])].map(d => d.id)).size;
-          if (orgService.isDocSpace(ot)) docs += n; else recs += n;
-        }
-        const lastEv = (act?.events || []).reduce((b, e) => (!b || (e.at || '') > (b.at || '') ? e : b), null);
-        const owners = [];
-        for (const n of (parts?.nodes || [])) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
-        setWsStats(s => ({ ...s, [w.id]: { recs, docs, lastEv, hasManifest: !!wsData?.manifest, owners } }));
-      }).catch(() => {});
+    const stats = {};
+    const reviews = {};
+    for (const w of (l || [])) {
+      const e = w.enrichment;
+      if (w.access === 'none' || !e) continue;
+      if (e.pendingReviews) reviews[w.id] = e.pendingReviews;
+      stats[w.id] = {
+        recs: e.recs || 0,
+        docs: e.docs || 0,
+        lastEv: e.lastEvent || null,
+        hasManifest: !!e.hasManifest,
+        // UI only reads owners[].length and per-owner {owner,isCreator,isSelf,isLocalNode,agents.length}.
+        owners: (e.participants || []).map(p => ({
+          owner: p.owner, node: p.node, isLocalNode: p.isLocalNode,
+          isCreator: p.isCreator, isSelf: p.isSelf, agents: new Array(p.agentsCount || 0),
+        })),
+      };
     }
+    setWsStats(stats);
+    setApprByWs(reviews);
   }, [orgId, onCount]);
   useEffect(() => { load(); }, [load]);
 
@@ -103,7 +107,15 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     orgService.buildOrganismOverviewMermaid(orgId).then(c => { if (!cancelled) setOverview(c); }).catch(() => {});
     return () => { cancelled = true; };
   }, [orgId, list, showOverview]);
-  useEffect(() => onLiveUpdate(['organisms'], () => load()), [load]);
+  // Re-load on organism changes, but DEBOUNCE: on a busy node dozens of agents emit 'organisms'
+  // events ~1/sec; a trailing debounce collapses a burst into one reload (the load is now a single
+  // cheap request). `onLiveUpdate` reads the Set-typed domains correctly — never via e.detail directly.
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    let timer = null;
+    const off = onLiveUpdate(['organisms'], () => { clearTimeout(timer); timer = setTimeout(() => liveRef.current(), 1500); });
+    return () => { clearTimeout(timer); off(); };
+  }, []);
 
   const create = async () => {
     const name = newName.trim();

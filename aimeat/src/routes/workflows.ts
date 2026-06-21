@@ -78,9 +78,20 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // namespace for storage regardless of whether the caller is the owner or one of their agents.
   const ownerGhiiOf = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
 
-  // GET /v1/workflows — list the owner's workflows.
+  // GET /v1/workflows — list the owner's workflows. ?include=health attaches each workflow's run-health
+  // inline (replaces the list view's per-workflow GET /:id/health fan-out).
   router.get('/v1/workflows', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
-    const defs = await listWorkflows(storage, ownerGhiiOf(req));
+    const owner = ownerGhiiOf(req);
+    const defs = await listWorkflows(storage, owner);
+    const include = String(req.query.include ?? '').split(',').map(s => s.trim());
+    if (include.includes('health')) {
+      const workflows = await Promise.all(defs.map(async (def) => {
+        const runs = (await listRuns(storage, owner, def.id)).slice(0, 20);
+        return { ...def, health: computeHealth(def, runs) };
+      }));
+      res.json(success(config.nodeId, { workflows, count: workflows.length }));
+      return;
+    }
     res.json(success(config.nodeId, { workflows: defs, count: defs.length }));
   });
 

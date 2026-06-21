@@ -8,6 +8,8 @@
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — Per-member workspace access uses one getWorkspaceAccessAll(orgId) call
+ *     instead of a per-owned-workspace getWorkspaceAccess fan-out.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -71,7 +73,12 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     let cancelled = false;
     (async () => {
       try {
-        const wss = await orgService.discoverWorkspaces(orgId);
+        // discoverWorkspaces → creators of every workspace; getWorkspaceAccessAll → members of MY
+        // workspaces in ONE request (was one getWorkspaceAccess per owned workspace).
+        const [wss, accessAll] = await Promise.all([
+          orgService.discoverWorkspaces(orgId),
+          orgService.getWorkspaceAccessAll(orgId),
+        ]);
         const map = {};
         const add = (who, wsName, role) => {
           const bare = String(who || '').split('@')[0];
@@ -80,10 +87,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           if (!list.some(x => x.ws === wsName)) list.push({ ws: wsName, role });
         };
         for (const w of wss) if (w.created_by) add(w.created_by, w.name || w.id, 'owner');
-        await Promise.all(wss.filter(w => w.access === 'owner').map(async (w) => {
-          const acc = await orgService.getWorkspaceAccess(orgId, w.id).catch(() => null);
-          for (const m of (acc?.members || [])) add(m.owner, w.name || w.id, m.role);
-        }));
+        for (const w of accessAll) for (const m of (w.members || [])) add(m.owner, w.name || w.ws, m.role);
         if (!cancelled) setWsAccess(map);
       } catch { /* the access line is optional */ }
     })();

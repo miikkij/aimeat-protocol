@@ -13,6 +13,8 @@
  *   import KnowledgeTab from './knowledge-tab.js';
  *   html`<${KnowledgeTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.1.0 — 2026-06-22 — Drop the per-package /v1/memory/{key} hydration fallback — the memory list
+ *     already returns each package's full value inline.
  *   v1.0.0 — 2026-03-17 — Refactor: remove all inline style="" attributes, use CSS
  *     classes (pf-ref-row, pf-ref-icon, pf-external-icon, pf-ref-title, pf-badge-xs,
  *     pf-sharing-box, pf-sharing-heading, kpkg-detail-loading). Replace inline
@@ -68,16 +70,11 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const loadPackages = useCallback(async ({ showSpinner = true } = {}) => {
     try {
       if (showSpinner) setLoading(true);
+      // The memory list (GET /v1/memory) already returns each entry's full `value`, so there's no need
+      // for a per-package /v1/memory/{key} hydration fetch (that fallback never fired in practice).
       const list = await knowledgeService.listMyPackages();
-      const hydrated = await Promise.all(list.map(async (pkg) => {
-        if (pkg.value) return pkg;
-        try {
-          const resp = await apiGet('/v1/memory/' + encodeURIComponent(pkg.key));
-          return { ...pkg, value: resp?.data?.value };
-        } catch { return pkg; }
-      }));
-      setPackages(hydrated);
-      onStats?.({ knowledge: hydrated.length });
+      setPackages(list);
+      onStats?.({ knowledge: list.length });
     } catch { if (showSpinner) setPackages([]); } // keep old list on a transient live-update refetch
     finally { setLoading(false); }
   }, [onStats]);

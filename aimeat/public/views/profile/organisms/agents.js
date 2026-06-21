@@ -8,6 +8,8 @@
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — Agent activity context comes from one getAgentsActivity(orgId) call instead
+ *     of a per-workspace getWorkspaceActivity fan-out.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -41,22 +43,15 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
     listAgents(ghii).then(a => setMine((a || []).filter(x => !String(x.name || '').startsWith('session-')))).catch(() => setMine([]));
   }, [ghii]);
 
-  // Best-effort activity context: which workspaces each agent has touched, and when last.
+  // Best-effort activity context: which workspaces each agent has touched, and when last. ONE
+  // aggregated request replaces the old per-workspace getWorkspaceActivity fan-out.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const wss = (await orgService.discoverWorkspaces(orgId)).filter(w => w.access !== 'none');
+        const agents = await orgService.getAgentsActivity(orgId);
         const map = {};
-        await Promise.all(wss.map(async (w) => {
-          const a = await orgService.getWorkspaceActivity(orgId, w.id);
-          for (const e of (a.events || [])) {
-            if (!e.agent) continue;
-            const m = map[e.agent] || (map[e.agent] = { count: 0, lastAt: '', ws: new Set() });
-            m.count++; m.ws.add(w.name || w.id);
-            if (!m.lastAt || e.at > m.lastAt) m.lastAt = e.at;
-          }
-        }));
+        for (const [name, v] of Object.entries(agents)) map[name] = { count: v.count, lastAt: v.lastAt, ws: new Set(v.workspaces || []) };
         if (!cancelled) setActed(map);
       } catch { /* context is optional */ }
     })();
