@@ -209,6 +209,12 @@ await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', a
   assert(r.body.error?.code === 'UNKNOWN_TOOL', `code ${r.body.error?.code}`);
 });
 
+await test('P3 — aimeat_agent_statistics rides the tunnel (own reputation rollup, no direct node GET)', async () => {
+  const r = await json(loopbackBase, '/local/call/aimeat_agent_statistics', { method: 'POST', body: '{}' });
+  assert(r.status === 200 && r.body.ok === true, `statistics: ${r.status} ${JSON.stringify(r.body)}`);
+  assert(r.body.data?.performance !== undefined && r.body.data?.reviews !== undefined, `expected performance+reviews rollups, got ${JSON.stringify(r.body.data)}`);
+});
+
 // ─── Local MCP ───
 console.log('\nPhase 2 — Local Streamable-HTTP MCP');
 

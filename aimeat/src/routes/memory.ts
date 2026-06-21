@@ -215,7 +215,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     // Memory Contracts (reactive): a write to a watched key fires Tracked Response evaluation. The
     // subscriber gates on the track-registry (O(1)) so non-watched writes do no work.
-    emitMemoryWritten(gaii, key);
+    emitMemoryWritten(gaii, key, existing ? 'updated' : 'created');
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,

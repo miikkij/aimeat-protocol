@@ -191,7 +191,19 @@ export async function revokeToken(token: string, expiresAt: number): Promise<voi
 
   // Update cache
   revocationCache.set(hash, { revoked: true, cachedAt: Date.now() });
+
+  // P2: if this exact bearer holds a live connector tunnel, push `auth_revoked` + close it now so the
+  // agent re-auths immediately instead of probing for liveness. Decoupled via a registered hook (the
+  // tunnel manager registers it) so this foundational auth module never imports the tunnel.
+  try { _onTokenRevoked?.(token); } catch { /* tunnel optional */ }
 }
+
+/**
+ * Hook invoked with the raw token whenever a token is revoked — the connector tunnel manager
+ * registers it to push `auth_revoked` to a live socket. Null = no tunnel (the common case in tests).
+ */
+let _onTokenRevoked: ((token: string) => void) | null = null;
+export function setTokenRevokedHook(fn: ((token: string) => void) | null): void { _onTokenRevoked = fn; }
 
 /**
  * Check if a token has been revoked.

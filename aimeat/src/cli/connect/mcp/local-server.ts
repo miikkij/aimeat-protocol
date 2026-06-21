@@ -39,6 +39,11 @@
  *   v1.1.0 — 2026-06-10 — Add `POST /local/call/:tool` — deterministic
  *     shell-callable tool dispatch over the tunnel (kills `connect call`
  *     subprocess + per-call TLS churn for plain-Python crews).
+ *   v1.2.0 — 2026-06-22 — P1 record push: `POST /local/subscribe` (register record-push spaces, held
+ *     + re-sent on reconnect via tunnel onConnect) + `GET /local/records/next` (long-poll on a queue
+ *     SEPARATE from tasks, so record wakes never intermix with real tasks). `workspace.record` delivers
+ *     route to the new queue; `/local/status` exposes per-agent subscriptions + reconnect count (the
+ *     consumer's catch-up signal).
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -102,6 +107,13 @@ interface QueuedTask {
 
 type Waiter = (item: QueuedTask | null) => void;
 
+/** A workspace record-change event pushed over the tunnel (`workspace.record` deliver). */
+interface QueuedRecord { event: Record<string, unknown>; receivedAt: string }
+type RecordWaiter = (item: QueuedRecord | null) => void;
+
+/** One (organism, ws, space) the agent subscribes to for record push. */
+interface SpaceRef { organism_id: string; ws: string; space: string }
+
 /**
  * Per-agent push state. Fed by the tunnel's `deliver` (live) and `backlog`
  * (on-connect snapshot) frames; tasks are deduped by id across both sources so
@@ -112,12 +124,49 @@ type Waiter = (item: QueuedTask | null) => void;
 class AgentChannel {
   transportMode: ServeDiscoveryAgent['transport'] = 'direct';
   tunnel: ConnectTunnelClient | null = null;
+  /** Tunnel (re)connect count (mirrors the client's connectCount). A consumer that sees this change
+   *  between cycles knows the socket reconnected and does its one catch-up read (record push is
+   *  per-socket; events during the disconnect window are not replayed). */
+  reconnects = 0;
   private seenTaskIds = new Set<string>();
   private seenMessageIds = new Set<string>();
   private queue: QueuedTask[] = [];
   private waiters: Waiter[] = [];
+  private recordQueue: QueuedRecord[] = [];
+  private recordWaiters: RecordWaiter[] = [];
+  /** Spaces the agent asked to subscribe to — held so the daemon re-sends them on each reconnect. */
+  private subscriptions: SpaceRef[] = [];
 
   constructor(readonly entry: RegisteredAgent) {}
+
+  setSubscriptions(spaces: SpaceRef[]): void { this.subscriptions = spaces; }
+  getSubscriptions(): SpaceRef[] { return this.subscriptions; }
+
+  /** A `workspace.record` event arrived — surface it on the record long-poll (no dedup: each write
+   *  is a distinct wake; storage stays the source of truth for content via an authorized read). */
+  handleRecord(payload: unknown): void {
+    if (!payload || typeof payload !== 'object') return;
+    const item: QueuedRecord = { event: payload as Record<string, unknown>, receivedAt: new Date().toISOString() };
+    const waiter = this.recordWaiters.shift();
+    if (waiter) waiter(item);
+    else this.recordQueue.push(item);
+  }
+
+  /** Long-poll: next undelivered record event, or null after `waitMs` with none. */
+  nextRecord(waitMs: number): Promise<QueuedRecord | null> {
+    const queued = this.recordQueue.shift();
+    if (queued) return Promise.resolve(queued);
+    if (waitMs <= 0) return Promise.resolve(null);
+    return new Promise<QueuedRecord | null>((resolve) => {
+      const waiter: RecordWaiter = (item) => { clearTimeout(timer); resolve(item); };
+      const timer = setTimeout(() => {
+        const i = this.recordWaiters.indexOf(waiter);
+        if (i >= 0) this.recordWaiters.splice(i, 1);
+        resolve(null);
+      }, waitMs);
+      this.recordWaiters.push(waiter);
+    });
+  }
 
   handleTask(payload: unknown, via: QueuedTask['via']): void {
     const task = payload as Record<string, unknown> | null;
@@ -174,6 +223,7 @@ class AgentChannel {
 
   drainWaiters(): void {
     for (const w of this.waiters.splice(0)) w(null);
+    for (const w of this.recordWaiters.splice(0)) w(null);
   }
 }
 
@@ -219,10 +269,17 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       label: `tunnel:${entry.agent}`,
       onDeliver: (kind, payload) => {
         if (kind === 'task_assigned') ch.handleTask(payload, 'deliver');
+        else if (kind === 'workspace.record') ch.handleRecord(payload);
       },
       onBacklog: ({ tasks, messages }) => {
         for (const t of tasks) ch.handleTask(t, 'backlog');
         ch.handleMessages(messages);
+      },
+      onConnect: (connectCount) => {
+        // Per-socket subscriptions die with the old socket — re-send them after every (re)connect.
+        ch.reconnects = connectCount;
+        const subs = ch.getSubscriptions();
+        if (subs.length) tunnel.subscribe(subs);
       },
       onAuthFailure: () => {
         // Token died mid-session: fall back to direct fetch so already-running
@@ -355,6 +412,50 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     });
   });
 
+  // ── Workspace record push (P1): subscribe + long-poll, on a queue SEPARATE from tasks ──
+  // POST /local/subscribe { spaces:[{organism_id, ws, space}] } — register record-push subscriptions
+  // for this agent. The daemon forwards a `subscribe` frame over the tunnel now (if online) and holds
+  // the list so it re-subscribes automatically on every reconnect.
+  app.post('/local/subscribe', (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    const rawSpaces = Array.isArray((req.body as { spaces?: unknown })?.spaces) ? (req.body as { spaces: unknown[] }).spaces : [];
+    const spaces: SpaceRef[] = [];
+    for (const s of rawSpaces) {
+      const r = s as Record<string, unknown>;
+      if (typeof r?.organism_id === 'string' && typeof r?.ws === 'string' && typeof r?.space === 'string') {
+        spaces.push({ organism_id: r.organism_id, ws: r.ws, space: r.space });
+      }
+    }
+    const ch = channels.get(entry.agent)!;
+    ch.setSubscriptions(spaces);
+    ch.tunnel?.subscribe(spaces);
+    res.json({ ok: true, data: { agent: entry.agent, subscribed: spaces.length, online: ch.transportMode === 'tunnel' } });
+  });
+
+  // GET /local/records/next?wait=ms[&agent=name] — long-poll for the next workspace record event.
+  // Distinct from /local/tasks/next: a separate queue, so record wakes never intermix with real tasks.
+  app.get('/local/records/next', async (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
+    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    const item = await channels.get(entry.agent)!.nextRecord(waitMs);
+    if (!item) { res.status(204).end(); return; }
+    res.json({
+      ok: true,
+      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.agent)!.reconnects, event: item.event },
+    });
+  });
+
   // ── Tool-call surface: deterministic shell-callable tool dispatch over the
   // tunnel. Same handler registry as `aimeat connect call`, but routed through
   // the agent's tunnel-backed client — one loopback POST, no per-call subprocess
@@ -409,6 +510,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
           node_url: e.config.node_url,
           transport: channels.get(e.agent)!.transportMode,
           tunnel_status: channels.get(e.agent)!.tunnel?.getStatus() ?? null,
+          // Record-push: how many spaces the agent subscribed to, and the (re)connect count. A consumer
+          // that sees `reconnects` increase between cycles does its one catch-up read (per-socket subs).
+          subscriptions: channels.get(e.agent)!.getSubscriptions().length,
+          reconnects: channels.get(e.agent)!.reconnects,
         })),
       },
     });
