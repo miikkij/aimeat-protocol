@@ -41,7 +41,7 @@ export function blankTemplate() {
     title: '',
     description: '',
     visibility: 'private',            // forward-compat: org/public when the marketplace lands
-    charter: { scope: '', trust: { derive: 'gated' } },
+    charter: { scope: '', cadence: 'daily', trust: { derive: 'auto' } },
     template: [
       { section: 'Overview', desc: 'A short, current summary of the topic.', slot: 'overview', kind: 'derived', rules: { max_words: 150 } },
     ],
@@ -117,6 +117,7 @@ export function charterToYaml(obj, indent = 0) {
 
 const configKey = (loc) => `${wsRoot(loc.orgId, loc.wsId)}.living.${loc.docId}.latest`;
 const slotKey = (loc, slotId) => `${wsRoot(loc.orgId, loc.wsId)}.living-slot.${loc.docId}__${slotId}.latest`;
+const pendingKey = (loc, slotId) => `${wsRoot(loc.orgId, loc.wsId)}.living-pending.${loc.docId}__${slotId}.latest`;
 const srcKey = (loc, srcId) => `${wsRoot(loc.orgId, loc.wsId)}.living-src.${loc.docId}__${srcId}.latest`;
 
 /** The objectTypes a workspace needs to host living documents (merged into its manifest on deploy). */
@@ -126,6 +127,7 @@ function livingObjectTypes() {
     { name: 'Living Sources', namespace: 'living-src', schemaRef: 'schema:living-source@1', mode: 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
     { name: 'Living Slots', namespace: 'living-slot', schemaRef: 'schema:living-slot@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true },
     { name: 'Living Ledger', namespace: 'living-ledger', schemaRef: 'schema:living-ledger@1', mode: 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
+    { name: 'Living Pending', namespace: 'living-pending', schemaRef: 'schema:living-slot@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
   ];
 }
 
@@ -196,15 +198,18 @@ export async function readInstance(orgId, wsId, docId) {
   const config = items.find(m => m.key === configKey(loc))?.value || null;
   if (!config) return null;
   const slotPrefix = `${wsRoot(orgId, wsId)}.living-slot.${docId}__`;
+  const pendingPrefix = `${wsRoot(orgId, wsId)}.living-pending.${docId}__`;
   const srcPrefix = `${wsRoot(orgId, wsId)}.living-src.${docId}__`;
   const slots = {};
+  const pending = {};
   const sources = [];
   for (const m of items) {
     if (typeof m.key !== 'string') continue;
-    if (m.key.startsWith(slotPrefix) && m.value) slots[m.value.slot] = m.value;
+    if (m.key.startsWith(pendingPrefix) && m.value) pending[m.value.slot] = m.value;
+    else if (m.key.startsWith(slotPrefix) && m.value) slots[m.value.slot] = m.value;
     else if (m.key.startsWith(srcPrefix) && m.value) sources.push(m.value);
   }
-  return { loc, config, slots, sources };
+  return { loc, config, slots, pending, sources };
 }
 
 /** Add a raw source to a slot (Phase 0: typed in by hand or pasted). */
@@ -215,6 +220,17 @@ export async function addSource(loc, slotId, src) {
   const resp = await createMemory(srcKey(loc, id), value, 'private');
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not add source');
   return value;
+}
+
+/** Approve a pending (gated) delta: promote it to the live derivation and clear the pending entry. */
+export async function approvePending(loc, slotId, pendingValue) {
+  await setSlotContent(loc, slotId, pendingValue?.markdown || '', pendingValue?.derivedFrom || []);
+  await deleteMemory(pendingKey(loc, slotId)).catch(() => {});
+}
+
+/** Reject a pending (gated) delta: discard it. */
+export async function rejectPending(loc, slotId) {
+  await deleteMemory(pendingKey(loc, slotId)).catch(() => {});
 }
 
 /** Write a slot derivation directly (manual content). */
@@ -320,6 +336,7 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
   await ensureLivingManifest(orgId, wsId);
   const inst = await readInstance(orgId, wsId, docId);
   if (!inst) throw new Error('Instance not found');
+  const gated = inst.config.charter?.trust?.derive === 'gated';
   const offersFeed = await offersService.listOffers().catch(() => null);
 
   let costUsd = 0;
@@ -364,9 +381,14 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
         const prompt = `Section: ${sec.section}\nScope: ${sec.desc || ''}\nDocument scope: ${inst.config.charter?.scope || ''}\n\nSources:\n${srcList}\n\nWrite the section.`;
         const { content, costUsd: c } = await aiRefine(prompt, DERIVE_SYSTEM);
         costUsd += c;
-        await setSlotContent(loc, slotId, content.trim(), active.map(s => s.id));
-        await addLedger(loc, { event: 'slot-derived', slot: slotId, sources: active.length, gathered });
-        results.push({ slot: slotId, ok: true, gathered });
+        if (gated) {
+          await createMemory(pendingKey(loc, slotId), { slot: slotId, markdown: content.trim(), derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: true }, 'private');
+          await addLedger(loc, { event: 'pending', slot: slotId, sources: active.length, gathered });
+        } else {
+          await setSlotContent(loc, slotId, content.trim(), active.map(s => s.id));
+          await addLedger(loc, { event: 'slot-derived', slot: slotId, sources: active.length, gathered });
+        }
+        results.push({ slot: slotId, ok: true, gathered, gated });
       } catch (e) {
         await addLedger(loc, { event: 'derive-failed', slot: slotId, error: String(e.message || e) });
         results.push({ slot: slotId, ok: false });

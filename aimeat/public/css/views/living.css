@@ -8,7 +8,26 @@
  *   v1.1.0 — 2026-06-21 — Phase 1: AI-author panel + charter Readable/YAML views.
  *   v1.2.0 — 2026-06-21 — Phase 2: pulse status + change ledger.
  *   v1.3.0 — 2026-06-21 — Phase 3: status line + pause + cadence control.
+ *   v1.4.0 — 2026-06-21 — Phase 4: automation controls (trust/triggers) + gated pending review.
  */
+
+.pf-ld-automation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md, 1rem);
+  align-items: center;
+}
+.pf-ld-num { max-width: 5rem; display: inline-block; margin-left: 0.3rem; }
+.pf-ld-pending {
+  border: 1px solid var(--accent, var(--border));
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem);
+  margin-top: var(--space-xs, 0.4rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-pending-body { max-height: 16rem; }
 
 .pf-ld-status {
   display: flex;

@@ -20,7 +20,13 @@ export interface LivingSlot { section: string; desc: string; slot: string; kind:
 export interface LivingTemplate {
   title: string;
   description: string;
-  charter: { scope: string; tracks: string[]; include: string[]; exclude: string[]; trust: { derive: 'gated' | 'auto' } };
+  charter: {
+    scope: string; tracks: string[]; include: string[]; exclude: string[];
+    cadence: 'hourly' | 'daily' | 'weekly';
+    trust: { derive: 'gated' | 'auto' };
+    triggers?: Array<{ kind: 'activity'; changed_gte: number }>;
+    stop_when?: string;
+  };
   template: LivingSlot[];
   charterReadable: string;
 }
@@ -107,7 +113,12 @@ export async function authorLivingTemplate(
       tracks: strArr(rawCharter.tracks),
       include: strArr(rawCharter.include),
       exclude: strArr(rawCharter.exclude),
+      cadence: (['hourly', 'weekly'].includes(String(rawCharter.cadence)) ? rawCharter.cadence : 'daily') as 'hourly' | 'daily' | 'weekly',
       trust: { derive: (rawCharter.trust as { derive?: unknown })?.derive === 'auto' ? 'auto' : 'gated' },
+      ...(Array.isArray(rawCharter.triggers)
+        ? { triggers: (rawCharter.triggers as Array<Record<string, unknown>>).filter(tr => tr.kind === 'activity' && Number(tr.changed_gte) > 0).map(tr => ({ kind: 'activity' as const, changed_gte: Number(tr.changed_gte) })) }
+        : {}),
+      ...(typeof rawCharter.stop_when === 'string' && rawCharter.stop_when.trim() ? { stop_when: rawCharter.stop_when.trim() } : {}),
     },
     template: slots.length ? slots : [{ section: 'Overview', desc: 'A short, current summary.', slot: 'overview', kind: 'derived', rules: { max_words: 150 }, agent: null }],
     charterReadable: str(parsed.charterReadable),
