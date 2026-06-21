@@ -1314,10 +1314,6 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         const ownerName = req.auth!.owner;
         const { current_password, new_password } = req.body ?? {};
 
-        if (!current_password || typeof current_password !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'current_password is required'));
-            return;
-        }
         if (!new_password || typeof new_password !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'new_password is required'));
             return;
@@ -1325,15 +1321,25 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
         const ghii = `${ownerName}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
-        if (!ghiiRecord || !ghiiRecord.passwordHash) {
-            res.status(400).json(error(config.nodeId, 'NO_PASSWORD', 'Account does not have a password set'));
+        if (!ghiiRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found'));
             return;
         }
 
-        const valid = await verifyPassword(current_password, ghiiRecord.passwordHash);
-        if (!valid) {
-            res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'Current password is incorrect'));
-            return;
+        // Accounts created via OAuth (e.g. Google sign-in) have no password yet. In that
+        // case this endpoint sets the initial password — no current password is required,
+        // since there is nothing to verify against. Once a password exists, the current
+        // one must be supplied and verified.
+        if (ghiiRecord.passwordHash) {
+            if (!current_password || typeof current_password !== 'string') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'current_password is required'));
+                return;
+            }
+            const valid = await verifyPassword(current_password, ghiiRecord.passwordHash);
+            if (!valid) {
+                res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'Current password is incorrect'));
+                return;
+            }
         }
 
         const pwErr = validatePasswordStrength(new_password);
@@ -1494,6 +1500,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             notification_email: ghiiRecord.notificationEmail ?? null,
             verification_level: ghiiRecord.verificationLevel,
             email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
+            // Whether a password has been set. Accounts created via OAuth (e.g. Google
+            // sign-in) start without one; the portal uses this to offer "set a password"
+            // (no current password required) instead of "change password".
+            has_password: !!ghiiRecord.passwordHash,
             // The Ed25519 PUBLIC key generated at registration (stored on the owner
             // record) — the Access tab shows it. The private key is never retrievable;
             // it was returned once at creation.

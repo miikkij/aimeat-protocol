@@ -353,6 +353,85 @@ await test('POST /v1/ghii/login — request_owner_key mints a fresh owner key th
     assert(memData.data.value.from === 'password login', 'data should match');
 });
 
+// ─── Phase 7b: Set initial password on a passwordless (OAuth-style) account ───
+// An account created without a password (as Google sign-in does) can later set one
+// via /v1/ghii/password/change WITHOUT supplying a current password — enabling
+// username + password login alongside the OAuth provider.
+console.log('\nPhase 7b — Set initial password on passwordless account');
+
+const noPwUsername = `nopwtest${Date.now()}`;
+const noPwNewPassword = 'FreshPass123';
+let noPwOwnerJwt = '';
+
+await test('POST /v1/ghii — register WITHOUT a password (OAuth-style)', async () => {
+    const data = await api('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: noPwUsername, display_name: 'No Password User' }),
+    });
+    assert(data.ok === true, `Registration failed: ${data.error?.message}`);
+    assert(data.data.has_password === false, 'newly registered passwordless account should report has_password=false');
+
+    // Obtain an owner JWT via signature (the OAuth flow yields a session the same way).
+    const timestamp = new Date().toISOString();
+    const message = noPwUsername + NODE_ID + timestamp;
+    const signature = await signMsg(data.data.private_key, message);
+    const tok = await api('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: noPwUsername, timestamp, signature }),
+    });
+    assert(tok.ok === true, `Owner auth failed: ${tok.error?.message}`);
+    noPwOwnerJwt = tok.data.token;
+});
+
+await test('GET /v1/ghii/me — reports has_password=false before setting one', async () => {
+    const data = await authApi('/v1/ghii/me', noPwOwnerJwt);
+    assert(data.ok === true, `me failed: ${data.error?.message}`);
+    assert(data.data.has_password === false, `expected has_password=false, got ${data.data.has_password}`);
+});
+
+await test('POST /v1/ghii/password/change — sets initial password with NO current_password', async () => {
+    const data = await authApi('/v1/ghii/password/change', noPwOwnerJwt, {
+        method: 'POST',
+        body: JSON.stringify({ new_password: noPwNewPassword }),
+    });
+    assert(data.ok === true, `set-password failed: ${data.error?.message}`);
+    assert(data._status === 200, `expected 200, got ${data._status}`);
+});
+
+await test('GET /v1/ghii/me — reports has_password=true after setting one', async () => {
+    const data = await authApi('/v1/ghii/me', noPwOwnerJwt);
+    assert(data.data.has_password === true, `expected has_password=true, got ${data.data.has_password}`);
+});
+
+await test('POST /v1/ghii/login — username + the newly set password now works', async () => {
+    const data = await api('/v1/ghii/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: noPwUsername, password: noPwNewPassword }),
+    });
+    assert(data.ok === true, `login with new password failed: ${data.error?.message}`);
+    assert(typeof data.data.token === 'string', 'should return a JWT');
+});
+
+await test('POST /v1/ghii/password/change — now that a password exists, current_password is required', async () => {
+    const data = await authApi('/v1/ghii/password/change', noPwOwnerJwt, {
+        method: 'POST',
+        body: JSON.stringify({ new_password: 'AnotherPass123' }),
+    });
+    assert(data.ok === false, 'should reject change without current_password once a password is set');
+    assert(data._status === 400, `expected 400, got ${data._status}`);
+    assert(data.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${data.error?.code}`);
+});
+
+await test('POST /v1/ghii/password/change — wrong current_password is rejected', async () => {
+    const data = await authApi('/v1/ghii/password/change', noPwOwnerJwt, {
+        method: 'POST',
+        body: JSON.stringify({ current_password: 'WrongPass123', new_password: 'AnotherPass123' }),
+    });
+    assert(data.ok === false, 'should reject wrong current password');
+    assert(data._status === 401, `expected 401, got ${data._status}`);
+    assert(data.error?.code === 'WRONG_PASSWORD', `expected WRONG_PASSWORD, got ${data.error?.code}`);
+});
+
 // ─── Phase 8: Dev Mode Re-registration ───
 console.log('\nPhase 8 — Dev Mode Re-registration');
 

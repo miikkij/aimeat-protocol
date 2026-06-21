@@ -15,6 +15,10 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.6.0 — 2026-06-21 — Change-password modal handles OAuth accounts with no password yet
+ *     (e.g. Google sign-in): fetches has_password from /v1/ghii/me and, when none is set, switches
+ *     to a "set a password" flow — drops the current-password field, shows an explanatory hint, and
+ *     no longer requires a current password. Lets such users enable username + password sign-in.
  *   v3.5.0 — 2026-06-20 — NextSteps recut to a curated, value-first set (write self-organizing
  *     notes → Notebook; create your portfolio → Portfolio; build an app → app-catalog create flow
  *     with ?lang=&create=1; use agents others shared → Offers) — dropped the package-manager /
@@ -321,6 +325,23 @@ function ChangePasswordModal({ onClose, onChanged }) {
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // null while loading; true once we know a password exists, false for OAuth-created
+  // accounts that have never set one (Google sign-in). When false we offer "set a
+  // password" with no current-password field, since there's nothing to verify against.
+  const [hasPassword, setHasPassword] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await getProfile();
+        if (!cancelled) setHasPassword(resp?.data?.has_password !== false);
+      } catch {
+        if (!cancelled) setHasPassword(true); // fail safe: require current password
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Live checklist — the requirements line becomes useful when it ticks green while typing.
   const rules = [
@@ -356,18 +377,28 @@ function ChangePasswordModal({ onClose, onChanged }) {
     if (e.target === e.currentTarget) onClose();
   };
 
+  // OAuth accounts with no password set: "set a password" flow (no current field).
+  const setupMode = hasPassword === false;
+
   return html`
     <div class="pf-edit-overlay" onClick=${onOverlayClick}>
       <div class="pf-edit-modal">
         <div class="pf-edit-header">
-          <h2 class="pf-edit-title">${t('profile.landing.changePasswordTitle')}</h2>
+          <h2 class="pf-edit-title">${setupMode
+            ? (t('profile.landing.setPasswordTitle') || 'Set a password')
+            : t('profile.landing.changePasswordTitle')}</h2>
           <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
         </div>
         <div class="pf-edit-body">
-          <label class="pf-edit-label">
-            ${t('profile.landing.currentPassword')}
-            <${PwInput} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
-          </label>
+          ${setupMode ? html`
+            <div class="pf-edit-hint">${t('profile.landing.setPasswordHint')
+              || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}</div>
+          ` : html`
+            <label class="pf-edit-label">
+              ${t('profile.landing.currentPassword')}
+              <${PwInput} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
+            </label>
+          `}
           <label class="pf-edit-label">
             ${t('profile.landing.newPassword')}
             <${PwInput} value=${newPw} onInput=${(e) => setNewPw(e.target.value)} />
@@ -386,8 +417,10 @@ function ChangePasswordModal({ onClose, onChanged }) {
           <button class="btn-outline" onClick=${onClose} disabled=${saving}>
             ${t('profile.landing.editCancel')}
           </button>
-          <button class="btn-primary" onClick=${save} disabled=${saving || !current || !rulesOk || !confirm || mismatch}>
-            ${saving ? t('profile.landing.passwordChanging') : (t('profile.landing.changePasswordBtn') || 'Change password')}
+          <button class="btn-primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
+            ${saving
+              ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
+              : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
           </button>
         </div>
       </div>
