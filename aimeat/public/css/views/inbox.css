@@ -361,3 +361,4 @@
 .inbox-tracked-sub code { font-size: 11px; background: var(--card-bg-alt); padding: 1px 5px; border-radius: var(--radius-xs); }
 .inbox-tracked-err { color: var(--danger); }
 .inbox-tracked-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.inbox-tracked-done { color: var(--text-dim); font-size: 12px; padding: 8px 6px 2px; border-top: 1px solid var(--border); margin-top: 4px; }
