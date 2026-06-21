@@ -23,6 +23,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -133,11 +134,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   // Live update listener
   const loadRef = useRef(loadPackages);
   loadRef.current = loadPackages;
-  useEffect(() => {
-    const handler = () => { loadRef.current({ showSpinner: false }); loadFedConsents(); }; // silent
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['knowledge', 'federation'], () => { loadRef.current({ showSpinner: false }); loadFedConsents(); }), []);
 
   /* ── Load Discover ── */
   const loadDiscover = useCallback(async () => {

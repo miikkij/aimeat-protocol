@@ -18,6 +18,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -84,11 +85,7 @@ export default function FederationTab({ data, reload }) {
     catch { setBook(null); }
   }, []);
   useEffect(() => { loadBook(); }, [loadBook]);
-  useEffect(() => {
-    const h = () => loadBook();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, [loadBook]);
+  useEffect(() => onLiveUpdate(['federation'], () => loadBook()), [loadBook]);
 
   const doSaveAuthPolicy = async (policy, scopes) => {
     const changes = [
@@ -123,11 +120,7 @@ export default function FederationTab({ data, reload }) {
 
   useEffect(() => { loadDirectory(''); }, []);
 
-  useEffect(() => {
-    const handler = () => loadDirectory(dirSearch);
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [dirSearch]);
+  useEffect(() => onLiveUpdate(['federation'], () => loadDirectory(dirSearch)), [dirSearch]);
 
   const onDirSearchInput = useCallback((e) => {
     const val = e.target.value;

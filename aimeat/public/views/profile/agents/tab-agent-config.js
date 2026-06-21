@@ -16,6 +16,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut, apiPatch } from '/js/api.js';
@@ -136,9 +137,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast, o
   loadRef.current = loadFiles;
   useEffect(() => {
     // Silent on live-update so the tab doesn't flash blank; first mount shows the spinner.
-    const handler = () => loadRef.current({ showSpinner: false });
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agents'], () => loadRef.current({ showSpinner: false }));
   }, []);
 
   function selectFile(file) {

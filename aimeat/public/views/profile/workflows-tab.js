@@ -17,6 +17,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
@@ -92,9 +93,7 @@ export default function WorkflowsTab({ showToast }) {
   loadRef.current = loadList;
   useEffect(() => {
     loadList();
-    const handler = () => { if (view.name === 'list') loadRef.current(); };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['workflows'], () => { if (view.name === 'list') loadRef.current(); });
   }, [loadList, view.name]);
 
   const doRun = async (id, mode) => {
@@ -183,11 +182,7 @@ function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
   useEffect(() => { load(); }, [load]);
   // Live updates: re-fetch the blueprint + recent runs as runs advance (engine emitChange → SSE).
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['workflows'], () => liveRef.current()), []);
 
   const stepDesc = (stepId) => loc((def?.steps || []).find(s => s.id === stepId)?.description);
   const triggerLine = def ? triggerSummary(def.trigger) : '';
@@ -247,11 +242,7 @@ function RunView({ id, runId, onBack, showToast }) {
   // Live updates: the engine emits emitChange('workflows') as the run advances (dispatch → green →
   // next step → done) → SSE → aimeat-live-update. Re-fetch so the timeline updates without a manual reload.
   const liveRef = useRef(loadRun); liveRef.current = loadRun;
-  useEffect(() => {
-    const h = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', h);
-    return () => window.removeEventListener('aimeat-live-update', h);
-  }, []);
+  useEffect(() => onLiveUpdate(['workflows'], () => liveRef.current()), []);
 
   const inFlight = run && (run.status === 'running' || run.status === 'waiting-step');
   const doCancel = async () => {

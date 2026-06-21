@@ -16,6 +16,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
@@ -196,11 +197,7 @@ export default function AgentActivitySubtab({ agentName, session, showToast }) {
   // Live update listener
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
-  useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['agent-tasks', 'agents'], () => loadRef.current()), []);
 
   function handleRangeChange(days) {
     setSelectedDays(days);

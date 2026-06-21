@@ -14,6 +14,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -41,11 +42,7 @@ export default function CortexTab({ data, reload, session }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-  useEffect(() => {
-    const handler = () => { loadData({ showSpinner: false }); }; // silent: no flash
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadData]);
+  useEffect(() => onLiveUpdate(['cortex'], () => loadData({ showSpinner: false })), [loadData]);
 
   const handleActivate = async (name) => {
     try {

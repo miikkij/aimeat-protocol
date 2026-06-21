@@ -25,6 +25,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { getAgentStatistics, listTasks, rateTask } from '/js/services/agent-tasks.js';
 import RateModal from './rate-modal.js';
@@ -127,11 +128,7 @@ export default function TabQuality({ agentName, showToast }) {
   // Live updates: refresh when a rating lands or tasks change.
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
-  useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  useEffect(() => onLiveUpdate(['agents'], () => loadRef.current()), []);
 
   if (loading) {
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;

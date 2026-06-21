@@ -28,6 +28,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -83,9 +84,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
     // "Loading..." placeholder. During Hello Integration the agent posts steps
     // + telemetry rapidly, so this fires often; showing the spinner each time
     // made the whole tab flash like a reload. Initial mount still shows it.
-    const handler = () => loadRef.current({ showSpinner: false });
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['agents', 'agent-onboarding'], () => loadRef.current({ showSpinner: false }));
   }, []);
 
   async function handleTestWebhook(e) {

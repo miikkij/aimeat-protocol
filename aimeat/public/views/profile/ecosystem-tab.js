@@ -472,9 +472,7 @@ function EcoAutomationSection({ app, showToast }) {
   loadRef.current = load;
   useEffect(() => {
     loadRef.current();
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['ecosystem-apps', 'apps'], () => loadRef.current());
   }, [app.app]);
 
   function toggleAgent(name) {
@@ -919,9 +917,7 @@ function EcoAskInClaude({ app }) {
   loadRef.current = load;
   useEffect(() => {
     loadRef.current();
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return onLiveUpdate(['ecosystem-apps', 'apps'], () => loadRef.current());
   }, [app.app]);
 
   const organismName = resolveOrganismName(recipe && recipe.organism, orgs);

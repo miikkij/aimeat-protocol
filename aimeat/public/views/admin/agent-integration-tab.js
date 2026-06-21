@@ -14,6 +14,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
@@ -49,11 +50,7 @@ export default function AgentIntegrationTab({ data, session }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  useEffect(() => {
-    const handler = () => { loadData(); };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadData]);
+  useEffect(() => onLiveUpdate(['agents'], () => loadData()), [loadData]);
 
   if (loading) return html`<div class="adm-card">${t('common.loading')}</div>`;
 

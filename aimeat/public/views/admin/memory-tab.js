@@ -13,6 +13,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -59,11 +60,7 @@ export default function MemoryTab({ data, reload, session }) {
   useEffect(() => { loadMemory(0); }, [loadMemory]);
 
   // Listen for live updates
-  useEffect(() => {
-    const handler = () => { loadMemory(offset, { showSpinner: false }); }; // silent: no flash
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadMemory, offset]);
+  useEffect(() => onLiveUpdate(['memory'], () => loadMemory(offset, { showSpinner: false })), [loadMemory, offset]);
 
   function toggleExpand(idx) {
     setExpanded(prev => {
