@@ -8,6 +8,33 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Tracked Responses — an inbox message that replies itself when the work is done.** From the
+  **Inbox**, any message gets two per-message actions: **⭐ Important** (a lightweight "needs a reply"
+  flag) and **🔗 Track a response** — turn the message into an actionable workspace **record** (e.g. a
+  critical `bug`) bound to a *contract* that owes a reply to the original sender. When the watched
+  record reaches its condition (e.g. `status: done`, set by an AI over MCP or the API), the reply is
+  composed from a template (injecting a field from the record, e.g. `resolution`) and sent back —
+  **automatically**, or after you **approve/edit** a pre-filled draft in the composer — across the
+  federation if the sender is on another node, reusing the existing signed message-delivery path.
+  Firing is **event-driven** (a write to a watched memory key triggers evaluation) with a **reconciler
+  sweep** as the safety net so nothing fires-once-and-fails-silently; idempotent (never double-sends).
+  New routes `POST/GET /v1/tracked-responses`, `/:id` (+ `/draft`, `/evaluate`, `/replied`, `/cancel`),
+  `/evaluate-due`, and an open `/spec`. `src/services/tracked-response.ts`,
+  `src/services/track-registry.ts`, `src/services/message-send.ts` (extracted from the messages route
+  and shared), `src/routes/tracked-responses.ts`, `src/routes/messages.ts`, `src/routes/memory.ts`,
+  `src/routes/organisms.ts`, `src/mcp/workspaces.ts`, `src/services/event-bus.ts`,
+  `src/server-bootstrap/routes-loader.ts`, `public/js/services/tracked-responses.js`,
+  `public/js/services/notebook.js` (`materializeRecord`), `public/views/profile/inbox-tab.js`,
+  `public/css/views/inbox.css`, `public/spa.html`, `openapi.yaml`, EN+FI `inbox.track*` / `inbox.markImportant`,
+  `test/e2e-tracked-response.ts`.
+- **Memory Contracts — a reusable pattern for automation/coordination.** Tracked Responses is the
+  first instance of a general procedure: hold all state in one **self-describing** memory record (a
+  `type` + a `spec` link other humans/AIs honor), express the trigger **condition as data**, react via
+  a **trackable-key registry + write hook** (with a reconciler safety net), dispatch the side effect
+  through a **channel/mode** seam, and guard idempotency/observability with explicit tracking fields.
+  Reach for it before adding bespoke tables/handlers — it rides the existing memory system (no schema
+  migration, spans both backends) and stays AI-legible and federation-friendly.
+  `docs/coding-guidelines/memory-contracts.md`, `docs/specs/tracked-response-contract.md`, `CLAUDE.md`.
 - **Living Documents — self-maintaining, workspace-backed docs.** A new top-level profile tab
   (**Living Docs**) where you author reusable **templates** (a charter + scoped sections), then
   **deploy** one into a workspace where it becomes a live instance that assembles its markdown from
