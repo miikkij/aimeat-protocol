@@ -93,13 +93,16 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     catch (e) { showToast((e && e.message) || 'Failed'); }
     finally { setBusy(false); }
   };
-  // Rebuild the overview whenever the workspace set changes (deterministic — aggregates members,
-  // agents, workspaces + their structure, and knowledge packages).
+  // Rebuild the overview (deterministic — aggregates members, agents, workspaces + their structure,
+  // and knowledge packages) ONLY when the map is actually shown. The map is hidden by default, so
+  // building it eagerly on every workspace-list change was a multi-request "build" storm for a chart
+  // nobody was looking at.
   useEffect(() => {
+    if (!showOverview) return;
     let cancelled = false;
     orgService.buildOrganismOverviewMermaid(orgId).then(c => { if (!cancelled) setOverview(c); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [orgId, list]);
+  }, [orgId, list, showOverview]);
   useEffect(() => onLiveUpdate(['organisms'], () => load()), [load]);
 
   const create = async () => {
