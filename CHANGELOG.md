@@ -6,6 +6,44 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Living Documents — self-maintaining, workspace-backed docs.** A new top-level profile tab
+  (**Living Docs**) where you author reusable **templates** (a charter + scoped sections), then
+  **deploy** one into a workspace where it becomes a live instance that assembles its markdown from
+  memory keys and keeps itself current. **AI author** (`POST /v1/living/author`) turns a plain-language
+  need into a full template (title, scope, sections with suggested agents, cadence/triggers/trust);
+  the charter is shown both **readable** and as **YAML**, hand-editable. The **pulse** refreshes each
+  section — gather (delegate to the section's agent / librarian search of your own material) → AI
+  re-derive → versioned derivation + change **ledger** + cost/last-pulse — triggered manually
+  ("Pulse now") or **unattended** on a schedule (`core:living-pulse` scheduler job + per-instance
+  cadence). **Triggers/guards** (refresh on workspace activity — "N items changed, or ≥1 and 24h" —
+  with cadence-floor + dormant guards), **stop conditions** (max-pulses / until / natural-language
+  `stop_when` judged by your AI → retire + notify), **gated review** (`trust:'gated'` writes a pending
+  delta you Approve/Reject; `'auto'` applies directly), and **unattended agent fills** (agent-backed
+  sections dispatch a queued offer task and fold its deliverable on a later pulse). Cross-workspace
+  **monitoring** (version · last-pulse · cost · paused) with a Pause/Resume control. Marketplace +
+  cross-owner billing are intentionally deferred until organisations land. `src/routes/living.ts`,
+  `src/services/living-pulse.ts`, `src/services/living-author{,-prompt}.ts`,
+  `src/services/{core-jobs,job-seeding,prompt-defaults}.ts`, `public/js/services/living.js`,
+  `public/views/profile/living-tab.js`, `public/css/views/living.css`, `public/views/profile.js`,
+  `public/views/profile/landing-page.js`, `public/spa.html`, `openapi.yaml`, EN+FI `profile.living.*`,
+  `docs/plans/2026-06-21-living-documents-plan.md`.
+- **Notebook: intent → enrich → file or distribute.** Between capturing a note and filing it, the
+  Notebook can now run a **multistep enrichment plan**: `POST /v1/librarian/plan` has your own AI reason
+  over a note and propose ordered steps — reason, assess your own material (librarian), or **delegate**
+  to one of your AI-agent offers (web research, etc.) — each result folded back into the note with a
+  **Sources / References** trail. Filing then offers **file-as-one** (existing classify → materialize)
+  or **split & distribute** (`POST /v1/librarian/distribute`) — chunk the note and file each chunk into
+  its own home. Per-owner **trust toggles** (auto-detect on capture, auto-run the plan, auto-distribute)
+  store in `notebook.settings`. `src/routes/librarian.ts`, `src/services/notebook-ai.ts`,
+  `src/services/notebook-plan{,-prompt}.ts`, `src/services/notebook-distribute-prompt.ts`,
+  `src/services/notebook-classify.ts`, `public/js/services/notebook-plan.js`,
+  `public/js/services/notebook.js`, `public/views/profile/notebook-{tab,card,helpers}.js`,
+  `public/css/views/notebook.css`, `openapi.yaml`, EN+FI `profile.notebook.*`,
+  `test/e2e-notebook-plan.ts`.
+- **Set a password on a Google-only account.** Accounts created via Google sign-in (no password yet)
+  can set a username password: `POST /v1/ghii/password/change` no longer requires `current_password`
+  when the account has none, with a landing-page UI to set one. `src/routes/ghii.ts`,
+  `public/views/profile/landing-page.js`, `openapi.yaml`, EN+FI, `test/e2e-auth-lib.ts`.
 - **Google sign-in (social login).** Humans can now create an account or log in with **Continue with
   Google** straight from the sign-in modal — no username/password required. A generic, **config-gated**
   OIDC sign-in path (`AIMEAT_GOOGLE_OAUTH_ENABLED` + client id/secret; redirect URI derived from
