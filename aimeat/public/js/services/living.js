@@ -385,6 +385,32 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
   return { results, costUsd, status };
 }
 
+// ── Instance config controls (pause / cadence) + server pulse-due ──
+
+async function saveInstanceConfig(loc, cfg) {
+  const resp = await createMemory(configKey(loc), cfg, 'private');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not save');
+  return cfg;
+}
+
+/** Pause/resume an instance's unattended pulse (cost control). */
+export async function setPaused(loc, cfg, paused) {
+  return saveInstanceConfig(loc, { ...cfg, status: { ...(cfg.status || {}), paused } });
+}
+
+/** Set the charter cadence ('hourly' | 'daily' | 'weekly', or a numeric cadence_minutes). */
+export async function setCadence(loc, cfg, cadence) {
+  return saveInstanceConfig(loc, { ...cfg, charter: { ...(cfg.charter || {}), cadence } });
+}
+
+/** Trigger the server-side unattended pulse for the owner's own DUE instances now (the same logic the
+ *  scheduler runs across all owners — exposed for on-demand refresh + testing). */
+export async function pulseDueServer() {
+  const resp = await api('/v1/living/pulse-due', { method: 'POST', body: '{}', timeoutMs: 1_800_000, retries: 0 });
+  if (resp?.ok === false) { const e = new Error(resp.error?.message || 'Pulse failed'); e.code = resp.error?.code; throw e; }
+  return resp?.data || {};
+}
+
 // ── Render ──
 
 /** Assemble the instance into markdown by walking the template and dropping in each slot's content. */

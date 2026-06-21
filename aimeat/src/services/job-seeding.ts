@@ -39,6 +39,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // Agent task stall detection (Phase 1) -- runs every 5 minutes
   jobs.push({ id: 'core:task-stall-detection', name: 'Task Stall Detection', coreHandler: 'task-stall-detection', cron: '*/5 * * * *' });
 
+  // Living Documents -- unattended pulse of due instances (per-instance charter cadence gates actual work)
+  jobs.push({ id: 'core:living-pulse', name: 'Living Document Pulse', coreHandler: 'living-pulse', cron: '*/5 * * * *' });
+
   const now = new Date().toISOString();
   for (const def of jobs) {
     const existing = await storage.getScheduledJob(def.id);

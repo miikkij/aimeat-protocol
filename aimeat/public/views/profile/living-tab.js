@@ -140,6 +140,17 @@ export default function LivingTab({ session, showToast }) {
 
   async function reopen() { if (opened) await openInstance(opened.loc); }
 
+  async function togglePause() {
+    if (!opened) return;
+    try { await living.setPaused(opened.loc, opened.config, !(opened.config.status?.paused)); await reopen(); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+  async function changeCadence(cadence) {
+    if (!opened) return;
+    try { await living.setCadence(opened.loc, opened.config, cadence); await reopen(); }
+    catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+
   async function handlePulse() {
     if (!opened || pulsing) return;
     setPulsing(true);
@@ -246,10 +257,22 @@ export default function LivingTab({ session, showToast }) {
           <div class="section-title">${escHtml(opened.config.title)}</div>
           <div class="pf-ld-card-btns">
             <button class="btn-primary btn-sm" disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}</button>
+            <button class="btn-outline btn-sm" onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setOpened(null)}>${t('profile.living.backToList')}</button>
           </div>
         </div>
-        <div class="text-meta-sm">${orgName(opened.loc.orgId)} · ${escHtml(opened.loc.wsId)} · v${st.version || 1} · ${t('profile.living.lastPulse')}: ${lastPulse} · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}</div>
+        <div class="text-meta-sm pf-ld-status">
+          ${orgName(opened.loc.orgId)} · ${escHtml(opened.loc.wsId)} · v${st.version || 1}
+          · ${t('profile.living.lastPulse')}: ${lastPulse}
+          · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
+          ${st.paused && html`· <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
+          · ${t('profile.living.cadence')}:
+          <select class="pf-ld-cadence" value=${opened.config.charter?.cadence || 'daily'} onChange=${e => changeCadence(e.target.value)}>
+            <option value="hourly">${t('profile.living.cadenceHourly')}</option>
+            <option value="daily">${t('profile.living.cadenceDaily')}</option>
+            <option value="weekly">${t('profile.living.cadenceWeekly')}</option>
+          </select>
+        </div>
 
         <div class="pf-nb-enrich-preview-body pf-ld-preview"><${Markdown} text=${md} /></div>
 
@@ -339,6 +362,12 @@ export default function LivingTab({ session, showToast }) {
                     <div class="pf-ld-card-head">
                       <span class="pf-nb-hit-title">${escHtml(inst.config.title)}</span>
                       <span class="badge badge-info">${escHtml(orgName(inst.loc.orgId))}</span>
+                    </div>
+                    <div class="text-meta-sm">
+                      v${inst.config.status?.version || 1} ·
+                      ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? new Date(inst.config.status.last_pulse).toLocaleString() : t('profile.living.never')} ·
+                      ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
+                      ${inst.config.status?.paused && html` · <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
                     </div>
                     <div class="pf-ld-card-btns">
                       <button class="btn-primary btn-sm" onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}</button>

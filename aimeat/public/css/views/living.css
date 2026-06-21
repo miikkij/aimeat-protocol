@@ -7,7 +7,22 @@
  *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + instance viewer.
  *   v1.1.0 — 2026-06-21 — Phase 1: AI-author panel + charter Readable/YAML views.
  *   v1.2.0 — 2026-06-21 — Phase 2: pulse status + change ledger.
+ *   v1.3.0 — 2026-06-21 — Phase 3: status line + pause + cadence control.
  */
+
+.pf-ld-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-ld-cadence {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.3rem;
+}
 
 .pf-ld-phase {
   color: var(--accent, var(--text));
