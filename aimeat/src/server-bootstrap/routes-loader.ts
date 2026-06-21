@@ -139,6 +139,7 @@ import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/
 import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
 import { onMemoryWrittenEvent } from '../services/event-bus.js';
 import { initStats } from '../services/stats.js';
+import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { statsMiddleware } from '../middleware/stats.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
@@ -188,6 +189,10 @@ export async function mountRoutes(
 
   // Statistics collector (with persistence via storage)
   const stats = await initStats(storage);
+
+  // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
+  // flushed to storage on an interval instead of per request.
+  initTelemetryBuffer(storage);
 
   // Prometheus metrics registry (opt-in)
   const metricsRegistry = config.metricsEnabled

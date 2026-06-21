@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.5.0 -- 2026-06-21 -- Track-a-response now forms the INTENT with AI (notebook classifier picks
+ *     the organism/workspace + title/content; no AI key → feature disabled, no static guessing) and
+ *     writes the record through the proper workspace draft→publish flow (real record type from the
+ *     workspace manifest, schema-aware value, activity + publish gate) instead of a raw memory write.
  *   v1.4.1 -- 2026-06-21 -- Tracked Response UX: per-message "tracked" badge + state on the 🔗 action
  *     (clicking an already-tracked message surfaces it instead of duplicating); a "Tracked responses"
  *     dashboard (open / approve-now / cancel, with state badges); create-modal spinner + disabled
@@ -36,10 +40,13 @@ import { Markdown } from '/components/Markdown.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { Modal } from '/components/Modal.js';
+import { Spinner } from './shared.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
-import { materializeRecord, patchRecord } from '/js/services/notebook.js';
-import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
+import { classifyNote } from '/js/services/notebook.js';
+import { listOrganisms, listWorkspaces, writeDraft, publishDraft, getObjectSchema, wsRoot } from '/js/services/organisms.js';
+import { getMemory } from '/js/services/memory.js';
+import { NB_STEPS, firstLine } from './notebook-helpers.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
  * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
@@ -236,68 +243,147 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
     </div>`;
 }
 
-/* Track-a-response modal: turn an inbox message into a workspace record (the actionable follow-up)
- * bound to a Tracked Response contract. The user picks where the record lands (organism → workspace →
- * record type), the reply mode (auto vs approve), and the completion condition. On submit it
- * materializes the record, creates the contract, and stamps a back-ref on the record. */
-function TrackResponseModal({ open, msg, peerGhii, onClose, onDone, showToast }) {
-  const [orgs, setOrgs] = useState([]);
-  const [wss, setWss] = useState([]);
+/** Record (mode:'records') object-types a workspace manifest declares — the real types a tracked
+ *  follow-up can become (e.g. bug / feature / task). Excludes document spaces. */
+function recordTypesOf(manifest) {
+  const ots = (manifest && manifest.objectTypes) || [];
+  return ots
+    .filter(ot => ot.mode === 'records' || (ot.backing === 'memory' && ot.mode !== 'document' && ot.kind !== 'document'))
+    .map(ot => ({ name: ot.name || ot.namespace, namespace: ot.namespace }));
+}
+
+/** Build a record value that satisfies a (strict) workspace schema: always id + title; fold the
+ *  message content into the schema's body-ish field; default status/severity from the schema; fill any
+ *  other required string fields so strict validation passes. With no schema, include the common fields. */
+function buildRecordValue(schema, { id, title, content, severity }) {
+  if (!schema || !schema.properties) return { id, title, status: 'open', severity, markdown: content, description: content };
+  const props = schema.properties;
+  const out = { id, title };
+  const pick = (names) => names.find(n => !!props[n]);
+  const statusKey = pick(['status', 'state']);
+  if (statusKey) { const ev = props[statusKey].enum; out[statusKey] = ev ? (ev.includes('open') ? 'open' : ev[0]) : 'open'; }
+  const bodyKey = pick(['markdown', 'description', 'body', 'details', 'notes', 'content', 'summary']);
+  if (bodyKey) out[bodyKey] = content;
+  const sevKey = pick(['severity', 'priority']);
+  if (sevKey) { const ev = props[sevKey].enum; out[sevKey] = (ev && !ev.includes(severity)) ? ev[0] : severity; }
+  for (const r of (schema.required || [])) {
+    if (out[r] === undefined && props[r]?.type === 'string') out[r] = props[r].enum?.[0] ?? '';
+  }
+  return out;
+}
+
+/* Track-a-response modal. The INTENT is formed by AI (the notebook classifier): on open it asks the
+ * caller's own model where this message belongs (organism + workspace) and a title/content. The user
+ * confirms, picks the workspace's REAL record type, and a reply policy. On submit the record is written
+ * as a DRAFT and PUBLISHED through the proper workspace flow (so it shows up with activity, the right
+ * namespace/owner, and the publish gate), then bound to a Tracked Response. No AI key → no feature. */
+function TrackResponseModal({ open, msg, onClose, onDone, showToast }) {
+  const [phase, setPhase] = useState('classify');   // 'classify' | 'review' | 'error'
+  const [aiErr, setAiErr] = useState(null);
+  const [orgs, setOrgs] = useState([]);             // the caller's own organisms (option list)
+  const [workspaces, setWorkspaces] = useState([]); // workspaces of the chosen organism
   const [orgId, setOrgId] = useState('');
   const [wsId, setWsId] = useState('');
-  const [space, setSpace] = useState('bug');
+  const [recTypes, setRecTypes] = useState([]);
+  const [namespace, setNamespace] = useState('');
   const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
   const [severity, setSeverity] = useState('critical');
-  const [body, setBody] = useState('');
-  const [mode, setMode] = useState('approve');
+  const [replyMode, setReplyMode] = useState('approve');
   const [field, setField] = useState('status');
   const [equals, setEquals] = useState('done');
   const [inject, setInject] = useState('resolution');
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(0);
+  const sugRef = useRef({ organismId: '', workspaceId: '' });   // AI's suggested placement (preselect)
 
+  // On open: run the AI classifier — it forms the intent (which organism/workspace + title + content).
+  // The dropdown OPTIONS come from real API calls (below); the AI suggestion only PRESELECTS.
   useEffect(() => {
-    if (!open) return;
-    setBody(String(msg?.body || ''));
-    setTitle((String(msg?.body || '').split('\n')[0] || '').slice(0, 80));
+    if (!open || !msg) return undefined;
+    let cancelled = false;
+    setPhase('classify'); setAiErr(null); setStep(0); setBusy(false);
+    setOrgs([]); setWorkspaces([]); setOrgId(''); setWsId(''); setRecTypes([]); setNamespace('');
+    const timer = setInterval(() => setStep(s => (s + 1) % NB_STEPS.length), 2200);
     (async () => {
-      // List the caller's OWN organisms (the `member` filter takes the bare owner name, as the
-      // Organisms tab does); fall back to the visible set if the session owner isn't available.
-      const owner = (typeof window !== 'undefined' && window.AIMEAT?.auth?.getSession?.()?.owner) || '';
-      const r = await (owner ? listOrganisms({ member: owner }) : listOrganisms()).catch(() => null);
-      const list = r?.data?.organisms || r?.data?.items || [];
-      setOrgs(list);
+      try {
+        const result = await classifyNote(msg.body);
+        if (cancelled) return;
+        const sug = result?.suggestion || {};
+        sugRef.current = { organismId: sug.organismId || '', workspaceId: sug.workspaceId || '' };
+        setTitle((sug.title || firstLine(msg.body) || '').slice(0, 120));
+        setContent(sug.markdown || msg.body || '');
+        // Authoritative option list: the caller's OWN organisms.
+        const owner = (typeof window !== 'undefined' && window.AIMEAT?.auth?.getSession?.()?.owner) || '';
+        const r = await (owner ? listOrganisms({ member: owner }) : listOrganisms()).catch(() => null);
+        if (cancelled) return;
+        const list = r?.data?.organisms || r?.data?.items || [];
+        setOrgs(list);
+        setOrgId(list.some(o => o.id === sug.organismId) ? sug.organismId : (list[0]?.id || ''));
+        setPhase('review');
+      } catch (e) {
+        if (cancelled) return;
+        setAiErr({ message: e?.message || '', code: e?.code }); setPhase('error');
+      } finally { clearInterval(timer); }
     })();
+    return () => { cancelled = true; clearInterval(timer); };
   }, [open, msg]);
 
+  // Organism chosen → load its workspaces (real registry), preselecting the AI's suggested one.
   useEffect(() => {
-    if (!orgId) { setWss([]); setWsId(''); return; }
+    if (!orgId) { setWorkspaces([]); setWsId(''); return undefined; }
+    let cancelled = false;
     (async () => {
       const list = await listWorkspaces(orgId).catch(() => []);
-      setWss(list);
-      setWsId(list[0]?.id || '');
+      if (cancelled) return;
+      setWorkspaces(list);
+      const sug = sugRef.current;
+      const pre = (sug.organismId === orgId && list.some(w => w.id === sug.workspaceId)) ? sug.workspaceId : (list[0]?.id || '');
+      setWsId(pre);
     })();
+    return () => { cancelled = true; };
   }, [orgId]);
+
+  // Workspace chosen → load its REAL record types from the manifest (never invent a namespace).
+  useEffect(() => {
+    if (!orgId || !wsId) { setRecTypes([]); setNamespace(''); return undefined; }
+    let cancelled = false;
+    (async () => {
+      const m = await getMemory(`${wsRoot(orgId, wsId)}.meta.manifest`).then(r => r?.data?.value).catch(() => null);
+      if (cancelled) return;
+      const types = recordTypesOf(m);
+      setRecTypes(types);
+      const def = types.find(tp => /bug|issue/i.test(tp.name)) || types[0];
+      setNamespace(def?.namespace || '');
+    })();
+    return () => { cancelled = true; };
+  }, [orgId, wsId]);
+
+  const close = () => { if (!busy) onClose?.(); };
 
   const submit = async () => {
     if (busy || !msg) return;
-    if (!orgId || !wsId) { showToast?.(t('inbox.trackPickTarget'), true); return; }
+    if (!orgId || !wsId || !namespace) { showToast?.(t('inbox.trackPickTarget'), true); return; }
     setBusy(true);
     try {
-      const mat = await materializeRecord({
-        organismId: orgId, workspaceId: wsId, space: space.trim() || 'bug',
-        record: { title: title.trim() || space, markdown: body, status: 'open', severity, source: 'inbox' },
-      });
-      const contract = await tracked.createTrackedResponse({
+      const recordId = 'rec-' + Math.random().toString(36).slice(2, 10);
+      const schema = await getObjectSchema(orgId, wsId, namespace).catch(() => null);
+      const value = buildRecordValue(schema, { id: recordId, title: title.trim() || namespace, content, severity });
+      // Proper workspace flow: write a DRAFT then PUBLISH (activity feed + right owner + publish gate).
+      const wr = await writeDraft(orgId, wsId, namespace, recordId, value);
+      if (wr?.ok === false) throw new Error(wr.error?.message || t('inbox.trackFailed'));
+      const pub = await publishDraft(orgId, wsId, namespace, recordId);
+      const gated = pub?.ok === false || pub?.data?.gated === true || /gate|approv/i.test(pub?.error?.code || '');
+      const watchKey = `${wsRoot(orgId, wsId)}.${namespace}.${recordId}.latest`;
+      await tracked.createTrackedResponse({
         messageId: msg.id,
         title: title.trim() || undefined,
-        watch: { key: mat.key, condition: { field: field.trim() || 'status', equals: equals.trim() || 'done' } },
-        response: { mode, inject: inject.trim() ? { from: 'watch.value', field: inject.trim() } : undefined },
-        references: { organismId: orgId, workspaceId: wsId, records: [{ namespace: mat.space, id: mat.recordId }] },
+        watch: { key: watchKey, condition: { field: field.trim() || 'status', equals: equals.trim() || 'done' } },
+        response: { mode: replyMode, inject: inject.trim() ? { from: 'watch.value', field: inject.trim() } : undefined },
+        references: { organismId: orgId, workspaceId: wsId, records: [{ namespace, id: recordId }] },
       });
-      await patchRecord(mat.key, { trackedResponse: { id: contract?.id, owedTo: peerGhii, replyState: 'watching' } });
-      showToast?.(t('inbox.trackCreated'));
-      onDone?.();
-      onClose?.();
+      showToast?.(gated ? t('inbox.trackCreatedGated') : t('inbox.trackCreated'));
+      onDone?.(); onClose?.();
     } catch (e) {
       showToast?.(e?.message || t('inbox.trackFailed'), true);
     }
@@ -305,69 +391,94 @@ function TrackResponseModal({ open, msg, peerGhii, onClose, onDone, showToast })
   };
 
   return html`
-    <${Modal} open=${open} onClose=${() => { if (!busy) onClose?.(); }} title=${t('inbox.trackResponse')} className="inbox-track-modal">
-      <div class="inbox-track-form">
-        <p class="inbox-track-hint">${t('inbox.trackHint')}</p>
-        <label class="inbox-form-row">
-          <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
-          <select class="inbox-input" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
-            <option value="">${t('inbox.trackChoose')}</option>
-            ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
-          </select>
-        </label>
-        <label class="inbox-form-row">
-          <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
-          <select class="inbox-input" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
-            ${wss.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
-          </select>
-        </label>
-        <div class="inbox-form-grid">
+    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal">
+      ${phase === 'classify' ? html`
+        <div class="inbox-track-classify">
+          <${Spinner} />
+          <div class="inbox-track-classify-step">${t('inbox.trackAiThinking')}</div>
+          <div class="inbox-track-classify-sub">${NB_STEPS[step] || ''}</div>
+        </div>` : null}
+
+      ${phase === 'error' ? html`
+        <div class="inbox-track-form">
+          <p class="inbox-track-hint">${t('inbox.trackNeedsAi')}</p>
+          ${aiErr?.message ? html`<p class="inbox-tracked-err">${escHtml(aiErr.message)}</p>` : null}
+          <div class="inbox-track-actions">
+            <button class="btn-ghost" onClick=${onClose}>${t('common.cancel')}</button>
+            <button class="btn-outline" onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>
+          </div>
+        </div>` : null}
+
+      ${phase === 'review' ? html`
+        <div class="inbox-track-form">
+          <p class="inbox-track-hint">${t('inbox.trackHintAi')}</p>
           <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackType')}</span>
-            <input class="inbox-input" type="text" value=${space} onInput=${(e) => setSpace(e.target.value)} />
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackSeverity')}</span>
-            <select class="inbox-input" value=${severity} onChange=${(e) => setSeverity(e.target.value)}>
-              <option value="critical">critical</option>
-              <option value="high">high</option>
-              <option value="normal">normal</option>
-              <option value="low">low</option>
+            <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
+            <select class="inbox-input" value=${orgId} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }}>
+              ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
             </select>
           </label>
-        </div>
-        <label class="inbox-form-row">
-          <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
-          <input class="inbox-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
-        </label>
-        <label class="inbox-form-row">
-          <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
-          <select class="inbox-input" value=${mode} onChange=${(e) => setMode(e.target.value)}>
-            <option value="approve">${t('inbox.trackModeApprove')}</option>
-            <option value="auto">${t('inbox.trackModeAuto')}</option>
-          </select>
-        </label>
-        <div class="inbox-form-grid">
           <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackWhenField')}</span>
-            <input class="inbox-input" type="text" value=${field} onInput=${(e) => setField(e.target.value)} />
+            <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
+            <select class="inbox-input" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
+              <option value="">${t('inbox.trackChoose')}</option>
+              ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
+            </select>
+          </label>
+          <div class="inbox-form-grid">
+            <label class="inbox-form-row">
+              <span class="inbox-form-label">${t('inbox.trackType')}</span>
+              <select class="inbox-input" value=${namespace} onChange=${(e) => setNamespace(e.target.value)} disabled=${!recTypes.length}>
+                ${recTypes.length === 0 ? html`<option value="">${t('inbox.trackNoTypes')}</option>` : null}
+                ${recTypes.map(tp => html`<option key=${tp.namespace} value=${tp.namespace}>${escHtml(tp.name)}</option>`)}
+              </select>
+            </label>
+            <label class="inbox-form-row">
+              <span class="inbox-form-label">${t('inbox.trackSeverity')}</span>
+              <select class="inbox-input" value=${severity} onChange=${(e) => setSeverity(e.target.value)}>
+                <option value="critical">critical</option>
+                <option value="high">high</option>
+                <option value="normal">normal</option>
+                <option value="low">low</option>
+              </select>
+            </label>
+          </div>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
+            <input class="inbox-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
           </label>
           <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackWhenEquals')}</span>
-            <input class="inbox-input" type="text" value=${equals} onInput=${(e) => setEquals(e.target.value)} />
+            <span class="inbox-form-label">${t('inbox.trackContent')}</span>
+            <textarea class="inbox-input inbox-track-content" rows="4" value=${content} onInput=${(e) => setContent(e.target.value)}></textarea>
           </label>
           <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackInject')}</span>
-            <input class="inbox-input" type="text" value=${inject} onInput=${(e) => setInject(e.target.value)} />
+            <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
+            <select class="inbox-input" value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}>
+              <option value="approve">${t('inbox.trackModeApprove')}</option>
+              <option value="auto">${t('inbox.trackModeAuto')}</option>
+            </select>
           </label>
-        </div>
-        <div class="inbox-track-actions">
-          <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
-          <button class="btn-primary" disabled=${busy} onClick=${submit}>
-            ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
-          </button>
-        </div>
-      </div>
+          <div class="inbox-form-grid">
+            <label class="inbox-form-row">
+              <span class="inbox-form-label">${t('inbox.trackWhenField')}</span>
+              <input class="inbox-input" type="text" value=${field} onInput=${(e) => setField(e.target.value)} />
+            </label>
+            <label class="inbox-form-row">
+              <span class="inbox-form-label">${t('inbox.trackWhenEquals')}</span>
+              <input class="inbox-input" type="text" value=${equals} onInput=${(e) => setEquals(e.target.value)} />
+            </label>
+            <label class="inbox-form-row">
+              <span class="inbox-form-label">${t('inbox.trackInject')}</span>
+              <input class="inbox-input" type="text" value=${inject} onInput=${(e) => setInject(e.target.value)} />
+            </label>
+          </div>
+          <div class="inbox-track-actions">
+            <button class="btn-ghost" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
+            <button class="btn-primary" disabled=${busy || !namespace} onClick=${submit}>
+              ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
+            </button>
+          </div>
+        </div>` : null}
     </${Modal}>`;
 }
 
@@ -704,7 +815,7 @@ export default function InboxTab({ showToast }) {
           </div>` : null}
       </div>
 
-      <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg} peerGhii=${activeConv?.peerGhii}
+      <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
     </div>`;
 }

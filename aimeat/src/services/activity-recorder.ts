@@ -8,6 +8,8 @@
  *                            counter on every event, and roll llm_call token data
  *                            into tokensUsed30d/aiCalls30d so the Activity tab is no
  *                            longer always zero when telemetry IS being reported.
+ *   v1.2.0 -- 2026-06-21 -- Move recordTelemetryEvent into telemetry-buffer.ts (batched
+ *                            in-memory flush). Task lifecycle recording stays synchronous.
  */
 import type { Storage, AgentActivityStats } from '../storage/interface.js';
 
@@ -46,56 +48,6 @@ export async function recordTaskFailed(storage: Storage, agentGaii: string): Pro
   const hour = now.getUTCHours();
   await storage.recordActivity({ agentGaii, date, hour, metric: 'tasks_failed', value: 1 });
   await updateAgentStats(storage, agentGaii, 'failed');
-}
-
-/**
- * Record a telemetry event for the daily activity counters. Always bumps
- * 'telemetry_events'. For llm_call events with token data, also accumulates
- * 'tokens_used' and 'ai_calls' into both the daily metric series and the
- * agent's embedded activityStats so the Activity tab updates.
- *
- * Tolerant about field names: agents in the wild send either
- * { tokens_in, tokens_out } or { tokens_used } or both.
- */
-export async function recordTelemetryEvent(
-  storage: Storage,
-  agentGaii: string,
-  event: { type: string; data: Record<string, unknown> },
-): Promise<void> {
-  const now = new Date();
-  const date = now.toISOString().split('T')[0];
-  const hour = now.getUTCHours();
-
-  await storage.recordActivity({ agentGaii, date, hour, metric: 'telemetry_events', value: 1 });
-
-  if (event.type !== 'llm_call') return;
-
-  const num = (v: unknown): number => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
-  const tokensIn = num(event.data.tokens_in);
-  const tokensOut = num(event.data.tokens_out);
-  const tokensUsedExplicit = num(event.data.tokens_used);
-  const totalTokens = tokensUsedExplicit > 0 ? tokensUsedExplicit : tokensIn + tokensOut;
-
-  if (totalTokens > 0) {
-    await storage.recordActivity({ agentGaii, date, hour, metric: 'tokens_used', value: totalTokens });
-  }
-  await storage.recordActivity({ agentGaii, date, hour, metric: 'ai_calls', value: 1 });
-
-  // Mirror into embedded activityStats so the dashboard's stat cards update.
-  const agent = await storage.getAgent(agentGaii);
-  if (!agent) return;
-  const existing = agent.activityStats;
-  const stats: AgentActivityStats = {
-    tasksCompleted: existing?.tasksCompleted ?? 0,
-    tasksFailed: existing?.tasksFailed ?? 0,
-    tokensUsed30d: (existing?.tokensUsed30d ?? 0) + totalTokens,
-    aiCalls30d: (existing?.aiCalls30d ?? 0) + 1,
-    successRate: existing?.successRate ?? 0,
-    lastTaskAt: existing?.lastTaskAt,
-    extensionsCreated: existing?.extensionsCreated ?? 0,
-    appsPublished: existing?.appsPublished ?? 0,
-  };
-  await storage.updateAgent(agentGaii, { activityStats: stats });
 }
 
 async function updateAgentStats(

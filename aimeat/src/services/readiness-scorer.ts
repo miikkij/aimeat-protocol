@@ -78,15 +78,20 @@ async function calculateDeliveryHealth(agentGaii: string, storage: Storage, sinc
 }
 
 async function calculateTelemetryContinuity(agentGaii: string, storage: Storage, since: string): Promise<number> {
-  const events = await storage.listTelemetry(agentGaii, { since, limit: 1000 });
-
-  if (events.length === 0) return 1.0;
+  // Derived from the persisted daily activity series rather than raw telemetry rows
+  // (which are no longer stored). Counts distinct days in the window that recorded at
+  // least one telemetry event — the same "continuity over 7 days" signal as before.
+  const sinceDay = since.substring(0, 10);
+  const history = await storage.getActivityHistory(agentGaii, { days: 7, granularity: 'daily' });
 
   const daysWithEvents = new Set<string>();
-  for (const event of events) {
-    const day = event.createdAt.substring(0, 10);
-    daysWithEvents.add(day);
+  for (const record of history) {
+    if (record.metric === 'telemetry_events' && record.value > 0 && record.date >= sinceDay) {
+      daysWithEvents.add(record.date);
+    }
   }
+
+  if (daysWithEvents.size === 0) return 1.0;
 
   return Math.min(daysWithEvents.size / 7, 1.0);
 }

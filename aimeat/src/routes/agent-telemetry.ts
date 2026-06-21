@@ -10,6 +10,9 @@
  *   v1.1.0 -- 2026-05-28 -- Wire POST handler into activity-recorder so telemetry
  *                            bumps the daily telemetry_events counter and llm_call
  *                            tokens flow into the agent's activityStats.
+ *   v1.2.0 -- 2026-06-21 -- Route POST/GET through the in-memory telemetry buffer: raw
+ *                            events go to a bounded ring + batched activity flush instead
+ *                            of a DB write per request; GET lists from the ring.
  */
 
 import { Router } from 'express';
@@ -20,8 +23,7 @@ import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
-import { recordTelemetryEvent } from '../services/activity-recorder.js';
+import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '../services/telemetry-buffer.js';
 
 /* ── Zod validation schema ── */
 const TelemetryAppendSchema = z.object({
@@ -89,10 +91,12 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
       createdAt: new Date().toISOString(),
     };
 
-    await storage.appendTelemetry(event);
-    await recordTelemetryEvent(storage, agentGaii, { type, data });
-
-    emitChange('agents');
+    // Buffered in-memory: the raw event lands in a bounded per-agent ring and the
+    // derived activity counters accumulate; both are flushed to storage on an interval
+    // (see telemetry-buffer.ts). No per-request DB write — 48 agents streaming telemetry
+    // no longer translate to a write per event.
+    pushTelemetry(event);
+    recordTelemetryActivity(agentGaii, { type, data });
 
     res.status(201).json(success(config.nodeId, { id: event.id }));
   });
@@ -119,7 +123,7 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
     const type = req.query.type as string | undefined;
     const perPage = Math.min(Math.max(parseInt(req.query.per_page as string) || 50, 1), 200);
 
-    const events = await storage.listTelemetry(agentGaii, { since, type, limit: perPage });
+    const events = listTelemetryBuffered(agentGaii, { since, type, limit: perPage });
 
     res.json(success(config.nodeId, { events, count: events.length, per_page: perPage }));
   });

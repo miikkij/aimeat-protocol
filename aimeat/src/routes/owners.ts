@@ -11,6 +11,7 @@ import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
+import { evictAgentTelemetry } from '../services/telemetry-buffer.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -638,6 +639,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
 
     // 1. Cancel in-flight work and return escrow for all agents
     for (const agent of agents) {
+      evictAgentTelemetry(agent.gaii);
       const providerWork = await storage.listWorkByProvider(agent.gaii);
       const requesterWork = await storage.listWorkByRequester(agent.gaii);
       for (const w of [...providerWork, ...requesterWork]) {

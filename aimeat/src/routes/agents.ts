@@ -37,6 +37,7 @@ import { detectPlatform } from '../services/platform-detector.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../services/offer-prereqs.js';
 import { listWorkflows } from '../services/workflow/store.js';
+import { markAgentSeen, evictAgentTelemetry } from '../services/telemetry-buffer.js';
 
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
@@ -1047,14 +1048,18 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/checkin — agent heartbeat (agent auth)
+  // lastSeen is buffered in-memory and flushed once per interval (telemetry-buffer.ts)
+  // rather than written on every heartbeat — it is a pure "last active" display value
+  // (10-min online window) with no correctness dependency, so a sub-minute lag is fine.
   router.post('/v1/checkin', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = req.auth!.sub;
     const now = new Date().toISOString();
-    const agent = await storage.updateAgent(gaii, { lastSeen: now });
+    const agent = await storage.getAgent(gaii);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
       return;
     }
+    markAgentSeen(gaii, now);
 
     res.json(success(config.nodeId, {
       gaii,
@@ -1062,7 +1067,6 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       trust_score: agent.trustScore,
       morsel_balance: agent.morselBalance,
     }));
-    emitChange('agents');
   });
 
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
@@ -1449,6 +1453,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to delete agent'));
       return;
     }
+    evictAgentTelemetry(agent.gaii);
 
     res.json(success(config.nodeId, { deleted: true, name: agentName, gaii: agent.gaii }));
     emitChange('agents');

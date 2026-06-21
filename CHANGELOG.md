@@ -11,7 +11,11 @@ All notable changes to AIMEAT are documented in this file.
 - **Tracked Responses — an inbox message that replies itself when the work is done.** From the
   **Inbox**, any message gets two per-message actions: **⭐ Important** (a lightweight "needs a reply"
   flag) and **🔗 Track a response** — turn the message into an actionable workspace **record** (e.g. a
-  critical `bug`) bound to a *contract* that owes a reply to the original sender. When the watched
+  `bug`) bound to a *contract* that owes a reply to the original sender. The **intent is formed by your
+  own AI** (the notebook classifier picks the organism + workspace and writes a title + content; no
+  OpenRouter/Ollama key → the feature is unavailable, never a static guess), and the record is written
+  through the proper workspace **draft → publish** flow (the workspace's real record type, schema-aware
+  value, activity feed, and publish gate) — not a raw memory write. When the watched
   record reaches its condition (e.g. `status: done`, set by an AI over MCP or the API), the reply is
   composed from a template (injecting a field from the record, e.g. `resolution`) and sent back —
   **automatically**, or after you **approve/edit** a pre-filled draft in the composer — across the
@@ -27,7 +31,7 @@ All notable changes to AIMEAT are documented in this file.
   and shared), `src/routes/tracked-responses.ts`, `src/routes/messages.ts`, `src/routes/memory.ts`,
   `src/routes/organisms.ts`, `src/mcp/workspaces.ts`, `src/services/event-bus.ts`,
   `src/server-bootstrap/routes-loader.ts`, `public/js/services/tracked-responses.js`,
-  `public/js/services/notebook.js` (`materializeRecord`), `public/views/profile/inbox-tab.js`,
+  `public/views/profile/inbox-tab.js` (reuses `classifyNote` + the organisms `writeDraft`/`publishDraft` flow),
   `public/css/views/inbox.css`, `public/spa.html`, `openapi.yaml`, EN+FI `inbox.track*` / `inbox.markImportant`,
   `test/e2e-tracked-response.ts`.
 - **Memory Contracts — a reusable pattern for automation/coordination.** Tracked Responses is the
