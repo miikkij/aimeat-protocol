@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.4.1 -- 2026-06-21 -- Tracked Response UX: per-message "tracked" badge + state on the 🔗 action
+ *     (clicking an already-tracked message surfaces it instead of duplicating); a "Tracked responses"
+ *     dashboard (open / approve-now / cancel, with state badges); create-modal spinner + disabled
+ *     buttons (and no close) while creating.
  *   v1.4.0 -- 2026-06-21 -- Two-tier message follow-up: ⭐ Important flag (Tier 1) + "Track a response"
  *     (Tier 2 — materialize a workspace record + bind a Tracked Response that replies when the work is
  *     done) + an approve-mode banner that pre-fills the composer with the suggested reply.
@@ -104,9 +108,22 @@ function prepareBody(body, urlMap, expiredIds) {
   return out;
 }
 
-function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack }) {
+/** Short label + tone for a Tracked Response state (used on the message badge + the list). */
+function trackStateLabel(state) {
+  switch (state) {
+    case 'watching': return { text: t('inbox.trackStateWatching'), tone: 'watch' };
+    case 'awaiting-approval': return { text: t('inbox.trackStateAwaiting'), tone: 'ready' };
+    case 'replied': return { text: t('inbox.trackStateReplied'), tone: 'done' };
+    case 'error': return { text: t('inbox.trackStateError'), tone: 'err' };
+    case 'sent': return { text: t('inbox.trackStateWatching'), tone: 'watch' };
+    default: return { text: state || '', tone: 'watch' };
+  }
+}
+
+function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
+  const trk = tracked ? trackStateLabel(tracked.state) : null;
   return html`
     <div class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
       ${!mine ? html`<${Avatar} seed=${msg.senderGhii} size=${28} />` : null}
@@ -114,7 +131,8 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack }) {
         <div class="inbox-bubble-actions">
           <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
             onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
-          <button class="inbox-bubble-act" title=${t('inbox.trackResponse')}
+          <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}
+            title=${tracked ? `${t('inbox.trackResponse')} — ${trk.text}` : t('inbox.trackResponse')}
             onClick=${() => onTrack?.(msg)}>🔗</button>
         </div>
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
@@ -130,6 +148,7 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack }) {
               </a>`)}
           </div>`}
         <div class="inbox-bubble-meta">
+          ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
           <span>${timeShort(msg.createdAt)}</span>
           ${mine && msg.status ? html`<span class=${`inbox-tick${msg.status === 'read' ? ' inbox-tick--read' : ''}${(msg.status === 'failed' || msg.status === 'undeliverable') ? ' inbox-tick--err' : ''}`}>${statusTick(msg.status)}</span>` : null}
         </div>
@@ -286,7 +305,7 @@ function TrackResponseModal({ open, msg, peerGhii, onClose, onDone, showToast })
   };
 
   return html`
-    <${Modal} open=${open} onClose=${onClose} title=${t('inbox.trackResponse')} className="inbox-track-modal">
+    <${Modal} open=${open} onClose=${() => { if (!busy) onClose?.(); }} title=${t('inbox.trackResponse')} className="inbox-track-modal">
       <div class="inbox-track-form">
         <p class="inbox-track-hint">${t('inbox.trackHint')}</p>
         <label class="inbox-form-row">
@@ -343,8 +362,10 @@ function TrackResponseModal({ open, msg, peerGhii, onClose, onDone, showToast })
           </label>
         </div>
         <div class="inbox-track-actions">
-          <button class="btn-ghost" onClick=${onClose}>${t('common.cancel')}</button>
-          <button class="btn-primary" disabled=${busy} onClick=${submit}>${busy ? t('inbox.trackCreating') : t('inbox.trackCreate')}</button>
+          <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
+          <button class="btn-primary" disabled=${busy} onClick=${submit}>
+            ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
+          </button>
         </div>
       </div>
     </${Modal}>`;
@@ -383,6 +404,31 @@ export default function InboxTab({ showToast }) {
   const awaitingForConv = activeConv
     ? trackedList.filter(tr => tr.state === 'awaiting-approval' && tr.source?.conversationId === activeConv.conversationId)
     : [];
+
+  // Map each message id → its Tracked Response (so a message shows its tracking state + we don't
+  // double-create). Prefer an active contract over a finished (replied) one for the same message.
+  const trackedByMsg = {};
+  for (const tr of trackedList) {
+    const mid = tr.source?.messageId;
+    if (!mid) continue;
+    const cur = trackedByMsg[mid];
+    if (!cur || (cur.state === 'replied' && tr.state !== 'replied')) trackedByMsg[mid] = tr;
+  }
+  const awaitingCount = trackedList.filter(tr => tr.state === 'awaiting-approval').length;
+
+  // Clicking 🔗: if the message already has an ACTIVE tracked response, surface it (don't make a
+  // duplicate); a finished (replied) one may be tracked again as a fresh task.
+  const onTrackMsg = (msg) => {
+    const existing = trackedByMsg[msg.id];
+    if (existing && existing.state !== 'replied') { showToast?.(t('inbox.trackAlready')); setMode('tracked'); return; }
+    setTrackMsg(msg);
+  };
+
+  const cancelTracked = async (tr) => {
+    await tracked.cancelTrackedResponse(tr.id).catch(() => {});
+    showToast?.(t('inbox.trackCancelled'));
+    await loadLists();
+  };
 
   const toggleImportant = async (msg) => {
     const next = new Set(important);
@@ -431,6 +477,13 @@ export default function InboxTab({ showToast }) {
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); };
+
+  // Open the conversation for a tracked response, then (for awaiting-approval) seed the suggested reply.
+  const openTracked = async (tr) => {
+    if (!tr.source?.conversationId) return;
+    await openConversation({ conversationId: tr.source.conversationId, peerGhii: tr.source.peerGhii });
+    if (tr.state === 'awaiting-approval') await useSuggestedReply(tr);
+  };
 
   // Open a specific thread when arriving from a notification deep-link (sessionStorage hint set by
   // the notification bell). 'requests' just lands on the inbox (requests show at the top of the list).
@@ -553,7 +606,7 @@ export default function InboxTab({ showToast }) {
             return html`
               ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
               <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
-                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${setTrackMsg} />`;
+                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} tracked=${trackedByMsg[m.id]} />`;
           })}
         </div>
         ${awaitingForConv.map(tr => html`
@@ -567,6 +620,48 @@ export default function InboxTab({ showToast }) {
       </div>`;
   };
 
+  // Tracked-responses dashboard: every contract + its state, with open / approve-now / cancel actions.
+  const recordLabel = (tr) => {
+    const rec = tr.references?.records?.[0];
+    if (rec?.namespace) return `${rec.namespace}/${rec.id}`;
+    const k = tr.watch?.key || '';
+    const parts = k.split('.');
+    return parts.slice(-2).join('.') || k;
+  };
+  const renderTrackedList = () => html`
+    <div class="inbox-panel">
+      <div class="inbox-thread-head">
+        <div class="inbox-name">🔗 ${t('inbox.trackedTitle')} <span class="inbox-count">${trackedList.length}</span></div>
+      </div>
+      <div class="inbox-tracked-list">
+        ${trackedList.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.trackedEmpty')}</div>` : null}
+        ${trackedList.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(tr => {
+          const trk = trackStateLabel(tr.state);
+          return html`
+            <div class="inbox-tracked-row" key=${tr.id}>
+              <div class="inbox-tracked-main">
+                <div class="inbox-tracked-line1">
+                  <span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`}>${trk.text}</span>
+                  <span class="inbox-tracked-name">${escHtml(tr.title || t('inbox.trackResponse'))}</span>
+                </div>
+                <div class="inbox-tracked-sub">
+                  ${t('inbox.trackedTo')} ${escHtml(peerName(tr.source?.peerGhii || ''))}
+                  · ${t('inbox.trackedWatching')} <code>${escHtml(recordLabel(tr))}</code>
+                  · ${tr.response?.mode === 'auto' ? t('inbox.trackModeAuto') : t('inbox.trackModeApprove')}
+                  ${tr.tracking?.lastError ? html` · <span class="inbox-tracked-err">${escHtml(tr.tracking.lastError)}</span>` : null}
+                </div>
+              </div>
+              <div class="inbox-tracked-actions">
+                ${tr.state === 'awaiting-approval'
+                  ? html`<button class="btn-primary btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackUseSuggested')}</button>`
+                  : html`<button class="btn-outline btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackedOpen')}</button>`}
+                ${tr.state !== 'replied' ? html`<button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>` : null}
+              </div>
+            </div>`;
+        })}
+      </div>
+    </div>`;
+
   return html`
     <div class="inbox">
       <div class="inbox-head">
@@ -574,7 +669,12 @@ export default function InboxTab({ showToast }) {
           <div class="section-title">${t('inbox.title')}</div>
           <div class="section-desc">${t('inbox.desc')}</div>
         </div>
-        <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
+        <div class="inbox-head-actions">
+          <button class=${`btn-outline${mode === 'tracked' ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}>
+            🔗 ${t('inbox.trackedTitle')}${trackedList.length ? html` <span class="inbox-count">${trackedList.length}</span>` : ''}${awaitingCount ? html` <span class="inbox-conv-badge">${awaitingCount}</span>` : ''}
+          </button>
+          <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
+        </div>
       </div>
 
       <div class="inbox-body">
@@ -592,6 +692,8 @@ export default function InboxTab({ showToast }) {
           </div>` : null}
 
         ${mode === 'thread' && activeConv ? renderThread() : null}
+
+        ${mode === 'tracked' ? renderTrackedList() : null}
 
         ${mode === 'idle' ? html`
           <div class="inbox-panel inbox-panel--empty">

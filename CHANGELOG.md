@@ -18,6 +18,9 @@ All notable changes to AIMEAT are documented in this file.
   federation if the sender is on another node, reusing the existing signed message-delivery path.
   Firing is **event-driven** (a write to a watched memory key triggers evaluation) with a **reconciler
   sweep** as the safety net so nothing fires-once-and-fails-silently; idempotent (never double-sends).
+  A **Tracked responses** dashboard lists every contract and its state (watching / reply-ready /
+  replied / error) with open · approve-now · cancel; a per-message **badge** marks an already-tracked
+  message (clicking 🔗 again surfaces it instead of creating a duplicate).
   New routes `POST/GET /v1/tracked-responses`, `/:id` (+ `/draft`, `/evaluate`, `/replied`, `/cancel`),
   `/evaluate-due`, and an open `/spec`. `src/services/tracked-response.ts`,
   `src/services/track-registry.ts`, `src/services/message-send.ts` (extracted from the messages route
