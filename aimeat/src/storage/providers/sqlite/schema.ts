@@ -1,9 +1,22 @@
+/**
+ * @file sqlite/schema.ts
+ * @description SQLite schema bootstrap + in-place migrations for all AIMEAT storage
+ *   entities. One CREATE TABLE/INDEX exec block (idempotent via IF NOT EXISTS) followed
+ *   by additive ALTER TABLE migrations (safeAddColumn) for databases that predate newer
+ *   columns. Runs on every SqliteStorage construction.
+ * @structure initializeSchema(db): (1) one big db.exec() of CREATE TABLE/INDEX IF NOT
+ *   EXISTS — applies in full only to a fresh DB; (2) safeAddColumn() ALTERs for upgrades.
+ *   Indexes on columns that are added by an ALTER must be created AFTER that ALTER (not in
+ *   block 1), or upgrades crash with "no such column" before the ALTER runs.
+ * @usage initializeSchema(db) from sqlite/index.ts constructor.
+ * @version-history
+ *   v1.0.0 — pre-2026-06 — Initial SQLite schema bootstrap + migrations
+ *   v1.0.1 — 2026-06-21 — Fix self-host upgrade crash: move idx_ghii_googleSub creation
+ *     to after safeAddColumn('ghiis','googleSub') so upgraded DBs index a column that
+ *     exists (was in block 1 → "no such column: googleSub" crash loop on 1.25→1.27).
+ */
 import type Database from 'better-sqlite3';
 
-/**
- * Initialize the SQLite database schema for all AIMEAT storage entities.
- * Creates tables and indexes using IF NOT EXISTS for idempotent initialization.
- */
 export function initializeSchema(db: Database.Database): void {
   db.exec(`
 
@@ -874,7 +887,8 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_storage_files_ownerGaii ON storage_files(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_ghii_ownerName ON ghiis(ownerName);
     CREATE INDEX IF NOT EXISTS idx_ghii_emailHash ON ghiis(emailHash);
-    CREATE INDEX IF NOT EXISTS idx_ghii_googleSub ON ghiis(googleSub);
+    -- idx_ghii_googleSub is created AFTER the safeAddColumn migration below, so the
+    -- column exists on upgraded databases before it is indexed (see note there).
     CREATE INDEX IF NOT EXISTS idx_chat_ownerName ON chat_instances(ownerName);
     CREATE INDEX IF NOT EXISTS idx_email_ver_ownerName ON email_verifications(ownerName);
     CREATE INDEX IF NOT EXISTS idx_personal_ownerName ON personal_nodes(ownerName);
@@ -1620,8 +1634,13 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('ghiis', 'passwordFailedAttempts', 'INTEGER DEFAULT 0');
   safeAddColumn('ghiis', 'passwordLockedUntil', 'TEXT');
 
-  // Social login — Google OIDC subject for account linking
+  // Social login — Google OIDC subject for account linking. The index must be
+  // created here, AFTER the ALTER, so it works on upgraded databases where the
+  // ghiis table predates the column (a fresh DB has it inline in CREATE TABLE).
+  // Creating it inside the main schema-exec block crashed self-host upgrades with
+  // "no such column: googleSub" before the ALTER below could run.
   safeAddColumn('ghiis', 'googleSub', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_ghii_googleSub ON ghiis(googleSub)');
 
   // Security audit — per-peer federation auth policy
   safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');

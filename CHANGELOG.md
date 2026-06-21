@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.27.1] - 2026-06-21
+
 ### Added
 
 - **Living Documents — self-maintaining, workspace-backed docs.** A new top-level profile tab
@@ -113,6 +115,14 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Fixed
 
+- **Self-host SQLite upgrade crash-loop (`no such column: googleSub`).** On a fresh database the
+  `ghiis.googleSub` column (Google sign-in) is created inline, but on an **upgrade** the column only
+  arrives via an `ALTER TABLE` migration that ran *after* the main schema block — which already tried
+  to `CREATE INDEX … ON ghiis(googleSub)`, throwing before the migration could add the column and
+  crash-looping the node on startup. The index is now created together with its `safeAddColumn`
+  migration (following the existing sessions-refresh-token precedent), so upgrades from pre-1.27
+  databases boot cleanly. Regression test: `test/unit/sqlite-schema-migration.test.ts`.
+  `src/storage/providers/sqlite/schema.ts`.
 - **OIDC code exchange against RFC 9207 providers (e.g. Google).** `exchangeCode` now reconstructs the
   callback URL with `state` and the provider's `iss` (issuer) parameter and passes `expectedState`, so
   token exchange no longer fails with *"invalid response encountered"* when the authorization server
