@@ -6,6 +6,8 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.3.0 — 2026-06-22 — Batch endpoints: discoverWorkspaces({include:'enrichment'}) folds the
+ *     per-workspace fan-out; new getWaiting() (home widget) and listCommentsBatch() (workspace comments).
  *   v1.2.1 — 2026-06-21 — Decode HTML entities in workspace names on read (listWorkspaces +
  *     discoverWorkspaces) so legacy double-escaped registry names (e.g. "STT &amp; Voice") render
  *     as plain text in the list + breadcrumb.
@@ -38,6 +40,7 @@ export async function listOrganisms(opts = {}) {
   if (opts.interest) params.set('interest', opts.interest);
   if (opts.visibility) params.set('visibility', opts.visibility);
   if (opts.member) params.set('member', opts.member);
+  if (opts.include) params.set('include', opts.include);   // 'counts' → each org gains workspace_count
   return apiGet(`/v1/organisms?${params.toString()}`);
 }
 
@@ -90,10 +93,41 @@ export async function reviewJoinRequest(organismId, requestId, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(organismId)}/join-requests/${encodeURIComponent(requestId)}/review`, { decision });
 }
 
+/** "Waiting for you" — pending reviews + join-requests + invitations aggregated across the caller's
+ *  member organisms in ONE request (replaces the home widget's per-org listApprovals/listJoinRequests/
+ *  listWorkspaces fan-out). Returns the flat `items` array ({kind:'review'|'join'|'invite', …}). */
+export async function getWaiting() {
+  try {
+    const resp = await apiGet('/v1/organisms/waiting');
+    return Array.isArray(resp?.data?.items) ? resp.data.items : [];
+  } catch { return []; }
+}
+
+/** Agent activity aggregated across every readable workspace in ONE request (organism Agents tab).
+ *  Returns { agentName: { count, lastAt, workspaces:[names] } } (replaces per-workspace activity fetches). */
+export async function getAgentsActivity(orgId) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/agents/activity`);
+    return resp?.data?.agents || {};
+  } catch { return {}; }
+}
+
 /** List the comment thread on a workspace object (record or document). */
 export async function listComments(orgId, ws, space, instanceId) {
   const params = new URLSearchParams({ ws, space, instance_id: instanceId });
   return apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/comments?${params.toString()}`);
+}
+
+/** Composite key the comments-batch response is keyed by (NUL-joined, never collides with any id). */
+export const commentBatchKey = (ws, space, instanceId) => `${ws}\u0000${space}\u0000${instanceId}`;
+
+/** Fetch comment threads for MANY workspace objects in one POST (body, not URL params, so a long
+ *  target list never bloats the URL). Returns the raw `{ "ws\0space\0id": {comments,total} }` map. */
+export async function listCommentsBatch(orgId, instances) {
+  try {
+    const resp = await apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/comments/batch`, { instances });
+    return (resp?.data?.comments) || {};
+  } catch { return {}; }
 }
 
 /** Add a comment to a workspace object. anchor: { section?|quote? }; parentId for a threaded reply. */
@@ -579,10 +613,13 @@ export async function saveWorkspaceRegistry(orgId, workspaces) {
  * Organism membership lets you DISCOVER every workspace (names + creator + your access status);
  * reading a workspace's content needs the creator's approval. ── */
 
-/** Discover all workspaces in the org with your access status ('owner' | 'granted' | 'none'). */
-export async function discoverWorkspaces(orgId) {
+/** Discover all workspaces in the org with your access status ('owner' | 'granted' | 'none').
+ *  opts.include='enrichment' folds the per-workspace getWorkspace+activity+participants fan-out into
+ *  one response: each readable row gains `enrichment:{hasManifest,recs,docs,lastEvent,participants,pendingReviews}`. */
+export async function discoverWorkspaces(orgId, opts = {}) {
   try {
-    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces`);
+    const qs = opts.include ? `?include=${encodeURIComponent(opts.include)}` : '';
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces${qs}`);
     const list = Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
     // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
     return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
@@ -613,6 +650,15 @@ export async function getWorkspaceAccess(orgId, ws) {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?ws=${encodeURIComponent(ws)}`);
     return { requests: Array.isArray(resp?.data?.requests) ? resp.data.requests : [], members: Array.isArray(resp?.data?.members) ? resp.data.members : [] };
   } catch { return { requests: [], members: [] }; }
+}
+
+/** Access rosters for ALL of my owned workspaces in one request (Members tab — replaces a per-owned-
+ *  workspace getWorkspaceAccess fan-out). Returns [{ ws, name, members, requests }]. */
+export async function getWorkspaceAccessAll(orgId) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?all=1`);
+    return Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
+  } catch { return []; }
 }
 
 /** Directly add (or re-role) a member: role 'viewer' (read) | 'contributor' (read+write). grantee = an

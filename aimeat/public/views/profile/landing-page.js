@@ -15,6 +15,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.7.0 — 2026-06-22 — WaitingForYou uses one getWaiting() call (server-aggregated) instead of the
+ *     per-organism listApprovals + listJoinRequests + listWorkspaces fan-out.
  *   v3.6.0 — 2026-06-21 — Change-password modal handles OAuth accounts with no password yet
  *     (e.g. Google sign-in): fetches has_password from /v1/ghii/me and, when none is set, switches
  *     to a "set a password" flow — drops the current-password field, shows an explanatory hint, and
@@ -434,36 +436,12 @@ function ChangePasswordModal({ onClose, onChanged }) {
 /* "Waiting for you" — everything that needs the user's decision, aggregated across organisms:
  * pending publish approvals (per workspace), pending join requests (orgs they manage), and
  * incoming organism invitations. Renders nothing when there is nothing to do. */
-function WaitingForYou({ owner }) {
+function WaitingForYou() {
   const [items, setItems] = useState(null);
-  const load = useCallback(async () => {
-    try {
-      const out = [];
-      const orgsResp = await orgService.listOrganisms({ member: owner }).catch(() => null);
-      const orgs = orgsResp?.data?.organisms || [];
-      await Promise.all(orgs.map(async (org) => {
-        const canManage = org.creatorGhii === owner || (org.admins || []).includes(owner);
-        const [aps, reqs] = await Promise.all([
-          orgService.listApprovals(org.id, 'pending').catch(() => []),
-          canManage ? orgService.listJoinRequests(org.id).catch(() => null) : Promise.resolve(null),
-        ]);
-        if ((aps || []).length > 0) {
-          const byWs = {};
-          for (const a of aps) { const w = a.arguments?.ws || ''; byWs[w] = (byWs[w] || 0) + 1; }
-          let names = {};
-          try { names = Object.fromEntries((await orgService.listWorkspaces(org.id)).map(w => [w.id, w.name])); } catch { /* ids will do */ }
-          for (const [wsId, n] of Object.entries(byWs)) {
-            out.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names[wsId] || wsId });
-          }
-        }
-        const pend = ((reqs?.data?.join_requests) || []).filter(r => r.status === 'pending').length;
-        if (pend > 0) out.push({ kind: 'join', n: pend, orgId: org.id, orgName: org.name });
-      }));
-      const inv = await orgService.listMyInvitations().catch(() => null);
-      for (const e of (inv?.data?.invitations || [])) out.push({ kind: 'invite', orgName: e?.organism?.name || '' });
-      setItems(out);
-    } catch { setItems([]); }
-  }, [owner]);
+  // ONE aggregated request replaces the old per-org fan-out (listOrganisms → per-org listApprovals +
+  // listJoinRequests + listWorkspaces + a final listMyInvitations). The server returns the same flat
+  // {kind:'review'|'join'|'invite', …} items this widget renders.
+  const load = useCallback(async () => { setItems(await orgService.getWaiting()); }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
   // Only re-run the per-organism approvals/join-requests fan-out when ORGANISMS actually

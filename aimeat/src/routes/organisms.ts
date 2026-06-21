@@ -79,10 +79,11 @@ import { importWorkspace } from '../services/workspace-import.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
 import { searchOrganismContent } from '../services/organism-search.js';
-import { canAccessWorkspaceComments, addComment, listComments, commentPrefix } from '../services/organism-comments.js';
+import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, type WorkspaceComment } from '../services/organism-comments.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
+import { countWorkspaceInstances, latestWorkspaceEvent, deriveWorkspaceEvents, aggregateParticipants } from '../services/workspace-enrichment.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
@@ -201,10 +202,70 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       perPage: per_page ? Number(per_page) : 20,
     });
 
+    // ?include=counts — attach workspace_count per org (distinct ids in the registry across all
+    // members' registry records), so the list view doesn't fan out one discoverWorkspaces per org.
+    const include = String(req.query.include ?? '').split(',').map(s => s.trim());
+    let payload: unknown[] = organisms;
+    if (include.includes('counts')) {
+      payload = await Promise.all(organisms.map(async (o) => {
+        const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(o.id), limit: 1000 });
+        const ids = new Set<string>();
+        for (const rec of items) {
+          if (rec.key !== wsRegPrefix(o.id)) continue;
+          for (const w of ((rec.value as { workspaces?: Array<{ id?: string }> } | null)?.workspaces ?? [])) {
+            if (w.id) ids.add(w.id);
+          }
+        }
+        return { ...o, workspace_count: ids.size };
+      }));
+    }
+
     res.json(success(config.nodeId, {
-      organisms,
-      total: organisms.length,
+      organisms: payload,
+      total: payload.length,
     }));
+  });
+
+  /* ── GET /v1/organisms/waiting — everything across the caller's member organisms that needs their
+   * decision, aggregated server-side: pending publish reviews (per workspace), pending join-requests
+   * (orgs they manage), and incoming invitations. Replaces the home "Waiting for you" widget's per-org
+   * 2–3N fan-out (listApprovals + listJoinRequests + listWorkspaces × O orgs). MUST be registered
+   * before GET /:id so ':id' doesn't capture 'waiting'. ── */
+  router.get('/v1/organisms/waiting', requireAuth(), requireRole('agent'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    await expireOverdueApprovals(storage, new Date().toISOString());
+    const orgs = await storage.listOrganisms({ member: owner });
+    const reviews: Array<{ kind: 'review'; n: number; orgId: string; orgName: string; wsId: string; wsName: string }> = [];
+    const joinRequests: Array<{ kind: 'join'; n: number; orgId: string; orgName: string }> = [];
+    await Promise.all(orgs.map(async (org) => {
+      const aps = await storage.listPendingApprovals(org.id, { status: 'pending' });
+      if (aps.length) {
+        const byWs: Record<string, number> = {};
+        for (const a of aps) { const w = (a.arguments as { ws?: string } | undefined)?.ws ?? ''; byWs[w] = (byWs[w] ?? 0) + 1; }
+        const names: Record<string, string> = {};   // ws id → name from the registry (names only, one scan/org)
+        const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(org.id), limit: 1000 });
+        for (const rec of items) {
+          if (rec.key !== wsRegPrefix(org.id)) continue;
+          for (const w of ((rec.value as { workspaces?: Array<{ id: string; name?: string }> } | null)?.workspaces ?? [])) {
+            if (w.id && !(w.id in names)) names[w.id] = w.name ?? w.id;
+          }
+        }
+        for (const [wsId, n] of Object.entries(byWs)) reviews.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names[wsId] || wsId });
+      }
+      const canManage = org.creatorGhii === owner || (org.admins ?? []).includes(owner);
+      if (canManage) {
+        const jr = await storage.listJoinRequests(org.id, { status: 'pending' });
+        if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
+      }
+    }));
+    const invited = (await storage.listMembershipsByGhii(owner)).filter(m => m.status === 'invited');
+    const invitations: Array<{ kind: 'invite'; orgName: string; organismId: string }> = [];
+    for (const m of invited) {
+      const org = await storage.getOrganism(m.organismId);
+      if (org) invitations.push({ kind: 'invite', orgName: org.name, organismId: org.id });
+    }
+    // Flat `items` array in the exact shape the home widget renders (review | join | invite).
+    res.json(success(config.nodeId, { items: [...reviews, ...joinRequests, ...invitations] }));
   });
 
   /* ── GET /v1/organisms/:id — Get organism detail ── */
@@ -1325,6 +1386,55 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { comments, total: comments.length }));
   });
 
+  /* ── POST /v1/organisms/:id/comments/batch — comments (or counts) for MANY (ws,space,instance)
+   * targets in one request, replacing the per-document `GET /comments` fan-out when many threads are
+   * visible at once. Body { instances:[{ws,space,instance_id}], countsOnly? } (POST body, so a large
+   * target list never bloats the URL). Each ws is gated ONCE with the same canAccessWorkspaceComments
+   * as the single GET; instances in a workspace the caller can't read are simply OMITTED (the batch is
+   * not 403'd). Per readable ws, ONE scan of its comments subtree buckets every thread. Response is a
+   * map keyed by a stable composite "ws\0space\0instance_id". ── */
+  router.post('/v1/organisms/:id/comments/batch', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const instances = Array.isArray(req.body?.instances) ? req.body.instances : null;
+    const countsOnly = req.body?.countsOnly === true;
+    if (!instances) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'instances[] is required')); return; }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const byWs = new Map<string, Array<{ space: string; instance_id: string }>>();
+    for (const it of instances) {
+      const ws = typeof it?.ws === 'string' ? it.ws : '';
+      const space = typeof it?.space === 'string' ? it.space : '';
+      const instance_id = typeof it?.instance_id === 'string' ? it.instance_id : '';
+      if (!ws || !space || !instance_id) continue;
+      const arr = byWs.get(ws) ?? [];
+      arr.push({ space, instance_id });
+      byWs.set(ws, arr);
+    }
+    const SEP = '\u0000';
+    const out: Record<string, { comments?: WorkspaceComment[]; total: number }> = {};
+    for (const [ws, targets] of byWs) {
+      if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) continue;   // omit unreadable ws
+      const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.meta.comments.`, limit: 5000 });
+      const wanted = new Set(targets.map(t => `${t.space}~${t.instance_id}`));
+      const threads = new Map<string, WorkspaceComment[]>();
+      for (const r of items) {
+        const v = r.value as WorkspaceComment | undefined;
+        if (!v || typeof v !== 'object') continue;
+        const k = `${v.space}~${v.instanceId}`;
+        if (!wanted.has(k)) continue;
+        const arr = threads.get(k) ?? [];
+        arr.push(v);
+        threads.set(k, arr);
+      }
+      for (const t of targets) {
+        const list = (threads.get(`${t.space}~${t.instance_id}`) ?? []).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+        out[`${ws}${SEP}${t.space}${SEP}${t.instance_id}`] = countsOnly ? { total: list.length } : { comments: list, total: list.length };
+      }
+    }
+    res.json(success(config.nodeId, { comments: out }));
+  });
+
   /* DELETE /v1/organisms/:id/comments/:commentId?ws=&space=&instance_id= — delete (author or creator/admin) */
   router.delete('/v1/organisms/:id/comments/:commentId', requireAuth(), requireRole('agent'), async (req, res) => {
     const id = req.params.id as string;
@@ -1650,7 +1760,74 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access });
       }
     }
-    res.json(success(config.nodeId, { workspaces: [...seen.values()] }));
+
+    // ?include=enrichment — fold the per-workspace getWorkspace+activity+participants fan-out (3N
+    // requests, each re-scanning the same prefix) into this ONE response. The three projections keep
+    // their EXACT per-endpoint semantics: recs/docs over all records in a readable workspace (= what
+    // GET /workspace returns when canReadWs passed); lastEvent over the per-record read-authorized
+    // subset (= GET /workspace/activity); participants over the raw bucket (= GET /workspace/participants,
+    // counts only — no agent names). Single scan of organism.{id}.w.; a per-ws fallback keeps counts
+    // exact above the cap.
+    const include = String(req.query.include ?? '').split(',').map(s => s.trim());
+    const wantEnrichment = include.includes('enrichment');
+    let result: Array<Record<string, unknown>> = [...seen.values()];
+    if (wantEnrichment) {
+      const ENRICH_SCAN_CAP = 20000;
+      const wRoot = `organism.${id}.w.`;
+      const buckets = new Map<string, MemoryRecord[]>();
+      let perWsScan = false;
+      const scan = await storage.listAllMemory({ prefix: wRoot, limit: ENRICH_SCAN_CAP });
+      if (scan.total > ENRICH_SCAN_CAP) {
+        perWsScan = true;   // org too large for one scan → scoped per-ws scans below (still 1 HTTP request)
+      } else {
+        for (const r of scan.items) {
+          const wsId = r.key.slice(wRoot.length).split('.')[0];
+          if (!wsId) continue;
+          let arr = buckets.get(wsId);
+          if (!arr) { arr = []; buckets.set(wsId, arr); }
+          arr.push(r);
+        }
+      }
+      // pending publish-review counts per workspace (folds the frontend's separate listApprovals call in).
+      const reviewByWs: Record<string, number> = {};
+      for (const a of await storage.listPendingApprovals(id, { status: 'pending' })) {
+        const w = (a.arguments as { ws?: string } | undefined)?.ws;
+        if (w) reviewByWs[w] = (reviewByWs[w] ?? 0) + 1;
+      }
+      const enriched: Array<Record<string, unknown>> = [];
+      for (const w of seen.values()) {
+        if (w.access === 'none') { enriched.push({ ...w }); continue; }
+        const root = `organism.${id}.w.${w.id}`;
+        const bucket = perWsScan
+          ? (await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 })).items
+          : (buckets.get(w.id) ?? []);
+        const manifestRec = bucket.find(r => r.key === `${root}.meta.manifest`);
+        const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
+        // Per-record read-authorization for lastEvent (cross-owner only; same-owner short-circuits) —
+        // identical to GET /workspace/activity.
+        const readable: MemoryRecord[] = [];
+        for (const r of bucket) {
+          if (r.ownerGaii !== callerGaii && !isSameOwner(r.ownerGaii, callerGaii)) {
+            const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
+            if (!d.allowed) continue;
+          }
+          readable.push(r);
+        }
+        const { recs, docs } = countWorkspaceInstances(bucket, manifest, root);
+        enriched.push({
+          ...w,
+          enrichment: {
+            hasManifest: !!manifestRec,
+            recs, docs,
+            lastEvent: latestWorkspaceEvent(readable, manifest, root),
+            participants: aggregateParticipants(bucket, { root, members: organism.members ?? [], creator: w.created_by, viewerOwner: ownerName, nodeId: config.nodeId }),
+            pendingReviews: reviewByWs[w.id] ?? 0,
+          },
+        });
+      }
+      result = enriched;
+    }
+    res.json(success(config.nodeId, { workspaces: result }));
   });
 
   /* ── POST /v1/organisms/:id/workspace-access — request access to a workspace. Records the request
@@ -1697,6 +1874,38 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
     const role = await memberRole(req, organism, id);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    // ?all=1 (no ws) — access rosters for ALL of the caller's OWNED workspaces in one request
+    // (replaces the Members tab's per-owned-workspace getWorkspaceAccess fan-out). Only own workspaces,
+    // so the creator gate is satisfied by construction.
+    if (!ws && (req.query.all === '1' || req.query.all === 'true')) {
+      const ownerName = req.auth!.owner as string;
+      const creatorGhii = `${ownerName}@${config.nodeId}`;
+      const reg = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
+      const owned: Array<{ id: string; name: string }> = [];
+      const seenWs = new Set<string>();
+      for (const rec of reg.items) {
+        if (rec.key !== wsRegPrefix(id)) continue;
+        for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string; createdBy?: string }> } | null)?.workspaces ?? [])) {
+          if (!w.id || seenWs.has(w.id)) continue;
+          seenWs.add(w.id);
+          if ((w.createdBy ?? bareOwner(rec.ownerGaii)) === ownerName) owned.push({ id: w.id, name: w.name ?? w.id });
+        }
+      }
+      const workspaces = await Promise.all(owned.map(async (w) => {
+        const roles = await memberRolesForWs(creatorGhii, id, w.id);
+        const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${w.id}.access.request.`, limit: 1000 });
+        const requests = items.map(r => {
+          const v = r.value as { requester?: string; message?: string; createdAt?: string };
+          const requester = v.requester ?? bareOwner(r.ownerGaii);
+          return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester) ?? null };
+        });
+        return { ws: w.id, name: w.name, requests, members: [...roles.entries()].map(([owner, r]) => ({ owner, role: r })) };
+      }));
+      res.json(success(config.nodeId, { workspaces }));
+      return;
+    }
+
     if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
     const entry = await findWsEntry(id, ws);
     if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
@@ -1859,6 +2068,67 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
+  });
+
+  /* ── GET /v1/organisms/:id/agents/activity — agent activity context aggregated across EVERY workspace
+   * the caller can read, in ONE request (replaces the organism Agents tab's per-workspace
+   * getWorkspaceActivity fan-out). Same read-authorized event derivation as GET /workspace/activity.
+   * Returns { agents: { agentName: { count, lastAt, workspaces:[names] } } }. ── */
+  router.get('/v1/organisms/:id/agents/activity', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const ownerName = req.auth!.owner as string;
+    // Registry → readable workspaces + names.
+    const reg = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
+    const wss: Array<{ id: string; name: string }> = [];
+    const seenWs = new Set<string>();
+    for (const rec of reg.items) {
+      if (rec.key !== wsRegPrefix(id)) continue;
+      for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string; createdBy?: string }> } | null)?.workspaces ?? [])) {
+        if (!w.id || seenWs.has(w.id)) continue;
+        seenWs.add(w.id);
+        const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
+        if (createdBy === ownerName || await canReadWs(id, w.id, callerGaii)) wss.push({ id: w.id, name: w.name ?? w.id });
+      }
+    }
+    // Single scan of organism.{id}.w. → bucket by ws (per-ws fallback above the cap).
+    const wRoot = `organism.${id}.w.`;
+    const ENRICH_SCAN_CAP = 20000;
+    const buckets = new Map<string, MemoryRecord[]>();
+    let perWsScan = false;
+    const scan = await storage.listAllMemory({ prefix: wRoot, limit: ENRICH_SCAN_CAP });
+    if (scan.total > ENRICH_SCAN_CAP) perWsScan = true;
+    else for (const r of scan.items) {
+      const wsId = r.key.slice(wRoot.length).split('.')[0];
+      if (!wsId) continue;
+      let arr = buckets.get(wsId); if (!arr) { arr = []; buckets.set(wsId, arr); } arr.push(r);
+    }
+    const agg: Record<string, { count: number; lastAt: string; workspaces: Set<string> }> = {};
+    for (const w of wss) {
+      const root = `organism.${id}.w.${w.id}`;
+      const bucket = perWsScan ? (await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 })).items : (buckets.get(w.id) ?? []);
+      const readable: MemoryRecord[] = [];
+      for (const r of bucket) {
+        if (r.ownerGaii !== callerGaii && !isSameOwner(r.ownerGaii, callerGaii)) {
+          const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
+          if (!d.allowed) continue;
+        }
+        readable.push(r);
+      }
+      const manifest = (bucket.find(r => r.key === `${root}.meta.manifest`)?.value as Record<string, unknown> | undefined) ?? null;
+      for (const e of deriveWorkspaceEvents(readable, manifest, root)) {
+        if (!e.agent) continue;
+        const a = agg[e.agent] ?? (agg[e.agent] = { count: 0, lastAt: '', workspaces: new Set<string>() });
+        a.count++; a.workspaces.add(w.name);
+        if (!a.lastAt || (e.at || '') > a.lastAt) a.lastAt = e.at;
+      }
+    }
+    const agents: Record<string, { count: number; lastAt: string; workspaces: string[] }> = {};
+    for (const [name, v] of Object.entries(agg)) agents[name] = { count: v.count, lastAt: v.lastAt, workspaces: [...v.workspaces] };
+    res.json(success(config.nodeId, { agents }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/participants?ws= — who takes part in this workspace, derived

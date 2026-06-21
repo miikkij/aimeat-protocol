@@ -13818,6 +13818,12 @@ paths:
           schema:
             type: string
           description: Filter by interest tag
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [counts]
+          description: '`counts` attaches `workspace_count` per organism (avoids a per-org workspace discovery fan-out).'
         - name: city
           in: query
           schema:
@@ -14618,24 +14624,37 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [enrichment] }
+          description: |
+            `enrichment` folds the per-workspace getWorkspace+activity+participants fan-out into this one
+            response: each readable workspace gains `enrichment: { hasManifest, recs, docs,
+            lastEvent:{type,instance,action,at}|null, participants:[{owner,node,isLocalNode,isCreator,isSelf,agentsCount}],
+            pendingReviews }`. Workspaces with `access:none` carry no enrichment.
       responses:
         '200':
-          description: Workspaces with the caller's per-workspace access status
+          description: Workspaces with the caller's per-workspace access status (+ enrichment when requested)
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/organisms/{id}/workspace-access:
     get:
       operationId: listWorkspaceAccessRequests
-      summary: List access requests for a workspace you created
-      description: The workspace creator (or an org admin) lists who has requested access and whether each is pending or approved.
+      summary: List access requests for a workspace you created (or all your workspaces)
+      description: |
+        The workspace creator (or an org admin) lists who has requested access and whether each is
+        pending or approved. With `all=1` (and no `ws`), returns the access roster for ALL of the
+        caller's owned workspaces in one response (`{ workspaces: [{ ws, name, members, requests }] }`).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
-        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id you created }
+        - { name: ws, in: query, required: false, schema: { type: string }, description: Workspace id you created (required unless all=1) }
+        - { name: all, in: query, required: false, schema: { type: string, enum: ['1', 'true'] }, description: All owned workspaces' rosters in one response }
       responses:
-        '200': { description: The workspace's access requests }
+        '200': { description: The workspace's access requests (or all owned workspaces' rosters) }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
@@ -18774,6 +18793,78 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/comments/batch:
+    post:
+      operationId: listOrganismCommentsBatch
+      summary: Comment threads for many workspace objects in one request
+      description: |
+        Returns the comment threads (or counts, with `countsOnly`) for MANY (ws, space, instance_id)
+        targets in one request — replacing the per-document GET /comments fan-out. Each workspace is
+        gated once with the same read authorization as the single GET; targets in a workspace the
+        caller cannot read are omitted. Response keyed by a NUL-joined composite of ws, space and instance_id.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instances]
+              properties:
+                instances:
+                  type: array
+                  items:
+                    type: object
+                    required: [ws, space, instance_id]
+                    properties:
+                      ws: { type: string }
+                      space: { type: string }
+                      instance_id: { type: string }
+                countsOnly: { type: boolean, description: Return only totals per target (no comment bodies) }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/waiting:
+    get:
+      operationId: getOrganismsWaiting
+      summary: Everything across your member organisms that needs your decision
+      description: |
+        Aggregates, across the caller's member organisms in one request: pending publish reviews (per
+        workspace), pending join-requests (orgs the caller manages), and incoming invitations.
+        Replaces the home widget's per-organism approvals + join-requests + workspaces fan-out.
+        Response: `{ items: [ {kind:'review',n,orgId,orgName,wsId,wsName} | {kind:'join',n,orgId,orgName} | {kind:'invite',orgName,organismId} ] }`.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/organisms/{id}/agents/activity:
+    get:
+      operationId: getOrganismAgentsActivity
+      summary: Agent activity aggregated across all readable workspaces
+      description: |
+        Aggregates each agent's activity (count, last-active time, workspaces touched) across EVERY
+        workspace the caller can read, in one request — replacing the organism Agents tab's
+        per-workspace activity fan-out. Same read authorization as GET /workspace/activity.
+        Response: `{ agents: { agentName: { count, lastAt, workspaces:[names] } } }`.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/comments/{commentId}:
     delete:
       operationId: deleteOrganismComment
@@ -21576,9 +21667,15 @@ paths:
       tags: [Workflows]
       security:
         - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [health] }
+          description: '`health` attaches each workflow''s run-health inline (avoids a per-workflow GET /:id/health fan-out).'
       responses:
         '200':
-          description: The owner's workflow definitions
+          description: The owner's workflow definitions (+ inline health when requested)
           content:
             application/json:
               schema:

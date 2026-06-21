@@ -73,6 +73,7 @@ const ALL_SUITES = [
     'test/e2e-organism-overview.ts',
     'test/e2e-organism-structure.ts',
     'test/e2e-organism-comments.ts',
+    'test/e2e-organism-batch.ts',
     'test/e2e-workspace-export-import.ts',
     'test/e2e-zip-security.ts',
     'test/e2e-workspace-activity.ts',

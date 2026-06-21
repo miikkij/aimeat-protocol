@@ -11,6 +11,9 @@
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — Add the free-form README panel + the interactive workspace mindmap; rename
  *     the structure overview to "table of contents" (Osa A/C).
+ *   v1.2.0 — 2026-06-22 — Batch + debounce: one /comments/batch covers all visible threads (records +
+ *     open doc) instead of per-thread fetches; the main load + comments refresh are debounced (1.5s)
+ *     so an agent-driven 'organisms'/'memory' event burst is a single reload.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -216,8 +219,42 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     } catch (e) { /* noop */ }
   }, [activeDoc, docKey]);
 
+  // Debounced: on a busy node dozens of agents emit 'organisms'/'memory' events ~1/sec; collapse a
+  // burst into one reload of the workspace + approvals + sections + activity.
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => onLiveUpdate(['organisms', 'memory'], () => liveRef.current()), []);
+  useEffect(() => {
+    let timer = null;
+    const off = onLiveUpdate(['organisms', 'memory'], () => { clearTimeout(timer); timer = setTimeout(() => liveRef.current(), 1500); });
+    return () => { clearTimeout(timer); off(); };
+  }, []);
+
+  // ── Comments: ONE /comments/batch request covers every visible thread (the open document + each
+  // expanded record), instead of every <WorkspaceComments> self-fetching AND re-fetching on every
+  // 'organisms' event (the per-document comments storm). Debounced like the main load. ──
+  const [commentsByKey, setCommentsByKey] = useState({});
+  const cKey = orgService.commentBatchKey;
+  const reloadComments = useCallback(async () => {
+    const instances = [];
+    for (const k of Object.keys(expandedRec)) {
+      if (!expandedRec[k]) continue;
+      const i = k.indexOf(':');
+      if (i < 0) continue;
+      instances.push({ ws: wsId, space: k.slice(0, i), instance_id: k.slice(i + 1) });
+    }
+    if (activeDoc?.type && activeDoc.page?.id) instances.push({ ws: wsId, space: activeDoc.type, instance_id: activeDoc.page.id });
+    if (!instances.length) { setCommentsByKey({}); return; }
+    const res = await orgService.listCommentsBatch(orgId, instances);
+    const map = {};
+    for (const [key, val] of Object.entries(res)) map[key] = val.comments || [];
+    setCommentsByKey(map);
+  }, [orgId, wsId, expandedRec, activeDoc]);
+  useEffect(() => { reloadComments(); }, [reloadComments]);
+  const commentsLiveRef = useRef(reloadComments); commentsLiveRef.current = reloadComments;
+  useEffect(() => {
+    let timer = null;
+    const off = onLiveUpdate(['organisms'], () => { clearTimeout(timer); timer = setTimeout(() => commentsLiveRef.current(), 1500); });
+    return () => { clearTimeout(timer); off(); };
+  }, []);
 
   // Clicking a single space inside a stacked group view opens that group, then scrolls to (and
   // expands) the clicked space's section. The anchor wrapper is id="ws-sec-<name>"; a short timeout
@@ -801,7 +838,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
                     if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
                     else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
                   }} />
-                <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast} />`;
+                <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast}
+                  batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} />`;
             })()}
           </div>
         </div>
@@ -832,7 +870,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
             <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
           </div>
-          ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} />` : null}
+          ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null}
         </div>
       `)}
 
@@ -847,7 +885,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
                 <button class="btn-ghost btn-sm" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
               <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
             </div>
-            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} />` : null}
+            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
           </div>
         `)
       }

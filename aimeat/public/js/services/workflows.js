@@ -23,9 +23,10 @@ export async function getAgentOffers(agentName) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/offers`);
 }
 
-/** List the owner's workflow definitions: { workflows, count }. */
-export async function listWorkflows() {
-  return apiGet('/v1/workflows');
+/** List the owner's workflow definitions: { workflows, count }. opts.include='health' attaches each
+ *  workflow's run-health inline (avoids a per-workflow getHealth fan-out in the list view). */
+export async function listWorkflows(opts = {}) {
+  return apiGet(`/v1/workflows${opts.include ? `?include=${encodeURIComponent(opts.include)}` : ''}`);
 }
 
 export async function getWorkflow(id) {

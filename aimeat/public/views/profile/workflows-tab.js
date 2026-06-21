@@ -9,6 +9,8 @@
  * @structure WorkflowsTab (default) — view state machine (list | detail | run)
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v1.2.0 -- 2026-06-22 -- List uses listWorkflows({include:'health'}) so health arrives inline in
+ *     one request instead of a per-workflow getHealth fan-out.
  *   v1.0.0 -- 2026-06-13 -- Phase 9: list + blueprint + runs + run-now + health.
  *   v1.1.0 -- 2026-06-13 -- Run view renders image deliverables: a step whose observed output / writes
  *     hold an image (a /v1/pub URL or { url, mime } value) shows inline thumbnails via the shared
@@ -20,7 +22,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
+import { listWorkflows, getWorkflow, getBlueprint, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
 import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
 import WorkflowForm from './workflows-form.js';
 
@@ -74,12 +76,10 @@ export default function WorkflowsTab({ showToast }) {
 
   const loadList = useCallback(async () => {
     try {
-      const res = await listWorkflows();
+      const res = await listWorkflows({ include: 'health' });
       const defs = res?.data?.workflows || [];
-      const withHealth = await Promise.all(defs.map(async (def) => {
-        const hr = await getHealth(def.id).catch(() => null);
-        return { def, health: hr?.data || null };
-      }));
+      // Health arrives inline now (one request) — split it back out of each def.
+      const withHealth = defs.map((w) => { const { health = null, ...def } = w; return { def, health }; });
       setItems(withHealth);
       setError(null);
     } catch (e) {
