@@ -255,6 +255,9 @@ export default function InboxTab({ showToast }) {
   const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply seeded into the composer
   const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
   const msgsRef = useRef(null);
+  // Ids the user just cancelled — kept so a stale re-fetch (replica lag on a multi-node node) can't
+  // re-add a row the user already dismissed until the cancel has propagated.
+  const dismissedRef = useRef(new Set());
 
   const loadLists = useCallback(async () => {
     const [reqs, convs, impIds, trs] = await Promise.all([
@@ -266,7 +269,7 @@ export default function InboxTab({ showToast }) {
     setRequests(reqs);
     setConversations(convs);
     setImportant(new Set(impIds));
-    setTrackedList(trs.filter(tr => tr.state !== 'cancelled'));
+    setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
 
   // Tracked Responses for the open conversation that are awaiting the owner's approval to reply.
@@ -294,9 +297,15 @@ export default function InboxTab({ showToast }) {
   };
 
   const cancelTracked = async (tr) => {
-    await tracked.cancelTrackedResponse(tr.id).catch(() => {});
+    let resp;
+    try { resp = await tracked.cancelTrackedResponse(tr.id); }
+    catch { showToast?.(t('inbox.trackFailed'), true); return; }
+    if (resp?.ok === false) { showToast?.(resp.error?.message || t('inbox.trackFailed'), true); return; }
+    // Only on confirmed success: dismiss it immediately (so a stale re-fetch can't bring it back) + toast.
+    dismissedRef.current.add(tr.id);
+    setTrackedList(prev => prev.filter(x => x.id !== tr.id));
     showToast?.(t('inbox.trackCancelled'));
-    await loadLists();
+    loadLists();
   };
 
   const toggleImportant = async (msg) => {
