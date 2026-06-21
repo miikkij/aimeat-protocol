@@ -43,7 +43,7 @@ export function registerCoreHandlers(
   // Living Documents — unattended self-fulfilled pulse of due instances
   scheduler.registerCoreHandler('living-pulse', async () => {
     const { scanAllDue } = await import('./living-pulse.js');
-    await scanAllDue(storage, config);
+    await scanAllDue(storage, config, scheduler.getNotifyServices());
   });
 }
 

@@ -118,7 +118,10 @@ export function charterToYaml(obj, indent = 0) {
 const configKey = (loc) => `${wsRoot(loc.orgId, loc.wsId)}.living.${loc.docId}.latest`;
 const slotKey = (loc, slotId) => `${wsRoot(loc.orgId, loc.wsId)}.living-slot.${loc.docId}__${slotId}.latest`;
 const pendingKey = (loc, slotId) => `${wsRoot(loc.orgId, loc.wsId)}.living-pending.${loc.docId}__${slotId}.latest`;
+const histKey = (loc, slotId) => `${wsRoot(loc.orgId, loc.wsId)}.living-hist.${loc.docId}__${slotId}.latest`;
+const pagesKey = (loc, docId) => `${wsRoot(loc.orgId, loc.wsId)}.pages.${docId}.latest`;
 const srcKey = (loc, srcId) => `${wsRoot(loc.orgId, loc.wsId)}.living-src.${loc.docId}__${srcId}.latest`;
+const HIST_CAP = 20;
 
 /** The objectTypes a workspace needs to host living documents (merged into its manifest on deploy). */
 function livingObjectTypes() {
@@ -128,6 +131,8 @@ function livingObjectTypes() {
     { name: 'Living Slots', namespace: 'living-slot', schemaRef: 'schema:living-slot@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true },
     { name: 'Living Ledger', namespace: 'living-ledger', schemaRef: 'schema:living-ledger@1', mode: 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
     { name: 'Living Pending', namespace: 'living-pending', schemaRef: 'schema:living-slot@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
+    { name: 'Living History', namespace: 'living-hist', schemaRef: 'schema:living-hist@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false },
+    { name: 'Pages', namespace: 'pages', schemaRef: 'schema:document@1', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true },
   ];
 }
 
@@ -199,24 +204,27 @@ export async function readInstance(orgId, wsId, docId) {
   if (!config) return null;
   const slotPrefix = `${wsRoot(orgId, wsId)}.living-slot.${docId}__`;
   const pendingPrefix = `${wsRoot(orgId, wsId)}.living-pending.${docId}__`;
+  const histPrefix = `${wsRoot(orgId, wsId)}.living-hist.${docId}__`;
   const srcPrefix = `${wsRoot(orgId, wsId)}.living-src.${docId}__`;
   const slots = {};
   const pending = {};
+  const history = {};
   const sources = [];
   for (const m of items) {
     if (typeof m.key !== 'string') continue;
-    if (m.key.startsWith(pendingPrefix) && m.value) pending[m.value.slot] = m.value;
+    if (m.key.startsWith(histPrefix) && m.value) history[m.value.slot] = m.value.versions || [];
+    else if (m.key.startsWith(pendingPrefix) && m.value) pending[m.value.slot] = m.value;
     else if (m.key.startsWith(slotPrefix) && m.value) slots[m.value.slot] = m.value;
     else if (m.key.startsWith(srcPrefix) && m.value) sources.push(m.value);
   }
-  return { loc, config, slots, pending, sources };
+  return { loc, config, slots, pending, history, sources };
 }
 
-/** Add a raw source to a slot (Phase 0: typed in by hand or pasted). */
+/** Add a raw source to a slot. `data` (optional {label?, value}) feeds aggregate-slot charts. */
 export async function addSource(loc, slotId, src) {
-  const { text = '', origin = '', producer = 'manual' } = src || {};
+  const { text = '', origin = '', producer = 'manual', data = null } = src || {};
   const id = rid('s-');
-  const value = { id, slot: slotId, text, origin, producer, active: true, addedAt: new Date().toISOString() };
+  const value = { id, slot: slotId, text, origin, producer, data, active: true, addedAt: new Date().toISOString() };
   const resp = await createMemory(srcKey(loc, id), value, 'private');
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not add source');
   return value;
@@ -233,11 +241,45 @@ export async function rejectPending(loc, slotId) {
   await deleteMemory(pendingKey(loc, slotId)).catch(() => {});
 }
 
-/** Write a slot derivation directly (manual content). */
-export async function setSlotContent(loc, slotId, markdown, derivedFrom) {
-  const value = { slot: slotId, version: 1, markdown: markdown || '', derivedFrom: derivedFrom || [], producedAt: new Date().toISOString(), producedBy: 'human' };
+/**
+ * Freeze a personalized snapshot: compose the chosen per-section versions (or the current ones) into a
+ * static markdown document saved to the workspace's normal `pages` space (a plain, non-living doc).
+ * @param {object} selection  { [slotId]: versionEntry } picked from the timeline; missing → current.
+ */
+export async function saveSnapshot(loc, config, selection) {
+  const inst = await readInstance(loc.orgId, loc.wsId, loc.docId);
+  const parts = [`# ${config.title || 'Living document'} — snapshot`];
+  if (config.charter?.scope) parts.push('', `_${config.charter.scope}_`);
+  for (const sec of (config.template || [])) {
+    parts.push('', `## ${sec.section || sec.slot}`);
+    const chosen = selection?.[sec.slot];
+    const md = (chosen?.markdown) ?? (inst.slots[sec.slot]?.markdown) ?? '_empty_';
+    parts.push('', md);
+  }
+  const markdown = parts.join('\n');
+  const docId = rid('snap-');
+  await ensureLivingManifest(loc.orgId, loc.wsId);   // also ensures the 'pages' objectType
+  const resp = await createMemory(pagesKey(loc, docId), { id: docId, title: `${config.title || 'Living'} — snapshot`, markdown }, 'private');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not save snapshot');
+  return { docId, markdown };
+}
+
+/** Append a version to a slot's capped history (newest first). Best-effort. */
+async function appendHistory(loc, slotId, entry) {
+  try {
+    const cur = (await getMemory(histKey(loc, slotId)))?.data?.value;
+    const versions = [entry, ...((cur?.versions) || [])].slice(0, HIST_CAP);
+    await createMemory(histKey(loc, slotId), { slot: slotId, versions }, 'private');
+  } catch { /* history is best-effort */ }
+}
+
+/** Write a slot derivation directly (manual content or an applied delta) + record a history version. */
+export async function setSlotContent(loc, slotId, markdown, derivedFrom, producedBy) {
+  const producedAt = new Date().toISOString();
+  const value = { slot: slotId, version: 1, markdown: markdown || '', derivedFrom: derivedFrom || [], producedAt, producedBy: producedBy || 'human' };
   const resp = await createMemory(slotKey(loc, slotId), value, 'private');
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not set slot content');
+  await appendHistory(loc, slotId, { markdown: value.markdown, producedAt, producedBy: value.producedBy, derivedFrom: value.derivedFrom });
   return value;
 }
 
@@ -385,7 +427,7 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
           await createMemory(pendingKey(loc, slotId), { slot: slotId, markdown: content.trim(), derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: true }, 'private');
           await addLedger(loc, { event: 'pending', slot: slotId, sources: active.length, gathered });
         } else {
-          await setSlotContent(loc, slotId, content.trim(), active.map(s => s.id));
+          await setSlotContent(loc, slotId, content.trim(), active.map(s => s.id), 'pulse');
           await addLedger(loc, { event: 'slot-derived', slot: slotId, sources: active.length, gathered });
         }
         results.push({ slot: slotId, ok: true, gathered, gated });
@@ -431,6 +473,20 @@ export async function pulseDueServer() {
   const resp = await api('/v1/living/pulse-due', { method: 'POST', body: '{}', timeoutMs: 1_800_000, retries: 0 });
   if (resp?.ok === false) { const e = new Error(resp.error?.message || 'Pulse failed'); e.code = resp.error?.code; throw e; }
   return resp?.data || {};
+}
+
+/** Numeric data points for an aggregate slot (oldest→newest): from each source's `data.value`, else a
+ *  number parsed from its text. Used to render a chart + table. */
+export function aggregateData(sources, slotId) {
+  return (sources || [])
+    .filter(s => s.slot === slotId && s.active !== false)
+    .map(s => {
+      const value = Number(s.data?.value ?? parseFloat(String(s.text).replace(/[^0-9.\-]/g, '')));
+      const label = s.data?.label || String(s.text || '').split(':')[0]?.slice(0, 16) || '';
+      return { label, value, at: s.addedAt };
+    })
+    .filter(d => Number.isFinite(d.value))
+    .sort((a, b) => +new Date(a.at || 0) - +new Date(b.at || 0));
 }
 
 // ── Render ──
