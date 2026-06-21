@@ -101,7 +101,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     if (!session) return;
     (async () => {
       try {
-        const r = await memoryService.getMemory(UI_PREFS_KEY);
+        const r = await memoryService.getMemory(UI_PREFS_KEY, { soft: true });
         const v = r?.data?.value;
         if (v && typeof v === 'object') {
           if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));

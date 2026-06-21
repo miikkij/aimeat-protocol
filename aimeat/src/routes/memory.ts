@@ -1089,6 +1089,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       }
     }
     if (!record) {
+      // Soft read: callers that treat absence as a normal empty state (UI preference
+      // keys, optional config) pass ?soft=1 to get a 200 with a null value instead of a
+      // 404. Avoids browser-console 404 noise for keys that legitimately may not exist yet.
+      if (req.query.soft) {
+        res.json(success(config.nodeId, { key, value: null, exists: false }));
+        return;
+      }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
     }

@@ -1046,7 +1046,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
      `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
   const [pins, setPins] = useState(DEFAULT_PINS);
   useEffect(() => {
-    getMemory('sidebar.pins')
+    getMemory('sidebar.pins', { soft: true })
       .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); })
       .catch(() => { /* defaults stand */ });
   }, []);

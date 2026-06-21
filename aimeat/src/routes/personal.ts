@@ -103,6 +103,13 @@ export function personalRouter(
       const ownerName = req.auth!.owner;
       const node = await storage.getPersonalNodeByOwner(ownerName);
       if (!node) {
+        // Soft read: the profile Nodes tab polls this on load and "no node anchored" is the
+        // normal state for most owners. ?soft=1 returns a 200 { anchored: false } instead of
+        // a 404 so it doesn't spam the browser console. Default stays 404 (RFC/test contract).
+        if (req.query.soft) {
+          res.json(success(config.nodeId, { anchored: false, node_id: null }));
+          return;
+        }
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No personal node anchored for this owner'));
         return;
       }

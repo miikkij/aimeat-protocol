@@ -13,6 +13,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 
 const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch { return ''; } };
@@ -49,10 +50,7 @@ export function NotificationBell({ t, onNavigate }) {
 
   useEffect(() => {
     load();
-    const onUpd = () => load();
-    window.addEventListener('aimeat-live-update', onUpd);
-    const iv = setInterval(load, 45000);
-    return () => { window.removeEventListener('aimeat-live-update', onUpd); clearInterval(iv); };
+    return onLiveUpdate(['agent-messages', 'agent-tasks', 'notifications', 'workspace-access'], () => load());
   }, [load]);
 
   // Close the dropdown on an outside click.

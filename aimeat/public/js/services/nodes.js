@@ -20,7 +20,7 @@ async function isPersonalEnabled() {
 export async function listNodes() {
   try {
     if (!(await isPersonalEnabled())) return [];
-    const data = await apiGet('/v1/personal/status');
+    const data = await apiGet('/v1/personal/status?soft=1');
     return data?.data?.node_id ? [data.data] : [];
   } catch { return []; }
 }

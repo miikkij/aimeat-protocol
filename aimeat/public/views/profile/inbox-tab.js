@@ -354,7 +354,10 @@ export default function InboxTab({ showToast }) {
     return () => { cancelled = true; };
   }, [awaitingIds]);
 
-  const loadThread = useCallback(async (conv) => {
+  // markRead=true ONLY when the user opens the conversation. Marking read POSTs a receipt which itself
+  // emits a 'messages' change → SSE → live refresh; doing it on every live refresh creates a
+  // self-sustaining request loop. So live refreshes reload the thread WITHOUT marking read.
+  const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
     const msgs = (await messages.getConversation(conv.conversationId).catch(() => [])).slice().reverse();
     setThread(msgs);
@@ -363,7 +366,7 @@ export default function InboxTab({ showToast }) {
       .filter(a => a.mode === 'duplicate' && a.localKey)
       .map(async a => { const u = await messages.attachmentUrl(a.localKey).catch(() => null); if (u) map[a.id] = u; })));
     setUrlMap(map);
-    await messages.markConversationRead(conv.conversationId).catch(() => {});
+    if (markRead) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
 
   useEffect(() => { loadLists(); }, [loadLists]);
@@ -371,10 +374,15 @@ export default function InboxTab({ showToast }) {
   const liveRef = useRef(null);
   liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
   // Coalesce a burst of SSE 'change' events into one refresh — on a multi-node node these arrive
-  // rapidly and uncoalesced re-fetches make the list flicker (different replicas, different states).
+  // rapidly and uncoalesced re-fetches both flicker AND hammer the server. Also IGNORE domains the
+  // inbox doesn't care about (agent/work/notification background churn): only refresh when the change
+  // touches messages or the owner's memory (where conversations + tracked responses live).
+  const RELEVANT = ['messages', 'memory'];
   const liveTimerRef = useRef(null);
   useEffect(() => {
-    const handler = () => {
+    const handler = (e) => {
+      const domains = e?.detail?.domains;
+      if (Array.isArray(domains) && !domains.some(d => RELEVANT.includes(d))) return;   // not for us
       if (liveTimerRef.current) return;
       liveTimerRef.current = setTimeout(() => { liveTimerRef.current = null; liveRef.current?.(); }, 700);
     };
@@ -389,7 +397,7 @@ export default function InboxTab({ showToast }) {
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
     setDraftPrefill(''); setReplyingTrId(null);   // don't leak a suggested reply across threads
-    await loadThread(conv);
+    await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); };

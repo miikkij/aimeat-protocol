@@ -24,6 +24,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads } from '/js/services/agent-messages.js';
@@ -151,12 +152,7 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
 
   useEffect(() => { loadMessages(); }, [activeThread]);
 
-  useEffect(() => {
-    const handler = () => { loadMessages(); loadThreads(); loadCommands(); };
-    window.addEventListener('aimeat-live-update', handler);
-    const poller = setInterval(handler, 10000);
-    return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
-  }, [agentName, activeThread]);
+  useEffect(() => onLiveUpdate(['agent-messages'], () => { loadMessages(); loadThreads(); loadCommands(); }), [agentName, activeThread]);
 
   useEffect(() => {
     if (historyRef.current) {

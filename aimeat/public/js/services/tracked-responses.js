@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-06-21 — Initial service (Tracked Responses + importance flags).
  */
 import { api, apiGet } from '/js/api.js';
-import { createMemory, getMemory, deleteMemory, listMemories } from '/js/services/memory.js';
+import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
 
 const enc = encodeURIComponent;
 const FLAG_PREFIX = 'message-flag.';
@@ -88,11 +88,13 @@ export async function isMessageImportant(messageId) {
   catch { return false; }
 }
 
-/** Return the set of message ids the owner flagged important (for the "Needs reply" filter). A flag
- *  memory record exists ONLY while important (un-flag deletes it), so key-presence is sufficient. */
+/** Return the set of message ids the owner flagged important (for the "Needs reply" filter). Uses a
+ *  PREFIX query so it fetches only the tiny `message-flag.*` set — never the whole memory store. A flag
+ *  record exists ONLY while important (un-flag deletes it), so key-presence is sufficient. */
 export async function listImportantMessageIds() {
   try {
-    const items = await listMemories();
+    const r = await apiGet(`/v1/memory?prefix=${enc(FLAG_PREFIX)}`);
+    const items = r?.data?.items || [];
     return items
       .map(m => String(m.key || ''))
       .filter(k => k.startsWith(FLAG_PREFIX))

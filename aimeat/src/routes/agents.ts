@@ -838,9 +838,36 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // GET /v1/agents — list agents (auth required, returns own agents)
+  // GET /v1/agents — list agents (auth required, returns own agents).
+  // ?include=stats attaches a per-agent `stats` projection (task/message counts + latest
+  // timestamps + active-task list + onboarding) computed in a few grouped queries, so a
+  // fleet dashboard gets everything in ONE request instead of N+1 per-agent round trips.
   router.get('/v1/agents', requireAuth(), async (req, res) => {
     const agents = await storage.getAgentsByOwner(req.auth!.owner);
+
+    const include = String(req.query.include ?? '').split(',').map(s => s.trim());
+    const wantStats = include.includes('stats');
+
+    let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+    let msgCounts: Record<string, { total: number; lastMessageAt: string | null }> = {};
+    const onboardingByGaii: Record<string, unknown> = {};
+    const activeByGaii: Record<string, Array<{ id: string; title: string; status: string; updatedAt: string; createdAt: string; agentGaii: string }>> = {};
+    if (wantStats && agents.length > 0) {
+      const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+      const gaiis = agents.map(a => a.gaii);
+      const [tc, mc, active, obs] = await Promise.all([
+        storage.countTasksByOwner(ownerGhii),
+        storage.countMessagesByAgents(gaiis),
+        storage.listAgentTasksByOwner(ownerGhii, { status: 'active', perPage: 200 }),
+        Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(() => null))),
+      ]);
+      taskCounts = tc;
+      msgCounts = mc;
+      agents.forEach((a, i) => { onboardingByGaii[a.gaii] = obs[i]; });
+      for (const tsk of active.tasks) {
+        (activeByGaii[tsk.agentGaii] ??= []).push({ id: tsk.id, title: tsk.title, status: tsk.status, updatedAt: tsk.updatedAt, createdAt: tsk.createdAt, agentGaii: tsk.agentGaii });
+      }
+    }
 
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
@@ -865,6 +892,14 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         max_concurrent_tasks: a.maxConcurrentTasks ?? 1,
         daily_spend_limit: a.dailySpendLimit ?? null,
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
+        ...(wantStats ? {
+          stats: {
+            tasks: taskCounts[a.gaii] ?? { queued: 0, active: 0, done: 0, failed: 0, doneToday: 0, lastTaskUpdateAt: null, lastFailedAt: null },
+            messages: msgCounts[a.gaii] ?? { total: 0, lastMessageAt: null },
+            onboarding: onboardingByGaii[a.gaii] ?? null,
+            active_tasks: activeByGaii[a.gaii] ?? [],
+          },
+        } : {}),
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },

@@ -267,7 +267,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       { description: 'Start task', method: 'POST', url: `/v1/agents/${agentName}/tasks/${id}/start` },
       { description: 'List events', method: 'GET', url: `/v1/agents/${agentName}/tasks/${id}/events` },
     ]));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
     // Event-triggered workflows: a USER ordering an offer (the offers Ask flow tags the task with an
     // `offer_id` scope) may start a workflow. The workflow engine's OWN dispatched tasks go through
     // storage.createAgentTask directly (NOT this route) and use a different scope, so they don't fire
@@ -471,7 +471,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     }
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
     try { emitResourceUpdated(resolveAgentGaii(req, req.params.name as string), `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
   });
 
@@ -530,7 +530,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     } catch { /* best-effort trace cleanup */ }
 
     res.json(success(config.nodeId, { deleted: true }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
   });
 
@@ -600,7 +600,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/propose-todos -- Agent proposes (or re-proposes) a TODO plan ──
@@ -713,7 +713,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/request-changes -- Owner asks agent to revise the proposed TODOs ──
@@ -831,8 +831,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/messages`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated, message: messageRecord }));
-    emitChange('agent-tasks');
-    emitChange('agent-messages');
+    emitChange('agent-tasks', resolve(req));
+    emitChange('agent-messages', resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/pause -- Pause task (active -> paused) ── */
@@ -890,7 +890,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/event -- Append event ── */
@@ -970,7 +970,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     await storage.updateAgentTask(id, taskUpdates);
 
     res.status(201).json(success(config.nodeId, { event }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/complete -- Complete task (active -> done) ── */
@@ -1028,7 +1028,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     await recordTaskCompleted(storage, task.agentGaii, task.telemetry);
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
     // Public landing feed — only when the agent published a PUBLIC deliverable (a real material).
     if (deliverableKey) {
       void (async () => {
@@ -1102,7 +1102,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     await recordTaskFailed(storage, task.agentGaii);
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
       .catch(e => logger.error('workflow advance on task fail failed', { taskId: id, error: String(e) }));
   });
@@ -1206,7 +1206,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     recomputeAndCacheStatistics(storage, task.agentGaii, config.nodeId).catch(() => {});
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── PATCH /v1/agents/:name/tasks/:id/triage -- Move a task between Tasks-tab buckets ──
@@ -1250,7 +1250,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     });
 
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── PATCH /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo ── */
@@ -1324,7 +1324,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     }
 
     res.json(success(config.nodeId, { task: updated, todo: updatedTodos[todoIndex] }));
-    emitChange('agent-tasks');
+    emitChange('agent-tasks', resolve(req));
   });
 
   /* ── GET /v1/agents/:name/tasks/:id/events -- List task events ── */

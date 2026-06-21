@@ -4,6 +4,10 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   v3.1.0 -- 2026-06-21 -- Perf: loadData() now makes ONE request (GET /v1/agents?include=stats)
+ *     instead of 1 + N×5 per-agent fan-out; change badges become has-unseen dots derived from
+ *     latest-activity timestamps; device-auth + fleet refresh are push-only (domain-filtered
+ *     live updates, no setInterval polling).
  *   v1.0.0 -- 2026-03-17 -- Refactor: replace all inline styles with CSS utility classes
  *   v1.1.0 -- 2026-03-18 -- Rewrite agent prompt to use device-auth flow; remove connectivity key UI
  *   v1.2.0 -- 2026-03-19 -- Replace profile-initiated device auth with inline pending request approval
@@ -66,9 +70,6 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { Modal, useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
 import AgentCard from './agents/agent-card.js';
-import { getOnboarding } from '/js/services/agent-integration.js';
-import { listTasks } from '/js/services/agent-tasks.js';
-import { listMessages } from '/js/services/agent-messages.js';
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -437,20 +438,6 @@ function markTabSeen(owner, agentName, tab) {
   (seen[agentName] ||= {})[tab] = new Date().toISOString();
   saveSeen(owner, seen);
 }
-// Count items whose newest available timestamp (first present of `fields`) is
-// strictly newer than `since`. `since` falsy → 0 (the caller seeds a baseline
-// on first observation, so an agent's whole history is never dumped as "new").
-function countNewer(items, since, fields) {
-  if (!Array.isArray(items) || !since) return 0;
-  const sinceMs = new Date(since).getTime();
-  let n = 0;
-  for (const it of items) {
-    let ts = null;
-    for (const f of fields) { if (it && it[f]) { ts = it[f]; break; } }
-    if (ts && new Date(ts).getTime() > sinceMs) n++;
-  }
-  return n;
-}
 // Effective ordering: agents named in the saved order first (in that order),
 // then any agents not yet ordered (e.g. newly connected) in their API order.
 function effectiveOrderedNames(agents, order) {
@@ -495,7 +482,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const deepLinkNonce = useRef(0);
   // Per-agent unseen-change counts { name: { tasks, messages, memory } } driving
   // the collapsed mini-badge + per-tab number badges. Computed in loadData()
-  // from the localStorage "last seen per tab" baseline (see loadSeen/countNewer).
+  // from the localStorage "last seen per tab" baseline (see loadSeen + loadData badge logic).
   const [changesMap, setChangesMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode' | 'custom'
@@ -623,87 +610,73 @@ export default function AgentsTab({ session, showToast, onStats }) {
   };
 
   useEffect(() => {
-    if (session) loadData();
+    if (session) { loadData(); loadPending(); }
   }, [session]);
 
-  // Poll for pending device auth requests every 5 seconds
-  useEffect(() => {
-    if (!session) return;
-    let active = true;
-    async function poll() {
-      try {
-        const resp = await apiGet('/v1/agents/device-authorize/pending');
-        if (active && resp?.data?.requests) setPendingRequests(resp.data.requests);
-      } catch { /* ignore */ }
-    }
-    poll();
-    const poller = setInterval(poll, 5000);
-    return () => { active = false; clearInterval(poller); };
-  }, [session]);
+  // Pending device-auth requests — fetched once on mount and refreshed via the live-update
+  // handler below (device-authorize / approve / deny all emit on the 'agents' domain), so no
+  // steady-state polling. Loaded together with the live listener effect.
+  async function loadPending() {
+    try {
+      const resp = await apiGet('/v1/agents/device-authorize/pending');
+      if (resp?.data?.requests) setPendingRequests(resp.data.requests);
+    } catch { /* ignore */ }
+  }
 
   async function loadData() {
     try {
-      const list = await listAgents(session.owner);
+      // ONE request for the whole fleet: agents + per-agent stats (task/message counts, latest
+      // activity timestamps, active-task list, onboarding) via ?include=stats. Replaces the old
+      // 1 + N×5 per-agent fan-out (~185 requests for 46 agents).
+      const list = await listAgents(session.owner, { include: 'stats' });
       setAgents(list);
       onStats?.({ agents: list.length });
       if (!groupByDefaultApplied.current && !userPickedGroupBy.current && list.some(a => (a.tags ?? []).length > 0)) {
         groupByDefaultApplied.current = true;
         setGroupBy('tag');
       }
+
       const obMap = {};
-      await Promise.all(list.map(async (a) => {
-        try {
-          const resp = await getOnboarding(a.name);
-          obMap[a.name] = resp?.data?.onboarding || null;
-        } catch { obMap[a.name] = null; }
-      }));
-      setOnboardings(obMap);
       const tsMap = {};
       const atsMap = {};
+      const chMap = {};
       const seen = loadSeen(session.owner);
       let seenSeeded = false;
-      const chMap = {};
-      await Promise.all(list.map(async (a) => {
-        try {
-          const [doneResp, activeResp, msgResp, failedResp] = await Promise.all([
-            listTasks(a.name, { status: 'done', per_page: 100 }),
-            listTasks(a.name, { status: 'active', per_page: 100 }),
-            listMessages(a.name, { perPage: 100 }).catch(() => null),
-            listTasks(a.name, { status: 'failed', per_page: 50 }).catch(() => null),
-          ]);
-          const today = new Date().toISOString().slice(0, 10);
-          const doneTasks = doneResp?.data?.tasks || [];
-          const activeTasks = activeResp?.data?.tasks || [];
-          const doneToday = doneTasks.filter(tk => tk.completedAt?.startsWith(today)).length;
-          tsMap[a.name] = { done: doneToday, active: activeTasks.length };
-          atsMap[a.name] = activeTasks;
+      const nowIso = new Date().toISOString();
 
-          // Per-tab unseen-change counts. First observation of a tab seeds its
-          // baseline to "now" (count 0) so an agent's whole history is never
-          // dumped as new; only changes after that point raise the badge.
-          const agentSeen = seen[a.name] || (seen[a.name] = {});
-          const nowIso = new Date().toISOString();
-          const ch = {};
-          const failedTasks = failedResp?.data?.tasks || [];
-          for (const [tab, items, fields] of [
-            // Tasks badge counts new completions + new failures (the "needs a look" set).
-            ['tasks', [...doneTasks, ...activeTasks, ...failedTasks], ['updatedAt', 'completedAt', 'createdAt']],
-            // Only count agent→owner messages as unread; the owner's own
-            // inbound messages are not "new" to them.
-            ['messages', (msgResp?.data?.messages || []).filter(m => m.direction !== 'inbound'), ['createdAt', 'created_at']],
-          ]) {
-            if (agentSeen[tab] === undefined) { agentSeen[tab] = nowIso; seenSeeded = true; ch[tab] = 0; }
-            else ch[tab] = countNewer(items, agentSeen[tab], fields);
-          }
-          // Red badge is reserved for unseen FAILED tasks; everything else stays neutral.
-          ch.tasksFailed = agentSeen.tasks === nowIso ? 0 : countNewer(failedTasks, agentSeen.tasks, ['updatedAt', 'completedAt', 'createdAt']);
-          chMap[a.name] = ch;
-        } catch { tsMap[a.name] = null; chMap[a.name] = null; atsMap[a.name] = []; }
-      }));
+      for (const a of list) {
+        const st = a.stats || {};
+        const tasks = st.tasks || {};
+        obMap[a.name] = st.onboarding || null;
+        tsMap[a.name] = {
+          done: tasks.doneToday || 0,    // completed today (live state-count)
+          active: tasks.active || 0,
+          failed: tasks.failed || 0,
+          queued: tasks.queued || 0,
+        };
+        atsMap[a.name] = st.active_tasks || [];
+
+        // Has-unseen badge (a dot, not an exact count): compare the agent's latest activity
+        // timestamp against the per-tab `seen` baseline. First observation seeds the baseline to
+        // "now" so an agent's whole history is never dumped as "new". Red = unseen FAILED task.
+        const agentSeen = seen[a.name] || (seen[a.name] = {});
+        const lastTaskAt = tasks.lastTaskUpdateAt || null;
+        const lastMsgAt = (st.messages && st.messages.lastMessageAt) || null;
+        const lastFailedAt = tasks.lastFailedAt || null;
+        const ch = {};
+        for (const [tab, latest] of [['tasks', lastTaskAt], ['messages', lastMsgAt]]) {
+          if (agentSeen[tab] === undefined) { agentSeen[tab] = nowIso; seenSeeded = true; ch[tab] = 0; }
+          else ch[tab] = (latest && latest > agentSeen[tab]) ? 1 : 0;
+        }
+        ch.tasksFailed = (agentSeen.tasks !== nowIso && lastFailedAt && lastFailedAt > agentSeen.tasks) ? 1 : 0;
+        chMap[a.name] = ch;
+      }
+
+      setOnboardings(obMap);
       setTaskStatsMap(tsMap);
       setActiveTasksMap(atsMap);
-      // Persist any freshly-seeded baselines. Merge against the latest storage
-      // so a tab the user opened mid-fetch (markTabSeen) is not overwritten.
+      // Persist any freshly-seeded baselines. Merge against the latest storage so a tab the user
+      // opened mid-fetch (markTabSeen) is not overwritten.
       if (seenSeeded) {
         const fresh = loadSeen(session.owner);
         for (const name of Object.keys(seen)) {
@@ -718,17 +691,23 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch { setAgents([]); }
   }
 
-  // Live update listener + fallback polling every 10s
+  // Live updates (push-only, no steady-state polling): refetch the fleet only when a relevant
+  // domain actually changed. Hidden tabs are already gated upstream (live-updates.js), so a
+  // background tab does nothing here.
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
+  const pendingRef = useRef(loadPending);
+  pendingRef.current = loadPending;
   useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    const poller = setInterval(() => loadRef.current(), 10000);
-    return () => {
-      window.removeEventListener('aimeat-live-update', handler);
-      clearInterval(poller);
+    const FLEET_DOMAINS = ['agents', 'agent-tasks', 'agent-messages', 'agent-onboarding'];
+    const handler = (e) => {
+      const d = e.detail?.domains;           // Set<string> | null (null = everything changed)
+      if (d && !FLEET_DOMAINS.some(x => d.has(x))) return;
+      loadRef.current();
+      if (!d || d.has('agents')) pendingRef.current();   // device-auth requests ride the 'agents' domain
     };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
 
   function toggleAgent(name) {

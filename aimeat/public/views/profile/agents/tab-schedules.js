@@ -10,6 +10,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { listAgentSchedules } from '/js/services/schedules.js';
 import { CreateForm } from '../scheduler-tab.js';
@@ -37,10 +38,7 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
   loadRef.current = loadData;
   useEffect(() => {
     loadData();
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    const poller = setInterval(() => loadRef.current(), 15000);
-    return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
+    return onLiveUpdate(['schedules', 'agent-tasks'], () => loadRef.current());
   }, [loadData]);
 
   if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;

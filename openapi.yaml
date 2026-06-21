@@ -5324,10 +5324,20 @@ paths:
     get:
       operationId: listAgents
       summary: List own agents
-      description: List all agents owned by the authenticated owner.
+      description: |
+        List all agents owned by the authenticated owner. Pass `include=stats` to attach a
+        per-agent `stats` projection (task/message counts, latest-activity timestamps, the
+        active-task list, and onboarding) computed in a few grouped queries — so a fleet
+        dashboard gets everything in ONE request instead of N+1 per-agent round trips.
       tags: [Identity]
       security:
         - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          schema:
+            type: string
+          description: 'Comma-separated optional projections. Currently supported: `stats`.'
       responses:
         '200':
           description: List of agents
@@ -5344,7 +5354,44 @@ paths:
                           agents:
                             type: array
                             items:
-                              $ref: '#/components/schemas/AgentProfile'
+                              allOf:
+                                - $ref: '#/components/schemas/AgentProfile'
+                                - type: object
+                                  properties:
+                                    stats:
+                                      type: object
+                                      description: Present only when `include=stats` was requested.
+                                      properties:
+                                        tasks:
+                                          type: object
+                                          properties:
+                                            queued: { type: integer }
+                                            active: { type: integer }
+                                            done: { type: integer }
+                                            failed: { type: integer }
+                                            doneToday: { type: integer }
+                                            lastTaskUpdateAt: { type: string, format: date-time, nullable: true }
+                                            lastFailedAt: { type: string, format: date-time, nullable: true }
+                                        messages:
+                                          type: object
+                                          properties:
+                                            total: { type: integer }
+                                            lastMessageAt: { type: string, format: date-time, nullable: true }
+                                        onboarding:
+                                          type: object
+                                          nullable: true
+                                          description: The agent's onboarding record, or null.
+                                        active_tasks:
+                                          type: array
+                                          items:
+                                            type: object
+                                            properties:
+                                              id: { type: string }
+                                              title: { type: string }
+                                              status: { type: string }
+                                              updatedAt: { type: string, format: date-time }
+                                              createdAt: { type: string, format: date-time }
+                                              agentGaii: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -6531,6 +6578,15 @@ paths:
           schema:
             type: string
           description: URL-encoded memory key (may include GAII prefix for public reads)
+        - name: soft
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: >-
+            When truthy, a missing key returns 200 with { value: null, exists: false }
+            instead of 404. Use for optional keys (UI preferences, config) that may not
+            exist yet, to avoid client-side 404 noise.
       responses:
         '200':
           description: Memory entry
