@@ -6725,6 +6725,83 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/librarian/plan:
+    post:
+      operationId: librarianPlan
+      summary: AI enrichment plan for a free-text note (notebook)
+      description: >
+        Owner-scoped. Given a free-text note and the caller's organism/workspace structure, asks the
+        caller's own OpenRouter model to reason about the note's intent and propose an ordered plan of
+        enrichment steps that expand the note before it is filed. Step kinds: `llm_reason` (expand using
+        only the note), `librarian_assess` (summarise the caller's own existing material found via the
+        librarian), and `delegate` (hand the work to one of the owner's AI-agent offers, grounded by the
+        optional `catalogue`). Returns the plan plus the structure context. The steps are executed
+        client-side over the generic AI (/v1/ai/complete), librarian (/v1/librarian/search) and agent
+        task/offer APIs; nothing is written here.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: The free-text note to plan enrichment for
+                catalogue:
+                  type: array
+                  description: >
+                    Optional compact list of the owner's AI-agent offers (agent, offerId, title, ask,
+                    latency, cost) so the planner can ground `delegate` steps against the live fleet.
+                    Delegate steps whose agent+offerId are not in this list are dropped.
+                  items:
+                    type: object
+                    properties:
+                      agent: { type: string }
+                      offerId: { type: string }
+                      title: { type: string }
+                      ask: { type: string }
+                      latency: { type: string }
+                      cost: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/librarian/distribute:
+    post:
+      operationId: librarianDistribute
+      summary: Split a free-text note into placed chunks (notebook)
+      description: >
+        Owner-scoped. Splits a (typically already enriched) note into 1–6 self-contained chunks and
+        suggests a home (organism → workspace → document space) for each, drafting a clean title +
+        markdown per chunk. Returns the chunks plus the structure context. The per-chunk materialize
+        runs client-side over the generic memory/organism APIs; nothing is written here.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: The free-text note to split and place
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/memory/discover:
     get:
       operationId: discoverPublicMemory

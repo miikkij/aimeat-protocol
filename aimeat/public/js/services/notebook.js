@@ -8,9 +8,13 @@
  *   note as a workspace DOCUMENT.
  * @structure
  *   - classifyNote(text) — POST /v1/librarian/classify
+ *   - distributeNote(text) — POST /v1/librarian/distribute (split into placed chunks)
  *   - materializeDocument(plan) — resolve/create org → ws → document space → write doc → drop source
+ *   - distributeChunks(chunks, sourceKey, onProgress) — materialize each chunk to its home
+ *   - getNotebookSettings/saveNotebookSettings — the per-owner trust toggles (notebook.settings)
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: classify + materialize-document orchestration (slice B).
+ *   v1.1.0 — 2026-06-21 — Phase 3: distribute (split → many homes) + notebook.settings trust toggles.
  */
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
@@ -35,6 +39,28 @@ export async function classifyNote(text) {
   });
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Classify failed');
   return resp?.data || null;
+}
+
+/** Ask the backend to SPLIT a note into placed chunks (notebook stage 3). Slow AI call — full timeout,
+ *  no retry (same reasoning as classifyNote). Returns the DistributeResult envelope's data. */
+export async function distributeNote(text) {
+  const resp = await api('/v1/librarian/distribute', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+    timeoutMs: 1_800_000,
+    retries: 0,
+  });
+  if (resp?.ok === false) { const e = new Error(resp.error?.message || 'Distribute failed'); e.code = resp.error?.code; throw e; }
+  return resp?.data || null;
+}
+
+/** The per-owner notebook trust toggles ({ autoDetectIntent, autoRunPlan, autoDistribute }). */
+export async function getNotebookSettings() {
+  try { const r = await getMemory('notebook.settings'); return (r?.data?.value) || {}; }
+  catch { return {}; }
+}
+export async function saveNotebookSettings(settings) {
+  return createMemory('notebook.settings', settings, 'private');
 }
 
 /** A document-space objectType for a memory-backed workspace. */
@@ -121,4 +147,50 @@ export async function materializeDocument(plan) {
   if (plan.sourceKey) await deleteMemory(plan.sourceKey).catch(() => {});
 
   return { organismId, workspaceId, space, docId };
+}
+
+/**
+ * Materialize each chunk of a distribute plan into its own home. Chunks with a resolved home go there;
+ * chunks the model proposed a NEW name for create that org/workspace; chunks with neither are grouped
+ * into a single shared "Notebook" organism (created once, reused) so unplaced pieces are never lost.
+ * The source inbox note is dropped ONLY after every chunk has been filed.
+ * @param {Array} chunks  DistributeChunk[] from distributeNote().
+ * @param {string} [sourceKey]  Inbox note key to delete once all chunks are filed.
+ * @param {(index:number, status:'running'|'done'|'failed', result?:object)=>void} [onProgress]
+ * @returns {Promise<Array>} per-chunk materialize results
+ */
+export async function distributeChunks(chunks, sourceKey, onProgress) {
+  const results = [];
+  let notebookFallback = null;   // { organismId, workspaceId, space } for unplaced chunks
+  for (let i = 0; i < chunks.length; i++) {
+    const c = chunks[i];
+    onProgress?.(i, 'running');
+    const organismName = c.createNew?.organismName || c.organismName;
+    const plan = {
+      organismId: c.organismId || null,
+      organismName,
+      workspaceId: c.workspaceId || null,
+      workspaceName: c.createNew?.workspaceName || c.workspaceName,
+      space: c.space || null,
+      title: c.title,
+      markdown: c.markdown,
+    };
+    const unplaced = !plan.organismId && !organismName;
+    if (unplaced && notebookFallback) {
+      plan.organismId = notebookFallback.organismId;
+      plan.workspaceId = notebookFallback.workspaceId;
+      plan.space = notebookFallback.space;
+    }
+    try {
+      const res = await materializeDocument(plan);   // no sourceKey — don't delete per chunk
+      if (unplaced && !notebookFallback) notebookFallback = { organismId: res.organismId, workspaceId: res.workspaceId, space: res.space };
+      results.push(res);
+      onProgress?.(i, 'done', res);
+    } catch (e) {
+      onProgress?.(i, 'failed');
+      throw e;   // surface the failure; source note is NOT deleted so nothing is lost
+    }
+  }
+  if (sourceKey) await deleteMemory(sourceKey).catch(() => {});
+  return results;
 }

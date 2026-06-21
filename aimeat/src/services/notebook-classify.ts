@@ -13,14 +13,16 @@
  * @usage const result = await classifyNote(storage, config, { gaii, ownerName, text });
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: AI placement classifier over OpenRouter (slice B).
+ *   v1.1.0 — 2026-06-21 — Key/model resolution + completion extracted to notebook-ai.ts (shared with
+ *     the planner); ClassifyError now extends NotebookAiError.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { complete } from './openrouter.js';
-import { decrypt, getEncryptionKey } from './encryption.js';
 import { stripCodeblock } from './generator-prompts/strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
+import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
+import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
 
 export interface PlacementSpace { namespace: string; name: string }
 export interface PlacementWorkspace { id: string; name: string; documentSpaces: PlacementSpace[] }
@@ -47,10 +49,9 @@ export interface ClassifyResult {
   model: string;
 }
 
-/** Raised with a stable `code` so the route can map it to the right HTTP status + envelope. */
-export class ClassifyError extends Error {
-  constructor(public code: string, message: string, public status = 400) { super(message); }
-}
+/** Raised with a stable `code` so the route can map it to the right HTTP status + envelope.
+ *  Extends NotebookAiError so routes can match either with one `instanceof` check. */
+export class ClassifyError extends NotebookAiError {}
 
 const MAX_ORGS = 30;
 const MAX_WS_PER_ORG = 25;
@@ -134,37 +135,13 @@ export async function classifyNote(
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
-  // OpenRouter key + model (same per-owner settings the /v1/openrouter routes use).
-  const [apiKeyRecord, prefsRecord] = await Promise.all([
-    storage.getMemory(opts.gaii, 'openrouter.apikey'),
-    storage.getMemory(opts.gaii, 'openrouter.settings'),
-  ]);
-  const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
-  const provider = (prefs.provider as string) || 'openrouter';
-  const baseUrl = (prefs.baseUrl as string) || 'https://openrouter.ai/api/v1';
-  const encrypted = (apiKeyRecord?.value as { encrypted?: string })?.encrypted;
-  let decryptedKey: string | undefined;
-  if (encrypted) {
-    const encKey = getEncryptionKey(config);
-    if (!encKey) throw new ClassifyError('ENCRYPTION_NOT_CONFIGURED', 'Encryption key not configured on this node.', 503);
-    decryptedKey = decrypt(encrypted, encKey);
-  } else if (provider === 'openrouter') {
-    throw new ClassifyError('NO_OPENROUTER_KEY', 'No OpenRouter API key configured. Add one in the OpenRouter settings to use AI sorting.', 400);
-  }
-  const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
+  // Owner's own OpenRouter key + model (shared resolution; throws NO_OPENROUTER_KEY when missing).
+  const owner = await resolveOwnerModel(storage, config, opts.gaii);
 
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
   const prompt = fillPrompt(await loadClassifyTemplate(storage), context, text);
 
-  let result;
-  try {
-    result = await complete(decryptedKey, model, prompt, NOTEBOOK_CLASSIFY_SYSTEM, baseUrl, { temperature: 0.2 });
-  } catch (e) {
-    const status = (e as { status?: number }).status;
-    if (status === 401) throw new ClassifyError('INVALID_API_KEY', 'OpenRouter rejected the API key.', 401);
-    if (status === 429) throw new ClassifyError('RATE_LIMITED', 'OpenRouter rate limit hit. Try again shortly.', 429);
-    throw new ClassifyError('OPENROUTER_ERROR', (e as Error).message, 502);
-  }
+  const result = await completeOwner(owner, prompt, NOTEBOOK_CLASSIFY_SYSTEM, { temperature: 0.2 });
 
   let parsed: Record<string, unknown>;
   try {
@@ -195,4 +172,78 @@ export async function classifyNote(
     : null;
 
   return { suggestion, alternatives, createNew, context: { organisms: context }, model: result.model };
+}
+
+// ── Distribute: split a note into placed chunks (notebook stage 3) ──
+
+export interface DistributeChunk extends PlacementTarget {
+  title: string;
+  markdown: string;
+  createNew?: { suggest: boolean; organismName?: string; workspaceName?: string } | null;
+}
+export interface DistributeResult {
+  chunks: DistributeChunk[];
+  context: { organisms: PlacementOrganism[] };
+  model: string;
+}
+
+const MAX_CHUNKS = 6;
+
+async function loadDistributeTemplate(storage: Storage): Promise<string> {
+  try {
+    const rec = await storage.getSystemPrompt('notebook-distribute');
+    if (rec && rec.active && typeof rec.content === 'string' && rec.content.trim()) return rec.content;
+  } catch { /* fall through to the code default */ }
+  return NOTEBOOK_DISTRIBUTE_TEMPLATE;
+}
+
+interface RawChunk extends RawSuggestion { createNew?: { suggest?: unknown; organismName?: unknown; workspaceName?: unknown } }
+
+/** Split a (typically enriched) note into self-contained chunks, each resolved to a real home (or a
+ *  create-new hint). Reuses the same OpenRouter resolution + placement context + id-resolution as the
+ *  classifier so the frontend can render/override homes the same way; the per-chunk materialize runs
+ *  client-side over the generic memory/organism APIs (no-SSR). */
+export async function distributeNote(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string },
+): Promise<DistributeResult> {
+  const text = opts.text.trim();
+  if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
+
+  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
+  const prompt = (await loadDistributeTemplate(storage))
+    .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))
+    .split('{{note}}').join(text);
+
+  const result = await completeOwner(owner, prompt, NOTEBOOK_DISTRIBUTE_SYSTEM, { temperature: 0.2 });
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(stripCodeblock(result.content).trim());
+  } catch {
+    throw new ClassifyError('PARSE_ERROR', 'The model did not return valid JSON. Try again.', 502);
+  }
+
+  const rawChunks = Array.isArray(parsed.chunks) ? (parsed.chunks as RawChunk[]).slice(0, MAX_CHUNKS) : [];
+  const chunks: DistributeChunk[] = rawChunks.map((rc) => {
+    const target = resolveTarget(context, rc);
+    const cn = rc.createNew;
+    const createNew = cn && cn.suggest
+      ? {
+          suggest: true,
+          organismName: typeof cn.organismName === 'string' ? cn.organismName : undefined,
+          workspaceName: typeof cn.workspaceName === 'string' ? cn.workspaceName : undefined,
+        }
+      : null;
+    return {
+      ...target,
+      title: typeof rc.title === 'string' && rc.title.trim() ? rc.title.trim() : 'Untitled',
+      markdown: typeof rc.markdown === 'string' ? rc.markdown : '',
+      createNew,
+    };
+  }).filter(c => c.markdown.trim());
+
+  return { chunks, context: { organisms: context }, model: result.model };
 }
