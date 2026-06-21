@@ -222,12 +222,14 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     } catch (e) { /* noop */ }
   }, [activeDoc, docKey]);
 
-  // Debounced: on a busy node dozens of agents emit 'organisms'/'memory' events ~1/sec; collapse a
-  // burst into one reload of the workspace + approvals + sections + activity.
+  // Subscribe to 'organisms' ONLY — NOT the global 'memory' firehose (every one of dozens of agents'
+  // unrelated memory writes was waking this view even when nothing in THIS workspace changed). Organism
+  // content writes now also emit 'organisms' (see the memory route), so real workspace changes still
+  // refresh; debounced to coalesce a burst into one reload.
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => {
     let timer = null;
-    const off = onLiveUpdate(['organisms', 'memory'], () => { clearTimeout(timer); timer = setTimeout(() => liveRef.current(), 1500); });
+    const off = onLiveUpdate(['organisms'], () => { clearTimeout(timer); timer = setTimeout(() => liveRef.current(), 1500); });
     return () => { clearTimeout(timer); off(); };
   }, []);
 
