@@ -146,7 +146,7 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
         <div class="inbox-track-classify">
           <${Spinner} />
           <div class="inbox-track-classify-step">${t('inbox.trackAiThinking')}</div>
-          <div class="inbox-track-classify-sub">${NB_STEPS[step] || ''}</div>
+          <div class="inbox-track-classify-sub">${t(NB_STEPS[step]) || ''}</div>
         </div>` : null}
 
       ${phase === 'error' ? html`

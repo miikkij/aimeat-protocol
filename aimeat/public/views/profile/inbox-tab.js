@@ -11,6 +11,11 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.6.1 -- 2026-06-21 -- Approve-mode fixes: the "reply ready" suggestion now renders as a dashed
+ *     draft bubble (Open record · Reject · Approve & edit) and "Approve & edit" actually seeds the
+ *     composer (the rich editor was initialising empty). Single header badge (no confusing double "1"),
+ *     a record link to jump to the watched workspace record, cancel shows real errors + removes the row
+ *     immediately, and SSE refreshes are debounced to stop the tracked-list flicker on multi-node nodes.
  *   v1.6.0 -- 2026-06-21 -- TrackResponseModal extracted to ./track-response-modal.js (shared with the
  *     Notebook) + a "park to notebook for later" action (keeps the message's source link + reply intent).
  *   v1.5.0 -- 2026-06-21 -- Track-a-response now forms the INTENT with AI (notebook classifier picks
@@ -185,7 +190,7 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
         height: '160px',
         initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
         previewStyle: 'tab',
-        initialValue: '',
+        initialValue: initialText || '', // seed the suggested reply (Composer remounts via key on change)
         usageStatistics: false,
         toolbarItems: [
           ['bold', 'italic', 'strike'],
@@ -254,6 +259,7 @@ export default function InboxTab({ showToast }) {
   const [trackMsg, setTrackMsg] = useState(null);         // message being tracked (opens modal)
   const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply seeded into the composer
   const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
+  const [awaitingDrafts, setAwaitingDrafts] = useState({}); // tr.id → suggested reply body (for the bubble)
   const msgsRef = useRef(null);
   // Ids the user just cancelled — kept so a stale re-fetch (replica lag on a multi-node node) can't
   // re-add a row the user already dismissed until the cancel has propagated.
@@ -318,9 +324,35 @@ export default function InboxTab({ showToast }) {
 
   const useSuggestedReply = async (tr) => {
     const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
-    setDraftPrefill(d?.draft?.body || '');
+    setDraftPrefill(d?.draft?.body || awaitingDrafts[tr.id] || '');
     setReplyingTrId(tr.id);
   };
+
+  // Open the workspace record this tracked response watches (so you can jump straight to the bug).
+  const openRecord = (tr) => {
+    const r = tr.references || {};
+    if (!r.organismId || !r.workspaceId) { showToast?.(t('inbox.trackNoRecord'), true); return; }
+    try {
+      sessionStorage.setItem('aimeat.ws.openId', r.organismId);
+      sessionStorage.setItem('aimeat.ws.openWs', r.workspaceId);
+    } catch { /* noop */ }
+    window.location.assign('/v1/profile?tab=organisms');
+  };
+
+  // Fetch the suggested-reply body for each awaiting contract in the open conversation (for the bubble).
+  const awaitingIds = awaitingForConv.map(t => t.id).join(',');
+  useEffect(() => {
+    if (!awaitingForConv.length) { setAwaitingDrafts({}); return undefined; }
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(awaitingForConv.map(async tr => {
+        const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
+        return [tr.id, d?.draft?.body || ''];
+      }));
+      if (!cancelled) setAwaitingDrafts(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [awaitingIds]);
 
   const loadThread = useCallback(async (conv) => {
     if (!conv) return;
@@ -338,10 +370,16 @@ export default function InboxTab({ showToast }) {
 
   const liveRef = useRef(null);
   liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
+  // Coalesce a burst of SSE 'change' events into one refresh — on a multi-node node these arrive
+  // rapidly and uncoalesced re-fetches make the list flicker (different replicas, different states).
+  const liveTimerRef = useRef(null);
   useEffect(() => {
-    const handler = () => liveRef.current?.();
+    const handler = () => {
+      if (liveTimerRef.current) return;
+      liveTimerRef.current = setTimeout(() => { liveTimerRef.current = null; liveRef.current?.(); }, 700);
+    };
     window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    return () => { window.removeEventListener('aimeat-live-update', handler); if (liveTimerRef.current) clearTimeout(liveTimerRef.current); };
   }, []);
 
   useEffect(() => {
@@ -488,10 +526,16 @@ export default function InboxTab({ showToast }) {
           })}
         </div>
         ${awaitingForConv.map(tr => html`
-          <div class="inbox-track-banner" key=${tr.id}>
-            <span class="inbox-track-banner-ico">✅</span>
-            <span class="inbox-track-banner-txt">${t('inbox.trackReady')} — ${escHtml(tr.title || '')}</span>
-            <button class="btn-primary btn-sm" onClick=${() => useSuggestedReply(tr)}>${t('inbox.trackUseSuggested')}</button>
+          <div class="inbox-row inbox-row--mine" key=${tr.id}>
+            <div class="inbox-bubble inbox-bubble--mine inbox-bubble--draft">
+              <div class="inbox-draft-label">🔗 ${t('inbox.trackReady')}</div>
+              <div class="inbox-bubble-body"><${Markdown} text=${awaitingDrafts[tr.id] || tr.title || ''} /></div>
+              <div class="inbox-draft-actions">
+                <button class="btn-ghost btn-sm" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>📄 ${t('inbox.trackOpenRecord')}</button>
+                <button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackReject')}</button>
+                <button class="btn-primary btn-sm" onClick=${() => useSuggestedReply(tr)}>${t('inbox.trackApprove')}</button>
+              </div>
+            </div>
           </div>`)}
         <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
           sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill} />
@@ -530,8 +574,9 @@ export default function InboxTab({ showToast }) {
                 </div>
               </div>
               <div class="inbox-tracked-actions">
+                ${tr.references?.organismId ? html`<button class="btn-ghost btn-sm" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>📄</button>` : null}
                 ${tr.state === 'awaiting-approval'
-                  ? html`<button class="btn-primary btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackUseSuggested')}</button>`
+                  ? html`<button class="btn-primary btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackApprove')}</button>`
                   : html`<button class="btn-outline btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackedOpen')}</button>`}
                 ${tr.state !== 'replied' ? html`<button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>` : null}
               </div>
@@ -548,8 +593,9 @@ export default function InboxTab({ showToast }) {
           <div class="section-desc">${t('inbox.desc')}</div>
         </div>
         <div class="inbox-head-actions">
-          <button class=${`btn-outline${mode === 'tracked' ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}>
-            🔗 ${t('inbox.trackedTitle')}${trackedList.length ? html` <span class="inbox-count">${trackedList.length}</span>` : ''}${awaitingCount ? html` <span class="inbox-conv-badge">${awaitingCount}</span>` : ''}
+          <button class=${`btn-outline${mode === 'tracked' ? ' btn-outline--active' : ''}${awaitingCount ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}
+            title=${awaitingCount ? t('inbox.trackReady') : ''}>
+            🔗 ${t('inbox.trackedTitle')}${trackedList.length ? html` <span class="inbox-count">${trackedList.length}</span>` : ''}
           </button>
           <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
         </div>

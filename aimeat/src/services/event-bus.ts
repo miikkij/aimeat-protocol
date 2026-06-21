@@ -15,6 +15,9 @@
  *     connector forward tunnel's realtime reverse delivery.
  *   v1.2.0 — 2026-06-16 — Add the `publicActivity` broadcast channel carrying a
  *     full public-feed event payload to every public SSE client (landing feed).
+ *   v1.3.0 — 2026-06-21 — `change` events carry an optional `ownerGaii` so the SSE
+ *     transport can scope owner-private domains per connected owner (hot agent paths);
+ *     omitted owner = global broadcast (shared data stays visible to all owners).
  */
 import { EventEmitter } from 'node:events';
 
@@ -24,10 +27,17 @@ bus.setMaxListeners(0); // unlimited — each SSE client adds a listener
 export interface ChangeEvent {
   domain: string;
   timestamp: number;
+  /**
+   * Owner this change concerns (GHII or GAII — only the owner SEGMENT is compared). When set,
+   * the SSE transport forwards the event ONLY to streams owned by that owner; when ABSENT the
+   * event is global (broadcast to every client). Default-omit keeps shared-data changes
+   * (organisms, boards, public activity, …) visible to other owners. See sse.ts owner filter.
+   */
+  ownerGaii?: string;
 }
 
-export function emitChange(domain: string): void {
-  bus.emit('change', { domain, timestamp: Date.now() } satisfies ChangeEvent);
+export function emitChange(domain: string, ownerGaii?: string): void {
+  bus.emit('change', { domain, timestamp: Date.now(), ...(ownerGaii ? { ownerGaii } : {}) } satisfies ChangeEvent);
 }
 
 export function onChangeEvent(handler: (evt: ChangeEvent) => void): void {

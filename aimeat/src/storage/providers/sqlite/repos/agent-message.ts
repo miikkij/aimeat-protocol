@@ -141,3 +141,22 @@ export function listThreads(
     };
   });
 }
+
+export function countMessagesByAgents(
+  db: Database.Database,
+  agentGaiis: string[],
+): Record<string, { total: number; lastMessageAt: string | null }> {
+  const out: Record<string, { total: number; lastMessageAt: string | null }> = {};
+  if (agentGaiis.length === 0) return out;
+  const placeholders = agentGaiis.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT agentGaii, COUNT(*) AS total, MAX(createdAt) AS lastMessageAt
+       FROM agent_messages
+      WHERE agentGaii IN (${placeholders}) AND direction != 'inbound'
+      GROUP BY agentGaii`
+  ).all(...agentGaiis) as Array<{ agentGaii: string; total: number; lastMessageAt: string | null }>;
+  for (const r of rows) {
+    out[r.agentGaii] = { total: r.total, lastMessageAt: r.lastMessageAt ?? null };
+  }
+  return out;
+}
