@@ -2207,8 +2207,8 @@
 .pj-empty { color: var(--muted); font-size: 0.85rem; padding: 0.2rem 0; }
 
 /* ── In-context content search (Kerros 1): filter tabs to matches + grouped result list ── */
-.pj-ws-searchbar { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.6rem; }
-.pj-ws-searchbar .search-bar { flex: 1; }
+.pj-ws-searchbar, .pj-org-globalsearch { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.6rem; }
+.pj-ws-searchbar .search-bar, .pj-org-globalsearch .search-bar { flex: 1; }
 .pj-org-tab-match { background: var(--accent); color: #fff; }
 .pj-search-results { margin-top: 0.4rem; }
 .pj-search-group { margin: 0 0 0.9rem; }
