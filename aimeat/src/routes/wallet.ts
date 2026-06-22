@@ -10,6 +10,8 @@
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
  *   v1.0.0 — 2026-03-17 — Simplify to single GHII-based balance (remove dual agent/owner paths)
+ *   v1.1.0 — 2026-06-22 — Cache the per-owner escrow sum (services/cache.ts, 60s): it scans every
+ *     agent's work items, so the wallet poll re-scanned on each load. Invalidated on work/wallet changes.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +22,7 @@ import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
+import { cached, TTL } from '../services/cache.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -37,12 +40,19 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const balance = ghiiRecord.morselBalance ?? 0;
     const transactions = await storage.getTransactions(identity, 100_000);
 
-    // Escrow is tracked per-agent (work items reference GAIIs), so iterate agents
-    let inEscrow = 0;
-    const agents = await storage.getAgentsByOwner(ownerName);
-    for (const agent of agents) {
-      inEscrow += await calculateEscrow(storage, agent.gaii);
-    }
+    // Escrow is tracked per-agent (work items reference GAIIs), so iterate agents. Cached 60s per
+    // owner — this is a full work-item scan per agent and the wallet polls on every load. The 'work'
+    // and 'wallet' write paths broadcast their domain (no owner), so the broad domain tags drop it.
+    const inEscrow = await cached(
+      `escrow:${ownerName}`, TTL.dashboard,
+      async () => {
+        const agents = await storage.getAgentsByOwner(ownerName);
+        let total = 0;
+        for (const agent of agents) total += await calculateEscrow(storage, agent.gaii);
+        return total;
+      },
+      ['domain:work', 'domain:wallet'],
+    );
 
     // Calculate lifetime stats from transactions
     let earned = 0, spent = 0, receivedAllowance = 0, welcomeBonus = 0;

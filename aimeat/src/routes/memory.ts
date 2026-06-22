@@ -27,7 +27,8 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { enqueueMemoryReplication } from '../services/memory-replication.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
+import { cached, TTL } from '../services/cache.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
@@ -290,6 +291,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // profile stats bar "🧠 N Muistit"). Tag/maxFlags filters fall through to the list-based count
     // below (countMemory supports prefix + visibility only).
     if (req.query.count === 'true' && !tags?.length && maxFlags === undefined) {
+      // Cached per identity-set + filter (60s, dashboard TTL): the profile stats bar polls this on
+      // every load / live-update; a COUNT(DISTINCT key) is cheap but recurs constantly. Invalidated
+      // by the `domain:memory` tag (memory writes broadcast `emitChange('memory')`) so a write drops
+      // the count before its TTL. Key includes prefix/visibility so different filters don't collide.
+      const filterKey = `${prefix ?? ''}|${visibility ?? ''}`;
       let count: number;
       if (ownerScope && !agentParam) {
         const ownerName = req.auth!.owner;
@@ -297,9 +303,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         const ownerAgents = await storage.getAgentsByOwner(ownerName);
         const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
         const gaiis = [ghii, ...ownerAgents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
-        count = await storage.countMemory(gaiis, { prefix, visibility });
+        count = await cached(
+          `memcount:owner:${ownerName}:${filterKey}`, TTL.dashboard,
+          () => storage.countMemory(gaiis, { prefix, visibility }),
+          ['domain:memory', `owner:${ownerName}:memory`],
+        );
       } else {
-        count = await storage.countMemory([gaii], { prefix, visibility });
+        const owner = parseGaiiLoose(gaii).owner;
+        count = await cached(
+          `memcount:${gaii}:${filterKey}`, TTL.dashboard,
+          () => storage.countMemory([gaii], { prefix, visibility }),
+          ['domain:memory', ...(owner ? [`owner:${owner}:memory`] : [])],
+        );
       }
       res.json(success(config.nodeId, { count }));
       return;

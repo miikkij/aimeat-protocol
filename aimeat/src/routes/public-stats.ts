@@ -12,132 +12,119 @@
  *   v1.2.0 — 2026-06-20 — Add GET /v1/public/node-totals: cumulative public counters
  *     (apps, organisms, agents+online, knowledge packages, downloads) for the landing
  *     panel that replaced the often-empty activity feed.
+ *   v1.3.0 — 2026-06-22 — Migrate the three hand-rolled CacheSlot caches onto the generic cache
+ *     layer (services/cache.ts): same 10/60/30s TTLs, now also event-bus invalidated by domain tag.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-
-interface CacheSlot<T> { at: number; value: T | null; }
+import { cached, TTL } from '../services/cache.js';
 
 export function publicStatsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const tickerCache: CacheSlot<unknown> = { at: 0, value: null };
-  const statsCache: CacheSlot<unknown> = { at: 0, value: null };
-  const totalsCache: CacheSlot<unknown> = { at: 0, value: null };
 
   const agentNameOf = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[0] : gaii.split('@')[0]);
   const isToday = (iso?: string) => !!iso && iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
 
   // GET /v1/public/activity-ticker — newest public memory writes + agents-online count.
+  // Cached 10s; invalidated when public memory or agents change.
   router.get('/v1/public/activity-ticker', rateLimit({ windowMs: 60_000, max: 60 }), async (_req, res) => {
-    if (Date.now() - tickerCache.at < 10_000 && tickerCache.value) {
-      res.json(success(config.nodeId, tickerCache.value));
-      return;
-    }
-    let items: Array<{ actor: string; key: string; at: string }> = [];
-    let agentsOnline = 0;
-    try {
-      const result = await storage.listAllMemory({ visibility: 'public', limit: 100 });
-      items = result.items
-        // Exclude synthetic public-activity-feed entries (system@; key 'activity/…') —
-        // they have their own feed and would otherwise double-up in this ticker.
-        .filter(m => m.updatedAt && !m.key.startsWith('activity/'))
-        .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
-        .slice(0, 10)
-        .map(m => ({
-          actor: agentNameOf(m.ownerGaii || ''),
-          // Only the key TAIL — full keys can encode organism/workspace structure.
-          key: m.key.split('.').slice(-2).join('.'),
-          at: m.updatedAt!,
-        }));
-    } catch { /* fall through to empty — frontend has a static fallback */ }
-    try {
-      const agents = await storage.listAgents();
-      const cutoff = Date.now() - 10 * 60 * 1000;
-      agentsOnline = agents.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
-    } catch { /* count stays 0 */ }
-    const payload = { items, agents_online: agentsOnline };
-    tickerCache.at = Date.now();
-    tickerCache.value = payload;
+    const payload = await cached('public:ticker', TTL.public, async () => {
+      let items: Array<{ actor: string; key: string; at: string }> = [];
+      let agentsOnline = 0;
+      try {
+        const result = await storage.listAllMemory({ visibility: 'public', limit: 100 });
+        items = result.items
+          // Exclude synthetic public-activity-feed entries (system@; key 'activity/…') —
+          // they have their own feed and would otherwise double-up in this ticker.
+          .filter(m => m.updatedAt && !m.key.startsWith('activity/'))
+          .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+          .slice(0, 10)
+          .map(m => ({
+            actor: agentNameOf(m.ownerGaii || ''),
+            // Only the key TAIL — full keys can encode organism/workspace structure.
+            key: m.key.split('.').slice(-2).join('.'),
+            at: m.updatedAt!,
+          }));
+      } catch { /* fall through to empty — frontend has a static fallback */ }
+      try {
+        const agents = await storage.listAgents();
+        const cutoff = Date.now() - 10 * 60 * 1000;
+        agentsOnline = agents.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
+      } catch { /* count stays 0 */ }
+      return { items, agents_online: agentsOnline };
+    }, ['domain:memory', 'domain:agents']);
     res.json(success(config.nodeId, payload));
   });
 
   // GET /v1/public/node-stats-today — aggregate counters for today. Real numbers,
-  // never hardcoded; the frontend omits zero counters from the sentence.
+  // never hardcoded; the frontend omits zero counters from the sentence. Cached 60s.
   router.get('/v1/public/node-stats-today', rateLimit({ windowMs: 60_000, max: 30 }), async (_req, res) => {
-    if (Date.now() - statsCache.at < 60_000 && statsCache.value) {
-      res.json(success(config.nodeId, statsCache.value));
-      return;
-    }
-    let publicWrites = 0;
-    let schedulesFired = 0;
-    let tasksCompleted = 0;
-    try {
-      const mem = await storage.listAllMemory({ visibility: 'public', limit: 500 });
-      // Exclude synthetic public-activity-feed entries — they would inflate the count.
-      publicWrites = mem.items.filter(m => isToday(m.updatedAt) && !m.key.startsWith('activity/')).length;
-    } catch { /* 0 */ }
-    try {
-      const jobs = await storage.listScheduledJobs();
-      schedulesFired = jobs.filter(j => isToday((j as { lastRunAt?: string }).lastRunAt)).length;
-    } catch { /* 0 */ }
-    try {
-      // Bounded sweep: first 50 agents × first 50 done tasks. The 60 s cache keeps
-      // this cheap; on very large nodes the figure is a floor, not a lie.
-      const agents = (await storage.listAgents()).slice(0, 50);
-      for (const a of agents) {
-        const r = await storage.listAgentTasks(a.gaii, { status: 'done', perPage: 50 });
-        tasksCompleted += r.tasks.filter(tk => isToday((tk as { completedAt?: string }).completedAt)).length;
-      }
-    } catch { /* 0 */ }
-    const payload = { public_writes: publicWrites, tasks_completed: tasksCompleted, schedules_fired: schedulesFired };
-    statsCache.at = Date.now();
-    statsCache.value = payload;
+    const payload = await cached('public:node-stats-today', TTL.dashboard, async () => {
+      let publicWrites = 0;
+      let schedulesFired = 0;
+      let tasksCompleted = 0;
+      try {
+        const mem = await storage.listAllMemory({ visibility: 'public', limit: 500 });
+        // Exclude synthetic public-activity-feed entries — they would inflate the count.
+        publicWrites = mem.items.filter(m => isToday(m.updatedAt) && !m.key.startsWith('activity/')).length;
+      } catch { /* 0 */ }
+      try {
+        const jobs = await storage.listScheduledJobs();
+        schedulesFired = jobs.filter(j => isToday((j as { lastRunAt?: string }).lastRunAt)).length;
+      } catch { /* 0 */ }
+      try {
+        // Bounded sweep: first 50 agents × first 50 done tasks. The 60 s cache keeps
+        // this cheap; on very large nodes the figure is a floor, not a lie.
+        const agents = (await storage.listAgents()).slice(0, 50);
+        for (const a of agents) {
+          const r = await storage.listAgentTasks(a.gaii, { status: 'done', perPage: 50 });
+          tasksCompleted += r.tasks.filter(tk => isToday((tk as { completedAt?: string }).completedAt)).length;
+        }
+      } catch { /* 0 */ }
+      return { public_writes: publicWrites, tasks_completed: tasksCompleted, schedules_fired: schedulesFired };
+    }, ['domain:memory', 'domain:scheduler', 'domain:agent-tasks']);
     res.json(success(config.nodeId, payload));
   });
 
   // GET /v1/public/node-totals — cumulative public counters for the landing panel.
   // Always-meaningful "this node has X" figures so the landing never reads as broken-empty.
-  // All real numbers; on very large nodes the bounded sweeps make a figure a floor, not a lie.
+  // All real numbers; on very large nodes the bounded sweeps make a figure a floor, not a lie. Cached 30s.
   router.get('/v1/public/node-totals', rateLimit({ windowMs: 60_000, max: 60 }), async (_req, res) => {
-    if (Date.now() - totalsCache.at < 30_000 && totalsCache.value) {
-      res.json(success(config.nodeId, totalsCache.value));
-      return;
-    }
-    let apps = 0, downloads = 0, organisms = 0, agents = 0, agentsOnline = 0, knowledgePackages = 0;
-    try {
-      // No ownerGaii/viewerGhii → public, latest-version, non-parked apps only.
-      const { apps: list, total } = await storage.listApps({ limit: 1000 });
-      apps = total || list.length;
-      const counts = await Promise.all(
-        list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(() => 0)),
-      );
-      downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
-    } catch { /* 0 */ }
-    try {
-      const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000 });
-      organisms = orgs.length;
-    } catch { /* 0 */ }
-    try {
-      const all = await storage.listAgents();
-      agents = all.length;
-      const cutoff = Date.now() - 10 * 60 * 1000;
-      agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
-    } catch { /* 0 */ }
-    try {
-      // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
-      const mem = await storage.listAllMemory({ visibility: 'public', limit: 1000 });
-      knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
-    } catch { /* 0 */ }
-    const payload = {
-      apps, downloads, organisms,
-      agents, agents_online: agentsOnline,
-      knowledge_packages: knowledgePackages,
-    };
-    totalsCache.at = Date.now();
-    totalsCache.value = payload;
+    const payload = await cached('public:node-totals', TTL.catalogue, async () => {
+      let apps = 0, downloads = 0, organisms = 0, agents = 0, agentsOnline = 0, knowledgePackages = 0;
+      try {
+        // No ownerGaii/viewerGhii → public, latest-version, non-parked apps only.
+        const { apps: list, total } = await storage.listApps({ limit: 1000 });
+        apps = total || list.length;
+        const counts = await Promise.all(
+          list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(() => 0)),
+        );
+        downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
+      } catch { /* 0 */ }
+      try {
+        const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000 });
+        organisms = orgs.length;
+      } catch { /* 0 */ }
+      try {
+        const all = await storage.listAgents();
+        agents = all.length;
+        const cutoff = Date.now() - 10 * 60 * 1000;
+        agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
+      } catch { /* 0 */ }
+      try {
+        // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
+        const mem = await storage.listAllMemory({ visibility: 'public', limit: 1000 });
+        knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
+      } catch { /* 0 */ }
+      return {
+        apps, downloads, organisms,
+        agents, agents_online: agentsOnline,
+        knowledge_packages: knowledgePackages,
+      };
+    }, ['domain:apps', 'domain:organisms', 'domain:agents', 'domain:memory']);
     res.json(success(config.nodeId, payload));
   });
 

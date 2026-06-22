@@ -6,14 +6,17 @@
  *   non-negative integers) and that the figures reflect real state: after registering an
  *   agent and publishing a public app + public organism, agents/apps/organisms are >= 1.
  *
- *   Harness quirk: the endpoint caches 30 s with NO cache-bust query param, so this suite
- *   publishes its fixtures FIRST and calls node-totals only afterwards — the first call is
- *   a cold cache that counts them. A negative check confirms it needs no auth (public).
+ *   The endpoint caches 30 s, but the cache is now event-bus invalidated (services/cache.ts): a
+ *   write in a counted domain (here a public organism → `domain:organisms`) drops the entry, so the
+ *   next read reflects it before the TTL. This suite both warms the cache and asserts that drop.
+ *   A negative check confirms it needs no auth (public).
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=public-totals
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial: node-totals shape + reflects-real-state + public-access.
+ *   v1.1.0 — 2026-06-22 — Assert the generic cache layer invalidates node-totals on a relevant
+ *     write (new public organism reflected before the 30s TTL).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -104,6 +107,17 @@ await test('Counters reflect the fixtures just published (apps/organisms/agents 
   assert(d.apps >= 1, `at least the published app is counted, got apps=${d.apps}`);
   assert(d.organisms >= 1, `at least the public organism is counted, got organisms=${d.organisms}`);
   assert(d.agents >= 1, `at least the registered agent is counted, got agents=${d.agents}`);
+});
+
+await test('Cache invalidates on a relevant write (new public organism reflected before the 30s TTL)', async () => {
+  // Warm the cache, then create another public organism. The create emits emitChange('organisms'),
+  // which the central wiring turns into invalidateTag('domain:organisms') — dropping this entry even
+  // though node-totals has no cache-bust param and the 30s TTL has not elapsed.
+  const before = (await json('/v1/public/node-totals')).body?.data?.organisms ?? 0;
+  const org = await json('/v1/organisms', agentAuth({ method: 'POST', body: JSON.stringify({ name: `PT Org Inval ${stamp}`, visibility: 'public' }) }));
+  assert(org.status === 201, `org status ${org.status}: ${JSON.stringify(org.body)}`);
+  const after = (await json('/v1/public/node-totals')).body?.data?.organisms ?? 0;
+  assert(after === before + 1, `organisms should rise immediately after creating one (cache invalidated, not waiting out TTL): ${after} vs ${before}`);
 });
 
 await test('Endpoint is public — works with no Authorization header', async () => {

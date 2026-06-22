@@ -20,6 +20,7 @@ import type { Storage } from '../storage/interface.js';
 import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
 import { readActiveRuns, readEventTriggers } from '../services/workflow/lifecycle.js';
+import { cacheStats } from '../services/cache.js';
 
 export function statsRouter(
   config: AimeatConfig,
@@ -106,11 +107,16 @@ export function statsRouter(
     };
 
     // Point-in-time gauges (always from current snapshot, not summable)
+    const cache = cacheStats();
     const gauges = {
       tunnel_connections_active: snap.tunnel.connections_active,
       mailbox_items_total: snap.mailbox.items_total,
       mailbox_bytes_total: snap.mailbox.bytes_total,
       mailbox_oldest_item_age_seconds: snap.mailbox.oldest_item_age_seconds,
+      // Generic read-cache health (services/cache.ts): live entry/tag counts + lifetime evictions.
+      cache_entries: cache.entries,
+      cache_tags: cache.tags,
+      cache_evictions_total: cache.evictions,
     };
 
     // Time-range filtering: if both from and to are provided, return range data

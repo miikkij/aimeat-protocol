@@ -138,7 +138,9 @@ import { startSyncScheduler } from '../services/sync-scheduler.js';
 import { startMessageRetryJob } from '../services/message-delivery.js';
 import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/tracked-response.js';
 import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
-import { onMemoryWrittenEvent } from '../services/event-bus.js';
+import { onMemoryWrittenEvent, onChangeEvent } from '../services/event-bus.js';
+import { invalidateTag } from '../services/cache.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
@@ -198,6 +200,18 @@ export async function mountRoutes(
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);
+
+  // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
+  // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't
+  // carry an owner; the owner-scoped tag is the precise drop when they do. Read paths opt in by
+  // tagging their cached() entries with these same tags (see services/cache.ts).
+  onChangeEvent((evt) => {
+    invalidateTag(`domain:${evt.domain}`);
+    if (evt.ownerGaii) {
+      const owner = parseGaiiLoose(evt.ownerGaii).owner;
+      if (owner) invalidateTag(`owner:${owner}:${evt.domain}`);
+    }
+  });
 
   // Prometheus metrics registry (opt-in)
   const metricsRegistry = config.metricsEnabled
