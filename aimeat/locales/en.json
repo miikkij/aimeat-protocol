@@ -6359,6 +6359,7 @@
   "search": {
     "wsPlaceholder": "Search this workspace…",
     "orgPlaceholder": "Search this organism…",
+    "allOrgsPlaceholder": "Search across all organisms…",
     "clear": "Clear",
     "noMatches": "No matches",
     "paletteTitle": "Search everything",

@@ -6359,6 +6359,7 @@
   "search": {
     "wsPlaceholder": "Hae tästä työtilasta…",
     "orgPlaceholder": "Hae tästä organismista…",
+    "allOrgsPlaceholder": "Hae kaikista organismeista…",
     "clear": "Tyhjennä",
     "noMatches": "Ei osumia",
     "paletteTitle": "Hae kaikkea",

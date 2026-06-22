@@ -17,6 +17,9 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.2.0 — 2026-06-22 — Cross-organism content search on the list view: one box searches ALL my
+ *     organisms (indexed librarian FTS), results grouped per organism; a hit opens that organism +
+ *     workspace with the in-workspace search pre-filled. Also listens for the Cmd-K aimeat-open-organism.
  *   v2.1.0 — 2026-06-22 — Workspace counts come inline via listOrganisms({include:'counts'}) instead
  *     of a per-organism discoverWorkspaces fan-out.
  *   v1.31.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking.
@@ -34,6 +37,8 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
+import { SearchBar } from '/components/SearchBar.js';
+import { EmptyState } from '/components/EmptyState.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
@@ -58,6 +63,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [sortMode, setSortMode] = useState('custom');
   const [customOrder, setCustomOrder] = useState([]);
   const [openSettings, setOpenSettings] = useState(false); // open OrganismHome with the Settings panel showing
+  // Cross-organism content search (all my organisms at once) — indexed librarian FTS, grouped per
+  // organism. Replaces the org lists while a query is active; a hit opens that organism + workspace
+  // with the in-workspace search pre-filled to the same query.
+  const [gQuery, setGQuery] = useState('');
+  const [gHits, setGHits] = useState(null);   // null = not searching
+  const [gBusy, setGBusy] = useState(false);
   const dragIdRef = useRef(null);
   const [dragOverId, setDragOverId] = useState(null);
 
@@ -183,6 +194,19 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     window.addEventListener('aimeat-open-organism', onOpen);
     return () => window.removeEventListener('aimeat-open-organism', onOpen);
   }, []);
+
+  // Cross-organism content search (debounced) — librarian FTS across all my own content.
+  useEffect(() => {
+    const query = gQuery.trim();
+    if (query.length < 2) { setGHits(null); setGBusy(false); return undefined; }
+    let cancelled = false;
+    setGBusy(true);
+    const tid = setTimeout(async () => {
+      const hits = await memoryService.librarianSearch(query, 60, 'own').catch(() => []);
+      if (!cancelled) { setGHits(hits || []); setGBusy(false); }
+    }, 220);
+    return () => { cancelled = true; clearTimeout(tid); };
+  }, [gQuery]);
 
   // Live update listener
   const liveRef = useRef(loadData);
@@ -376,6 +400,20 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
   if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
 
+  // Open a cross-organism search hit: jump to its organism + workspace, pre-filling the in-workspace
+  // search with the query so you land on the filtered result list (reuses Kerros 1).
+  const openGHit = (hit) => {
+    try { if (hit.workspaceId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.search`, gQuery.trim()); } catch { /* noop */ }
+    setOpenId(hit.organismId);
+    setOpenWs(hit.workspaceId || null);
+    setOpenSettings(false);
+  };
+  // Group the librarian hits under each organism (name from my list / discover), for the results view.
+  const orgNameOf = (id) => (myOrganisms || []).find(o => o.id === id)?.name
+    || publicOrganisms.find(o => o.id === id)?.name || id;
+  const gGroups = {};
+  for (const hh of (gHits || [])) { if (!hh.organismId) continue; (gGroups[hh.organismId] = gGroups[hh.organismId] || []).push(hh); }
+
   return html`
     <div class="section-title">${t('organisms.title') || 'Organisms'}</div>
     <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
@@ -427,6 +465,28 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       `}
     </div>
 
+    <!-- Cross-organism content search: one box over ALL my organisms, results grouped per organism -->
+    <div class="pj-org-globalsearch">
+      <${SearchBar} value=${gQuery} onInput=${e => setGQuery(e.target.value)}
+        placeholder=${t('search.allOrgsPlaceholder') || 'Search across all organisms…'} ariaLabel=${t('search.allOrgsPlaceholder') || 'Search across all organisms'} />
+      ${gHits !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setGQuery('')}>${t('search.clear') || 'Clear'}</button>` : null}
+    </div>
+
+    ${gHits !== null ? html`
+      <div class="pj-search-results">
+        ${gBusy && !gHits.length ? html`<${Spinner} text=${t('search.searching') || 'Searching…'} />` : null}
+        ${!gHits.length && !gBusy ? html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />` : null}
+        ${Object.entries(gGroups).map(([orgId, hits]) => html`
+          <div class="pj-search-group" key=${orgId}>
+            <div class="pj-search-group-head">${orgNameOf(orgId)}<span class="pj-org-tab-count">${hits.length}</span></div>
+            ${hits.map(hh => html`
+              <button class="pj-search-hit" key=${hh.key} onClick=${() => openGHit(hh)}>
+                <span class="pj-search-hit-title">${hh.title || hh.key}${hh.workspaceId ? html` <span class="pj-mini">· ${hh.workspaceId}</span>` : null}</span>
+                <span class="pj-search-hit-snippet">${hh.snippet || ''}</span>
+              </button>`)}
+          </div>`)}
+      </div>
+    ` : html`
     <!-- Incoming invitations -->
     <${IncomingInvitations} showToast=${showToast} onChanged=${loadData} />
 
@@ -459,6 +519,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     ${publicOrganisms.length > 0 && html`
       <div class="section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
       <div class="pj-org-list">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
+    `}
     `}
     <${ConfirmUI} />
   `;
