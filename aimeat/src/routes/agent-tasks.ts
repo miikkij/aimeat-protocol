@@ -313,6 +313,20 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
+    // Fast path (the hot path): a STATUS-filtered poll that needs no bucket counts — e.g. a crew
+    // daemon listing queued/active/stalled every cycle. Query storage filtered + paged instead of
+    // loading the agent's ENTIRE task history just to derive the UI counts. Counts/buckets are a
+    // dashboard concern; a plain status poll (no bucket/q/date filter) skips them. Turns the per-call
+    // cost from O(all the agent's tasks) into O(one page) — the load 40 polling agents were paying
+    // every cycle.
+    if (status && !bucket && !q && !updatedAfter && !updatedBefore) {
+      const r = isOwnerSession
+        ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, status, page, perPage })
+        : await storage.listAgentTasks(agentGaii, { status, page, perPage });
+      res.json(success(config.nodeId, { tasks: r.tasks, total: r.total, counts: { recent: 0, keep: 0, archive: 0 }, page, per_page: perPage }));
+      return;
+    }
+
     // Fetch all of the agent's tasks (no status filter -- we need every task for
     // the bucket counts), paging through the storage layer.
     const all: AgentTaskRecord[] = [];
