@@ -126,39 +126,52 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   }
 
   if (isLocal) {
-    // Resolve / seed the recipient-side contact state (first-contact gate) under the OWNER's inbox.
-    let contact = await storage.getContact(deliveryGhii, senderGhii);
-    if (!contact) {
-      const autoAccept = isSameOwner(senderGhii, deliveryGhii);
-      contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
-    }
-    const isRequest = contact.state === 'pending';
+    // Sending to your OWN agent/eco: delivery resolves to you (the owner). The owner's mailbox already
+    // holds the sender (outbound) copy, so the inbound copy is owned by the AGENT to avoid a primary-key
+    // clash (id+ownerGhii) — the agent reads it (recipientGhii match) and you see your sent copy. No
+    // first-contact gate or self-notification for your own agent.
+    const ownAgent = deliveryGhii === senderGhii;
+    const inboundOwner = ownAgent ? recipientGhii : deliveryGhii;
 
-    // Recipient's inbound copy — owned by the OWNER's inbox, but recipientGhii still names the agent/eco
-    // identity the thread is with (so it threads with the message they sent you).
+    let isRequest = false;
+    if (!ownAgent) {
+      // Resolve / seed the recipient-side contact state (first-contact gate) under the OWNER's inbox.
+      let contact = await storage.getContact(deliveryGhii, senderGhii);
+      if (!contact) {
+        const autoAccept = isSameOwner(senderGhii, deliveryGhii);
+        contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
+      }
+      isRequest = contact.state === 'pending';
+    }
+
+    // Recipient's inbound copy. recipientGhii names the agent/eco the thread is with; ownerGhii is the
+    // mailbox it lands in (the owner, or the agent itself for your own agent — see above).
     await storage.createDirectMessage({
-      id, ownerGhii: deliveryGhii, conversationId, subject, senderGhii, recipientGhii,
+      id, ownerGhii: inboundOwner, conversationId, subject, senderGhii, recipientGhii,
       body, attachments, status: 'delivered', direction: 'inbound',
       replyToId, origin: 'local', originNodeId: config.nodeId,
       createdAt: now, deliveredAt: now,
     });
 
     // Duplicate attachments into the recipient's storage now (accepted contacts only; a pending request
-    // keeps them as reference until accepted — DECISION #3).
-    if (!isRequest && attachments?.length) {
-      const recCopy = await storage.getDirectMessage(id, deliveryGhii);
+    // keeps them as reference until accepted — DECISION #3). Own-agent shares the owner's storage, so the
+    // reference is already readable — no duplication needed.
+    if (!ownAgent && !isRequest && attachments?.length) {
+      const recCopy = await storage.getDirectMessage(id, inboundOwner);
       if (recCopy) {
-        const dup = await duplicateMessageAttachments(ctx, deliveryGhii, recCopy);
-        if (dup.changed) await storage.updateMessageAttachments(id, deliveryGhii, dup.attachments);
+        const dup = await duplicateMessageAttachments(ctx, inboundOwner, recCopy);
+        if (dup.changed) await storage.updateMessageAttachments(id, inboundOwner, dup.attachments);
       }
     }
 
-    await notify(storage, deliveryGhii, {
-      type: isRequest ? 'direct_message_request' : 'direct_message',
-      title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
-      body: messagePreview(body),
-      link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
-    });
+    if (!ownAgent) {
+      await notify(storage, deliveryGhii, {
+        type: isRequest ? 'direct_message_request' : 'direct_message',
+        title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
+        body: messagePreview(body),
+        link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
+      });
+    }
     await logDelivery(ctx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
     emitChange('messages');
 

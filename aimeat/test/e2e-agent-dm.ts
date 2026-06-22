@@ -200,5 +200,32 @@ await test('9. Agent WITHOUT messages:read cannot read the inbox (403)', async (
     assert(r.status === 403, `expected 403 for missing messages:read, got ${r.status}`);
 });
 
+console.log('\nPhase C — owner DMs its OWN agent through the inbox (uniform channel, with attachments)');
+await test('10. Owner can DM its own agent (with an attachment); the agent reads it; owner sees the thread', async () => {
+    const owner = await registerOwner(`selfowner${stamp}`);
+    const myAgent = await createAgent(`selfowner${stamp}`, owner.token, 'mybot', ['messages:read']);
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({
+            to: myAgent.gaii,
+            body: 'Hei oma agentti — hoida tämä liite.',
+            attachments: [{ storage_key: `selftask-${stamp}.pdf`, mime: 'application/pdf', kind: 'file', size: 1024, name: 'task.pdf' }],
+        }),
+    });
+    assert(send.status === 201, `own-agent send should be 201, got ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(send.body.data.message.recipientGhii === myAgent.gaii, `thread is with the agent, got ${send.body.data.message.recipientGhii}`);
+
+    // The agent reads the DM addressed to it (with the attachment).
+    const inbox = await json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${myAgent.token}` } });
+    const m = inbox.body.data.messages.find((x: any) => x.recipientGhii === myAgent.gaii && /oma agentti/.test(x.body));
+    assert(m !== undefined, 'the agent reads the DM its owner sent it');
+    assert(m.senderGhii === owner.ghii, `from the owner, got ${m.senderGhii}`);
+    assert((m.attachments?.length ?? 0) === 1, `attachment delivered to the agent, got ${m.attachments?.length}`);
+
+    // The owner sees their sent copy as a thread with the agent (so they can follow + intervene).
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${owner.token}` } });
+    assert(convs.body.data.conversations.some((c: any) => c.peerGhii === myAgent.gaii), 'owner sees the thread with their own agent');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
