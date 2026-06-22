@@ -259,6 +259,32 @@ await test('Long-poll with nothing pending returns 204 (no spin, no error)', asy
   assert(r.status === 204, `status ${r.status}`);
 });
 
+await test('A DM to the agent reaches /local/dm/next via the tunnel (owner -> own agent, the crewaimeat repro)', async () => {
+  // End-to-end through the REAL serve daemon: node emits dm.inbound -> tunnel -> connector onDeliver ->
+  // handleDm -> /local/dm/next. Owner -> own agent (same owner, same node) is the exact reported case.
+  const agentGaii = `${agentName}#${account.ownerName}@${NODE_ID}`;
+  const waiter = json(loopbackBase, '/local/dm/next?wait=8000');
+  await sleep(300); // ensure the long-poll is registered before the DM is sent
+  const t0 = Date.now();
+  const send = await json(BASE, '/v1/messages', {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ to: agentGaii, body: 'Loopback DM push', subject: 'Push' }),
+  });
+  assert(send.status === 201, `dm send: ${send.status} ${JSON.stringify(send.body)}`);
+  const r = await waiter;
+  const latency = Date.now() - t0;
+  assert(r.status === 200, `dm long-poll status ${r.status} (204 = the connector never routed dm.inbound)`);
+  assert(r.body.data.event.id === send.body.data.message.id, `event id ${r.body.data.event.id} != ${send.body.data.message.id}`);
+  assert(r.body.data.event.conversationId === send.body.data.message.conversationId, 'conversationId matches');
+  assert(r.body.data.event.senderGhii === `${account.ownerName}@${NODE_ID}`, `from the owner, got ${r.body.data.event.senderGhii}`);
+  assert(latency < 3000, `latency ${latency}ms — looks like polling, not push`);
+});
+
+await test('DM long-poll with nothing pending returns 204', async () => {
+  const r = await json(loopbackBase, '/local/dm/next?wait=300');
+  assert(r.status === 204, `status ${r.status}`);
+});
+
 // ─── Single upstream socket ───
 console.log('\nPhase 4 — Single-socket invariant');
 
