@@ -280,5 +280,44 @@ await test('17. Cannot reply to your OWN agent (delivers to yourself)', async ()
     assert(status === 400, `self-delivery should be 400, got ${status}`);
 });
 
+console.log('\nPhase 8 -- Subject threads (start a new topic thread instead of one endless chat)');
+await test('18. A subject opens a NEW thread distinct from the pair thread', async () => {
+    const plain = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'pair-thread message' }),
+    });
+    assert(plain.status === 201, `plain send ${plain.status}`);
+    const pairConv = plain.body.data.message.conversationId;
+
+    const subj = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'topic opener', subject: 'Project Falcon' }),
+    });
+    assert(subj.status === 201, `subject send ${subj.status}: ${JSON.stringify(subj.body)}`);
+    const subjConv = subj.body.data.message.conversationId;
+    assert(subjConv && subjConv !== pairConv, `subject thread must differ from pair thread (${subjConv} vs ${pairConv})`);
+    assert(subj.body.data.message.subject === 'Project Falcon', `message carries subject, got ${subj.body.data.message.subject}`);
+
+    // Bob (recipient) sees the subject thread with its subject surfaced.
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const sc = convs.body.data.conversations.find((c: any) => c.conversationId === subjConv);
+    assert(sc !== undefined, 'bob sees the subject thread');
+    assert(sc.subject === 'Project Falcon', `conversation surfaces subject, got ${sc.subject}`);
+});
+
+await test('19. Continuing a subject thread by conversation_id stays in that thread', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const sc = convs.body.data.conversations.find((c: any) => c.subject === 'Project Falcon');
+    assert(sc !== undefined, 'alice has the subject thread');
+    const cont = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'follow-up in topic', conversation_id: sc.conversationId }),
+    });
+    assert(cont.status === 201, `continue ${cont.status}`);
+    assert(cont.body.data.message.conversationId === sc.conversationId, `stays in subject thread, got ${cont.body.data.message.conversationId}`);
+    const thread = await json(`/v1/messages/conversations/${encodeURIComponent(sc.conversationId)}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(thread.body.data.messages.length >= 2, `subject thread should have >=2 messages, got ${thread.body.data.messages.length}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

@@ -4,6 +4,49 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-06-22
+
+### Added
+
+- **Agents can now use the federated inbox — send and receive direct messages across the network.**
+  The inbox ("Postilaatikko") is the federation-wide messenger between people and their agents; until
+  now only humans could use it. This adds the agent side, kept deliberately separate from the existing
+  agent↔owner dashboard channel (now relabelled **Chat**) so the two threading/trust models don't mix.
+  - **Send from an agent (`aimeat_dm_send`)** — a new MCP tool (server `/v1/mcp` + `aimeat connect serve`)
+    that sends a direct message FROM the agent's own identity TO any person (`owner@node`), agent
+    (`agent#owner@node`) or app (`eco:app#owner@node`), across nodes. The recipient sees it is from the
+    agent; first contact lands in their requests until accepted. Gated by a new **`messages:send`** scope.
+  - **Read replies (`aimeat_dm_inbox` / `aimeat_dm_thread`)** — two-way over MCP, gated by a new
+    **`messages:read`** scope. A reply addressed to an agent is delivered to its owner's mailbox, so
+    these surface the messages where the agent is the recipient (plus REST `GET /v1/messages/agent-inbox`
+    and `GET /v1/messages/agent-thread/:conversationId`).
+  - **File attachments (up to 20 per message)** — agents attach files the same way humans do: upload
+    each via the presigned `aimeat_storage_upload`, then pass the returned storage keys in `attachments`
+    (MCP never carries the bytes). The send route + the new tool share one attachment mapper.
+  - **`messages:send` / `messages:read` scopes** are provisioned across the stack: MCP tool→scope map,
+    the `coordinator` agent profile, device-auth / bootstrap recommended scopes, the app-grant
+    vocabulary, and the profile **Agents → scope picker** (new "Direct messages" domain).
+- **Inbox shows a person and their agents as one group.** Conversations are grouped by the owner behind
+  each peer: a person is a group header with their human thread and each of their agents' threads nested
+  beneath (each keeping its own conversation), so a human and their agent are no longer indistinguishable
+  rows. Single-peer conversations still render flat.
+- **Subject threads — start a new topic instead of one endless conversation.** A direct message can
+  carry an optional `subject` to open a fresh thread with someone (a `conversation_id` continues a
+  specific one); omitting both keeps the existing per-pair thread. Federation-correct (the minted
+  conversation id + subject travel in the signed payload, so both nodes group it identically) and
+  backward compatible. Added a `subject` column to `direct_messages` on both backends (SQLite
+  `safeAddColumn` for self-host upgrades; Prisma/Mongo), surfaced in the conversation list, thread
+  header, and the composer's new **Subject** field.
+- **Rich attachment viewing in the inbox.** Image attachments render as thumbnails (click → full size
+  in a new tab); PDFs open natively in a new tab; Markdown opens an in-app rendered viewer; every
+  attachment gets a **download** button. Senders can now also view/download the files they sent
+  (previously stuck showing "pending" forever).
+
+### Changed
+
+- The agent dashboard messages view is relabelled **Chat** (FI **Keskustelu**) to distinguish the
+  private agent↔owner channel from the federation-wide inbox.
+
 ## [1.29.0] - 2026-06-22
 
 ### Added

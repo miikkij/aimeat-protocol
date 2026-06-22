@@ -35,6 +35,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import type { PeerInfo } from '../services/federation.js';
 import { registerCoreTools } from './core.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
@@ -57,6 +58,7 @@ import { registerAgentScheduleTools } from './agent-schedules.js';
 import { registerWorkflowTools } from './workflows.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
+import { registerDmMessageTools } from './dm-messages.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
@@ -101,7 +103,7 @@ function hashToken(raw: string): string {
     return createHash('sha256').update(raw).digest('hex');
 }
 
-export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
+export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
     // Per-session transports
@@ -163,6 +165,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerWorkflowTools(mcp, storage, config, () => agentGaii);
         registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

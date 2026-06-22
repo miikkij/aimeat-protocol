@@ -2049,8 +2049,12 @@ export interface DirectMessageRecord {
   id: string;
   /** Whose mailbox copy this row is (sender's copy or recipient's copy). */
   ownerGhii: string;
-  /** Deterministic id derived from the sorted GHII pair; groups a thread on both nodes. */
+  /** Groups a thread on both nodes. By default derived from the sorted GHII pair (one thread per pair);
+   *  a subject thread instead uses a freshly minted id carried in the federation payload. */
   conversationId: string;
+  /** Optional thread subject — set on the message that opens a new subject thread; lets a pair have
+   *  more than one thread (e.g. per topic) instead of a single endless conversation. */
+  subject?: string;
   senderGhii: string;
   recipientGhii: string;
   /** GFM markdown; inline media referenced as cid:{attachmentId}. May be empty if attachment-only. */

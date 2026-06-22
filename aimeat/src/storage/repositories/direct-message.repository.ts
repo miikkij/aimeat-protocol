@@ -25,10 +25,24 @@ export interface DirectMessageRepository {
     page?: number;
     perPage?: number;
   }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
+  /** Messages ADDRESSED TO an agent/eco identity (recipientGhii match), newest first. These physically
+   *  live in the owner's mailbox (a reply to an agent is delivered to its owner), so they are NOT found
+   *  by listInbox(agentGaii); this is how an agent reads its own federated DMs. */
+  listDmsAddressedTo(recipientGhii: string, opts?: {
+    page?: number;
+    perPage?: number;
+  }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
+  /** One conversation as an AGENT sees it: its own sent copies (ownerGhii=agent, outbound) + the
+   *  inbound copies addressed to it (recipientGhii=agent, inbound). De-duplicated, newest first. */
+  listAgentDmThread(agentGaii: string, conversationId: string, opts?: {
+    page?: number;
+    perPage?: number;
+  }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
   /** One entry per conversation: peer, last message preview, unread count, updatedAt. */
   listConversations(ownerGhii: string): Promise<Array<{
     conversationId: string;
     peerGhii: string;
+    subject?: string;
     lastMessage: string;
     lastDirection: 'inbound' | 'outbound';
     messageCount: number;

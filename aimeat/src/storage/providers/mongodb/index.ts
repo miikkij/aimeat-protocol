@@ -7166,6 +7166,7 @@ export class PrismaStorage implements Storage {
             originNodeId: row.originNodeId,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
         };
+        if (row.subject) record.subject = row.subject;
         if (row.attachments) record.attachments = row.attachments as DirectMessageRecord['attachments'];
         if (row.replyToId) record.replyToId = row.replyToId;
         if (row.error) record.error = row.error;
@@ -7194,6 +7195,7 @@ export class PrismaStorage implements Storage {
                 mid: record.id,
                 ownerGhii: record.ownerGhii,
                 conversationId: record.conversationId,
+                subject: record.subject ?? null,
                 senderGhii: record.senderGhii,
                 recipientGhii: record.recipientGhii,
                 body: record.body,
@@ -7245,7 +7247,38 @@ export class PrismaStorage implements Storage {
         return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
     }
 
-    async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
+    async listDmsAddressedTo(recipientGhii: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where = { recipientGhii, direction: 'inbound' };
+        const [rows, total] = await Promise.all([
+            this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
+            this.prisma.directMessage.count({ where }),
+        ]);
+        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+    }
+
+    async listAgentDmThread(agentGaii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 50;
+        // Agent's own sent copies (ownerGhii=agent, outbound) + inbound copies addressed to it. No overlap.
+        const where = {
+            conversationId,
+            OR: [
+                { ownerGhii: agentGaii, direction: 'outbound' },
+                { recipientGhii: agentGaii, direction: 'inbound' },
+            ],
+        };
+        const [rows, total] = await Promise.all([
+            this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
+            this.prisma.directMessage.count({ where }),
+        ]);
+        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+    }
+
+    async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
         this.ensureReady();
         const groups = await this.prisma.directMessage.groupBy({
             by: ['conversationId'],
@@ -7254,7 +7287,7 @@ export class PrismaStorage implements Storage {
             _max: { createdAt: true },
         });
 
-        const results: Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }> = [];
+        const results: Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }> = [];
         for (const g of groups) {
             const last = await this.prisma.directMessage.findFirst({
                 where: { ownerGhii, conversationId: g.conversationId },
@@ -7264,10 +7297,17 @@ export class PrismaStorage implements Storage {
             const unread = await this.prisma.directMessage.count({
                 where: { ownerGhii, conversationId: g.conversationId, direction: 'inbound', readAt: null },
             });
+            // Thread subject = the one set on the message that opened it (earliest non-null subject).
+            const subj = await this.prisma.directMessage.findFirst({
+                where: { ownerGhii, conversationId: g.conversationId, subject: { not: null } },
+                orderBy: { createdAt: 'asc' },
+                select: { subject: true },
+            });
             const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
             results.push({
                 conversationId: g.conversationId,
                 peerGhii: last ? (lastDirection === 'inbound' ? last.senderGhii : last.recipientGhii) : '',
+                subject: subj?.subject ?? undefined,
                 lastMessage: last?.body ?? '',
                 lastDirection,
                 messageCount: g._count._all,

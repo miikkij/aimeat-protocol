@@ -24,9 +24,8 @@
  */
 
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageAttachment } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -35,7 +34,7 @@ import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/m
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
-import { sendDirectMessage } from '../services/message-send.js';
+import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -54,25 +53,6 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     return !!p.owner && !!p.node;
   }
 
-  function mapAttachments(
-    input: NonNullable<ReturnType<typeof MessageSendSchema.parse>['attachments']>,
-    senderGhii: string,
-  ): DirectMessageAttachment[] {
-    return input.map(a => ({
-      id: a.id ?? randomUUID().slice(0, 8),
-      inline: a.inline,
-      storageKey: a.storage_key,
-      ownerGhii: senderGhii,
-      originNodeId: config.nodeId,
-      // Same-node messages can reference the sender's storage directly; cross-node duplication
-      // (and the reference→duplicate-on-accept rule) is wired in the attachments layer.
-      mode: 'reference',
-      mime: a.mime,
-      size: a.size,
-      name: a.name,
-      kind: a.kind,
-    }));
-  }
 
   /* ── POST /v1/messages — send ── */
   router.post('/v1/messages', requireAuth(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
@@ -96,12 +76,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       return;
     }
 
-    const attachments = input.attachments ? mapAttachments(input.attachments, senderGhii) : undefined;
+    const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
 
     // Core create + deliver (local inline / cross-node federation + first-contact gate). Shared with
     // the Tracked Response evaluator, which sends automated replies server-side via the same helper.
     const result = await sendDirectMessage(deliveryCtx, {
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
+      conversationId: input.conversation_id, subject: input.subject,
     });
     if (!result.ok) {
       if (result.code === 'RECIPIENT_NOT_FOUND') {
@@ -149,6 +130,27 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
     const result = await storage.listConversation(ghii, conversationId, { page, perPage });
     res.json(success(config.nodeId, { messages: result.messages, total: result.total, page, per_page: perPage }));
+  });
+
+  /* ── GET /v1/messages/agent-inbox — federated DMs ADDRESSED TO the calling agent ──
+     A reply to an agent is delivered to its owner's mailbox (recipientGhii = the agent), so the agent
+     can't see it via the owner-only inbox routes. This exposes those messages to the agent itself. */
+  router.get('/v1/messages/agent-inbox', requireAuth(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
+    const agentGhii = resolve(req);
+    const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
+    const { messages, total } = await storage.listDmsAddressedTo(agentGhii, { page, perPage });
+    res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
+  });
+
+  /* ── GET /v1/messages/agent-thread/:conversationId — full DM thread as the calling agent sees it ── */
+  router.get('/v1/messages/agent-thread/:conversationId', requireAuth(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
+    const agentGhii = resolve(req);
+    const conversationId = req.params.conversationId as string;
+    const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
+    const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
+    const { messages, total } = await storage.listAgentDmThread(agentGhii, conversationId, { page, perPage });
+    res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
   });
 
   /* ── POST /v1/messages/conversations/:conversationId/read — mark thread read ── */

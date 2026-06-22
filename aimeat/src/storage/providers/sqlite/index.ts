@@ -6583,7 +6583,15 @@ export class SqliteStorage implements Storage {
     return directMessageRepo.listConversation(this.db, ownerGhii, conversationId, opts);
   }
 
-  async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
+  async listDmsAddressedTo(recipientGhii: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+    return directMessageRepo.listDmsAddressedTo(this.db, recipientGhii, opts);
+  }
+
+  async listAgentDmThread(agentGaii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+    return directMessageRepo.listAgentDmThread(this.db, agentGaii, conversationId, opts);
+  }
+
+  async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
     return directMessageRepo.listConversations(this.db, ownerGhii);
   }
 

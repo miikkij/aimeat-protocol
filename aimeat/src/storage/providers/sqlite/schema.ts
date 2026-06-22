@@ -1479,6 +1479,7 @@ export function initializeSchema(db: Database.Database): void {
       id             TEXT NOT NULL,
       ownerGhii      TEXT NOT NULL,
       conversationId TEXT NOT NULL,
+      subject        TEXT,
       senderGhii     TEXT NOT NULL,
       recipientGhii  TEXT NOT NULL,
       body           TEXT NOT NULL DEFAULT '',
@@ -1593,6 +1594,10 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('sessions', 'userAgent', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_refreshTokenHash ON sessions(refreshTokenHash)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_prevTokenHash ON sessions(prevTokenHash)');
+
+  // Direct-message subject threads — add to existing tables (no index needed: threads are grouped by
+  // the already-indexed conversationId; subject is only stored + displayed). Fresh DBs get it inline.
+  safeAddColumn('direct_messages', 'subject', 'TEXT');
 
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');

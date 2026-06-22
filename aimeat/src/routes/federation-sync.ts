@@ -206,6 +206,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                 id: message.id,
                 ownerGhii: recipientGhii,
                 conversationId: message.conversationId,
+                subject: message.subject ?? undefined,
                 senderGhii: message.senderGhii,
                 recipientGhii,
                 body: message.body ?? '',

@@ -382,7 +382,7 @@ export async function mountRoutes(
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
-  app.use(mcpRouter(config, storage));
+  app.use(mcpRouter(config, storage, peers));
   app.use(siteRouter(config, storage, siteService));    // Node Portal — GET / + /v1/site/*
 
   // Site LB sync — manual trigger endpoint + background job

@@ -15,11 +15,12 @@ import { api, apiGet } from '/js/api.js';
 
 const enc = encodeURIComponent;
 
-/** Send a direct message. `attachments` is an array of descriptors (storage_key, mime, size, kind, inline, id). */
-export async function send({ to, body, attachments, replyTo } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any }} */ ({})) {
+/** Send a direct message. `attachments` is an array of descriptors (storage_key, mime, size, kind, inline, id).
+ *  `subject` opens a new topic thread; `conversationId` continues a specific existing thread. */
+export async function send({ to, body, attachments, replyTo, subject, conversationId } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any, subject?: any, conversationId?: any }} */ ({})) {
   return api('/v1/messages', {
     method: 'POST',
-    body: JSON.stringify({ to, body, attachments, reply_to: replyTo }),
+    body: JSON.stringify({ to, body, attachments, reply_to: replyTo, subject, conversation_id: conversationId }),
   });
 }
 
