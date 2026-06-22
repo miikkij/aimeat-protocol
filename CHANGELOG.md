@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-06-23
+
 ### Added
 
 - **Interactive messages — a federated AskUserQuestion in the inbox.** An agent can ask a person a
