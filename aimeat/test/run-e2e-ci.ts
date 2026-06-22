@@ -72,6 +72,7 @@ const ALL_SUITES = [
     'test/e2e-notebook-plan.ts',
     'test/e2e-organism-overview.ts',
     'test/e2e-organism-structure.ts',
+    'test/e2e-organism-delete-cascade.ts',
     'test/e2e-organism-comments.ts',
     'test/e2e-organism-batch.ts',
     'test/e2e-workspace-export-import.ts',
