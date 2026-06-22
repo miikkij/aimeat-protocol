@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.7.0 — 2026-06-22 — Home "Usage & quotas" card: .pf-usage-card/.pf-usage-row/.pf-usage-bar/
+ *     .pf-usage-fill (quota bars) + .pf-usage-chips/.pf-usage-chip (count chips).
  *   v2.6.0 — 2026-06-22 — Scalable Memory tab: .pf-mem-quota* (storage-usage bar), .pf-mem-size
  *     (value-size column), .mem-tools-bar/.mem-import-group (server search + export/import row),
  *     .mem-group-actions (hover search/delete on group headers), .mem-search-summary.
@@ -2723,6 +2725,20 @@
 .pf-home-row-meta.pf-ok { color: var(--success-fg, var(--text)); }
 .pf-lp-stat-link { background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }
 .pf-lp-stat-link:hover { background: var(--bg-surface); }
+/* Home "Usage & quotas" card — quota bars + count chips */
+.pf-usage-card { grid-column: 1 / -1; }
+.pf-usage-row { margin-bottom: 0.55rem; }
+.pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.25rem; }
+.pf-usage-label { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.pf-usage-bar { height: 6px; border-radius: 999px; background: var(--bg-dim); overflow: hidden; }
+.pf-usage-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+.pf-usage-fill--danger { background: var(--danger); }
+.pf-usage-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
+.pf-usage-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); cursor: pointer; text-align: left; }
+.pf-usage-chip[disabled] { cursor: default; }
+.pf-usage-chip:not([disabled]):hover { border-color: var(--accent); }
+.pf-usage-chip-val { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-usage-chip-label { font-size: 0.7rem; color: var(--muted); }
 .pf-promo-dismiss { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
 .pf-promo-dismiss:hover { color: var(--text); }
 /* Edit profile / password dialogs */

@@ -15,6 +15,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.8.0 — 2026-06-22 — Home UsageCard: quota usage bars (memory / files / micro-memory) + resource
+ *     counts (agents, organisms, apps, connected apps, extensions, cortexes, services), backed by the
+ *     cached GET /v1/owner/usage endpoint (60s server-side TTL).
  *   v3.7.0 — 2026-06-22 — WaitingForYou uses one getWaiting() call (server-aggregated) instead of the
  *     per-organism listApprovals + listJoinRequests + listWorkspaces fan-out.
  *   v3.6.0 — 2026-06-21 — Change-password modal handles OAuth accounts with no password yet
@@ -551,6 +554,69 @@ function AgentsCard({ owner }) {
           <span class="pf-home-row-label">${escHtml(nextJob.name || nextJob.id || '')}</span>
           <span class="pf-home-row-meta">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
         </button>` : null}
+    </div>
+  `;
+}
+
+/* "Usage" — quota usage bars (memory / storage / micro-memory) + resource counts. Backed by the
+ * cached GET /v1/owner/usage endpoint (60s server-side TTL), so it's cheap to refetch on each
+ * live-update. Surfaces the same kind of quota bar the Memory tab shows, for the whole account. */
+function fmtBytes(n) {
+  if (n == null) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+  if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+function UsageCard({ switchTab }) {
+  const [u, setU] = useState(null);
+  const load = useCallback(async () => {
+    try { const r = await apiGet('/v1/owner/usage'); setU(r?.data || null); } catch { setU(null); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => onLiveUpdate(['memory', 'files', 'agents', 'apps', 'organisms'], () => liveRef.current()), []);
+
+  if (!u) return null;
+
+  const bar = (label, q, usedText) => {
+    const pct = q.percent >= 0 ? Math.max(0, Math.min(100, q.percent)) : 0;
+    return html`
+      <div class="pf-usage-row">
+        <div class="pf-usage-head">
+          <span class="pf-usage-label">${label}</span>
+          <span class="text-meta-sm">${usedText}</span>
+        </div>
+        <div class="pf-usage-bar"><div class="pf-usage-fill ${pct >= 90 ? 'pf-usage-fill--danger' : ''}" style=${`width:${pct}%`}></div></div>
+      </div>`;
+  };
+
+  const chip = (label, value, tab) => html`
+    <button class="pf-usage-chip" onClick=${tab ? () => switchTab(tab) : undefined} disabled=${!tab}>
+      <span class="pf-usage-chip-val">${value}</span>
+      <span class="pf-usage-chip-label">${label}</span>
+    </button>`;
+
+  const c = u.counts;
+  return html`
+    <div class="pf-home-card pf-usage-card">
+      <div class="pf-home-card-title">${t('profile.landing.usageTitle') || 'Usage & quotas'}</div>
+      ${bar(t('profile.landing.usageMemory') || 'Memory', u.memory,
+        `${u.memory.used_keys}/${u.memory.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${fmtBytes(u.memory.used_bytes)} / ${fmtBytes(u.memory.max_bytes)}`)}
+      ${bar(t('profile.landing.usageStorage') || 'Files', u.storage,
+        `${u.storage.used_files} ${t('profile.landing.usageFilesWord') || 'files'} · ${fmtBytes(u.storage.used_bytes)} / ${fmtBytes(u.storage.max_bytes)}`)}
+      ${bar(t('profile.landing.usageMicro') || 'Micro-memory', u.micro_memory,
+        `${u.micro_memory.used_sets}/${u.micro_memory.max_sets} ${t('profile.landing.usageSetsWord') || 'sets'} · ${fmtBytes(u.micro_memory.used_bytes)} / ${fmtBytes(u.micro_memory.max_bytes)}`)}
+      <div class="pf-usage-chips">
+        ${chip(t('profile.landing.usageAgents') || 'Agents', c.agents, 'agents')}
+        ${chip(t('profile.landing.usageOrganisms') || 'Organisms', c.organisms, 'organisms')}
+        ${chip(t('profile.landing.usageApps') || 'Apps', `${c.apps.used}/${c.apps.max}`, 'apps')}
+        ${chip(t('profile.landing.usageEcoApps') || 'Connected apps', c.ecosystem_apps, 'ecosystem')}
+        ${chip(t('profile.landing.usageExtensions') || 'Extensions', `${c.extensions.used}/${c.extensions.max}`, 'extensions')}
+        ${chip(t('profile.landing.usageCortexes') || 'Cortexes', c.cortexes, 'extensions')}
+        ${chip(t('profile.landing.usageServices') || 'Services', `${c.services.used}/${c.services.max}`, 'offers')}
+      </div>
     </div>
   `;
 }
@@ -1182,6 +1248,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           <${NextSteps} switchTab=${(id) => open(id, 'main')}
             hasApps=${appsLoaded ? apps.length > 0 : undefined} />
           <div class="pf-home-grid">
+            <${UsageCard} switchTab=${(id) => open(id, 'main')} />
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
           </div>
