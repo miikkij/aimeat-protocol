@@ -2,9 +2,12 @@
  * @file e2e-owner-usage.ts
  * @description E2E for GET /v1/owner/usage — the cached owner usage/quota summary that backs the
  *   profile Home usage card. Covers: response shape (memory/storage/micro-memory quota + counts +
- *   morsels), auth requirement, and the 60s in-memory cache (two reads return the same cached_at).
+ *   morsels), auth requirement, the in-memory cache (two reads return the same cached_at), and that a
+ *   memory write INVALIDATES the cache (next read recomputes — new cached_at + higher used_keys —
+ *   before the TTL would have expired), exercising the generic cache layer's event-bus invalidation.
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial.
+ *   v1.1.0 — 2026-06-22 — Add the cache-invalidation-on-write assertion (generic cache layer).
  */
 // Run: cd aimeat && pnpm exec tsx test/e2e-owner-usage.ts
 
@@ -109,9 +112,23 @@ await test('GET /v1/owner/usage returns the full summary shape', async () => {
     firstCachedAt = d.cached_at;
 });
 
+let cachedKeys = 0;
 await test('Second read within TTL is served from cache (same cached_at)', async () => {
     const { body } = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(body.data?.cached_at === firstCachedAt, `cached_at should match (cache hit): ${body.data?.cached_at} vs ${firstCachedAt}`);
+    cachedKeys = body.data.memory.used_keys;
+});
+
+await test('A memory write INVALIDATES the cache before the TTL (new cached_at + higher used_keys)', async () => {
+    // Write a new key — the memory route emits emitChange('memory'), which the central event-bus
+    // wiring translates into a `domain:memory` tag drop, evicting this owner's cached usage entry.
+    const { status } = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'usage.c', value: { n: 1 }, visibility: 'private' }) });
+    assert(status === 201 || status === 200, `write usage.c status ${status}`);
+    // Immediately re-read (well within the 60s TTL). If the cache were NOT invalidated we'd get the
+    // stale cached_at + old count; invalidation forces a recompute.
+    const { body } = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(body.data?.cached_at !== firstCachedAt, `cached_at should change after a write (invalidation): still ${body.data?.cached_at}`);
+    assert(body.data?.memory.used_keys > cachedKeys, `used_keys should rise after the write: ${body.data?.memory.used_keys} vs ${cachedKeys}`);
 });
 
 await test('Cleanup owner', async () => {

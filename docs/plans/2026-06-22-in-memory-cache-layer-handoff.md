@@ -1,6 +1,19 @@
 # Handoff: a generic server-side in-memory cache layer for repeated reads
 
-**Status:** Not started — research + design only. Hand this whole file to a fresh Claude Code session as the prompt.
+**Status:** COMPLETE (2026-06-22). Both passes landed.
+- **Pass 1:** util (`services/cache.ts`) + central event-bus invalidation wiring (`routes-loader.ts`) +
+  adopters #1 (`GET /v1/owner/usage`) and #2 (`GET /v1/memory?count=true`). `cacheStats()` exposed in
+  `GET /v1/stats` gauges; keying/tagging convention documented in `docs/coding-guidelines/architecture.md`.
+- **Pass 2:** adopter #3 (catalogue node-global scans — `listActions/listAgents/listBoards` behind
+  `cat:*` keys, used by `/v1/catalogue`, `/actions`, `/agents`, `/boards`, `/hash`, `/:actionId`;
+  the catalogue `/v1/stats` is shadowed by `routes/stats.ts` so it was left alone), #4 (migrated
+  `public-stats.ts`'s three ad-hoc CacheSlot caches onto the util at the same 10/60/30s TTLs), #5
+  (wallet `in_escrow` cached per-owner).
+- **Tests:** `e2e-owner-usage` (cache-hit + invalidation-on-write) and `e2e-public-totals` (cache
+  invalidation on a counted-domain write) — SQLite + MongoDB green. Parity confirmed by
+  `e2e-mcp-catalogue`, `e2e-mcp-wallet-extended`, `e2e-public-activity`. Browser-verified live.
+
+Nothing left to do here unless new hot read paths appear (apply the same `cached()` + tag pattern).
 **Created:** 2026-06-22
 **Author of research:** prior session that shipped the profile Home "Usage & quotas" card.
 

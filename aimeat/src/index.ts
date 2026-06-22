@@ -1097,6 +1097,8 @@ if (subcommand === 'config') {
     await shutdownTelemetryBuffer();
     const { shutdownConsentAuditBuffer } = await import('./services/consent-audit-buffer.js');
     await shutdownConsentAuditBuffer();
+    const { shutdownCache } = await import('./services/cache.js');
+    shutdownCache();
     if (tunnelManager) await tunnelManager.shutdown();
     if (connectTunnelManager) await connectTunnelManager.shutdown();
     if (realtimeManager) await realtimeManager.shutdown();

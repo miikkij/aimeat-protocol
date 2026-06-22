@@ -7,9 +7,8 @@
  *   in-memory TTL cache keyed by owner. The home page polls this on load / live-update; without
  *   the cache every visit would re-scan the owner's whole keyspace.
  *
- *   This is a LOCAL, single-purpose cache (one map, one TTL). A general reusable cache layer for
- *   the many other repeated-read hot paths is deliberately deferred — see
- *   docs/plans/2026-06-22-in-memory-cache-layer-handoff.md.
+ *   The 60s TTL + per-owner key + invalidation now ride the generic cache layer (services/cache.ts);
+ *   this file just supplies the compute + the keying/tagging convention.
  * @structure
  *   - getOwnerUsageSummary(config, storage, ownerName) — cached summary (computes on miss/expiry)
  *   - invalidateOwnerUsage(ownerName) — drop one owner's cache entry (e.g. after a big delete)
@@ -18,14 +17,29 @@
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: quota usage (memory/storage/micro-memory) + counts + morsels,
  *     60s TTL in-memory cache, for the profile Home usage card.
+ *   v1.1.0 — 2026-06-22 — Migrate the hand-rolled Map cache onto the generic cache layer
+ *     (services/cache.ts): same 60s TTL, now invalidated precisely by event-bus tags.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { getMemoryTotalBytes, getStorageTotalBytes, getMicroMemoryTotalBytes } from './quota.js';
+import { cached, invalidateKey, TTL } from './cache.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps
  *  the full-scan byte computations off the request hot path on repeated visits. */
-export const USAGE_CACHE_TTL_MS = 60_000;
+export const USAGE_CACHE_TTL_MS = TTL.dashboard;
+
+/** Cache key for one owner's usage summary. */
+const usageKey = (ownerName: string) => `usage:${ownerName}`;
+
+/** Tags this summary is invalidated by. Domain-level tags fire on ANY write in that domain (the
+ *  memory/agents/etc. write paths broadcast `emitChange(domain)` without an owner — safety net);
+ *  the owner-scoped tags fire when a write does carry the owner (precise). Either drops this entry
+ *  before its TTL, so the card reflects a fresh delete/write on the next poll. */
+const usageTags = (ownerName: string): string[] => {
+  const domains = ['memory', 'files', 'agents', 'organisms'];
+  return [...domains.map(d => `domain:${d}`), ...domains.map(d => `owner:${ownerName}:${d}`)];
+};
 
 export interface QuotaUsage {
   used_bytes: number;
@@ -53,9 +67,6 @@ export interface OwnerUsageSummary {
   cached_at: string;
   ttl_seconds: number;
 }
-
-interface CacheEntry { summary: OwnerUsageSummary; expiresAt: number; }
-const cache = new Map<string, CacheEntry>();
 
 const pct = (used: number, max: number): number =>
   max > 0 ? Math.min(100, Math.round((used / max) * 100)) : -1;
@@ -130,20 +141,15 @@ async function computeOwnerUsageSummary(
 export async function getOwnerUsageSummary(
   config: AimeatConfig, storage: Storage, ownerName: string,
 ): Promise<OwnerUsageSummary> {
-  const hit = cache.get(ownerName);
-  const now = Date.now();
-  if (hit && hit.expiresAt > now) return hit.summary;
-  const summary = await computeOwnerUsageSummary(config, storage, ownerName);
-  cache.set(ownerName, { summary, expiresAt: now + USAGE_CACHE_TTL_MS });
-  return summary;
+  return cached(
+    usageKey(ownerName),
+    USAGE_CACHE_TTL_MS,
+    () => computeOwnerUsageSummary(config, storage, ownerName),
+    usageTags(ownerName),
+  );
 }
 
 /** Drop one owner's cached summary (force a fresh recompute on next read). */
 export function invalidateOwnerUsage(ownerName: string): void {
-  cache.delete(ownerName);
-}
-
-/** Clear the whole cache (tests / shutdown). */
-export function clearOwnerUsageCache(): void {
-  cache.clear();
+  invalidateKey(usageKey(ownerName));
 }

@@ -257,6 +257,39 @@ Storage Interface (interface.ts)
 
 ---
 
+## Read-Cache Layer (`services/cache.ts`)
+
+A few read endpoints recompute the same expensive result on every page load / poll (owner usage
+summary, memory counts, catalogue scans). `services/cache.ts` is a tiny process-local TTL cache with
+tag-based invalidation that those hot paths opt into with one call. The node is a single Express
+process (federation/relay coordinate out-of-band, not via shared app cache), so a plain in-process
+`Map` is coherent — **do not** add Redis/memcached/lru-cache.
+
+**When to reach for it:** a read that (a) recurs on every load/poll and (b) is materially more
+expensive than a `Map` lookup (full scans, byte-sums, multi-query aggregation). One-off reads, writes,
+and anything not measurably hot don't need it.
+
+```ts
+import { cached, TTL } from '../services/cache.js';
+const summary = await cached(`usage:${owner}`, TTL.dashboard,
+  () => computeOwnerUsageSummary(config, storage, owner),
+  [`owner:${owner}:memory`, `owner:${owner}:files`, `domain:memory`, `domain:files`]);
+```
+
+**Keying convention:** include the owner/GAII in the key for anything identity-scoped (one user must
+never read another's cached value); include any filter params (prefix/visibility) so different filters
+don't collide. Global (non-identity) data omits the owner segment.
+
+**Tagging convention:** tag entries with `domain:<d>` (+ `owner:<owner>:<d>` when identity-scoped) for
+each domain whose writes should drop the entry. The event bus is wired centrally in
+`server-bootstrap/routes-loader.ts` to translate every `emitChange(domain, ownerGaii?)` into
+`invalidateTag('domain:<d>')` (plus the owner-scoped tag when the write carries an owner). TTL is the
+backstop; tags are the precise drop. Many write paths broadcast `emitChange(domain)` *without* an
+owner, so the broad `domain:<d>` tag is the safety net — always include it. Cache health
+(`entries`/`tags`/`evictions`) is exposed in `GET /v1/stats` gauges.
+
+---
+
 ## Federation
 
 Nodes can federate to form a decentralized network:

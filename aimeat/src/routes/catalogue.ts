@@ -5,11 +5,20 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
 
 export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService, getRealtimeStats?: () => RealtimeStats | null): Router {
   const router = Router();
+
+  // Node-global full-table scans, cached 30s. These lists are polled every 5–30s by federation
+  // peers and clients (catalogue hash/list sync), so the scan dominates without a cache. No owner
+  // key — the data is global. Invalidated by the matching domain tag: actions also drop on the
+  // 'catalogue' domain (POST/DELETE /v1/catalogue emit it); agents on 'agents'; boards on 'boards'.
+  const cachedActions = () => cached('cat:actions', TTL.catalogue, () => storage.listActions(), ['domain:actions', 'domain:catalogue']);
+  const cachedAgents = () => cached('cat:agents', TTL.catalogue, () => storage.listAgents(), ['domain:agents']);
+  const cachedBoards = () => cached('cat:boards', TTL.catalogue, () => storage.listBoards(), ['domain:boards']);
 
   // GET /v1/catalogue — public action catalogue (Tier 0, no auth)
   router.get('/v1/catalogue', async (req, res) => {
@@ -19,7 +28,8 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const includeFederated = req.query.include_federated !== 'false'; // default true
-    const actions = await storage.listActions({ search, category });
+    // No filters → the cached node-global list (the common federation/client poll); filtered → fresh.
+    const actions = (search || category) ? await storage.listActions({ search, category }) : await cachedActions();
 
     // B.5: Optionally exclude federated entries
     const filteredActions = includeFederated
@@ -62,7 +72,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const includeFederated = req.query.include_federated !== 'false'; // default true
-    const actions = await storage.listActions({ category });
+    const actions = category ? await storage.listActions({ category }) : await cachedActions();
 
     // B.5: Optionally exclude federated entries
     const filteredActions = includeFederated
@@ -94,7 +104,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
-    const agents = await storage.listAgents();
+    const agents = await cachedAgents();
     const start = (page - 1) * perPage;
     const paged = agents.slice(start, start + perPage);
 
@@ -115,7 +125,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // GET /v1/catalogue/boards — public boards (Tier 0)
   router.get('/v1/catalogue/boards', async (_req, res) => {
-    const boards = await storage.listBoards();
+    const boards = await cachedBoards();
     const publicBoards = boards.filter(b => b.visibility === 'public');
 
     res.json(success(config.nodeId, {
@@ -133,9 +143,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // GET /v1/catalogue/hash — SHA-256 for change detection (§17.3 Tier 0)
   router.get('/v1/catalogue/hash', async (_req, res) => {
-    const actions = await storage.listActions();
-    const agents = await storage.listAgents();
-    const boards = await storage.listBoards();
+    const actions = await cachedActions();
+    const agents = await cachedAgents();
+    const boards = await cachedBoards();
 
     // Include updatedAt so edits are detected, not just additions
     const content = JSON.stringify({
@@ -411,7 +421,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)
   router.get('/v1/catalogue/:actionId', async (req, res) => {
-    const actions = await storage.listActions();
+    const actions = await cachedActions();
     const action = actions.find(a => a.id === req.params.actionId);
     if (!action) {
       res.status(404).json(error(config.nodeId, 'ACTION_NOT_FOUND', `Action not found: ${req.params.actionId}`));
