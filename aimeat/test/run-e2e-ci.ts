@@ -36,6 +36,7 @@ const ALL_SUITES = [
     'test/e2e-calibrator.ts',
     'test/e2e-concurrency.ts',
     'test/e2e-disputes.ts',
+    'test/e2e-enterprise-stub.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
     // sender (or credentials) is available. -- disabled 2026-06-14
@@ -255,6 +256,11 @@ async function startServer(): Promise<ChildProcess> {
         // own flag-ON server, so it is unaffected.
         AIMEAT_APP_ORIGIN_ENABLED: 'false',
         AIMEAT_APP_HOST: '',
+        // Open-core test suite runs in Community edition (no proprietary ee/ module): force the
+        // enterprise stub even when an ee/ directory exists in the local working tree, so the
+        // ENTERPRISE_REQUIRED behavior is deterministic in both CI and local. The ee/ module has
+        // its own tests in its own (private) repo.
+        AIMEAT_EE_DISABLED: process.env.AIMEAT_EE_DISABLED ?? 'true',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];

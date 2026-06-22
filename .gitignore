@@ -17,6 +17,10 @@ tmp/
 logs/**
 *.log
 
+# Enterprise edition — proprietary, lives in a SEPARATE PRIVATE repo, dropped in here at deploy.
+# Never commit it to this MIT-licensed open-core repo. See src/enterprise/ for the loader seam.
+/ee/
+
 # Git worktrees
 .worktrees/
 

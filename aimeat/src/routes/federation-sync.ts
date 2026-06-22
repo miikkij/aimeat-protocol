@@ -248,11 +248,12 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             if (recipientGhii !== deliveryGhii) {
                 emitDelivery({
                     target: recipientGhii, kind: 'dm.inbound', id: message.id,
+                    // camelCase + GHII, matching the record / GET /v1/messages/agent-inbox shape.
                     payload: {
-                        message_id: message.id, conversation_id: message.conversationId,
-                        subject: message.subject ?? null, from: message.senderGhii,
+                        id: message.id, conversationId: message.conversationId,
+                        subject: message.subject ?? null, senderGhii: message.senderGhii,
                         preview: messagePreview(message.body ?? ''),
-                        attachments: message.attachments?.length ?? 0, created_at: message.createdAt ?? now,
+                        attachments: message.attachments?.length ?? 0, createdAt: message.createdAt ?? now,
                     },
                 });
                 try { emitResourceUpdated(recipientGhii, 'aimeat://dm/inbox'); } catch { /* no live MCP session */ }
