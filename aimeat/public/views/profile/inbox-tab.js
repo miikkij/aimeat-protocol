@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.7.1 -- 2026-06-23 -- Fix thread-splitting: a reply in an open thread now pins to that
+ *     conversationId. Without it, replying in a SUBJECT thread fell back to the default per-pair thread,
+ *     so the reply spawned a brand-new thread named after the agent (e.g. "concierge") and the subject
+ *     thread was abandoned.
  *   v1.7.0 -- 2026-06-23 -- Interactive messages (federated AskUserQuestion): a question message renders
  *     inline as a form (radio/checkbox + "Other" + Submit, gated on required); submitting sends a normal
  *     reply carrying a human-readable summary + machine-readable `interactive.answers`. Answered questions
@@ -731,9 +735,12 @@ export default function InboxTab({ showToast }) {
         const desc = await messages.uploadAttachment(files[i]);
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
-      // A subject (compose mode only) opens a new topic thread; replies stay in the active thread.
+      // A subject (compose mode only) opens a new topic thread. When REPLYING in an open thread, pin the
+      // send to that exact conversationId — without it the server derives the default per-pair thread, so
+      // a reply to a subject thread (e.g. "keskustelu") spawned a brand-new thread named after the agent.
       const subject = (mode === 'compose' && composeSubject.trim()) ? composeSubject.trim() : undefined;
-      const resp = await messages.send({ to: recipient, body, attachments, subject });
+      const conversationId = (mode === 'thread' && activeConv) ? activeConv.conversationId : undefined;
+      const resp = await messages.send({ to: recipient, body, attachments, subject, conversationId });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();
