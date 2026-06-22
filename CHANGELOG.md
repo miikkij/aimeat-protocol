@@ -40,6 +40,21 @@ All notable changes to AIMEAT are documented in this file.
   first consumer (one trackable key per organism); the mechanism is generic for any key that wants a
   history without bloating the hot table.
 
+### Changed
+
+- **Stop the connector tunnel's per-cycle polling load.** Production showed ~600 MB in 5 minutes on
+  one node's `/v1/connect/tunnel` — almost entirely crew daemons re-listing their tasks every poll
+  cycle (those REST calls are forwarded over the tunnel as request/response frames). Two fixes: **(1)**
+  the node's `GET /v1/agents/:name/tasks` gains a fast path — a plain status-filtered poll (no
+  bucket/search/date filter) now queries storage filtered + paged instead of loading the agent's
+  *entire* task history just to derive the dashboard bucket counts (O(one page), not O(all tasks) —
+  the cost every polling agent was paying). **(2)** the `aimeat-crewai` daemon (0.7.1) only re-lists
+  from the node when a push actually woke it (plus a rare safety-net interval), not on every idle
+  cycle, and replaces the per-dispatch owner-scoped `agents.cancel.*` memory scan with a pushed
+  `task.cancelled` event (the node pushes it; the connector exposes it at `GET /local/cancelled`). Net
+  effect: an idle agent on a live tunnel makes ~zero periodic node calls. The cancellation push reuses
+  the same `deliver` frame as record push and is ignored by older clients.
+
 ## [1.28.0] - 2026-06-22
 
 ### Added

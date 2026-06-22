@@ -44,6 +44,9 @@
  *     SEPARATE from tasks, so record wakes never intermix with real tasks). `workspace.record` delivers
  *     route to the new queue; `/local/status` exposes per-agent subscriptions + reconnect count (the
  *     consumer's catch-up signal).
+ *   v1.3.0 — 2026-06-22 — P3 cancellation push: `task.cancelled` delivers populate a per-agent
+ *     cancelled-set, exposed at `GET /local/cancelled` so the daemon checks a loopback set instead of
+ *     scanning owner-scoped `agents.cancel.*` memory before every dispatch.
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -134,6 +137,9 @@ class AgentChannel {
   private waiters: Waiter[] = [];
   private recordQueue: QueuedRecord[] = [];
   private recordWaiters: RecordWaiter[] = [];
+  /** Task ids the node pushed as cancelled (P3) — checked by the daemon instead of polling the
+   *  owner-scoped `agents.cancel.*` memory before every dispatch. Bounded by a daemon's task volume. */
+  private cancelledIds = new Set<string>();
   /** Spaces the agent asked to subscribe to — held so the daemon re-sends them on each reconnect. */
   private subscriptions: SpaceRef[] = [];
 
@@ -141,6 +147,13 @@ class AgentChannel {
 
   setSubscriptions(spaces: SpaceRef[]): void { this.subscriptions = spaces; }
   getSubscriptions(): SpaceRef[] { return this.subscriptions; }
+
+  /** Record a pushed task cancellation (P3 `task.cancelled` deliver). */
+  handleCancelled(payload: unknown): void {
+    const id = (payload as { id?: unknown })?.id;
+    if (typeof id === 'string' && id) this.cancelledIds.add(id);
+  }
+  getCancelledIds(): string[] { return [...this.cancelledIds]; }
 
   /** A `workspace.record` event arrived — surface it on the record long-poll (no dedup: each write
    *  is a distinct wake; storage stays the source of truth for content via an authorized read). */
@@ -270,6 +283,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       onDeliver: (kind, payload) => {
         if (kind === 'task_assigned') ch.handleTask(payload, 'deliver');
         else if (kind === 'workspace.record') ch.handleRecord(payload);
+        else if (kind === 'task.cancelled') ch.handleCancelled(payload);
       },
       onBacklog: ({ tasks, messages }) => {
         for (const t of tasks) ch.handleTask(t, 'backlog');
@@ -454,6 +468,18 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       ok: true,
       data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.agent)!.reconnects, event: item.event },
     });
+  });
+
+  // GET /local/cancelled?agent= — task ids the node has pushed as cancelled (P3). The daemon checks
+  // this loopback set before a dispatch instead of scanning the owner-scoped `agents.cancel.*` memory.
+  app.get('/local/cancelled', (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    res.json({ ok: true, data: { agent: entry.agent, cancelled: channels.get(entry.agent)!.getCancelledIds() } });
   });
 
   // ── Tool-call surface: deterministic shell-callable tool dispatch over the

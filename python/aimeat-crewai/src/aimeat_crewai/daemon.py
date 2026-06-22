@@ -14,6 +14,15 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.7.1 -- Stop the per-cycle tunnel polling (prod showed ~600 MB / 5 min of /v1/connect/tunnel
+    from daemons re-listing tasks every cycle). Two changes: (1) when the agent has a live tunnel,
+    the cycle re-lists tasks from the node ONLY when a push woke it (`_wait_for_work` now returns
+    whether a push arrived) + a rare safety-net interval (max(poll_interval, 300s)); idle cycles do
+    NOT re-poll. With no tunnel it polls every cycle as before. Future-reaping stays local + every
+    cycle. (2) `_is_cancelled` no longer scans owner-scoped `agents.cancel.*` memory before every
+    dispatch -- the node pushes `task.cancelled` and the serve daemon holds the set, so it's a free
+    loopback `/local/cancelled` read (legacy memory scan kept only as a fallback for an old connector
+    without that endpoint). Net: an idle records-only agent makes ZERO periodic node calls.
   0.7.0 -- Workspace record push (P1). `run_crew_daemon` gains listen_for="records":
     given `record_spaces` (lists of {organism_id, ws, space}), it subscribes them with
     the serve daemon (POST /local/subscribe -> a `subscribe` frame over the tunnel, re-sent
@@ -293,7 +302,19 @@ def _is_cancelled(api: _Api, task_id: str) -> bool:
                 return True
     except Exception:
         pass
-    # 2) cancel markers (owner-scope), covers coordinator-written cancellations
+    # 2) coordinator-written cancellations. New connectors get these PUSHED over the tunnel
+    #    (task.cancelled) and the serve daemon holds the set — a FREE loopback read, no more
+    #    owner-scoped `agents.cancel.*` memory scan (100 records) before every dispatch. Fall back to
+    #    the legacy scan only if the serve daemon is too old to expose /local/cancelled (404).
+    try:
+        r = api.get("/local/cancelled", params={"agent": api.agent_name}, timeout=10)
+        if r.status_code == 200:
+            return task_id in (r.json().get("data", {}).get("cancelled", []) or [])
+        if r.status_code != 404:
+            return False
+    except Exception:
+        return False
+    # Legacy fallback (old connector without /local/cancelled): the owner-scoped marker scan.
     try:
         r = api.get(
             "/v1/memory",

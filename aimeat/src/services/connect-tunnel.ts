@@ -39,6 +39,10 @@
  *     `.latest` only; drafts/version history skipped). Read access is gated by the SHARED
  *     canReadWorkspace() — identical to the REST read — and RE-validated at push time so a
  *     mid-session consent revocation stops delivery. Lets contract agents drop idle space-polling.
+ *   v1.4.0 — 2026-06-22 — Control pushes that let daemons drop more polling: P2 `auth_revoked`
+ *     (revokeToken → stop+close the matching socket) and P3 `task.cancelled` (a cancel-marker write
+ *     `agents.cancel.*` → resolve the task-id list to agents and push), so the per-dispatch
+ *     owner-scoped `agents.cancel.*` memory scan goes away.
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
@@ -71,7 +75,7 @@ export interface ConnectFrame {
     | 'subscribe'      // C→S: subscribe to workspace record events for one or more (organism, ws, space)
     | 'subscribed'     // S→C: subscribe ack — which space refs were accepted vs rejected
     | 'auth_revoked'   // S→C: the connected principal's bearer was revoked — stop + re-auth
-    | 'backlog'
+    | 'backlog'        // S→C: on-connect snapshot of queued+active tasks + pending messages
     | 'disconnect'
     | 'error';
   /** Correlation id (request↔response, heartbeat↔ack, deliver↔ack, invoke↔invoke_result, subscribe↔subscribed). */
@@ -571,6 +575,11 @@ export class ConnectTunnelManager {
    * each update is its own wake (never suppressed by the in-session ack dedup).
    */
   private async onMemoryWrite(evt: MemoryWriteEvent): Promise<void> {
+    // P3: a cancel marker write (`agents.cancel.task.<id>` / `agents.cancel.run.<run>`, value = task
+    // id list) → push `task.cancelled` to each affected agent's socket, so daemons stop polling the
+    // owner-scoped `agents.cancel.*` memory before every dispatch. Handled before the subscriber gate.
+    if (evt.key.startsWith('agents.cancel.')) { await this.pushTaskCancellations(evt.ownerGaii, evt.key); return; }
+
     if (this.spaceSubscribers.size === 0) return;  // no subscribers anywhere — cheapest exit
     const parsed = parseWorkspaceRecordKey(evt.key);
     if (!parsed) return;
@@ -655,6 +664,29 @@ export class ConnectTunnelManager {
       this.send(conn.ws, { type: 'auth_revoked', message: 'Token revoked', timestamp: new Date().toISOString() });
       try { conn.ws.close(1000, 'auth_revoked'); } catch { /* ignore */ }
       break;  // single-socket-per-principal — at most one match
+    }
+  }
+
+  /**
+   * P3: resolve a cancel marker (its value is a list of task ids) to the owning agents and push a
+   * `task.cancelled` wake to each online one. The agent records it locally and skips dispatch — no
+   * more per-dispatch `agents.cancel.*` memory scan. Best-effort; a missed push is caught by the
+   * agent's cheap single-task status re-check.
+   */
+  private async pushTaskCancellations(ownerGaii: string, key: string): Promise<void> {
+    try {
+      const rec = await this.storage.getMemory(ownerGaii, key);
+      const ids = Array.isArray(rec?.value) ? (rec!.value as unknown[]).map(String) : [];
+      for (const taskId of ids) {
+        const task = await this.storage.getAgentTask(taskId);
+        if (!task) continue;
+        const conn = this.connections.get(task.agentGaii);
+        if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
+        this.stats.deliveriesTotal++;
+        this.send(conn.ws, { type: 'deliver', id: `cancel/${taskId}`, kind: 'task.cancelled', payload: { type: 'task.cancelled', id: taskId } });
+      }
+    } catch (err) {
+      logger.warn('Connect tunnel cancel push failed', { event: 'connect_tunnel.error', key, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
