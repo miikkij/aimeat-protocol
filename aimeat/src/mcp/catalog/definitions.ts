@@ -206,6 +206,39 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_send',
+        description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
+            body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.' },
+            reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).' },
+            attachments: { type: 'array', description: 'Up to 20 attachment descriptors { storage_key, mime, kind, size, name }, each pre-uploaded via aimeat_storage_upload.' },
+        },
+    },
+    {
+        name: 'aimeat_dm_inbox',
+        description: 'Read recent federated direct messages addressed to THIS agent (across the inbox / "Postilaatikko") — replies and messages people sent you, newest first. A reply to an agent is delivered to its owner\'s inbox, so this surfaces messages where you are the recipient. Each item has id, conversation_id, subject, from, body, attachments and created_at. Use aimeat_dm_thread for a full conversation. Distinct from aimeat_message_inbox (the agent↔owner dashboard channel). Requires the messages:read scope.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 20, max 100).' },
+        },
+    },
+    {
+        name: 'aimeat_dm_thread',
+        description: 'Read a full federated direct-message thread as THIS agent sees it (your sent messages + the messages addressed to you), oldest-first, for one conversation_id (from aimeat_dm_inbox or aimeat_dm_send). Requires the messages:read scope.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            conversation_id: { type: 'string', required: true, description: 'Conversation id to read.' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
+        },
+    },
+    {
         name: 'aimeat_agents_list',
         description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
         caller: 'agent',

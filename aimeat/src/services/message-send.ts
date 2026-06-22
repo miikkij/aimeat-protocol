@@ -16,6 +16,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
+import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -29,6 +30,36 @@ export interface SendMessageInput {
   body: string;
   replyToId?: string;
   attachments?: DirectMessageAttachment[];
+  /** Override the thread id: omit → the deterministic pair thread; provide a fresh id (with `subject`)
+   *  to open a new subject thread, or an existing thread's id to continue it. */
+  conversationId?: string;
+  /** Subject for a new thread (stored on this message; surfaced as the thread title). */
+  subject?: string;
+}
+
+/**
+ * Map sender-supplied attachment descriptors (the wire/schema shape `{ storage_key, mime, … }`) to the
+ * stored `DirectMessageAttachment` form. Attachments start as `reference` (point at the sender's storage
+ * key); cross-node duplication promotes them to `duplicate` on accept. Shared by the REST send route and
+ * the MCP `aimeat_dm_send` tool so both produce identical records.
+ */
+export function mapMessageAttachments(
+  input: MessageAttachmentInput[],
+  senderGhii: string,
+  nodeId: string,
+): DirectMessageAttachment[] {
+  return input.map(a => ({
+    id: a.id ?? randomUUID().slice(0, 8),
+    inline: a.inline,
+    storageKey: a.storage_key,
+    ownerGhii: senderGhii,
+    originNodeId: nodeId,
+    mode: 'reference',
+    mime: a.mime,
+    size: a.size,
+    name: a.name,
+    kind: a.kind,
+  }));
 }
 
 export type SendMessageResult =
@@ -43,7 +74,7 @@ export type SendMessageResult =
  */
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
-  const { senderGhii, recipientGhii, body, replyToId, attachments } = input;
+  const { senderGhii, recipientGhii, body, replyToId, attachments, subject } = input;
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
@@ -53,7 +84,10 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
 
   const id = randomUUID();
   const now = new Date().toISOString();
-  const conversationId = conversationIdFor(senderGhii, recipientGhii);
+  // Default: the deterministic per-pair thread. An explicit conversationId continues a specific thread;
+  // a `subject` with no id opens a NEW thread (fresh minted id). Both nodes share the id via the payload.
+  const conversationId = input.conversationId
+    || (subject ? randomUUID() : conversationIdFor(senderGhii, recipientGhii));
 
   // For a local recipient, enforce the first-contact gate (block) BEFORE materialising delivery.
   if (isLocal) {
@@ -64,7 +98,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     if (contact?.state === 'blocked') {
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
       await storage.createDirectMessage({
-        id, ownerGhii: senderGhii, conversationId, senderGhii, recipientGhii,
+        id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
         body, attachments, status: 'undeliverable', direction: 'outbound',
         replyToId, origin: 'local', originNodeId: config.nodeId,
         error: 'blocked', createdAt: now,
@@ -75,7 +109,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
 
   // Sender's outbound copy.
   const senderCopy: DirectMessageRecord = {
-    id, ownerGhii: senderGhii, conversationId, senderGhii, recipientGhii,
+    id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
     body, attachments,
     status: isLocal ? 'delivered' : 'queued',
     direction: 'outbound', replyToId,
@@ -103,7 +137,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     // Recipient's inbound copy — owned by the OWNER's inbox, but recipientGhii still names the agent/eco
     // identity the thread is with (so it threads with the message they sent you).
     await storage.createDirectMessage({
-      id, ownerGhii: deliveryGhii, conversationId, senderGhii, recipientGhii,
+      id, ownerGhii: deliveryGhii, conversationId, subject, senderGhii, recipientGhii,
       body, attachments, status: 'delivered', direction: 'inbound',
       replyToId, origin: 'local', originNodeId: config.nodeId,
       createdAt: now, deliveredAt: now,

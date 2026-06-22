@@ -116,6 +116,25 @@
 }
 .inbox-conv:hover { background: var(--card-bg-alt); }
 .inbox-conv--active { background: var(--accent-subtle); }
+
+/* A person group: header (the human) + their threads (human + agents) nested + indented beneath. */
+.inbox-conv-group { margin-bottom: 2px; }
+.inbox-conv-group-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px 2px; font-weight: 600;
+}
+.inbox-conv-group-head .inbox-name { flex: 1; min-width: 0; }
+.inbox-conv--nested { padding-left: 18px; }
+.inbox-conv--nested .inbox-name { font-weight: 400; }
+.inbox-conv-subico {
+  width: 28px; flex: none; text-align: center; font-size: 15px; opacity: 0.8;
+}
+/* Subject thread chips (conversation list + thread header). */
+.inbox-conv-subject {
+  flex: none; max-width: 60%; font-size: 11px; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inbox-thread-subject { font-size: 12px; color: var(--accent); margin-top: 1px; }
 .inbox-conv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .inbox-conv-line1, .inbox-conv-line2 { display: flex; align-items: center; gap: 6px; }
 .inbox-conv-line1 .inbox-name { flex: 1; }
@@ -228,9 +247,51 @@
   text-decoration: none;
   color: inherit;
 }
-.inbox-attach-chip--pending { opacity: 0.55; pointer-events: none; }
+.inbox-attach-chip--pending { opacity: 0.55; }
 .inbox-attach-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inbox-attach-pending { color: var(--text-dim); font-style: italic; }
+
+/* The chip's main affordance (link or button) opens/views the file; the download button sits beside it. */
+.inbox-attach-open {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; color: inherit; text-decoration: none;
+}
+.inbox-attach-open:hover .inbox-attach-name { text-decoration: underline; }
+.inbox-attach-dl {
+  flex-shrink: 0; text-decoration: none; color: var(--text-dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: var(--radius-xs);
+}
+.inbox-attach-dl:hover { color: var(--text); background: var(--bg-dim); }
+
+/* Image attachment: thumbnail + caption row (name + download). */
+.inbox-attach-item {
+  display: inline-flex; flex-direction: column; gap: 4px; max-width: 200px;
+}
+.inbox-attach-thumb-link { display: block; line-height: 0; }
+.inbox-attach-thumb {
+  max-width: 200px; max-height: 160px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); object-fit: cover; cursor: zoom-in;
+}
+.inbox-attach-cap { display: flex; align-items: center; gap: 6px; font-size: 12px; max-width: 200px; }
+.inbox-attach-cap .inbox-attach-name { flex: 1; min-width: 0; color: var(--text-dim); }
+
+/* In-app markdown viewer overlay. */
+.inbox-mdviewer-overlay {
+  position: fixed; inset: 0; z-index: 1200; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.inbox-mdviewer {
+  display: flex; flex-direction: column; width: min(860px, 100%); max-height: 88vh;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;
+}
+.inbox-mdviewer-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.inbox-mdviewer-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inbox-mdviewer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.inbox-mdviewer-body { padding: 18px 22px; overflow: auto; }
 
 /* ── Composer ── */
 .inbox-compose-fields { padding: 12px 12px 0; }

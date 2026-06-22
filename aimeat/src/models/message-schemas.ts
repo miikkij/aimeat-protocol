@@ -33,6 +33,10 @@ export const MessageSendSchema = z.object({
   body: z.string().max(50000).optional().default(''),
   /** Id of a message being replied to (same conversation). */
   reply_to: z.string().uuid().optional(),
+  /** Continue a specific thread by id (e.g. an existing subject thread). Omit for the default pair thread. */
+  conversation_id: z.string().min(8).max(64).optional(),
+  /** Open a NEW subject thread with this title (a fresh conversation id is minted server-side). */
+  subject: z.string().min(1).max(200).optional(),
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
 }).refine(
   d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0,
@@ -40,3 +44,4 @@ export const MessageSendSchema = z.object({
 );
 
 export type MessageSendInput = z.infer<typeof MessageSendSchema>;
+export type MessageAttachmentInput = z.infer<typeof MessageAttachmentInputSchema>;

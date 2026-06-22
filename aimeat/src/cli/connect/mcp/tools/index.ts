@@ -16,6 +16,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { registerCoreTools } from './core.js';
 import { registerAgentTasksTools } from './agent-tasks.js';
 import { registerAgentMessagesTools } from './agent-messages.js';
+import { registerDmMessagesTools } from './dm-messages.js';
 import { registerAgentCapsTools } from './agent-caps.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
@@ -43,6 +44,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerCoreTools(mcp, registry);
   registerAgentTasksTools(mcp, registry);
   registerAgentMessagesTools(mcp, registry);
+  registerDmMessagesTools(mcp, registry);
   registerAgentCapsTools(mcp, registry);
   registerAgentManagementTools(mcp, registry);
   registerAgentTelemetryTools(mcp, registry);

@@ -1603,6 +1603,7 @@ model DirectMessage {
   mid            String // the shared message id (same on sender + recipient copies)
   ownerGhii      String
   conversationId String
+  subject        String?
   senderGhii     String
   recipientGhii  String
   body           String    @default("")

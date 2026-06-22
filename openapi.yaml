@@ -3037,6 +3037,7 @@ components:
         id: { type: string, format: uuid }
         ownerGhii: { type: string, description: Whose mailbox copy this row is. }
         conversationId: { type: string }
+        subject: { type: string, description: Topic thread title (present only on subject threads). }
         senderGhii: { type: string }
         recipientGhii: { type: string }
         body:
@@ -3080,12 +3081,17 @@ components:
 
     DirectMessageSend:
       type: object
-      description: Request body for sending a direct message.
+      description: >-
+        Request body for sending a direct message. The recipient may be a human GHII (owner@node), an
+        agent GAII (agent#owner@node) or an app GEAI (eco:app#owner@node); messages to an agent/app are
+        delivered to that identity's owner inbox.
       required: [to]
       properties:
-        to: { type: string, description: Recipient human GHII (owner@node). }
+        to: { type: string, description: Recipient GHII/GAII/GEAI (owner@node, agent#owner@node, or eco:app#owner@node). }
         body: { type: string, description: GFM markdown. May be empty if attachment-only. }
         reply_to: { type: string, format: uuid }
+        conversation_id: { type: string, description: Continue a specific thread by id. Omit for the default per-pair thread. }
+        subject: { type: string, description: Open a NEW topic thread with this title (a fresh conversation id is minted). }
         attachments:
           type: array
           items:
@@ -3105,6 +3111,7 @@ components:
       properties:
         conversationId: { type: string }
         peerGhii: { type: string }
+        subject: { type: string, description: Topic thread title (present only for subject threads). }
         lastMessage: { type: string }
         lastDirection: { type: string, enum: [inbound, outbound] }
         messageCount: { type: integer }
@@ -23683,6 +23690,88 @@ paths:
           description: Recipient is not accepting messages from the sender (blocked)
         '404':
           description: Recipient not found
+
+  /v1/messages/agent-inbox:
+    get:
+      operationId: listAgentDmInbox
+      summary: List federated DMs addressed to the calling agent (recipient = the agent)
+      description: >-
+        Messages sent to an agent/eco identity are delivered to its owner's mailbox, so the agent cannot
+        see them via the owner-only inbox. This returns messages where recipientGhii is the calling agent.
+        Requires an external principal (agent/eco/app) with the messages:read scope.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: DMs addressed to the agent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DirectMessageRecord'
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing messages:read scope
+
+  /v1/messages/agent-thread/{conversationId}:
+    get:
+      operationId: getAgentDmThread
+      summary: Full DM thread as the calling agent sees it (sent + received)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        '200':
+          description: Thread page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DirectMessageRecord'
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing messages:read scope
 
   /v1/messages/inbox:
     get:

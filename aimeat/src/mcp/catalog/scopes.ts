@@ -77,6 +77,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_workflow_save: 'workflow:write',
     aimeat_workflow_run: 'workflow:write',
     aimeat_workflow_get: 'workflow:read',
+
+    // Federated direct messages / inbox (REST: POST /v1/messages → messages:send). Distinct from the
+    // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).
+    aimeat_dm_send: 'messages:send',
+    aimeat_dm_inbox: 'messages:read',
+    aimeat_dm_thread: 'messages:read',
 };
 
 /** The scope required to use a tool, or undefined if the tool is not scope-gated. */
@@ -108,7 +114,7 @@ export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
  */
 export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
-    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
+    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
     appdev: ['memory:read', 'memory:write'],
     'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
     interactive: ['*'],

@@ -47,6 +47,8 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'catalogue:read': 'Read the public catalogue/directory',
   'social:read': 'Read boards you can access',
   'social:write': 'Post to boards on your behalf',
+  'messages:send': 'Send direct messages on your behalf across the federation',
+  'messages:read': 'Read direct messages addressed to you across the federation',
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
 };

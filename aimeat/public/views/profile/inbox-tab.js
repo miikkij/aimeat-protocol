@@ -85,6 +85,33 @@ function peerName(id) {
   return beforeAt.includes('#') ? beforeAt.split('#').pop() : beforeAt;
 }
 
+// ── Grouping a person + their agents ──
+// A peer is a human GHII (owner@node), an agent GAII (agent#owner@node) or an app GEAI
+// (eco:app#owner@node). They all belong to ONE person — the owner — so we group conversations under
+// the owner key and keep each thread separate beneath it.
+function ownerKeyOf(ghii) {
+  const s = String(ghii || '');
+  const hash = s.indexOf('#');                 // 'agent#owner@node' / 'eco:app#owner@node' → 'owner@node'
+  return hash >= 0 ? s.slice(hash + 1) : s;    // human 'owner@node' → itself
+}
+function isAgentPeer(ghii) { return String(ghii).includes('#'); }
+function ownerDisplayName(ownerKey) { return String(ownerKey).split('@')[0]; }
+/** Label for one thread INSIDE a person group: the agent/app id before '#', or null for the human thread. */
+function subThreadLabel(ghii) {
+  const at = String(ghii || '').split('@')[0];
+  return at.includes('#') ? at.split('#')[0] : null;
+}
+/** Group conversations by the owner behind each peer, preserving input (recency) order. */
+function groupConversations(conversations) {
+  const map = new Map();
+  for (const c of conversations) {
+    const key = ownerKeyOf(c.peerGhii);
+    if (!map.has(key)) map.set(key, { ownerKey: key, convs: [] });
+    map.get(key).convs.push(c);
+  }
+  return [...map.values()];
+}
+
 function Avatar({ seed, size = 36 }) {
   const svg = minidenticon(seed || 'user');
   return html`<span class="inbox-avatar" style=${`width:${size}px;height:${size}px`}
@@ -134,7 +161,92 @@ function trackStateLabel(state) {
   }
 }
 
-function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked }) {
+/** Classify an attachment for rendering: how to view it (thumbnail / native tab / markdown viewer). */
+const ATTACH_ICO = { image: '🖼', pdf: '📄', markdown: '📄', audio: '🎵', video: '🎬', file: '📎' };
+function attachKind(a) {
+  const mime = a.mime || '';
+  const name = a.name || a.storageKey || '';
+  if (a.kind === 'image' || /^image\//.test(mime)) return 'image';
+  if (mime === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
+  if (/markdown/.test(mime) || /\.(md|markdown|mdx)$/i.test(name)) return 'markdown';
+  if (a.kind === 'audio' || /^audio\//.test(mime)) return 'audio';
+  if (a.kind === 'video' || /^video\//.test(mime)) return 'video';
+  return 'file';
+}
+
+/** One received/sent attachment. Images render as a thumbnail (click → full-size in a new tab);
+ *  PDF/audio/video/file open natively in a new tab; markdown opens the in-app rendered viewer. Every
+ *  ready attachment gets a download button. Not-yet-duplicated / expired attachments show their state. */
+function AttachmentItem({ a, url, onOpenMarkdown }) {
+  const kind = attachKind(a);
+  const name = a.name || a.storageKey;
+  const ready = !!url && !a.expired;
+
+  if (!ready) {
+    const status = a.expired ? t('inbox.attachmentExpired') : (a.mode !== 'duplicate' ? t('inbox.attachmentPending') : null);
+    return html`<div class="inbox-attach-chip inbox-attach-chip--pending">
+      <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span>
+      <span class="inbox-attach-name">${escHtml(name)}</span>
+      ${status ? html`<span class="inbox-attach-pending">${status}</span>` : null}
+    </div>`;
+  }
+
+  const download = html`<a class="inbox-attach-dl" href=${url} download=${name} title=${t('inbox.attachmentDownload')}>⬇</a>`;
+
+  if (kind === 'image') {
+    return html`<div class="inbox-attach-item">
+      <a class="inbox-attach-thumb-link" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
+        <img class="inbox-attach-thumb" src=${url} alt=${escHtml(name)} loading="lazy" />
+      </a>
+      <div class="inbox-attach-cap"><span class="inbox-attach-name">${escHtml(name)}</span>${download}</div>
+    </div>`;
+  }
+  if (kind === 'markdown') {
+    return html`<div class="inbox-attach-chip">
+      <button class="inbox-attach-open" onClick=${() => onOpenMarkdown?.(url, name)} title=${t('inbox.attachmentView')}>
+        <span class="inbox-attach-ico">📄</span><span class="inbox-attach-name">${escHtml(name)}</span>
+      </button>${download}
+    </div>`;
+  }
+  // pdf / audio / video / file — let the browser open it in a new tab.
+  return html`<div class="inbox-attach-chip">
+    <a class="inbox-attach-open" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
+      <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span><span class="inbox-attach-name">${escHtml(name)}</span>
+    </a>${download}
+  </div>`;
+}
+
+/** In-app viewer for a markdown attachment — browsers don't render .md, so we fetch the (same-origin,
+ *  presigned) file and render it with the shared safe Markdown component. Offers open-raw + download. */
+function MarkdownViewer({ url, name, onClose }) {
+  const [text, setText] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(url).then(r => r.ok ? r.text() : Promise.reject(new Error('http'))).then(tx => { if (alive) setText(tx); }).catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [url]);
+  return html`
+    <div class="inbox-mdviewer-overlay" onClick=${onClose}>
+      <div class="inbox-mdviewer" onClick=${e => e.stopPropagation()}>
+        <div class="inbox-mdviewer-head">
+          <span class="inbox-mdviewer-title">📄 ${escHtml(name)}</span>
+          <div class="inbox-mdviewer-actions">
+            <a class="btn-ghost btn-sm" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
+            <a class="btn-ghost btn-sm" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>
+            <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
+          </div>
+        </div>
+        <div class="inbox-mdviewer-body">
+          ${failed ? html`<div class="inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
+            : text === null ? html`<div class="inbox-empty-sm">…</div>`
+            : html`<${Markdown} text=${text} />`}
+        </div>
+      </div>
+    </div>`;
+}
+
+function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked, onOpenMarkdown }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   const trk = tracked ? trackStateLabel(tracked.state) : null;
@@ -152,14 +264,7 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked })
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
         ${nonInline.length > 0 && html`
           <div class="inbox-attach-row">
-            ${nonInline.map(a => html`
-              <a key=${a.id} class=${`inbox-attach-chip${(urlMap[a.id] && !a.expired) ? '' : ' inbox-attach-chip--pending'}`}
-                href=${(urlMap[a.id] && !a.expired) ? urlMap[a.id] : '#'} target="_blank" rel="noopener">
-                <span class="inbox-attach-ico">${a.kind === 'image' ? '🖼' : a.kind === 'audio' ? '🎵' : a.kind === 'video' ? '🎬' : '📎'}</span>
-                <span class="inbox-attach-name">${escHtml(a.name || a.storageKey)}</span>
-                ${a.expired ? html`<span class="inbox-attach-pending">${t('inbox.attachmentExpired')}</span>`
-                  : a.mode !== 'duplicate' ? html`<span class="inbox-attach-pending">${t('inbox.attachmentPending')}</span>` : null}
-              </a>`)}
+            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urlMap[a.id]} onOpenMarkdown=${onOpenMarkdown} />`)}
           </div>`}
         <div class="inbox-bubble-meta">
           ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
@@ -256,6 +361,8 @@ export default function InboxTab({ showToast }) {
   const [activeConv, setActiveConv] = useState(null);     // { conversationId, peerGhii }
   const [thread, setThread] = useState([]);
   const [urlMap, setUrlMap] = useState({});
+  const [mdViewer, setMdViewer] = useState(null);         // { url, name } — open markdown attachment viewer
+  const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
   const [sending, setSending] = useState(false);
@@ -385,8 +492,16 @@ export default function InboxTab({ showToast }) {
     setThread(msgs);
     const map = {};
     await Promise.all(msgs.flatMap(m => (m.attachments || [])
-      .filter(a => a.mode === 'duplicate' && a.localKey)
-      .map(async a => { const u = await messages.attachmentUrl(a.localKey).catch(() => null); if (u) map[a.id] = u; })));
+      .filter(a => !a.inline)
+      .map(async a => {
+        // Inbound: only the recipient's duplicated local copy is fetchable (after accept). Outbound:
+        // the sender owns the original storage key, so resolve that — you can view/download what you sent.
+        const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
+          : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
+        if (!key) return;
+        const u = await messages.attachmentUrl(key).catch(() => null);
+        if (u) map[a.id] = u;
+      })));
     setUrlMap(map);
     if (markRead) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
@@ -434,7 +549,7 @@ export default function InboxTab({ showToast }) {
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
   };
-  const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); };
+  const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
 
   // Open the conversation for a tracked response, then (for awaiting-approval) seed the suggested reply.
   const openTracked = async (tr) => {
@@ -485,10 +600,13 @@ export default function InboxTab({ showToast }) {
         const desc = await messages.uploadAttachment(files[i]);
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
-      const resp = await messages.send({ to: recipient, body, attachments });
+      // A subject (compose mode only) opens a new topic thread; replies stay in the active thread.
+      const subject = (mode === 'compose' && composeSubject.trim()) ? composeSubject.trim() : undefined;
+      const resp = await messages.send({ to: recipient, body, attachments, subject });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();
+        setComposeSubject('');
         // If this send fulfils a Tracked Response awaiting approval, mark it replied.
         if (replyingTrId) {
           await tracked.markTrackedResponseReplied(replyingTrId, resp?.data?.message?.id).catch(() => {});
@@ -528,22 +646,46 @@ export default function InboxTab({ showToast }) {
 
       <div class="inbox-list-section">${t('inbox.conversations')}</div>
       ${conversations.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noConversations')}</div>` : null}
-      ${conversations.map(c => html`
-        <button class=${`inbox-conv${activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : ''}`}
-          key=${c.conversationId} onClick=${() => openConversation(c)}>
-          <${Avatar} seed=${c.peerGhii} size=${40} />
-          <div class="inbox-conv-main">
-            <div class="inbox-conv-line1">
-              <span class="inbox-name">${escHtml(peerName(c.peerGhii))} <${PresenceDot} ghii=${c.peerGhii} /></span>
-              <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
+      ${groupConversations(conversations).map(g => {
+        // A person with a single human-only thread (no agents) renders flat, as before.
+        if (g.convs.length === 1 && !isAgentPeer(g.convs[0].peerGhii)) return convRow(g.convs[0], false);
+        // Otherwise: a group header for the person + a nested row per thread (human + each agent).
+        const unread = g.convs.reduce((n, c) => n + (c.unread || 0), 0);
+        return html`
+          <div class="inbox-conv-group" key=${g.ownerKey}>
+            <div class="inbox-conv-group-head">
+              <${Avatar} seed=${g.ownerKey} size=${28} />
+              <span class="inbox-name">${escHtml(ownerDisplayName(g.ownerKey))} <${PresenceDot} ghii=${g.ownerKey} /></span>
+              ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
             </div>
-            <div class="inbox-conv-line2">
-              <span class="inbox-conv-preview">${c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : ''}${escHtml(c.lastMessage || '')}</span>
-              ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
-            </div>
-          </div>
-        </button>`)}
+            ${g.convs.map(c => convRow(c, true))}
+          </div>`;
+      })}
     </div>`;
+
+  /** One conversation row. `nested` = inside a person group (labelled by the agent/thread, indented). */
+  const convRow = (c, nested) => {
+    const active = activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
+    const sub = subThreadLabel(c.peerGhii);
+    // Nested: a subject thread shows its topic; otherwise the agent name / "Direct". Flat: the person.
+    const label = nested ? (c.subject || sub || t('inbox.directThread')) : peerName(c.peerGhii);
+    const icon = sub ? '🤖' : (c.subject ? '🏷' : '💬');
+    return html`
+      <button class=${`inbox-conv${active}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId} onClick=${() => openConversation(c)}>
+        ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
+        <div class="inbox-conv-main">
+          <div class="inbox-conv-line1">
+            <span class="inbox-name">${escHtml(label)} ${nested ? '' : html`<${PresenceDot} ghii=${c.peerGhii} />`}</span>
+            <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
+          </div>
+          <div class="inbox-conv-line2">
+            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">🏷 ${escHtml(c.subject)}</span>` : ''}
+            <span class="inbox-conv-preview">${c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : ''}${escHtml(c.lastMessage || '')}</span>
+            ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
+          </div>
+        </div>
+      </button>`;
+  };
 
   const renderThread = () => {
     let lastDay = '';
@@ -553,6 +695,7 @@ export default function InboxTab({ showToast }) {
           <${Avatar} seed=${activeConv.peerGhii} size=${36} />
           <div class="inbox-thread-id">
             <div class="inbox-name">${escHtml(peerName(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
+            ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
             <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
           </div>
         </div>
@@ -564,7 +707,8 @@ export default function InboxTab({ showToast }) {
             return html`
               ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
               <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
-                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} tracked=${trackedByMsg[m.id]} />`;
+                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} tracked=${trackedByMsg[m.id]}
+                onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
           })}
         </div>
         ${awaitingForConv.map(tr => html`
@@ -653,6 +797,8 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-compose-fields">
               <input class="inbox-input" type="text" placeholder=${t('inbox.toPlaceholder')}
                 value=${to} onInput=${(e) => setTo(e.target.value)} />
+              <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
+                value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>
             <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
               sending=${sending} onSend=${doSend} />
@@ -673,5 +819,6 @@ export default function InboxTab({ showToast }) {
 
       <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
+      ${mdViewer && html`<${MarkdownViewer} url=${mdViewer.url} name=${mdViewer.name} onClose=${() => setMdViewer(null)} />`}
     </div>`;
 }

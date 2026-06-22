@@ -28,6 +28,7 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
     originNodeId: row.originNodeId as string,
     createdAt: row.createdAt as string,
   };
+  if (row.subject) record.subject = row.subject as string;
   if (row.attachments) record.attachments = JSON.parse(row.attachments as string);
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
@@ -53,13 +54,14 @@ function deserializeContact(row: Record<string, unknown>): ContactConsentRecord 
 export function createDirectMessage(db: Database.Database, record: DirectMessageRecord): DirectMessageRecord {
   db.prepare(
     `INSERT INTO direct_messages
-     (id, ownerGhii, conversationId, senderGhii, recipientGhii, body, attachments, status,
+     (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, status,
       direction, replyToId, origin, originNodeId, error, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
     record.conversationId,
+    record.subject ?? null,
     record.senderGhii,
     record.recipientGhii,
     record.body,
@@ -128,12 +130,49 @@ export function listConversation(
   return { messages: rows.map(deserializeMessage), total };
 }
 
+export function listDmsAddressedTo(
+  db: Database.Database,
+  recipientGhii: string,
+  opts?: { page?: number; perPage?: number },
+): { messages: DirectMessageRecord[]; total: number } {
+  const page = opts?.page ?? 1;
+  const perPage = opts?.perPage ?? 20;
+  const offset = (page - 1) * perPage;
+  const total = (db.prepare(
+    "SELECT COUNT(*) as cnt FROM direct_messages WHERE recipientGhii = ? AND direction = 'inbound'",
+  ).get(recipientGhii) as { cnt: number }).cnt;
+  const rows = db.prepare(
+    "SELECT * FROM direct_messages WHERE recipientGhii = ? AND direction = 'inbound' ORDER BY createdAt DESC LIMIT ? OFFSET ?",
+  ).all(recipientGhii, perPage, offset) as Record<string, unknown>[];
+  return { messages: rows.map(deserializeMessage), total };
+}
+
+export function listAgentDmThread(
+  db: Database.Database,
+  agentGaii: string,
+  conversationId: string,
+  opts?: { page?: number; perPage?: number },
+): { messages: DirectMessageRecord[]; total: number } {
+  const page = opts?.page ?? 1;
+  const perPage = opts?.perPage ?? 50;
+  const offset = (page - 1) * perPage;
+  // The agent's own sent copies (ownerGhii=agent, outbound) + inbound copies addressed to it
+  // (recipientGhii=agent, inbound). These two sets never overlap, so no dedup is needed.
+  const where = "conversationId = ? AND ((ownerGhii = ? AND direction = 'outbound') OR (recipientGhii = ? AND direction = 'inbound'))";
+  const total = (db.prepare(`SELECT COUNT(*) as cnt FROM direct_messages WHERE ${where}`)
+    .get(conversationId, agentGaii, agentGaii) as { cnt: number }).cnt;
+  const rows = db.prepare(`SELECT * FROM direct_messages WHERE ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`)
+    .all(conversationId, agentGaii, agentGaii, perPage, offset) as Record<string, unknown>[];
+  return { messages: rows.map(deserializeMessage), total };
+}
+
 export function listConversations(
   db: Database.Database,
   ownerGhii: string,
 ): Array<{
   conversationId: string;
   peerGhii: string;
+  subject?: string;
   lastMessage: string;
   lastDirection: 'inbound' | 'outbound';
   messageCount: number;
@@ -153,6 +192,10 @@ export function listConversations(
     const unread = (db.prepare(
       "SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND direction = 'inbound' AND readAt IS NULL",
     ).get(ownerGhii, row.conversationId) as { cnt: number }).cnt;
+    // The thread subject is the one set on the message that opened it (earliest non-null subject).
+    const subj = db.prepare(
+      'SELECT subject FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND subject IS NOT NULL ORDER BY createdAt ASC LIMIT 1',
+    ).get(ownerGhii, row.conversationId) as { subject: string } | undefined;
 
     // The peer is the other party relative to this mailbox owner.
     const peerGhii = last
@@ -162,6 +205,7 @@ export function listConversations(
     return {
       conversationId: row.conversationId,
       peerGhii,
+      subject: subj?.subject,
       lastMessage: last?.body ?? '',
       lastDirection: last?.direction ?? 'inbound',
       messageCount: row.messageCount,

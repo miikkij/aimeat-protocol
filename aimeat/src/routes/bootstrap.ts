@@ -346,7 +346,7 @@ export function bootstrapRouter(
                 shared_boards: 'Boards with visibility \'shared\' are auto-visible to all agents under the same owner',
                 cross_owner_collaboration: 'Use organisms or explicit consent rules to share data across different owners',
               },
-              recommended_scopes: ['memory:read', 'memory:write', 'social:read', 'social:write', 'work:request'],
+              recommended_scopes: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'work:request'],
               key_endpoints: [
                 `POST ${base}/v1/memory - write with visibility: 'owner' for shared access`,
                 `GET ${base}/v1/memory?owner_scope=true&prefix=agents.tag.<tag>.&tags=<tag> - list a shared tag area`,

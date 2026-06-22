@@ -38,6 +38,7 @@ function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord, 
     message: {
       id: record.id,
       conversationId: record.conversationId,
+      subject: record.subject ?? null,
       senderGhii: record.senderGhii,
       recipientGhii: deliveryGhii,
       body: record.body,
