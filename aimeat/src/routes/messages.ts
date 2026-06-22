@@ -30,7 +30,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview } from '../utils/messaging.js';
+import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
@@ -80,11 +80,26 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
 
     const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
 
+    // Interactive answers must point at a real question the sender actually received (prevents orphan
+    // answers). The copy lives in the sender's mailbox: for a human that is their own GHII; for an agent
+    // the question landed in its OWNER's mailbox with recipientGhii = the agent. So resolve the mailbox via
+    // deliveryTargetFor and require the question be addressed to (or owned by) the sender. The question spec
+    // itself (role:'questions') is validated structurally by Zod.
+    if (input.interactive?.role === 'answers') {
+      const mailbox = deliveryTargetFor(senderGhii);
+      const question = await storage.getDirectMessage(input.interactive.answersFor, mailbox);
+      const visible = !!question && (question.recipientGhii === senderGhii || question.ownerGhii === senderGhii);
+      if (!question || !visible || question.interactive?.role !== 'questions') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'interactive.answersFor does not reference a question you received'));
+        return;
+      }
+    }
+
     // Core create + deliver (local inline / cross-node federation + first-contact gate). Shared with
     // the Tracked Response evaluator, which sends automated replies server-side via the same helper.
     const result = await sendDirectMessage(deliveryCtx, {
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
-      conversationId: input.conversation_id, subject: input.subject,
+      conversationId: input.conversation_id, subject: input.subject, interactive: input.interactive,
     });
     if (!result.ok) {
       if (result.code === 'RECIPIENT_NOT_FOUND') {

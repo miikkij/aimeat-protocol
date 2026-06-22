@@ -81,6 +81,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Federated direct messages / inbox (REST: POST /v1/messages → messages:send). Distinct from the
     // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).
     aimeat_dm_send: 'messages:send',
+    aimeat_dm_ask: 'messages:send',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
 };

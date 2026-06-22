@@ -7168,6 +7168,7 @@ export class PrismaStorage implements Storage {
         };
         if (row.subject) record.subject = row.subject;
         if (row.attachments) record.attachments = row.attachments as DirectMessageRecord['attachments'];
+        if (row.interactive) record.interactive = row.interactive as DirectMessageRecord['interactive'];
         if (row.replyToId) record.replyToId = row.replyToId;
         if (row.error) record.error = row.error;
         if (row.deliveredAt) record.deliveredAt = row.deliveredAt instanceof Date ? row.deliveredAt.toISOString() : row.deliveredAt;
@@ -7200,6 +7201,7 @@ export class PrismaStorage implements Storage {
                 recipientGhii: record.recipientGhii,
                 body: record.body,
                 attachments: (record.attachments as any) ?? null,
+                interactive: (record.interactive as any) ?? null,
                 status: record.status,
                 direction: record.direction,
                 replyToId: record.replyToId ?? null,

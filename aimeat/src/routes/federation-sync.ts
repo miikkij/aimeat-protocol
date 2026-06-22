@@ -216,6 +216,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                 recipientGhii,
                 body: message.body ?? '',
                 attachments: message.attachments ?? undefined,
+                interactive: message.interactive ?? undefined,
                 status: 'delivered',
                 direction: 'inbound',
                 replyToId: message.replyToId ?? undefined,
@@ -254,6 +255,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                         subject: message.subject ?? null, senderGhii: message.senderGhii,
                         preview: messagePreview(message.body ?? ''),
                         attachments: message.attachments?.length ?? 0, createdAt: message.createdAt ?? now,
+                        interactive: message.interactive?.role ?? null,
                     },
                 });
                 try { emitResourceUpdated(recipientGhii, 'aimeat://dm/inbox'); } catch { /* no live MCP session */ }

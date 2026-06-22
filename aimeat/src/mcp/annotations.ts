@@ -208,6 +208,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_message_history: { title: 'Read Message Thread History', readOnlyHint: true },
     aimeat_message_send: { title: 'Send Agent Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_dm_send: { title: 'Send Federated Direct Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },
     aimeat_dm_thread: { title: 'Read Federated DM Thread', readOnlyHint: true },
 

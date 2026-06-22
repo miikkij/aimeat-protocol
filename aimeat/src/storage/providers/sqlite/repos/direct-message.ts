@@ -30,6 +30,7 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   };
   if (row.subject) record.subject = row.subject as string;
   if (row.attachments) record.attachments = JSON.parse(row.attachments as string);
+  if (row.interactive) record.interactive = JSON.parse(row.interactive as string);
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
   if (row.deliveredAt) record.deliveredAt = row.deliveredAt as string;
@@ -54,9 +55,9 @@ function deserializeContact(row: Record<string, unknown>): ContactConsentRecord 
 export function createDirectMessage(db: Database.Database, record: DirectMessageRecord): DirectMessageRecord {
   db.prepare(
     `INSERT INTO direct_messages
-     (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, status,
+     (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive, status,
       direction, replyToId, origin, originNodeId, error, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -66,6 +67,7 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.recipientGhii,
     record.body,
     record.attachments ? JSON.stringify(record.attachments) : null,
+    record.interactive ? JSON.stringify(record.interactive) : null,
     record.status,
     record.direction,
     record.replyToId ?? null,

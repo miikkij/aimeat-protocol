@@ -10,6 +10,8 @@
  *
  * @version-history
  *   v1.0.0 -- 2026-06-16 -- Initial cross-node direct messaging tests (layer 3: federation delivery).
+ *   v1.1.0 -- 2026-06-23 -- Phase 5: cross-node interactive message (federated AskUserQuestion) — the
+ *     question spec rides the signed wire payload and the structured answer round-trips back.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-messages.ts
@@ -305,6 +307,57 @@ await test('8. Cross-node DM to an AGENT: the agent reads it AND its owner sees 
     const ownerSees = (ownerReq.body?.data?.requests ?? []).some((r: any) => r.contactId === A!.ownerGhii)
         || (ownerInbox.body?.data?.messages ?? []).some((m: any) => m.recipientGhii === bot.gaii);
     assert(ownerSees, 'the agent owner also sees the message (pending request or inbox)');
+});
+
+console.log('\nPhase 5 -- Interactive message (federated AskUserQuestion) across nodes');
+await test('9. Cross-node interactive question: the spec survives the wire + the answer round-trips', async () => {
+    const owner = await registerOwnerOn(B!, `bask${ts}`);
+    const bot = await createAgentOn(B!, `bask${ts}`, owner.token, 'askb', ['messages:send', 'messages:read']);
+
+    // Alice (A) asks the B-agent a structured question across the federation.
+    const ask = await A!.json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${A!.ownerToken}` },
+        body: JSON.stringify({
+            to: bot.gaii, body: 'Yksi kysymys ennen kuin aloitan:',
+            interactive: { role: 'questions', v: 1, questions: [{
+                id: 'q1', header: 'Env', prompt: 'Which environment?', multiSelect: false, allowOther: true, required: true,
+                options: [{ id: 'prod', label: 'Production' }, { id: 'staging', label: 'Staging' }],
+            }] },
+        }),
+    });
+    assert(ask.status === 201, `ask status ${ask.status}: ${JSON.stringify(ask.body)}`);
+    const qid = ask.body.data.message.id;
+    const conv = ask.body.data.message.conversationId;
+
+    // The agent on B reads the question with the spec intact (the field rode the signed wire payload).
+    let q: any;
+    for (let i = 0; i < 25; i++) {
+        const inbox = await B!.json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${bot.token}` } });
+        q = (inbox.body?.data?.messages ?? []).find((m: any) => m.id === qid);
+        if (q?.interactive?.role === 'questions') break;
+        await sleep(150);
+    }
+    assert(q?.interactive?.role === 'questions', 'the B-agent receives the interactive question spec across nodes');
+    assert(q.interactive.questions[0].options[1].id === 'staging', 'option ids survive the wire');
+
+    // The B-agent answers; Alice (A) reads the structured picks back cross-node.
+    const ans = await B!.json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bot.token}` },
+        body: JSON.stringify({
+            to: A!.ownerGhii, conversation_id: conv, reply_to: qid, body: '- Env: Production',
+            interactive: { role: 'answers', v: 1, answersFor: qid, answers: { q1: { selected: ['prod'], other: null } } },
+        }),
+    });
+    assert(ans.status === 201, `answer status ${ans.status}: ${JSON.stringify(ans.body)}`);
+
+    let got: any;
+    for (let i = 0; i < 25; i++) {
+        const conv2 = await A!.json(`/v1/messages/conversations/${conv}`, { headers: { Authorization: `Bearer ${A!.ownerToken}` } });
+        got = (conv2.body?.data?.messages ?? []).find((m: any) => m.interactive?.role === 'answers');
+        if (got) break;
+        await sleep(150);
+    }
+    assert(got?.interactive?.answers?.q1?.selected?.[0] === 'prod', `Alice reads the answer cross-node, got ${JSON.stringify(got?.interactive)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

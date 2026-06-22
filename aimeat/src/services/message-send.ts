@@ -13,9 +13,11 @@
  *   v1.1.0 — 2026-06-21 — Allow replying to an AGENT/eco identity that messaged you: the stored copy +
  *     conversation keep the agent GAII (so the thread is intact), but delivery is routed to the agent's
  *     OWNER human inbox (the owner reads + acts on their agent's DMs) — works on un-upgraded peers too.
+ *   v1.2.0 — 2026-06-23 — Carry the optional `interactive` payload (federated AskUserQuestion) onto every
+ *     stored copy + the dm.inbound push (as the role) so questions/answers survive send + delivery.
  */
 import { randomUUID } from 'node:crypto';
-import type { DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
+import type { DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
@@ -35,6 +37,8 @@ export interface SendMessageInput {
   conversationId?: string;
   /** Subject for a new thread (stored on this message; surfaced as the thread title). */
   subject?: string;
+  /** Optional interactive payload — a question set (agent asks) or the human's answers (reply). */
+  interactive?: InteractivePayload;
 }
 
 /**
@@ -74,7 +78,7 @@ export type SendMessageResult =
  */
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
-  const { senderGhii, recipientGhii, body, replyToId, attachments, subject } = input;
+  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive } = input;
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
@@ -99,7 +103,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
       await storage.createDirectMessage({
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
-        body, attachments, status: 'undeliverable', direction: 'outbound',
+        body, attachments, interactive, status: 'undeliverable', direction: 'outbound',
         replyToId, origin: 'local', originNodeId: config.nodeId,
         error: 'blocked', createdAt: now,
       });
@@ -110,7 +114,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   // Sender's outbound copy.
   const senderCopy: DirectMessageRecord = {
     id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
-    body, attachments,
+    body, attachments, interactive,
     status: isLocal ? 'delivered' : 'queued',
     direction: 'outbound', replyToId,
     origin: 'local', originNodeId: config.nodeId,
@@ -148,7 +152,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     // mailbox it lands in (the owner, or the agent itself for your own agent — see above).
     await storage.createDirectMessage({
       id, ownerGhii: inboundOwner, conversationId, subject, senderGhii, recipientGhii,
-      body, attachments, status: 'delivered', direction: 'inbound',
+      body, attachments, interactive, status: 'delivered', direction: 'inbound',
       replyToId, origin: 'local', originNodeId: config.nodeId,
       createdAt: now, deliveredAt: now,
     });
@@ -188,6 +192,8 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         payload: {
           id, conversationId, subject: subject ?? null, senderGhii,
           preview: messagePreview(body), attachments: attachments?.length ?? 0, createdAt: now,
+          // Let the woken agent distinguish a question it should answer from a normal/answer DM.
+          interactive: interactive?.role ?? null,
         },
       });
     }
