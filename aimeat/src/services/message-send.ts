@@ -20,7 +20,7 @@ import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
 
@@ -161,6 +161,21 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     });
     await logDelivery(ctx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
     emitChange('messages');
+
+    // Event-based push: if the actual recipient is an agent/eco (delivery routed to its owner), wake it
+    // over the connect tunnel (mirrors task_assigned / workspace.record) so it acts on the DM without
+    // polling. The owner keeps the mailbox copy above. (MCP-resource push is emitted by the route layer
+    // to avoid a service→mcp import cycle; the tunnel deliver is what connect-serve agents drain.)
+    if (recipientGhii !== deliveryGhii) {
+      emitDelivery({
+        target: recipientGhii, kind: 'dm.inbound', id,
+        payload: {
+          message_id: id, conversation_id: conversationId, subject: subject ?? null,
+          from: senderGhii, preview: messagePreview(body),
+          attachments: attachments?.length ?? 0, created_at: now,
+        },
+      });
+    }
   } else {
     // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued and the
     // retry job will deliver it later. Delivery targets the owner's human GHII (deliveryGhii) so the

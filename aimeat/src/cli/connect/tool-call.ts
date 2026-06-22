@@ -327,6 +327,50 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // ── Federated direct messages (the inbox / "Postilaatikko"), distinct from the agent↔owner
+        //    aimeat_message_* tools above. Thin REST wrappers so no-LLM crews can send/read DMs via
+        //    `aimeat connect call` without an MCP client. Server-side scopes (messages:send/read) + the
+        //    first-contact gate are unchanged. ──
+        name: 'aimeat_dm_send',
+        description: 'Send a federated direct message from this agent to any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) on the network. Upload files first via aimeat_storage_upload, then pass storage keys in attachments.',
+        input: {
+            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
+            body: { type: 'string', description: 'Message body (markdown). Optional if attachments are given.' },
+            reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the thread).' },
+            subject: { type: 'string', description: 'Open a NEW topic thread with this title.' },
+            conversation_id: { type: 'string', description: 'Continue a specific existing thread by id.' },
+            attachments: { type: 'array', description: 'Up to 20 { storage_key, mime, kind, size, name } descriptors.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { to: requiredString(input, 'to') };
+            const text = optionalString(input, 'body'); if (text) body.body = text;
+            const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;
+            const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
+            const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
+            const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
+            return client.post('/v1/messages', body);
+        },
+    },
+    {
+        name: 'aimeat_dm_inbox',
+        description: 'Read recent federated DMs addressed to this agent (replies + messages people sent you), newest first.',
+        input: {
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 20, max 100).' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/messages/agent-inbox${query({ page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page') })}`),
+    },
+    {
+        name: 'aimeat_dm_thread',
+        description: "Read a full federated DM thread as this agent sees it (your sent + the messages addressed to you), for one conversation_id.",
+        input: {
+            conversation_id: { type: 'string', required: true, description: 'Conversation id (from aimeat_dm_inbox or aimeat_dm_send).' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/messages/agent-thread/${encodeURIComponent(requiredString(input, 'conversation_id'))}${query({ page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page') })}`),
+    },
+    {
         name: 'aimeat_agents_list',
         description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create.",
         input: {},

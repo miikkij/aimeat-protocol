@@ -104,6 +104,32 @@ async function addAndActivatePeer(node: NodeState, peerNodeId: string, peerUrl: 
     assert(act.body.ok === true && act.body.data.status === 'active', `activate ${peerNodeId} on ${node.nodeId}: ${JSON.stringify(act.body.error)}`);
 }
 
+async function signMsg(privKeyB64: string, message: string): Promise<string> {
+    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privKeyB64, 'base64'));
+    return Buffer.from(sig).toString('base64');
+}
+/** Register a NON-operator owner via public registration + mint its token (so its agent's owner is
+ *  independent of the node operator, who may have blocked the sender in an earlier test). */
+async function registerOwnerOn(node: NodeState, name: string): Promise<{ token: string; ghii: string }> {
+    const reg = await node.json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register owner ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const ts2 = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, name + node.nodeId + ts2);
+    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts2, signature: sig }) });
+    assert(tok.body.ok === true, `owner token ${name}: ${JSON.stringify(tok.body.error)}`);
+    return { token: tok.body.data.token, ghii: `${name}@${node.nodeId}` };
+}
+async function createAgentOn(node: NodeState, ownerName: string, ownerToken: string, agentName: string, scopes: string[]): Promise<{ gaii: string; token: string }> {
+    const reg = await node.json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes }) });
+    assert(reg.status === 201, `create agent ${agentName}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const gaii = reg.body.data.agent.gaii;
+    const ts2 = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, gaii + ts2);
+    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts2, signature: sig }) });
+    assert(tok.body.ok === true, `agent token ${agentName}: ${JSON.stringify(tok.body.error)}`);
+    return { gaii, token: tok.body.data.token };
+}
+
 console.log('\n=== AIMEAT Federation Direct Messages E2E ===\n');
 
 let A: NodeState;
@@ -248,6 +274,37 @@ await test('7. Bob blocks Alice; Alice cross-node send becomes undeliverable', a
     assert(send.status === 201, `send status ${send.status}`);
     // The remote node rejects with 403; the sender copy is marked undeliverable.
     assert(send.body.data.message.status === 'undeliverable', `expected undeliverable, got ${send.body.data.message.status}`);
+});
+
+await test('8. Cross-node DM to an AGENT: the agent reads it AND its owner sees it', async () => {
+    // Fresh owner on B (independent of the operator Bob, who blocked Alice above) + an agent with read.
+    const owner = await registerOwnerOn(B!, `bagent${ts}`);
+    const bot = await createAgentOn(B!, `bagent${ts}`, owner.token, 'bbot', ['messages:send', 'messages:read']);
+
+    const send = await A!.json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${A!.ownerToken}` },
+        body: JSON.stringify({ to: bot.gaii, body: 'Hei B-agentti, viesti solmurajan yli.' }),
+    });
+    assert(send.status === 201, `send to agent ${send.status}: ${JSON.stringify(send.body)}`);
+    assert(send.body.data.message.recipientGhii === bot.gaii, `outbound keeps the agent recipient, got ${send.body.data.message.recipientGhii}`);
+
+    // Federation delivery is async — poll the agent's own inbox on B.
+    let agentMsg: any;
+    for (let i = 0; i < 25; i++) {
+        const inbox = await B!.json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${bot.token}` } });
+        agentMsg = (inbox.body?.data?.messages ?? []).find((m: any) => m.recipientGhii === bot.gaii && /solmurajan yli/.test(m.body));
+        if (agentMsg) break;
+        await new Promise(r => setTimeout(r, 150));
+    }
+    assert(agentMsg !== undefined, 'agent on B reads the cross-node DM addressed to it (recipient identity preserved)');
+    assert(agentMsg.senderGhii === A!.ownerGhii, `from Alice, got ${agentMsg.senderGhii}`);
+
+    // The agent's OWNER also has it (mailbox copy owned by the owner) — as a pending first-contact request.
+    const ownerReq = await B!.json('/v1/messages/requests', { headers: { Authorization: `Bearer ${owner.token}` } });
+    const ownerInbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${owner.token}` } });
+    const ownerSees = (ownerReq.body?.data?.requests ?? []).some((r: any) => r.contactId === A!.ownerGhii)
+        || (ownerInbox.body?.data?.messages ?? []).some((m: any) => m.recipientGhii === bot.gaii);
+    assert(ownerSees, 'the agent owner also sees the message (pending request or inbox)');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

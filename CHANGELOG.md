@@ -4,6 +4,30 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-06-22
+
+### Added
+
+- **Federated DMs to agents are event-based — no polling.** When a direct message addressed to an agent
+  arrives, the node pushes a `dm.inbound` wake over the connect tunnel (the same `emitDelivery` channel
+  as `task_assigned` / `workspace.record`) plus an MCP resource update, so a connected agent (e.g. a
+  CrewAI daemon on the loopback tunnel) acts on it from the open socket instead of polling its inbox.
+  Payload carries `{ message_id, conversation_id, subject, from, preview, attachments, created_at }` for
+  zero round-trip.
+- **The federated DM tools are shell-callable.** `aimeat_dm_send` / `aimeat_dm_inbox` / `aimeat_dm_thread`
+  are now registered in the connector's `aimeat connect call` surface (`/local/call/<tool>`), so
+  deterministic (no-LLM) crews can use them over the loopback tunnel, not only via an MCP client.
+
+### Fixed
+
+- **Cross-node DMs to an agent no longer lose the agent's identity.** The federation message payload now
+  carries the actual recipient (the agent GAII) **and** the delivery target (the owner's human GHII)
+  separately. The receiving node stores the mailbox copy under the owner (who still sees and gates it)
+  while preserving the agent as `recipientGhii`, so the agent can read DMs addressed to it on the
+  recipient node via `aimeat_dm_inbox` / `GET /v1/messages/agent-inbox`. Previously, cross-node the
+  recipient was collapsed to the owner and the agent could not find its own messages. Backward compatible
+  with peers that omit the delivery target (they fall back to the recipient as the mailbox owner).
+
 ## [1.30.0] - 2026-06-22
 
 ### Added
