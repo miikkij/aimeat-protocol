@@ -244,6 +244,24 @@ await test('A federated DM to the agent pushes deliver{dm.inbound} with the reco
   await t.close();
 });
 
+await test('OWNER -> OWN AGENT (same owner, same node) ALSO pushes deliver{dm.inbound}', async () => {
+  // The dev's exact repro: a human DMs their own agent. Delivery routes to the owner, but the wake must
+  // still reach the agent (recipientGhii != deliveryGhii).
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: auth(A.token),     // A is aAgent's OWNER
+    body: JSON.stringify({ to: aAgent.gaii, body: 'Oma agentti — push?', subject: 'Self' }),
+  });
+  assert(send.status === 201, `own-agent dm send ${send.status}: ${JSON.stringify(send.body)}`);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null, 'agent received a dm deliver for an owner->own-agent DM');
+  assert(d!.kind === 'dm.inbound', `kind ${d!.kind}`);
+  assert((d!.payload as any)?.id === send.body.data.message.id, 'message id matches');
+  assert((d!.payload as any)?.senderGhii === `${A.name}@${NODE_ID}`, 'from the owner');
+  await t.close();
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
