@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-06-22
+
 ### Added
 
 - **Organisms & workspaces now lead with a human story, a living map, and a growth timeline.** Three
