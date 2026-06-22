@@ -8754,6 +8754,67 @@ paths:
                               $ref: '#/components/schemas/DisputeAuditEntry'
 
   # ── Economy ────────────────────────────────────────────────
+  /v1/owner/usage:
+    get:
+      operationId: getOwnerUsage
+      summary: Owner usage & quota summary
+      description: >
+        Quota usage (memory, files, micro-memory), resource counts (agents, organisms, apps,
+        connected apps, extensions, cortexes, services) and morsel balance for the authenticated
+        owner, in one call. Served from a 60-second in-memory cache so the profile dashboard can poll
+        it cheaply without re-scanning the owner's keyspace on every visit.
+      tags: [Owner]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 'Usage summary (cached up to ttl_seconds)'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          memory:
+                            type: object
+                            properties:
+                              used_keys: { type: integer }
+                              max_keys: { type: integer }
+                              used_bytes: { type: integer }
+                              max_bytes: { type: integer }
+                              percent: { type: integer }
+                          storage:
+                            type: object
+                            properties:
+                              used_files: { type: integer }
+                              used_bytes: { type: integer }
+                              max_bytes: { type: integer }
+                              percent: { type: integer }
+                          micro_memory:
+                            type: object
+                            properties:
+                              used_sets: { type: integer }
+                              max_sets: { type: integer }
+                              used_bytes: { type: integer }
+                              max_bytes: { type: integer }
+                              percent: { type: integer }
+                          counts:
+                            type: object
+                            description: Resource counts; apps/extensions/services carry their per-account max.
+                          morsels:
+                            type: object
+                            properties:
+                              balance: { type: number }
+                          cached_at: { type: string, format: date-time }
+                          ttl_seconds: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/wallet:
     get:
       operationId: getWallet

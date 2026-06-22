@@ -36,6 +36,7 @@ import { actionsRouter } from '../routes/actions.js';
 import { catalogueRouter } from '../routes/catalogue.js';
 import { workRouter } from '../routes/work.js';
 import { walletRouter } from '../routes/wallet.js';
+import { usageRouter } from '../routes/usage.js';
 import { boardsRouter } from '../routes/boards.js';
 import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
@@ -317,6 +318,7 @@ export async function mountRoutes(
   }));
   app.use(workRouter(config, storage, peers, mailboxNotificationService));
   app.use(walletRouter(config, storage));
+  app.use(usageRouter(config, storage));
   app.use(knowledgeRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled
