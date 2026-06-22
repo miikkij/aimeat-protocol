@@ -30,8 +30,11 @@ export interface DeliveryCtx {
 }
 
 /** Build the canonical signed payload for a message delivery. Key order MUST match the receiver.
- *  `deliveryGhii` is the human GHII the peer node accepts as recipient (the owner of an agent/eco
- *  recipient, or the recipient itself for a human); the conversationId still threads with the agent. */
+ *  `recipientGhii` is the ACTUAL recipient (may be an agent/eco GAII) — preserved so the recipient node
+ *  can store it and the agent can read its own DMs cross-node. `deliveryGhii` is the human GHII whose
+ *  mailbox the copy lands in (the owner of an agent/eco recipient, or the recipient itself for a human),
+ *  so the human still sees + gates the message. An older peer that ignores `deliveryGhii` falls back to
+ *  `recipientGhii` as the mailbox owner (its receiver already parses owner+node from a GAII). */
 function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord, deliveryGhii: string) {
   return {
     source_node: config.nodeId,
@@ -40,7 +43,8 @@ function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord, 
       conversationId: record.conversationId,
       subject: record.subject ?? null,
       senderGhii: record.senderGhii,
-      recipientGhii: deliveryGhii,
+      recipientGhii: record.recipientGhii,
+      deliveryGhii,
       body: record.body,
       attachments: record.attachments ?? null,
       replyToId: record.replyToId ?? null,

@@ -24,7 +24,8 @@ import { deriveTierFlags } from '../services/federation-tiers.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { RouteHop, RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage } from '../types/route-manifest.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, emitDelivery } from '../services/event-bus.js';
+import { emitResourceUpdated } from '../mcp/index.js';
 import { notify } from '../services/notify.js';
 import { parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { messagePreview } from '../utils/messaging.js';
@@ -171,40 +172,44 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        // Recipient must be a human GHII hosted on THIS node.
+        // The ACTUAL recipient (may be an agent/eco GAII) vs the mailbox owner it's delivered to.
+        // `deliveryGhii` is where the copy lands (the owner of an agent/eco recipient); the human owns +
+        // gates the mailbox, while the agent can still read messages addressed to it. Older senders omit
+        // `deliveryGhii`, so fall back to the recipient itself (prior behaviour).
         const recipientGhii: string = message.recipientGhii;
-        const parsedRecipient = parseGaiiLoose(recipientGhii);
-        if (parsedRecipient.node !== config.nodeId) {
+        const deliveryGhii: string = message.deliveryGhii ?? recipientGhii;
+        const parsedDelivery = parseGaiiLoose(deliveryGhii);
+        if (parsedDelivery.node !== config.nodeId) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Recipient is not hosted on this node'));
             return;
         }
-        const ownerRec = await storage.getOwner(parsedRecipient.owner);
+        const ownerRec = await storage.getOwner(parsedDelivery.owner);
         if (!ownerRec) {
-            res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${recipientGhii}`));
+            res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${deliveryGhii}`));
             return;
         }
 
-        // First-contact gate (recipient side).
-        const contact = await storage.getContact(recipientGhii, message.senderGhii);
+        // First-contact gate is the OWNER's (they decide who may reach them and their agents).
+        const contact = await storage.getContact(deliveryGhii, message.senderGhii);
         if (contact?.state === 'blocked') {
             res.status(403).json(error(config.nodeId, 'BLOCKED', 'Recipient is not accepting messages from this sender'));
             return;
         }
         let state = contact?.state;
         if (!state) {
-            const autoAccept = isSameOwner(message.senderGhii, recipientGhii);
+            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii);
             state = autoAccept ? 'accepted' : 'pending';
-            await storage.setContactState(recipientGhii, message.senderGhii, state, message.id);
+            await storage.setContactState(deliveryGhii, message.senderGhii, state, message.id);
         }
         const isRequest = state === 'pending';
 
         // Idempotent: a retried delivery must not create a duplicate inbox copy.
-        const existingCopy = await storage.getDirectMessage(message.id, recipientGhii);
+        const existingCopy = await storage.getDirectMessage(message.id, deliveryGhii);
         if (!existingCopy) {
             const now = new Date().toISOString();
             await storage.createDirectMessage({
                 id: message.id,
-                ownerGhii: recipientGhii,
+                ownerGhii: deliveryGhii,
                 conversationId: message.conversationId,
                 subject: message.subject ?? undefined,
                 senderGhii: message.senderGhii,
@@ -222,20 +227,36 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             // Accepted contact → pull the attachment bytes into the recipient's storage now; a
             // pending request leaves them as reference until accepted (DECISION #3).
             if (!isRequest && message.attachments?.length) {
-                const recCopy = await storage.getDirectMessage(message.id, recipientGhii);
+                const recCopy = await storage.getDirectMessage(message.id, deliveryGhii);
                 if (recCopy) {
-                    const dup = await duplicateMessageAttachments({ config, storage, peers }, recipientGhii, recCopy);
-                    if (dup.changed) await storage.updateMessageAttachments(message.id, recipientGhii, dup.attachments);
+                    const dup = await duplicateMessageAttachments({ config, storage, peers }, deliveryGhii, recCopy);
+                    if (dup.changed) await storage.updateMessageAttachments(message.id, deliveryGhii, dup.attachments);
                 }
             }
 
-            await notify(storage, recipientGhii, {
+            await notify(storage, deliveryGhii, {
                 type: isRequest ? 'direct_message_request' : 'direct_message',
                 title: isRequest ? `${message.senderGhii} wants to message you` : `New message from ${message.senderGhii}`,
                 body: messagePreview(message.body ?? ''),
                 link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${message.conversationId}`,
             });
             emitChange('messages');
+
+            // Event-based push: if the actual recipient is an agent/eco hosted here, wake it over the
+            // connect tunnel (mirrors task_assigned / workspace.record) so it acts on the DM without
+            // polling. The owner keeps the mailbox copy above.
+            if (recipientGhii !== deliveryGhii) {
+                emitDelivery({
+                    target: recipientGhii, kind: 'dm.inbound', id: message.id,
+                    payload: {
+                        message_id: message.id, conversation_id: message.conversationId,
+                        subject: message.subject ?? null, from: message.senderGhii,
+                        preview: messagePreview(message.body ?? ''),
+                        attachments: message.attachments?.length ?? 0, created_at: message.createdAt ?? now,
+                    },
+                });
+                try { emitResourceUpdated(recipientGhii, 'aimeat://dm/inbox'); } catch { /* no live MCP session */ }
+            }
         }
 
         res.json(success(config.nodeId, { delivered: true, state }));
