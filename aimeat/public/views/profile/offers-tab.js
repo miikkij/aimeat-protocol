@@ -38,6 +38,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
+import { OfferBadges, OfferExample, OfferRequirements, OfferDeliverable } from '/components/offer-card-view.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { dt } from '/js/format.js';
 import * as offersService from '/js/services/offers.js';
@@ -55,17 +56,6 @@ const locTitle = (title) => {
   if (typeof title === 'string') return title;
   return title.en_US || title.fi_FI || Object.values(title)[0] || '';
 };
-
-function Badges({ offer }) {
-  const chips = [];
-  if (offer.visibility && offer.visibility !== 'private') chips.push(['vis', t('profile.offers.visibility.' + offer.visibility) || offer.visibility]);
-  if (offer.price && offer.price.morsels > 0) chips.push(['price', offer.price.morsels + ' ' + (t('profile.offers.morsels') || 'morsels')]);
-  if (offer.verification) chips.push(['ver', t('profile.offers.verification.' + offer.verification) || offer.verification]);
-  if (offer.dataHandling) chips.push(['data', t('profile.offers.dataHandling.' + offer.dataHandling) || offer.dataHandling]);
-  if (offer.cost) chips.push(['cost', t('profile.offers.cost.' + offer.cost) || offer.cost]);
-  if (offer.latency) chips.push(['lat', t('profile.offers.latency.' + offer.latency) || offer.latency]);
-  return html`<span class="of-badges">${chips.map(([k, label]) => html`<span class="of-badge of-badge--${k}" key=${k}>${escHtml(label)}</span>`)}</span>`;
-}
 
 function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged, onGoInbox, autoOpen, onAutoOpened }) {
   const [open, setOpen] = useState(false);
@@ -158,19 +148,15 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
           <span class="of-offer-title">${escHtml(offer.title)}</span>
           <span class="of-agent">${escHtml(entry.agent)} <span class="of-dot ${entry.online ? 'of-dot--on' : 'of-dot--off'}" title=${entry.online ? (t('profile.offers.online') || 'online') : (t('profile.offers.offline') || 'last seen ' + (entry.last_seen ? dt(entry.last_seen) : '—'))}></span></span>
         </div>
-        <${Badges} offer=${offer} />
+        <${OfferBadges} offer=${offer} />
       </div>
       <div class="of-ask">${escHtml(offer.ask)}</div>
 
       ${open ? html`
         <div class="of-detail">
-          ${offer.example ? html`<div class="of-example"><span class="of-label">${t('profile.offers.example') || 'Example'}:</span> ${escHtml(offer.example)}</div>` : null}
+          <${OfferExample} offer=${offer} />
 
-          ${(offer.requirements || []).length ? html`
-            <div class="of-label">${t('profile.offers.requirements') || 'Before you ask'}</div>
-            <div class="of-req-list">${offer.requirements.map((r, i) => html`
-              <span class="of-req" key=${i}>${escHtml(r.need)}${r.instruction ? html` <span class="of-mini">— ${escHtml(r.instruction)}</span>` : null}${r.fix ? html` <span class="of-fix">${escHtml(r.fix)}</span>` : null}</span>`)}</div>
-          ` : null}
+          <${OfferRequirements} offer=${offer} />
 
           ${consequences.length ? html`
             <div class="of-label">${t('profile.offers.consequences') || 'What this does'}</div>
@@ -186,12 +172,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
                 <span class="of-prereq-mark">${it.ok ? '✓' : (it.hard ? '✕' : '!')}</span> ${escHtml(it.label)}</span>`)}</div>
           ` : null}
 
-          ${offer.deliverable ? html`
-            <div class="of-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${escHtml(offer.deliverable.format || '')}${offer.deliverable.location?.space ? html` <span class="of-mini">→ ${escHtml(offer.deliverable.location.space)}</span>` : null}</div>
-            ${offer.deliverable.sample === 'untested'
-              ? html`<span class="of-badge of-badge--untested">${t('profile.offers.untested') || 'untested — no sample yet'}</span>`
-              : html`<div class="of-md of-sample-md"><${DeliverableBody} value=${offer.deliverable.sample} alt=${offer.title} format=${offer.deliverable.format} /></div>`}
-          ` : null}
+          <${OfferDeliverable} offer=${offer} />
 
           <div class="of-runs">
             <button class="of-runs-toggle" onClick=${toggleRuns}>${runsOpen ? '▾' : '▸'} ${t('profile.offers.recentRuns') || 'Recent runs'}</button>

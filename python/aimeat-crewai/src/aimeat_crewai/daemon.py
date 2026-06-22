@@ -14,6 +14,11 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.9.0 -- Interactive messages (federated AskUserQuestion). The dm.inbound wake now carries
+    `interactive` ("questions" | "answers" | None) so an on_dm handler can tell a question it should
+    answer from an answer to one it asked. New crew helpers in aimeat_crewai.messaging: ask() sends a
+    structured question, read_answers()/answers_from_dm() fetch the human's machine-readable picks,
+    build_question() shapes one, serve_client() builds a loopback REST client. Requires AIMEAT >= 1.31.
   0.8.1 -- Fix the DM wake-consume bug (0.8.0 lost DMs with listen_for="dms" + on_dm). The idle wait
     long-polls the wake queue (`_wait_for_work` on /local/dm/next for a dms agent), which CONSUMES the
     event off the serve queue. Tasks were fine (the next cycle re-lists from the store), but the DM and
@@ -781,10 +786,13 @@ def run_crew_daemon(
             a synthetic task dict and routed to build_crew (like messages).
         on_dm: With "dms" in listen_for, a callback invoked with each pushed
             `dm.inbound` event (record-shaped: id, conversationId, subject,
-            senderGhii, preview, attachments (count), createdAt). When omitted,
-            each wake is wrapped into a synthetic task dict and routed to
-            build_crew (like records/messages). The wake is a lightweight
-            summary -- read the full thread via aimeat_dm_thread(conversationId).
+            senderGhii, preview, attachments (count), createdAt, and
+            `interactive`: "questions" | "answers" | None for a federated
+            AskUserQuestion). When omitted, each wake is wrapped into a synthetic
+            task dict and routed to build_crew (like records/messages). The wake
+            is a lightweight summary -- read the full thread via
+            aimeat_dm_thread(conversationId), or use messaging.read_answers /
+            answers_from_dm to pull structured answers for an "answers" wake.
         on_idle: Optional callback fired once per poll cycle when no work
             arrived. Useful for heartbeat logging.
         on_error: Optional callback fired with any unhandled exception
