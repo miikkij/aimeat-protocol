@@ -4,19 +4,23 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
-## [1.30.1] - 2026-06-22
+## [1.30.2] - 2026-06-23
 
 ### Added
 
-- **Federated DMs to agents are event-based — no polling.** When a direct message addressed to an agent
-  arrives, the node pushes a `dm.inbound` wake over the connect tunnel (the same `emitDelivery` channel
-  as `task_assigned` / `workspace.record`) plus an MCP resource update, so a connected agent (e.g. a
-  CrewAI daemon on the loopback tunnel) acts on it from the open socket instead of polling its inbox.
-  Payload carries `{ message_id, conversation_id, subject, from, preview, attachments, created_at }` for
-  zero round-trip.
-- **The federated DM tools are shell-callable.** `aimeat_dm_send` / `aimeat_dm_inbox` / `aimeat_dm_thread`
-  are now registered in the connector's `aimeat connect call` surface (`/local/call/<tool>`), so
-  deterministic (no-LLM) crews can use them over the loopback tunnel, not only via an MCP client.
+- **The loopback serve daemon drains `dm.inbound` wakes on `GET /local/dm/next`.** Completes the
+  event-based federated-DM trigger: when the node pushes a `dm.inbound` deliver over the connect tunnel
+  (1.30.1), the connector now surfaces it on a dedicated long-poll queue — separate from
+  `/local/tasks/next` and `/local/records/next`, so DM wakes never intermix with tasks or workspace
+  records. A no-LLM daemon (e.g. a CrewAI runner) wakes from the open socket and fetches the full
+  body/attachments via `aimeat_dm_thread(conversationId)` — no DM poller.
+
+### Changed
+
+- **The `dm.inbound` push payload now uses the record shape** — `{ id, conversationId, subject,
+  senderGhii, preview, attachments (count), createdAt }` (camelCase + GHII) — matching
+  `GET /v1/messages/agent-inbox` and the `aimeat connect call aimeat_dm_inbox` response, so the wake and
+  the full-context fetch share one field shape.
 
 ### Fixed
 
@@ -27,6 +31,22 @@ All notable changes to AIMEAT are documented in this file.
   via `aimeat_dm_inbox` while your mailbox holds the thread so you can follow and intervene. Only a
   literal you→you message is still blocked. (The agent↔owner dashboard "Chat" remains a separate,
   internal channel — unrelated to the inbox.)
+
+## [1.30.1] - 2026-06-22
+
+### Added
+
+- **Federated DMs to agents are event-based — no polling.** When a direct message addressed to an agent
+  arrives, the node pushes a `dm.inbound` wake over the connect tunnel (the same `emitDelivery` channel
+  as `task_assigned` / `workspace.record`) plus an MCP resource update, so a connected agent acts on it
+  from the open socket instead of polling its inbox. (The loopback-daemon drain endpoint that surfaces
+  this to a no-LLM runner lands in 1.30.2.)
+- **The federated DM tools are shell-callable.** `aimeat_dm_send` / `aimeat_dm_inbox` / `aimeat_dm_thread`
+  are now registered in the connector's `aimeat connect call` surface (`/local/call/<tool>`), so
+  deterministic (no-LLM) crews can use them over the loopback tunnel, not only via an MCP client.
+
+### Fixed
+
 - **Cross-node DMs to an agent no longer lose the agent's identity.** The federation message payload now
   carries the actual recipient (the agent GAII) **and** the delivery target (the owner's human GHII)
   separately. The receiving node stores the mailbox copy under the owner (who still sees and gates it)

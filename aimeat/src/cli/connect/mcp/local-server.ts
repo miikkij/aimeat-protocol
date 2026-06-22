@@ -137,6 +137,8 @@ class AgentChannel {
   private waiters: Waiter[] = [];
   private recordQueue: QueuedRecord[] = [];
   private recordWaiters: RecordWaiter[] = [];
+  private dmQueue: QueuedRecord[] = [];
+  private dmWaiters: RecordWaiter[] = [];
   /** Task ids the node pushed as cancelled (P3) — checked by the daemon instead of polling the
    *  owner-scoped `agents.cancel.*` memory before every dispatch. Bounded by a daemon's task volume. */
   private cancelledIds = new Set<string>();
@@ -178,6 +180,33 @@ class AgentChannel {
         resolve(null);
       }, waitMs);
       this.recordWaiters.push(waiter);
+    });
+  }
+
+  /** A `dm.inbound` event arrived — surface it on the DM long-poll. Separate queue from tasks/records so
+   *  federated-inbox wakes never intermix with task or workspace-record wakes (same philosophy as records).
+   *  No dedup: each DM is a distinct wake; full body/attachments are read via aimeat_dm_thread. */
+  handleDm(payload: unknown): void {
+    if (!payload || typeof payload !== 'object') return;
+    const item: QueuedRecord = { event: payload as Record<string, unknown>, receivedAt: new Date().toISOString() };
+    const waiter = this.dmWaiters.shift();
+    if (waiter) waiter(item);
+    else this.dmQueue.push(item);
+  }
+
+  /** Long-poll: next undelivered DM event, or null after `waitMs` with none. */
+  nextDm(waitMs: number): Promise<QueuedRecord | null> {
+    const queued = this.dmQueue.shift();
+    if (queued) return Promise.resolve(queued);
+    if (waitMs <= 0) return Promise.resolve(null);
+    return new Promise<QueuedRecord | null>((resolve) => {
+      const waiter: RecordWaiter = (item) => { clearTimeout(timer); resolve(item); };
+      const timer = setTimeout(() => {
+        const i = this.dmWaiters.indexOf(waiter);
+        if (i >= 0) this.dmWaiters.splice(i, 1);
+        resolve(null);
+      }, waitMs);
+      this.dmWaiters.push(waiter);
     });
   }
 
@@ -283,6 +312,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       onDeliver: (kind, payload) => {
         if (kind === 'task_assigned') ch.handleTask(payload, 'deliver');
         else if (kind === 'workspace.record') ch.handleRecord(payload);
+        else if (kind === 'dm.inbound') ch.handleDm(payload);
         else if (kind === 'task.cancelled') ch.handleCancelled(payload);
       },
       onBacklog: ({ tasks, messages }) => {
@@ -463,6 +493,26 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
     const item = await channels.get(entry.agent)!.nextRecord(waitMs);
+    if (!item) { res.status(204).end(); return; }
+    res.json({
+      ok: true,
+      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.agent)!.reconnects, event: item.event },
+    });
+  });
+
+  // GET /local/dm/next?wait=ms[&agent=name] — long-poll for the next federated-inbox `dm.inbound` wake.
+  // Distinct queue from tasks + records (no intermixing). The wake carries a lightweight summary; read the
+  // full body/attachments via aimeat_dm_thread(conversation_id) when the responder needs them.
+  app.get('/local/dm/next', async (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
+    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    const item = await channels.get(entry.agent)!.nextDm(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
       ok: true,

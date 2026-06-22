@@ -15,6 +15,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
+import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -400,6 +401,12 @@ export async function mountRoutes(
   if (config.portfolioEnabled) {
     app.use(portfolioRouter(config, storage));
   }
+
+  // Enterprise edition (open-core seam): mount the proprietary `ee/` module if dropped in, else the
+  // Community stub (returns ENTERPRISE_REQUIRED for gated namespaces). See src/enterprise/.
+  const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
+  await enterprise.mountRoutes(app);
+
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));
   app.use(publicStatsRouter(config, storage));

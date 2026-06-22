@@ -182,10 +182,12 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     if (recipientGhii !== deliveryGhii) {
       emitDelivery({
         target: recipientGhii, kind: 'dm.inbound', id,
+        // Field names match the DirectMessageRecord / GET /v1/messages/agent-inbox shape (camelCase + GHII),
+        // so the daemon's wake and its full-context fetch use ONE shape. `preview` + `attachments` (count)
+        // are the lightweight extras; read the full body/attachments via aimeat_dm_thread(conversationId).
         payload: {
-          message_id: id, conversation_id: conversationId, subject: subject ?? null,
-          from: senderGhii, preview: messagePreview(body),
-          attachments: attachments?.length ?? 0, created_at: now,
+          id, conversationId, subject: subject ?? null, senderGhii,
+          preview: messagePreview(body), attachments: attachments?.length ?? 0, createdAt: now,
         },
       });
     }

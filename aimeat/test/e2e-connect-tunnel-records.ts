@@ -222,6 +222,28 @@ await test('8. Writing a cancel marker pushes task.cancelled to the task\'s agen
   await t.close();
 });
 
+// ─── Federated DM push (event-based, no poll) ───
+console.log('\nPhase 5 — Federated DM addressed to the agent pushes deliver{dm.inbound}');
+await test('A federated DM to the agent pushes deliver{dm.inbound} with the record-shaped payload', async () => {
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  // Owner B sends a DM to A's agent (first contact; the wake fires regardless of the request gate).
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: auth(B.token),
+    body: JSON.stringify({ to: aAgent.gaii, body: 'Hei agentti — tunnel-push testi.', subject: 'Push' }),
+  });
+  assert(send.status === 201, `dm send ${send.status}: ${JSON.stringify(send.body)}`);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null, 'received a dm deliver');
+  assert(d!.kind === 'dm.inbound', `kind ${d!.kind}`);
+  const p = d!.payload as any;
+  assert(p?.id === send.body.data.message.id, `message id ${p?.id}`);
+  assert(p?.conversationId === send.body.data.message.conversationId, `conversationId ${p?.conversationId}`);
+  assert(p?.senderGhii === `${B.name}@${NODE_ID}`, `senderGhii ${p?.senderGhii}`);
+  assert(p?.subject === 'Push', `subject ${p?.subject}`);
+  await t.close();
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
