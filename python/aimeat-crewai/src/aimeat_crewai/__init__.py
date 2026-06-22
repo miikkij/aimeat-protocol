@@ -61,8 +61,17 @@ from .offers import (
     OfferValidationError,
 )
 from .offers_tool import offers_check, offers_publish, offers_tools
+from .messaging import (
+    ServeClient,
+    serve_client,
+    build_question,
+    ask,
+    read_answers,
+    answers_from_dm,
+    AimeatMessagingError,
+)
 
-__version__ = "0.6.0"
+__version__ = "0.9.0"
 
 __all__ = [
     "__version__",
@@ -95,4 +104,12 @@ __all__ = [
     "offers_check",
     "offers_publish",
     "offers_tools",
+    # Interactive messages — federated AskUserQuestion (0.9.0)
+    "ServeClient",
+    "serve_client",
+    "build_question",
+    "ask",
+    "read_answers",
+    "answers_from_dm",
+    "AimeatMessagingError",
 ]
