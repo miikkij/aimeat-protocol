@@ -8,6 +8,8 @@
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-06-22 — OrgSearch: instant (debounced) indexed search, results grouped by workspace,
+ *     and clicking a hit deep-links to the exact record/document (via the workspace openDoc handoff).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -32,34 +34,49 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const doSearch = async () => {
+  // Instant (debounced) search across the organism — indexed FTS backend (GET /:id/search).
+  useEffect(() => {
     const query = q.trim();
-    if (query.length < 2) return;
+    if (query.length < 2) { setResults(null); setBusy(false); return undefined; }
+    let cancelled = false;
     setBusy(true);
-    try {
-      const r = await orgService.searchOrganism(orgId, query);
-      setResults(r?.data?.results || []);
-    } catch { setResults([]); }
-    finally { setBusy(false); }
+    const tid = setTimeout(async () => {
+      try { const r = await orgService.searchOrganism(orgId, query); if (!cancelled) setResults(r?.data?.results || []); }
+      catch { if (!cancelled) setResults([]); }
+      finally { if (!cancelled) setBusy(false); }
+    }, 220);
+    return () => { cancelled = true; clearTimeout(tid); };
+  }, [q, orgId]);
+
+  // Open a hit at the exact record/document: stash the deep-link the workspace reads on mount, then
+  // navigate to that workspace (its openDoc effect resolves namespace → space tab + opens the item).
+  const openHit = (r) => {
+    try { sessionStorage.setItem(`aimeat.ws.${orgId}.${r.ws}.openDoc`, JSON.stringify({ namespace: r.namespace, id: r.id })); } catch { /* noop */ }
+    onOpenWorkspace?.(r.ws);
   };
+
+  // Group hits by workspace so a big organism's results stay legible.
+  const byWs = {};
+  for (const r of (results || [])) (byWs[r.ws] = byWs[r.ws] || { name: r.wsName || r.ws, hits: [] }).hits.push(r);
 
   return html`
     <div class="pj-orgsearch">
       <div class="flex-row-wrap">
         <input class="input-field input-sm pj-orgsearch-input" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
-          onInput=${(e) => setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') doSearch(); }} />
-        <button class="btn-outline btn-sm" disabled=${busy || q.trim().length < 2} onClick=${doSearch}>${t('organisms.search') || 'Search'}</button>
+          onInput=${(e) => setQ(e.target.value)} />
+        ${busy ? html`<${Spinner} />` : null}
+        ${results !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setQ('')}>${t('search.clear') || 'Clear'}</button>` : null}
       </div>
-      ${results !== null && results.length === 0 ? html`<div class="section-desc">${t('organisms.searchNoResults') || 'No matches.'}</div>` : null}
-      ${(results || []).map(r => html`
-        <div class="pj-access-row card-clickable" key=${r.ws + '/' + r.space + '/' + r.id} role="button" onClick=${() => onOpenWorkspace?.(r.ws)}>
-          <span>
-            <b>${(r.title)}</b>
-            <span class="pj-mini"> — ${(r.wsName || r.ws)} · ${(r.space)}</span>
-            <div class="pj-mini">${(r.snippet)}</div>
-          </span>
-        </div>
-      `)}
+      ${results !== null && results.length === 0 && !busy ? html`<div class="section-desc">${t('search.noMatches') || 'No matches.'}</div>` : null}
+      ${Object.entries(byWs).map(([ws, grp]) => html`
+        <div class="pj-search-group" key=${ws}>
+          <div class="pj-search-group-head">${(grp.name)}<span class="pj-org-tab-count">${grp.hits.length}</span></div>
+          ${grp.hits.map(r => html`
+            <button class="pj-search-hit" key=${r.space + '/' + r.id} onClick=${() => openHit(r)}>
+              <span class="pj-search-hit-title">${(r.title)} <span class="pj-mini">· ${(r.space)}</span></span>
+              <span class="pj-search-hit-snippet">${(r.snippet)}</span>
+            </button>`)}
+        </div>`)}
     </div>
   `;
 }

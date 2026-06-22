@@ -2056,6 +2056,7 @@
       "bulkDone": "{n} updated",
       "bulkDeleted": "{n} deleted",
       "bulkDeleteConfirm": "Delete {n} memory entries? This cannot be undone.",
+      "toolsLabel": "Tools",
       "storageUsed": "Storage",
       "keysWord": "keys",
       "sizeLabel": "Value size",
@@ -6354,6 +6355,18 @@
     "snapshot": "Snapshot",
     "pick": "Pick a point to see the structure then.",
     "changed": "structure changed"
+  },
+  "search": {
+    "wsPlaceholder": "Search this workspace…",
+    "orgPlaceholder": "Search this organism…",
+    "clear": "Clear",
+    "noMatches": "No matches",
+    "paletteTitle": "Search everything",
+    "palettePlaceholder": "Search organisms, workspaces, records…",
+    "recents": "Recent",
+    "results": "Results",
+    "openHint": "↵ open · Esc close",
+    "searching": "Searching…"
   },
   "organisms": {
     "title": "Organisms",

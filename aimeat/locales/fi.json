@@ -2056,6 +2056,7 @@
       "bulkDone": "{n} päivitetty",
       "bulkDeleted": "{n} poistettu",
       "bulkDeleteConfirm": "Poistetaanko {n} muistimerkintää? Ei voi perua.",
+      "toolsLabel": "Työkalut",
       "storageUsed": "Tallennustila",
       "keysWord": "avainta",
       "sizeLabel": "Arvon koko",
@@ -6354,6 +6355,18 @@
     "snapshot": "Tilannekuva",
     "pick": "Valitse kohta nähdäksesi rakenteen silloin.",
     "changed": "rakenne muuttui"
+  },
+  "search": {
+    "wsPlaceholder": "Hae tästä työtilasta…",
+    "orgPlaceholder": "Hae tästä organismista…",
+    "clear": "Tyhjennä",
+    "noMatches": "Ei osumia",
+    "paletteTitle": "Hae kaikkea",
+    "palettePlaceholder": "Hae organismeja, työtiloja, recordeja…",
+    "recents": "Viimeisimmät",
+    "results": "Tulokset",
+    "openHint": "↵ avaa · Esc sulje",
+    "searching": "Haetaan…"
   },
   "organisms": {
     "title": "Organismit",
