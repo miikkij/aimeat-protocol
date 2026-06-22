@@ -38,6 +38,9 @@
  *     no values) with per-key lazy value fetch on expand + "Load all contents"; server-side content
  *     search (key/value/tags) with per-group scoping; storage-usage bar; value-size column + "largest
  *     first" sort; bulk-delete a whole group; JSON export/import (skip/overwrite/rename).
+ *   v2.3.1 — 2026-06-22 — Toolbar layout: data tools (Load all / Export / Import) grouped in their
+ *     own bordered .mem-tools-section up top; content-search + filter on one row; sort + "New memory"
+ *     moved to a bottom bar (New-memory pushed right).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -798,12 +801,37 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <div class="pf-mem-quota-bar"><div class="pf-mem-quota-fill ${quotaPct >= 90 ? 'pf-mem-quota-fill--danger' : ''}" style=${`width:${quotaPct}%`}></div></div>
         </div>
       `}
+      <div class="mem-tools-section">
+        <span class="mem-tools-label">${t('profile.memory.toolsLabel') || 'Tools'}</span>
+        <div class="mem-tools-actions">
+          ${!fullLoaded && html`<button class="btn-outline btn-sm" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button>`}
+          <span class="mem-import-group">
+            <button class="btn-outline btn-sm" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button>
+            <button class="btn-outline btn-sm" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button>
+            <select class="input-field mem-vis-select" value=${importMode} onChange=${e => setImportMode(e.target.value)} title=${t('profile.memory.importModeLabel') || 'Conflict handling'}>
+              <option value="skip">${t('profile.memory.importMode.skip') || 'Skip existing'}</option>
+              <option value="overwrite">${t('profile.memory.importMode.overwrite') || 'Overwrite'}</option>
+              <option value="rename">${t('profile.memory.importMode.rename') || 'Import as new'}</option>
+            </select>
+            <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} />
+          </span>
+        </div>
+      </div>
       <div class="action-bar">
+        <div class="search-bar">
+          <input type="text" class="input-field" placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
+            value=${searchInput} onInput=${e => setSearchInput(e.target.value)}
+            onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, searchScopePrefix); }} />
+          <button class="btn-sm" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
+          ${searchResults !== null && html`<button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕</button>`}
+        </div>
         <div class="search-bar">
           <input type="text" class="input-field" placeholder=${t('profile.memory.filterType')}
             value=${filterText} onInput=${e => setFilterText(e.target.value)} />
           ${filterText && html`<button class="btn-ghost btn-sm" onClick=${() => setFilterText('')}>✕</button>`}
         </div>
+      </div>
+      <div class="action-bar mem-bottom-bar">
         <div class="mem-sort-bar">
           <label class="text-meta-sm">${t('profile.memory.sortLabel')}</label>
           <select class="input-field mem-sort-select" value=${sortBy} onChange=${e => setSortBy(e.target.value)}>
@@ -813,27 +841,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
             <option value="size">${t('profile.memory.sortSize') || 'Largest first'}</option>
           </select>
         </div>
-        <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
-      </div>
-      <div class="action-bar mem-tools-bar">
-        <div class="search-bar">
-          <input type="text" class="input-field" placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
-            value=${searchInput} onInput=${e => setSearchInput(e.target.value)}
-            onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, searchScopePrefix); }} />
-          <button class="btn-sm" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
-          ${searchResults !== null && html`<button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕</button>`}
-        </div>
-        ${!fullLoaded && html`<button class="btn-outline btn-sm" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button>`}
-        <button class="btn-outline btn-sm" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button>
-        <span class="mem-import-group">
-          <select class="input-field mem-vis-select" value=${importMode} onChange=${e => setImportMode(e.target.value)} title=${t('profile.memory.importModeLabel') || 'Conflict handling'}>
-            <option value="skip">${t('profile.memory.importMode.skip') || 'Skip existing'}</option>
-            <option value="overwrite">${t('profile.memory.importMode.overwrite') || 'Overwrite'}</option>
-            <option value="rename">${t('profile.memory.importMode.rename') || 'Import as new'}</option>
-          </select>
-          <button class="btn-outline btn-sm" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button>
-          <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} />
-        </span>
+        <button class="btn-primary mem-new-btn" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
       <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
       ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
