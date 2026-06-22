@@ -196,6 +196,32 @@ await test("7. Revoking an agent's token pushes auth_revoked + closes its tunnel
   await t.close();
 });
 
+// ─── P3: task-cancellation push ───
+console.log('\nPhase 4 — Task-cancellation push (P3)');
+
+await test('8. Writing a cancel marker pushes task.cancelled to the task\'s agent', async () => {
+  // A task owned by A's agent (name "recbota", from setupAgent above).
+  const ct = await json('/v1/agents/recbota/tasks', {
+    method: 'POST', headers: auth(A.token),
+    body: JSON.stringify({ title: 'Cancellable', description: 'x', status: 'queued' }),
+  });
+  assert(ct.status === 201, `create task ${ct.status}: ${JSON.stringify(ct.body)}`);
+  const taskId = ct.body.data.task.id;
+
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  // Owner writes the cancel marker (value = task id list), as the cortex cancelTask lib does.
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: auth(A.token),
+    body: JSON.stringify({ key: `agents.cancel.task.${taskId}`, value: [taskId], visibility: 'owner' }),
+  });
+  assert(w.status === 201 || w.status === 200, `cancel marker write ${w.status}`);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null && d!.kind === 'task.cancelled', `expected task.cancelled, got ${JSON.stringify(d)}`);
+  assert((d!.payload as any)?.id === taskId, `cancelled id ${(d!.payload as any)?.id} != ${taskId}`);
+  await t.close();
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
