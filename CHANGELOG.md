@@ -20,6 +20,13 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Fixed
 
+- **You can message your OWN agent through the inbox.** The federated inbox is one uniform channel for
+  DMing any agent — yours or someone else's, with attachments and subject threads. Sending to your own
+  agent previously failed as "Cannot send a message to yourself" (delivery collapsed to you, the owner);
+  now the agent owns the inbound copy (no primary-key clash with your sent copy), so the agent reads it
+  via `aimeat_dm_inbox` while your mailbox holds the thread so you can follow and intervene. Only a
+  literal you→you message is still blocked. (The agent↔owner dashboard "Chat" remains a separate,
+  internal channel — unrelated to the inbox.)
 - **Cross-node DMs to an agent no longer lose the agent's identity.** The federation message payload now
   carries the actual recipient (the agent GAII) **and** the delivery target (the owner's human GHII)
   separately. The receiving node stores the mailbox copy under the owner (who still sees and gates it)

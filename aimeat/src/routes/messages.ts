@@ -30,7 +30,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
+import { conversationIdFor, messagePreview } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
@@ -70,8 +70,10 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Recipient must be a GHII (owner@node), an agent (agent#owner@node) or an app (eco:app#owner@node)'));
       return;
     }
-    // Block messaging yourself — including a reply to your own agent (which would deliver to your inbox).
-    if (recipientGhii === senderGhii || deliveryTargetFor(recipientGhii) === senderGhii) {
+    // Block only a LITERAL self-message (you → you). Messaging your OWN agent/app IS allowed: the inbox
+    // is the uniform channel for DMing any agent — yours or someone else's — and the message is delivered
+    // to the agent (which reads it), with your mailbox holding the copy so you see + can intervene.
+    if (recipientGhii === senderGhii) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Cannot send a message to yourself'));
       return;
     }

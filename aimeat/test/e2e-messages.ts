@@ -272,12 +272,21 @@ await test('16. Replying to an agent GAII delivers to the owner (thread keeps th
     assert(m !== undefined, 'owner bob received the agent-addressed reply in his inbox');
 });
 
-await test('17. Cannot reply to your OWN agent (delivers to yourself)', async () => {
-    const { status } = await json('/v1/messages', {
+await test('17. Can message your OWN agent via the inbox (allowed; not a self-message)', async () => {
+    const { status, body } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
         body: JSON.stringify({ to: `myagent#${aliceName}@${NODE_ID}`, body: 'to my own agent' }),
     });
-    assert(status === 400, `self-delivery should be 400, got ${status}`);
+    assert(status === 201, `own-agent send should be 201, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.recipientGhii === `myagent#${aliceName}@${NODE_ID}`, 'thread is with the agent');
+});
+
+await test('17b. A LITERAL self-message (you → you) is still blocked', async () => {
+    const { status } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: alice.ghii, body: 'note to self' }),
+    });
+    assert(status === 400, `literal self-message should be 400, got ${status}`);
 });
 
 console.log('\nPhase 8 -- Subject threads (start a new topic thread instead of one endless chat)');
