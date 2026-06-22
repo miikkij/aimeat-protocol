@@ -1608,6 +1608,7 @@ model DirectMessage {
   recipientGhii  String
   body           String    @default("")
   attachments    Json?
+  interactive    Json?
   status         String    @default("queued")
   direction      String
   replyToId      String?

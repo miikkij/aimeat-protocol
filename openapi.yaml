@@ -3047,6 +3047,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DirectMessageAttachment'
+        interactive:
+          $ref: '#/components/schemas/InteractivePayload'
         status:
           type: string
           enum: [queued, sent, delivered, read, failed, undeliverable]
@@ -3076,6 +3078,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DirectMessageAttachment'
+        interactive:
+          $ref: '#/components/schemas/InteractivePayload'
         replyToId: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
 
@@ -3105,6 +3109,52 @@ components:
               name: { type: string }
               inline: { type: boolean }
               id: { type: string }
+        interactive:
+          $ref: '#/components/schemas/InteractivePayload'
+
+    InteractivePayload:
+      type: object
+      description: >-
+        Structured AskUserQuestion payload on a direct message. role=questions → an agent asks the human a
+        set of option-based questions (rendered as an inline form in the inbox: radio for single-select,
+        checkboxes for multiSelect, plus an always-available "Other" freeform). role=answers → the human's
+        reply, with machine-readable picks keyed by question id (the message body still carries a
+        human-readable summary so the thread reads naturally on any peer).
+      required: [role]
+      properties:
+        role: { type: string, enum: [questions, answers] }
+        v: { type: integer, default: 1 }
+        questions:
+          type: array
+          description: Present when role=questions.
+          items:
+            type: object
+            required: [id, header, prompt, options]
+            properties:
+              id: { type: string }
+              header: { type: string, description: Short chip label (≈ ≤12 chars). }
+              prompt: { type: string }
+              multiSelect: { type: boolean, default: false }
+              allowOther: { type: boolean, default: true }
+              required: { type: boolean, default: false }
+              options:
+                type: array
+                items:
+                  type: object
+                  required: [id, label]
+                  properties:
+                    id: { type: string }
+                    label: { type: string }
+        submitLabel: { type: string, description: Optional submit-button label (role=questions). }
+        answersFor: { type: string, description: The question message id this answers (role=answers). }
+        answers:
+          type: object
+          description: 'Map of question id → { selected:[optionId], other } (role=answers).'
+          additionalProperties:
+            type: object
+            properties:
+              selected: { type: array, items: { type: string } }
+              other: { type: string, nullable: true }
 
     ConversationSummary:
       type: object

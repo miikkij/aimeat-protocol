@@ -10,17 +10,19 @@
  * @version-history
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5: Inbox tab).
  *   v1.0.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
+ *   v1.1.0 -- 2026-06-23 -- send() carries the optional `interactive` payload (federated AskUserQuestion).
  */
 import { api, apiGet } from '/js/api.js';
 
 const enc = encodeURIComponent;
 
 /** Send a direct message. `attachments` is an array of descriptors (storage_key, mime, size, kind, inline, id).
- *  `subject` opens a new topic thread; `conversationId` continues a specific existing thread. */
-export async function send({ to, body, attachments, replyTo, subject, conversationId } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any, subject?: any, conversationId?: any }} */ ({})) {
+ *  `subject` opens a new topic thread; `conversationId` continues a specific existing thread.
+ *  `interactive` carries a structured AskUserQuestion payload (a `questions` spec or the human's `answers`). */
+export async function send({ to, body, attachments, replyTo, subject, conversationId, interactive } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any, subject?: any, conversationId?: any, interactive?: any }} */ ({})) {
   return api('/v1/messages', {
     method: 'POST',
-    body: JSON.stringify({ to, body, attachments, reply_to: replyTo, subject, conversation_id: conversationId }),
+    body: JSON.stringify({ to, body, attachments, reply_to: replyTo, subject, conversation_id: conversationId, interactive }),
   });
 }
 

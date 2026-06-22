@@ -2040,6 +2040,44 @@ export interface DirectMessageAttachment {
   kind: 'image' | 'audio' | 'video' | 'file';
 }
 
+/** One option in an interactive question. `id` is stable; `label` is the human-facing text. */
+export interface InteractiveOption {
+  id: string;
+  label: string;
+}
+
+/** A single structured question carried by an interactive message (mirrors the AskUserQuestion shape). */
+export interface InteractiveQuestion {
+  id: string;
+  /** Short chip label (≈ ≤12 chars). */
+  header: string;
+  /** The full question text. */
+  prompt: string;
+  options: InteractiveOption[];
+  /** true → the human may pick multiple options (checkboxes); false → single-select (radio). */
+  multiSelect?: boolean;
+  /** true (default) → also offer a freeform "Other" answer. */
+  allowOther?: boolean;
+  /** true → the human must answer before the reply can be sent (UI-gated). */
+  required?: boolean;
+}
+
+/** The human's answer to one question: the chosen option ids plus an optional freeform "Other" value. */
+export interface InteractiveAnswer {
+  selected: string[];
+  other?: string | null;
+}
+
+/**
+ * Optional structured payload on a direct message — a federated AskUserQuestion. Discriminated by `role`:
+ *  - `questions`: an agent asks the human a set of option-based questions (rendered as a form in the inbox).
+ *  - `answers`: the human's reply, carrying machine-readable picks keyed by question id (the message body
+ *    still holds a human-readable summary so the thread reads naturally on any peer).
+ */
+export type InteractivePayload =
+  | { role: 'questions'; v: number; questions: InteractiveQuestion[]; submitLabel?: string }
+  | { role: 'answers'; v: number; answersFor: string; answers: Record<string, InteractiveAnswer> };
+
 /**
  * One mailbox copy of a direct message. Both sides store their own row (classic mailbox model):
  * the sender keeps an `outbound` row, the recipient an `inbound` row, sharing `id`/`conversationId`
@@ -2060,6 +2098,8 @@ export interface DirectMessageRecord {
   /** GFM markdown; inline media referenced as cid:{attachmentId}. May be empty if attachment-only. */
   body: string;
   attachments?: DirectMessageAttachment[];
+  /** Optional structured payload — a federated AskUserQuestion (the question spec, or the human's answers). */
+  interactive?: InteractivePayload;
   status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'undeliverable';
   direction: 'inbound' | 'outbound';
   /** Message this is a reply to (same conversationId). */

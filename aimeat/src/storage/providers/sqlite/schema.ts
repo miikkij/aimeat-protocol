@@ -1484,6 +1484,7 @@ export function initializeSchema(db: Database.Database): void {
       recipientGhii  TEXT NOT NULL,
       body           TEXT NOT NULL DEFAULT '',
       attachments    TEXT,
+      interactive    TEXT,
       status         TEXT NOT NULL DEFAULT 'queued',
       direction      TEXT NOT NULL,
       replyToId      TEXT,
@@ -1598,6 +1599,10 @@ export function initializeSchema(db: Database.Database): void {
   // Direct-message subject threads — add to existing tables (no index needed: threads are grouped by
   // the already-indexed conversationId; subject is only stored + displayed). Fresh DBs get it inline.
   safeAddColumn('direct_messages', 'subject', 'TEXT');
+  // Interactive messages (federated AskUserQuestion) — the question spec / the human's answers as JSON.
+  // No index needed (read alongside the row, grouped by the already-indexed conversationId). Fresh DBs
+  // get it inline above.
+  safeAddColumn('direct_messages', 'interactive', 'TEXT');
 
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');

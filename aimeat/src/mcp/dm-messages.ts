@@ -11,6 +11,8 @@
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: aimeat_dm_send (federated send + multi-attachment), gated messages:send.
+ *   v1.1.0 — 2026-06-23 — aimeat_dm_ask (federated AskUserQuestion: structured option questions); inbox/thread
+ *     now surface the `interactive` payload so the agent reads the human's machine-readable answers.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,7 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
-import { MessageAttachmentInputSchema } from '../models/message-schemas.js';
+import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -87,6 +89,53 @@ export function registerDmMessageTools(
         },
     );
 
+    // ── aimeat_dm_ask — ask a person a STRUCTURED question (a federated AskUserQuestion) ──
+    mcp.tool(
+        'aimeat_dm_ask',
+        descriptionFor('aimeat_dm_ask'),
+        {
+            to: z.string().min(3).max(256).describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node).'),
+            questions: z.array(InteractiveQuestionSchema).min(1).max(20)
+                .describe('1–20 questions. Each: { id, header (short chip), prompt, options:[{id,label}], multiSelect? (checkboxes), allowOther? (default true), required? }.'),
+            body: z.string().max(50000).optional().describe('Optional intro text shown above the questions (GFM markdown).'),
+            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (else the default thread or conversation_id).'),
+            conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id.'),
+            submit_label: z.string().min(1).max(80).optional().describe('Optional submit-button label (the inbox defaults to a localized "Send answers").'),
+        },
+        annotationsFor('aimeat_dm_ask'),
+        async ({ to, questions, body, subject, conversation_id, submit_label }) => {
+            const senderGhii = getAgentGaii();
+            const recipientGhii = to.trim();
+            if (recipientGhii === senderGhii) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
+            }
+            const result = await sendDirectMessage(ctx, {
+                senderGhii, recipientGhii, body: body ?? '', conversationId: conversation_id, subject,
+                interactive: { role: 'questions', v: 1, questions, submitLabel: submit_label },
+            });
+            if (!result.ok) {
+                const msg = result.code === 'RECIPIENT_NOT_FOUND'
+                    ? `No such recipient: ${recipientGhii}`
+                    : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).';
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
+            }
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        message_id: result.message.id,
+                        conversation_id: result.message.conversationId,
+                        recipient: result.message.recipientGhii,
+                        questions: questions.length,
+                        status: result.message.status,
+                        note: 'The answer returns as a reply — read interactive.answers via aimeat_dm_thread(conversation_id).',
+                        created_at: result.message.createdAt,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
     // ── aimeat_dm_inbox — read recent federated DMs addressed to this agent ──
     mcp.tool(
         'aimeat_dm_inbox',
@@ -110,6 +159,7 @@ export function registerDmMessageTools(
                             from: m.senderGhii,
                             body: m.body,
                             attachments: m.attachments?.map(a => ({ storage_key: a.storageKey, mime: a.mime, kind: a.kind, name: a.name })) ?? [],
+                            interactive: m.interactive ?? null,
                             created_at: m.createdAt,
                         })),
                         total,
@@ -146,6 +196,7 @@ export function registerDmMessageTools(
                             subject: m.subject ?? null,
                             body: m.body,
                             attachments: m.attachments?.map(a => ({ storage_key: a.storageKey, mime: a.mime, kind: a.kind, name: a.name })) ?? [],
+                            interactive: m.interactive ?? null,
                             created_at: m.createdAt,
                         })),
                         total,

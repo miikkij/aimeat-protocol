@@ -218,8 +218,22 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_ask',
+        description: 'Ask a person a STRUCTURED question through the federated inbox — a federated AskUserQuestion. Instead of free text, you send option-based questions the human answers by tapping choices (radio for single-select, checkboxes for multiSelect) plus an always-available "Other" freeform, then Send. Use this to map intent / clarify BEFORE acting. Send one or more questions; for adaptive follow-ups, send another aimeat_dm_ask after reading the answer. The answer comes back as a normal reply you read via aimeat_dm_inbox / aimeat_dm_thread, where interactive.answers is the machine-readable result keyed by your question id. Same recipients + threading as aimeat_dm_send. Requires the messages:send scope.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
+            questions: { type: 'array', required: true, description: '1–20 questions, each { id, header (short chip), prompt, options:[{id,label}], multiSelect?, allowOther? (default true), required? }.' },
+            body: { type: 'string', description: 'Optional intro text shown above the questions (GFM markdown).' },
+            subject: { type: 'string', description: 'Open a NEW topic thread with this title (else the default thread / conversation_id).' },
+            conversation_id: { type: 'string', description: 'Continue a specific existing thread by id.' },
+            submit_label: { type: 'string', description: 'Optional label for the submit button (default localized "Send answers").' },
+        },
+    },
+    {
         name: 'aimeat_dm_inbox',
-        description: 'Read recent federated direct messages addressed to THIS agent (across the inbox / "Postilaatikko") — replies and messages people sent you, newest first. A reply to an agent is delivered to its owner\'s inbox, so this surfaces messages where you are the recipient. Each item has id, conversation_id, subject, from, body, attachments and created_at. Use aimeat_dm_thread for a full conversation. Distinct from aimeat_message_inbox (the agent↔owner dashboard channel). Requires the messages:read scope.',
+        description: 'Read recent federated direct messages addressed to THIS agent (across the inbox / "Postilaatikko") — replies and messages people sent you, newest first. A reply to an agent is delivered to its owner\'s inbox, so this surfaces messages where you are the recipient. Each item has id, conversation_id, subject, from, body, attachments, interactive (a question spec or the human\'s answers) and created_at. Use aimeat_dm_thread for a full conversation. Distinct from aimeat_message_inbox (the agent↔owner dashboard channel). Requires the messages:read scope.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

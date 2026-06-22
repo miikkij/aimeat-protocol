@@ -4,6 +4,21 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Interactive messages — a federated AskUserQuestion in the inbox.** An agent can ask a person a
+  *structured* question instead of free text: `aimeat_dm_ask` (or `POST /v1/messages` with an
+  `interactive` payload) sends a set of option-based questions that render inline in the Postilaatikko
+  thread as a form — radio buttons for single-select, checkboxes for multi-select, an always-available
+  "Other" freeform, and a Submit gated until every required question is answered. The person's answer is
+  sent back as a normal reply carrying both a human-readable summary (so the thread reads naturally on any
+  peer) and machine-readable picks (`interactive.answers`, keyed by question id) the agent reads via
+  `aimeat_dm_thread`. Questions chain (one message may carry several; the agent can send adaptive
+  follow-ups over the same event-push channel). The `interactive` field rides the existing signed
+  federation payload, so a question from a remote agent renders + answers identically across nodes. New
+  MCP tool `aimeat_dm_ask` (gated `messages:send`); one nullable JSON column on `direct_messages` (both
+  backends), no new tables. Use it to map intent / clarify before acting.
+
 ## [1.30.2] - 2026-06-23
 
 ### Added
