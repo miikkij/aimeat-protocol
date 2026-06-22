@@ -2837,8 +2837,16 @@ export class SqliteStorage implements Storage {
         this.db.prepare('DELETE FROM board_subscriptions WHERE boardId = ?').run(org.boardId);
         this.db.prepare('DELETE FROM boards WHERE id = ?').run(org.boardId);
 
-        // Cascade: delete memory entries under the organism's namespace
-        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(org.memoryNamespace);
+        // Cascade: delete ALL content under the organism's key namespace, across every owner. The
+        // workspace records/documents/meta are keyed `organism.{id}.…` but OWNED by the member who
+        // wrote them (creator GHII, a contributor's GAII), NOT by `memoryNamespace` — so a
+        // delete-by-ownerGaii left them orphaned (and still searchable via the FTS index). Delete by
+        // key prefix instead; the memory_fts AFTER DELETE trigger clears the search index in step.
+        const orgKey = `organism.${id}`;
+        const orgPrefix = `organism.${id}.%`;
+        this.db.prepare('DELETE FROM memory WHERE key = ? OR key LIKE ?').run(orgKey, orgPrefix);
+        this.db.prepare('DELETE FROM memory_history WHERE key = ? OR key LIKE ?').run(orgKey, orgPrefix);
+        this.db.prepare('DELETE FROM schemas WHERE keyPattern = ? OR keyPattern LIKE ?').run(orgKey, orgPrefix);
       }
 
       const result = this.db.prepare('DELETE FROM organisms WHERE id = ?').run(id);

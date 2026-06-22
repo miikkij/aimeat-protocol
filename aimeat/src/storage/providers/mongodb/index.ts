@@ -2585,7 +2585,16 @@ export class PrismaStorage implements Storage {
                 await this.prisma.boardSubscription.deleteMany({ where: { boardId: org.boardId } });
                 await this.prisma.board.delete({ where: { boardId: org.boardId } });
             } catch { /* best-effort */ }
-            await this.prisma.memory.deleteMany({ where: { ownerGaii: org.memoryNamespace } });
+            // Delete ALL content under the organism's key namespace, across every owner — workspace
+            // records/documents/meta are keyed `organism.{id}.…` but owned by the member who wrote
+            // them, NOT by memoryNamespace, so a delete-by-ownerGaii left them orphaned (and still
+            // findable via $text search). Delete by key prefix; also the trackable-version history and
+            // any locked schemas under the prefix.
+            const orgKey = `organism.${id}`;
+            const keyFilter = { OR: [{ key: orgKey }, { key: { startsWith: `${orgKey}.` } }] };
+            await this.prisma.memory.deleteMany({ where: keyFilter });
+            await this.prisma.memoryVersion.deleteMany({ where: keyFilter });
+            await this.prisma.schemaLock.deleteMany({ where: { OR: [{ keyPattern: orgKey }, { keyPattern: { startsWith: `${orgKey}.` } }] } });
         }
         try { await this.prisma.organism.delete({ where: { id } }); return true; } catch { return false; }
     }
