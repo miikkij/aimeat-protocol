@@ -28,6 +28,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { Spinner, KebabMenu } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { SearchBar } from '/components/SearchBar.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import * as orgService from '/js/services/organisms.js';
@@ -199,6 +200,31 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     showToast?.(t('readme.saved') || 'README saved', 'success');
   };
   const onWsMapNav = (target) => { if (target?.type === 'space' && target.space) setTab('space:' + target.space); };
+
+  // ── In-workspace content search (Kerros 1): indexed FTS scoped to this workspace. While a query is
+  // active the space tabs are filtered to the ones with matches (+ counts) and a grouped result list
+  // replaces the space view; clicking a hit jumps straight to that record/document. ──
+  const [wsQuery, setWsQuery] = useState('');
+  const [wsHits, setWsHits] = useState(null);   // null = not searching; [] = searched, no matches
+  const [wsSearching, setWsSearching] = useState(false);
+  useEffect(() => {
+    const q = wsQuery.trim();
+    if (q.length < 2) { setWsHits(null); setWsSearching(false); return undefined; }
+    let cancelled = false;
+    setWsSearching(true);
+    const tid = setTimeout(async () => {
+      const r = await orgService.searchOrganism(orgId, q, wsId).catch(() => null);
+      if (!cancelled) { setWsHits((r?.data?.results) || []); setWsSearching(false); }
+    }, 220);   // debounce — instant feel without a request per keystroke
+    return () => { cancelled = true; clearTimeout(tid); };
+  }, [wsQuery, orgId, wsId]);
+  const wsSearchCounts = wsHits ? wsHits.reduce((m, h) => { m[h.space] = (m[h.space] || 0) + 1; return m; }, {}) : null;
+  // One-shot: the command palette (Cmd-K) can pre-fill this workspace's search so you land on the
+  // filtered result list for the query you jumped from.
+  useEffect(() => {
+    const k = `aimeat.ws.${orgId}.${wsId}.search`;
+    try { const v = sessionStorage.getItem(k); if (v) { setWsQuery(v); sessionStorage.removeItem(k); } } catch { /* noop */ }
+  }, [orgId, wsId]);
 
   // Deep-link from the librarian "Open" button: aimeat.ws.{org}.{ws}.openDoc = { namespace, id }.
   // Once the manifest is loaded we resolve the namespace → object-type name, open that space tab and
@@ -1028,6 +1054,32 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     pickTab('space:' + target.name);
   };
   const openOvRec = (ot, r) => { setExpandedRec(s => ({ ...s, [ot.name + ':' + r.id]: true })); pickTab('space:' + ot.name); };
+  // Jump from a search hit to its record/document in the right space, then close the search.
+  const gotoHit = (hit) => {
+    const target = allTypes.find(o => o.name === hit.space || o.namespace === hit.namespace);
+    if (!target) return;
+    if (isDocSpace(target)) setActiveDoc({ type: target.name, mode: 'view', page: { id: hit.id } });
+    else setExpandedRec(s => ({ ...s, [target.name + ':' + hit.id]: true }));
+    pickTab('space:' + target.name);
+    setWsQuery(''); setWsHits(null);
+  };
+  const renderWsSearchResults = () => {
+    if (wsSearching && !wsHits) return html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`;
+    if (!wsHits || !wsHits.length) return html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />`;
+    const bySpace = {};
+    for (const h of wsHits) (bySpace[h.space] = bySpace[h.space] || []).push(h);
+    return html`<div class="pj-search-results">
+      ${Object.entries(bySpace).map(([space, hits]) => html`
+        <div class="pj-search-group" key=${space}>
+          <div class="pj-search-group-head">${cap(wsT('type.' + space) || space)}<span class="pj-org-tab-count">${hits.length}</span></div>
+          ${hits.map(h => html`
+            <button class="pj-search-hit" key=${h.id} onClick=${() => gotoHit(h)}>
+              <span class="pj-search-hit-title">${h.title}</span>
+              <span class="pj-search-hit-snippet">${h.snippet}</span>
+            </button>`)}
+        </div>`)}
+    </div>`;
+  };
   // A document opens in its space tab on desktop; on mobile it expands INLINE right here —
   // view and edit both — so no window juggling is ever needed on a phone.
   const openOvDoc = (ot, d) => {
@@ -1159,10 +1211,19 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           <button class="btn-outline btn-sm" onClick=${() => setTab('review')}>${t('organisms.reviewQueue') || 'Review queue'}</button>
         </div>` : null}
 
+      <div class="pj-ws-searchbar">
+        <${SearchBar} value=${wsQuery} onInput=${e => setWsQuery(e.target.value)}
+          placeholder=${t('search.wsPlaceholder') || 'Search this workspace…'} ariaLabel=${t('search.wsPlaceholder') || 'Search this workspace'} />
+        ${wsHits !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => { setWsQuery(''); setWsHits(null); }}>${t('search.clear') || 'Clear'}</button>` : null}
+      </div>
+
       <div class="pj-org-groups" role="tablist">
         ${groups.map(g => {
           const stacked = g.kind === 'stacked';
           const groupActive = activeTab === g.id;
+          // While searching, a stacked (content) group shows only the spaces that have matches.
+          const members = (wsSearchCounts && stacked) ? g.members.filter(tb => wsSearchCounts[tb.ot.name]) : g.members;
+          if (wsSearchCounts && stacked && !members.length) return null;
           return html`
             <div class="pj-org-group ${groupActive ? 'active' : ''}" key=${g.id}>
               ${stacked
@@ -1171,14 +1232,16 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
                   </button>`
                 : html`<span class="pj-org-group-cap pj-org-group-cap-static">${g.label}</span>`}
               <div class="pj-org-group-tabs">
-                ${g.members.map(tb => {
+                ${members.map(tb => {
                   // Related members are independent panels; a stacked member scrolls within its group.
                   const isActive = activeTab === tb.id;
                   const u = isActive ? 0 : unseenOf(tb.id);
+                  const matchCount = (wsSearchCounts && stacked) ? wsSearchCounts[tb.ot.name] : null;
                   const onClick = stacked ? () => scrollToSpace(g.id, tb.ot.name) : () => pickTab(tb.id);
                   return html`
                     <button class="pj-org-tab ${isActive ? 'active' : ''}" role="tab" aria-selected=${isActive} key=${tb.id} onClick=${onClick}>
-                      ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
+                      ${(tb.label)}${matchCount != null ? html`<span class="pj-org-tab-count pj-org-tab-match">${matchCount}</span>`
+                        : (tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null)}
                       ${u > 0 ? html`<span class="pj-org-tab-unseen" title=${t('organisms.unseenHint') || 'Changed since your last visit'}>${u}</span>` : null}
                     </button>`;
                 })}
@@ -1267,26 +1330,28 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         </div>
       `}
 
-      ${REL_DESC[activeTab] ? html`<div class="section-desc pj-tab-desc">${REL_DESC[activeTab]}</div>` : null}
+      ${wsHits !== null ? renderWsSearchResults() : html`
+        ${REL_DESC[activeTab] ? html`<div class="section-desc pj-tab-desc">${REL_DESC[activeTab]}</div>` : null}
 
-      ${activeTab === 'overview' ? renderOverview() : null}
+        ${activeTab === 'overview' ? renderOverview() : null}
 
-      ${activeGroup ? html`
-        <div class="pj-ov pj-group-view">
-          <div class="pj-group-head">
-            <div class="section-title">${activeGroup.label}</div>
-            ${activeGroup.desc ? html`<div class="section-desc">${activeGroup.desc}</div>` : null}
-          </div>
-          ${activeGroup.spaces.map(ot => html`
-            <div class="pj-group-sec" id=${'ws-sec-' + ot.name} key=${'gs-' + ot.name}>${renderOvSection(ot)}</div>`)}
-          ${activeGroup.spaces.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
-        </div>` : null}
+        ${activeGroup ? html`
+          <div class="pj-ov pj-group-view">
+            <div class="pj-group-head">
+              <div class="section-title">${activeGroup.label}</div>
+              ${activeGroup.desc ? html`<div class="section-desc">${activeGroup.desc}</div>` : null}
+            </div>
+            ${activeGroup.spaces.map(ot => html`
+              <div class="pj-group-sec" id=${'ws-sec-' + ot.name} key=${'gs-' + ot.name}>${renderOvSection(ot)}</div>`)}
+            ${activeGroup.spaces.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
+          </div>` : null}
 
-      ${activeSpace
-        ? (!orgService.isMemorySpace(activeSpace)
-          ? renderSpaceNotice(activeSpace)
-          : (isDocSpace(activeSpace) ? renderDocSpace(activeSpace) : renderRecordSpace(activeSpace)))
-        : null}
+        ${activeSpace
+          ? (!orgService.isMemorySpace(activeSpace)
+            ? renderSpaceNotice(activeSpace)
+            : (isDocSpace(activeSpace) ? renderDocSpace(activeSpace) : renderRecordSpace(activeSpace)))
+          : null}
+      `}
 
       ${activeTab === 'sources' ? html`<${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
 

@@ -172,6 +172,18 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) { setOpenId(null); setOpenWs(null); }
   }, [openId, myOrganisms]);
 
+  // Jump from the global command palette (Cmd-K) when this tab is already mounted — open the chosen
+  // organism (+ workspace). A cold navigation instead reads sessionStorage on mount (above).
+  useEffect(() => {
+    const onOpen = (e) => {
+      const d = e.detail || {};
+      if (!d.orgId) return;
+      setOpenId(d.orgId); setOpenWs(d.wsId || null); setOpenSettings(false);
+    };
+    window.addEventListener('aimeat-open-organism', onOpen);
+    return () => window.removeEventListener('aimeat-open-organism', onOpen);
+  }, []);
+
   // Live update listener
   const liveRef = useRef(loadData);
   liveRef.current = loadData;

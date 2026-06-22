@@ -240,6 +240,7 @@
       "/views/profile/organisms/sources-panel.js": "/views/profile/organisms/sources-panel.js",
       "/views/profile/organisms/schema-form.js": "/views/profile/organisms/schema-form.js",
       "/views/profile/organisms/document.js": "/views/profile/organisms/document.js",
+      "/views/command-palette.js": "/views/command-palette.js",
       "/views/profile/organisms/mindmap.js": "/views/profile/organisms/mindmap.js",
       "/views/profile/organisms/readme-panel.js": "/views/profile/organisms/readme-panel.js",
       "/views/profile/organisms/timeline-panel.js": "/views/profile/organisms/timeline-panel.js"
@@ -286,6 +287,7 @@
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { initThemeSystem, getTheme, toggleTheme, onThemeChange } from '/js/theme.js';
     import { NotificationBell } from '/components/NotificationBell.js';
+    import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
     // generateStars no longer needed for light theme
 
@@ -467,6 +469,7 @@
 
       return html`
         <${Header} navigate=${navigate} locale=${locale} />
+        <${CommandPalette} navigate=${navigate} />
         <div class="page-content">
           ${viewError
             ? html`<div style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim,#888);">
