@@ -14,6 +14,15 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.8.0 -- Federated-inbox DM push. `run_crew_daemon` gains listen_for="dms": when a direct message
+    addressed to this agent arrives, the node pushes a `dm.inbound` wake over the connector tunnel and
+    the daemon drains it from the new /local/dm/next long-poll (a queue separate from tasks + records,
+    so wakes never intermix) -- via an `on_dm(event)` callback, or wrapped into a synthetic task ->
+    build_crew. A dms-driven agent parks its idle wait on the DM long-poll: event-based, no DM poller.
+    The wake is record-shaped (id, conversationId, subject, senderGhii, preview, attachments (count),
+    createdAt); read the full body/attachments via aimeat_dm_thread(conversationId) and reply in-thread
+    with aimeat_dm_send. Requires AIMEAT >= 1.30.2 (node push + /local/dm/next); older serve daemons
+    simply return 204.
   0.7.1 -- Stop the per-cycle tunnel polling (prod showed ~600 MB / 5 min of /v1/connect/tunnel
     from daemons re-listing tasks every cycle). Two changes: (1) when the agent has a live tunnel,
     the cycle re-lists tasks from the node ONLY when a push woke it (`_wait_for_work` now returns
@@ -493,6 +502,26 @@ def _drain_records(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
     return out
 
 
+def _drain_dms(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
+    """Pull all immediately-available federated-inbox `dm.inbound` wakes off the serve daemon's DM queue
+    (wait=0, non-blocking), up to `max_items`. Each envelope is record-shaped (id, conversationId,
+    subject, senderGhii, preview, attachments (count), createdAt). [] when none/on error. Read the full
+    body/attachments via aimeat_dm_thread(conversationId)."""
+    out: list[dict[str, Any]] = []
+    for _ in range(max_items):
+        try:
+            r = api.get("/local/dm/next", params={"wait": 0, "agent": api.agent_name}, timeout=10)
+            if r.status_code != 200:
+                break
+            event = r.json().get("data", {}).get("event")
+            if not isinstance(event, dict):
+                break
+            out.append(event)
+        except Exception:
+            break
+    return out
+
+
 def _serve_agent_status(api: _Api) -> dict[str, Any]:
     """This agent's serve-daemon status entry (transport, reconnects, ...) from `/local/status`, or {}
     on error. Loopback-only -- NOT a node call -- so polling it per cycle keeps an idle agent quiet."""
@@ -628,6 +657,7 @@ def run_crew_daemon(
     listen_for: Iterable[str] = ("tasks",),
     record_spaces: Iterable[dict[str, Any]] | None = None,
     on_record: Callable[[dict[str, Any]], None] | None = None,
+    on_dm: Callable[[dict[str, Any]], None] | None = None,
     on_idle: Callable[[], None] | None = None,
     on_error: Callable[[Exception], None] | None = None,
     one_shot: bool = False,
@@ -704,7 +734,7 @@ def run_crew_daemon(
             liaison. The value is read once at startup -- restart to apply a
             change. Mind LLM rate limits: N parallel crews fan out further
             internally, so start conservative (3-5).
-        listen_for: Iterable of "tasks", "messages" and/or "records".
+        listen_for: Iterable of "tasks", "messages", "records" and/or "dms".
             Default ("tasks",). When "messages" is included, inbox messages
             also become triggers (wrapped into a synthetic task dict with the
             message body as description). When "records" is included, workspace
@@ -713,6 +743,12 @@ def run_crew_daemon(
             each event instead of idle-polling the served spaces. With push
             active the idle wait long-polls `/local/records/next`, so a
             records-only contract agent makes ZERO periodic node calls.
+            When "dms" is included, federated-inbox direct messages addressed to
+            this agent become triggers: the node pushes a `dm.inbound` wake over
+            the tunnel and the daemon drains it from `/local/dm/next` (a queue
+            separate from tasks + records). A dms-driven agent parks its idle
+            wait on the DM long-poll -- no DM poller. Reply in-thread with
+            aimeat_dm_send; read full body/attachments via aimeat_dm_thread.
         record_spaces: With "records" in listen_for, the list of spaces to
             subscribe to -- each a dict {"organism_id", "ws", "space"} where
             `space` is the workspace records-space key segment (the manifest
@@ -724,6 +760,12 @@ def run_crew_daemon(
             subscribed space (op="catchup") so the handler re-scans for writes
             missed while disconnected. When omitted, each event is wrapped into
             a synthetic task dict and routed to build_crew (like messages).
+        on_dm: With "dms" in listen_for, a callback invoked with each pushed
+            `dm.inbound` event (record-shaped: id, conversationId, subject,
+            senderGhii, preview, attachments (count), createdAt). When omitted,
+            each wake is wrapped into a synthetic task dict and routed to
+            build_crew (like records/messages). The wake is a lightweight
+            summary -- read the full thread via aimeat_dm_thread(conversationId).
         on_idle: Optional callback fired once per poll cycle when no work
             arrived. Useful for heartbeat logging.
         on_error: Optional callback fired with any unhandled exception
@@ -775,7 +817,10 @@ def run_crew_daemon(
     # wait on the record long-poll. `last_reconnects` tracks the tunnel (re)connect count so a reconnect
     # triggers one catch-up scan. Initialised so startup itself counts as the first catch-up.
     records_on = "records" in listen_set and bool(record_space_list)
-    wake_path = "/local/records/next" if records_on else "/local/tasks/next"
+    # Federated-inbox DM push: a `dms`-driven agent parks its idle wait on the DM long-poll. (Records take
+    # priority for the park when both are on; the other queue still drains every cycle / on wake.)
+    dms_on = "dms" in listen_set
+    wake_path = "/local/records/next" if records_on else ("/local/dm/next" if dms_on else "/local/tasks/next")
     last_reconnects = -1
     if records_on:
         n = _subscribe_records(api, record_space_list)
@@ -1007,6 +1052,44 @@ def run_crew_daemon(
                     except Exception:
                         pass
 
+        def _handle_dm(event: dict[str, Any]) -> None:
+            """Act on one federated-inbox `dm.inbound` wake: the caller's on_dm, else wrap as a synthetic
+            task -> crew. The wake is a lightweight summary; the handler reads the full body/attachments
+            via aimeat_dm_thread(conversationId)."""
+            if on_dm is not None:
+                try:
+                    on_dm(event)
+                except Exception as inner:
+                    print(f"[daemon:{agent_name}] on_dm handler crashed: {inner}")
+                    if on_error:
+                        try:
+                            on_error(inner)
+                        except Exception:
+                            pass
+                return
+            did = f"dm-{event.get('id')}"
+            synthetic_task = {
+                "id": did,
+                "title": f"Direct message from {event.get('senderGhii')}",
+                "description": (
+                    f"A direct message arrived (subject: {event.get('subject') or '-'}, "
+                    f"from: {event.get('senderGhii')}). Preview: {event.get('preview', '')}. "
+                    f"Read the full thread via aimeat_dm_thread (conversation_id: "
+                    f"{event.get('conversationId')}) and reply in-thread with aimeat_dm_send."
+                ),
+                "_source": "dm",
+                "_original": event,
+            }
+            try:
+                build_crew(synthetic_task, liaison).kickoff()
+            except Exception as inner:
+                print(f"[daemon:{agent_name}] dm {did} crashed: {inner}")
+                if on_error:
+                    try:
+                        on_error(inner)
+                    except Exception:
+                        pass
+
         while not stop["flag"]:
             dispatched_this_cycle = False
 
@@ -1014,7 +1097,7 @@ def run_crew_daemon(
             # `auth_revoked`, the connector stops the socket). Detect it via the loopback status (free,
             # not a node call) and exit so the supervisor re-auths instead of looping forever. Replaces
             # the old periodic node auth-liveness probe.
-            agent_status = _serve_agent_status(api) if (push_wake or records_on) else {}
+            agent_status = _serve_agent_status(api) if (push_wake or records_on or dms_on) else {}
             if agent_status.get("transport") == "auth_failed":
                 print(f"[daemon:{agent_name}] tunnel auth revoked/expired -- run `aimeat connect` to re-auth. Exiting.")
                 auth_failed = True
@@ -1164,6 +1247,16 @@ def run_crew_daemon(
                         if stop["flag"]:
                             break
                         _handle_record(event)
+                        dispatched_this_cycle = True
+
+                if dms_on:
+                    # Drain federated-inbox DM wakes pushed since the last cycle. No catch-up re-list:
+                    # DMs aren't backlogged on reconnect (the agent can aimeat_dm_inbox on demand if it
+                    # missed a window) — keeps an idle agent quiet, no DM poller.
+                    for event in _drain_dms(api):
+                        if stop["flag"]:
+                            break
+                        _handle_dm(event)
                         dispatched_this_cycle = True
 
             except Exception as outer:
