@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.7.2 -- 2026-06-23 -- Delivery ticks now distinguish delivered from sent: delivered = ✓✓ (grey,
+ *     "reached the mailbox" — incl. agent threads, which never send a read receipt), read = ✓✓ coloured,
+ *     sent = ✓, queued = clock. Previously delivered rendered as a single ✓ identical to sent, so an
+ *     agent DM never showed a "got there" confirmation.
  *   v1.7.1 -- 2026-06-23 -- Fix thread-splitting: a reply in an open thread now pins to that
  *     conversationId. Without it, replying in a SUBJECT thread fell back to the default per-pair thread,
  *     so the reply spawned a brand-new thread named after the agent (e.g. "concierge") and the subject
@@ -126,7 +130,10 @@ function Avatar({ seed, size = 36 }) {
     dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
 }
 
-const TICK = { sent: '✓', delivered: '✓', read: '✓✓', queued: '🕒', failed: '⚠', undeliverable: '⚠' };
+// WhatsApp-style ticks: sent = one ✓; delivered (reached the recipient's mailbox, incl. an agent's) =
+// two ✓✓ (grey); read (read receipt — humans send one, agents don't yet) = two ✓✓ coloured via
+// inbox-tick--read; queued (cross-node, peer unreachable) = a clock.
+const TICK = { sent: '✓', delivered: '✓✓', read: '✓✓', queued: '🕒', failed: '⚠', undeliverable: '⚠' };
 function statusTick(status) { return TICK[status] || ''; }
 
 function timeShort(s) {
