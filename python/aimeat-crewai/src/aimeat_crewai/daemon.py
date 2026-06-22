@@ -401,8 +401,10 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
 def _wait_for_work(
     api: _Api, use_push: bool, seconds: float, stop: dict[str, Any],
     wake_path: str = "/local/tasks/next",
-) -> None:
-    """Idle wait between poll cycles.
+) -> bool:
+    """Idle wait between poll cycles. Returns True if a PUSH woke it (new work arrived on the wake
+    long-poll), False if it timed out / slept with nothing. The caller uses this to skip re-listing
+    from the node on idle cycles — the whole point of the tunnel.
 
     With `use_push` (the agent's serve transport is 'tunnel'), this long-polls
     the serve daemon's push surface (`wake_path`, default `/local/tasks/next`;
@@ -421,7 +423,7 @@ def _wait_for_work(
     while not stop["flag"]:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return
+            return False
         if use_push:
             wait_ms = int(min(remaining, 5.0) * 1000)
             try:
@@ -431,12 +433,13 @@ def _wait_for_work(
                     timeout=wait_ms / 1000 + 10,
                 )
                 if r.status_code == 200:
-                    return  # push wake -- new work arrived, start the next cycle now
+                    return True  # push wake -- new work arrived, start the next cycle now
             except Exception:
                 # serve hiccup: degrade to a plain sleep slice for this round
                 time.sleep(min(1.0, max(remaining, 0.1)))
         else:
             time.sleep(min(1.0, remaining))
+    return False
 
 
 def _subscribe_records(api: _Api, spaces: list[dict[str, Any]]) -> int:
@@ -819,6 +822,15 @@ def run_crew_daemon(
     done_ids: set[str] = set()
     auth_failed = False  # set True if the serve tunnel reports the bearer was revoked/expired (P2)
 
+    # Poll-gate (the tunnel's promise for tasks): when the agent has a live tunnel, the node PUSHES
+    # new tasks (deliver/backlog) and the idle wait parks on the loopback wake long-poll. So re-listing
+    # tasks from the node every cycle is pure waste — do it ONLY when a push woke us, plus a rare
+    # safety-net re-list to catch anything missed (a dropped frame, a status flip with no push). With
+    # no tunnel (direct/degraded) the wake always times out, so we keep polling every cycle as before.
+    woke_by_push = False
+    next_poll_due = 0.0  # monotonic deadline for the safety-net re-list; 0 => poll on the first cycle
+    safety_net_s = max(poll_interval_seconds, 300)
+
     # Concurrent-EXECUTE state (only used when effective_max > 1). Mutated by the
     # MAIN thread only: workers just run and return, the main thread reaps their
     # futures and updates done_ids, so no lock is needed.
@@ -987,8 +999,18 @@ def run_crew_daemon(
                 auth_failed = True
                 break
 
+            # Re-list from the node only when a push woke us (or on the rare safety-net interval).
+            # With no tunnel, push_wake is False so this is always True — unchanged polling.
+            should_poll = (not push_wake) or woke_by_push or (time.monotonic() >= next_poll_due)
+
             try:
-                if "tasks" in listen_set:
+                # Reaping finished EXECUTE workers is LOCAL (no node call) and must run every cycle so
+                # a long task's slot frees even on idle, push-less cycles — independent of should_poll.
+                if executor is not None:
+                    _reap_finished()
+
+                if "tasks" in listen_set and should_poll:
+                    next_poll_due = time.monotonic() + safety_net_s
                     # PROPOSE phase: queued tasks the daemon hasn't proposed yet.
                     # Owner-created tasks land in 'queued'; the daemon proposes a
                     # plan and waits for owner approval (or for task-runner mode's
@@ -1010,10 +1032,9 @@ def run_crew_daemon(
                     # mid-task doesn't lose the task).
                     #
                     # Serial (effective_max == 1) keeps the original shared-liaison,
-                    # blocking-kickoff path. Concurrent (>1) reaps finished workers,
-                    # then submits up to the free pool slots -- each task on its own
-                    # per-task liaison/MCP (a shared stdio MCP can't be driven by
-                    # parallel kickoffs).
+                    # blocking-kickoff path. Concurrent (>1) submits up to the free
+                    # pool slots -- each task on its own per-task liaison/MCP (a
+                    # shared stdio MCP can't be driven by parallel kickoffs).
                     if effective_max <= 1:
                         for task_status in ("active", "stalled"):
                             for task in _poll_tasks(api, status=task_status):
@@ -1041,7 +1062,6 @@ def run_crew_daemon(
                                     done_ids.add(task_id)
                                 dispatched_this_cycle = True
                     else:
-                        _reap_finished()
                         for task_status in ("active", "stalled"):
                             if len(in_flight) >= effective_max:
                                 break
@@ -1066,7 +1086,7 @@ def run_crew_daemon(
                                 in_flight.add(task_id)
                                 dispatched_this_cycle = True
 
-                if "messages" in listen_set:
+                if "messages" in listen_set and should_poll:
                     messages = _poll_messages(api)
                     for msg in messages:
                         if stop["flag"]:
@@ -1151,7 +1171,7 @@ def run_crew_daemon(
             # parks on the serve long-poll and wakes instantly on a delivered
             # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
+            woke_by_push = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
 
