@@ -14,6 +14,14 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.8.1 -- Fix the DM wake-consume bug (0.8.0 lost DMs with listen_for="dms" + on_dm). The idle wait
+    long-polls the wake queue (`_wait_for_work` on /local/dm/next for a dms agent), which CONSUMES the
+    event off the serve queue. Tasks were fine (the next cycle re-lists from the store), but the DM and
+    record queues are the ONLY source -- the wake popped the dm.inbound event and discarded the body, so
+    the following _drain_dms found nothing and on_dm never fired (a single DM = one wake = lost).
+    `_wait_for_work` now RETURNS the consumed payload instead of a bare bool, and the loop hands a dm /
+    record wake event straight to _handle_dm / _handle_record; the next cycle's drain still collects any
+    further events. (Same latent issue fixed for records.) No node/connector change -- 1.30.2 still fine.
   0.8.0 -- Federated-inbox DM push. `run_crew_daemon` gains listen_for="dms": when a direct message
     addressed to this agent arrives, the node pushes a `dm.inbound` wake over the connector tunnel and
     the daemon drains it from the new /local/dm/next long-poll (a queue separate from tasks + records,
@@ -431,19 +439,24 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
 def _wait_for_work(
     api: _Api, use_push: bool, seconds: float, stop: dict[str, Any],
     wake_path: str = "/local/tasks/next",
-) -> bool:
-    """Idle wait between poll cycles. Returns True if a PUSH woke it (new work arrived on the wake
-    long-poll), False if it timed out / slept with nothing. The caller uses this to skip re-listing
-    from the node on idle cycles — the whole point of the tunnel.
+) -> dict[str, Any] | None:
+    """Idle wait between poll cycles. Returns the wake long-poll's `data` dict if a PUSH woke it (new work
+    arrived), or None if it timed out / slept with nothing. The caller treats a non-None result as "woke".
 
     With `use_push` (the agent's serve transport is 'tunnel'), this long-polls
     the serve daemon's push surface (`wake_path`, default `/local/tasks/next`;
-    a record-driven contract agent watches `/local/records/next` instead) in
+    records watch `/local/records/next`, federated DMs `/local/dm/next`) in
     <=5s chunks: an event answers the long-poll the instant the tunnel delivers
     it, so the next cycle starts immediately (true push, zero upstream traffic)
-    while SIGINT/SIGTERM handlers still get a look-in every few seconds. The
-    handed-out item is ONLY a wake signal -- the cycle that follows re-lists
-    work from the store (storage is the source of truth).
+    while SIGINT/SIGTERM handlers still get a look-in every few seconds.
+
+    IMPORTANT: the wake long-poll CONSUMES the event from the serve queue. For
+    /local/tasks/next that is fine — the next cycle re-lists tasks from the store
+    (the source of truth). But /local/dm/next and /local/records/next are
+    queue-only (no store re-list / no catch-up between reconnects), so the caller
+    MUST process the returned event or it is lost (a single-DM wake would
+    otherwise be popped here and never reach on_dm). Hence this returns the
+    consumed `data` (with its `event`/`task`), not just a bool.
 
     Without push (transport 'direct'/'auth_failed' -- node tunnel off or too
     old), the serve long-poll would always time out, so this falls back to the
@@ -453,7 +466,7 @@ def _wait_for_work(
     while not stop["flag"]:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return False
+            return None
         if use_push:
             wait_ms = int(min(remaining, 5.0) * 1000)
             try:
@@ -463,13 +476,19 @@ def _wait_for_work(
                     timeout=wait_ms / 1000 + 10,
                 )
                 if r.status_code == 200:
-                    return True  # push wake -- new work arrived, start the next cycle now
+                    # push wake -- return the consumed payload so the caller can process queue-only
+                    # events (DM / record) that the next cycle's drain would no longer see.
+                    try:
+                        data = r.json().get("data")
+                        return data if isinstance(data, dict) else {}
+                    except Exception:
+                        return {}
             except Exception:
                 # serve hiccup: degrade to a plain sleep slice for this round
                 time.sleep(min(1.0, max(remaining, 0.1)))
         else:
             time.sleep(min(1.0, remaining))
-    return False
+    return None
 
 
 def _subscribe_records(api: _Api, spaces: list[dict[str, Any]]) -> int:
@@ -1285,7 +1304,20 @@ def run_crew_daemon(
             # parks on the serve long-poll and wakes instantly on a delivered
             # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            woke_by_push = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
+            wake = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
+            woke_by_push = wake is not None
+            # The wake long-poll CONSUMED the event off the serve queue. /local/tasks/next is re-listed
+            # from the store next cycle, but /local/dm/next and /local/records/next are queue-only (no
+            # store re-list, no catch-up mid-session) -- so process the consumed event HERE or it is lost
+            # (a single-DM wake would otherwise be popped and never reach on_dm). The next cycle's drain
+            # still picks up any further events that arrived after this one.
+            if wake:
+                ev = wake.get("event")
+                if isinstance(ev, dict) and not stop["flag"]:
+                    if dms_on and wake_path == "/local/dm/next":
+                        _handle_dm(ev)
+                    elif records_on and wake_path == "/local/records/next":
+                        _handle_record(ev)
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
 
