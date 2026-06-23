@@ -14820,6 +14820,42 @@ paths:
                           readable:
                             type: boolean
                             description: False when the caller lacks read access (the markdown says so and lists nothing)
+                          objectives:
+                            type: array
+                            description: >
+                              Measurability objectives declared on the workspace manifest, each with its
+                              KPIs and a resolved `current` value — computed from the workspace's own
+                              published records when the KPI `source` is `{from:'records',...}`, otherwise
+                              the declared value. Empty when none are declared or the caller cannot read.
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                statement: { type: string }
+                                why: { type: string }
+                                status: { type: string, enum: [active, met, abandoned] }
+                                kpis:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name: { type: string }
+                                      kind: { type: string, enum: [value, cost, roi, outcome, quality] }
+                                      unit: { type: string }
+                                      target:
+                                        type: object
+                                        properties:
+                                          op: { type: string, enum: ['<', '<=', '>', '>=', '==', between] }
+                                          value: { type: number }
+                                          values: { type: array, items: { type: number } }
+                                      current:
+                                        type: number
+                                        nullable: true
+                                        description: Resolved value (computed or declared); null when not measurable yet
+                                      computed:
+                                        type: boolean
+                                        description: True when `current` was computed from a records rollup
+                                      measuredAt: { type: string }
             text/markdown:
               schema:
                 type: string

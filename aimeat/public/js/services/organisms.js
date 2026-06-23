@@ -552,6 +552,17 @@ export async function getWorkspaceOverview(orgId, wsId) {
   } catch { return ''; }
 }
 
+/** Full workspace overview payload in ONE call: the OKF markdown PLUS the measurability `objectives`
+ *  (each KPI with its resolved `current` — computed from records where the source allows, else the
+ *  declared value). Lets a caller render both the table-of-contents seed and the objectives card
+ *  without two requests to the same endpoint. Returns safe empties on failure. */
+export async function getWorkspaceOverviewFull(orgId, wsId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/overview?ws=${encodeURIComponent(wsId)}`);
+    return { markdown: r?.data?.markdown || '', objectives: Array.isArray(r?.data?.objectives) ? r.data.objectives : [], readable: r?.data?.readable !== false };
+  } catch { return { markdown: '', objectives: [], readable: false }; }
+}
+
 /** Deterministic GRAPH of the whole organism (workspaces → spaces + counts/last-activity, members,
  *  agents) — the data behind the interactive mindmap. Returns null on failure. */
 export async function getOrganismGraph(orgId) {

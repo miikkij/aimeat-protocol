@@ -266,3 +266,83 @@ the adopt task itself is created by the agent's OWN owner.
 5. Validate every records write against its schema — §6.
 6. Nothing for attribution/visibility — AIMEAT handles it — §7.
 7. **Advertise the contract** with the `workspace-contract` + `contract.<id>` tags — §7b.
+
+## 9. Recording purpose & value (optional measurability convention)
+
+A contract says *how* a workspace is processed. This section says *why* an organism exists and *whether
+it is working* — a small, **optional, domain-agnostic** convention that layers on top of any organism
+(a cabin build, a research study, a sales campaign, a business — not just an agent pipeline). Use it only
+when the organism carries real ongoing value; a throwaway space declares none of it. Full design:
+`docs/internal/2026-06-23-organism-measurability-design.md`.
+
+It is three things, all optional:
+
+### 9.1 `objectives` — the why + the measures (on the manifest)
+
+A top-level array on the manifest (organism *or* workspace level — same envelope). Each objective states
+the goal and carries KPIs:
+
+```jsonc
+"objectives": [{
+  "id": "the-cabin",                               // stable slug, referenced by servesObjective
+  "statement": "A year-round cabin, under 80 000 €, within a 2 h drive",
+  "why": "A family place without a mortgage-sized build",
+  "status": "active",                              // active | met | abandoned
+  "kpis": [
+    { "name": "total-build-cost", "kind": "cost", "unit": "EUR",
+      "target": { "op": "<", "value": 80000 },
+      "source": { "from": "records", "space": "costs", "agg": "sum", "field": "quote_eur" },
+      "current": 92000, "measuredAt": "2026-06-23T..." },
+    { "name": "viable-locations", "kind": "outcome", "unit": "count",
+      "target": { "op": ">=", "value": 2 },
+      "source": { "from": "records", "space": "locations", "agg": "count",
+                  "equals": { "field": "status", "value": "viable" } } }
+  ]
+}]
+```
+
+- **`kind`** ∈ `value` (revenue/leads) · `cost` (budget/€) · `roi` (value÷cost) · `outcome` (counts,
+  turnaround) · `quality`. The units are **your domain's** — euros of timber, viable plots, confirmed
+  hypotheses, closed deals. A KPI never assumes a domain.
+- **`source`** is either a free-text recipe string (you refresh `current` by hand — not auto-evaluated) or
+  an **aggregation over the organism's own published records**:
+  `{ from:'records', space, agg:'sum'|'count'|'avg'|'min'|'max', field, equals?:{ field, value } }`. The
+  record-aggregation form is computed for you (no LLM); the budget KPI above stays live as the costs space
+  fills. *(Agent-operational cost sources — telemetry/wallet/quota — are a separate, fenced case in the
+  design doc §5, and not part of this convention.)*
+- **`current`/`measuredAt`** are a last-known cache, not a history.
+
+### 9.2 `servesObjective` — link a space to what it feeds (on the objectType)
+
+```jsonc
+{ "name": "costs", "namespace": "shared.costs", "mode": "records",
+  "description": "Quotes & estimates per build item",
+  "servesObjective": "the-cabin" }                 // matches an objectives[].id
+```
+
+Same flavor as the existing `description`/`contract` annotations; it just keeps the structure legible
+(which space feeds which objective).
+
+### 9.3 `_meta` — the update note + the value that moved (inside a record)
+
+A reserved key any record MAY carry inside its value. Distinct from version history (which says only
+*that* a record changed) and from workspace comments (a discussion thread): `_meta.log` travels *with the
+record* and says *why*, in one line.
+
+```jsonc
+{
+  "id": "cost-foundation", "item": "Foundation", "quote_eur": 11000, "status": "quoted",  // domain fields
+  "_meta": {                                          // OPTIONAL
+    "why": "Second contractor quote came in 5k under the first",
+    "value": { "metric": "total-build-cost", "amount": -5000, "unit": "EUR" },
+    "log": [
+      { "at": "2026-06-22T09:00:00Z", "by": "alice@node", "note": "first quote 16k" },
+      { "at": "2026-06-23T14:00:00Z", "by": "alice@node", "note": "second quote 11k — switched" }
+    ]
+  }
+}
+```
+
+A records space that wants `_meta` either includes it in its locked schema or leaves the schema `open`.
+Keep it tiny — **one line per meaningful update**, not a paragraph. This is what lets a later analysis
+(human or AI) judge whether the content is actually working.

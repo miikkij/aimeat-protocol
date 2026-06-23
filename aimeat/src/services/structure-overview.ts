@@ -25,12 +25,17 @@
  *     fidelity (each workspace a ## section with its spaces' recent ids+titles) instead of a
  *     count-only breakdown — shared spaceLines() renders both, so the org view is navigable to a
  *     record id, not a lossy splat.
+ *   v1.2.0 — 2026-06-23 — Measurability: a workspace manifest's `objectives[]` are surfaced in the
+ *     summary + rendered as an "Objectives" block (KPI current vs target). A `from:'records'` KPI's
+ *     `current` is computed from the workspace's own published records via kpi-rollup; a string-recipe
+ *     KPI shows its declared `current`. Design: docs/internal/2026-06-23-organism-measurability-design.md.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
+import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
 export const MAX_ITEMS = 10;
@@ -43,18 +48,39 @@ interface SpaceSummary {
   total: number;
   recent: SpaceEntry[];   // up to MAX_ITEMS, most-recently-updated first
 }
+/** One KPI, with `current` resolved: computed from records (when `source` is `from:'records'`) or the
+ *  declared value otherwise. `target`/`unit`/`kind` echo the manifest declaration. */
+export interface KpiSummary {
+  name: string;
+  kind?: string;
+  unit?: string;
+  target?: { op?: string; value?: number; values?: number[] };
+  current: number | null;
+  computed: boolean;             // true → `current` came from a records rollup; false → declared/absent
+  measuredAt?: string;
+}
+export interface ObjectiveSummary {
+  id: string;
+  statement?: string;
+  why?: string;
+  status?: string;
+  kpis: KpiSummary[];
+}
 export interface WorkspaceSummary {
   ws: string;
   name: string;
   readme: string | null;
   readable: boolean;
   spaces: SpaceSummary[];
+  objectives: ObjectiveSummary[];   // measurability convention (empty when the manifest declares none)
   totalRecords: number;
   totalDocuments: number;
   lastActivity: string | null;   // ISO of the most-recently-updated content key, deterministic
 }
 
 type ObjType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
+type RawKpi = { name?: unknown; kind?: unknown; unit?: unknown; target?: unknown; source?: unknown; current?: unknown; measuredAt?: unknown };
+type RawObjective = { id?: unknown; statement?: unknown; why?: unknown; status?: unknown; kpis?: unknown };
 
 /** A short, human display title for a record/document value (best-effort, schema-agnostic). */
 function entryTitle(value: unknown, fallbackId: string): string {
@@ -111,7 +137,7 @@ export async function collectWorkspaceSummary(
   const manRec = items.find(r => r.key === `${root}.meta.manifest`);
   const summary: WorkspaceSummary = {
     ws, name: opts.name || ws, readme: null, readable: false,
-    spaces: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
+    spaces: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
   };
   if (!manRec) return summary;   // empty / non-existent workspace
 
@@ -123,7 +149,7 @@ export async function collectWorkspaceSummary(
     });
     readable = d.allowed;
   }
-  const manifest = manRec.value as { name?: unknown; objectTypes?: ObjType[] } | null;
+  const manifest = manRec.value as { name?: unknown; objectTypes?: ObjType[]; objectives?: RawObjective[] } | null;
   if (typeof manifest?.name === 'string') summary.name = manifest.name;
   summary.readme = oneLine(items.find(r => r.key === `${root}.meta.readme`)?.value);
   summary.readable = readable;
@@ -162,6 +188,39 @@ export async function collectWorkspaceSummary(
   }
   // Stable space order: most-populated first, then by name — deterministic regardless of manifest order.
   summary.spaces.sort((a, b) => (b.total - a.total) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+  // Objectives + KPIs (measurability convention). A `from:'records'` KPI's `current` is computed from
+  // this workspace's published records (the `items` already read above — no extra storage hit, same
+  // authorization); a string-recipe / other source falls back to the declared `current`.
+  const objectTypes = manifest?.objectTypes ?? [];
+  for (const o of manifest?.objectives ?? []) {
+    if (!o || typeof o.id !== 'string') continue;
+    const kpis: KpiSummary[] = [];
+    for (const k of (Array.isArray(o.kpis) ? o.kpis : []) as RawKpi[]) {
+      if (!k || typeof k.name !== 'string') continue;
+      let current = typeof k.current === 'number' ? k.current : null;
+      let computed = false;
+      if (isRecordsSource(k.source)) {
+        const v = evaluateRecordsKpi(items, objectTypes, root, k.source);
+        if (v !== null) { current = v; computed = true; }
+      }
+      kpis.push({
+        name: k.name,
+        kind: typeof k.kind === 'string' ? k.kind : undefined,
+        unit: typeof k.unit === 'string' ? k.unit : undefined,
+        target: (k.target && typeof k.target === 'object') ? k.target as KpiSummary['target'] : undefined,
+        current, computed,
+        measuredAt: typeof k.measuredAt === 'string' ? k.measuredAt : undefined,
+      });
+    }
+    summary.objectives.push({
+      id: o.id,
+      statement: typeof o.statement === 'string' ? o.statement : undefined,
+      why: typeof o.why === 'string' ? o.why : undefined,
+      status: typeof o.status === 'string' ? o.status : undefined,
+      kpis,
+    });
+  }
   return summary;
 }
 
@@ -212,6 +271,7 @@ export async function buildWorkspaceOverview(
   }
   if (s.readme) out.push(`> ${s.readme}\n`);
   out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · ${s.spaces.length} spaces · last activity ${date(s.lastActivity)}\n`);
+  out.push(...objectiveLines(s.objectives, '##'));
   if (!s.spaces.length) out.push('_No spaces with content yet._\n');
   for (const sp of s.spaces) out.push(...spaceLines(sp, '##'));
   return { markdown: out.join('\n'), readable: true, summary: s };
@@ -227,6 +287,52 @@ function spaceLines(sp: SpaceSummary, hashes: string): string[] {
   for (const e of sp.recent) lines.push(`- **${e.title}**  ·  \`${e.id}\`  ·  ${date(e.updatedAt)}`);
   if (sp.total === 0) lines.push('- _empty_');
   else if (sp.total > sp.recent.length) lines.push(`- _… ${sp.recent.length} of ${sp.total} shown — open the space for the rest_`);
+  lines.push('');
+  return lines;
+}
+
+/** "≤ 5" / "< 80000" / "between 2 and 4" — a human rendering of a KPI target. */
+function targetText(t: ObjectiveSummary['kpis'][number]['target']): string | null {
+  if (!t || typeof t.op !== 'string') return null;
+  if (t.op === 'between' && Array.isArray(t.values) && t.values.length === 2) return `between ${t.values[0]} and ${t.values[1]}`;
+  const sym = t.op === '<=' ? '≤' : t.op === '>=' ? '≥' : t.op === '==' ? '=' : t.op;
+  return typeof t.value === 'number' ? `${sym} ${t.value}` : null;
+}
+
+/** Does `current` meet the target? null when undecidable (no current / no target). */
+function meetsTarget(current: number | null, t: ObjectiveSummary['kpis'][number]['target']): boolean | null {
+  if (current === null || !t || typeof t.op !== 'string') return null;
+  const v = t.value;
+  switch (t.op) {
+    case '<': return typeof v === 'number' ? current < v : null;
+    case '<=': return typeof v === 'number' ? current <= v : null;
+    case '>': return typeof v === 'number' ? current > v : null;
+    case '>=': return typeof v === 'number' ? current >= v : null;
+    case '==': return typeof v === 'number' ? current === v : null;
+    case 'between': return Array.isArray(t.values) && t.values.length === 2 ? current >= t.values[0] && current <= t.values[1] : null;
+    default: return null;
+  }
+}
+
+/** Render a workspace's objectives as Markdown lines: each objective a bullet with its KPIs as
+ *  "current vs target" sub-bullets (✅ met · ⚠️ off-target · — not yet measured). */
+function objectiveLines(objectives: ObjectiveSummary[], hashes: string): string[] {
+  if (!objectives.length) return [];
+  const lines = [`${hashes} Objectives`, ''];
+  for (const o of objectives) {
+    const tag = o.status && o.status !== 'active' ? ` _(${o.status})_` : '';
+    lines.push(`- **${o.statement || o.id}**${tag}`);
+    for (const k of o.kpis) {
+      const cur = k.current === null ? '—' : String(k.current);
+      const tgt = targetText(k.target);
+      const ok = meetsTarget(k.current, k.target);
+      const mark = ok === null ? '' : ok ? ' ✅' : ' ⚠️';
+      const unit = k.unit ? ` ${k.unit}` : '';
+      const vs = tgt ? ` (target ${tgt})` : '';
+      const src = k.computed ? '' : ' _·declared_';
+      lines.push(`  - ${k.name}: ${cur}${unit}${vs}${mark}${src}`);
+    }
+  }
   lines.push('');
   return lines;
 }
@@ -268,7 +374,8 @@ export async function buildOrganismOverview(
     if (!s.readable) { out.push('_no read access_\n'); continue; }
     if (s.readme) out.push(`> ${s.readme}`);
     out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · last activity ${date(s.lastActivity)}\n`);
-    if (!s.spaces.length) { out.push('_no content yet_\n'); continue; }
+    out.push(...objectiveLines(s.objectives, '###'));
+    if (!s.spaces.length && !s.objectives.length) { out.push('_no content yet_\n'); continue; }
     for (const sp of s.spaces) out.push(...spaceLines(sp, '###'));
   }
   return { markdown: out.join('\n'), workspaces: summaries.length };

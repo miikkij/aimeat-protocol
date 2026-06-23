@@ -20,6 +20,10 @@
  *     top of the space; each record is a separated card with breathing room.
  *   v1.4.0 — 2026-06-23 — Accept an `initialSpace` prop: a deep-link from the organism mindmap opens
  *     the workspace straight on that space's tab (instead of always the overview).
+ *   v1.5.0 — 2026-06-23 — Measurability: render the manifest's objectives[] as an Objectives card
+ *     (each KPI's current vs target, ✅/⚠️, computed-vs-self-reported) at the top of the workspace,
+ *     fed by getWorkspaceOverviewFull + refreshed on live updates. Design:
+ *     docs/internal/2026-06-23-organism-measurability-design.md (Phase G).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -179,15 +183,16 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // loaded alongside, refreshed on live updates.
   const [wsGraph, setWsGraph] = useState(null);
   const [wsTocSeed, setWsTocSeed] = useState('');
+  const [wsObjectives, setWsObjectives] = useState([]);   // measurability objectives + resolved KPIs
   useEffect(() => {
     let cancelled = false;
     const loadGraph = async () => {
-      const [g, toc] = await Promise.all([
+      const [g, ov] = await Promise.all([
         orgService.getWorkspaceGraph(orgId, wsId).catch(() => null),
-        orgService.getWorkspaceOverview(orgId, wsId).catch(() => ''),
+        orgService.getWorkspaceOverviewFull(orgId, wsId).catch(() => ({ markdown: '', objectives: [] })),
       ]);
       if (cancelled) return;
-      setWsGraph(g); setWsTocSeed(toc || '');
+      setWsGraph(g); setWsTocSeed(ov.markdown || ''); setWsObjectives(ov.objectives || []);
     };
     loadGraph();
     const off = onLiveUpdate(['organisms'], loadGraph);
@@ -1161,6 +1166,57 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       </div>`;
   };
 
+  // ── Measurability objectives (the manifest's objectives[] + each KPI's resolved current vs target).
+  // The server (overview endpoint) already computed `current` for from:records KPIs; we only render.
+  const kpiTargetText = (tg) => {
+    if (!tg || typeof tg.op !== 'string') return '';
+    if (tg.op === 'between' && Array.isArray(tg.values) && tg.values.length === 2) return `${tg.values[0]}–${tg.values[1]}`;
+    const sym = tg.op === '<=' ? '≤' : tg.op === '>=' ? '≥' : tg.op === '==' ? '=' : tg.op;
+    return typeof tg.value === 'number' ? `${sym} ${tg.value}` : '';
+  };
+  const kpiMeets = (cur, tg) => {
+    if (cur === null || cur === undefined || !tg || typeof tg.op !== 'string') return null;
+    const v = tg.value;
+    switch (tg.op) {
+      case '<': return typeof v === 'number' ? cur < v : null;
+      case '<=': return typeof v === 'number' ? cur <= v : null;
+      case '>': return typeof v === 'number' ? cur > v : null;
+      case '>=': return typeof v === 'number' ? cur >= v : null;
+      case '==': return typeof v === 'number' ? cur === v : null;
+      case 'between': return (Array.isArray(tg.values) && tg.values.length === 2) ? (cur >= tg.values[0] && cur <= tg.values[1]) : null;
+      default: return null;
+    }
+  };
+  const renderObjectives = () => html`
+    <div class="pj-obj">
+      <div class="pj-obj-title">${t('organisms.objectivesTitle') || 'Objectives'}</div>
+      ${wsObjectives.map((o, oi) => html`
+        <div class="pj-obj-card" key=${o.id || oi}>
+          <div class="pj-obj-statement">
+            ${(o.statement || o.id)}
+            ${o.status === 'met' ? html`<span class="badge badge-success pj-obj-status">${t('organisms.objStatusMet') || 'met'}</span>` : null}
+            ${o.status === 'abandoned' ? html`<span class="badge pj-obj-status">${t('organisms.objStatusAbandoned') || 'abandoned'}</span>` : null}
+          </div>
+          ${o.why ? html`<div class="pj-obj-why">${(o.why)}</div>` : null}
+          ${(o.kpis && o.kpis.length) ? html`
+            <div class="pj-obj-kpis">
+              ${o.kpis.map((k, ki) => {
+                const ok = kpiMeets(k.current, k.target);
+                const tgt = kpiTargetText(k.target);
+                const unit = k.unit ? ` ${k.unit}` : '';
+                const val = (k.current === null || k.current === undefined) ? '—' : String(k.current);
+                return html`
+                  <div class="pj-obj-kpi ${ok === true ? 'met' : ok === false ? 'off' : ''}" key=${k.name || ki}>
+                    <span class="pj-obj-kpi-name">${k.name}</span>
+                    <span class="pj-obj-kpi-val">${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}</span>
+                    ${tgt ? html`<span class="pj-obj-kpi-target">${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}
+                    ${k.computed === false ? html`<span class="pj-obj-kpi-declared" title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}
+                  </div>`;
+              })}
+            </div>` : null}
+        </div>`)}
+    </div>`;
+
   const renderOverview = () => {
     const recent = wsEvents.slice(0, 8);
     return html`
@@ -1196,6 +1252,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         </span>
       </div>
       ${ws.manifest?.summary ? html`<div class="section-desc">${(ws.manifest.summary)}</div>` : null}
+
+      ${wsObjectives.length ? renderObjectives() : null}
 
       <${ReadmePanel} markdown=${ws.readme || ''} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'}
         aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />

@@ -401,6 +401,11 @@ for completeness but are NOT needed for typical app building:
   ALL its content. To build an agent that PROCESSES a workspace (reads requests -> writes results),
   it carries a "contract" (inputs/outputs/lifecycle) — see the guide at
   GET /v1/agents/me/handbook/appdev (Workspace contracts section), full text in
+  docs/agent-workspace-contracts.md. An organism can also state WHY it exists and HOW success is
+  measured via an optional, domain-agnostic measurability convention — a manifest-level objectives[]
+  with KPIs (kind value/cost/roi/outcome/quality; source can sum/count the organism's own records),
+  objectType servesObjective, and a per-record _meta update note. Units are the domain's (€, viable
+  plots, confirmed hypotheses, closed deals); all optional. See "Recording purpose & value" in
   docs/agent-workspace-contracts.md.
 - Micro-memory, App store, Matches, Push notifications
 
