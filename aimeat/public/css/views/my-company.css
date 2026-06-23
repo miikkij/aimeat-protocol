@@ -217,6 +217,17 @@
   border-radius: var(--radius-sm); padding: 0.5rem 0.7rem;
 }
 .mc-listed { color: var(--success); font-size: 0.8rem; font-weight: 600; }
+.mc-pick-agents { display: flex; flex-direction: column; gap: 0.75rem; }
+.mc-pick-agent { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; background: var(--bg-elevated); }
+.mc-pick-agent-name { font-weight: 600; color: var(--text); font-size: 0.85rem; margin-bottom: 0.35rem; }
+.mc-pick-none { color: var(--text-muted); }
+
+.mc-manage { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; margin: 0.4rem 0 0.6rem; }
+.mc-manage-row { align-items: center; gap: 0.4rem; }
+.mc-price-input { width: 5rem; }
+.mc-saved { color: var(--success); }
+.mc-warn { color: var(--text-muted); }
+.mc-remove { color: var(--danger); }
 
 .mc-cat-item { list-style: none; margin-bottom: 0.6rem; }
 .of-card-head--static { cursor: default; }
