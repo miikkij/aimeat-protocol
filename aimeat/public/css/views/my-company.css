@@ -243,6 +243,7 @@
 }
 .mc-subtab:hover { color: var(--text); }
 .mc-subtab.active { color: var(--accent-bright); border-bottom-color: var(--accent); }
+.mc-role-chip { margin-left: auto; align-self: center; font-size: 0.72rem; font-weight: 600; color: var(--text-dim); background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 0.1rem 0.55rem; }
 
 .mc-cust-list, .mc-member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .mc-cust { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; }
