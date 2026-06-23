@@ -6406,6 +6406,33 @@
     "exportSuccess": "Exported {count} config values in {format} format",
     "migrationHint": "Tip: To migrate .env to database, run: aimeat config import --file .env"
   },
+  "discover": {
+    "tabLabel": "Discover",
+    "title": "Discover",
+    "desc": "The master directory — find anything on the node across every domain: capabilities, workflows, knowledge, decisions, research, produced material, companies and their offerings, documents, apps, and memory.",
+    "searchPlaceholder": "Search everything…",
+    "allTypes": "All",
+    "empty": "Nothing matches yet. Try a different scope or query.",
+    "scope": {
+      "own": "Mine",
+      "public": "Public",
+      "shared": "Shared with me"
+    },
+    "type": {
+      "capability": "Capability",
+      "workflow": "Workflow",
+      "knowledge": "Knowledge",
+      "decision": "Decision",
+      "research": "Research",
+      "material": "Material",
+      "company": "Company",
+      "offering": "Offering",
+      "document": "Document",
+      "organism": "Organism",
+      "app": "App",
+      "memory": "Memory"
+    }
+  },
   "knowledge": {
     "tabLabel": "Knowledge",
     "actionBar": {

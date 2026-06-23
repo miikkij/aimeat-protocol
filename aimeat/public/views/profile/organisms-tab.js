@@ -17,6 +17,9 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.3.0 — 2026-06-23 — Thread an `openSpace` deep-link from the organism mindmap through onOpenWs
+ *     into the Workspace (keyed remount + initialSpace), so a space node opens its tab; cleared on the
+ *     Cmd-K and cross-organism-search jump paths so it never goes stale.
  *   v2.2.0 — 2026-06-22 — Cross-organism content search on the list view: one box searches ALL my
  *     organisms (indexed librarian FTS), results grouped per organism; a hit opens that organism +
  *     workspace with the in-workspace search pre-filled. Also listens for the Cmd-K aimeat-open-organism.
@@ -56,6 +59,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch (e) { return null; } });
   const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch (e) { return null; } });
+  // Transient deep-link target from the organism mindmap: open this space's tab on first render of the
+  // workspace. In-memory only (not persisted) — an F5 lands on the workspace overview, not a stale tab.
+  const [openSpace, setOpenSpace] = useState(null);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   // List ordering: 'custom' (drag-and-drop, persisted) | 'name' | 'newest'. Persisted together with
@@ -189,7 +195,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     const onOpen = (e) => {
       const d = e.detail || {};
       if (!d.orgId) return;
-      setOpenId(d.orgId); setOpenWs(d.wsId || null); setOpenSettings(false);
+      setOpenId(d.orgId); setOpenWs(d.wsId || null); setOpenSpace(null); setOpenSettings(false);
     };
     window.addEventListener('aimeat-open-organism', onOpen);
     return () => window.removeEventListener('aimeat-open-organism', onOpen);
@@ -385,13 +391,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     // openWs chosen → that workspace; otherwise the organism's HOME page (tabs incl. workspaces).
     if (openWs) {
       return html`<${Workspace} org=${org} wsId=${openWs} session=${session} showToast=${showToast}
-        onBack=${() => { setOpenWs(null); }}
-        onBackToList=${() => { setOpenWs(null); setOpenId(null); setOpenSettings(false); loadData(); }} />`;
+        key=${openWs + (openSpace ? ':' + openSpace : '')} initialSpace=${openSpace}
+        onBack=${() => { setOpenWs(null); setOpenSpace(null); }}
+        onBackToList=${() => { setOpenWs(null); setOpenSpace(null); setOpenId(null); setOpenSettings(false); loadData(); }} />`;
     }
     return html`
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
         initialSettings=${openSettings}
-        onOpenWs=${(wsId) => setOpenWs(wsId)}
+        onOpenWs=${(wsId, space) => { setOpenSpace(space || null); setOpenWs(wsId); }}
         onBack=${() => { setOpenId(null); setOpenSettings(false); loadData(); }}
         onChanged=${loadData}
         onLeave=${() => handleLeave(org.id, org.name)} />
@@ -406,6 +413,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     try { if (hit.workspaceId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.search`, gQuery.trim()); } catch { /* noop */ }
     setOpenId(hit.organismId);
     setOpenWs(hit.workspaceId || null);
+    setOpenSpace(null);
     setOpenSettings(false);
   };
   // Group the librarian hits under each organism (name from my list / discover), for the results view.

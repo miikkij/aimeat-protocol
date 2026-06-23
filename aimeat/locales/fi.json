@@ -6406,6 +6406,33 @@
     "exportSuccess": "Vietiin {count} asetusarvoa {format}-muodossa",
     "migrationHint": "Vinkki: Siirrä .env tietokantaan komennolla: aimeat config import --file .env"
   },
+  "discover": {
+    "tabLabel": "Löydä",
+    "title": "Löydä",
+    "desc": "Päähakemisto — löydä mitä tahansa solmusta kaikilta alueilta: kyvyt, työnkulut, tieto, päätökset, tutkimus, tuotettu materiaali, yritykset ja niiden tarjoukset, dokumentit, sovellukset ja muisti.",
+    "searchPlaceholder": "Hae kaikkea…",
+    "allTypes": "Kaikki",
+    "empty": "Ei vielä osumia. Kokeile eri näkymää tai hakusanaa.",
+    "scope": {
+      "own": "Omat",
+      "public": "Julkiset",
+      "shared": "Jaetut minulle"
+    },
+    "type": {
+      "capability": "Kyky",
+      "workflow": "Työnkulku",
+      "knowledge": "Tieto",
+      "decision": "Päätös",
+      "research": "Tutkimus",
+      "material": "Materiaali",
+      "company": "Yritys",
+      "offering": "Tarjous",
+      "document": "Dokumentti",
+      "organism": "Organismi",
+      "app": "Sovellus",
+      "memory": "Muisti"
+    }
+  },
   "knowledge": {
     "tabLabel": "Tietopankki",
     "actionBar": {

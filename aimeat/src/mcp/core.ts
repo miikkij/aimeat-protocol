@@ -45,6 +45,7 @@ import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
+import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -175,6 +176,62 @@ export function registerCoreTools(
                 tags: a.tags,
             }));
             return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, payload));
+        },
+    );
+
+    // ── Tool 1b: aimeat_discover (master directory) ──
+    // Domain-agnostic discovery across every content type via the shared source registry. The agent
+    // is the caller; its full-owner-set view is gated by the agent's own read-scopes (design §11.3).
+    const discoveryRegistry = buildDiscoveryRegistry(storage, config);
+    const VALID_DISCOVER_TYPES = new Set<DiscoveryType>([
+        'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
+        'company', 'offering', 'document', 'organism', 'app', 'memory',
+    ]);
+    const discoverCsv = (v: string | undefined): string[] =>
+        typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
+    mcp.tool(
+        'aimeat_discover',
+        descriptionFor('aimeat_discover'),
+        {
+            mode: z.enum(['map', 'find']).optional(),
+            q: z.string().optional(),
+            type: z.string().optional(),
+            tags: z.string().optional(),
+            segment: z.string().optional(),
+            scope: z.enum(['own', 'public', 'shared']).optional(),
+            limit: z.number().optional(),
+            response_format: responseFormatSchema,
+        },
+        annotationsFor('aimeat_discover'),
+        async ({ mode, q, type, tags, segment, scope, limit, response_format }) => {
+            const parsed = parseGAII(agentGaii);
+            const agent = await storage.getAgent(agentGaii);
+            const types = discoverCsv(type).filter((t): t is DiscoveryType => VALID_DISCOVER_TYPES.has(t as DiscoveryType));
+            const lim = typeof limit === 'number' && limit > 0 ? Math.min(limit, 100) : 20;
+            const ctx = {
+                caller: {
+                    ownerName: parsed?.owner ?? '',
+                    sub: agentGaii,
+                    gaii: agentGaii,
+                    isOwnerSession: false,
+                    scopes: agent?.defaultScopes ?? [],
+                },
+                scope: (scope ?? 'own') as 'own' | 'public' | 'shared',
+                filters: {
+                    q: q?.trim() || undefined,
+                    types: types.length ? types : undefined,
+                    tags: discoverCsv(tags).length ? discoverCsv(tags) : undefined,
+                    segments: discoverCsv(segment).length ? discoverCsv(segment) : undefined,
+                    limit: lim,
+                },
+                nodeId: config.nodeId,
+            };
+            const entries = await runDiscovery(discoveryRegistry, ctx);
+            if (mode === 'map') {
+                return jsonContent({ scope: ctx.scope, total: entries.length, ...computeFacets(entries) });
+            }
+            const payload = { entries: entries.slice(0, lim), total: entries.length, scope: ctx.scope, facets: computeFacets(entries) };
+            return jsonContent(shapeResponse('aimeat_discover', response_format, payload));
         },
     );
 

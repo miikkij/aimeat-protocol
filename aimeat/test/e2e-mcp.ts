@@ -425,6 +425,7 @@ await test('16. List tools', async () => {
     assert(toolNames.includes('aimeat_memory_write'), 'has aimeat_memory_write');
     assert(toolNames.includes('aimeat_memory_read'), 'has aimeat_memory_read');
     assert(toolNames.includes('aimeat_catalogue_search'), 'has aimeat_catalogue_search');
+    assert(toolNames.includes('aimeat_discover'), 'has aimeat_discover');
     assert(toolNames.includes('aimeat_wallet_balance'), 'has aimeat_wallet_balance');
     assert(toolNames.includes('aimeat_agent_profile'), 'has aimeat_agent_profile');
     assert(toolNames.includes('aimeat_board_read'), 'has aimeat_board_read');
@@ -489,6 +490,20 @@ await test('21. aimeat_catalogue_search', async () => {
     assert(status === 200, `status ${status}`);
     const result = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(result), 'is array');
+});
+
+await test('21b. aimeat_discover (map + find)', async () => {
+    const map = await mcpRpc('tools/call', { name: 'aimeat_discover', arguments: { mode: 'map', scope: 'own' } }, 131);
+    assert(map.status === 200, `map status ${map.status}`);
+    const mapResult = JSON.parse(map.body.result.content[0].text);
+    assert(Array.isArray(mapResult.types), 'map: types is array');
+    assert(typeof mapResult.total === 'number', 'map: total is number');
+
+    const find = await mcpRpc('tools/call', { name: 'aimeat_discover', arguments: { mode: 'find', scope: 'own' } }, 132);
+    assert(find.status === 200, `find status ${find.status}`);
+    const findResult = JSON.parse(find.body.result.content[0].text);
+    assert(Array.isArray(findResult.entries), 'find: entries is array');
+    assert(findResult.facets && Array.isArray(findResult.facets.types), 'find: inline facets present');
 });
 
 await test('22. aimeat_wallet_balance', async () => {

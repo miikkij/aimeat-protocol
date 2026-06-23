@@ -79,11 +79,12 @@ describe('v2 MCP surfaces', () => {
 
     it('surface sizes are in the expected ballpark', () => {
         // Ballpark guard (was stale at 20/50/52 — drifted as workspace + other tools were added;
-        // brought current 2026-06-09: +3 organism invitation tools, +1 organism search, +2 workspace
-        // comment tools per surface).
-        expect(MCP_SURFACES.appdev.length).toBe(43);
-        expect(MCP_SURFACES.agent.length).toBe(68);
-        expect(MCP_SURFACES.service.length).toBe(70);
+        // brought current 2026-06-23: reconciled drift (+aimeat_discover, +aimeat_organism_update,
+        // +aimeat_organism_overview, +aimeat_workspace_overview, +aimeat_dm_ask) — surfaces now fully
+        // cover the connector and the catalog has no uncovered tools).
+        expect(MCP_SURFACES.appdev.length).toBe(48);
+        expect(MCP_SURFACES.agent.length).toBe(80);
+        expect(MCP_SURFACES.service.length).toBe(75);
         expect(MCP_SURFACES.admin.length).toBe(15);
     });
 });

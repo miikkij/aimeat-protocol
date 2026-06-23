@@ -71,6 +71,7 @@ const ALL_SUITES = [
     'test/e2e-organism-membership.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-librarian.ts',
+    'test/e2e-discover.ts',
     'test/e2e-notebook-plan.ts',
     'test/e2e-organism-overview.ts',
     'test/e2e-organism-structure.ts',

@@ -16,6 +16,8 @@
  *   v1.0.0 — 2026-06-22 — Initial: clickable organism/workspace mindmap with level/users/activity/heatmap.
  *   v1.1.0 — 2026-06-22 — Chart types (mindmap default + flowchart LR/TD), per-org/ws localStorage
  *     persistence, label-text click resolution for mindmap mode.
+ *   v1.1.1 — 2026-06-23 — Fix: strip trailing heat marker from mindmap click labels so space nodes
+ *     (no " · " separator at the "+ Spaces" level) resolve and navigate, not just workspace nodes.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -184,13 +186,22 @@ function resolveFlowchartClick(scope, graph, domId) {
 /** Mindmap: resolve by the clicked node's label text (mindmap nodes have no stable id). Strips the
  *  activity/count suffix and the user emoji, then matches the core name to a workspace / space /
  *  member. Workspace + member matches are exact; a space name is matched to the first workspace that
- *  has it (mindmap can't disambiguate a repeated space name across workspaces — opens that workspace). */
+ *  has it (mindmap can't disambiguate a repeated space name across workspaces — opens that workspace
+ *  on the matched space tab). */
 function resolveMindmapClick(scope, graph, text) {
-  const core = String(text || '').trim().split(' · ')[0].replace(/^👤\s*|^🤖\s*/, '').trim();
+  // Strip the activity suffix (everything after the first " · "), a leading user/agent emoji, and a
+  // trailing heat marker. The heat mark is appended with just a leading space (no " · "), so at the
+  // "+ Spaces" level — where space nodes carry no count separator — it would otherwise stay glued to
+  // the name and break the exact match below.
+  const core = String(text || '').trim()
+    .split(' · ')[0]
+    .replace(/^👤\s*|^🤖\s*/, '')
+    .replace(/\s*[🟢🔶🔥]\s*$/u, '')
+    .trim();
   if (!core) return null;
   if (scope === 'organism') {
     for (const w of (graph.workspaces || [])) if (w.name === core) return { type: 'workspace', wsId: w.id };
-    for (const w of (graph.workspaces || [])) for (const sp of (w.spaces || [])) if (sp.name === core) return { type: 'workspace', wsId: w.id };
+    for (const w of (graph.workspaces || [])) for (const sp of (w.spaces || [])) if (sp.name === core) return { type: 'space', wsId: w.id, space: sp.name };
     if ((graph.members || []).some(m => m.name === core) || (graph.agents || []).some(a => (a.name || a.gaii) === core)) return { type: 'members' };
     return null;
   }

@@ -4,6 +4,34 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-06-23
+
+### Added
+
+- **Master directory — unified cross-domain discovery (`GET /v1/discover` + `GET /v1/discover/facets`).**
+  One faceted surface to find anything on the node across every domain — capabilities, workflows,
+  knowledge, decisions, research, produced material, companies + offerings, live documents, apps, and
+  memory — instead of ~20 scattered per-domain search endpoints. Two modes: **map**
+  (`/v1/discover/facets`) returns a catalog-of-catalogs (counts by type / segment / tag) as a cheap
+  "what exists here?" probe *before* pulling content; **find** (`/v1/discover`) returns ranked,
+  paginated, normalized entries with inline facets. Scopes: `own` (the caller's reachable content),
+  `public` (public content node-wide), and `shared` (content in organisms the caller belongs to, gated
+  per-workspace by the same `canReadWorkspace` check as the REST read — facet counts obey the identical
+  gate, so nothing the caller cannot read is ever revealed; an agent only sees the full owner set when it
+  holds `memory:read`). Built on a `DiscoverySource` registry, so a new content type becomes discoverable
+  by registering one adapter (or, for memory-keyed content, a single classifier rule) — expansion is a
+  registration, not a rewrite. New MCP tool **`aimeat_discover`** (`mode: map|find`) on both the server
+  MCP and the CLI connector; surfaced in the node bootstrap (`GET /`), `llms.txt`, and the agent
+  handbook; plus a faceted **Discover** browse tab in the profile UI. The `aimeat-crewai` liaison now
+  points crews at it first.
+
+### Changed
+
+- **MCP surface reconciliation.** Registered previously-missing connector tools
+  (`aimeat_organism_overview`, `aimeat_workspace_overview`, `aimeat_dm_ask`, `aimeat_organism_update`)
+  and placed `aimeat_organism_update` on the appdev/agent/service surfaces, so the connector
+  (`aimeat connect serve`) now fully mirrors every v2 MCP surface.
+
 ## [1.31.0] - 2026-06-23
 
 ### Added

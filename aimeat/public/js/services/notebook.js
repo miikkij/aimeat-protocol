@@ -9,7 +9,7 @@
  * @structure
  *   - classifyNote(text) — POST /v1/librarian/classify
  *   - distributeNote(text) — POST /v1/librarian/distribute (split into placed chunks)
- *   - materializeDocument(plan) — resolve/create org → ws → document space → write doc → drop source
+ *   - materializeDocument(plan) — resolve/create org → ws → document space → draft→publish doc → drop source
  *   - distributeChunks(chunks, sourceKey, onProgress) — materialize each chunk to its home
  *   - getNotebookSettings/saveNotebookSettings — the per-owner trust toggles (notebook.settings)
  * @version-history
@@ -18,10 +18,13 @@
  *   v1.2.0 — 2026-06-21 — (reverted) materializeRecord/patchRecord removed — the Tracked Response flow
  *     now writes records through the proper workspace draft→publish path (services/organisms.js), not a
  *     raw memory write, so records land in the right namespace/owner and show up with activity.
+ *   v1.3.0 — 2026-06-23 — materializeDocument now writes via writeDraft + publishDraft (was a raw
+ *     `.latest` memory write) so notebook documents get version history and appear in the workspace
+ *     activity log/heatmap — the document-path counterpart to the v1.2.0 record fix.
  */
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
-import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot } from '/js/services/organisms.js';
+import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft } from '/js/services/organisms.js';
 
 const DOC_SPACE = 'pages';
 
@@ -162,11 +165,18 @@ export async function materializeDocument(plan) {
     }
   }
 
-  // 4. Write the document.
+  // 4. Write the document through the proper workspace draft→publish path (NOT a raw `.latest` write).
+  //    A raw write to `…{space}.{docId}.latest` lands the content but produces no version history and
+  //    no activity event (the feed is derived from `.draft`/`.version.N` keys), so notebook documents
+  //    used to be invisible in the workspace activity log / heatmap. Going through writeDraft +
+  //    publishDraft mints `.version.1` + `.latest` and shows up like every other published object —
+  //    matching the Tracked-Response record path migrated in v1.2.0.
   const docId = rid('doc-');
-  const key = `${wsRoot(organismId, workspaceId)}.${space}.${docId}.latest`;
-  const resp = await createMemory(key, { id: docId, title: plan.title, markdown: plan.markdown }, 'private');
-  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not write document');
+  const docValue = { id: docId, title: plan.title, markdown: plan.markdown };
+  const draftResp = await writeDraft(organismId, workspaceId, space, docId, docValue);
+  if (draftResp?.ok === false) throw new Error(draftResp.error?.message || 'Could not write document');
+  const pubResp = await publishDraft(organismId, workspaceId, space, docId);
+  if (pubResp?.ok === false) throw new Error(pubResp.error?.message || 'Could not publish document');
 
   // 5. Drop the source inbox note (it has been filed).
   if (plan.sourceKey) await deleteMemory(plan.sourceKey).catch(() => {});

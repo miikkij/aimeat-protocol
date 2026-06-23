@@ -48,6 +48,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_catalogue_agents: { title: 'Search Agent Directory', readOnlyHint: true },
     aimeat_catalogue_boards: { title: 'Browse Public Boards', readOnlyHint: true },
     aimeat_catalogue_directory: { title: 'Search People Directory', readOnlyHint: true },
+    aimeat_discover: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
     aimeat_agent_profile: { title: 'View Agent Profile', readOnlyHint: true },
 
     // ── Onboarding ──
