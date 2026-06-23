@@ -8,6 +8,7 @@
   "inbox.send": "Send",
   "inbox.sending": "Sending…",
   "inbox.reply": "Reply",
+  "inbox.contactAgentSuffix": "(your agent)",
   "inbox.answer.other": "Other",
   "inbox.answer.otherPlaceholder": "Type your answer…",
   "inbox.answer.send": "Send answers",
