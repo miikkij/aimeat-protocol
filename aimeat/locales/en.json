@@ -40,6 +40,8 @@
   "inbox.schedCreate": "Schedule",
   "inbox.schedCreated": "Scheduled.",
   "inbox.schedError": "Could not schedule.",
+  "inbox.parkToNotebook": "Add to notebook for later",
+  "inbox.parkedToNotebook": "Added to your notebook.",
   "inbox.announcementNote": "Announcement — replies are disabled",
   "inbox.bcTypeMessage": "Message",
   "inbox.bcTypePoll": "Poll",
