@@ -21,7 +21,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
@@ -210,6 +210,108 @@ function SettingsPanel({ org, onSaved }) {
       ${ok && html`<p class="mc-saved">${t('myCompany.settingsSaved')}</p>`}
       <button class="btn-primary" type="submit" disabled=${busy || uploading}>${t('myCompany.saveSettings')}</button>
     </form>`;
+}
+
+/** Compose the prompt the user takes to their AI to generate the portfolio HTML (prompt-driven). */
+function buildPortfolioPrompt(org, offerings, c) {
+  const origin = (typeof window !== 'undefined' && window.location.origin) || '';
+  const lines = [];
+  lines.push(`Build a single self-contained HTML file: a professional, responsive public portfolio / landing page for the company "${org.name}" on the AIMEAT platform.`);
+  lines.push('Requirements: ONE .html file, all CSS inline in a <style> tag, no external JS/CSS/font dependencies (system fonts only), mobile-friendly, accessible, tasteful.');
+  if (c.includeInfo) {
+    lines.push('', 'Company information to feature:', `- Name: ${org.name}`);
+    if (org.businessId) lines.push(`- Business ID (Y-tunnus): ${org.businessId}`);
+    if (org.description) lines.push(`- About: ${org.description}`);
+  }
+  if (c.useLogo && org.logo) lines.push(`- Logo image (use it in the header): ${origin}${org.logo}`);
+  if (c.includeOfferings && offerings.length) {
+    lines.push('', 'Services for sale (present them attractively as cards, include each price):');
+    for (const o of offerings) {
+      const price = o.offer?.price?.morsels ? `${o.offer.price.morsels} morsels` : 'contact for pricing';
+      lines.push(`- ${o.offer?.title} — ${price} (fulfilled by agent ${o.agentName})${o.offer?.ask ? `: ${o.offer.ask}` : ''}`);
+    }
+  }
+  lines.push('', `Desired look & feel: ${(c.lookDescription || '').trim() || 'clean, modern, trustworthy, professional'}`);
+  lines.push('', 'Output ONLY the HTML, starting with <!DOCTYPE html>. No explanations, no markdown fences.');
+  return lines.join('\n');
+}
+
+/** Company portfolio builder (admin) — prompt-driven, mirrors the profile portfolio with company focus. */
+function PortfolioPanel({ org, offerings }) {
+  const [cfg, setCfg] = useState(undefined); // undefined=loading, null=none, object
+  const [includeOfferings, setIncludeOfferings] = useState(true);
+  const [includeInfo, setIncludeInfo] = useState(true);
+  const [useLogo, setUseLogo] = useState(!!org.logo);
+  const [look, setLook] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [htmlIn, setHtmlIn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`).then(r => {
+      const c = r.data?.config; setCfg(c || null);
+      if (c) { setIncludeOfferings(c.includeOfferings !== false); setIncludeInfo(c.includeInfo !== false); setUseLogo(c.useLogo !== false && !!org.logo); setLook(c.lookDescription || ''); }
+    }).catch(() => setCfg(null));
+  }, [org.slug]);
+
+  function generate() {
+    setPrompt(buildPortfolioPrompt(org, offerings, { includeOfferings, includeInfo, useLogo, lookDescription: look }));
+    apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { includeOfferings, includeInfo, useLogo, lookDescription: look }).catch(() => {});
+  }
+  async function copyPrompt() { try { await navigator.clipboard.writeText(prompt); setMsg(t('myCompany.pfCopied')); } catch { /* clipboard blocked */ } }
+  async function publish() {
+    if (!htmlIn.trim()) { setErr(t('myCompany.pfNeedHtml')); return; }
+    setBusy(true); setErr(''); setMsg('');
+    try { const r = await apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/publish`, { html: htmlIn }); setCfg(r.data?.portfolio); setMsg(t('myCompany.pfPublished')); setHtmlIn(''); }
+    catch (e) { setErr(e.message || 'Publish failed'); }
+    finally { setBusy(false); }
+  }
+  async function unpublish() {
+    setBusy(true); setErr('');
+    try { const r = await apiDelete(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio`); setCfg(r.data?.portfolio); }
+    catch (e) { setErr(e.message || ''); }
+    finally { setBusy(false); }
+  }
+
+  if (cfg === undefined) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  const published = cfg?.enabled && cfg?.publicUrl;
+
+  return html`
+    <div class="mc-portfolio">
+      <p class="section-desc">${t('myCompany.pfIntro')}</p>
+      ${published && html`
+        <div class="mc-pf-live">
+          <span class="mc-saved">${t('myCompany.pfLive')}</span>
+          <div class="flex-row-wrap">
+            <a class="btn-outline btn-sm" href=${cfg.publicUrl} target="_blank">${t('myCompany.pfVisit')}</a>
+            <button class="btn-ghost btn-sm mc-remove" disabled=${busy} onClick=${unpublish}>${t('myCompany.pfUnpublish')}</button>
+          </div>
+          ${cfg.publishedAt && html`<span class="mc-mini">${t('myCompany.pfLastPublished')}: ${new Date(cfg.publishedAt).toLocaleString()}${cfg.htmlSizeKb ? ` · ${cfg.htmlSizeKb} KB` : ''}</span>`}
+        </div>`}
+
+      <h3 class="mc-form-title">${t('myCompany.pfStep1')}</h3>
+      <label class="mc-checkbox-row"><input type="checkbox" checked=${includeInfo} onChange=${e => setIncludeInfo(e.target.checked)} /><span>${t('myCompany.pfIncludeInfo')}</span></label>
+      <label class="mc-checkbox-row"><input type="checkbox" checked=${includeOfferings} onChange=${e => setIncludeOfferings(e.target.checked)} /><span>${t('myCompany.pfIncludeOfferings')} (${offerings.length})</span></label>
+      <label class="mc-checkbox-row"><input type="checkbox" checked=${useLogo} disabled=${!org.logo} onChange=${e => setUseLogo(e.target.checked)} /><span>${t('myCompany.pfUseLogo')}${!org.logo ? ` — ${t('myCompany.pfNoLogo')}` : ''}</span></label>
+      <label class="mc-label">${t('myCompany.pfLook')}
+        <textarea class="mc-input" rows="3" value=${look} placeholder=${t('myCompany.pfLookPlaceholder')} onInput=${e => setLook(e.target.value)}></textarea></label>
+      <button class="btn-primary btn-sm" onClick=${generate}>${t('myCompany.pfGenerate')}</button>
+
+      ${prompt && html`
+        <h3 class="mc-form-title">${t('myCompany.pfStep2')}</h3>
+        <p class="mc-mini">${t('myCompany.pfStep2Hint')}</p>
+        <textarea class="mc-input mc-pf-prompt" rows="8" readonly>${prompt}</textarea>
+        <button class="btn-outline btn-sm" onClick=${copyPrompt}>${t('myCompany.pfCopyPrompt')}</button>
+
+        <h3 class="mc-form-title">${t('myCompany.pfStep3')}</h3>
+        <textarea class="mc-input mc-pf-html" rows="6" value=${htmlIn} placeholder="<!DOCTYPE html>…" onInput=${e => setHtmlIn(e.target.value)}></textarea>
+        <div><button class="btn-primary btn-sm" disabled=${busy} onClick=${publish}>${t('myCompany.pfPublish')}</button></div>`}
+
+      ${err && html`<p class="mc-error">${err}</p>`}
+      ${msg && html`<p class="mc-saved">${msg}</p>`}
+    </div>`;
 }
 
 /** A catalog entry: the SAME offer card format as profile>offers + owner controls + an order box. */
@@ -495,7 +597,7 @@ export default function MyCompanyView() {
             </div>
 
             <div class="mc-subtabs">
-              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'settings'] : []), 'members'].map(id => html`
+              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'portfolio', 'settings'] : []), 'members'].map(id => html`
                 <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
               <span class="mc-role-chip">${t('myCompany.role' + (selected.role || 'member').charAt(0).toUpperCase() + (selected.role || 'member').slice(1))}</span>
             </div>
@@ -513,6 +615,7 @@ export default function MyCompanyView() {
 
             ${subTab === 'orders' && html`<${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />`}
             ${subTab === 'customers' && html`<${CustomersPanel} slug=${selected.slug} />`}
+            ${subTab === 'portfolio' && html`<${PortfolioPanel} org=${selected} offerings=${offerings} />`}
             ${subTab === 'settings' && html`<${SettingsPanel} org=${selected} onSaved=${(updated) => {
               // Update in place (no loadOrgs → no loading flash that would remount the panel and drop the "saved ✓").
               if (!updated) return;

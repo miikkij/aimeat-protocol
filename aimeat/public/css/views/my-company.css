@@ -264,6 +264,11 @@
 .mc-file-hidden { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .mc-checkbox-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-size: 0.9rem; cursor: pointer; }
 
+.mc-portfolio { display: flex; flex-direction: column; gap: 0.6rem; }
+.mc-pf-live { background: var(--success-bg); border: 1px solid var(--success); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.mc-pf-prompt { font-family: var(--font-mono, monospace); font-size: 0.8rem; white-space: pre; }
+.mc-pf-html { font-family: var(--font-mono, monospace); font-size: 0.8rem; }
+
 .mc-header-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 
 .mc-orders-received { border-top: 1px solid var(--border); margin-top: 1.25rem; padding-top: 1rem; }

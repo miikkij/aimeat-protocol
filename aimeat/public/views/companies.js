@@ -175,6 +175,8 @@ export default function CompaniesView() {
                 </div>
               </div>
               ${profile.org?.description && html`<p class="cm-profile-desc">${profile.org.description}</p>`}
+              ${profile.org?.portfolio?.enabled && profile.org.portfolio.publicUrl && html`
+                <a class="btn-outline btn-sm cm-pf-link" href=${profile.org.portfolio.publicUrl} target="_blank">${t('companies.viewPortfolio')}</a>`}
             </div>
             <h3 class="cm-form-title">${t('companies.catalogue')}</h3>
             ${(profile.offerings ?? []).length === 0 && html`<p class="cm-empty">${t('companies.noOfferings')}</p>`}
