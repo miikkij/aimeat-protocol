@@ -217,6 +217,8 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                 body: message.body ?? '',
                 attachments: message.attachments ?? undefined,
                 interactive: message.interactive ?? undefined,
+                broadcastId: message.broadcastId ?? undefined,
+                respondable: message.respondable ?? undefined,
                 status: 'delivered',
                 direction: 'inbound',
                 replyToId: message.replyToId ?? undefined,

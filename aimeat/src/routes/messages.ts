@@ -32,9 +32,10 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
-import { MessageSendSchema } from '../models/message-schemas.js';
+import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
+import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -95,6 +96,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       }
     }
 
+    // Announcements are read-only: reject a reply to a non-respondable broadcast message. The flag travels
+    // with the message (incl. cross-node), so the check is local — look it up in the sender's mailbox.
+    if (input.reply_to) {
+      const parent = await storage.getDirectMessage(input.reply_to, deliveryTargetFor(senderGhii));
+      if (parent && parent.respondable === false) {
+        res.status(403).json(error(config.nodeId, 'NOT_RESPONDABLE', 'This is an announcement — replies are disabled'));
+        return;
+      }
+    }
+
     // Core create + deliver (local inline / cross-node federation + first-contact gate). Shared with
     // the Tracked Response evaluator, which sends automated replies server-side via the same helper.
     const result = await sendDirectMessage(deliveryCtx, {
@@ -114,6 +125,69 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       { description: 'View conversation', method: 'GET', url: `/v1/messages/conversations/${result.message.conversationId}` },
       { description: 'View inbox', method: 'GET', url: '/v1/messages/inbox' },
     ]));
+  });
+
+  /* ── POST /v1/messages/broadcast — send one message to MANY (announcement / broadcast / poll) ── */
+  router.post('/v1/messages/broadcast', requireAuth(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
+    const parsed = BroadcastSendSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+    const input = parsed.data;
+    const senderGhii = resolve(req);
+
+    const recipients = (await resolveAudience(deliveryCtx, senderGhii, { to: input.to, groupId: input.group_id }))
+      .filter(isAddressableRecipient);
+    if (recipients.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid recipients in the audience'));
+      return;
+    }
+
+    const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
+    const result = await sendBroadcast(deliveryCtx, {
+      senderGhii, recipients, mode: input.mode, body: input.body, attachments, interactive: input.interactive,
+    });
+
+    res.status(201).json(success(config.nodeId, {
+      broadcast_id: result.broadcastId, recipients: recipients.length, sent: result.sent, failed: result.failed,
+    }, [
+      { description: 'View results', method: 'GET', url: `/v1/messages/broadcast/${result.broadcastId}` },
+    ]));
+  });
+
+  /* ── GET /v1/messages/broadcast/:id — aggregated results (recipients + delivery/poll answers) ── */
+  router.get('/v1/messages/broadcast/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+    const senderGhii = resolve(req);
+    const broadcastId = req.params.id as string;
+    const copies = (await storage.listDmsByBroadcast(broadcastId, senderGhii)).filter(m => m.direction === 'outbound');
+    if (copies.length === 0) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such broadcast'));
+      return;
+    }
+    // For each outbound copy, find the recipient's reply (used by the poll results in Phase 2).
+    const recipients = await Promise.all(copies.map(async (m) => {
+      const replies = await storage.listConversation(senderGhii, m.conversationId, { perPage: 200 });
+      const answer = replies.messages.find(r => r.direction === 'inbound' && r.replyToId === m.id && r.interactive?.role === 'answers');
+      return {
+        recipient: m.recipientGhii,
+        status: m.status,
+        answered: !!answer,
+        answers: answer?.interactive?.role === 'answers' ? answer.interactive.answers : undefined,
+      };
+    }));
+    const first = copies[0];
+    res.json(success(config.nodeId, {
+      broadcast_id: broadcastId,
+      mode: first.respondable === false ? 'announcement' : 'broadcast',
+      interactive: first.interactive ?? null,
+      total: recipients.length,
+      delivered: recipients.filter(r => r.status === 'delivered' || r.status === 'read').length,
+      read: recipients.filter(r => r.status === 'read').length,
+      answered: recipients.filter(r => r.answered).length,
+      recipients,
+    }));
   });
 
   /* ── GET /v1/messages/inbox — inbound from accepted contacts ── */

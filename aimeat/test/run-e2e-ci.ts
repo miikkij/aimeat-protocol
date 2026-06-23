@@ -119,6 +119,7 @@ const ALL_SUITES = [
     'test/e2e-messages.ts',
     'test/e2e-agent-dm.ts',
     'test/e2e-interactive-messages.ts',
+    'test/e2e-broadcast.ts',
     'test/e2e-tracked-response.ts',
     'test/e2e-attachment-sweep.ts',
     'test/e2e-agent-services.ts',

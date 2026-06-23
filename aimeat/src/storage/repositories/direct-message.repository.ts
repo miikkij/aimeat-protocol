@@ -38,6 +38,9 @@ export interface DirectMessageRepository {
     page?: number;
     perPage?: number;
   }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
+  /** All copies of a broadcast (send-to-many) in the sender's mailbox — outbound copies + inbound replies
+   *  that inherited the broadcastId — for the results/aggregation view. */
+  listDmsByBroadcast(broadcastId: string, ownerGhii: string): Promise<DirectMessageRecord[]>;
   /** One entry per conversation: peer, last message preview, unread count, updatedAt. */
   listConversations(ownerGhii: string): Promise<Array<{
     conversationId: string;
