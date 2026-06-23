@@ -161,6 +161,66 @@ await test('7. Failure mode: an owner who never configured a key has no Secretar
     assert(findSecretary(body.data.agents) === undefined, 'no-key owner should have no Secretary');
 });
 
+// ─── Phase 1: the "hire" sequence (frontend orchestrates these generic endpoints) ───
+console.log('\nPhase 1 -- Hire (brain + self-organism)');
+
+let selfOrgId = '';
+
+await test('8. Set the Secretary brain via directives (purpose + rules persists)', async () => {
+    const { status, body } = await json('/v1/agents/secretary/directives', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            purpose: 'Keeps my projects organized and drafts my replies.',
+            rules: [
+                { id: 'r1', description: 'Prefer Finnish in replies' },
+                { id: 'scout-before-build', description: 'Before building, search what already exists via aimeat_discover and reuse it' },
+            ],
+        }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const { body: get } = await json('/v1/agents/secretary/directives', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(get.data.purpose === 'Keeps my projects organized and drafts my replies.', `purpose: ${get.data.purpose}`);
+    const agentRules = (get.data.rules || []).filter((r: any) => r.source === 'agent');
+    assert(agentRules.length === 2, `agent rules: ${agentRules.length}`);
+});
+
+await test('9. Create the self-organism', async () => {
+    const { status, body } = await json('/v1/organisms', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'My Space', description: 'Secretary-designed filing space', visibility: 'private', join_policy: 'open' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    selfOrgId = body.data.organism.id;
+    assert(typeof selfOrgId === 'string' && selfOrgId.length > 0, 'got organism id');
+});
+
+await test('10. Register workspaces + read back', async () => {
+    const wss = [
+        { id: 'ws-a', name: 'Projects', createdAt: new Date().toISOString(), createdBy: ownerName },
+        { id: 'ws-b', name: 'Drafts', createdAt: new Date().toISOString(), createdBy: ownerName },
+    ];
+    const { status } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `organism.${selfOrgId}.meta.workspaces`, value: { workspaces: wss }, visibility: 'private' }),
+    });
+    assert(status === 200 || status === 201, `status ${status}`);
+    const { body } = await json(`/v1/memory/${encodeURIComponent(`organism.${selfOrgId}.meta.workspaces`)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((body.data.value.workspaces || []).length === 2, `workspaces: ${JSON.stringify(body.data.value)}`);
+});
+
+await test('11. Store + read secretary.config (self-organism link)', async () => {
+    await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'secretary.config', value: { selfOrganismId: selfOrgId, organismName: 'My Space' }, visibility: 'private' }),
+    });
+    const { body } = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(body.data.value.selfOrganismId === selfOrgId, `config: ${JSON.stringify(body.data.value)}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

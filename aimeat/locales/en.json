@@ -554,7 +554,22 @@
     "notReady": "Your Secretary isn't set up yet. Configure OpenRouter in your profile settings to enable it.",
     "identity": "Identity",
     "scopes": "Permissions",
-    "soon": "Chat, schedule, and decisions are coming soon."
+    "soon": "Chat, schedule, and decisions are coming soon.",
+    "hireTitle": "Set up your Secretary",
+    "hireIntro": "Run a quick interview in your own AI chat so your Secretary learns what you need — then it sets up its brain and organizes a space for your information automatically.",
+    "hireStep1": "Copy this prompt into your AI chat (Claude, ChatGPT, …) and answer its questions.",
+    "hireStep2": "Paste the AI's final result here and apply it.",
+    "copyPrompt": "Copy setup prompt",
+    "copied": "Copied",
+    "pastePlaceholder": "Paste the JSON your AI produced here…",
+    "apply": "Set up my Secretary",
+    "applying": "Setting up…",
+    "hireDone": "Your Secretary is set up.",
+    "hireError": "Couldn't set up the Secretary",
+    "hireBadShape": "The pasted result is missing required fields (brain.purpose, organism.name, workspaces).",
+    "hiredStatus": "Secretary is set up",
+    "brain": "Brain",
+    "selfOrganism": "Your space"
   },
   "companies": {
     "title": "Companies",

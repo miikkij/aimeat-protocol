@@ -554,7 +554,22 @@
     "notReady": "Sihteeriäsi ei ole vielä pystytetty. Ota se käyttöön määrittämällä OpenRouter profiilisi asetuksissa.",
     "identity": "Identiteetti",
     "scopes": "Oikeudet",
-    "soon": "Chat, kalenteri ja päätökset tulossa pian."
+    "soon": "Chat, kalenteri ja päätökset tulossa pian.",
+    "hireTitle": "Pystytä sihteerisi",
+    "hireIntro": "Tee nopea haastattelu omassa AI-chatissasi, jotta sihteerisi oppii mitä tarvitset — sitten se pystyttää aivonsa ja järjestää tiedoillesi tilan automaattisesti.",
+    "hireStep1": "Kopioi tämä prompt AI-chattiisi (Claude, ChatGPT, …) ja vastaa sen kysymyksiin.",
+    "hireStep2": "Liitä AI:n lopullinen tulos tähän ja ota se käyttöön.",
+    "copyPrompt": "Kopioi pystytysprompt",
+    "copied": "Kopioitu",
+    "pastePlaceholder": "Liitä AI:n tuottama JSON tähän…",
+    "apply": "Pystytä sihteerini",
+    "applying": "Pystytetään…",
+    "hireDone": "Sihteerisi on pystytetty.",
+    "hireError": "Sihteerin pystytys epäonnistui",
+    "hireBadShape": "Liitetystä tuloksesta puuttuu pakollisia kenttiä (brain.purpose, organism.name, workspaces).",
+    "hiredStatus": "Sihteeri on pystytetty",
+    "brain": "Aivot",
+    "selfOrganism": "Tilasi"
   },
   "companies": {
     "title": "Yritykset",
