@@ -32,6 +32,13 @@
  *     stamps it; the workspace UI groups all spaces sharing a contract into one unit). Open schema,
  *     so it was always accepted — listed for clarity. Seed version bumped 2→3 so the stored system
  *     schema upgrades in place.
+ *   v1.5.0 -- 2026-06-23 -- Measurability convention (domain-agnostic): optional top-level
+ *     `objectives[]` (why + measurable KPIs: kind/unit/target/source, where source is a string recipe
+ *     or a `{from:'records',...}` aggregation over the organism's own records) and an optional
+ *     objectType `servesObjective` linking a space to the objective it feeds. Schema stays `open` so
+ *     absent objectives stay valid, but the defined subschema enforces the kind/op enums when present.
+ *     Seed version bumped 3→4 so the stored system schema upgrades in place. Design:
+ *     docs/internal/2026-06-23-organism-measurability-design.md.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -53,7 +60,7 @@ export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
  */
 /** Bump when the seeded schema changes in a way existing nodes must pick up (e.g. the backing
  *  enum). seedManifestSchema() upgrades any system-seeded record carrying an older version. */
-export const MANIFEST_SEED_VERSION = 3;
+export const MANIFEST_SEED_VERSION = 4;
 
 export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
   // Standard JSON Schema annotation (safe under ajv strict mode) doubling as the seed-version
@@ -97,6 +104,53 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
           contract: { type: 'string' },  // optional contract id a provisioning agent stamps; the workspace UI groups all spaces sharing a contract into one unit
+          servesObjective: { type: 'string' },  // optional: id of an objectives[] entry this space feeds (measurability convention)
+        },
+      },
+    },
+    // Measurability convention (all optional; domain-agnostic — units are the domain's: € of timber,
+    // viable plots, confirmed hypotheses, closed deals). The subschema enforces the kind/op enums when
+    // present, while the open envelope keeps a manifest with no objectives valid. See
+    // docs/internal/2026-06-23-organism-measurability-design.md.
+    objectives: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'statement'],
+        properties: {
+          id: { type: 'string' },                 // stable slug, referenced by objectType.servesObjective
+          statement: { type: 'string' },          // what this is for
+          why: { type: 'string' },                // why it matters now
+          status: { enum: ['active', 'met', 'abandoned'] },
+          kpis: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['name'],
+              properties: {
+                name: { type: 'string' },
+                kind: { enum: ['value', 'cost', 'roi', 'outcome', 'quality'] },
+                unit: { type: 'string' },          // the domain's unit (EUR, count, minutes, %, …)
+                target: {
+                  type: 'object',
+                  properties: {
+                    op: { enum: ['<', '<=', '>', '>=', '==', 'between'] },
+                    value: { type: 'number' },
+                    values: { type: 'array', items: { type: 'number' } },  // for op: 'between'
+                  },
+                },
+                // string recipe (human/agent-readable, NOT auto-evaluated in v1) OR an aggregation object
+                // { from:'records', space, agg:'sum'|'count'|'avg'|'min'|'max', field, equals? } over the
+                // organism's own published records. (Agent-ops sources telemetry/wallet/quota are a fenced
+                // appendix — see the design doc §5 — and not enabled in this build.)
+                source: { type: ['string', 'object'] },
+                of: { type: 'object' },            // for kind:'roi' — { value:'<kpiName>', cost:'<kpiName>' }
+                current: { type: 'number' },       // last-known value (cache, not history)
+                measuredAt: { type: 'string' },
+                measuredBy: { type: 'string' },
+              },
+            },
+          },
         },
       },
     },

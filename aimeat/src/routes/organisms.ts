@@ -1226,9 +1226,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const { markdown, readable } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii });
+    const { markdown, readable, summary } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
-    res.json(success(config.nodeId, { markdown, ws, readable }, [
+    // `objectives` carries the measurability KPIs with their resolved `current` (computed from records
+    // where source:from='records', else declared) so a consumer can check targets without parsing markdown.
+    res.json(success(config.nodeId, { markdown, ws, readable, objectives: readable ? summary.objectives : [] }, [
       { description: 'Read the full workspace', method: 'GET', url: `/v1/organisms/${id}/workspace?ws=${encodeURIComponent(ws)}` },
     ]));
   });

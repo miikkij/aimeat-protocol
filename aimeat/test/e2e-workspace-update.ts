@@ -7,6 +7,9 @@
  *   v1.0.0 — 2026-06-09 — Initial.
  *   v1.1.0 — 2026-06-16 — add_spaces round-trips the optional `contract` + `description` fields
  *     (the workspace UI groups spaces by `contract`); a no-namespace entry is still rejected.
+ *   v1.2.0 — 2026-06-23 — Measurability convention: a manifest carrying top-level objectives[] (with a
+ *     from:records KPI) + an objectType servesObjective validates and persists (2f); a KPI with an
+ *     out-of-enum `kind` is rejected (2g).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-update
 
@@ -124,6 +127,38 @@ await test('2d. add_spaces preserves a `contract` + `description` field (UI grou
     const res = man.objectTypes.find((o: any) => o.name === 'research-result');
     assert(req?.contract === 'research' && res?.contract === 'research', `contract preserved: ${JSON.stringify({ req: req?.contract, res: res?.contract })}`);
     assert(req?.description === 'Briefs awaiting work', `description preserved: ${JSON.stringify(req?.description)}`);
+});
+
+await test('2f. manifest carrying objectives[] + servesObjective validates and persists', async () => {
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    // Tag the 'task' space as serving an objective + attach a measurability objective with a from:records KPI.
+    const objectTypes = man.objectTypes.map((o: any) => o.name === 'task' ? { ...o, servesObjective: 'ship-it' } : o);
+    const newManifest = { ...man, objectTypes, objectives: [{
+        id: 'ship-it',
+        statement: 'Ship the thing under budget',
+        why: 'Budget overran last time',
+        status: 'active',
+        kpis: [
+            { name: 'open-tasks', kind: 'outcome', unit: 'count',
+              target: { op: '<=', value: 5 },
+              source: { from: 'records', space: 'task', agg: 'count', equals: { field: 'status', value: 'open' } } },
+            { name: 'measured-by-hand', kind: 'quality', unit: '%', target: { op: '>=', value: 90 },
+              source: 'eyeballed each release', current: 88 },
+        ],
+    }] };
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ manifest: newManifest }) });
+    assert(r.status === 200 && r.body.data.updated.includes('manifest'), `update ${r.status}: ${JSON.stringify(r.body)}`);
+    const man2 = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    assert(Array.isArray(man2.objectives) && man2.objectives[0].id === 'ship-it', `objectives persisted: ${JSON.stringify(man2.objectives)}`);
+    assert(man2.objectives[0].kpis[0].kind === 'outcome' && man2.objectives[0].kpis[0].source.from === 'records', 'KPI shape persisted');
+    assert(man2.objectTypes.find((o: any) => o.name === 'task')?.servesObjective === 'ship-it', 'servesObjective persisted on the space');
+});
+
+await test('2g. failure: a KPI with an out-of-enum `kind` is rejected', async () => {
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    const bad = { ...man, objectives: [{ id: 'bad', statement: 'x', kpis: [{ name: 'k', kind: 'bogus', target: { op: '<', value: 1 } }] }] };
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ manifest: bad }) });
+    assert(r.status === 400, `expected 400 (INVALID_MANIFEST), got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
 await test('2e. failure: add_spaces entry without a namespace is rejected', async () => {
