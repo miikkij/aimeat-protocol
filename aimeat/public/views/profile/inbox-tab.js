@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.13.0 -- 2026-06-23 -- Agent capabilities in chat: (A) a peer agent's public `chat.commands` render
+ *     as fill-in command chips above the composer — pick one, fill the params, the filled template drops
+ *     into the composer to review + send; (B) for the human's OWN agents, a 📅 schedule panel lists the
+ *     agent's scheduled tasks and creates a recurring agent_task (node scheduler scoped to the agent).
  *   v1.12.1 -- 2026-06-23 -- Operator broadcast audience is now a select: All node users OR All federation
  *     users (genesis operator → every owner across the federation; delegated per-peer fan-out server-side).
  *   v1.12.0 -- 2026-06-23 -- Operator broadcast: an operator sees an "📣 All node users" audience in the
@@ -93,6 +97,7 @@ import { PresenceDot } from '/components/PresenceDot.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
+import * as schedules from '/js/services/schedules.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
@@ -587,6 +592,87 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '', dra
     </div>`;
 }
 
+/* ── Agent chat commands (Phase A) — a peer agent advertises fill-in templates via its public
+ *    `chat.commands` memory key ([{id,label,description,template,params:[{name,type,required,placeholder,
+ *    default,options}]}]). We render a chip per command; the human fills the params; the resulting prose
+ *    drops into the composer to review + send. The agent receives the filled template it advertised. ── */
+function CommandBar({ commands, onPick }) {
+  return html`<div class="inbox-cmdbar">
+    <span class="inbox-cmdbar-label">⚡ ${t('inbox.cmdTitle')}</span>
+    ${commands.map(c => html`<button class="inbox-cmd-chip" key=${c.id} title=${c.description || ''}
+      onClick=${() => onPick(c)}>${escHtml(c.label || c.id)}</button>`)}
+  </div>`;
+}
+
+function CommandFill({ command, onInsert, onCancel }) {
+  const [values, setValues] = useState({});
+  const params = Array.isArray(command.params) ? command.params : [];
+  const valOf = (p) => String(values[p.name] ?? p.default ?? '');
+  const missing = params.some(p => p.required && !valOf(p).trim());
+  return html`<div class="inbox-cmdfill">
+    <div class="inbox-cmdfill-head">⚡ ${escHtml(command.label || command.id)}
+      <button class="btn-ghost btn-sm" onClick=${onCancel} title=${t('inbox.close')}>✕</button></div>
+    ${command.description ? html`<div class="inbox-cmdfill-desc">${escHtml(command.description)}</div>` : null}
+    ${params.map(p => html`<label class="inbox-cmdfill-field" key=${p.name}>
+      <span class="inbox-cmdfill-pname">${escHtml(p.name)}${p.required ? ' *' : ''}</span>
+      ${p.type === 'select' && Array.isArray(p.options)
+        ? html`<select class="inbox-input" value=${valOf(p)}
+            onChange=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))}>
+            ${p.options.map(o => html`<option key=${o} value=${o}>${escHtml(String(o))}</option>`)}</select>`
+        : html`<input class="inbox-input" type=${p.type === 'number' ? 'number' : 'text'}
+            placeholder=${p.placeholder || ''} value=${valOf(p)}
+            onInput=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))} />`}
+    </label>`)}
+    <button class="btn-primary btn-sm inbox-cmdfill-go" disabled=${missing}
+      onClick=${() => onInsert(command, values)}>${t('inbox.cmdInsert')}</button>
+  </div>`;
+}
+
+/* ── Agent schedule (Phase B) — surfaces the node scheduler scoped to one of YOUR OWN agents
+ *    (GET/POST /v1/agents/:name/schedules, which always resolve under the caller's owner). List the
+ *    agent's managed jobs + create a recurring agent_task. Only shown for the human's own agents. ── */
+function SchedulePanel({ agentName, onClose, showToast }) {
+  const [jobs, setJobs] = useState(null);
+  const [title, setTitle] = useState('');
+  const [cron, setCron] = useState('0 9 * * *');
+  const [desc, setDesc] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    try { const r = await schedules.listAgentSchedules(agentName); setJobs(r?.data?.managed || []); }
+    catch { setJobs([]); }
+  };
+  useEffect(() => { setJobs(null); load(); /* eslint-disable-next-line */ }, [agentName]);
+  const create = async () => {
+    if (!title.trim() || !cron.trim() || busy) return;
+    setBusy(true);
+    try {
+      await schedules.createAgentSchedule(agentName, {
+        kind: 'agent_task', cron: cron.trim(), task_title: title.trim(),
+        task_description: desc.trim(), display_name: title.trim(),
+      });
+      setTitle(''); setDesc(''); showToast?.(t('inbox.schedCreated'));
+      await load();
+    } catch (e) { showToast?.(e?.message || t('inbox.schedError'), true); }
+    finally { setBusy(false); }
+  };
+  return html`<div class="inbox-sched">
+    <div class="inbox-sched-head">📅 ${t('inbox.schedTitle')}
+      <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button></div>
+    ${jobs == null ? html`<div class="inbox-empty-sm">${t('inbox.loading')}</div>`
+      : jobs.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.schedNone')}</div>`
+      : html`<ul class="inbox-sched-list">${jobs.map(j => html`<li class="inbox-sched-item" key=${j.id}>
+          <span class="inbox-sched-name">${escHtml(j.displayName || j.input?.taskTemplate?.title || j.id)}</span>
+          <span class="inbox-sched-cron">${escHtml(j.cron)}${j.enabled === false ? ' · ' + t('inbox.schedOff') : ''}</span>
+        </li>`)}</ul>`}
+    <div class="inbox-sched-new">
+      <input class="inbox-input" placeholder=${t('inbox.schedTaskPh')} value=${title} onInput=${e => setTitle(e.target.value)} />
+      <input class="inbox-input" placeholder="0 9 * * *" value=${cron} onInput=${e => setCron(e.target.value)} />
+      <textarea class="inbox-input inbox-sched-desc" placeholder=${t('inbox.schedDescPh')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea>
+      <button class="btn-primary btn-sm" disabled=${busy || !title.trim() || !cron.trim()} onClick=${create}>${t('inbox.schedCreate')}</button>
+    </div>
+  </div>`;
+}
+
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -614,7 +700,11 @@ export default function InboxTab({ showToast }) {
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
   const [trackMsg, setTrackMsg] = useState(null);         // message being tracked (opens modal)
-  const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply seeded into the composer
+  const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply / filled command seeded into the composer
+  const [prefillNonce, setPrefillNonce] = useState(0);    // bump to force a composer remount on each insert
+  const [agentCommands, setAgentCommands] = useState(null); // peer agent's chat.commands (Phase A)
+  const [cmdFill, setCmdFill] = useState(null);           // a command being filled in (param form)
+  const [schedOpen, setSchedOpen] = useState(false);      // schedule panel open (own agent, Phase B)
   const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
   const [awaitingDrafts, setAwaitingDrafts] = useState({}); // tr.id → suggested reply body (for the bubble)
   const msgsRef = useRef(null);
@@ -764,6 +854,23 @@ export default function InboxTab({ showToast }) {
   useEffect(() => { loadLists(); }, [loadLists]);
   // The owner's own agents — recipient suggestions when composing (so you don't retype long GAIIs).
   useEffect(() => { agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {}); }, []);
+
+  // Phase A: when the active thread is with an AGENT, read its public `chat.commands` so the composer can
+  // offer fill-in command chips. Absent/empty key → no chips (graceful). Reset per-thread UI on switch.
+  const activePeer = activeConv?.peerGhii;
+  useEffect(() => {
+    setAgentCommands(null); setCmdFill(null); setSchedOpen(false);
+    if (!activePeer || !isAgentPeer(activePeer)) return;
+    let cancelled = false;
+    apiGet(`/v1/memory/${encodeURIComponent(activePeer)}/${encodeURIComponent('chat.commands')}`)
+      .then(r => {
+        const val = r?.data?.value;
+        const cmds = val && Array.isArray(val.commands) ? val.commands.filter(c => c && c.id) : [];
+        if (!cancelled && cmds.length) setAgentCommands(cmds);
+      })
+      .catch(() => { /* no commands published — fine */ });
+    return () => { cancelled = true; };
+  }, [activePeer]);
   // The owner's Share Groups — reusable broadcast audiences (distribution lists).
   useEffect(() => { apiGet('/v1/groups').then(r => setMyGroups(r?.data?.groups || [])).catch(() => {}); }, []);
 
@@ -964,6 +1071,18 @@ export default function InboxTab({ showToast }) {
     setSending(false);
   };
 
+  // Phase A: substitute a command's {{param}} placeholders and drop the resulting prose into the
+  // composer (the human reviews + sends it). Bump the nonce so the composer remounts on every insert.
+  const insertCommand = (cmd, values) => {
+    let text = cmd.template || '';
+    for (const p of (Array.isArray(cmd.params) ? cmd.params : [])) {
+      const raw = values[p.name];
+      const v = (raw == null || raw === '') ? (p.default ?? '') : raw;
+      text = text.split(`{{${p.name}}}`).join(String(v));
+    }
+    setCmdFill(null); setDraftPrefill(text); setPrefillNonce(n => n + 1);
+  };
+
   const doSend = async (recipient, text, files, reset) => {
     if (sending) return;
     const body = (text || '').trim();
@@ -1075,6 +1194,11 @@ export default function InboxTab({ showToast }) {
     }
     // An announcement (a non-respondable broadcast) is read-only for the recipient — hide the composer.
     const isAnnouncement = thread.some(m => m.direction === 'inbound' && m.respondable === false);
+    // Agent capabilities in chat: command chips for any agent peer (public chat.commands); the schedule
+    // panel only for the human's OWN agents (the scheduler routes resolve under the caller's owner).
+    const peerIsAgent = isAgentPeer(activeConv.peerGhii);
+    const peerAgentName = peerIsAgent ? subThreadLabel(activeConv.peerGhii) : null;
+    const peerIsMyAgent = peerIsAgent && ownerDisplayName(ownerKeyOf(activeConv.peerGhii)) === getSession()?.owner;
     return html`
       <div class="inbox-panel">
         <div class="inbox-thread-head">
@@ -1084,6 +1208,8 @@ export default function InboxTab({ showToast }) {
             ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
             <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
           </div>
+          ${peerIsMyAgent ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
+            onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
         </div>
         <div class="inbox-msgs" ref=${msgsRef}>
           ${thread.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noThread')}</div>` : null}
@@ -1111,9 +1237,16 @@ export default function InboxTab({ showToast }) {
               </div>
             </div>
           </div>`)}
+        ${peerIsMyAgent && schedOpen
+          ? html`<${SchedulePanel} agentName=${peerAgentName} showToast=${showToast} onClose=${() => setSchedOpen(false)} />` : null}
+        ${!isAnnouncement && cmdFill
+          ? html`<${CommandFill} command=${cmdFill} onInsert=${insertCommand} onCancel=${() => setCmdFill(null)} />`
+          : (!isAnnouncement && agentCommands
+            ? html`<${CommandBar} commands=${agentCommands} onPick=${(c) =>
+                (Array.isArray(c.params) && c.params.length) ? setCmdFill(c) : insertCommand(c, {})} />` : null)}
         ${isAnnouncement
           ? html`<div class="inbox-announce-note">📢 ${t('inbox.announcementNote')}</div>`
-          : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
+          : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
               sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
               draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
       </div>`;
