@@ -479,3 +479,32 @@
 /* Read-only summary once the question has been answered. */
 .inbox-iform--done { gap: 8px; }
 .inbox-iform-answered { font-size: 13px; color: var(--text-dim); }
+
+/* ── Broadcast / send-to-many compose ── */
+.inbox-bc-mode { display: flex; gap: 8px; flex-wrap: wrap; }
+.inbox-bc-modeopt {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--card-bg); cursor: pointer; font-size: 13px;
+}
+.inbox-bc-modeopt input { accent-color: var(--accent); }
+.inbox-bc-modeopt--on { border-color: var(--accent); background: var(--accent-subtle); }
+.inbox-bc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.inbox-bc-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 10px; border: 1px solid var(--accent-border); border-radius: var(--radius-full);
+  background: var(--accent-subtle); font-size: 12px; max-width: 100%;
+}
+.inbox-bc-chip-x {
+  border: none; background: transparent; color: var(--text-dim); cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: var(--radius-full);
+}
+.inbox-bc-chip-x:hover { color: var(--danger); background: var(--card-bg); }
+.inbox-bc-add { display: flex; gap: 8px; }
+.inbox-bc-add .inbox-input { flex: 1; }
+
+/* Announcement note shown in place of the reply composer (read-only thread). */
+.inbox-announce-note {
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 16px; color: var(--text-dim); font-size: 13px; text-align: center;
+}

@@ -1609,6 +1609,8 @@ model DirectMessage {
   body           String    @default("")
   attachments    Json?
   interactive    Json?
+  broadcastId    String?
+  respondable    Boolean?
   status         String    @default("queued")
   direction      String
   replyToId      String?
@@ -1623,6 +1625,7 @@ model DirectMessage {
   @@index([ownerGhii, conversationId, createdAt])
   @@index([mid])
   @@index([status, origin])
+  @@index([broadcastId])
 }
 
 model ContactConsent {

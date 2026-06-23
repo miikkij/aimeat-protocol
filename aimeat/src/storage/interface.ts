@@ -2100,6 +2100,11 @@ export interface DirectMessageRecord {
   attachments?: DirectMessageAttachment[];
   /** Optional structured payload — a federated AskUserQuestion (the question spec, or the human's answers). */
   interactive?: InteractivePayload;
+  /** Set when this message is one copy of a broadcast (send-to-many) — groups the copies for results. */
+  broadcastId?: string;
+  /** false = an announcement (recipients cannot reply); omitted/true = a normal message. Travels with the
+   *  message (incl. cross-node) so the recipient's node can enforce/hide replies. */
+  respondable?: boolean;
   status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'undeliverable';
   direction: 'inbound' | 'outbound';
   /** Message this is a reply to (same conversationId). */

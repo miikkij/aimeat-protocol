@@ -92,7 +92,28 @@ export const MessageSendSchema = z.object({
   { message: 'A message must have a body, an attachment, or an interactive payload' },
 );
 
+// ── Broadcast / send-to-many ──
+
+/** Send one message to many recipients (an explicit list and/or a Share Group's members). `mode`
+ *  'announcement' = non-respondable (read-only); 'broadcast' = each recipient can reply (1:1 thread).
+ *  An `interactive` payload makes it a poll fanned out to everyone. */
+export const BroadcastSendSchema = z.object({
+  to: z.array(z.string().min(3).max(256)).max(500).optional(),
+  group_id: z.string().min(1).max(64).optional(),
+  mode: z.enum(['broadcast', 'announcement']).optional().default('broadcast'),
+  body: z.string().max(50000).optional().default(''),
+  attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
+  interactive: InteractivePayloadSchema.optional(),
+}).refine(
+  d => (d.to?.length ?? 0) > 0 || !!d.group_id,
+  { message: 'A broadcast needs recipients (to[] and/or group_id)' },
+).refine(
+  d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0 || d.interactive != null,
+  { message: 'A broadcast must have a body, an attachment, or an interactive payload' },
+);
+
 export type MessageSendInput = z.infer<typeof MessageSendSchema>;
 export type MessageAttachmentInput = z.infer<typeof MessageAttachmentInputSchema>;
 export type InteractivePayloadInput = z.infer<typeof InteractivePayloadSchema>;
 export type InteractiveQuestionInput = z.infer<typeof InteractiveQuestionSchema>;
+export type BroadcastSendInput = z.infer<typeof BroadcastSendSchema>;

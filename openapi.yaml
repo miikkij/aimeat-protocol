@@ -3049,6 +3049,8 @@ components:
             $ref: '#/components/schemas/DirectMessageAttachment'
         interactive:
           $ref: '#/components/schemas/InteractivePayload'
+        broadcastId: { type: string, description: Set when this is one copy of a broadcast (send-to-many). }
+        respondable: { type: boolean, description: 'false = an announcement (replies disabled); omitted/true = normal.' }
         status:
           type: string
           enum: [queued, sent, delivered, read, failed, undeliverable]
@@ -23740,6 +23742,71 @@ paths:
           description: Recipient is not accepting messages from the sender (blocked)
         '404':
           description: Recipient not found
+
+  /v1/messages/broadcast:
+    post:
+      operationId: sendBroadcast
+      summary: Send one message to many (broadcast / announcement / poll)
+      description: >-
+        Fan out one message to many recipients — an explicit list (`to[]`) and/or a Share Group's members
+        (`group_id`, the group as a distribution list). `mode` 'announcement' marks the copies
+        non-respondable (read-only); 'broadcast' is repliable (each reply is a normal 1:1 thread). An
+        `interactive` question payload makes it a poll fanned out to everyone. Requires the messages:send
+        scope.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to: { type: array, items: { type: string }, description: Recipient identities. }
+                group_id: { type: string, description: A Share Group whose members are the audience. }
+                mode: { type: string, enum: [broadcast, announcement], default: broadcast }
+                body: { type: string }
+                attachments: { type: array, items: { type: object } }
+                interactive: { $ref: '#/components/schemas/InteractivePayload' }
+      responses:
+        '201':
+          description: Broadcast fanned out
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          broadcast_id: { type: string }
+                          recipients: { type: integer }
+                          sent: { type: integer }
+                          failed: { type: array, items: { type: object } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/messages/broadcast/{id}:
+    get:
+      operationId: getBroadcastResults
+      summary: Aggregated broadcast results
+      description: Recipients, delivered/read/answered counts, and (for polls) each recipient's answers.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Aggregated results
+        '404':
+          description: No such broadcast
 
   /v1/messages/agent-inbox:
     get:

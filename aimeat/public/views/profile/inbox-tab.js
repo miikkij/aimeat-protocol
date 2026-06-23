@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.8.0 -- 2026-06-23 -- Send-to-many (broadcast): a 📢 Broadcast compose with a recipient-chip picker
+ *     (+ Share Group audience) and a mode toggle — Message (repliable) vs Announcement (read-only). An
+ *     announcement thread hides the reply composer for the recipient.
  *   v1.7.4 -- 2026-06-23 -- Recipient suggestions when composing: the "to" field autocompletes (datalist)
  *     with your own agents (GAIIs, labelled) + everyone you have a thread with — no retyping long GAIIs.
  *   v1.7.3 -- 2026-06-23 -- Show an AGENT's own presence dot on its conversation row (a nested agent row
@@ -71,6 +74,7 @@ import { PresenceDot } from '/components/PresenceDot.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
+import { apiGet } from '/js/api.js';
 import { TrackResponseModal } from './track-response-modal.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
@@ -497,6 +501,11 @@ export default function InboxTab({ showToast }) {
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
   const [myAgents, setMyAgents] = useState([]);           // the owner's own agents (recipient suggestions)
+  const [bcRecipients, setBcRecipients] = useState([]);   // broadcast: selected recipient ids
+  const [bcInput, setBcInput] = useState('');             // broadcast: add-recipient field
+  const [bcMode, setBcMode] = useState('broadcast');      // broadcast: 'broadcast' | 'announcement'
+  const [bcGroupId, setBcGroupId] = useState('');         // broadcast: optional Share Group audience
+  const [myGroups, setMyGroups] = useState([]);           // the owner's Share Groups (audiences)
   const [sending, setSending] = useState(false);
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
@@ -641,6 +650,8 @@ export default function InboxTab({ showToast }) {
   useEffect(() => { loadLists(); }, [loadLists]);
   // The owner's own agents — recipient suggestions when composing (so you don't retype long GAIIs).
   useEffect(() => { agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {}); }, []);
+  // The owner's Share Groups — reusable broadcast audiences (distribution lists).
+  useEffect(() => { apiGet('/v1/groups').then(r => setMyGroups(r?.data?.groups || [])).catch(() => {}); }, []);
 
   // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
   const contactOptions = (() => {
@@ -696,6 +707,38 @@ export default function InboxTab({ showToast }) {
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
+  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); };
+  const addBcRecipient = (id) => {
+    const v = (id ?? bcInput).trim();
+    if (v && !bcRecipients.includes(v)) setBcRecipients([...bcRecipients, v]);
+    setBcInput('');
+  };
+  const removeBcRecipient = (id) => setBcRecipients(bcRecipients.filter(r => r !== id));
+
+  // Send one message to many: explicit recipients and/or a Share Group audience. doBroadcast is the
+  // Composer's onSend for the broadcast panel.
+  const doBroadcast = async (_recipient, text, files, reset) => {
+    if (sending) return;
+    const body = (text || '').trim();
+    if (bcRecipients.length === 0 && !bcGroupId) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
+    if (!body && files.length === 0) return;
+    setSending(true);
+    try {
+      const attachments = [];
+      for (let i = 0; i < files.length; i++) {
+        const desc = await messages.uploadAttachment(files[i]);
+        attachments.push({ ...desc, inline: false, id: `at${i}` });
+      }
+      const resp = await messages.sendBroadcast({ to: bcRecipients, groupId: bcGroupId || undefined, mode: bcMode, body, attachments });
+      if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
+      else {
+        reset?.();
+        showToast?.(`${t('inbox.bcSent')} (${resp?.data?.sent ?? 0})`);
+        setMode('idle'); loadLists();
+      }
+    } catch { showToast?.(t('inbox.failed'), true); }
+    setSending(false);
+  };
 
   // Open the conversation for a tracked response, then (for awaiting-approval) seed the suggested reply.
   const openTracked = async (tr) => {
@@ -861,6 +904,8 @@ export default function InboxTab({ showToast }) {
     for (const m of thread) {
       if (m.interactive?.role === 'answers' && m.interactive.answersFor) answersByQ[m.interactive.answersFor] = m.interactive;
     }
+    // An announcement (a non-respondable broadcast) is read-only for the recipient — hide the composer.
+    const isAnnouncement = thread.some(m => m.direction === 'inbound' && m.respondable === false);
     return html`
       <div class="inbox-panel">
         <div class="inbox-thread-head">
@@ -897,8 +942,10 @@ export default function InboxTab({ showToast }) {
               </div>
             </div>
           </div>`)}
-        <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
-          sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill} />
+        ${isAnnouncement
+          ? html`<div class="inbox-announce-note">📢 ${t('inbox.announcementNote')}</div>`
+          : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
+              sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill} />`}
       </div>`;
   };
 
@@ -958,9 +1005,13 @@ export default function InboxTab({ showToast }) {
             title=${awaitingCount ? t('inbox.trackReady') : ''}>
             🔗 ${t('inbox.trackedTitle')}${activeTracked.length ? html` <span class="inbox-count">${activeTracked.length}</span>` : ''}
           </button>
+          <button class=${`btn-outline${mode === 'broadcast' ? ' btn-outline--active' : ''}`} onClick=${startBroadcast}>📢 ${t('inbox.broadcast')}</button>
           <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
         </div>
       </div>
+      <datalist id="inbox-contact-suggest">
+        ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
+      </datalist>
 
       <div class="inbox-body">
         ${renderList()}
@@ -971,14 +1022,44 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-compose-fields">
               <input class="inbox-input" type="text" placeholder=${t('inbox.toPlaceholder')}
                 list="inbox-contact-suggest" value=${to} onInput=${(e) => setTo(e.target.value)} />
-              <datalist id="inbox-contact-suggest">
-                ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
-              </datalist>
               <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
                 value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>
             <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
               sending=${sending} onSend=${doSend} />
+          </div>` : null}
+
+        ${mode === 'broadcast' ? html`
+          <div class="inbox-panel">
+            <div class="inbox-thread-head"><div class="inbox-name">📢 ${t('inbox.broadcastTitle')}</div></div>
+            <div class="inbox-compose-fields">
+              <div class="inbox-bc-mode">
+                <label class=${`inbox-bc-modeopt${bcMode === 'broadcast' ? ' inbox-bc-modeopt--on' : ''}`}>
+                  <input type="radio" name="bcmode" checked=${bcMode === 'broadcast'} onChange=${() => setBcMode('broadcast')} />
+                  <span>📨 ${t('inbox.bcModeBroadcast')}</span>
+                </label>
+                <label class=${`inbox-bc-modeopt${bcMode === 'announcement' ? ' inbox-bc-modeopt--on' : ''}`}>
+                  <input type="radio" name="bcmode" checked=${bcMode === 'announcement'} onChange=${() => setBcMode('announcement')} />
+                  <span>📢 ${t('inbox.bcModeAnnouncement')}</span>
+                </label>
+              </div>
+              ${bcRecipients.length ? html`<div class="inbox-bc-chips">
+                ${bcRecipients.map(r => html`<span class="inbox-bc-chip" key=${r}>${escHtml(peerName(r))}
+                  <button class="inbox-bc-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
+              </div>` : null}
+              <div class="inbox-bc-add">
+                <input class="inbox-input" type="text" list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
+                  value=${bcInput} onInput=${(e) => setBcInput(e.target.value)}
+                  onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addBcRecipient(); } }} />
+                <button class="btn-outline btn-sm" onClick=${() => addBcRecipient()}>${t('inbox.bcAdd')}</button>
+              </div>
+              ${myGroups.length ? html`<select class="inbox-input" value=${bcGroupId} onChange=${(e) => setBcGroupId(e.target.value)}>
+                <option value="">${t('inbox.bcNoGroup')}</option>
+                ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
+              </select>` : null}
+            </div>
+            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId) ? 'bc' : ''} sendLabel=${t('inbox.bcSend')}
+              sending=${sending} onSend=${doBroadcast} />
           </div>` : null}
 
         ${mode === 'thread' && activeConv ? renderThread() : null}

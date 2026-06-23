@@ -1485,6 +1485,8 @@ export function initializeSchema(db: Database.Database): void {
       body           TEXT NOT NULL DEFAULT '',
       attachments    TEXT,
       interactive    TEXT,
+      broadcastId    TEXT,
+      respondable    INTEGER,
       status         TEXT NOT NULL DEFAULT 'queued',
       direction      TEXT NOT NULL,
       replyToId      TEXT,
@@ -1603,6 +1605,9 @@ export function initializeSchema(db: Database.Database): void {
   // No index needed (read alongside the row, grouped by the already-indexed conversationId). Fresh DBs
   // get it inline above.
   safeAddColumn('direct_messages', 'interactive', 'TEXT');
+  // Broadcast / send-to-many: groups the per-recipient copies + marks announcements (non-respondable).
+  safeAddColumn('direct_messages', 'broadcastId', 'TEXT');
+  safeAddColumn('direct_messages', 'respondable', 'INTEGER');
 
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');

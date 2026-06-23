@@ -6591,6 +6591,10 @@ export class SqliteStorage implements Storage {
     return directMessageRepo.listAgentDmThread(this.db, agentGaii, conversationId, opts);
   }
 
+  async listDmsByBroadcast(broadcastId: string, ownerGhii: string): Promise<DirectMessageRecord[]> {
+    return directMessageRepo.listDmsByBroadcast(this.db, broadcastId, ownerGhii);
+  }
+
   async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
     return directMessageRepo.listConversations(this.db, ownerGhii);
   }

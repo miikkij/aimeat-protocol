@@ -7169,6 +7169,8 @@ export class PrismaStorage implements Storage {
         if (row.subject) record.subject = row.subject;
         if (row.attachments) record.attachments = row.attachments as DirectMessageRecord['attachments'];
         if (row.interactive) record.interactive = row.interactive as DirectMessageRecord['interactive'];
+        if (row.broadcastId) record.broadcastId = row.broadcastId;
+        if (row.respondable != null) record.respondable = row.respondable;
         if (row.replyToId) record.replyToId = row.replyToId;
         if (row.error) record.error = row.error;
         if (row.deliveredAt) record.deliveredAt = row.deliveredAt instanceof Date ? row.deliveredAt.toISOString() : row.deliveredAt;
@@ -7202,6 +7204,8 @@ export class PrismaStorage implements Storage {
                 body: record.body,
                 attachments: (record.attachments as any) ?? null,
                 interactive: (record.interactive as any) ?? null,
+                broadcastId: record.broadcastId ?? null,
+                respondable: record.respondable ?? null,
                 status: record.status,
                 direction: record.direction,
                 replyToId: record.replyToId ?? null,
@@ -7278,6 +7282,14 @@ export class PrismaStorage implements Storage {
             this.prisma.directMessage.count({ where }),
         ]);
         return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+    }
+
+    async listDmsByBroadcast(broadcastId: string, ownerGhii: string): Promise<DirectMessageRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.directMessage.findMany({
+            where: { broadcastId, ownerGhii }, orderBy: { createdAt: 'asc' },
+        });
+        return rows.map((r: any) => this.toDirectMessageRecord(r));
     }
 
     async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {

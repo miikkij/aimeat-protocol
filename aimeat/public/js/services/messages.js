@@ -26,6 +26,22 @@ export async function send({ to, body, attachments, replyTo, subject, conversati
   });
 }
 
+/** Send one message to MANY recipients. `to` is an array of identities and/or `groupId` is a Share Group
+ *  whose members are the audience. `mode` 'announcement' = read-only; 'broadcast' = repliable. `interactive`
+ *  makes it a poll. Returns { broadcast_id, recipients, sent, failed }. */
+export async function sendBroadcast({ to, groupId, mode, body, attachments, interactive } = /** @type {{ to?: any, groupId?: any, mode?: any, body?: any, attachments?: any, interactive?: any }} */ ({})) {
+  return api('/v1/messages/broadcast', {
+    method: 'POST',
+    body: JSON.stringify({ to, group_id: groupId, mode, body, attachments, interactive }),
+  });
+}
+
+/** Aggregated results for a broadcast (recipients, delivered/read/answered counts, poll answers). */
+export async function getBroadcastResults(broadcastId) {
+  const r = await apiGet(`/v1/messages/broadcast/${enc(broadcastId)}`);
+  return r?.data || null;
+}
+
 export async function listInbox(unreadOnly = false) {
   const r = await apiGet(`/v1/messages/inbox${unreadOnly ? '?unread=true' : ''}`);
   return r?.data || { messages: [], total: 0, unread: 0 };

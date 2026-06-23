@@ -39,6 +39,10 @@ export interface SendMessageInput {
   subject?: string;
   /** Optional interactive payload — a question set (agent asks) or the human's answers (reply). */
   interactive?: InteractivePayload;
+  /** Set when this is one copy of a broadcast (send-to-many) — groups copies for the results view. */
+  broadcastId?: string;
+  /** false = an announcement (recipient cannot reply). Omitted/true = normal. Travels with the message. */
+  respondable?: boolean;
 }
 
 /**
@@ -78,7 +82,7 @@ export type SendMessageResult =
  */
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
-  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive } = input;
+  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive, broadcastId, respondable } = input;
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
@@ -103,7 +107,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
       await storage.createDirectMessage({
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
-        body, attachments, interactive, status: 'undeliverable', direction: 'outbound',
+        body, attachments, interactive, broadcastId, respondable, status: 'undeliverable', direction: 'outbound',
         replyToId, origin: 'local', originNodeId: config.nodeId,
         error: 'blocked', createdAt: now,
       });
@@ -114,7 +118,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   // Sender's outbound copy.
   const senderCopy: DirectMessageRecord = {
     id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
-    body, attachments, interactive,
+    body, attachments, interactive, broadcastId, respondable,
     status: isLocal ? 'delivered' : 'queued',
     direction: 'outbound', replyToId,
     origin: 'local', originNodeId: config.nodeId,
@@ -152,7 +156,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     // mailbox it lands in (the owner, or the agent itself for your own agent — see above).
     await storage.createDirectMessage({
       id, ownerGhii: inboundOwner, conversationId, subject, senderGhii, recipientGhii,
-      body, attachments, interactive, status: 'delivered', direction: 'inbound',
+      body, attachments, interactive, broadcastId, respondable, status: 'delivered', direction: 'inbound',
       replyToId, origin: 'local', originNodeId: config.nodeId,
       createdAt: now, deliveredAt: now,
     });

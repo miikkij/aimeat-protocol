@@ -31,6 +31,8 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   if (row.subject) record.subject = row.subject as string;
   if (row.attachments) record.attachments = JSON.parse(row.attachments as string);
   if (row.interactive) record.interactive = JSON.parse(row.interactive as string);
+  if (row.broadcastId) record.broadcastId = row.broadcastId as string;
+  if (row.respondable != null) record.respondable = (row.respondable as number) === 1;
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
   if (row.deliveredAt) record.deliveredAt = row.deliveredAt as string;
@@ -55,9 +57,10 @@ function deserializeContact(row: Record<string, unknown>): ContactConsentRecord 
 export function createDirectMessage(db: Database.Database, record: DirectMessageRecord): DirectMessageRecord {
   db.prepare(
     `INSERT INTO direct_messages
-     (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive, status,
+     (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive,
+      broadcastId, respondable, status,
       direction, replyToId, origin, originNodeId, error, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -68,6 +71,8 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.body,
     record.attachments ? JSON.stringify(record.attachments) : null,
     record.interactive ? JSON.stringify(record.interactive) : null,
+    record.broadcastId ?? null,
+    record.respondable == null ? null : (record.respondable ? 1 : 0),
     record.status,
     record.direction,
     record.replyToId ?? null,
@@ -166,6 +171,15 @@ export function listAgentDmThread(
   const rows = db.prepare(`SELECT * FROM direct_messages WHERE ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`)
     .all(conversationId, agentGaii, agentGaii, perPage, offset) as Record<string, unknown>[];
   return { messages: rows.map(deserializeMessage), total };
+}
+
+/** All copies of a broadcast in the sender's mailbox (outbound questions/messages + inbound replies that
+ *  inherited the broadcastId), for the results/aggregation view. */
+export function listDmsByBroadcast(db: Database.Database, broadcastId: string, ownerGhii: string): DirectMessageRecord[] {
+  const rows = db.prepare(
+    'SELECT * FROM direct_messages WHERE broadcastId = ? AND ownerGhii = ? ORDER BY createdAt ASC',
+  ).all(broadcastId, ownerGhii) as Record<string, unknown>[];
+  return rows.map(deserializeMessage);
 }
 
 export function listConversations(
