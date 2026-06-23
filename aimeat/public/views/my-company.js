@@ -60,6 +60,74 @@ function OrdersList({ orders, view, empty }) {
   return html`<ul class="mc-order-list">${orders.map(o => html`<${OrderRow} key=${o.id} o=${o} view=${view} />`)}</ul>`;
 }
 
+/** Customers: who used the company's agents, which agents, how many times, total spend. */
+function CustomersPanel({ slug }) {
+  const [customers, setCustomers] = useState(null);
+  useEffect(() => {
+    apiGet(`/v1/orgs/${encodeURIComponent(slug)}/customers`).then(r => setCustomers(r.data?.customers ?? [])).catch(() => setCustomers([]));
+  }, [slug]);
+  if (customers === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  if (!customers.length) return html`<p class="mc-empty">${t('myCompany.noCustomers')}</p>`;
+  return html`
+    <ul class="mc-cust-list">
+      ${customers.map(c => html`
+        <li class="mc-cust" key=${c.buyerOwner || c.buyerGhii}>
+          <div class="mc-cust-head">
+            <span class="mc-cust-name">${c.buyerOwner || c.buyerGhii}</span>
+            <span class="mc-cust-spend">${c.totalCharged} ${t('myCompany.morsels')}</span>
+          </div>
+          <div class="mc-cust-meta">${t('myCompany.orderCount')}: ${c.orderCount} · ${t('myCompany.lastOrder')}: ${new Date(c.lastOrderAt).toLocaleDateString()}</div>
+          <div class="mc-off-meta">${Object.entries(c.agents).map(([a, n]) => html`<span class="mc-chip" key=${a}>🤖 ${a} ×${n}</span>`)}</div>
+        </li>`)}
+    </ul>`;
+}
+
+/** Members & roles: list members, invite by username, set role, remove. */
+function MembersPanel({ slug, creatorOwner }) {
+  const [members, setMembers] = useState(null);
+  const [owner, setOwner] = useState('');
+  const [role, setRole] = useState('member');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function load() { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch { setMembers([]); } }
+  useEffect(() => { load(); }, [slug]);
+  async function add(e) {
+    e.preventDefault(); setBusy(true); setErr('');
+    try { await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/members`, { owner: owner.trim().toLowerCase(), role }); setOwner(''); await load(); }
+    catch (e) { setErr(e.message || 'Failed'); } finally { setBusy(false); }
+  }
+  async function changeRole(m, r) { try { await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/members/${encodeURIComponent(m.owner)}`, { role: r }); await load(); } catch (e) { setErr(e.message || ''); } }
+  async function remove(m) { try { await apiDelete(`/v1/orgs/${encodeURIComponent(slug)}/members/${encodeURIComponent(m.owner)}`); await load(); } catch (e) { setErr(e.message || ''); } }
+  const roleOpts = html`
+    <option value="admin">${t('myCompany.roleAdmin')}</option>
+    <option value="member">${t('myCompany.roleMember')}</option>
+    <option value="visitor">${t('myCompany.roleVisitor')}</option>`;
+  if (members === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  return html`
+    <ul class="mc-member-list">
+      ${members.map(m => {
+        const isCreator = m.owner === creatorOwner;
+        return html`
+          <li class="mc-member" key=${m.owner}>
+            <span class="mc-member-name">${m.owner}${isCreator ? html` <span class="mc-mini">(${t('myCompany.creator')})</span>` : ''}</span>
+            <div class="flex-row-wrap">
+              <select class="input-field input-sm" value=${m.role} disabled=${isCreator} onChange=${(e) => changeRole(m, e.target.value)}>${roleOpts}</select>
+              ${!isCreator && html`<button class="btn-ghost btn-sm mc-remove" onClick=${() => remove(m)}>${t('myCompany.removeMember')}</button>`}
+            </div>
+          </li>`;
+      })}
+    </ul>
+    ${err && html`<p class="mc-error">${err}</p>`}
+    <form class="mc-form" onSubmit=${add}>
+      <h3 class="mc-form-title">${t('myCompany.addMember')}</h3>
+      <div class="flex-row-wrap mc-manage-row">
+        <input class="input-field input-sm" placeholder=${t('myCompany.memberUsername')} value=${owner} onInput=${(e) => setOwner(e.target.value)} required />
+        <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>${roleOpts}</select>
+        <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
+      </div>
+    </form>`;
+}
+
 /** A catalog entry: the SAME offer card format as profile>offers + owner controls + an order box. */
 function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
   const offer = o.offer;
@@ -219,6 +287,7 @@ export default function MyCompanyView() {
   const [offerings, setOfferings] = useState([]);
   const [ordersReceived, setOrdersReceived] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [subTab, setSubTab] = useState('catalog');
   const [myOrders, setMyOrders] = useState(null);
   const [showMyOrders, setShowMyOrders] = useState(false);
   const [errMsg, setErrMsg] = useState('');
@@ -242,7 +311,7 @@ export default function MyCompanyView() {
     catch { setOrdersReceived([]); }
   }
   async function openOrg(org) {
-    setSelected(org); setOfferings([]); setOrdersReceived([]); setShowPicker(false);
+    setSelected(org); setOfferings([]); setOrdersReceived([]); setShowPicker(false); setSubTab('catalog');
     try {
       const res = await apiGet(`/v1/orgs/${encodeURIComponent(org.creatorOwner)}/${encodeURIComponent(org.slug)}/offerings`);
       setOfferings(res.data?.offerings ?? []);
@@ -326,20 +395,25 @@ export default function MyCompanyView() {
               <span class="mc-wallet">${t('myCompany.wallet')}: <strong>${selected.wallet?.balance ?? 0}</strong> ${t('myCompany.morsels')}</span>
             </div>
 
-            <div class="mc-section-head">
-              <h3 class="mc-form-title">${t('myCompany.offerings')}</h3>
-              <button class="btn-outline btn-sm" onClick=${() => setShowPicker(s => !s)}>${showPicker ? t('myCompany.done') : t('myCompany.addFromOffers')}</button>
+            <div class="mc-subtabs">
+              ${['catalog', 'orders', 'customers', 'members'].map(id => html`
+                <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
             </div>
-            ${showPicker && html`<div class="mc-picker"><p class="mc-pick-hint">${t('myCompany.pickHint')}</p><${OfferPicker} slug=${selected.slug} alreadyListed=${listedKeys} onListed=${() => openOrg(selected)} /></div>`}
-            ${offerings.length === 0 && !showPicker && html`<p class="mc-empty">${t('myCompany.noOfferings')}</p>`}
-            <ul class="mc-off-list">
-              ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
-            </ul>
 
-            <div class="mc-orders-received">
-              <h3 class="mc-form-title">${t('myCompany.ordersReceived')}</h3>
-              <${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />
-            </div>
+            ${subTab === 'catalog' && html`
+              <div class="mc-section-head">
+                <h3 class="mc-form-title">${t('myCompany.offerings')}</h3>
+                <button class="btn-outline btn-sm" onClick=${() => setShowPicker(s => !s)}>${showPicker ? t('myCompany.done') : t('myCompany.addFromOffers')}</button>
+              </div>
+              ${showPicker && html`<div class="mc-picker"><p class="mc-pick-hint">${t('myCompany.pickHint')}</p><${OfferPicker} slug=${selected.slug} alreadyListed=${listedKeys} onListed=${() => openOrg(selected)} /></div>`}
+              ${offerings.length === 0 && !showPicker && html`<p class="mc-empty">${t('myCompany.noOfferings')}</p>`}
+              <ul class="mc-off-list">
+                ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
+              </ul>`}
+
+            ${subTab === 'orders' && html`<${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />`}
+            ${subTab === 'customers' && html`<${CustomersPanel} slug=${selected.slug} />`}
+            ${subTab === 'members' && html`<${MembersPanel} slug=${selected.slug} creatorOwner=${selected.creatorOwner} />`}
           `}
         </section>
       </div>

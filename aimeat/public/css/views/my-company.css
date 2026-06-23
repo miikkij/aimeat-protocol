@@ -236,6 +236,24 @@
 .of-card-head--static { cursor: default; }
 .mc-not-callable { color: var(--text-muted); font-size: 0.75rem; margin: 0.2rem 0; }
 
+.mc-subtabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin: 0.5rem 0 1rem; flex-wrap: wrap; }
+.mc-subtab {
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 0.4rem 0.7rem; cursor: pointer; color: var(--text-dim); font-size: 0.9rem; font-weight: 600;
+}
+.mc-subtab:hover { color: var(--text); }
+.mc-subtab.active { color: var(--accent-bright); border-bottom-color: var(--accent); }
+
+.mc-cust-list, .mc-member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.mc-cust { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; }
+.mc-cust-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.mc-cust-name { color: var(--text); font-weight: 600; }
+.mc-cust-spend { color: var(--accent-bright); font-weight: 600; }
+.mc-cust-meta { color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0.4rem; }
+
+.mc-member { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
+.mc-member-name { color: var(--text); font-weight: 600; }
+
 .mc-header-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 
 .mc-orders-received { border-top: 1px solid var(--border); margin-top: 1.25rem; padding-top: 1rem; }
