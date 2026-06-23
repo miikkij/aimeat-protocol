@@ -86,6 +86,7 @@
   <link rel="stylesheet" href="/css/views/aimeat-os.css">
   <link rel="stylesheet" href="/css/views/openclaw.css">
   <link rel="stylesheet" href="/css/views/portfolio.css">
+  <link rel="stylesheet" href="/css/views/members.css">
   <link rel="stylesheet" href="/css/views/inbox.css">
   <link rel="stylesheet" href="/css/components/tags.css">
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
@@ -350,6 +351,7 @@
       '/v1/openclaw':    () => import('/views/openclaw.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
+      '/v1/members':     () => import('/views/members.js' + B),
       '/v1/admin':       () => import('/views/admin.js' + B),
       '/v1/help':        () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
@@ -512,6 +514,7 @@
       { id: 'try',        path: '/v1/portal',          key: 'nav.try' },
       { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works' },
       { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business' },
+      { id: 'members',    path: '/v1/members',         key: 'nav.members',    fallback: 'Members' },
       { id: 'devView',    path: '/v1/portal?view=dev', key: 'nav.devView',    matchActive: false },
       { id: 'help',       path: '/v1/help',            key: 'nav.help' },
     ];
