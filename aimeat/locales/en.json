@@ -527,7 +527,29 @@
     "themeToLight": "Switch to light mode",
     "howItWorks": "How it works",
     "business": "For your business",
-    "myCompany": "My Company"
+    "myCompany": "My Company",
+    "companies": "Companies"
+  },
+  "companies": {
+    "title": "Companies",
+    "desc": "Browse companies on this node and order their agents' offerings.",
+    "directory": "Directory",
+    "none": "No companies yet.",
+    "offeringsShort": "offerings",
+    "selectHint": "Pick a company to see its profile and catalogue.",
+    "businessId": "Business ID (Y-tunnus)",
+    "catalogue": "Offerings for sale",
+    "noOfferings": "This company has no offerings listed yet.",
+    "callable": "Runs instantly — result appears below.",
+    "viaInbox": "Handled by the seller's agent — track it in My orders.",
+    "usePlaceholder": "Describe what you need (optional)…",
+    "order": "Order",
+    "morsels": "morsels",
+    "loginToOrder": "Log in to order",
+    "orderResult": "Done — result below.",
+    "orderTask": "Order received — the seller's agent {agent} will handle it.",
+    "charged": "Charged {n} morsels",
+    "enterpriseRequired": "The company directory requires the AIMEAT Enterprise edition. This node runs the free Community edition."
   },
   "myCompany": {
     "title": "My Company",

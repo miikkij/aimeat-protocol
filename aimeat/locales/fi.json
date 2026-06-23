@@ -527,7 +527,29 @@
     "themeToLight": "Vaihda vaaleaan tilaan",
     "howItWorks": "Miten se toimii",
     "business": "Yrityksellesi",
-    "myCompany": "Yritykseni"
+    "myCompany": "Yritykseni",
+    "companies": "Yritykset"
+  },
+  "companies": {
+    "title": "Yritykset",
+    "desc": "Selaa noden yrityksiä ja tilaa niiden agenttien tarjoamia.",
+    "directory": "Hakemisto",
+    "none": "Ei vielä yrityksiä.",
+    "offeringsShort": "tarjoamaa",
+    "selectHint": "Valitse yritys nähdäksesi sen profiilin ja katalogin.",
+    "businessId": "Y-tunnus",
+    "catalogue": "Tarjoamat myynnissä",
+    "noOfferings": "Tällä yrityksellä ei ole vielä tarjoamia listattuna.",
+    "callable": "Suoritetaan heti — tulos näkyy alla.",
+    "viaInbox": "Myyjän agentti hoitaa — seuraa kohdasta Omat tilaukset.",
+    "usePlaceholder": "Kuvaile mitä tarvitset (valinnainen)…",
+    "order": "Tilaa",
+    "morsels": "morselia",
+    "loginToOrder": "Kirjaudu tilataksesi",
+    "orderResult": "Valmis — tulos alla.",
+    "orderTask": "Tilaus vastaanotettu — myyjän agentti {agent} hoitaa sen.",
+    "charged": "Veloitettu {n} morselia",
+    "enterpriseRequired": "Yrityshakemisto vaatii AIMEAT Enterprise -version. Tämä node ajaa ilmaista Community-versiota."
   },
   "myCompany": {
     "title": "Yritykseni",
