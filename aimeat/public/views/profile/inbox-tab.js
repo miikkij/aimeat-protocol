@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.8.1 -- 2026-06-23 -- Perf: cache resolved attachment URLs per conversation. A refresh / new message
+ *     reused to re-resolve EVERY attachment (fresh presigned URL each time → new <img src> → the whole
+ *     image gallery re-downloaded on every send/reply — hundreds of MB on an image-heavy thread). Now only
+ *     not-yet-resolved attachments are fetched; existing URLs stay stable so the browser doesn't re-fetch.
  *   v1.8.0 -- 2026-06-23 -- Send-to-many (broadcast): a 📢 Broadcast compose with a recipient-chip picker
  *     (+ Share Group audience) and a mode toggle — Message (repliable) vs Announcement (read-only). An
  *     announcement thread hides the reply composer for the recipient.
@@ -514,6 +518,9 @@ export default function InboxTab({ showToast }) {
   const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
   const [awaitingDrafts, setAwaitingDrafts] = useState({}); // tr.id → suggested reply body (for the bubble)
   const msgsRef = useRef(null);
+  // Resolved attachment URLs cached per conversation, so a refresh / new message reuses them instead of
+  // re-resolving (re-downloading) every image. { convId, map: { attachmentId → presignedUrl } }.
+  const urlCacheRef = useRef({ convId: null, map: {} });
   // Ids the user just cancelled — kept so a stale re-fetch (replica lag on a multi-node node) can't
   // re-add a row the user already dismissed until the cancel has propagated.
   const dismissedRef = useRef(new Set());
@@ -631,10 +638,16 @@ export default function InboxTab({ showToast }) {
     if (!conv) return;
     const msgs = (await messages.getConversation(conv.conversationId).catch(() => [])).slice().reverse();
     setThread(msgs);
+    // REUSE already-resolved attachment URLs for the SAME conversation: a refresh / new message must NOT
+    // re-resolve (and thus re-download via a fresh presigned URL) every existing image. Only fetch URLs
+    // for attachments we haven't resolved yet. A different conversation starts a fresh cache.
+    const sameConv = urlCacheRef.current.convId === conv.conversationId;
+    const prev = sameConv ? urlCacheRef.current.map : {};
     const map = {};
     await Promise.all(msgs.flatMap(m => (m.attachments || [])
       .filter(a => !a.inline)
       .map(async a => {
+        if (prev[a.id]) { map[a.id] = prev[a.id]; return; } // keep the stable URL → browser won't re-fetch
         // Inbound: only the recipient's duplicated local copy is fetchable (after accept). Outbound:
         // the sender owns the original storage key, so resolve that — you can view/download what you sent.
         const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
@@ -643,6 +656,7 @@ export default function InboxTab({ showToast }) {
         const u = await messages.attachmentUrl(key).catch(() => null);
         if (u) map[a.id] = u;
       })));
+    urlCacheRef.current = { convId: conv.conversationId, map };
     setUrlMap(map);
     if (markRead) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
