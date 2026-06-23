@@ -19,7 +19,8 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
@@ -59,13 +60,18 @@ function OrdersList({ orders, view, empty }) {
   return html`<ul class="mc-order-list">${orders.map(o => html`<${OrderRow} key=${o.id} o=${o} view=${view} />`)}</ul>`;
 }
 
-/** A catalog entry: the SAME offer card format as profile>offers + an order box. */
-function OfferingCard({ o, orgOwner, slug, onOrdered }) {
+/** A catalog entry: the SAME offer card format as profile>offers + owner controls + an order box. */
+function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
   const offer = o.offer;
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
+  // Owner controls — edit the underlying offer's price + visibility, or remove from the catalog.
+  const [price, setPrice] = useState(offer.price?.morsels ?? 0);
+  const [vis, setVis] = useState(offer.visibility ?? 'private');
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
 
   async function order() {
     setBusy(true); setErr(''); setResult(null);
@@ -78,7 +84,43 @@ function OfferingCard({ o, orgOwner, slug, onOrdered }) {
     finally { setBusy(false); }
   }
 
+  async function saveBilling() {
+    setSaving(true); setErr(''); setSavedMsg('');
+    try {
+      const p = Number(price) > 0 ? { morsels: Math.floor(Number(price)), unit: 'per-call' } : null;
+      await setOfferBilling(o.agentName, o.offerId, { price: p, visibility: vis });
+      setSavedMsg(t('myCompany.saved'));
+      if (onChanged) await onChanged();
+    } catch (e) { setErr(e.message || 'Save failed'); }
+    finally { setSaving(false); }
+  }
+
+  async function removeFromCatalog() {
+    setSaving(true); setErr('');
+    try {
+      await apiDelete(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId });
+      if (onChanged) await onChanged();
+    } catch (e) { setErr(e.message || 'Remove failed'); setSaving(false); }
+  }
+
   const actions = html`
+    <div class="mc-manage">
+      <span class="of-label">${t('myCompany.manage')}</span>
+      <div class="flex-row-wrap mc-manage-row">
+        <select class="input-field input-sm" value=${vis} onChange=${(e) => setVis(e.target.value)}>
+          <option value="private">${t('myCompany.visPrivate')}</option>
+          <option value="unlisted">${t('myCompany.visUnlisted')}</option>
+          <option value="public">${t('myCompany.visPublic')}</option>
+        </select>
+        <input class="input-field input-sm mc-price-input" type="number" min="0" value=${price} onInput=${(e) => setPrice(e.target.value)} />
+        <span class="mc-mini">${t('myCompany.morsels')}</span>
+        <button class="btn-outline btn-sm" disabled=${saving} onClick=${saveBilling}>${t('myCompany.savePrice')}</button>
+        <button class="btn-ghost btn-sm mc-remove" disabled=${saving} onClick=${removeFromCatalog}>${t('myCompany.removeFromCatalog')}</button>
+      </div>
+      ${savedMsg && html`<span class="mc-mini mc-saved">${savedMsg}</span>`}
+      ${vis === 'private' && html`<div class="mc-mini mc-warn">${t('myCompany.privateHint')}</div>`}
+    </div>
+
     <div class="mc-not-callable">${o.callable ? t('myCompany.callable') : t('myCompany.viaInbox')}</div>
     <textarea class="input-field input-sm of-input" rows="2" value=${input}
       placeholder=${t('myCompany.usePlaceholder')} onInput=${(e) => setInput(e.target.value)}></textarea>
@@ -99,39 +141,49 @@ function OfferingCard({ o, orgOwner, slug, onOrdered }) {
 }
 
 function OfferPicker({ slug, alreadyListed, onListed }) {
-  const [myOffers, setMyOffers] = useState(null);
+  const [agents, setAgents] = useState(null); // [{ name, offers: [] }]
   const [busy, setBusy] = useState('');
   useEffect(() => {
-    apiGet('/v1/offers').then(r => {
-      const flat = [];
-      for (const a of (r.data?.agents ?? [])) for (const off of (a.offers ?? [])) flat.push({ agentName: a.agent, offer: off });
-      setMyOffers(flat);
-    }).catch(() => setMyOffers([]));
+    Promise.all([apiGet('/v1/offers').catch(() => ({})), apiGet('/v1/agents').catch(() => ({}))]).then(([offR, agR]) => {
+      const offersByAgent = {};
+      for (const a of (offR.data?.agents ?? [])) offersByAgent[a.agent] = a.offers ?? [];
+      const names = (agR.data?.agents ?? agR.data ?? []).map(a => a.name || String(a.gaii || '').split('#')[0]).filter(Boolean);
+      for (const k of Object.keys(offersByAgent)) if (!names.includes(k)) names.push(k);
+      setAgents(names.map(name => ({ name, offers: offersByAgent[name] ?? [] })));
+    });
   }, []);
-  async function list(agentName, offer) {
-    setBusy(agentName + '/' + offer.id);
-    try { await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName, offerId: offer.id }); await onListed(); }
+  async function list(agentName, offerId) {
+    setBusy(agentName + '/' + offerId);
+    try { await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName, offerId }); await onListed(); }
     catch (e) { alert(e.message || 'Failed'); }
     finally { setBusy(''); }
   }
-  if (myOffers === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
-  if (myOffers.length === 0) return html`<p class="mc-empty">${t('myCompany.noOffersToList')}</p>`;
+  if (agents === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  if (agents.length === 0) return html`<p class="mc-empty">${t('myCompany.noOffersToList')}</p>`;
   return html`
-    <ul class="mc-pick-list">
-      ${myOffers.map(({ agentName, offer }) => {
-        const key = agentName + '/' + offer.id;
-        const listed = alreadyListed.has(key);
-        return html`
-          <li class="mc-pick-item" key=${key}>
-            <div>
-              <div class="mc-off-title">${offer.title}</div>
-              <div class="mc-off-meta"><span class="mc-chip">🤖 ${agentName}</span>${offer.price?.morsels ? html`<span class="mc-chip">${offer.price.morsels} ${t('myCompany.morsels')}</span>` : null}${offer.deliverable?.format ? html`<span class="mc-chip">📦 ${offer.deliverable.format}</span>` : null}</div>
-            </div>
-            ${listed ? html`<span class="mc-listed">${t('myCompany.listed')}</span>`
-              : html`<button class="btn-outline" disabled=${busy === key} onClick=${() => list(agentName, offer)}>${t('myCompany.putUpForSale')}</button>`}
-          </li>`;
-      })}
-    </ul>`;
+    <div class="mc-pick-agents">
+      ${agents.map(ag => html`
+        <div class="mc-pick-agent" key=${ag.name}>
+          <div class="mc-pick-agent-name">🤖 ${ag.name}</div>
+          ${ag.offers.length === 0
+            ? html`<div class="mc-mini mc-pick-none">${t('myCompany.agentNoOfferings')}</div>`
+            : html`<ul class="mc-pick-list">
+                ${ag.offers.map(offer => {
+                  const key = ag.name + '/' + offer.id;
+                  const listed = alreadyListed.has(key);
+                  return html`
+                    <li class="mc-pick-item" key=${key}>
+                      <div>
+                        <div class="mc-off-title">${offer.title}</div>
+                        <div class="mc-off-meta">${offer.price?.morsels ? html`<span class="mc-chip">${offer.price.morsels} ${t('myCompany.morsels')}</span>` : null}${offer.deliverable?.format ? html`<span class="mc-chip">📦 ${offer.deliverable.format}</span>` : null}<span class="mc-chip">${offer.visibility || 'private'}</span></div>
+                      </div>
+                      ${listed ? html`<span class="mc-listed">${t('myCompany.listed')}</span>`
+                        : html`<button class="btn-outline btn-sm" disabled=${busy === key} onClick=${() => list(ag.name, offer.id)}>${t('myCompany.putUpForSale')}</button>`}
+                    </li>`;
+                })}
+              </ul>`}
+        </div>`)}
+    </div>`;
 }
 
 export default function MyCompanyView() {
@@ -257,7 +309,7 @@ export default function MyCompanyView() {
             ${showPicker && html`<div class="mc-picker"><p class="mc-pick-hint">${t('myCompany.pickHint')}</p><${OfferPicker} slug=${selected.slug} alreadyListed=${listedKeys} onListed=${() => openOrg(selected)} /></div>`}
             ${offerings.length === 0 && !showPicker && html`<p class="mc-empty">${t('myCompany.noOfferings')}</p>`}
             <ul class="mc-off-list">
-              ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} onOrdered=${afterOrder} />`)}
+              ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
             </ul>
 
             <div class="mc-orders-received">
