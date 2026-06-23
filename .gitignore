@@ -124,3 +124,6 @@ __pycache__/
 .venv/
 venv/
 docs/internal/
+# Local dev-server log (from PowerShell pnpm dev redirect)
+.devlog.txt
+.devlog.err.txt
