@@ -487,6 +487,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/openclaw',
     '/v1/classic',
     '/v1/portfolio',
+    '/v1/members',
     '/v1/admin',
     '/v1/help',
     '/v1/publicknowledgeviewer',

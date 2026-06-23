@@ -110,6 +110,35 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /**
+   * GET /v1/portfolio/members
+   * Public showcase: node members (owners) who have PUBLISHED a portfolio (portfolio.config.enabled).
+   * Cached briefly — listing all owners + reading each portfolio.config is O(owners). Doubles as the
+   * node's "discover people here" list.
+   */
+  let membersCache: { at: number; data: Array<Record<string, unknown>> } | null = null;
+  const MEMBERS_TTL_MS = 60_000;
+  router.get('/v1/portfolio/members', optionalAuth(), async (_req, res) => {
+    if (membersCache && Date.now() - membersCache.at < MEMBERS_TTL_MS) {
+      res.json(success(config.nodeId, { members: membersCache.data, total: membersCache.data.length }));
+      return;
+    }
+    const ghiis = await storage.listGHIIs();
+    const members: Array<Record<string, unknown>> = [];
+    for (const g of ghiis) {
+      try {
+        const agents = await storage.getAgentsByOwner(g.username);
+        if (!agents.length) continue;
+        const cfg = await storage.getMemory(agents[0].gaii, 'portfolio.config');
+        if (cfg?.value && (cfg.value as Record<string, unknown>).enabled) {
+          members.push({ username: g.username, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
+        }
+      } catch { /* skip a bad owner record */ }
+    }
+    membersCache = { at: Date.now(), data: members };
+    res.json(success(config.nodeId, { members, total: members.length }));
+  });
+
+  /**
    * GET /v1/portfolio/config
    * Returns the user's portfolio configuration from memory.
    */
