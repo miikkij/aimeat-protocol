@@ -19,7 +19,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
@@ -67,11 +67,14 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
-  // Owner controls — edit the underlying offer's price + visibility, or remove from the catalog.
+  // Admin controls — view the selling config; click Edit to change price/visibility, then Save.
+  const [editMode, setEditMode] = useState(false);
   const [price, setPrice] = useState(offer.price?.morsels ?? 0);
   const [vis, setVis] = useState(offer.visibility ?? 'private');
   const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState('');
+
+  const visLabel = (v) => t('myCompany.vis' + (v || 'private').charAt(0).toUpperCase() + (v || 'private').slice(1));
+  const ownerOf = (ghii) => String(ghii || '').split('@')[0];
 
   async function order() {
     setBusy(true); setErr(''); setResult(null);
@@ -85,11 +88,13 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
   }
 
   async function saveBilling() {
-    setSaving(true); setErr(''); setSavedMsg('');
+    setSaving(true); setErr('');
     try {
       const p = Number(price) > 0 ? { morsels: Math.floor(Number(price)), unit: 'per-call' } : null;
       await setOfferBilling(o.agentName, o.offerId, { price: p, visibility: vis });
-      setSavedMsg(t('myCompany.saved'));
+      // record who last edited the company's listing (surfaced as "last saved by")
+      await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId }).catch(() => {});
+      setEditMode(false);
       if (onChanged) await onChanged();
     } catch (e) { setErr(e.message || 'Save failed'); }
     finally { setSaving(false); }
@@ -103,24 +108,43 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
     } catch (e) { setErr(e.message || 'Remove failed'); setSaving(false); }
   }
 
-  const actions = html`
-    <div class="mc-manage">
-      <span class="of-label">${t('myCompany.manage')}</span>
-      <div class="flex-row-wrap mc-manage-row">
-        <select class="input-field input-sm" value=${vis} onChange=${(e) => setVis(e.target.value)}>
-          <option value="private">${t('myCompany.visPrivate')}</option>
-          <option value="unlisted">${t('myCompany.visUnlisted')}</option>
-          <option value="public">${t('myCompany.visPublic')}</option>
-        </select>
-        <input class="input-field input-sm mc-price-input" type="number" min="0" value=${price} onInput=${(e) => setPrice(e.target.value)} />
-        <span class="mc-mini">${t('myCompany.morsels')}</span>
-        <button class="btn-outline btn-sm" disabled=${saving} onClick=${saveBilling}>${t('myCompany.savePrice')}</button>
-        <button class="btn-ghost btn-sm mc-remove" disabled=${saving} onClick=${removeFromCatalog}>${t('myCompany.removeFromCatalog')}</button>
-      </div>
-      ${savedMsg && html`<span class="mc-mini mc-saved">${savedMsg}</span>`}
-      ${vis === 'private' && html`<div class="mc-mini mc-warn">${t('myCompany.privateHint')}</div>`}
-    </div>
+  const manage = editMode
+    ? html`
+      <div class="mc-manage">
+        <span class="of-label">${t('myCompany.manage')}</span>
+        <div class="flex-row-wrap mc-manage-row">
+          <select class="input-field input-sm" value=${vis} onChange=${(e) => setVis(e.target.value)}>
+            <option value="private">${t('myCompany.visPrivate')}</option>
+            <option value="unlisted">${t('myCompany.visUnlisted')}</option>
+            <option value="public">${t('myCompany.visPublic')}</option>
+          </select>
+          <input class="input-field input-sm mc-price-input" type="number" min="0" value=${price} onInput=${(e) => setPrice(e.target.value)} />
+          <span class="mc-mini">${t('myCompany.morsels')}</span>
+          <button class="btn-primary btn-sm" disabled=${saving} onClick=${saveBilling}>${t('myCompany.savePrice')}</button>
+          <button class="btn-ghost btn-sm" disabled=${saving} onClick=${() => { setEditMode(false); setPrice(offer.price?.morsels ?? 0); setVis(offer.visibility ?? 'private'); }}>${t('myCompany.cancel')}</button>
+        </div>
+        ${vis === 'private' && html`<div class="mc-mini mc-warn">${t('myCompany.privateHint')}</div>`}
+      </div>`
+    : html`
+      <div class="mc-manage">
+        <div class="mc-manage-head">
+          <span class="of-label">${t('myCompany.manage')}</span>
+          <div class="flex-row-wrap">
+            <button class="btn-outline btn-sm" onClick=${() => setEditMode(true)}>${t('myCompany.edit')}</button>
+            <button class="btn-ghost btn-sm mc-remove" disabled=${saving} onClick=${removeFromCatalog}>${t('myCompany.removeFromCatalog')}</button>
+          </div>
+        </div>
+        <div class="mc-config">
+          <span><b>${t('myCompany.visibilityLabel')}:</b> ${visLabel(offer.visibility)}</span>
+          <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}</span>
+          ${o.lastEditedBy
+            ? html`<span class="mc-mini">${t('myCompany.lastSavedBy')}: <b>${ownerOf(o.lastEditedBy)}</b>${o.lastEditedAt ? ` · ${new Date(o.lastEditedAt).toLocaleString()}` : ''}</span>`
+            : html`<span class="mc-mini">${t('myCompany.neverEdited')}</span>`}
+        </div>
+      </div>`;
 
+  const actions = html`
+    ${manage}
     <div class="mc-not-callable">${o.callable ? t('myCompany.callable') : t('myCompany.viaInbox')}</div>
     <textarea class="input-field input-sm of-input" rows="2" value=${input}
       placeholder=${t('myCompany.usePlaceholder')} onInput=${(e) => setInput(e.target.value)}></textarea>

@@ -223,6 +223,9 @@
 .mc-pick-none { color: var(--text-muted); }
 
 .mc-manage { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; margin: 0.4rem 0 0.6rem; }
+.mc-manage-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.mc-config { display: flex; flex-direction: column; gap: 0.2rem; color: var(--text-dim); font-size: 0.85rem; }
+.mc-config b { color: var(--text); }
 .mc-manage-row { align-items: center; gap: 0.4rem; }
 .mc-price-input { width: 5rem; }
 .mc-saved { color: var(--success); }
