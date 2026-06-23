@@ -23765,7 +23765,7 @@ paths:
               properties:
                 to: { type: array, items: { type: string }, description: Recipient identities. }
                 group_id: { type: string, description: A Share Group whose members are the audience. }
-                audience: { type: string, enum: [node-users], description: 'All node users (OPERATOR-only).' }
+                audience: { type: string, enum: [node-users, federation-users], description: 'All node users, or all owners across the federation (OPERATOR-only).' }
                 mode: { type: string, enum: [broadcast, announcement], default: broadcast }
                 body: { type: string }
                 attachments: { type: array, items: { type: object } }

@@ -43,6 +43,8 @@ export interface SendMessageInput {
   broadcastId?: string;
   /** false = an announcement (recipient cannot reply). Omitted/true = normal. Travels with the message. */
   respondable?: boolean;
+  /** Auto-accept the first-contact gate (operator announcements → land in inbox, not requests). */
+  skipContactGate?: boolean;
 }
 
 /**
@@ -146,7 +148,9 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       // Resolve / seed the recipient-side contact state (first-contact gate) under the OWNER's inbox.
       let contact = await storage.getContact(deliveryGhii, senderGhii);
       if (!contact) {
-        const autoAccept = isSameOwner(senderGhii, deliveryGhii);
+        // skipContactGate (operator announcements) auto-accepts so a node/federation-wide notice lands
+        // in the inbox instead of the first-contact requests bucket.
+        const autoAccept = isSameOwner(senderGhii, deliveryGhii) || !!input.skipContactGate;
         contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
       }
       isRequest = contact.state === 'pending';

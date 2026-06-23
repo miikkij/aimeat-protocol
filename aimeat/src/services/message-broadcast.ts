@@ -17,14 +17,18 @@ import { randomUUID } from 'node:crypto';
 import type { DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { DeliveryCtx } from './message-delivery.js';
 import { sendDirectMessage } from './message-send.js';
+import { sign } from '../auth/keypair.js';
+import { logger } from '../utils/logger.js';
 
 export interface AudienceSelector {
   /** Explicit recipient identities (owner@node, agent#owner@node, eco:app#owner@node). */
   to?: string[];
   /** A Share Group id whose members become recipients (a reusable distribution list). */
   groupId?: string;
-  /** 'node-users' = every human owner on this node (OPERATOR ONLY — gate at the route). */
-  audience?: 'node-users';
+  /** 'node-users' = every human owner on this node; 'federation-users' = that PLUS every owner on each
+   *  active peer (delivered by fanning the broadcast out to peers — see broadcastToFederation). Both
+   *  OPERATOR-ONLY (gate at the route). resolveAudience returns only the LOCAL owners for either. */
+  audience?: 'node-users' | 'federation-users';
 }
 
 export interface BroadcastInput {
@@ -34,6 +38,8 @@ export interface BroadcastInput {
   body?: string;
   attachments?: DirectMessageAttachment[];
   interactive?: InteractivePayload;
+  /** Auto-accept first contact (operator announcements land in inbox, not requests). */
+  skipContactGate?: boolean;
 }
 
 export interface BroadcastResult {
@@ -53,8 +59,8 @@ export async function resolveAudience(ctx: DeliveryCtx, senderGhii: string, sel:
     const group = await ctx.storage.getSharingGroup(sel.groupId);
     if (group) for (const m of group.members) set.add(m.identifier);
   }
-  if (sel.audience === 'node-users') {
-    const ghiis = await ctx.storage.listGHIIs();
+  if (sel.audience === 'node-users' || sel.audience === 'federation-users') {
+    const ghiis = await ctx.storage.listGHIIs();   // local owners; peers are reached via broadcastToFederation
     for (const g of ghiis) if (g.ghii) set.add(g.ghii);
   }
   set.delete(senderGhii); // never broadcast to yourself
@@ -79,6 +85,7 @@ export async function sendBroadcast(ctx: DeliveryCtx, input: BroadcastInput): Pr
         interactive: input.interactive,
         broadcastId,
         respondable,
+        skipContactGate: input.skipContactGate,
       });
       if (result.ok) sent++;
       else failed.push({ recipient: recipientGhii, code: result.code });
@@ -87,4 +94,46 @@ export async function sendBroadcast(ctx: DeliveryCtx, input: BroadcastInput): Pr
     }
   }
   return { broadcastId, sent, failed };
+}
+
+/** Delegated federation broadcast: send the announcement to each ACTIVE peer's /v1/federation/broadcast
+ *  (signed with the node key). Each peer enumerates ITS OWN owners and delivers locally — so one frame
+ *  per peer, not one message per federation user, and peer autonomy is preserved (a peer accepts only
+ *  from active peers). Returns how many peers accepted it. */
+export async function broadcastToFederation(
+  ctx: DeliveryCtx,
+  input: { senderGhii: string; mode: 'broadcast' | 'announcement'; body?: string; interactive?: InteractivePayload; broadcastId: string },
+): Promise<{ peers: number }> {
+  const { config, storage, peers } = ctx;
+  const active = [...peers.values()].filter(p => p.status === 'active' && p.peerMode !== 'private');
+  if (!active.length) return { peers: 0 };
+  const nodeKey = await storage.getNodeKey();
+  let count = 0;
+  for (const peer of active) {
+    try {
+      const payload = {
+        source_node: config.nodeId,
+        broadcast: {
+          broadcastId: input.broadcastId,
+          senderGhii: input.senderGhii,
+          body: input.body ?? '',
+          interactive: input.interactive ?? null,
+          respondable: input.mode !== 'announcement',
+          createdAt: new Date().toISOString(),
+        },
+        timestamp: new Date().toISOString(),
+      };
+      const signature = nodeKey?.privateKey ? await sign(nodeKey.privateKey, JSON.stringify(payload)) : undefined;
+      const resp = await fetch(`${peer.url}/v1/federation/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
+        body: JSON.stringify({ ...payload, signature }),
+        signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5000),
+      });
+      if (resp.ok) count++;
+    } catch (err) {
+      logger.warn('Federation broadcast to peer failed', { peer: peer.nodeId, error: (err as Error).message });
+    }
+  }
+  return { peers: count };
 }

@@ -25,7 +25,9 @@
   "inbox.bcSend": "Lähetä kaikille",
   "inbox.bcNoRecipients": "Lisää vähintään yksi vastaanottaja tai ryhmä",
   "inbox.bcSent": "Joukkoviesti lähetetty",
+  "inbox.bcNoAudience": "— Yleisö (valinnainen) —",
   "inbox.bcNodeUsers": "Kaikki solmun käyttäjät (operaattori)",
+  "inbox.bcFederationUsers": "Koko federaatio (operaattori)",
   "inbox.announcementNote": "Tiedote — vastaaminen ei ole käytössä",
   "inbox.bcTypeMessage": "Viesti",
   "inbox.bcTypePoll": "Kysely",
@@ -549,6 +551,16 @@
     "orderResult": "Valmis — tulos alla.",
     "orderTask": "Tilaus vastaanotettu — myyjän agentti {agent} hoitaa sen.",
     "charged": "Veloitettu {n} morselia",
+    "myOrders": "Omat tilaukset",
+    "noMyOrders": "Et ole vielä tilannut mitään.",
+    "done": "Valmis",
+    "free": "Ilmainen",
+    "fromCompany": "Yritys",
+    "stQueued": "Jonossa",
+    "stActive": "Käynnissä",
+    "stDone": "Valmis",
+    "stFailed": "Epäonnistui",
+    "stInstant": "Heti",
     "enterpriseRequired": "Yrityshakemisto vaatii AIMEAT Enterprise -version. Tämä node ajaa ilmaista Community-versiota."
   },
   "myCompany": {
@@ -637,7 +649,8 @@
     "commission": "Yrityksen komissio %",
     "commissionHint": "Yrityksen osuus jokaisesta myynnistä; loppu menee tarjoaman toteuttavalle jäsenelle. Oletus 20 %.",
     "settingsSaved": "Asetukset tallennettu ✓",
-    "saveSettings": "Tallenna asetukset"
+    "saveSettings": "Tallenna asetukset",
+    "receiptLabel": "Kuitti"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",

@@ -360,6 +360,38 @@ await test('9. Cross-node interactive question: the spec survives the wire + the
     assert(got?.interactive?.answers?.q1?.selected?.[0] === 'prod', `Alice reads the answer cross-node, got ${JSON.stringify(got?.interactive)}`);
 });
 
+console.log('\nPhase 6 -- Federation-wide operator broadcast');
+await test('10. Operator broadcasts to the whole federation; a peer owner receives it (inbox, non-respondable)', async () => {
+    const bUser = await registerOwnerOn(B!, `bcfed${ts}`); // a fresh B owner (no block)
+    // A's operator (setupOwner registered the node operator) broadcasts federation-wide.
+    const bc = await A!.json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${A!.ownerToken}` },
+        body: JSON.stringify({ audience: 'federation-users', mode: 'announcement', body: 'Federation-wide maintenance notice.' }),
+    });
+    assert(bc.status === 201, `broadcast ${bc.status}: ${JSON.stringify(bc.body)}`);
+    assert((bc.body.data.federation_peers ?? 0) >= 1, `expected federation_peers >= 1, got ${bc.body.data.federation_peers}`);
+    // The B owner receives it directly in their inbox (operator announcement bypasses the request gate).
+    let msg: any;
+    for (let i = 0; i < 25; i++) {
+        const inbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bUser.token}` } });
+        msg = (inbox.body?.data?.messages ?? []).find((m: any) => /maintenance notice/.test(m.body));
+        if (msg) break;
+        await sleep(150);
+    }
+    assert(msg !== undefined, 'B owner received the federation announcement in their inbox');
+    assert(msg.senderGhii === A!.ownerGhii, `from A operator, got ${msg.senderGhii}`);
+    assert(msg.respondable === false, 'an announcement is non-respondable');
+});
+
+await test('11. A non-operator cannot broadcast to the federation (403)', async () => {
+    const plain = await registerOwnerOn(A!, `bcplain${ts}`);
+    const bc = await A!.json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${plain.token}` },
+        body: JSON.stringify({ audience: 'federation-users', mode: 'announcement', body: 'nope' }),
+    });
+    assert(bc.status === 403, `expected 403 for a non-operator, got ${bc.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 
 // Cleanup

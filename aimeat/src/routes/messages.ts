@@ -35,7 +35,7 @@ import { emitChange } from '../services/event-bus.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
+import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -138,15 +138,18 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const input = parsed.data;
     const senderGhii = resolve(req);
 
-    // "all node users" is operator-only (a node-wide announcement is a privileged action).
-    if (input.audience === 'node-users' && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'The "all node users" audience is operator-only'));
+    // "all node users" and "all federation users" are operator-only (a node/federation-wide announcement
+    // is a privileged action). An operator broadcast also bypasses the first-contact gate (lands in inbox).
+    const isOperatorAudience = input.audience === 'node-users' || input.audience === 'federation-users';
+    if (isOperatorAudience && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'A node/federation-wide audience is operator-only'));
       return;
     }
 
     const recipients = (await resolveAudience(deliveryCtx, senderGhii, { to: input.to, groupId: input.group_id, audience: input.audience }))
       .filter(isAddressableRecipient);
-    if (recipients.length === 0) {
+    // federation-users still proceeds with no LOCAL recipients — peers deliver to their own owners.
+    if (recipients.length === 0 && input.audience !== 'federation-users') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid recipients in the audience'));
       return;
     }
@@ -154,10 +157,21 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
     const result = await sendBroadcast(deliveryCtx, {
       senderGhii, recipients, mode: input.mode, body: input.body, attachments, interactive: input.interactive,
+      skipContactGate: isOperatorAudience,
     });
+
+    // federation-users: fan the announcement out to each active peer (each delivers to its own owners).
+    let federationPeers = 0;
+    if (input.audience === 'federation-users') {
+      const fed = await broadcastToFederation(deliveryCtx, {
+        senderGhii, mode: input.mode, body: input.body, interactive: input.interactive, broadcastId: result.broadcastId,
+      });
+      federationPeers = fed.peers;
+    }
 
     res.status(201).json(success(config.nodeId, {
       broadcast_id: result.broadcastId, recipients: recipients.length, sent: result.sent, failed: result.failed,
+      federation_peers: federationPeers,
     }, [
       { description: 'View results', method: 'GET', url: `/v1/messages/broadcast/${result.broadcastId}` },
     ]));

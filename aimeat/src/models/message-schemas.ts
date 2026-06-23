@@ -100,7 +100,7 @@ export const MessageSendSchema = z.object({
 export const BroadcastSendSchema = z.object({
   to: z.array(z.string().min(3).max(256)).max(500).optional(),
   group_id: z.string().min(1).max(64).optional(),
-  audience: z.enum(['node-users']).optional(),  // OPERATOR-only (gated at the route)
+  audience: z.enum(['node-users', 'federation-users']).optional(),  // OPERATOR-only (gated at the route)
   mode: z.enum(['broadcast', 'announcement']).optional().default('broadcast'),
   body: z.string().max(50000).optional().default(''),
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
