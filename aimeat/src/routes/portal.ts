@@ -478,6 +478,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
 
   const spaRoutes = [
     '/v1/profile',
+    '/v1/secretary',
     '/v1/my-company',
     '/v1/companies',
     '/v1/guides',

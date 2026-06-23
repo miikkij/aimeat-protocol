@@ -24,6 +24,14 @@
  *     (each KPI's current vs target, ✅/⚠️, computed-vs-self-reported) at the top of the workspace,
  *     fed by getWorkspaceOverviewFull + refreshed on live updates. Design:
  *     docs/internal/2026-06-23-organism-measurability-design.md (Phase G).
+ *   v1.6.0 — 2026-06-23 — Findability pass (vaihe 1): the "What happened here" feed shows the
+ *     document/record title instead of the raw id (instanceTitle); multi-part documents
+ *     ("… — osa N") collapse under one expandable series row (niputus) in both the doc-space index
+ *     and the Overview space list — pure display grouping, never touches stored sections/data.
+ *   v1.7.0 — 2026-06-23 — Findability pass (vaihe 2): optional color tags. A small preset palette
+ *     (ColorPicker + TAG_PALETTE → theme tokens) lets sections, documents and records be tagged with
+ *     a color (left-rail accent). Section colors persist on the section object; per-item colors in a
+ *     parallel meta.colors map (getAllColors/saveColors). Colors are optional and default to none.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -60,6 +68,29 @@ import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * gate, the approval inbox, and the decision log. */
 
 const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
+
+// Optional color tags for sections / documents / records. A small fixed palette of theme tokens
+// (kept in CSS as .pj-tag-{key} → --pj-tag) so colors always match the active light/dark theme —
+// never a free hex that could clash. null/absent = no color (the default, neutral).
+const TAG_PALETTE = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
+
+// A dot that opens an inline swatch palette; picking a color (or ∅) calls onPick(key|null) and closes.
+// Self-contained so it can sit in a section head, a document row or a record row alike.
+function ColorPicker({ value, onPick, title }) {
+  const [open, setOpen] = useState(false);
+  return html`
+    <span class="pj-cp">
+      <button class="pj-cp-dot ${value ? 'pj-colored pj-tag-' + value : 'pj-cp-empty'}" title=${title || (t('organisms.color') || 'Color')}
+        onClick=${(e) => { e.stopPropagation(); e.preventDefault(); setOpen(o => !o); }}></button>
+      ${open ? html`
+        <span class="pj-cp-pop" onMouseLeave=${() => setOpen(false)}>
+          <button class="pj-cp-sw pj-cp-none" title=${t('organisms.noColor') || 'No color'}
+            onClick=${(e) => { e.stopPropagation(); e.preventDefault(); onPick(null); setOpen(false); }}>∅</button>
+          ${TAG_PALETTE.map(c => html`<button key=${c} class="pj-cp-sw pj-colored pj-tag-${c}"
+            onClick=${(e) => { e.stopPropagation(); e.preventDefault(); onPick(c); setOpen(false); }}></button>`)}
+        </span>` : null}
+    </span>`;
+}
 
 export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialSpace }) {
   const orgId = org.id;
@@ -115,7 +146,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // NOT persisted: opening a workspace must show the overview, not whatever tab was last open.
   // Exception: a deep-link from the organism mindmap (initialSpace) opens straight on that space tab.
   const [tab, setTab] = useState(initialSpace ? 'space:' + initialSpace : 'overview');
-  const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
+  const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId],color?}] }
+  const [colorsByType, setColorsByType] = useState({});      // { typeName: { instanceId: colorKey } } — optional per-item color tags
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
   const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
   const [showRegenerate, setShowRegenerate] = useState(false);
@@ -124,6 +156,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [addingInitial, setAddingInitial] = useState(null);   // record being edited (null = new draft)
   const [addingId, setAddingId] = useState(null);             // its id, preserved so save overwrites
   const [expandedRec, setExpandedRec] = useState({});         // { "type:id": true } — records expanded to view fields
+  const [expandedSeries, setExpandedSeries] = useState({});   // { "type:base": true } — a multi-part doc series expanded in the index
   const [showSpaces, setShowSpaces] = useState(false);        // inline add-space form at the workspace top
   const [showFlow, setShowFlow] = useState(true);             // the manifest-defined edit-flow chart (first item)
   const [share, setShare] = useState(null);                   // { public, spaces, docs } — lazy-loaded when Settings opens
@@ -165,14 +198,15 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
     if (w && w.manifest) {
-      const [ap, cfg, secs, act] = await Promise.all([
+      const [ap, cfg, secs, act, cols] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(() => []),
         orgService.getConfig(orgId).catch(() => ({})),
         orgService.getAllSections(orgId, wsId).catch(() => ({})),
         orgService.getWorkspaceActivity(orgId, wsId).catch(() => ({ events: [] })),
+        orgService.getAllColors(orgId, wsId).catch(() => ({})),
       ]);
       setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
-      setWsEvents(act?.events || []);
+      setWsEvents(act?.events || []); setColorsByType(cols);
     }
     setWs(w && w.manifest ? w : null);
   }, [orgId, wsId]);
@@ -504,6 +538,20 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     setSectionsByType(s => ({ ...s, [typeName]: (s[typeName] || []).map(x => x.id === secId ? { ...x, name } : x) }));
   const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, wsId, typeName, sectionsRef.current[typeName] || []).catch(() => {}); };
 
+  // ── Optional color tags. Section colors live on the section object (persisted via updateSections);
+  // per-document/record colors live in a parallel meta.colors map (persisted via saveColors). ──
+  const setSectionColor = (typeName, secId, color) =>
+    updateSections(typeName, (sectionsByType[typeName] || []).map(s => s.id === secId ? { ...s, color: color || undefined } : s));
+  const itemColor = (typeName, id) => (colorsByType[typeName] || {})[id] || null;
+  const setItemColor = useCallback((typeName, id, color) => {
+    setColorsByType(prev => {
+      const m = { ...(prev[typeName] || {}) };
+      if (color) m[id] = color; else delete m[id];
+      orgService.saveColors(orgId, wsId, typeName, m).catch(e => showToast((e && e.message) || 'Failed to save color'));
+      return { ...prev, [typeName]: m };
+    });
+  }, [orgId, wsId, showToast]);
+
   const publish = useCallback(async (ot, instanceId) => {
     setBusy(true);
     try {
@@ -814,6 +862,40 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     catch { showToast(t('organisms.copyFailed') || 'Copy failed'); }
   };
 
+  // Resolve an activity-feed event's instance id to a human title (document title / record primary
+  // field), so the feed reads "published · Techstack-matriisi" instead of "published · doc-76qchtb".
+  // Falls back to the id when the item isn't in the loaded set (deleted, or not readable).
+  const instanceTitle = (typeName, id) => {
+    const rec = [...objectsFor(typeName), ...draftsFor(typeName)].find(x => x.id === id);
+    if (!rec) return id;
+    return rec.title || rec.label || rec.summary || rec.name || rec[PRIMARY_FIELD[typeName]] || id;
+  };
+
+  // ── Series niputus: collapse multi-part documents ("Foo — osa 2", "Foo — part 3") under one
+  // expandable parent so a 4-part doc reads as ONE line, not four near-identical ones. PURELY a
+  // display grouping — it never touches the stored sections or the documents themselves. The base
+  // title is whatever precedes a trailing "— osa N / part N / #N"; a document with no such suffix is
+  // its own base (so the lead "Foo" groups with "Foo — osa 2/3"). Only bases with ≥2 members collapse.
+  const seriesParse = (title) => {
+    const m = /^(.*?)[\s—–-]+(?:osa|part|pt\.?|#)\s*(\d+)\s*$/i.exec(String(title || ''));
+    return (m && m[1].trim()) ? { base: m[1].trim(), part: parseInt(m[2], 10) } : { base: String(title || '').trim(), part: 0 };
+  };
+  const groupDocs = (list) => {
+    const map = new Map(); const order = [];
+    for (const d of list) {
+      const { base, part } = seriesParse(d.title || d.label || d.id || '');
+      const k = base.toLowerCase();
+      if (!map.has(k)) { map.set(k, { base, parts: [] }); order.push(k); }
+      map.get(k).parts.push({ ...d, _part: part });
+    }
+    return order.map(k => {
+      const g = map.get(k);
+      if (g.parts.length < 2) return { single: g.parts[0] };
+      g.parts.sort((a, b) => a._part - b._part);
+      return { base: g.base, parts: g.parts };
+    });
+  };
+
   // A document-space: left index (section tree + documents, with an Unsorted group) + a main
   // area showing the active document (view/edit). Sections nest via parentId; documents are
   // tied to a section's documents[] (or unsorted). Edits to the tree persist immediately.
@@ -827,11 +909,12 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const isActive = (d) => activeDoc?.type === ot.name && activeDoc.page?.id === d.id;
 
     const docItem = (d) => html`
-      <div class="pj-doc-item ${isActive(d) ? 'active' : ''}" key=${'di' + d.id}
+      <div class="pj-doc-item ${isActive(d) ? 'active' : ''} ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'di' + d.id}
         draggable=${true}
         onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch (x) { /* noop */ } } }}
         onDragEnd=${() => { draggedDoc.current = null; }}>
         <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
+        <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
           ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
         </button>
@@ -842,9 +925,28 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const dropOn = (secId) => (e) => { e.preventDefault(); e.stopPropagation(); if (draggedDoc.current?.type === ot.name) { moveDocToSection(ot.name, draggedDoc.current.id, secId); draggedDoc.current = null; } };
     const allowDrop = (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; };
 
+    // Render a document list with multi-part series collapsed (see groupDocs). A series auto-opens
+    // when the active document is one of its parts; otherwise it toggles on the header click.
+    const renderDocList = (list) => groupDocs(list).map((g) => {
+      if (g.single) return docItem(g.single);
+      const key = ot.name + ':' + g.base;
+      const open = g.parts.some(isActive) || !!expandedSeries[key];
+      return html`
+        <div class="pj-doc-series ${open ? 'open' : ''}" key=${'ser-' + g.base}>
+          <button class="pj-doc-series-head" onClick=${() => setExpandedSeries(s => ({ ...s, [key]: !open }))}>
+            <span class="pj-ov-chevron">${open ? '▾' : '▸'}</span>
+            <span class="pj-doc-series-name">${g.base}</span>
+            <span class="pj-org-tab-count">${g.parts.length}</span>
+            ${g.parts.some(p => p._draft) ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+          </button>
+          ${open ? html`<div class="pj-doc-series-parts">${g.parts.map(docItem)}</div>` : null}
+        </div>`;
+    });
+
     const renderSection = (sec) => html`
-      <div class="pj-sec" key=${sec.id} onDragOver=${allowDrop} onDrop=${dropOn(sec.id)}>
+      <div class="pj-sec ${sec.color ? 'pj-colored pj-tag-' + sec.color : ''}" key=${sec.id} onDragOver=${allowDrop} onDrop=${dropOn(sec.id)}>
         <div class="pj-sec-head">
+          <${ColorPicker} value=${sec.color} onPick=${(c) => setSectionColor(ot.name, sec.id, c)} />
           ${editingSec === sec.id
             ? html`<input class="input-field input-xs pj-sec-name" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
                 value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
@@ -855,7 +957,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
           <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
           <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id, sec.name)}>✕</button>
         </div>
-        ${(sec.documents || []).map(id => docById[id]).filter(Boolean).map(docItem)}
+        ${renderDocList((sec.documents || []).map(id => docById[id]).filter(Boolean))}
         ${childrenOf(sec.id).map(renderSection)}
       </div>`;
 
@@ -871,7 +973,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
           <div class="pj-doc-index">
             ${childrenOf(null).map(renderSection)}
             ${unsorted.length > 0 ? html`
-              <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${unsorted.map(docItem)}</div>` : null}
+              <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${renderDocList(unsorted)}</div>` : null}
             ${docs.length === 0 && secs.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
           </div>
           <div class="pj-doc-main">
@@ -922,8 +1024,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         : html`<${Spinner} />`)}
 
       ${draftsFor(ot.name).map((d, i) => html`
-        <div class="pj-rec" key=${'d' + i}>
+        <div class="pj-rec ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'d' + i}>
           <div class="pj-item pj-item-draft">
+            <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
             <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
             <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
@@ -943,8 +1046,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       ${objectsFor(ot.name).length === 0 && draftsFor(ot.name).length === 0
         ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />`
         : objectsFor(ot.name).map((o, i) => html`
-          <div class="pj-rec" key=${'o' + i}>
+          <div class="pj-rec ${itemColor(ot.name, o.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, o.id) : ''}" key=${'o' + i}>
             <div class="pj-item">
+              <${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />
               <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
               ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
               ${!draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
@@ -1132,7 +1236,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         <button class="btn-ghost btn-sm" onClick=${() => ovAddNew(ot, docMode)}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
       </div>`;
     const open = ovOpen[ot.name] ?? !isMobileView();
-    const shown = items.slice(0, 5);
+    // Multi-part documents collapse into one series row here too (see groupDocs); records pass through.
+    const display = docMode ? groupDocs(items) : items.map(d => ({ single: d }));
+    const shown = display.slice(0, 5);
     return html`
       <div class="pj-ov-sec" key=${ot.name}>
         <div class="pj-ov-sec-head" onClick=${() => setOvOpen(s => ({ ...s, [ot.name]: !open }))}>
@@ -1146,21 +1252,35 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         ${open ? html`
           ${spaceDesc(ot) ? html`<div class="section-desc pj-ov-desc">${spaceDesc(ot)}</div>` : null}
           <div class="pj-ov-items">
-            ${shown.map(d => docMode ? html`
-              <div class="pj-ov-doc" key=${d.id}>
-                <button class="pj-ov-item" onClick=${() => openOvDoc(ot, d)}>
+            ${shown.map((g) => {
+              // A collapsed multi-part series (docMode only) → one row; clicking opens the first part
+              // in the space tab, where the full series index lives.
+              if (g.parts) return html`
+                <div class="pj-ov-doc" key=${'ser-' + g.base}>
+                  <button class="pj-ov-item" onClick=${() => openOvDoc(ot, g.parts[0])}>
+                    ${g.parts.some(p => p._draft) ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+                    <span class="pj-ov-item-title">${g.base}</span>
+                    <span class="pj-org-tab-count">${g.parts.length}</span>
+                    <span class="pj-ov-preview">${firstLine(g.parts[0].markdown)}</span>
+                  </button>
+                </div>`;
+              const d = g.single;
+              return docMode ? html`
+                <div class="pj-ov-doc" key=${d.id}>
+                  <button class="pj-ov-item" onClick=${() => openOvDoc(ot, d)}>
+                    ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+                    <span class="pj-ov-item-title">${d.title || d.id}</span>
+                    <span class="pj-ov-preview">${firstLine(d.markdown)}</span>
+                  </button>
+                  ${ovDoc && ovDoc.type === ot.name && ovDoc.id === d.id ? renderOvDocInline(ot, d) : null}
+                </div>` : html`
+                <button class="pj-ov-item" key=${d.id} onClick=${() => openOvRec(ot, d)}>
                   ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
-                  <span class="pj-ov-item-title">${d.title || d.id}</span>
-                  <span class="pj-ov-preview">${firstLine(d.markdown)}</span>
-                </button>
-                ${ovDoc && ovDoc.type === ot.name && ovDoc.id === d.id ? renderOvDocInline(ot, d) : null}
-              </div>` : html`
-              <button class="pj-ov-item" key=${d.id} onClick=${() => openOvRec(ot, d)}>
-                ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
-                <span class="pj-ov-item-title">${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.summary || d.id || '')}</span>
-                ${d.status ? html`<span class="badge badge-info">${String(d.status)}</span>` : null}
-              </button>`)}
-            ${items.length > 5 ? html`
+                  <span class="pj-ov-item-title">${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.summary || d.id || '')}</span>
+                  ${d.status ? html`<span class="badge badge-info">${String(d.status)}</span>` : null}
+                </button>`;
+            })}
+            ${display.length > 5 ? html`
               <button class="pj-ov-more" onClick=${() => pickTab('space:' + ot.name)}>${(t('organisms.ovShowAll') || 'Show all {n} →').replace('{n}', String(items.length))}</button>` : null}
           </div>` : null}
       </div>`;
@@ -1229,7 +1349,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                 <span class="pj-act-dot ${e.action}"></span>
                 <span class="pj-ov-event-who">${shortActor(e.actor)}${e.agent ? html` <span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>🤖 ${e.agent}</span>` : null}</span>
                 <span class="pj-ov-event-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
-                <span class="pj-ov-event-what">${e.mode === 'document' ? '📄' : '🗂'} ${(wsT('type.' + e.type) || e.type)}${' / '}${e.instance}</span>
+                <span class="pj-ov-event-what">${e.mode === 'document' ? '📄' : '🗂'} ${(wsT('type.' + e.type) || e.type)}${' / '}${instanceTitle(e.type, e.instance)}</span>
                 <span class="pj-ov-event-time">${relTime(e.at)}</span>
               </button>`)}
           </div>` : null}

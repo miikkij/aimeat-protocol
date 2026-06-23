@@ -6,6 +6,8 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.4.0 — 2026-06-23 — Optional color tags: getAllColors()/saveColors() read/write the per-item
+ *     color map at …w.{ws}.meta.colors.{type} (mirrors getAllSections/saveSections).
  *   v1.3.0 — 2026-06-22 — Batch endpoints: discoverWorkspaces({include:'enrichment'}) folds the
  *     per-workspace fan-out; new getWaiting() (home widget) and listCommentsBatch() (workspace comments).
  *   v1.2.1 — 2026-06-21 — Decode HTML entities in workspace names on read (listWorkspaces +
@@ -1237,6 +1239,25 @@ export async function getAllSections(orgId, wsId) {
 /** Persist the section index for one document-space (…w.{wsId}.meta.sections.{typeName}). */
 export async function saveSections(orgId, wsId, typeName, sections) {
   return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
+}
+
+/** Read the optional per-item color tags for every space → { typeName: { instanceId: colorKey } }.
+ *  Mirrors getAllSections; stored at …w.{wsId}.meta.colors.{typeName} = { colors: { id: key } }. */
+export async function getAllColors(orgId, wsId) {
+  const out = {};
+  try {
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(`${wsRoot(orgId, wsId)}.meta.colors.`)}`);
+    for (const it of (resp?.data?.items || [])) {
+      const m = String(it.key || '').match(/\.meta\.colors\.(.+)$/);
+      if (m) out[m[1]] = (it.value && typeof it.value.colors === 'object' && it.value.colors) || {};
+    }
+  } catch { /* none yet */ }
+  return out;
+}
+
+/** Persist the per-item color map for one space (…w.{wsId}.meta.colors.{typeName}). */
+export async function saveColors(orgId, wsId, typeName, colors) {
+  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.colors.${typeName}`, value: { colors }, visibility: 'private' });
 }
 
 /* ── Sources: references the workspace draws on (memory / storage / knowledge). Pointers only —

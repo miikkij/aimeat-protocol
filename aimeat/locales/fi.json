@@ -544,7 +544,17 @@
     "howItWorks": "Miten se toimii",
     "business": "Yrityksellesi",
     "myCompany": "Yritykseni",
-    "companies": "Yritykset"
+    "companies": "Yritykset",
+    "secretary": "Sihteeri"
+  },
+  "secretary": {
+    "title": "Sihteeri",
+    "desc": "Henkilökohtainen AIMEAT-sihteerisi — pystytetty ja valmiina auttamaan.",
+    "ready": "Sihteeri on pystytetty",
+    "notReady": "Sihteeriäsi ei ole vielä pystytetty. Ota se käyttöön määrittämällä OpenRouter profiilisi asetuksissa.",
+    "identity": "Identiteetti",
+    "scopes": "Oikeudet",
+    "soon": "Chat, kalenteri ja päätökset tulossa pian."
   },
   "companies": {
     "title": "Yritykset",
@@ -6859,6 +6869,8 @@
     "orPaste": "…tai liitä / vedä kuva editoriin",
     "saving": "Tallennetaan…",
     "pageSaved": "Dokumentti tallennettu",
+    "color": "Väri",
+    "noColor": "Ei väriä",
     "section": "Osio",
     "sectionName": "Osion nimi",
     "unsorted": "Lajittelematon",

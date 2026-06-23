@@ -544,7 +544,17 @@
     "howItWorks": "How it works",
     "business": "For your business",
     "myCompany": "My Company",
-    "companies": "Companies"
+    "companies": "Companies",
+    "secretary": "Secretary"
+  },
+  "secretary": {
+    "title": "Secretary",
+    "desc": "Your personal AIMEAT secretary — set up and ready to help.",
+    "ready": "Secretary is set up",
+    "notReady": "Your Secretary isn't set up yet. Configure OpenRouter in your profile settings to enable it.",
+    "identity": "Identity",
+    "scopes": "Permissions",
+    "soon": "Chat, schedule, and decisions are coming soon."
   },
   "companies": {
     "title": "Companies",
@@ -6859,6 +6869,8 @@
     "orPaste": "…or paste / drag an image into the editor",
     "saving": "Saving…",
     "pageSaved": "Document saved",
+    "color": "Color",
+    "noColor": "No color",
     "section": "Section",
     "sectionName": "Section name",
     "unsorted": "Unsorted",

@@ -144,6 +144,16 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        // Connector-CLI-only convenience (no MCP surface): the loopback serve daemon / a no-LLM crew
+        // reads its own rollups over `aimeat connect call` instead of a periodic node GET. Excluded
+        // from the v2 MCP surfaces (V2_EXCLUDED); cliFallback only.
+        name: 'aimeat_agent_statistics',
+        description: "Get this agent's own performance + per-context review rollups (recomputed from its tasks).",
+        caller: 'agent',
+        visibility: { publicMcp: false, connectorMcp: false, cliFallback: true },
+        input: {},
+    },
+    {
         name: 'aimeat_agent_telemetry_report',
         description: 'Append one telemetry event (llm_call, tool_call, or agent_report) recording metrics such as tokens, duration, or tool name; optionally tie it to a session or AIMEAT task. Feeds the node\'s activity stats (viewable via aimeat_agent_activity). Use for fine-grained runtime metrics — for task lifecycle/progress use the aimeat_task_* tools instead.',
         caller: 'agent',

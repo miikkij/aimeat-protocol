@@ -36,6 +36,8 @@ export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', '
 export const V2_EXCLUDED: readonly string[] = [
     'aimeat_instance_list', 'aimeat_instance_create', 'aimeat_instance_status',
     'aimeat_task_request_changes',
+    // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
+    'aimeat_agent_statistics',
 ];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */

@@ -123,6 +123,10 @@
  *     bordered/bolder DRAFT chip and the inline Edit button gets the card-fill
  *     treatment (both were nearly invisible). Expanded fields (.pj-rec-fields .kv-row)
  *     gain a dotted leader between label and value so each value maps to its key.
+ *   v1.14.0 — 2026-06-23 — Multi-part document series niputus: .pj-doc-series-head/-name/-parts
+ *     (collapsed series row in the doc index).
+ *   v1.14.1 — 2026-06-23 — Optional color tags: .pj-tag-{red…gray} (→ --pj-tag theme tokens),
+ *     .pj-colored left-rail accent, and the .pj-cp/.pj-cp-dot/-pop/-sw/-none swatch picker.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -2435,6 +2439,30 @@
 .pj-doc-item:hover { background: var(--bg-surface); }
 .pj-doc-item.active { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
 .pj-doc-item .pj-doc-link { flex: 1; font-size: 0.85rem; color: var(--text); }
+/* Multi-part document series collapsed under one row (niputus) — in the doc index. */
+.pj-doc-series-head { display: flex; align-items: center; gap: 0.3rem; width: 100%; padding: 0.15rem 0.3rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.pj-doc-series-head:hover { background: var(--bg-surface); }
+.pj-doc-series-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-doc-series-parts { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
+/* ── Optional color tags (preset palette → theme tokens; never a free hex). A .pj-tag-{key} class
+ *    sets --pj-tag; structural classes consume it, so colors flip correctly with the theme. ── */
+.pj-tag-red    { --pj-tag: var(--danger); }
+.pj-tag-orange { --pj-tag: var(--orange); }
+.pj-tag-yellow { --pj-tag: var(--yellow); }
+.pj-tag-green  { --pj-tag: var(--success); }
+.pj-tag-blue   { --pj-tag: var(--blue); }
+.pj-tag-purple { --pj-tag: var(--purple); }
+.pj-tag-gray   { --pj-tag: var(--badge-node-bg); }
+.pj-colored { border-left: 3px solid var(--pj-tag); padding-left: 0.45rem; }
+.pj-cp { position: relative; display: inline-flex; align-items: center; }
+.pj-cp-dot { width: 11px; height: 11px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; flex-shrink: 0; opacity: 0.55; }
+.pj-cp-dot:hover { opacity: 1; }
+.pj-cp-dot.pj-colored { border-left: 0; padding-left: 0; background: var(--pj-tag); opacity: 1; }
+.pj-cp-empty { background: transparent; border: 1.5px solid var(--border); }
+.pj-cp-pop { position: absolute; top: 100%; left: 0; z-index: 30; display: flex; gap: 4px; padding: 5px; margin-top: 3px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); }
+.pj-cp-sw { width: 16px; height: 16px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; }
+.pj-cp-sw.pj-colored { border-left: 0; padding-left: 0; background: var(--pj-tag); }
+.pj-cp-none { background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); font-size: 0.7rem; line-height: 14px; text-align: center; }
 .input-xs { padding: 0.15rem 0.35rem; font-size: 0.78rem; height: auto; }
 .pj-mini { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
 .pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
