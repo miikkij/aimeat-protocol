@@ -29,6 +29,9 @@
  *     summary + rendered as an "Objectives" block (KPI current vs target). A `from:'records'` KPI's
  *     `current` is computed from the workspace's own published records via kpi-rollup; a string-recipe
  *     KPI shows its declared `current`. Design: docs/internal/2026-06-23-organism-measurability-design.md.
+ *   v1.3.0 — 2026-06-23 — spaceLines() now renders each space's recent entries as a 3-column Markdown
+ *     TABLE (Title · ID · Updated) instead of an inline "title · id · date" run-on, so the structure
+ *     overview reads as aligned columns (human + agent). Pipe-safe titles via cell().
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -277,17 +280,26 @@ export async function buildWorkspaceOverview(
   return { markdown: out.join('\n'), readable: true, summary: s };
 }
 
-/** Render one space as Markdown lines: a heading (`{hashes} name (mode) — total`) + its most-recent
- *  entries (title + id + date) up to MAX_ITEMS, with a "N total" hint when more exist. Shared by the
- *  workspace overview (## spaces) and the organism overview (### spaces under each ## workspace) so
- *  BOTH carry the same per-entry detail — the organism view is the workspace views composed, not a
- *  lossy count-only summary. */
+/** A title is rendered into a Markdown table CELL — the table parser splits on raw `|`, so a pipe in
+ *  the title would break the row. Swap it for a look-alike broken bar (titles are already single-line
+ *  via clip()). */
+function cell(title: string): string {
+  return title.replace(/\|/g, '¦');
+}
+
+/** Render one space as Markdown lines: a heading (`{hashes} name (mode) — total`) + a 3-column TABLE
+ *  of its most-recent entries (Title · ID · Updated) up to MAX_ITEMS, with a "N of M shown" hint when
+ *  more exist. The table renders as aligned columns (vs the old inline "title · id · date" run-on),
+ *  so a human scans down a column and an agent still reads the same fields. Shared by the workspace
+ *  overview (## spaces) and the organism overview (### spaces under each ## workspace) so BOTH carry
+ *  the same per-entry detail — the organism view is the workspace views composed, not a lossy splat. */
 function spaceLines(sp: SpaceSummary, hashes: string): string[] {
   const lines = [`${hashes} ${sp.name} (${sp.mode}) — ${sp.total}`, ''];
-  for (const e of sp.recent) lines.push(`- **${e.title}**  ·  \`${e.id}\`  ·  ${date(e.updatedAt)}`);
-  if (sp.total === 0) lines.push('- _empty_');
-  else if (sp.total > sp.recent.length) lines.push(`- _… ${sp.recent.length} of ${sp.total} shown — open the space for the rest_`);
+  if (sp.total === 0) { lines.push('_empty_', ''); return lines; }
+  lines.push('| Title | ID | Updated |', '|---|---|---|');
+  for (const e of sp.recent) lines.push(`| **${cell(e.title)}** | \`${e.id}\` | ${date(e.updatedAt)} |`);
   lines.push('');
+  if (sp.total > sp.recent.length) lines.push(`_… ${sp.recent.length} of ${sp.total} shown — open the space for the rest_`, '');
   return lines;
 }
 

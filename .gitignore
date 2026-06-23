@@ -132,4 +132,5 @@ docs/internal/
 # Local verification artifacts (Playwright MCP browser-drive output + screenshots)
 .playwright-mcp/
 /secretary-phase0-view.png
+/secretary-phase1-hired.png
 /niputus-verify.png
