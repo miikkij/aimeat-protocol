@@ -29,10 +29,10 @@ export async function send({ to, body, attachments, replyTo, subject, conversati
 /** Send one message to MANY recipients. `to` is an array of identities and/or `groupId` is a Share Group
  *  whose members are the audience. `mode` 'announcement' = read-only; 'broadcast' = repliable. `interactive`
  *  makes it a poll. Returns { broadcast_id, recipients, sent, failed }. */
-export async function sendBroadcast({ to, groupId, mode, body, attachments, interactive } = /** @type {{ to?: any, groupId?: any, mode?: any, body?: any, attachments?: any, interactive?: any }} */ ({})) {
+export async function sendBroadcast({ to, groupId, audience, mode, body, attachments, interactive } = /** @type {{ to?: any, groupId?: any, audience?: any, mode?: any, body?: any, attachments?: any, interactive?: any }} */ ({})) {
   return api('/v1/messages/broadcast', {
     method: 'POST',
-    body: JSON.stringify({ to, group_id: groupId, mode, body, attachments, interactive }),
+    body: JSON.stringify({ to, group_id: groupId, audience, mode, body, attachments, interactive }),
   });
 }
 

@@ -138,7 +138,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const input = parsed.data;
     const senderGhii = resolve(req);
 
-    const recipients = (await resolveAudience(deliveryCtx, senderGhii, { to: input.to, groupId: input.group_id }))
+    // "all node users" is operator-only (a node-wide announcement is a privileged action).
+    if (input.audience === 'node-users' && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'The "all node users" audience is operator-only'));
+      return;
+    }
+
+    const recipients = (await resolveAudience(deliveryCtx, senderGhii, { to: input.to, groupId: input.group_id, audience: input.audience }))
       .filter(isAddressableRecipient);
     if (recipients.length === 0) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid recipients in the audience'));

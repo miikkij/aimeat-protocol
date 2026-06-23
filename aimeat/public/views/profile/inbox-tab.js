@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.12.0 -- 2026-06-23 -- Operator broadcast: an operator sees an "📣 All node users" audience in the
+ *     broadcast compose (sends audience:'node-users', gated operator-only server-side) — e.g. a node-wide
+ *     announcement. Announcement read stats are in the existing Results view (delivered/read per recipient).
  *   v1.11.0 -- 2026-06-23 -- Inbox-links: the tab reads ?to=<id[,id]>&subject= on mount and opens a
  *     prefilled compose (single) or broadcast (multiple), then clears the URL. Pairs with the reusable
  *     <InboxLink> component (mailto-style one-click DM), wired into the agent profile.
@@ -89,6 +92,7 @@ import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
+import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
@@ -598,6 +602,8 @@ export default function InboxTab({ showToast }) {
   const [bcGroupId, setBcGroupId] = useState('');         // broadcast: optional Share Group audience
   const [bcType, setBcType] = useState('message');        // broadcast content: 'message' | 'poll'
   const [bcQuestions, setBcQuestions] = useState([]);     // poll: the questions being built
+  const [bcNodeUsers, setBcNodeUsers] = useState(false);  // broadcast: target ALL node users (operator)
+  const isOperator = (getSession()?.roles || []).includes('operator');
   const [myGroups, setMyGroups] = useState([]);           // the owner's Share Groups (audiences)
   const [resultsId, setResultsId] = useState(null);       // broadcast id whose results are shown
   const [results, setResults] = useState(null);           // fetched broadcast results
@@ -842,7 +848,7 @@ export default function InboxTab({ showToast }) {
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
-  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); };
+  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcNodeUsers(false); };
   const addBcRecipient = (id) => {
     const v = (id ?? bcInput).trim();
     if (v && !bcRecipients.includes(v)) setBcRecipients([...bcRecipients, v]);
@@ -855,7 +861,7 @@ export default function InboxTab({ showToast }) {
   const doBroadcast = async (_recipient, text, files, reset) => {
     if (sending) return;
     const body = (text || '').trim();
-    if (bcRecipients.length === 0 && !bcGroupId) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
+    if (bcRecipients.length === 0 && !bcGroupId && !bcNodeUsers) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
 
     let interactive;
     if (bcType === 'poll') {
@@ -879,7 +885,7 @@ export default function InboxTab({ showToast }) {
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
       const resp = await messages.sendBroadcast({
-        to: bcRecipients, groupId: bcGroupId || undefined,
+        to: bcRecipients, groupId: bcGroupId || undefined, audience: bcNodeUsers ? 'node-users' : undefined,
         mode: bcType === 'poll' ? 'broadcast' : bcMode,   // a poll must be repliable (recipients answer)
         body, attachments, interactive,
       });
@@ -1283,8 +1289,12 @@ export default function InboxTab({ showToast }) {
                 <option value="">${t('inbox.bcNoGroup')}</option>
                 ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
               </select>` : null}
+              ${isOperator ? html`<label class=${`inbox-bc-nodeusers${bcNodeUsers ? ' inbox-bc-nodeusers--on' : ''}`}>
+                <input type="checkbox" checked=${bcNodeUsers} onChange=${(e) => setBcNodeUsers(e.target.checked)} />
+                <span>📣 ${t('inbox.bcNodeUsers')}</span>
+              </label>` : null}
             </div>
-            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId) ? 'bc' : ''}
+            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId || bcNodeUsers) ? 'bc' : ''}
               sendLabel=${bcType === 'poll' ? t('inbox.pollSend') : t('inbox.bcSend')} sending=${sending} onSend=${doBroadcast} />
           </div>` : null}
 

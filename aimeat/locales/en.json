@@ -21,6 +21,7 @@
   "inbox.bcSend": "Send to all",
   "inbox.bcNoRecipients": "Add at least one recipient or a group",
   "inbox.bcSent": "Broadcast sent",
+  "inbox.bcNodeUsers": "All node users (operator)",
   "inbox.announcementNote": "Announcement — replies are disabled",
   "inbox.bcTypeMessage": "Message",
   "inbox.bcTypePoll": "Poll",

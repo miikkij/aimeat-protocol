@@ -21,6 +21,7 @@
   "inbox.bcSend": "Lähetä kaikille",
   "inbox.bcNoRecipients": "Lisää vähintään yksi vastaanottaja tai ryhmä",
   "inbox.bcSent": "Joukkoviesti lähetetty",
+  "inbox.bcNodeUsers": "Kaikki solmun käyttäjät (operaattori)",
   "inbox.announcementNote": "Tiedote — vastaaminen ei ole käytössä",
   "inbox.bcTypeMessage": "Viesti",
   "inbox.bcTypePoll": "Kysely",

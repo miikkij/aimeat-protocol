@@ -502,6 +502,12 @@
 .inbox-bc-chip-x:hover { color: var(--danger); background: var(--card-bg); }
 .inbox-bc-add { display: flex; gap: 8px; }
 .inbox-bc-add .inbox-input { flex: 1; }
+.inbox-bc-nodeusers {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
+  padding: 8px 10px; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); background: var(--accent-subtle);
+}
+.inbox-bc-nodeusers input { accent-color: var(--accent); }
+.inbox-bc-nodeusers--on { border-color: var(--accent); }
 
 /* Announcement note shown in place of the reply composer (read-only thread). */
 .inbox-announce-note {
