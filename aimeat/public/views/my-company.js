@@ -14,6 +14,8 @@
  *   v0.1.0 — 2026-06-23 — initial (hand-typed)
  *   v0.2.0 — 2026-06-23 — pick existing offerings; order → result/inbox
  *   v0.2.1 — 2026-06-23 — order tracking (my orders + orders received) with live status
+ *   v0.3.0 — 2026-06-23 — members & roles + customers + revenue-split receipt
+ *   v0.4.0 — 2026-06-23 — company Settings tab (admin): name, Y-tunnus, description, commission %
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -128,6 +130,44 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
           <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
         </div>
       </form>`}`;
+}
+
+/** Company settings (admin only): edit name, Y-tunnus (business ID), description, commission %. */
+function SettingsPanel({ org, onSaved }) {
+  const [name, setName] = useState(org.name || '');
+  const [businessId, setBusinessId] = useState(org.businessId || '');
+  const [description, setDescription] = useState(org.description || '');
+  const [commission, setCommission] = useState(org.commissionPercent ?? 20);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState(false);
+  async function save(e) {
+    e.preventDefault(); setBusy(true); setErr(''); setOk(false);
+    try {
+      const r = await apiPatch(`/v1/orgs/${encodeURIComponent(org.slug)}`, {
+        name: name.trim(), businessId: businessId.trim(), description: description.trim(), commissionPercent: Number(commission),
+      });
+      setOk(true);
+      if (onSaved) await onSaved(r.data?.org);
+    } catch (e) { setErr(e.message || 'Save failed'); }
+    finally { setBusy(false); }
+  }
+  return html`
+    <form class="mc-form mc-settings" onSubmit=${save}>
+      <label class="mc-label">${t('myCompany.name')}
+        <input class="mc-input" value=${name} onInput=${(e) => { setName(e.target.value); setOk(false); }} required /></label>
+      <label class="mc-label">${t('myCompany.businessId')}
+        <input class="mc-input" value=${businessId} placeholder="1234567-8" onInput=${(e) => { setBusinessId(e.target.value); setOk(false); }} /></label>
+      <span class="mc-mini">${t('myCompany.businessIdHint')}</span>
+      <label class="mc-label">${t('myCompany.description')}
+        <textarea class="mc-input" rows="3" value=${description} onInput=${(e) => { setDescription(e.target.value); setOk(false); }}></textarea></label>
+      <label class="mc-label">${t('myCompany.commission')}
+        <input class="mc-input mc-price-input" type="number" min="0" max="100" value=${commission} onInput=${(e) => { setCommission(e.target.value); setOk(false); }} /></label>
+      <span class="mc-mini">${t('myCompany.commissionHint')}</span>
+      ${err && html`<p class="mc-error">${err}</p>`}
+      ${ok && html`<p class="mc-saved">${t('myCompany.settingsSaved')}</p>`}
+      <button class="btn-primary" type="submit" disabled=${busy}>${t('myCompany.saveSettings')}</button>
+    </form>`;
 }
 
 /** A catalog entry: the SAME offer card format as profile>offers + owner controls + an order box. */
@@ -299,6 +339,7 @@ export default function MyCompanyView() {
   const [errMsg, setErrMsg] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newName, setNewName] = useState('');
+  const [newBusinessId, setNewBusinessId] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function loadOrgs() {
@@ -340,8 +381,8 @@ export default function MyCompanyView() {
   async function createOrg(e) {
     e.preventDefault(); setErrMsg(''); setBusy(true);
     try {
-      const res = await apiPost('/v1/orgs', { slug: newSlug.trim().toLowerCase(), name: newName.trim() });
-      setNewSlug(''); setNewName(''); await loadOrgs();
+      const res = await apiPost('/v1/orgs', { slug: newSlug.trim().toLowerCase(), name: newName.trim(), businessId: newBusinessId.trim() || undefined });
+      setNewSlug(''); setNewName(''); setNewBusinessId(''); await loadOrgs();
       if (res.data?.org) await openOrg(res.data.org);
     } catch (e) { setErrMsg(e.message || 'Create failed'); }
     finally { setBusy(false); }
@@ -389,6 +430,8 @@ export default function MyCompanyView() {
               <input class="mc-input" value=${newSlug} placeholder="overscale" onInput=${(e) => setNewSlug(e.target.value)} required /></label>
             <label class="mc-label">${t('myCompany.name')}
               <input class="mc-input" value=${newName} placeholder="Overscale Solutions Oy" onInput=${(e) => setNewName(e.target.value)} required /></label>
+            <label class="mc-label">${t('myCompany.businessIdOptional')}
+              <input class="mc-input" value=${newBusinessId} placeholder="1234567-8" onInput=${(e) => setNewBusinessId(e.target.value)} /></label>
             <button class="btn-primary" type="submit" disabled=${busy}>${t('myCompany.create')}</button>
           </form>
         </aside>
@@ -397,12 +440,17 @@ export default function MyCompanyView() {
           ${!selected && html`<p class="mc-empty">${t('myCompany.selectHint')}</p>`}
           ${selected && html`
             <div class="mc-detail-head">
-              <h2 class="mc-col-title">${selected.name}</h2>
+              <div>
+                <h2 class="mc-col-title">${selected.name}</h2>
+                ${selected.businessId
+                  ? html`<span class="mc-mini">${t('myCompany.businessId')}: ${selected.businessId}</span>`
+                  : (selected.role === 'admin' ? html`<span class="mc-mini mc-warn">${t('myCompany.noBusinessId')}</span>` : null)}
+              </div>
               <span class="mc-wallet">${t('myCompany.wallet')}: <strong>${selected.wallet?.balance ?? 0}</strong> ${t('myCompany.morsels')}</span>
             </div>
 
             <div class="mc-subtabs">
-              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers'] : []), 'members'].map(id => html`
+              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'settings'] : []), 'members'].map(id => html`
                 <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
               <span class="mc-role-chip">${t('myCompany.role' + (selected.role || 'member').charAt(0).toUpperCase() + (selected.role || 'member').slice(1))}</span>
             </div>
@@ -420,6 +468,12 @@ export default function MyCompanyView() {
 
             ${subTab === 'orders' && html`<${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />`}
             ${subTab === 'customers' && html`<${CustomersPanel} slug=${selected.slug} />`}
+            ${subTab === 'settings' && html`<${SettingsPanel} org=${selected} onSaved=${(updated) => {
+              // Update in place (no loadOrgs → no loading flash that would remount the panel and drop the "saved ✓").
+              if (!updated) return;
+              setSelected(s => ({ ...s, ...updated }));
+              setOrgs(list => list.map(o => (o.slug === updated.slug && o.creatorOwner === updated.creatorOwner) ? { ...o, ...updated } : o));
+            }} />`}
             ${subTab === 'members' && html`<${MembersPanel} slug=${selected.slug} creatorOwner=${selected.creatorOwner} viewerRole=${selected.role} />`}
           `}
         </section>

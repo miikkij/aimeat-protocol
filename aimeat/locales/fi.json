@@ -601,7 +601,17 @@
     "morsels": "morselia",
     "enterpriseBadge": "Enterprise-ominaisuus",
     "enterpriseRequired": "Yrityskauppa vaatii AIMEAT Enterprise -version. Tämä node ajaa ilmaista Community-versiota.",
-    "loginRequired": "Kirjaudu sisään hallitaksesi yrityksiäsi."
+    "loginRequired": "Kirjaudu sisään hallitaksesi yrityksiäsi.",
+    "tabSettings": "Asetukset",
+    "businessId": "Y-tunnus",
+    "businessIdOptional": "Y-tunnus — valinnainen",
+    "businessIdHint": "Suomalainen muoto: 1234567-8. Vaaditaan myyntiin rekisteröitynä yrityksenä (KYB).",
+    "noBusinessId": "Y-tunnusta ei asetettu — lisää se Asetuksissa.",
+    "description": "Kuvaus",
+    "commission": "Yrityksen komissio %",
+    "commissionHint": "Yrityksen osuus jokaisesta myynnistä; loppu menee tarjoaman toteuttavalle jäsenelle. Oletus 20 %.",
+    "settingsSaved": "Asetukset tallennettu ✓",
+    "saveSettings": "Tallenna asetukset"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
