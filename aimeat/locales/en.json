@@ -694,7 +694,12 @@
     "pfPublish": "Publish portfolio",
     "pfPublished": "Portfolio published ✓",
     "pfNeedHtml": "Paste the HTML your AI produced first.",
-    "pfCopied": "Prompt copied ✓"
+    "pfCopied": "Prompt copied ✓",
+    "pfThemeHeading": "Ready-made theme",
+    "pfThemeHint": "Pick a theme and publish instantly — no AI needed. Uses your choices above.",
+    "pfPreview": "Preview",
+    "pfPublishTheme": "Publish with this theme",
+    "pfOrAi": "Or design your own with AI"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",

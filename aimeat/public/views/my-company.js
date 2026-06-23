@@ -26,6 +26,7 @@ import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
+import { THEMES, buildPortfolioData } from '/views/portfolio-themes.js';
 
 const html = htm.bind(h);
 
@@ -243,6 +244,7 @@ function PortfolioPanel({ org, offerings }) {
   const [includeInfo, setIncludeInfo] = useState(true);
   const [useLogo, setUseLogo] = useState(!!org.logo);
   const [look, setLook] = useState('');
+  const [themeId, setThemeId] = useState('minimal');
   const [prompt, setPrompt] = useState('');
   const [htmlIn, setHtmlIn] = useState('');
   const [busy, setBusy] = useState(false);
@@ -252,9 +254,29 @@ function PortfolioPanel({ org, offerings }) {
   useEffect(() => {
     apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`).then(r => {
       const c = r.data?.config; setCfg(c || null);
-      if (c) { setIncludeOfferings(c.includeOfferings !== false); setIncludeInfo(c.includeInfo !== false); setUseLogo(c.useLogo !== false && !!org.logo); setLook(c.lookDescription || ''); }
+      if (c) { setIncludeOfferings(c.includeOfferings !== false); setIncludeInfo(c.includeInfo !== false); setUseLogo(c.useLogo !== false && !!org.logo); setLook(c.lookDescription || ''); if (c.themeId) setThemeId(c.themeId); }
     }).catch(() => setCfg(null));
   }, [org.slug]);
+
+  const choices = () => ({ includeOfferings, includeInfo, useLogo, lookDescription: look });
+  function renderTheme() {
+    const theme = THEMES.find(x => x.id === themeId) || THEMES[0];
+    return theme.render(buildPortfolioData(org, offerings, choices()));
+  }
+  function previewTheme() {
+    const url = URL.createObjectURL(new Blob([renderTheme()], { type: 'text/html' }));
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  async function publishTheme() {
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const r = await apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/publish`, { html: renderTheme() });
+      apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { ...choices(), themeId }).catch(() => {});
+      setCfg(r.data?.portfolio); setMsg(t('myCompany.pfPublished'));
+    } catch (e) { setErr(e.message || 'Publish failed'); }
+    finally { setBusy(false); }
+  }
 
   function generate() {
     setPrompt(buildPortfolioPrompt(org, offerings, { includeOfferings, includeInfo, useLogo, lookDescription: look }));
@@ -295,9 +317,21 @@ function PortfolioPanel({ org, offerings }) {
       <label class="mc-checkbox-row"><input type="checkbox" checked=${includeInfo} onChange=${e => setIncludeInfo(e.target.checked)} /><span>${t('myCompany.pfIncludeInfo')}</span></label>
       <label class="mc-checkbox-row"><input type="checkbox" checked=${includeOfferings} onChange=${e => setIncludeOfferings(e.target.checked)} /><span>${t('myCompany.pfIncludeOfferings')} (${offerings.length})</span></label>
       <label class="mc-checkbox-row"><input type="checkbox" checked=${useLogo} disabled=${!org.logo} onChange=${e => setUseLogo(e.target.checked)} /><span>${t('myCompany.pfUseLogo')}${!org.logo ? ` — ${t('myCompany.pfNoLogo')}` : ''}</span></label>
+
+      <h3 class="mc-form-title">${t('myCompany.pfThemeHeading')}</h3>
+      <p class="mc-mini">${t('myCompany.pfThemeHint')}</p>
+      <div class="mc-theme-row">
+        ${THEMES.map(th => html`<button type="button" key=${th.id} class="mc-theme-btn ${themeId === th.id ? 'active' : ''}" onClick=${() => setThemeId(th.id)}>${th.name}</button>`)}
+      </div>
+      <div class="flex-row-wrap">
+        <button type="button" class="btn-outline btn-sm" onClick=${previewTheme}>${t('myCompany.pfPreview')}</button>
+        <button type="button" class="btn-primary btn-sm" disabled=${busy} onClick=${publishTheme}>${t('myCompany.pfPublishTheme')}</button>
+      </div>
+
+      <h3 class="mc-form-title">${t('myCompany.pfOrAi')}</h3>
       <label class="mc-label">${t('myCompany.pfLook')}
         <textarea class="mc-input" rows="3" value=${look} placeholder=${t('myCompany.pfLookPlaceholder')} onInput=${e => setLook(e.target.value)}></textarea></label>
-      <button class="btn-primary btn-sm" onClick=${generate}>${t('myCompany.pfGenerate')}</button>
+      <button type="button" class="btn-outline btn-sm" onClick=${generate}>${t('myCompany.pfGenerate')}</button>
 
       ${prompt && html`
         <h3 class="mc-form-title">${t('myCompany.pfStep2')}</h3>

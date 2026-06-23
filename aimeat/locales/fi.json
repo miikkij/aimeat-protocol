@@ -694,7 +694,12 @@
     "pfPublish": "Julkaise portfolio",
     "pfPublished": "Portfolio julkaistu ✓",
     "pfNeedHtml": "Liitä ensin AI:n tuottama HTML.",
-    "pfCopied": "Prompt kopioitu ✓"
+    "pfCopied": "Prompt kopioitu ✓",
+    "pfThemeHeading": "Valmis teema",
+    "pfThemeHint": "Valitse teema ja julkaise heti — ei AI:ta tarvita. Käyttää yllä tekemiäsi valintoja.",
+    "pfPreview": "Esikatsele",
+    "pfPublishTheme": "Julkaise tällä teemalla",
+    "pfOrAi": "Tai suunnittele oma tekoälyllä"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
