@@ -230,7 +230,7 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
         ${result.kind === 'result'
           ? html`<div class="mc-result-msg">${t('myCompany.orderPlacedResult')}</div><div class="mc-result-label">${t('myCompany.result')}</div><${DeliverableBody} value=${result.result} alt=${offer.title} format=${offer.deliverable?.format} />`
           : html`<div class="mc-result-msg">${t('myCompany.orderPlacedTask').replace('{agent}', o.agentName)}</div>`}
-        ${result.receipt?.charged > 0 && html`<div class="mc-receipt">${t('myCompany.charged').replace('{n}', result.receipt.charged)} → ${t('myCompany.wallet')} +${result.receipt.toOrgWallet}</div>`}
+        ${result.receipt?.charged > 0 && html`<div class="mc-receipt">${t('myCompany.charged').replace('{n}', result.receipt.charged)} → ${t('myCompany.byMember')} +${result.receipt.memberCut ?? 0} · ${t('myCompany.wallet')} +${result.receipt.orgCut ?? result.receipt.toOrgWallet ?? 0}</div>`}
       </div>`}
   `;
 
