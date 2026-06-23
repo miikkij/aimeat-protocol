@@ -82,8 +82,9 @@ function CustomersPanel({ slug }) {
     </ul>`;
 }
 
-/** Members & roles: list members, invite by username, set role, remove. */
-function MembersPanel({ slug, creatorOwner }) {
+/** Members & roles: list members, invite by username, set role, remove (admins manage). */
+function MembersPanel({ slug, creatorOwner, viewerRole }) {
+  const canManage = viewerRole === 'admin';
   const [members, setMembers] = useState(null);
   const [owner, setOwner] = useState('');
   const [role, setRole] = useState('member');
@@ -111,31 +112,34 @@ function MembersPanel({ slug, creatorOwner }) {
           <li class="mc-member" key=${m.owner}>
             <span class="mc-member-name">${m.owner}${isCreator ? html` <span class="mc-mini">(${t('myCompany.creator')})</span>` : ''}</span>
             <div class="flex-row-wrap">
-              <select class="input-field input-sm" value=${m.role} disabled=${isCreator} onChange=${(e) => changeRole(m, e.target.value)}>${roleOpts}</select>
-              ${!isCreator && html`<button class="btn-ghost btn-sm mc-remove" onClick=${() => remove(m)}>${t('myCompany.removeMember')}</button>`}
+              <select class="input-field input-sm" value=${m.role} disabled=${isCreator || !canManage} onChange=${(e) => changeRole(m, e.target.value)}>${roleOpts}</select>
+              ${canManage && !isCreator && html`<button class="btn-ghost btn-sm mc-remove" onClick=${() => remove(m)}>${t('myCompany.removeMember')}</button>`}
             </div>
           </li>`;
       })}
     </ul>
     ${err && html`<p class="mc-error">${err}</p>`}
-    <form class="mc-form" onSubmit=${add}>
-      <h3 class="mc-form-title">${t('myCompany.addMember')}</h3>
-      <div class="flex-row-wrap mc-manage-row">
-        <input class="input-field input-sm" placeholder=${t('myCompany.memberUsername')} value=${owner} onInput=${(e) => setOwner(e.target.value)} required />
-        <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>${roleOpts}</select>
-        <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
-      </div>
-    </form>`;
+    ${canManage && html`
+      <form class="mc-form" onSubmit=${add}>
+        <h3 class="mc-form-title">${t('myCompany.addMember')}</h3>
+        <div class="flex-row-wrap mc-manage-row">
+          <input class="input-field input-sm" placeholder=${t('myCompany.memberUsername')} value=${owner} onInput=${(e) => setOwner(e.target.value)} required />
+          <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>${roleOpts}</select>
+          <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
+        </div>
+      </form>`}`;
 }
 
 /** A catalog entry: the SAME offer card format as profile>offers + owner controls + an order box. */
-function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
+function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, role }) {
   const offer = o.offer;
+  const isOwn = (o.agentOwner ?? orgOwner) === callerOwner; // I own the underlying agent/offering
+  const isAdmin = role === 'admin';
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
-  // Admin controls — view the selling config; click Edit to change price/visibility, then Save.
+  // Controls — own offering: edit price/visibility; admin/own: remove from catalog.
   const [editMode, setEditMode] = useState(false);
   const [price, setPrice] = useState(offer.price?.morsels ?? 0);
   const [vis, setVis] = useState(offer.visibility ?? 'private');
@@ -198,11 +202,12 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged }) {
         <div class="mc-manage-head">
           <span class="of-label">${t('myCompany.manage')}</span>
           <div class="flex-row-wrap">
-            <button class="btn-outline btn-sm" onClick=${() => setEditMode(true)}>${t('myCompany.edit')}</button>
-            <button class="btn-ghost btn-sm mc-remove" disabled=${saving} onClick=${removeFromCatalog}>${t('myCompany.removeFromCatalog')}</button>
+            ${isOwn && html`<button class="btn-outline btn-sm" onClick=${() => setEditMode(true)}>${t('myCompany.edit')}</button>`}
+            ${(isAdmin || isOwn) && html`<button class="btn-ghost btn-sm mc-remove" disabled=${saving} onClick=${removeFromCatalog}>${t('myCompany.removeFromCatalog')}</button>`}
           </div>
         </div>
         <div class="mc-config">
+          ${!isOwn && html`<span class="mc-mini">${t('myCompany.byMember')}: <b>${o.agentOwner}</b></span>`}
           <span><b>${t('myCompany.visibilityLabel')}:</b> ${visLabel(offer.visibility)}</span>
           <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}</span>
           ${o.lastEditedBy
@@ -280,6 +285,7 @@ function OfferPicker({ slug, alreadyListed, onListed }) {
 
 export default function MyCompanyView() {
   useViewCSS('/css/views/my-company.css');
+  const callerOwner = (typeof window !== 'undefined' && window.AIMEAT?.auth?.getSession?.()?.owner) || '';
 
   const [state, setState] = useState('loading');
   const [orgs, setOrgs] = useState([]);
@@ -396,8 +402,9 @@ export default function MyCompanyView() {
             </div>
 
             <div class="mc-subtabs">
-              ${['catalog', 'orders', 'customers', 'members'].map(id => html`
+              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers'] : []), 'members'].map(id => html`
                 <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
+              <span class="mc-role-chip">${t('myCompany.role' + (selected.role || 'member').charAt(0).toUpperCase() + (selected.role || 'member').slice(1))}</span>
             </div>
 
             ${subTab === 'catalog' && html`
@@ -408,12 +415,12 @@ export default function MyCompanyView() {
               ${showPicker && html`<div class="mc-picker"><p class="mc-pick-hint">${t('myCompany.pickHint')}</p><${OfferPicker} slug=${selected.slug} alreadyListed=${listedKeys} onListed=${() => openOrg(selected)} /></div>`}
               ${offerings.length === 0 && !showPicker && html`<p class="mc-empty">${t('myCompany.noOfferings')}</p>`}
               <ul class="mc-off-list">
-                ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
+                ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} callerOwner=${callerOwner} role=${selected.role} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
               </ul>`}
 
             ${subTab === 'orders' && html`<${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />`}
             ${subTab === 'customers' && html`<${CustomersPanel} slug=${selected.slug} />`}
-            ${subTab === 'members' && html`<${MembersPanel} slug=${selected.slug} creatorOwner=${selected.creatorOwner} />`}
+            ${subTab === 'members' && html`<${MembersPanel} slug=${selected.slug} creatorOwner=${selected.creatorOwner} viewerRole=${selected.role} />`}
           `}
         </section>
       </div>

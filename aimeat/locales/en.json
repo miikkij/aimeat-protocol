@@ -543,6 +543,7 @@
     "orderCount": "Orders",
     "lastOrder": "Last order",
     "creator": "creator",
+    "byMember": "Offered by",
     "roleAdmin": "Admin",
     "roleMember": "Member",
     "roleVisitor": "Visitor",

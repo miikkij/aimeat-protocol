@@ -543,6 +543,7 @@
     "orderCount": "Tilauksia",
     "lastOrder": "Viimeisin tilaus",
     "creator": "perustaja",
+    "byMember": "Tarjoaa",
     "roleAdmin": "Ylläpitäjä",
     "roleMember": "Jäsen",
     "roleVisitor": "Vierailija",
