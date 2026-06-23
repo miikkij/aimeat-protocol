@@ -29,6 +29,9 @@
  * @usage import { presence } from '../services/presence.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial presence feature (local + federated, change-driven push).
+ *   v1.1.0 — 2026-06-23 — Agent/app (GAII/GEAI) presence: a principal now reports its OWN liveness, not
+ *     its owner's — a live connect-tunnel socket → available, recently-seen (lastSeen) → away, else
+ *     offline (LOCAL principals only). Previously a GAII fell through to `unknown`.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -37,6 +40,7 @@ import { sign } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { logger } from '../utils/logger.js';
 
 export type RawStatus = 'available' | 'busy' | 'away' | 'offline';
@@ -72,6 +76,8 @@ const VISIBILITIES = new Set<Visibility>(['everyone', 'contacts', 'nobody']);
 
 const CONFIG_CACHE_TTL_MS = 30_000;
 const FLUSH_INTERVAL_MS = 60_000; // "at most once a minute" per the federation design
+const AGENT_RECENT_MS = 5 * 60_000;     // no live socket but seen within this → 'away' (amber)
+const AGENT_SEEN_CACHE_TTL_MS = 15_000; // cache an agent's lastSeen briefly (avoid per-refresh DB hits)
 
 /** Canonical string that a node signs (and a receiver verifies) for a presence push. */
 export function presenceSignString(fromNodeId: string, timestamp: string, updates: PresenceUpdate[]): string {
@@ -114,6 +120,7 @@ export class PresenceTracker {
   private lastBroadcast = new Map<string, VisibleStatus>(); // ghii → last status pushed to peers
   private dirty = new Set<string>();                 // local ghiis with a pending delta
   private configCache = new Map<string, { cfg: PresenceConfig; exp: number }>();
+  private agentSeenCache = new Map<string, { lastSeen: string | null; exp: number }>(); // agent GAII → lastSeen
 
   // ── Remote (federated) cache ──
   private remote = new Map<string, RemoteEntry>();   // full ghii (owner@remoteNode) → entry
@@ -239,6 +246,10 @@ export class PresenceTracker {
   async getVisible(viewerGhii: string, targetGhii: string): Promise<PresenceView> {
     if (viewerGhii === targetGhii) return this.getOwnStatus(targetGhii);
 
+    // An agent/app principal (GAII/GEAI, has '#') reports its OWN liveness, not its owner's: a connected
+    // tunnel socket → available; recently seen → away; else offline. Only LOCAL principals are knowable.
+    if (targetGhii.includes('#')) return this.getAgentStatus(targetGhii);
+
     if (this.isLocalGhii(targetGhii)) {
       const cfg = await this.getConfig(targetGhii);
       const raw = this.rawStatus(cfg, this.isOnline(targetGhii));
@@ -258,6 +269,34 @@ export class PresenceTracker {
 
   async getVisibleMany(viewerGhii: string, targets: string[]): Promise<PresenceView[]> {
     return Promise.all(targets.map(t => this.getVisible(viewerGhii, t)));
+  }
+
+  /** Liveness of an agent/app principal (GAII/GEAI). LOCAL only — a remote node owns its principals'
+   *  state, so a remote GAII is `unknown` (presence reads are always local). */
+  private async getAgentStatus(gaii: string): Promise<PresenceView> {
+    const { node } = parseGaiiLoose(gaii);
+    if (!this.config || node !== this.config.nodeId) return { ghii: gaii, status: 'unknown', since: null };
+
+    // A live tunnel socket is the strongest "running right now" signal (in-memory, no DB).
+    if (getActiveConnectTunnelManager()?.isConnected(gaii)) return { ghii: gaii, status: 'available', since: null };
+
+    // No socket: recently-seen (last heartbeat/activity) → away; otherwise offline.
+    const lastSeen = await this.getAgentLastSeen(gaii);
+    if (lastSeen && Date.now() - new Date(lastSeen).getTime() < AGENT_RECENT_MS) {
+      return { ghii: gaii, status: 'away', since: lastSeen };
+    }
+    return { ghii: gaii, status: 'offline', since: lastSeen };
+  }
+
+  private async getAgentLastSeen(gaii: string): Promise<string | null> {
+    const cached = this.agentSeenCache.get(gaii);
+    if (cached && cached.exp > Date.now()) return cached.lastSeen;
+    let lastSeen: string | null = null;
+    if (this.storage) {
+      try { lastSeen = (await this.storage.getAgent(gaii))?.lastSeen ?? null; } catch { /* none */ }
+    }
+    this.agentSeenCache.set(gaii, { lastSeen, exp: Date.now() + AGENT_SEEN_CACHE_TTL_MS });
+    return lastSeen;
   }
 
   private async isContact(targetGhii: string, viewerGhii: string): Promise<boolean> {
