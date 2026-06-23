@@ -11,6 +11,8 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.12.1 -- 2026-06-23 -- Operator broadcast audience is now a select: All node users OR All federation
+ *     users (genesis operator → every owner across the federation; delegated per-peer fan-out server-side).
  *   v1.12.0 -- 2026-06-23 -- Operator broadcast: an operator sees an "📣 All node users" audience in the
  *     broadcast compose (sends audience:'node-users', gated operator-only server-side) — e.g. a node-wide
  *     announcement. Announcement read stats are in the existing Results view (delivered/read per recipient).
@@ -602,7 +604,7 @@ export default function InboxTab({ showToast }) {
   const [bcGroupId, setBcGroupId] = useState('');         // broadcast: optional Share Group audience
   const [bcType, setBcType] = useState('message');        // broadcast content: 'message' | 'poll'
   const [bcQuestions, setBcQuestions] = useState([]);     // poll: the questions being built
-  const [bcNodeUsers, setBcNodeUsers] = useState(false);  // broadcast: target ALL node users (operator)
+  const [bcAudience, setBcAudience] = useState('');       // broadcast: '' | 'node-users' | 'federation-users' (operator)
   const isOperator = (getSession()?.roles || []).includes('operator');
   const [myGroups, setMyGroups] = useState([]);           // the owner's Share Groups (audiences)
   const [resultsId, setResultsId] = useState(null);       // broadcast id whose results are shown
@@ -848,7 +850,7 @@ export default function InboxTab({ showToast }) {
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
-  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcNodeUsers(false); };
+  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcAudience(''); };
   const addBcRecipient = (id) => {
     const v = (id ?? bcInput).trim();
     if (v && !bcRecipients.includes(v)) setBcRecipients([...bcRecipients, v]);
@@ -861,7 +863,7 @@ export default function InboxTab({ showToast }) {
   const doBroadcast = async (_recipient, text, files, reset) => {
     if (sending) return;
     const body = (text || '').trim();
-    if (bcRecipients.length === 0 && !bcGroupId && !bcNodeUsers) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
+    if (bcRecipients.length === 0 && !bcGroupId && !bcAudience) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
 
     let interactive;
     if (bcType === 'poll') {
@@ -885,7 +887,7 @@ export default function InboxTab({ showToast }) {
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
       const resp = await messages.sendBroadcast({
-        to: bcRecipients, groupId: bcGroupId || undefined, audience: bcNodeUsers ? 'node-users' : undefined,
+        to: bcRecipients, groupId: bcGroupId || undefined, audience: bcAudience || undefined,
         mode: bcType === 'poll' ? 'broadcast' : bcMode,   // a poll must be repliable (recipients answer)
         body, attachments, interactive,
       });
@@ -1289,12 +1291,13 @@ export default function InboxTab({ showToast }) {
                 <option value="">${t('inbox.bcNoGroup')}</option>
                 ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
               </select>` : null}
-              ${isOperator ? html`<label class=${`inbox-bc-nodeusers${bcNodeUsers ? ' inbox-bc-nodeusers--on' : ''}`}>
-                <input type="checkbox" checked=${bcNodeUsers} onChange=${(e) => setBcNodeUsers(e.target.checked)} />
-                <span>📣 ${t('inbox.bcNodeUsers')}</span>
-              </label>` : null}
+              ${isOperator ? html`<select class=${`inbox-input${bcAudience ? ' inbox-bc-audience--on' : ''}`} value=${bcAudience} onChange=${(e) => setBcAudience(e.target.value)}>
+                <option value="">${t('inbox.bcNoAudience')}</option>
+                <option value="node-users">📣 ${t('inbox.bcNodeUsers')}</option>
+                <option value="federation-users">🌐 ${t('inbox.bcFederationUsers')}</option>
+              </select>` : null}
             </div>
-            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId || bcNodeUsers) ? 'bc' : ''}
+            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId || bcAudience) ? 'bc' : ''}
               sendLabel=${bcType === 'poll' ? t('inbox.pollSend') : t('inbox.bcSend')} sending=${sending} onSend=${doBroadcast} />
           </div>` : null}
 

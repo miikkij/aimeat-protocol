@@ -12,7 +12,7 @@
  */
 
 import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -28,7 +28,7 @@ import { emitChange, emitDelivery } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { notify } from '../services/notify.js';
 import { parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
-import { messagePreview } from '../utils/messaging.js';
+import { messagePreview, conversationIdFor } from '../utils/messaging.js';
 import { generateDownloadToken } from '../services/download-token.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
@@ -265,6 +265,67 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
         }
 
         res.json(success(config.nodeId, { delivered: true, state }));
+    });
+
+    // POST /v1/federation/broadcast — Receive a federation-wide announcement from a peer operator and
+    // deliver it to THIS node's own owners (the delegated federation broadcast: one frame per peer, the
+    // peer fans out locally). Accepted only from active peers; the first-contact gate is auto-accepted so
+    // the announcement lands in each owner's inbox.
+    router.post('/v1/federation/broadcast', async (req, res) => {
+        const { source_node, broadcast, timestamp, signature } = req.body ?? {};
+        if (!source_node || !broadcast || typeof broadcast.senderGhii !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and broadcast{senderGhii} are required'));
+            return;
+        }
+        const peer = [...peers.values()].find(p => p.nodeId === source_node);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+        if (!signature || !peer.publicKey) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer key'));
+            return;
+        }
+        const payload = JSON.stringify({ source_node, broadcast, timestamp });
+        if (!await verify(peer.publicKey, payload, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on broadcast'));
+            return;
+        }
+
+        const senderGhii: string = broadcast.senderGhii;
+        const now = new Date().toISOString();
+        const ghiis = await storage.listGHIIs();
+        let delivered = 0;
+        for (const g of ghiis) {
+            try {
+                if (g.ghii === senderGhii) continue; // don't deliver back to the sender if they're local
+                // Respect a block: a recipient who blocked the sender does NOT get the announcement.
+                const existing = await storage.getContact(g.ghii, senderGhii).catch(() => null);
+                if (existing?.state === 'blocked') continue;
+                const conversationId = conversationIdFor(senderGhii, g.ghii);
+                const id = randomUUID();
+                // Operator announcement: auto-accept a NEW contact so it lands in the inbox, not requests.
+                if (!existing) await storage.setContactState(g.ghii, senderGhii, 'accepted', id).catch(() => { /* best-effort */ });
+                await storage.createDirectMessage({
+                    id, ownerGhii: g.ghii, conversationId, senderGhii, recipientGhii: g.ghii,
+                    body: broadcast.body ?? '', interactive: broadcast.interactive ?? undefined,
+                    broadcastId: broadcast.broadcastId, respondable: broadcast.respondable,
+                    status: 'delivered', direction: 'inbound', origin: 'federation', originNodeId: source_node,
+                    createdAt: broadcast.createdAt ?? now, deliveredAt: now,
+                });
+                await notify(storage, g.ghii, {
+                    type: 'direct_message',
+                    title: `Announcement from ${senderGhii}`,
+                    body: messagePreview(broadcast.body ?? ''),
+                    link: `/v1/profile#inbox/${conversationId}`,
+                });
+                delivered++;
+            } catch (err) {
+                logger.warn('Federation broadcast: failed to deliver to a local owner', { error: (err as Error).message });
+            }
+        }
+        emitChange('messages');
+        res.json(success(config.nodeId, { delivered }));
     });
 
     // POST /v1/federation/message/receipt — Receive a delivery/read receipt from the recipient node.

@@ -25,7 +25,9 @@
   "inbox.bcSend": "Send to all",
   "inbox.bcNoRecipients": "Add at least one recipient or a group",
   "inbox.bcSent": "Broadcast sent",
+  "inbox.bcNoAudience": "— Audience (optional) —",
   "inbox.bcNodeUsers": "All node users (operator)",
+  "inbox.bcFederationUsers": "All federation users (operator)",
   "inbox.announcementNote": "Announcement — replies are disabled",
   "inbox.bcTypeMessage": "Message",
   "inbox.bcTypePoll": "Poll",
@@ -549,6 +551,16 @@
     "orderResult": "Done — result below.",
     "orderTask": "Order received — the seller's agent {agent} will handle it.",
     "charged": "Charged {n} morsels",
+    "myOrders": "My orders",
+    "noMyOrders": "You haven't ordered anything yet.",
+    "done": "Done",
+    "free": "Free",
+    "fromCompany": "Company",
+    "stQueued": "Queued",
+    "stActive": "In progress",
+    "stDone": "Done",
+    "stFailed": "Failed",
+    "stInstant": "Instant",
     "enterpriseRequired": "The company directory requires the AIMEAT Enterprise edition. This node runs the free Community edition."
   },
   "myCompany": {
@@ -637,7 +649,8 @@
     "commission": "Company commission %",
     "commissionHint": "The company's cut of each sale; the rest goes to the fulfilling member. Default 20%.",
     "settingsSaved": "Settings saved ✓",
-    "saveSettings": "Save settings"
+    "saveSettings": "Save settings",
+    "receiptLabel": "Receipt"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",
