@@ -127,3 +127,9 @@ docs/internal/
 # Local dev-server log (from PowerShell pnpm dev redirect)
 .devlog.txt
 .devlog.err.txt
+.devlog/
+
+# Local verification artifacts (Playwright MCP browser-drive output + screenshots)
+.playwright-mcp/
+/secretary-phase0-view.png
+/niputus-verify.png
