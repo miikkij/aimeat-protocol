@@ -1,3 +1,14 @@
+/**
+ * @file catalogue.ts
+ * @description Public (Tier-0) discovery catalogue — node-global, mostly unauthenticated listings of
+ *   actions, agents, and boards, plus the people/organism directory and catalogue hash for federation
+ *   sync. Node-global scans are cached (~30s) and invalidated by domain tags. Agents tagged `unlisted`
+ *   (e.g. the per-owner Secretary) are excluded from the public agent listing.
+ * @structure catalogueRouter(config, storage, directoryService?, getRealtimeStats?) — GET /v1/catalogue,
+ *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
+ * @version-history
+ *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
+ */
 import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -104,7 +115,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
-    const agents = await cachedAgents();
+    // Hide `unlisted` agents from the public directory (e.g. the per-owner Secretary, which is
+    // visible to its owner via /v1/agents but is not a marketplace agent). Generic convention.
+    const agents = (await cachedAgents()).filter(a => !(a.tags ?? []).includes('unlisted'));
     const start = (page - 1) * perPage;
     const paged = agents.slice(start, start + perPage);
 

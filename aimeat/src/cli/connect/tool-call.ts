@@ -352,6 +352,22 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_ask',
+        handler: ({ client }, input) => {
+            const questions = optionalArray(input, 'questions');
+            if (!questions) throw new Error('Missing required array field: questions');
+            const submitLabel = optionalString(input, 'submit_label');
+            const body: JsonObject = {
+                to: requiredString(input, 'to'),
+                interactive: { role: 'questions', v: 1, questions, ...(submitLabel ? { submitLabel } : {}) },
+            };
+            const intro = optionalString(input, 'body'); if (intro) body.body = intro;
+            const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
+            const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
+            return client.post('/v1/messages', body);
+        },
+    },
+    {
         name: 'aimeat_dm_inbox',
         description: 'Read recent federated DMs addressed to this agent (replies + messages people sent you), newest first.',
         input: {
@@ -517,6 +533,22 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_catalogue_search',
         handler: ({ client }, input) => client.get(`/v1/catalogue${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_discover',
+        handler: ({ client }, input) => {
+            const q = query({
+                q: optionalString(input, 'q'),
+                type: optionalString(input, 'type'),
+                tags: optionalString(input, 'tags'),
+                segment: optionalString(input, 'segment'),
+                scope: optionalString(input, 'scope'),
+                per_page: optionalNumber(input, 'limit'),
+            });
+            // mode=map → facet counts only; mode=find (default) → ranked entries.
+            const path = optionalString(input, 'mode') === 'map' ? '/v1/discover/facets' : '/v1/discover';
+            return client.get(`${path}${q}`);
+        },
     },
     {
         name: 'aimeat_agent_profile',
@@ -805,6 +837,23 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}`),
     },
     {
+        name: 'aimeat_organism_overview',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/overview`),
+    },
+    {
+        name: 'aimeat_organism_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const name = optionalString(input, 'name'); if (name !== undefined) body.name = name;
+            const description = optionalString(input, 'description'); if (description !== undefined) body.description = description;
+            const readme = optionalString(input, 'readme'); if (readme !== undefined) body.readme = readme;
+            const interests = optionalArray(input, 'interests'); if (interests) body.interests = interests;
+            const joinPolicy = optionalString(input, 'join_policy'); if (joinPolicy) body.join_policy = joinPolicy;
+            const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}`, body);
+        },
+    },
+    {
         name: 'aimeat_organism_join',
         handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/join`),
     },
@@ -929,6 +978,10 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_workspace_read',
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`),
+    },
+    {
+        name: 'aimeat_workspace_overview',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/overview${query({ ws: requiredString(input, 'ws') })}`),
     },
     {
         name: 'aimeat_workspace_write',

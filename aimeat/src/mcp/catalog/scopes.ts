@@ -18,6 +18,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.1.0 -- 2026-06-23 -- Add the `secretary` scope profile (Secretary feature Phase 0).
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 
@@ -118,6 +119,11 @@ export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
     appdev: ['memory:read', 'memory:write'],
     'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
+    // The personal Secretary's Community scope set: read-heavy, owns its own organism/workspaces,
+    // drafts freely, but never spends or reaches outside the owner's boundary on its own. Outbound
+    // (messages:send), transactional (work:*), wallet, social-write, consent, and ext lifecycle are
+    // the Enterprise-only `secretary-enterprise` superset (see docs/plans/2026-06-23-secretary-feature.md §9).
+    secretary: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'messages:read', 'workflow:read'],
     interactive: ['*'],
     autonomous: ['*'],
     workstation: ['*'],

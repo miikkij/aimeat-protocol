@@ -12,6 +12,7 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.3.0 — 2026-06-23 — Auto-provision the owner's Secretary agent when an OpenRouter key is saved (Secretary Phase 0).
  *   v1.2.0 — 2026-04-01 — Add temperature/top_p/max_tokens model parameters
  *   v1.1.0 — 2026-03-21 — Add provider type (openrouter/lmstudio/custom) support
  *   v1.0.0 — 2026-03-20 — Initial implementation
@@ -28,6 +29,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { complete, listModels } from '../services/openrouter.js';
+import { ensureSecretary } from '../services/secretary.js';
 
 function validateProviderUrl(url: string): string | null {
   try {
@@ -159,6 +161,18 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       if (max_tokens !== undefined) prefs.max_tokens = (max_tokens === null || isNaN(Number(max_tokens))) ? null : Math.max(1, Math.min(128000, Math.floor(Number(max_tokens))));
 
       await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
+
+      // Auto-provision the owner's Secretary whenever OpenRouter is configured (idempotent; see
+      // docs/plans/2026-06-23-secretary-feature.md Phase 0). Gated on the key actually being present
+      // — so it covers both "key just set" and "existing-key owner tweaks settings", but never an
+      // lmstudio/custom save with no key. Best-effort: provisioning must not block saving settings.
+      try {
+        const keyRec = await storage.getMemory(gaii, 'openrouter.apikey');
+        const hasKey = !!((keyRec?.value as { encrypted?: string } | undefined)?.encrypted);
+        if (hasKey) await ensureSecretary(storage, config, req.auth!.owner as string);
+      } catch (err) {
+        logger.warn('[secretary] auto-provision on settings save failed', { error: String(err) });
+      }
 
       res.json(success(config.nodeId, { saved: true }));
     });

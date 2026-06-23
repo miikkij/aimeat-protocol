@@ -30,7 +30,10 @@ All notable changes to AIMEAT are documented in this file.
 - **MCP surface reconciliation.** Registered previously-missing connector tools
   (`aimeat_organism_overview`, `aimeat_workspace_overview`, `aimeat_dm_ask`, `aimeat_organism_update`)
   and placed `aimeat_organism_update` on the appdev/agent/service surfaces, so the connector
-  (`aimeat connect serve`) now fully mirrors every v2 MCP surface.
+  (`aimeat connect serve`) now fully mirrors every v2 MCP surface. Also added shell-callable
+  (`aimeat connect call`) handlers for `aimeat_discover` + those four, and gave the CLI-only
+  `aimeat_agent_statistics` a catalog entry — closing the `connect tools` ↔ `connect call` parity gaps
+  (every listed tool is now actually callable).
 
 ## [1.31.0] - 2026-06-23
 
