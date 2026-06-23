@@ -502,12 +502,8 @@
 .inbox-bc-chip-x:hover { color: var(--danger); background: var(--card-bg); }
 .inbox-bc-add { display: flex; gap: 8px; }
 .inbox-bc-add .inbox-input { flex: 1; }
-.inbox-bc-nodeusers {
-  display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
-  padding: 8px 10px; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); background: var(--accent-subtle);
-}
-.inbox-bc-nodeusers input { accent-color: var(--accent); }
-.inbox-bc-nodeusers--on { border-color: var(--accent); }
+/* Operator audience select (all node / all federation users). */
+.inbox-bc-audience--on { border-color: var(--accent); background: var(--accent-subtle); }
 
 /* Announcement note shown in place of the reply composer (read-only thread). */
 .inbox-announce-note {
@@ -542,3 +538,40 @@
 .inbox-results-others { font-size: 12px; color: var(--text-dim); }
 .inbox-results-reclist { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
 .inbox-results-rec { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
+
+/* ── Agent capabilities in chat: command chips + fill-in form (Phase A) ── */
+.inbox-cmdbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 8px 12px; border-top: 1px solid var(--border-subtle);
+}
+.inbox-cmdbar-label { font-size: 12px; color: var(--text-dim); margin-right: 2px; }
+.inbox-cmd-chip {
+  border: 1px solid var(--accent-border); background: var(--accent-subtle); color: var(--text);
+  font-size: 12px; padding: 4px 10px; border-radius: var(--radius-full); cursor: pointer;
+}
+.inbox-cmd-chip:hover { border-color: var(--accent); }
+.inbox-cmdfill {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; border-top: 1px solid var(--border-subtle); background: var(--card-bg-alt);
+}
+.inbox-cmdfill-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+.inbox-cmdfill-desc { font-size: 12px; color: var(--text-dim); }
+.inbox-cmdfill-field { display: flex; flex-direction: column; gap: 3px; }
+.inbox-cmdfill-pname { font-size: 12px; color: var(--text-dim); }
+.inbox-cmdfill-go { align-self: flex-start; }
+
+/* ── Agent schedule panel (Phase B — own agents only) ── */
+.inbox-sched-btn { margin-left: auto; }
+.inbox-sched-btn--on { background: var(--accent-subtle); border-color: var(--accent); }
+.inbox-sched {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 10px 12px; border-top: 1px solid var(--border-subtle); background: var(--card-bg-alt);
+}
+.inbox-sched-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+.inbox-sched-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.inbox-sched-item { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.inbox-sched-name { color: var(--text); }
+.inbox-sched-cron { color: var(--text-dim); font-family: var(--font-mono, monospace); font-size: 12px; }
+.inbox-sched-new { display: flex; flex-direction: column; gap: 6px; }
+.inbox-sched-new .btn-primary { align-self: flex-start; }
+.inbox-sched-desc { min-height: 38px; resize: vertical; }
