@@ -226,6 +226,13 @@ export class ConnectTunnelManager {
     setTokenRevokedHook((token) => this.onTokenRevoked(token));
   }
 
+  /** Is `principal` (a GAII/GEAI) currently holding a live tunnel socket? Used by presence to show an
+   *  agent as online while its serve daemon is connected. */
+  isConnected(principal: string): boolean {
+    const conn = this.connections.get(principal);
+    return !!conn && conn.ws.readyState === WebSocket.OPEN;
+  }
+
   private onDelivery(evt: DeliveryEvent): void {
     const conn = this.connections.get(evt.target);
     if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;          // offline → backlog handles it

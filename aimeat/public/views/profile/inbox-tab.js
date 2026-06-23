@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.7.3 -- 2026-06-23 -- Show an AGENT's own presence dot on its conversation row (a nested agent row
+ *     now renders <PresenceDot> for the agent GAII — connected = available, recently-seen = away, else
+ *     offline — instead of nothing). The owner group header still shows the human's presence.
  *   v1.7.2 -- 2026-06-23 -- Delivery ticks now distinguish delivered from sent: delivered = ✓✓ (grey,
  *     "reached the mailbox" — incl. agent threads, which never send a read receipt), read = ✓✓ coloured,
  *     sent = ✓, queued = clock. Previously delivered rendered as a single ✓ identical to sent, so an
@@ -820,7 +823,7 @@ export default function InboxTab({ showToast }) {
         ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
         <div class="inbox-conv-main">
           <div class="inbox-conv-line1">
-            <span class="inbox-name">${escHtml(label)} ${nested ? '' : html`<${PresenceDot} ghii=${c.peerGhii} />`}</span>
+            <span class="inbox-name">${escHtml(label)} ${(!nested || c.peerGhii?.includes('#')) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
             <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
           </div>
           <div class="inbox-conv-line2">
