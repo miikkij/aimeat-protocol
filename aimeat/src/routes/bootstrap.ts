@@ -212,6 +212,8 @@ export function bootstrapRouter(
             requires_registration: false,
             guide: 'Show them what the node has: browse the public catalogue for available services, check node statistics, look at public discussion boards, and browse available apps. All of these work without any authentication.',
             tier_0_endpoints: [
+              `GET ${base}/v1/discover?scope=public - MASTER DIRECTORY: one faceted search across every domain (capabilities, workflows, knowledge, companies+offerings, apps, documents…). Start here.`,
+              `GET ${base}/v1/discover/facets?scope=public - map mode: counts by type/segment/tag (what exists here, before pulling content)`,
               `GET ${base}/v1/catalogue - browse all public actions, agents, boards`,
               `GET ${base}/v1/stats - node statistics (agents, actions, economy)`,
               `GET ${base}/v1/apps - downloadable apps directory`,
@@ -374,6 +376,7 @@ export function bootstrapRouter(
                 aimeat_memory_read: `GET ${base}/v1/memory/{key}`,
                 aimeat_memory_write: `PUT ${base}/v1/memory/{key} with body { "value": ..., "visibility": "private|owner|public" }`,
                 aimeat_memory_search: `GET ${base}/v1/memory/search?q={query}`,
+                aimeat_discover: `GET ${base}/v1/discover?mode=find&scope={own|public|shared}&q={query}&type={csv}&tags={csv} (map mode: ${base}/v1/discover/facets)`,
                 aimeat_knowledge_list: `GET ${base}/v1/catalogue/knowledge`,
                 aimeat_knowledge_get: `GET ${base}/v1/knowledge/{package_id}`,
                 aimeat_knowledge_links: `GET ${base}/v1/knowledge/{package_id}/links`,

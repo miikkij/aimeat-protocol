@@ -110,6 +110,36 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, resp.data ?? resp));
   });
 
+  // ── Master directory (cross-domain discovery) ───────────────────────
+
+  mcp.tool('aimeat_discover', descriptionFor('aimeat_discover'), {
+    agent_name: agentNameSchema,
+    mode: z.enum(['map', 'find']).optional().describe('"find" (default) returns entries; "map" returns only facet counts'),
+    q: z.string().optional().describe('Free-text query; omit to browse by filters'),
+    type: z.string().optional().describe('CSV of types to include'),
+    tags: z.string().optional().describe('CSV of tags; an entry must carry ALL'),
+    segment: z.string().optional().describe('CSV of segments to include'),
+    scope: z.enum(['own', 'public', 'shared']).optional().describe('own (default), public, or shared'),
+    limit: z.number().optional().describe('Max entries (default 20, max 100)'),
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_discover'), async ({ agent_name, mode, q, type, tags, segment, scope, limit, response_format }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (type) params.set('type', type);
+    if (tags) params.set('tags', tags);
+    if (segment) params.set('segment', segment);
+    if (scope) params.set('scope', scope);
+    if (typeof limit === 'number') params.set('per_page', String(limit));
+    const qs2 = params.toString() ? `?${params.toString()}` : '';
+    if (mode === 'map') {
+      const resp = await client.get(`/v1/discover/facets${qs2}`);
+      return jsonContent(resp.data ?? resp);
+    }
+    const resp = await client.get(`/v1/discover${qs2}`);
+    return jsonContent(shapeResponse('aimeat_discover', response_format, resp.data ?? resp));
+  });
+
   // ── Agent profile ──────────────────────────────────────────────────
 
   mcp.tool(

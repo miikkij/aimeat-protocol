@@ -9,7 +9,7 @@
  *   applying the per-record read-authorization BEFORE passing records to the count/event helpers
  *   (participants deliberately runs over the raw bucket, matching the existing participants endpoint).
  * @structure
- *   - deriveWorkspaceEvents(readable, manifest, root) — publish/draft events (newest-first not guaranteed)
+ *   - deriveWorkspaceEvents(readable, manifest, root) — publish/draft events incl. direct writes (newest-first not guaranteed)
  *   - latestWorkspaceEvent(readable, manifest, root)   — the single most-recent event, or null
  *   - countWorkspaceInstances(readable, manifest, root) — { recs, docs } distinct-instance counts
  *   - aggregateParticipants(records, opts)             — node→owner participation (agentsCount only)
@@ -17,6 +17,9 @@
  * @version-history
  *   v1.0.0 -- 2026-06-22 -- Extracted from organisms.ts per-ws endpoints to back the batch
  *     ?include=enrichment workspace list (kills the 3N per-workspace fetch fan-out).
+ *   v1.1.0 -- 2026-06-23 -- deriveWorkspaceEvents now emits a publish event for current content
+ *     (`.latest`/bare) that has no `.version.N`, so direct writes (notebook docs pre-fix, agent/import
+ *     writes that skip draft→publish) appear in the activity log/heatmap instead of going unnoticed.
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -40,38 +43,66 @@ export interface WorkspaceEvent {
 }
 
 /**
- * Derive publish/draft events from a workspace's (already read-authorized) records — identical logic
- * to GET /workspace/activity: `.draft` → draft@updatedAt, `.version.N` → publish@createdAt; bare /
- * `.latest` are skipped (publishes come from `.version.N`, avoids double-count); meta./access. skipped.
- * `root` is the workspace root WITHOUT a trailing dot, e.g. `organism.{id}.w.{ws}`.
+ * Derive publish/draft events from a workspace's (already read-authorized) records. The feed is a
+ * reconstruction of CURRENT memory state, not an append-only log, so events come from the key shape:
+ *   - `.draft`     → a `draft` (edit) event @updatedAt — exists only while a draft is open.
+ *   - `.version.N` → a `publish` event @createdAt — the persistent record of a publish.
+ *   - bare / `.latest` with NO `.version.N` for that instance → a `publish` event @updatedAt. This is
+ *     the "direct write" case: content written straight to `.latest`/bare (an agent, an import, or any
+ *     path that skips draft→publish) would otherwise emit NOTHING and go unnoticed in the activity
+ *     log / heatmap. When a `.version.N` DOES exist, the bare/`.latest` pointer is ignored (the publish
+ *     events already cover it — avoids double-counting).
+ * meta./access. keys are skipped. `root` is the workspace root WITHOUT a trailing dot, e.g.
+ * `organism.{id}.w.{ws}`.
  */
 export function deriveWorkspaceEvents(readable: MemoryRecord[], manifest: Record<string, unknown> | null | undefined, root: string): WorkspaceEvent[] {
   const types = objectTypesOf(manifest);
   const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
   const modeByNs = new Map(types.filter(o => o.namespace).map(o => [o.namespace as string, o.mode === 'document' ? 'document' : 'records'] as const));
-  const events: WorkspaceEvent[] = [];
+
+  // Group each instance's records so a direct write (current content, no version history) can be told
+  // apart from a normal publish (which has `.version.N`).
+  interface Slot { ns: string; instance: string; draft?: MemoryRecord; versions: MemoryRecord[]; current?: MemoryRecord }
+  const slots = new Map<string, Slot>();
   for (const r of readable) {
     const rel = r.key.slice(root.length + 1);
     if (rel.startsWith('meta.') || rel.startsWith('access.')) continue;
     const parts = rel.split('.');
     const last = parts[parts.length - 1];
     const secondLast = parts[parts.length - 2];
-    let action: 'publish' | 'draft';
+    let role: 'draft' | 'version' | 'latest' | 'bare';
     let core: string[];
-    if (last === 'draft') { action = 'draft'; core = parts.slice(0, -1); }
-    else if (secondLast === 'version' && /^\d+$/.test(last)) { action = 'publish'; core = parts.slice(0, -2); }
-    else continue;
+    if (last === 'draft') { role = 'draft'; core = parts.slice(0, -1); }
+    else if (secondLast === 'version' && /^\d+$/.test(last)) { role = 'version'; core = parts.slice(0, -2); }
+    else if (last === 'latest') { role = 'latest'; core = parts.slice(0, -1); }
+    else { role = 'bare'; core = parts; }
     const instance = core[core.length - 1];
     const namespace = core.slice(0, -1).join('.');
     if (!instance || !namespace) continue;
+    const k = `${namespace}.${instance}`;
+    let s = slots.get(k);
+    if (!s) { s = { ns: namespace, instance, versions: [] }; slots.set(k, s); }
+    if (role === 'draft') s.draft = r;
+    else if (role === 'version') s.versions.push(r);
+    else if (role === 'latest') s.current = r;       // `.latest` is the canonical current pointer
+    else if (!s.current) s.current = r;              // bare key only counts as current if no `.latest`
+  }
+
+  const events: WorkspaceEvent[] = [];
+  const push = (r: MemoryRecord, ns: string, instance: string, action: 'publish' | 'draft', at: string) => {
     const p = parseGaiiLoose(r.ownerGaii);
     events.push({
-      at: action === 'draft' ? r.updatedAt : r.createdAt,
-      actor: p.owner || '', agent: p.agent || null, namespace,
-      type: typeByNs.get(namespace) || namespace,
-      mode: (modeByNs.get(namespace) as 'document' | 'records') || 'records',
+      at, actor: p.owner || '', agent: p.agent || null, namespace: ns,
+      type: typeByNs.get(ns) || ns,
+      mode: (modeByNs.get(ns) as 'document' | 'records') || 'records',
       instance, action,
     });
+  };
+  for (const s of slots.values()) {
+    if (s.draft) push(s.draft, s.ns, s.instance, 'draft', s.draft.updatedAt);
+    for (const v of s.versions) push(v, s.ns, s.instance, 'publish', v.createdAt);
+    // Direct write: current content with no version history — surface it so nothing goes unnoticed.
+    if (s.versions.length === 0 && s.current) push(s.current, s.ns, s.instance, 'publish', s.current.updatedAt);
   }
   return events;
 }

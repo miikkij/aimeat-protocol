@@ -942,7 +942,8 @@ function InlineView({ tabId, label, onClose, renderTab }) {
  * abstract taxonomy (the old Daily/Personal/Technical groups are gone). Badges remain
  * reserved for action-required counts only — never static totals. */
 const SIDEBAR_GROUPS = [
-  { titleKey: 'profile.landing.menuInformation', items: [   // raw → curated → governed
+  { titleKey: 'profile.landing.menuInformation', items: [   // find-anything → raw → curated → governed
+    { id: 'discover', icon: '\u{1F9ED}', labelKey: 'discover.tabLabel' },
     { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
     { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
     { id: 'notebook', icon: '\u{1F4D3}', labelKey: 'profile.tabs.notebook' },

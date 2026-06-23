@@ -48,6 +48,33 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
+  mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'), {
+    organism_id: z.string().describe('Organism identifier.'),
+  }, annotationsFor('aimeat_organism_overview'), async ({ organism_id }) => {
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/overview`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_organism_update', descriptionFor('aimeat_organism_update'), {
+    organism_id: z.string().describe('Organism identifier.'),
+    name: z.string().optional().describe('New organism name.'),
+    description: z.string().optional().describe('Short tagline shown under the name.'),
+    readme: z.string().optional().describe('Free-form markdown README (mermaid allowed) shown at the top of the organism home.'),
+    interests: z.array(z.string()).optional().describe('Interest tags.'),
+    join_policy: z.string().optional().describe('open | approval_required | invite_only.'),
+    visibility: z.string().optional().describe('public | listed | private.'),
+  }, annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility }) => {
+    const body: Record<string, unknown> = {};
+    if (name !== undefined) body.name = name;
+    if (description !== undefined) body.description = description;
+    if (readme !== undefined) body.readme = readme;
+    if (interests !== undefined) body.interests = interests;
+    if (join_policy !== undefined) body.join_policy = join_policy;
+    if (visibility !== undefined) body.visibility = visibility;
+    const resp = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
   mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), {
     organism_id: z.string().describe('ID of the organism to join'),
     message: z.string().optional().describe('Optional message for join requests (used when approval is required)'),

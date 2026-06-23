@@ -6,6 +6,7 @@
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
  *   v1.0.0 -- 2026-06-22 -- Initial: aimeat_dm_send / aimeat_dm_inbox / aimeat_dm_thread.
+ *   v1.1.0 -- 2026-06-23 -- Add aimeat_dm_ask (structured federated AskUserQuestion) — connector parity.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -32,6 +33,27 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (subject) payload.subject = subject;
     if (conversation_id) payload.conversation_id = conversation_id;
     if (attachments) payload.attachments = attachments;
+    const resp = await client.post('/v1/messages', payload);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), {
+    agent_name: agentNameSchema,
+    to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
+    questions: z.array(z.record(z.string(), z.unknown())).describe('1–20 questions, each { id, header, prompt, options:[{id,label}], multiSelect?, allowOther?, required? }.'),
+    body: z.string().optional().describe('Optional intro text shown above the questions (GFM markdown).'),
+    subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
+    conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
+    submit_label: z.string().optional().describe('Optional submit-button label.'),
+  }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const payload: Record<string, unknown> = {
+      to,
+      interactive: { role: 'questions', v: 1, questions, ...(submit_label ? { submitLabel: submit_label } : {}) },
+    };
+    if (body) payload.body = body;
+    if (subject) payload.subject = subject;
+    if (conversation_id) payload.conversation_id = conversation_id;
     const resp = await client.post('/v1/messages', payload);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

@@ -60,6 +60,14 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 
+  mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
+    { organism_id: z.string().describe('Organism identifier.'), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+    annotationsFor('aimeat_workspace_overview'),
+    async ({ organism_id, ws }) => {
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/overview?ws=${encodeURIComponent(ws)}`);
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
   mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
     {
       organism_id: z.string(), ws: z.string(),

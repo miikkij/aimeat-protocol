@@ -10,6 +10,8 @@
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — Add the free-form README panel, the interactive structure mindmap, and the
  *     development timeline; rename the structure overview to "table of contents" (Osa A/C/D).
+ *   v1.1.1 — 2026-06-23 — Mindmap space-node click now deep-links into the workspace on that space's
+ *     tab (onOpenWs gained a second `space` arg); was opening the workspace overview.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
@@ -81,11 +83,11 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     showToast?.(t('readme.saved') || 'README saved', 'success');
   };
 
-  // Mindmap node click → navigate: a workspace/space node opens that workspace; a user node jumps to
-  // the Members tab. (Deep-linking to a specific space tab is deferred — open the workspace for now.)
+  // Mindmap node click → navigate: a workspace node opens that workspace; a space node opens its
+  // workspace straight on that space's tab; a user node jumps to the Members tab.
   const onMapNav = (target) => {
     if (target?.type === 'members') { setShowSettings(false); setTab('members'); }
-    else if (target?.wsId) onOpenWs(target.wsId);
+    else if (target?.wsId) onOpenWs(target.wsId, target.type === 'space' ? target.space : undefined);
   };
 
   useEffect(() => {

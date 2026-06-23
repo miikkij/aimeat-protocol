@@ -2,9 +2,12 @@
  * @file e2e-workspace-activity.ts
  * @description Tests the workspace activity feed: each .version.N is reported as a publish event and
  *   each .draft as an edit event, with the actor, space (objectType), instance and timestamp; newest
- *   first; member-gated.
+ *   first; member-gated. Also covers direct writes (a `.latest`-only or bare-key write that skips
+ *   draft→publish) surfacing as publish events, and that a normally-published instance
+ *   (.version.N + .latest) is not double-counted.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial.
+ *   v1.1.0 — 2026-06-23 — Cover direct-write visibility + the no-double-count invariant.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-activity
 
@@ -41,9 +44,14 @@ await test('Setup owner + org + workspace + history (a draft + a published versi
     orgId = o.body.data.organism.id;
     const manifest = { manifestVersion: '1.0', id: orgId, name: 'Act', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
     await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
-    // a draft (edit) + a published version (publish)
+    // a draft (edit) + a published instance (t2: a publish creates BOTH .version.1 AND .latest)
     await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t1.draft`, value: { id: 't1', title: 'WIP' }, visibility: 'private' }) });
     await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t2.version.1`, value: { id: 't2', title: 'Done' }, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t2.latest`, value: { id: 't2', title: 'Done' }, visibility: 'private' }) });
+    // DIRECT WRITES that skip draft→publish: a `.latest`-only write (t3) and a bare-key write (t4).
+    // These have no .version.N, so they must still surface as events (nothing goes unnoticed).
+    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t3.latest`, value: { id: 't3', title: 'Direct latest' }, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t4`, value: { id: 't4', title: 'Direct bare' }, visibility: 'private' }) });
 });
 
 await test('1. activity reports a publish + a draft event with actor/space/instance', async () => {
@@ -57,7 +65,24 @@ await test('1. activity reports a publish + a draft event with actor/space/insta
     assert(typeof pub.at === 'string' && pub.at.length > 0, 'events carry a timestamp');
 });
 
-await test('2. non-member is denied', async () => {
+await test('2. direct writes (.latest-only and bare key) surface as publish events', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${WS}`, { headers: auth(token) });
+    assert(r.status === 200, `activity ${r.status}`);
+    const ev = r.body.data.events || [];
+    const t3 = ev.find((e: any) => e.instance === 't3');
+    const t4 = ev.find((e: any) => e.instance === 't4');
+    assert(!!t3 && t3.action === 'publish' && t3.actor === ownerName && t3.type === 'task', `direct .latest write surfaced: ${JSON.stringify(t3)}`);
+    assert(!!t4 && t4.action === 'publish' && t4.actor === ownerName && t4.type === 'task', `direct bare write surfaced: ${JSON.stringify(t4)}`);
+});
+
+await test('3. a published instance (.version.N + .latest) is NOT double-counted', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${WS}`, { headers: auth(token) });
+    const ev = (r.body.data.events || []).filter((e: any) => e.instance === 't2');
+    assert(ev.length === 1, `t2 should yield exactly one event (the publish), got ${ev.length}: ${JSON.stringify(ev)}`);
+    assert(ev[0].action === 'publish', `t2 event is a publish, got ${ev[0]?.action}`);
+});
+
+await test('4. non-member is denied', async () => {
     const reg2 = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName + 'x', display_name: 'X', password: 'Act12345' }) });
     const ts = new Date().toISOString();
     const tk2 = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName + 'x', timestamp: ts, signature: await sign(reg2.body.data.private_key, ownerName + 'x' + NODE_ID + ts) }) });

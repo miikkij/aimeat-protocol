@@ -32,6 +32,7 @@ import { consentRouter } from '../routes/consent.js';
 import { permissionsRouter } from '../routes/permissions.js';
 import { memoryRouter } from '../routes/memory.js';
 import { librarianRouter } from '../routes/librarian.js';
+import { discoverRouter } from '../routes/discover.js';
 import { livingRouter } from '../routes/living.js';
 import { actionsRouter } from '../routes/actions.js';
 import { catalogueRouter } from '../routes/catalogue.js';
@@ -311,6 +312,7 @@ export async function mountRoutes(
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval
+  app.use(discoverRouter(config, storage));   // Master directory — unified cross-domain discovery
   app.use(livingRouter(config, storage));     // Living Documents — AI template author
   if (config.generatorEnabled) {
     app.use(generatorRouter(config, storage));   // Agent-driven service generator

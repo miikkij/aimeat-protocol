@@ -58,6 +58,9 @@
  *   v1.17.0 -- 2026-06-22 -- Structure timeline: GET /:id/structure/history returns the trackable
  *     structure fingerprint's history (organism growth over time). Structural mutations (create,
  *     workspace create/update/delete, publish) record a snapshot via services/structure-snapshot.ts.
+ *   v1.18.0 -- 2026-06-23 -- GET /workspace/activity now derives events via the shared
+ *     deriveWorkspaceEvents helper (was an inline copy), so direct writes (`.latest`/bare with no
+ *     `.version.N`) surface as publish events instead of going unnoticed in the feed/heatmap.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -2035,37 +2038,21 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const root = `organism.${id}.w.${ws}`;
     const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
+    const manifest = (items.find(r => r.key === `${root}.meta.manifest`)?.value as Record<string, unknown> | undefined) ?? null;
 
-    // namespace → objectType name + mode, from the manifest (best-effort, for friendly labels + the
-    // document/records split shown in the heatmap quadrants).
-    const manRec = items.find(r => r.key === `${root}.meta.manifest`);
-    const types = ((manRec?.value as { objectTypes?: Array<{ name?: string; namespace?: string; mode?: string }> } | undefined)?.objectTypes) ?? [];
-    const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
-    const modeByNs = new Map(types.filter(o => o.namespace).map(o => [o.namespace as string, o.mode === 'document' ? 'document' : 'records']));
-
-    const events: Array<{ at: string; actor: string; agent: string | null; namespace: string; type: string; mode: string; instance: string; action: 'publish' | 'draft' }> = [];
+    // Read-authorize each record (the caller's own records AND their own agents' records — same owner,
+    // different GAII — are always theirs to see; only genuinely other-owner records hit the consent
+    // check), then derive the events via the shared helper so the activity feed, the workspace list's
+    // lastEvent, and the agents/activity aggregate all reconstruct events identically.
+    const readable: typeof items = [];
     for (const r of items) {
-      // The caller's own records AND their own agents' records (same owner, different GAII) are always
-      // theirs to see; only genuinely other-owner records go through the consent check.
       if (r.ownerGaii !== callerGaii && !isSameOwner(r.ownerGaii, callerGaii)) {
         const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
         if (!d.allowed) continue;
       }
-      const rel = r.key.slice(root.length + 1);
-      if (rel.startsWith('meta.') || rel.startsWith('access.')) continue;
-      const parts = rel.split('.');
-      const last = parts[parts.length - 1];
-      const secondLast = parts[parts.length - 2];
-      let action: 'publish' | 'draft';
-      let core: string[];
-      if (last === 'draft') { action = 'draft'; core = parts.slice(0, -1); }
-      else if (secondLast === 'version' && /^\d+$/.test(last)) { action = 'publish'; core = parts.slice(0, -2); }
-      else continue;   // .latest / bare → skip (publishes come from .version.N; avoids double-count)
-      const instance = core[core.length - 1];
-      const namespace = core.slice(0, -1).join('.');
-      if (!instance || !namespace) continue;
-      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), agent: parseGaiiLoose(r.ownerGaii).agent || null, namespace, type: typeByNs.get(namespace) || namespace, mode: modeByNs.get(namespace) || 'records', instance, action });
+      readable.push(r);
     }
+    const events = deriveWorkspaceEvents(readable, manifest, root);
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
   });

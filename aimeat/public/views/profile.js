@@ -71,12 +71,14 @@ import WorkflowsTab from './profile/workflows-tab.js';
 import InboxTab from './profile/inbox-tab.js';
 import NotebookTab from './profile/notebook-tab.js';
 import LivingTab from './profile/living-tab.js';
+import DiscoverTab from './profile/discover-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
 // Deep links (?tab=X) bypass tier filtering.
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
+  { id: 'discover',      key: 'discover.tabLabel',           component: DiscoverTab,       minTier: 'new' },
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
   { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      component: EcosystemTab,      minTier: 'active' },

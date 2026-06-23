@@ -7024,6 +7024,114 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/discover:
+    get:
+      operationId: discover
+      summary: Master directory — unified cross-domain discovery (entry mode)
+      description: >
+        One faceted surface over every content domain (capabilities, workflows, knowledge, decisions,
+        research, produced material, companies + offerings, live documents, memory) so agents, the
+        Secretary, and humans can find "what exists here that I can use?". Returns ranked, paginated,
+        normalized `DiscoveryEntry` items plus inline facet counts. The handler is domain-agnostic — it
+        fans across a registry of source adapters (design doc 2026-06-23). Scopes: `own` (caller's own
+        content), `public` (public content node-wide), `shared` (content in organisms the caller is a
+        member of, gated per-workspace by the same `canReadWorkspace` check as the REST read — nothing
+        the caller cannot read is ever returned, and facet counts obey the identical gate). Default
+        scope: authenticated → `own`, anonymous → `public`. For an agent caller, results span the full
+        owner identity set only when the agent holds the `memory:read` scope; otherwise they are limited
+        to the agent's own content.
+      tags: [Catalogue]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Free-text query (FTS). Omit to browse/list by filters only.
+        - name: type
+          in: query
+          schema: { type: string }
+          description: >
+            CSV of types to include (capability, workflow, knowledge, decision, research, material,
+            company, offering, document, organism, app, memory).
+        - name: segment
+          in: query
+          schema: { type: string }
+          description: CSV of segments (coarse area within a type) to include.
+        - name: tags
+          in: query
+          schema: { type: string }
+          description: CSV of tags; an entry must carry ALL listed tags.
+        - name: owner
+          in: query
+          schema: { type: string }
+          description: Restrict to a single owner GHII (`owner@node-id`).
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [own, public, shared]
+          description: >
+            `own` (default when authenticated) = the caller's reachable content; `public` (default when
+            anonymous) = public-visibility content node-wide; `shared` = readable content across the
+            organisms the caller is a member of (per-workspace gated). `own`/`shared` require auth.
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/discover/facets:
+    get:
+      operationId: discoverFacets
+      summary: Master directory — map mode (catalog-of-catalogs counts)
+      description: >
+        The cheap "what kinds of things, segments, and tags exist here, and how many?" probe an LLM
+        runs before pulling entries. Returns facet counts (types, segments, tags) over the same
+        access-gated, filtered set as `/v1/discover` — counts never reveal content the caller cannot
+        read. Accepts the same filter + scope parameters as `/v1/discover`.
+      tags: [Catalogue]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: segment
+          in: query
+          schema: { type: string }
+        - name: tags
+          in: query
+          schema: { type: string }
+        - name: owner
+          in: query
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [own, public, shared]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/librarian/classify:
     post:
       operationId: librarianClassify

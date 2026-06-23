@@ -18,6 +18,8 @@
  *     markdown for text / lists for arrays / pretty JSON for objects (was a right-aligned one-liner);
  *     editing happens INLINE in the record's own card (one editor at a time) instead of a form at the
  *     top of the space; each record is a separated card with breathing room.
+ *   v1.4.0 — 2026-06-23 — Accept an `initialSpace` prop: a deep-link from the organism mindmap opens
+ *     the workspace straight on that space's tab (instead of always the overview).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -55,7 +57,7 @@ import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
 
 const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
 
-export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
+export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialSpace }) {
   const orgId = org.id;
   // Registry name for the breadcrumb (the manifest's name can differ from the workspace's name).
   const [wsName, setWsName] = useState('');
@@ -107,7 +109,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   // Active tab — Overview first (ALWAYS the landing view: the whole workspace on one scroll),
   // then one tab per manifest space + fixed Sources/Share/Review/Activity/People. Deliberately
   // NOT persisted: opening a workspace must show the overview, not whatever tab was last open.
-  const [tab, setTab] = useState('overview');
+  // Exception: a deep-link from the organism mindmap (initialSpace) opens straight on that space tab.
+  const [tab, setTab] = useState(initialSpace ? 'space:' + initialSpace : 'overview');
   const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
   const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
