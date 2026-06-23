@@ -133,20 +133,42 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
       </form>`}`;
 }
 
-/** Company settings (admin only): edit name, Y-tunnus (business ID), description, commission %. */
+/** Company settings (admin only): logo, name, Y-tunnus, description, commission, directory visibility. */
 function SettingsPanel({ org, onSaved }) {
   const [name, setName] = useState(org.name || '');
   const [businessId, setBusinessId] = useState(org.businessId || '');
   const [description, setDescription] = useState(org.description || '');
   const [commission, setCommission] = useState(org.commissionPercent ?? 20);
+  const [logo, setLogo] = useState(org.logo || '');
+  const [listed, setListed] = useState(org.listed !== false);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState(false);
+
+  // Upload the logo to public storage (under the admin's GAII), then store its public URL on the
+  // company. Reuses the generic /v1/storage endpoint — the backend stays protocol-only.
+  async function uploadLogo(file) {
+    if (!file) return;
+    if (file.size > 1024 * 1024) { setErr(t('myCompany.logoTooBig')); return; }
+    setUploading(true); setErr(''); setOk(false);
+    try {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+      const ext = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
+      const key = `org-${org.slug}-logo-${Date.now()}.${ext}`;
+      await apiPost('/v1/storage', { key, visibility: 'public', mime_type: file.type || 'image/png', data: b64 });
+      const ghii = window.AIMEAT?.auth?.getSession?.()?.ghii;
+      setLogo(`/v1/pub/${encodeURIComponent(ghii)}/${encodeURIComponent(key)}`);
+    } catch (e) { setErr(e.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  }
+
   async function save(e) {
     e.preventDefault(); setBusy(true); setErr(''); setOk(false);
     try {
       const r = await apiPatch(`/v1/orgs/${encodeURIComponent(org.slug)}`, {
-        name: name.trim(), businessId: businessId.trim(), description: description.trim(), commissionPercent: Number(commission),
+        name: name.trim(), businessId: businessId.trim(), description: description.trim(),
+        commissionPercent: Number(commission), logo: logo || null, listed,
       });
       setOk(true);
       if (onSaved) await onSaved(r.data?.org);
@@ -155,6 +177,20 @@ function SettingsPanel({ org, onSaved }) {
   }
   return html`
     <form class="mc-form mc-settings" onSubmit=${save}>
+      <div class="mc-label">${t('myCompany.logo')}
+        <div class="mc-logo-row">
+          ${logo
+            ? html`<img class="mc-logo-preview" src=${logo} alt=${t('myCompany.logo')} />`
+            : html`<div class="mc-logo-empty">${t('myCompany.noLogo')}</div>`}
+          <div class="flex-row-wrap">
+            <label class="btn-outline btn-sm mc-upload-btn">
+              ${uploading ? t('myCompany.uploading') : t('myCompany.uploadLogo')}
+              <input type="file" accept="image/*" class="mc-file-hidden" disabled=${uploading} onChange=${(e) => uploadLogo(e.target.files?.[0])} />
+            </label>
+            ${logo && html`<button type="button" class="btn-ghost btn-sm" onClick=${() => { setLogo(''); setOk(false); }}>${t('myCompany.removeLogo')}</button>`}
+          </div>
+        </div>
+      </div>
       <label class="mc-label">${t('myCompany.name')}
         <input class="mc-input" value=${name} onInput=${(e) => { setName(e.target.value); setOk(false); }} required /></label>
       <label class="mc-label">${t('myCompany.businessId')}
@@ -165,9 +201,14 @@ function SettingsPanel({ org, onSaved }) {
       <label class="mc-label">${t('myCompany.commission')}
         <input class="mc-input mc-price-input" type="number" min="0" max="100" value=${commission} onInput=${(e) => { setCommission(e.target.value); setOk(false); }} /></label>
       <span class="mc-mini">${t('myCompany.commissionHint')}</span>
+      <label class="mc-checkbox-row">
+        <input type="checkbox" checked=${listed} onChange=${(e) => { setListed(e.target.checked); setOk(false); }} />
+        <span>${t('myCompany.listedLabel')}</span>
+      </label>
+      <span class="mc-mini">${t('myCompany.listedHint')}</span>
       ${err && html`<p class="mc-error">${err}</p>`}
       ${ok && html`<p class="mc-saved">${t('myCompany.settingsSaved')}</p>`}
-      <button class="btn-primary" type="submit" disabled=${busy}>${t('myCompany.saveSettings')}</button>
+      <button class="btn-primary" type="submit" disabled=${busy || uploading}>${t('myCompany.saveSettings')}</button>
     </form>`;
 }
 
@@ -441,11 +482,14 @@ export default function MyCompanyView() {
           ${!selected && html`<p class="mc-empty">${t('myCompany.selectHint')}</p>`}
           ${selected && html`
             <div class="mc-detail-head">
-              <div>
-                <h2 class="mc-col-title">${selected.name}</h2>
-                ${selected.businessId
-                  ? html`<span class="mc-mini">${t('myCompany.businessId')}: ${selected.businessId}</span>`
-                  : (selected.role === 'admin' ? html`<span class="mc-mini mc-warn">${t('myCompany.noBusinessId')}</span>` : null)}
+              <div class="mc-head-id">
+                ${selected.logo && html`<img class="mc-head-logo" src=${selected.logo} alt=${selected.name} />`}
+                <div>
+                  <h2 class="mc-col-title">${selected.name}${selected.listed === false ? html` <span class="mc-mini mc-warn">· ${t('myCompany.unlistedBadge')}</span>` : ''}</h2>
+                  ${selected.businessId
+                    ? html`<span class="mc-mini">${t('myCompany.businessId')}: ${selected.businessId}</span>`
+                    : (selected.role === 'admin' ? html`<span class="mc-mini mc-warn">${t('myCompany.noBusinessId')}</span>` : null)}
+                </div>
               </div>
               <span class="mc-wallet">${t('myCompany.wallet')}: <strong>${selected.wallet?.balance ?? 0}</strong> ${t('myCompany.morsels')}</span>
             </div>

@@ -255,6 +255,15 @@
 .mc-member { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
 .mc-member-name { color: var(--text); font-weight: 600; }
 
+.mc-head-id { display: flex; align-items: center; gap: 0.75rem; }
+.mc-head-logo { width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; border: 1px solid var(--border); background: var(--bg-elevated); }
+.mc-logo-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.3rem; }
+.mc-logo-preview { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; border: 1px solid var(--border); background: var(--bg-elevated); }
+.mc-logo-empty { width: 56px; height: 56px; border-radius: var(--radius-sm); border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.7rem; text-align: center; }
+.mc-upload-btn { position: relative; overflow: hidden; cursor: pointer; }
+.mc-file-hidden { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.mc-checkbox-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-size: 0.9rem; cursor: pointer; }
+
 .mc-header-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 
 .mc-orders-received { border-top: 1px solid var(--border); margin-top: 1.25rem; padding-top: 1rem; }

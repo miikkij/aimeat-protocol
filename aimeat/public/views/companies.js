@@ -154,8 +154,11 @@ export default function CompaniesView() {
           <ul class="cm-dir-list">
             ${companies.map(c => html`<li key=${c.goii}>
               <button class="cm-dir-item ${selected?.slug === c.slug && selected?.owner === c.creatorOwner ? 'active' : ''}" onClick=${() => openCompany(c.creatorOwner, c.slug)}>
-                <span class="cm-dir-name">${c.name}</span>
-                <span class="cm-dir-meta">${c.businessId ? html`<span class="cm-tag">Y ${c.businessId}</span>` : ''}${c.offerings} ${t('companies.offeringsShort')}</span>
+                ${c.logo && html`<img class="cm-dir-logo" src=${c.logo} alt=${c.name} />`}
+                <div class="cm-dir-text">
+                  <span class="cm-dir-name">${c.name}</span>
+                  <span class="cm-dir-meta">${c.businessId ? html`<span class="cm-tag">Y ${c.businessId}</span>` : ''}${c.offerings} ${t('companies.offeringsShort')}</span>
+                </div>
               </button></li>`)}
           </ul>
         </aside>
@@ -164,8 +167,13 @@ export default function CompaniesView() {
           ${selected && !profile && html`<div class="cm-center"><div class="spinner"></div></div>`}
           ${profile && html`
             <div class="cm-profile-head">
-              <h2 class="cm-col-title">${profile.org?.name}</h2>
-              ${profile.org?.businessId && html`<span class="cm-mini">${t('companies.businessId')}: ${profile.org.businessId}</span>`}
+              <div class="cm-profile-id">
+                ${profile.org?.logo && html`<img class="cm-profile-logo" src=${profile.org.logo} alt=${profile.org?.name} />`}
+                <div>
+                  <h2 class="cm-col-title">${profile.org?.name}</h2>
+                  ${profile.org?.businessId && html`<span class="cm-mini">${t('companies.businessId')}: ${profile.org.businessId}</span>`}
+                </div>
+              </div>
               ${profile.org?.description && html`<p class="cm-profile-desc">${profile.org.description}</p>`}
             </div>
             <h3 class="cm-form-title">${t('companies.catalogue')}</h3>
