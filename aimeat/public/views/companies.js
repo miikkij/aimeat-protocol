@@ -66,11 +66,39 @@ function PublicOfferingCard({ o, owner, slug }) {
   return html`<li class="cm-cat-item"><${OfferCardView} entry=${{ agent: o.agentName, online: o.online }} offer=${offer} actions=${actions} /></li>`;
 }
 
+/** One purchase receipt in the buyer's "My orders" panel. */
+function ReceiptRow({ o }) {
+  const statusKey = o.kind === 'result' ? 'stInstant' : ({ queued: 'stQueued', active: 'stActive', done: 'stDone', failed: 'stFailed' }[o.status] || 'stQueued');
+  return html`
+    <li class="cm-receipt-row">
+      <div class="cm-receipt-top">
+        <span class="cm-receipt-title">${o.offerTitle}</span>
+        <span class="cm-receipt-amt">${o.charged > 0 ? `${o.charged} ${t('companies.morsels')}` : t('companies.free')}</span>
+      </div>
+      <div class="cm-receipt-meta">
+        <span>${t('companies.fromCompany')}: ${o.orgSlug}</span>
+        <span>🤖 ${o.agentName}</span>
+        <span>${t('companies.' + statusKey)}</span>
+        <span class="cm-mini">${new Date(o.createdAt).toLocaleString()}</span>
+      </div>
+      ${o.trackingCode && html`<div class="cm-mini cm-receipt-code">🧾 ${o.trackingCode}</div>`}
+    </li>`;
+}
+
 export default function CompaniesView() {
   const [companies, setCompanies] = useState(null);
   const [selected, setSelected] = useState(null); // { owner, slug }
   const [profile, setProfile] = useState(null);    // { org, offerings }
+  const [myOrders, setMyOrders] = useState(null);
+  const [showOrders, setShowOrders] = useState(false);
   const [err, setErr] = useState('');
+  const loggedIn = isLoggedIn();
+
+  async function loadMyOrders() {
+    try { const r = await apiGet('/v1/orders'); setMyOrders(r.data?.orders ?? []); }
+    catch { setMyOrders([]); }
+  }
+  function toggleOrders() { const n = !showOrders; setShowOrders(n); if (n) loadMyOrders(); }
 
   async function loadDirectory() {
     try { const r = await apiGet('/v1/orgs/directory'); setCompanies(r.data?.companies ?? []); }
@@ -104,10 +132,21 @@ export default function CompaniesView() {
   return html`
     <div class="cm-container">
       <header class="cm-header">
-        <h1 class="cm-title">${t('companies.title')}</h1>
+        <div class="cm-header-row">
+          <h1 class="cm-title">${t('companies.title')}</h1>
+          ${loggedIn && html`<button class="btn-outline btn-sm" onClick=${toggleOrders}>${showOrders ? t('companies.done') : t('companies.myOrders')}</button>`}
+        </div>
         <p class="cm-desc">${t('companies.desc')}</p>
       </header>
       ${err && html`<p class="cm-error">${err}</p>`}
+
+      ${showOrders && html`
+        <div class="cm-col cm-orders-panel">
+          <h2 class="cm-col-title">${t('companies.myOrders')}</h2>
+          ${myOrders === null ? html`<div class="cm-center"><div class="spinner"></div></div>`
+            : (myOrders.length === 0 ? html`<p class="cm-empty">${t('companies.noMyOrders')}</p>`
+              : html`<ul class="cm-receipt-list">${myOrders.map(o => html`<${ReceiptRow} key=${o.id} o=${o} />`)}</ul>`)}
+        </div>`}
       <div class="cm-grid">
         <aside class="cm-col">
           <h2 class="cm-col-title">${t('companies.directory')} (${companies.length})</h2>
