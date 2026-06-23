@@ -11,6 +11,8 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.7.4 -- 2026-06-23 -- Recipient suggestions when composing: the "to" field autocompletes (datalist)
+ *     with your own agents (GAIIs, labelled) + everyone you have a thread with — no retyping long GAIIs.
  *   v1.7.3 -- 2026-06-23 -- Show an AGENT's own presence dot on its conversation row (a nested agent row
  *     now renders <PresenceDot> for the agent GAII — connected = available, recently-seen = away, else
  *     offline — instead of nothing). The owner group header still shows the human's presence.
@@ -68,6 +70,7 @@ import { minidenticon } from '/lib/minidenticons.min.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
+import * as agentsSvc from '/js/services/agents.js';
 import { TrackResponseModal } from './track-response-modal.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
@@ -493,6 +496,7 @@ export default function InboxTab({ showToast }) {
   const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
+  const [myAgents, setMyAgents] = useState([]);           // the owner's own agents (recipient suggestions)
   const [sending, setSending] = useState(false);
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
@@ -635,6 +639,20 @@ export default function InboxTab({ showToast }) {
   }, []);
 
   useEffect(() => { loadLists(); }, [loadLists]);
+  // The owner's own agents — recipient suggestions when composing (so you don't retype long GAIIs).
+  useEffect(() => { agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {}); }, []);
+
+  // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
+  const contactOptions = (() => {
+    const map = new Map();
+    for (const a of myAgents) {
+      if (a?.gaii) map.set(a.gaii, `${a.name || a.gaii} ${t('inbox.contactAgentSuffix')}`);
+    }
+    for (const c of conversations) {
+      if (c?.peerGhii && !map.has(c.peerGhii)) map.set(c.peerGhii, peerName(c.peerGhii));
+    }
+    return [...map.entries()].map(([id, label]) => ({ id, label }));
+  })();
 
   const liveRef = useRef(null);
   liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
@@ -952,7 +970,10 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-thread-head"><div class="inbox-name">${t('inbox.new')}</div></div>
             <div class="inbox-compose-fields">
               <input class="inbox-input" type="text" placeholder=${t('inbox.toPlaceholder')}
-                value=${to} onInput=${(e) => setTo(e.target.value)} />
+                list="inbox-contact-suggest" value=${to} onInput=${(e) => setTo(e.target.value)} />
+              <datalist id="inbox-contact-suggest">
+                ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
+              </datalist>
               <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
                 value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>

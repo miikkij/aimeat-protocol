@@ -8,6 +8,7 @@
   "inbox.send": "Lähetä",
   "inbox.sending": "Lähetetään…",
   "inbox.reply": "Vastaa",
+  "inbox.contactAgentSuffix": "(agenttisi)",
   "inbox.answer.other": "Muu",
   "inbox.answer.otherPlaceholder": "Kirjoita vastauksesi…",
   "inbox.answer.send": "Lähetä vastaukset",
