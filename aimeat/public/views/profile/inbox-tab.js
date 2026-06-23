@@ -11,6 +11,8 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.14.0 -- 2026-06-23 -- Per-message 📓 action parks a message straight into the notebook for later
+ *     processing (instant copy via parkMessageToNotebook — keeps the source link + reply intent; no AI step).
  *   v1.13.0 -- 2026-06-23 -- Agent capabilities in chat: (A) a peer agent's public `chat.commands` render
  *     as fill-in command chips above the composer — pick one, fill the params, the filled template drops
  *     into the composer to review + send; (B) for the human's OWN agents, a 📅 schedule panel lists the
@@ -98,6 +100,8 @@ import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
 import * as schedules from '/js/services/schedules.js';
+import { parkMessageToNotebook } from '/js/services/notebook.js';
+import { firstLine } from './notebook-helpers.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
@@ -460,7 +464,7 @@ function tallyPoll(spec, recipients) {
   return out;
 }
 
-function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
+function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   const trk = tracked ? trackStateLabel(tracked.state) : null;
@@ -474,6 +478,8 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked, o
           <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}
             title=${tracked ? `${t('inbox.trackResponse')} — ${trk.text}` : t('inbox.trackResponse')}
             onClick=${() => onTrack?.(msg)}>🔗</button>
+          <button class="inbox-bubble-act" title=${t('inbox.parkToNotebook')}
+            onClick=${() => onPark?.(msg)}>📓</button>
         </div>
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
         ${msg.interactive?.role === 'questions' ? (
@@ -764,6 +770,15 @@ export default function InboxTab({ showToast }) {
     const existing = trackedByMsg[msg.id];
     if (existing && existing.state !== 'replied') { showToast?.(t('inbox.trackAlready')); setMode('tracked'); return; }
     setTrackMsg(msg);
+  };
+
+  // Clicking 📓: copy the message straight into the notebook for later processing (no AI step) — keeps the
+  // source link + reply intent so it can be replied to or enriched/filed from the notebook later.
+  const onParkMsg = async (msg) => {
+    try {
+      await parkMessageToNotebook(msg, { title: firstLine(msg.body) });
+      showToast?.(t('inbox.parkedToNotebook'));
+    } catch (e) { showToast?.(e?.message || t('inbox.trackFailed'), true); }
   };
 
   const cancelTracked = async (tr) => {
@@ -1219,7 +1234,7 @@ export default function InboxTab({ showToast }) {
             return html`
               ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
               <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
-                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} tracked=${trackedByMsg[m.id]}
+                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} tracked=${trackedByMsg[m.id]}
                 answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
                 onAnswer=${submitInteractiveAnswers} submitting=${sending}
                 onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;

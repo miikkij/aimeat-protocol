@@ -12,6 +12,9 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.1.1 — 2026-06-23 — Fix: Skip on an enrichment step was disabled whenever ANY step was running
+ *     (so during an auto-run batch every Skip was dead). Skip is now only disabled for the step actually
+ *     running; a live skip-ref lets an in-flight batch honor a mid-run skip.
  *   v1.1.0 — 2026-06-21 — Notes parked from an inbox message (Track a response → "put in notebook for
  *     later") show a banner + "Track a response" action that re-opens the shared modal seeded with the
  *     original message, so the reply still binds back to the sender; the note is removed once tracked.
@@ -50,6 +53,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   const [planning, setPlanning] = useState(false);
   const [enrich, setEnrich] = useState(null);             // { plan, enrichments[], runningStepId, doneStepIds[], skippedStepIds[], offersFeed, stepStatus }
   const [enrichError, setEnrichError] = useState(null);   // { message, code }
+  const skippedRef = useRef(new Set());                   // live skip set so an auto-run batch honors a mid-run skip
 
   // Distribute (split → many homes).
   const [distributing, setDistributing] = useState(false);
@@ -184,6 +188,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       const data = await generatePlan(baseText(), catalogue);
       const existing = Array.isArray(note.value?.enrichments) ? note.value.enrichments : [];
       const plan = data?.plan || { steps: [], summary: '', confidence: 0 };
+      skippedRef.current = new Set();
       setEnrich({ plan, enrichments: existing, runningStepId: null, doneStepIds: existing.map(e => e.stepId), skippedStepIds: [], offersFeed, stepStatus: {} });
       setPlanning(false);
       if (settings?.autoRunPlan && plan.steps.length) {
@@ -211,7 +216,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   async function runStepsBatch(ctx, steps, handledIds) {
     let prior = ctx.priorEnrichments;
     for (const step of steps) {
-      if (handledIds.has(step.id)) continue;
+      if (handledIds.has(step.id) || skippedRef.current.has(step.id)) continue;  // honor a mid-batch skip
       try {
         prior = await executeStep(step, { ...ctx, priorEnrichments: prior });
       } catch (e) {
@@ -235,7 +240,10 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     await runStepsBatch({ priorEnrichments: enrich.enrichments, plan: enrich.plan, offersFeed: enrich.offersFeed }, enrich.plan.steps, handled);
   }
 
-  const handleSkipStep = (step) => setEnrich(s => s ? { ...s, skippedStepIds: [...new Set([...s.skippedStepIds, step.id])] } : s);
+  const handleSkipStep = (step) => {
+    skippedRef.current.add(step.id);  // so an in-flight auto-run batch skips it when it gets there
+    setEnrich(s => s ? { ...s, skippedStepIds: [...new Set([...s.skippedStepIds, step.id])] } : s);
+  };
 
   // ── Distribute: split → file each chunk ──
 
@@ -326,7 +334,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                     ${!done && !skipped && html`
                       <div class="pf-nb-plan-step-btns">
                         <button class="btn-primary btn-sm" disabled=${!!runningStepId} onClick=${() => runOneStep(step)}>${running ? '…' : t('profile.notebook.runStep')}</button>
-                        <button class="btn-ghost btn-sm" disabled=${!!runningStepId} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}</button>
+                        <button class="btn-ghost btn-sm" disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}</button>
                       </div>`}
                   </li>`;
               })}

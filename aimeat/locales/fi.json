@@ -40,6 +40,8 @@
   "inbox.schedCreate": "Ajasta",
   "inbox.schedCreated": "Ajastettu.",
   "inbox.schedError": "Ajastus epäonnistui.",
+  "inbox.parkToNotebook": "Lisää muistikirjaan myöhempää varten",
+  "inbox.parkedToNotebook": "Lisätty muistikirjaasi.",
   "inbox.announcementNote": "Tiedote — vastaaminen ei ole käytössä",
   "inbox.bcTypeMessage": "Viesti",
   "inbox.bcTypePoll": "Kysely",
