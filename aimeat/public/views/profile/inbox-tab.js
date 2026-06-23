@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.10.0 -- 2026-06-23 -- Drafts: the composer auto-saves its text (debounced) to localStorage keyed by
+ *     conversation (or `new`), restoring it when you reopen the thread/compose so an in-progress message
+ *     isn't lost when switching threads; cleared on send. A suggested reply (Tracked Response) still wins.
  *   v1.9.0 -- 2026-06-23 -- Polls: the broadcast compose gains a Message/Poll toggle + a PollBuilder
  *     (questions, options, multi/Other/required) that fans out an interactive AskUserQuestion to the
  *     audience; a Results view aggregates per-option tallies + delivered/read/answered counts. Sent
@@ -482,13 +485,26 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked, o
  * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
  * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
  * the draft doesn't leak between threads. */
-function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
+function Composer({ recipient, sendLabel, sending, onSend, initialText = '', draftKey = '' }) {
+  // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
+  const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };
+  const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
   const [mode, setMode] = useState('rich');     // 'rich' = Toast UI; 'markdown' = fallback textarea
-  const [md, setMd] = useState(initialText);
+  const [md, setMd] = useState(seeded);
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const fileRef = useRef(null);
+  const saveTimer = useRef(null);
+  // Debounced auto-save of the draft (skipped when there's no key). Empty text clears the draft.
+  const saveDraft = (text) => {
+    if (!draftKey) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { if (text && text.trim()) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey); } catch { /* quota */ }
+    }, 400);
+  };
+  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };
 
   useEffect(() => {
     if (mode !== 'rich') return undefined;
@@ -503,8 +519,11 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
         height: '160px',
         initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
         previewStyle: 'tab',
-        initialValue: initialText || '', // seed the suggested reply (Composer remounts via key on change)
+        initialValue: seeded,            // seed from a saved draft / suggested reply (remounts via key)
         usageStatistics: false,
+        // editorRef is set only AFTER construction, so the constructor's own change (initialValue) is
+        // skipped — only real user edits auto-save the draft.
+        events: { change: () => { if (editorRef.current) saveDraft(editorRef.current.getMarkdown()); } },
         toolbarItems: [
           ['bold', 'italic', 'strike'],
           ['ul', 'ol', 'task'],
@@ -532,6 +551,7 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
   const reset = () => {
     try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
     setMd(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
+    clearDraft();   // a sent message is no longer a draft
   };
   const submit = () => onSend(recipient, getText(), files, reset);
 
@@ -544,7 +564,7 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '' }) {
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
         : html`<div class="inbox-md-fallback">
             <textarea class="inbox-textarea" rows="3" placeholder=${t('inbox.bodyPlaceholder')}
-              value=${md} onInput=${(e) => setMd(e.target.value)}></textarea>
+              value=${md} onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="inbox-composer-bar">
@@ -1067,7 +1087,8 @@ export default function InboxTab({ showToast }) {
         ${isAnnouncement
           ? html`<div class="inbox-announce-note">📢 ${t('inbox.announcementNote')}</div>`
           : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' : '')} recipient=${activeConv.peerGhii}
-              sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill} />`}
+              sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
+              draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
       </div>`;
   };
 
@@ -1202,7 +1223,7 @@ export default function InboxTab({ showToast }) {
                 value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>
             <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
-              sending=${sending} onSend=${doSend} />
+              sending=${sending} onSend=${doSend} draftKey="aimeat.inbox.draft.new" />
           </div>` : null}
 
         ${mode === 'broadcast' ? html`
