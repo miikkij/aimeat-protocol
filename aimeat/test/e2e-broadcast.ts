@@ -153,5 +153,54 @@ await test('6. A broadcast with no recipients is rejected (400)', async () => {
     assert(status === 400, `expected 400, got ${status}`);
 });
 
+await test('7. Poll: broadcast an interactive question, a recipient answers, results aggregate it', async () => {
+    // Bob is an accepted contact (test 3). Alice polls him.
+    const poll = await json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({
+            to: [bob.ghii], mode: 'broadcast', body: 'Quick poll:',
+            interactive: { role: 'questions', v: 1, questions: [{
+                id: 'q1', header: 'Color', prompt: 'Favorite color?', multiSelect: false, allowOther: false, required: true,
+                options: [{ id: 'red', label: 'Red' }, { id: 'blue', label: 'Blue' }],
+            }] },
+        }),
+    });
+    assert(poll.status === 201, `poll broadcast ${poll.status}: ${JSON.stringify(poll.body)}`);
+    const pollBcId = poll.body.data.broadcast_id;
+
+    // Bob finds the poll question in his inbox.
+    let q: any;
+    for (let i = 0; i < 10; i++) {
+        const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+        q = inbox.body.data.messages.find((m: any) => m.interactive?.role === 'questions' && /Favorite color/.test(m.interactive.questions[0]?.prompt || ''));
+        if (q) break;
+        await sleep(100);
+    }
+    assert(q !== undefined, 'Bob received the poll question');
+
+    // Bob answers the poll (Blue).
+    const ans = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({
+            to: alice.ghii, conversation_id: q.conversationId, reply_to: q.id, body: '- Color: Blue',
+            interactive: { role: 'answers', v: 1, answersFor: q.id, answers: { q1: { selected: ['blue'], other: null } } },
+        }),
+    });
+    assert(ans.status === 201, `poll answer ${ans.status}: ${JSON.stringify(ans.body)}`);
+
+    // Alice's results aggregate Bob's answer.
+    let res: any;
+    for (let i = 0; i < 10; i++) {
+        const r = await json(`/v1/messages/broadcast/${pollBcId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+        res = r.body.data;
+        if (res.answered >= 1) break;
+        await sleep(150);
+    }
+    assert(res.interactive?.role === 'questions', 'results carry the poll question spec');
+    assert(res.answered >= 1, `expected ≥1 answered, got ${res.answered}`);
+    const bobRec = res.recipients.find((x: any) => x.recipient === bob.ghii);
+    assert(bobRec?.answers?.q1?.selected?.[0] === 'blue', `Bob's answer aggregated, got ${JSON.stringify(bobRec?.answers)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

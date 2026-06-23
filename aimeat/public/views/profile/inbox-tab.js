@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.9.0 -- 2026-06-23 -- Polls: the broadcast compose gains a Message/Poll toggle + a PollBuilder
+ *     (questions, options, multi/Other/required) that fans out an interactive AskUserQuestion to the
+ *     audience; a Results view aggregates per-option tallies + delivered/read/answered counts. Sent
+ *     broadcasts are tracked in localStorage so results stay re-accessible (📊 Results).
  *   v1.8.1 -- 2026-06-23 -- Perf: cache resolved attachment URLs per conversation. A refresh / new message
  *     reused to re-resolve EVERY attachment (fresh presigned URL each time → new <img src> → the whole
  *     image gallery re-downloaded on every send/reply — hundreds of MB on an image-heavy thread). Now only
@@ -379,6 +383,66 @@ function InteractiveAnswered({ spec, answers }) {
     </div>`;
 }
 
+/** Compose the questions for a poll broadcast (a fanned-out AskUserQuestion). Controlled — owns no state;
+ *  edits go through setQuestions. */
+function PollBuilder({ questions, setQuestions }) {
+  const uid = () => 'q' + Math.random().toString(36).slice(2, 8);
+  const oid = () => 'o' + Math.random().toString(36).slice(2, 8);
+  const update = (i, patch) => setQuestions(questions.map((q, j) => (j === i ? { ...q, ...patch } : q)));
+  const addQ = () => setQuestions([...questions, {
+    id: uid(), header: '', prompt: '', options: [{ id: oid(), label: '' }, { id: oid(), label: '' }],
+    multiSelect: false, allowOther: true, required: false,
+  }]);
+  const removeQ = (i) => setQuestions(questions.filter((_, j) => j !== i));
+  const updateOpt = (qi, oi, label) => update(qi, { options: questions[qi].options.map((o, j) => (j === oi ? { ...o, label } : o)) });
+  const addOpt = (qi) => update(qi, { options: [...questions[qi].options, { id: oid(), label: '' }] });
+  const removeOpt = (qi, oi) => update(qi, { options: questions[qi].options.filter((_, j) => j !== oi) });
+
+  return html`
+    <div class="inbox-poll-builder">
+      ${questions.map((q, qi) => html`
+        <div class="inbox-poll-q" key=${q.id}>
+          <div class="inbox-poll-q-head">
+            <span class="inbox-poll-q-n">${qi + 1}.</span>
+            <input class="inbox-input" placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(e) => update(qi, { header: e.target.value })} />
+            <button class="inbox-bc-chip-x" title=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}>✕</button>
+          </div>
+          <input class="inbox-input" placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(e) => update(qi, { prompt: e.target.value })} />
+          <div class="inbox-poll-opts">
+            ${q.options.map((o, oi) => html`<div class="inbox-poll-opt" key=${o.id}>
+              <input class="inbox-input" placeholder=${`${t('inbox.pollOption')} ${oi + 1}`} value=${o.label} onInput=${(e) => updateOpt(qi, oi, e.target.value)} />
+              ${q.options.length > 1 ? html`<button class="inbox-bc-chip-x" onClick=${() => removeOpt(qi, oi)}>✕</button>` : null}
+            </div>`)}
+            <button class="btn-ghost btn-sm" onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}</button>
+          </div>
+          <div class="inbox-poll-flags">
+            <label><input type="checkbox" checked=${q.multiSelect} onChange=${(e) => update(qi, { multiSelect: e.target.checked })} /> ${t('inbox.pollMulti')}</label>
+            <label><input type="checkbox" checked=${q.allowOther} onChange=${(e) => update(qi, { allowOther: e.target.checked })} /> ${t('inbox.pollAllowOther')}</label>
+            <label><input type="checkbox" checked=${q.required} onChange=${(e) => update(qi, { required: e.target.checked })} /> ${t('inbox.pollRequired')}</label>
+          </div>
+        </div>`)}
+      <button class="btn-outline btn-sm" onClick=${addQ}>+ ${t('inbox.pollAddQuestion')}</button>
+    </div>`;
+}
+
+/** Aggregate poll answers across a broadcast's recipients into per-option tallies for the results view. */
+function tallyPoll(spec, recipients) {
+  const out = [];
+  for (const q of (spec?.questions || [])) {
+    const counts = {};
+    const others = [];
+    for (const o of (q.options || [])) counts[o.id] = 0;
+    for (const r of recipients) {
+      const a = r.answers?.[q.id];
+      if (!a) continue;
+      for (const sel of (a.selected || [])) if (sel in counts) counts[sel]++;
+      if (a.other) others.push(a.other);
+    }
+    out.push({ q, counts, others });
+  }
+  return out;
+}
+
 function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
@@ -509,7 +573,12 @@ export default function InboxTab({ showToast }) {
   const [bcInput, setBcInput] = useState('');             // broadcast: add-recipient field
   const [bcMode, setBcMode] = useState('broadcast');      // broadcast: 'broadcast' | 'announcement'
   const [bcGroupId, setBcGroupId] = useState('');         // broadcast: optional Share Group audience
+  const [bcType, setBcType] = useState('message');        // broadcast content: 'message' | 'poll'
+  const [bcQuestions, setBcQuestions] = useState([]);     // poll: the questions being built
   const [myGroups, setMyGroups] = useState([]);           // the owner's Share Groups (audiences)
+  const [resultsId, setResultsId] = useState(null);       // broadcast id whose results are shown
+  const [results, setResults] = useState(null);           // fetched broadcast results
+  const [recentBroadcasts, setRecentBroadcasts] = useState([]); // localStorage-tracked sent broadcasts
   const [sending, setSending] = useState(false);
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
@@ -667,6 +736,19 @@ export default function InboxTab({ showToast }) {
   // The owner's Share Groups — reusable broadcast audiences (distribution lists).
   useEffect(() => { apiGet('/v1/groups').then(r => setMyGroups(r?.data?.groups || [])).catch(() => {}); }, []);
 
+  // Recent broadcasts/polls the user sent — tracked in localStorage so results stay re-accessible.
+  const BC_STORE = 'aimeat.inbox.broadcasts';
+  useEffect(() => { try { setRecentBroadcasts(JSON.parse(localStorage.getItem(BC_STORE) || '[]')); } catch { /* none */ } }, []);
+  const trackBroadcast = (entry) => setRecentBroadcasts(prev => {
+    const next = [entry, ...prev.filter(b => b.id !== entry.id)].slice(0, 30);
+    try { localStorage.setItem(BC_STORE, JSON.stringify(next)); } catch { /* quota */ }
+    return next;
+  });
+  const openResults = async (id) => {
+    setMode('results'); setResultsId(id); setResults(null); setActiveConv(null);
+    setResults(await messages.getBroadcastResults(id).catch(() => null));
+  };
+
   // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
   const contactOptions = (() => {
     const map = new Map();
@@ -721,7 +803,7 @@ export default function InboxTab({ showToast }) {
     loadLists();
   };
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
-  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); };
+  const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); };
   const addBcRecipient = (id) => {
     const v = (id ?? bcInput).trim();
     if (v && !bcRecipients.includes(v)) setBcRecipients([...bcRecipients, v]);
@@ -735,7 +817,21 @@ export default function InboxTab({ showToast }) {
     if (sending) return;
     const body = (text || '').trim();
     if (bcRecipients.length === 0 && !bcGroupId) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
-    if (!body && files.length === 0) return;
+
+    let interactive;
+    if (bcType === 'poll') {
+      const questions = bcQuestions
+        .map(q => ({ ...q, options: (q.options || []).filter(o => o.label.trim()) }))
+        .filter(q => q.prompt.trim() && q.options.length >= 1)
+        .map(q => ({
+          id: q.id, header: (q.header || q.prompt).slice(0, 80), prompt: q.prompt.trim(),
+          options: q.options.map(o => ({ id: o.id, label: o.label.trim() })),
+          multiSelect: !!q.multiSelect, allowOther: q.allowOther !== false, required: !!q.required,
+        }));
+      if (!questions.length) { showToast?.(t('inbox.pollNeedQuestion'), true); return; }
+      interactive = { role: 'questions', v: 1, questions };
+    } else if (!body && files.length === 0) { return; }
+
     setSending(true);
     try {
       const attachments = [];
@@ -743,12 +839,24 @@ export default function InboxTab({ showToast }) {
         const desc = await messages.uploadAttachment(files[i]);
         attachments.push({ ...desc, inline: false, id: `at${i}` });
       }
-      const resp = await messages.sendBroadcast({ to: bcRecipients, groupId: bcGroupId || undefined, mode: bcMode, body, attachments });
+      const resp = await messages.sendBroadcast({
+        to: bcRecipients, groupId: bcGroupId || undefined,
+        mode: bcType === 'poll' ? 'broadcast' : bcMode,   // a poll must be repliable (recipients answer)
+        body, attachments, interactive,
+      });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();
+        const id = resp?.data?.broadcast_id;
+        const titleSrc = (bcType === 'poll' ? (interactive.questions[0]?.prompt || '') : body) || '';
+        if (id) trackBroadcast({
+          id, type: bcType,
+          title: titleSrc.slice(0, 60) || t('inbox.broadcast'),
+          createdAt: new Date().toISOString(),
+        });
         showToast?.(`${t('inbox.bcSent')} (${resp?.data?.sent ?? 0})`);
-        setMode('idle'); loadLists();
+        loadLists();
+        if (id) openResults(id); else setMode('idle');
       }
     } catch { showToast?.(t('inbox.failed'), true); }
     setSending(false);
@@ -1007,6 +1115,59 @@ export default function InboxTab({ showToast }) {
       </div>
     </div>`;
 
+  // Broadcast/poll results: a list of recent broadcasts, or the tallies for the selected one.
+  const renderResults = () => {
+    if (!resultsId) {
+      return html`<div class="inbox-panel">
+        <div class="inbox-thread-head"><div class="inbox-name">📊 ${t('inbox.resultsTitle')}</div></div>
+        <div class="inbox-tracked-list">
+          ${recentBroadcasts.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.resultsEmpty')}</div>` : null}
+          ${recentBroadcasts.map(b => html`
+            <button class="inbox-conv" key=${b.id} onClick=${() => openResults(b.id)}>
+              <div class="inbox-conv-main">
+                <div class="inbox-conv-line1">
+                  <span class="inbox-name">${b.type === 'poll' ? '📊' : '📨'} ${escHtml(b.title)}</span>
+                  <span class="inbox-conv-time">${b.createdAt ? timeShort(b.createdAt) : ''}</span>
+                </div>
+              </div>
+            </button>`)}
+        </div>
+      </div>`;
+    }
+    const r = results;
+    const isPoll = r?.interactive?.role === 'questions';
+    const tallies = isPoll ? tallyPoll(r.interactive, r.recipients || []) : [];
+    return html`<div class="inbox-panel">
+      <div class="inbox-thread-head">
+        <button class="btn-ghost btn-sm" onClick=${() => { setResultsId(null); setResults(null); }}>←</button>
+        <div class="inbox-name">📊 ${t('inbox.resultsTitle')}</div>
+      </div>
+      <div class="inbox-msgs">
+        ${!r ? html`<div class="inbox-empty-sm">…</div>` : html`
+          <div class="inbox-results-summary">
+            ${t('inbox.resultsRecipients')}: ${r.total} · ${t('inbox.resultsDelivered')}: ${r.delivered} · ${t('inbox.resultsRead')}: ${r.read}${isPoll ? ` · ${t('inbox.resultsAnswered')}: ${r.answered}` : ''}
+          </div>
+          ${tallies.map(({ q, counts, others }) => html`
+            <div class="inbox-results-q" key=${q.id}>
+              <div class="inbox-results-prompt">${escHtml(q.prompt)}</div>
+              ${(q.options || []).map(o => {
+                const n = counts[o.id] || 0;
+                const pct = r.answered ? Math.round((n / r.answered) * 100) : 0;
+                return html`<div class="inbox-results-bar" key=${o.id}>
+                  <div class="inbox-results-bar-label"><span>${escHtml(o.label)}</span><span>${n}</span></div>
+                  <div class="inbox-results-bar-track"><div class="inbox-results-bar-fill" style=${`--w:${pct}%`}></div></div>
+                </div>`;
+              })}
+              ${others.length ? html`<div class="inbox-results-others">${t('inbox.answer.other')}: ${others.map(o => escHtml(o)).join(', ')}</div>` : null}
+            </div>`)}
+          ${!isPoll ? html`<div class="inbox-results-reclist">
+            ${(r.recipients || []).map(rec => html`<div class="inbox-results-rec" key=${rec.recipient}><span>${escHtml(peerName(rec.recipient))}</span><span>${rec.status}</span></div>`)}
+          </div>` : null}
+        `}
+      </div>
+    </div>`;
+  };
+
   return html`
     <div class="inbox">
       <div class="inbox-head">
@@ -1019,6 +1180,7 @@ export default function InboxTab({ showToast }) {
             title=${awaitingCount ? t('inbox.trackReady') : ''}>
             🔗 ${t('inbox.trackedTitle')}${activeTracked.length ? html` <span class="inbox-count">${activeTracked.length}</span>` : ''}
           </button>
+          ${recentBroadcasts.length ? html`<button class=${`btn-outline${mode === 'results' ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>📊 ${t('inbox.results')}</button>` : null}
           <button class=${`btn-outline${mode === 'broadcast' ? ' btn-outline--active' : ''}`} onClick=${startBroadcast}>📢 ${t('inbox.broadcast')}</button>
           <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
         </div>
@@ -1048,15 +1210,25 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-thread-head"><div class="inbox-name">📢 ${t('inbox.broadcastTitle')}</div></div>
             <div class="inbox-compose-fields">
               <div class="inbox-bc-mode">
+                <label class=${`inbox-bc-modeopt${bcType === 'message' ? ' inbox-bc-modeopt--on' : ''}`}>
+                  <input type="radio" name="bctype" checked=${bcType === 'message'} onChange=${() => setBcType('message')} />
+                  <span>📨 ${t('inbox.bcTypeMessage')}</span>
+                </label>
+                <label class=${`inbox-bc-modeopt${bcType === 'poll' ? ' inbox-bc-modeopt--on' : ''}`}>
+                  <input type="radio" name="bctype" checked=${bcType === 'poll'} onChange=${() => setBcType('poll')} />
+                  <span>📊 ${t('inbox.bcTypePoll')}</span>
+                </label>
+              </div>
+              ${bcType === 'message' ? html`<div class="inbox-bc-mode">
                 <label class=${`inbox-bc-modeopt${bcMode === 'broadcast' ? ' inbox-bc-modeopt--on' : ''}`}>
                   <input type="radio" name="bcmode" checked=${bcMode === 'broadcast'} onChange=${() => setBcMode('broadcast')} />
-                  <span>📨 ${t('inbox.bcModeBroadcast')}</span>
+                  <span>${t('inbox.bcModeBroadcast')}</span>
                 </label>
                 <label class=${`inbox-bc-modeopt${bcMode === 'announcement' ? ' inbox-bc-modeopt--on' : ''}`}>
                   <input type="radio" name="bcmode" checked=${bcMode === 'announcement'} onChange=${() => setBcMode('announcement')} />
-                  <span>📢 ${t('inbox.bcModeAnnouncement')}</span>
+                  <span>${t('inbox.bcModeAnnouncement')}</span>
                 </label>
-              </div>
+              </div>` : html`<${PollBuilder} questions=${bcQuestions} setQuestions=${setBcQuestions} />`}
               ${bcRecipients.length ? html`<div class="inbox-bc-chips">
                 ${bcRecipients.map(r => html`<span class="inbox-bc-chip" key=${r}>${escHtml(peerName(r))}
                   <button class="inbox-bc-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
@@ -1072,9 +1244,11 @@ export default function InboxTab({ showToast }) {
                 ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
               </select>` : null}
             </div>
-            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId) ? 'bc' : ''} sendLabel=${t('inbox.bcSend')}
-              sending=${sending} onSend=${doBroadcast} />
+            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId) ? 'bc' : ''}
+              sendLabel=${bcType === 'poll' ? t('inbox.pollSend') : t('inbox.bcSend')} sending=${sending} onSend=${doBroadcast} />
           </div>` : null}
+
+        ${mode === 'results' ? renderResults() : null}
 
         ${mode === 'thread' && activeConv ? renderThread() : null}
 

@@ -508,3 +508,31 @@
   border-top: 1px solid var(--border-subtle);
   padding: 12px 16px; color: var(--text-dim); font-size: 13px; text-align: center;
 }
+
+/* ── Poll builder (compose a poll broadcast) ── */
+.inbox-poll-builder { display: flex; flex-direction: column; gap: 12px; }
+.inbox-poll-q {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; background: var(--card-bg);
+}
+.inbox-poll-q-head { display: flex; align-items: center; gap: 8px; }
+.inbox-poll-q-head .inbox-input { flex: 1; }
+.inbox-poll-q-n { font-weight: 600; color: var(--text-dim); }
+.inbox-poll-opts { display: flex; flex-direction: column; gap: 6px; padding-left: 12px; }
+.inbox-poll-opt { display: flex; align-items: center; gap: 6px; }
+.inbox-poll-opt .inbox-input { flex: 1; }
+.inbox-poll-flags { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-dim); }
+.inbox-poll-flags label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.inbox-poll-flags input { accent-color: var(--accent); }
+
+/* ── Broadcast / poll results ── */
+.inbox-results-summary { font-size: 13px; color: var(--text-dim); padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); }
+.inbox-results-q { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; }
+.inbox-results-prompt { font-weight: 600; font-size: 14px; }
+.inbox-results-bar { display: flex; flex-direction: column; gap: 3px; }
+.inbox-results-bar-label { display: flex; justify-content: space-between; font-size: 13px; }
+.inbox-results-bar-track { height: 8px; border-radius: var(--radius-full); background: var(--card-bg-alt); overflow: hidden; }
+.inbox-results-bar-fill { height: 100%; width: var(--w, 0%); background: var(--accent); border-radius: var(--radius-full); transition: width 0.3s; }
+.inbox-results-others { font-size: 12px; color: var(--text-dim); }
+.inbox-results-reclist { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
+.inbox-results-rec { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
