@@ -52,6 +52,7 @@ function OrderRow({ o, view }) {
         <span class="mc-mini">${new Date(o.createdAt).toLocaleString()}</span>
       </div>
       ${o.input && html`<div class="mc-order-input">${t('myCompany.orderedWhat')}: “${o.input}”</div>`}
+      ${o.charged > 0 && html`<div class="mc-order-receipt">🧾 ${t('myCompany.receiptLabel')}: ${t('myCompany.charged').replace('{n}', o.charged)}${o.trackingCode ? html` · <span class="mc-mini">${o.trackingCode}</span>` : ''}</div>`}
       ${o.kind === 'result' && o.result != null && html`
         <div class="mc-result"><div class="mc-result-label">${t('myCompany.result')}</div><${DeliverableBody} value=${o.result} alt=${o.offerTitle} /></div>`}
     </li>`;

@@ -267,6 +267,7 @@
 .mc-order-title { color: var(--text); font-weight: 600; }
 .mc-order-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; color: var(--text-muted); font-size: 0.78rem; margin-top: 0.2rem; }
 .mc-order-input { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.3rem; }
+.mc-order-receipt { color: var(--accent-bright); font-size: 0.82rem; margin-top: 0.3rem; }
 
 .mc-status { font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: var(--radius-full); white-space: nowrap; }
 .mc-status--queued { background: var(--bg-card); color: var(--text-dim); border: 1px solid var(--border); }
