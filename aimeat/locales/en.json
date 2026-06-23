@@ -9,6 +9,7 @@
   "inbox.sending": "Sending…",
   "inbox.reply": "Reply",
   "inbox.contactAgentSuffix": "(your agent)",
+  "inbox.messageThis": "Send a message",
   "inbox.broadcast": "Broadcast",
   "inbox.broadcastTitle": "Send to many",
   "inbox.bcModeBroadcast": "Message (repliable)",

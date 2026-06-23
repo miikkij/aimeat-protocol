@@ -9,6 +9,7 @@
   "inbox.sending": "Lähetetään…",
   "inbox.reply": "Vastaa",
   "inbox.contactAgentSuffix": "(agenttisi)",
+  "inbox.messageThis": "Lähetä viesti",
   "inbox.broadcast": "Joukkoviesti",
   "inbox.broadcastTitle": "Lähetä monelle",
   "inbox.bcModeBroadcast": "Viesti (vastattava)",

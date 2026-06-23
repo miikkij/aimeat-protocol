@@ -63,6 +63,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { InboxLink } from '/components/InboxLink.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGroups } from '/js/services/agents.js';
@@ -1401,7 +1402,9 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
 
   return html`
     <${Modal} open=${true} onClose=${onCancel} className="scope-modal" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}>
-        <div class="scope-agent-info">${escHtml(agent.gaii || '')}</div>
+        <div class="scope-agent-info">${escHtml(agent.gaii || '')}
+          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">✉️</${InboxLink}>` : null}
+        </div>
 
         ${isReadOnly ? html`
           <p class="text-caption mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>

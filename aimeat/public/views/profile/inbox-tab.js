@@ -11,6 +11,9 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.11.0 -- 2026-06-23 -- Inbox-links: the tab reads ?to=<id[,id]>&subject= on mount and opens a
+ *     prefilled compose (single) or broadcast (multiple), then clears the URL. Pairs with the reusable
+ *     <InboxLink> component (mailto-style one-click DM), wired into the agent profile.
  *   v1.10.0 -- 2026-06-23 -- Drafts: the composer auto-saves its text (debounced) to localStorage keyed by
  *     conversation (or `new`), restoring it when you reopen the thread/compose so an in-progress message
  *     isn't lost when switching threads; cleared on send. A suggested reply (Tracked Response) still wins.
@@ -768,6 +771,22 @@ export default function InboxTab({ showToast }) {
     setMode('results'); setResultsId(id); setResults(null); setActiveConv(null);
     setResults(await messages.getBroadcastResults(id).catch(() => null));
   };
+
+  // Inbox-link (mailto-style): /v1/profile?tab=messages&to=<id>[,<id>]&subject=<s> opens a prefilled
+  // compose (single recipient) or broadcast (multiple). Cleared from the URL so a refresh doesn't re-open.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const toParam = (params.get('to') || '').trim();
+    if (!toParam) return;
+    const recips = toParam.split(',').map(s => s.trim()).filter(Boolean);
+    const subject = params.get('subject') || '';
+    if (recips.length > 1) {
+      setMode('broadcast'); setActiveConv(null); setBcRecipients(recips); setBcMode('broadcast'); setBcType('message'); setBcGroupId('');
+    } else {
+      setMode('compose'); setActiveConv(null); setTo(recips[0]); setComposeSubject(subject);
+    }
+    try { window.history.replaceState({}, '', '/v1/profile?tab=messages'); } catch { /* noop */ }
+  }, []);
 
   // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
   const contactOptions = (() => {
