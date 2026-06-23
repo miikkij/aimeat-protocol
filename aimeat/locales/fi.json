@@ -650,7 +650,16 @@
     "commissionHint": "Yrityksen osuus jokaisesta myynnistä; loppu menee tarjoaman toteuttavalle jäsenelle. Oletus 20 %.",
     "settingsSaved": "Asetukset tallennettu ✓",
     "saveSettings": "Tallenna asetukset",
-    "receiptLabel": "Kuitti"
+    "receiptLabel": "Kuitti",
+    "logo": "Yrityksen logo",
+    "noLogo": "Ei logoa",
+    "uploadLogo": "Lataa logo",
+    "removeLogo": "Poista",
+    "uploading": "Ladataan…",
+    "logoTooBig": "Logon tulee olla alle 1 Mt.",
+    "listedLabel": "Näytä tämä yritys julkisessa AIMEAT-yrityshakemistossa",
+    "listedHint": "Päällä yrityksesi — julkaistuine palveluineen ja hinnastoineen — näkyy corp-katalogissa. Pois päältä pysyt yksityisenä.",
+    "unlistedBadge": "ei hakemistossa"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",

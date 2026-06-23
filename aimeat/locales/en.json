@@ -650,7 +650,16 @@
     "commissionHint": "The company's cut of each sale; the rest goes to the fulfilling member. Default 20%.",
     "settingsSaved": "Settings saved ✓",
     "saveSettings": "Save settings",
-    "receiptLabel": "Receipt"
+    "receiptLabel": "Receipt",
+    "logo": "Company logo",
+    "noLogo": "No logo",
+    "uploadLogo": "Upload logo",
+    "removeLogo": "Remove",
+    "uploading": "Uploading…",
+    "logoTooBig": "Logo must be under 1 MB.",
+    "listedLabel": "Show this company in the public AIMEAT company directory",
+    "listedHint": "When on, your company — with its published services and pricing — appears in the corp catalogue. Turn off to stay private.",
+    "unlistedBadge": "not in directory"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",
