@@ -601,7 +601,17 @@
     "morsels": "morsels",
     "enterpriseBadge": "Enterprise feature",
     "enterpriseRequired": "Company commerce requires the AIMEAT Enterprise edition. This node runs the free Community edition.",
-    "loginRequired": "Please log in to manage your companies."
+    "loginRequired": "Please log in to manage your companies.",
+    "tabSettings": "Settings",
+    "businessId": "Business ID (Y-tunnus)",
+    "businessIdOptional": "Business ID (Y-tunnus) — optional",
+    "businessIdHint": "Finnish format: 1234567-8. Required to sell as a registered company (KYB).",
+    "noBusinessId": "No business ID set — add it in Settings.",
+    "description": "Description",
+    "commission": "Company commission %",
+    "commissionHint": "The company's cut of each sale; the rest goes to the fulfilling member. Default 20%.",
+    "settingsSaved": "Settings saved ✓",
+    "saveSettings": "Save settings"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",
