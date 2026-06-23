@@ -23,6 +23,8 @@ export interface AudienceSelector {
   to?: string[];
   /** A Share Group id whose members become recipients (a reusable distribution list). */
   groupId?: string;
+  /** 'node-users' = every human owner on this node (OPERATOR ONLY — gate at the route). */
+  audience?: 'node-users';
 }
 
 export interface BroadcastInput {
@@ -50,6 +52,10 @@ export async function resolveAudience(ctx: DeliveryCtx, senderGhii: string, sel:
   if (sel.groupId) {
     const group = await ctx.storage.getSharingGroup(sel.groupId);
     if (group) for (const m of group.members) set.add(m.identifier);
+  }
+  if (sel.audience === 'node-users') {
+    const ghiis = await ctx.storage.listGHIIs();
+    for (const g of ghiis) if (g.ghii) set.add(g.ghii);
   }
   set.delete(senderGhii); // never broadcast to yourself
   return [...set];

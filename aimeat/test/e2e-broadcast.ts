@@ -202,5 +202,15 @@ await test('7. Poll: broadcast an interactive question, a recipient answers, res
     assert(bobRec?.answers?.q1?.selected?.[0] === 'blue', `Bob's answer aggregated, got ${JSON.stringify(bobRec?.answers)}`);
 });
 
+await test('8. The "all node users" audience is operator-only (a non-operator gets 403)', async () => {
+    // Carol was registered third — not the node operator. node-users must be rejected for her.
+    const { status, body } = await json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${carol.token}` },
+        body: JSON.stringify({ audience: 'node-users', mode: 'announcement', body: 'node-wide notice' }),
+    });
+    assert(status === 403, `expected 403 for non-operator node-users, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'FORBIDDEN', `code, got ${body.error?.code}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
