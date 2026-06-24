@@ -4,6 +4,24 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.33.1] - 2026-06-24
+
+### Fixed
+
+- **Agent self-tagging restored — `PATCH /v1/agents/:name/tags` is now same-owner gated, not
+  owner-role.** The route had been `requireRole('owner')` since inception, so every agent calling
+  `aimeat_agent_tags_set` on itself via the connector shell got `ACCESS_DENIED` — breaking tag-based
+  discovery/matching fleet-wide (agents could self-report capabilities but not self-set tags). The
+  owner may still tag any of their agents; an agent may now tag itself or a same-owner sibling;
+  cross-owner is rejected. `aimeat_agent_tags_set` moved onto the **agent** + **service** MCP surfaces
+  (parity with `aimeat_agent_capabilities_report`).
+
+### Changed
+
+- **Tag validation now allows `:`** (pattern `^[a-z0-9][a-z0-9._:-]{0,63}$`), so the documented
+  faceted `prefix:value` tags (`source:crewai`, `role:researcher`) validate and compose with
+  `aimeat_discover`'s `tags` CSV filter. `@` stays excluded so a tag can never be mistaken for a GAII.
+
 ## [1.33.0] - 2026-06-24
 
 ### Added
