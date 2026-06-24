@@ -43,8 +43,8 @@ the entire §15–20 "specialist/templates/connectors" addendum were never start
 | **§21 Crew setup (configure other agents)** | §21 | ❌ ABSENT | **P2** |
 | **Doc/image intake into the self-organism** | §2,§7 | ❌ ABSENT (chat text-only) | **P3** |
 | **Auto-create decisions from Ask cards / guided plans** | §7 | ❌ ABSENT (manual only) | **P3** |
-| Policy block on the directives record (vs `secretary.config`) | §4 | ◑ DEVIATES (works; scheduler reads config) | **P4 (accept/optional)** |
-| Company locked brain as `source:'enterprise'` merge layer | §4 | ◑ PARTIAL (written in-place to agent directives) | **P4 (accept/optional)** |
+| Policy block on the directives record (vs `secretary.config`) | §4 | ✅ ACCEPTED (config is the home; §4 amended) | **P4-A DONE 2026-06-24** |
+| Company locked brain as `source:'enterprise'` merge layer | §4 | ✅ BUILT (live `enterprise` overlay, read-only, multi-company) | **P4-B DONE 2026-06-24** |
 | §15 Specialist agent type (S-A) | §15,§19 | ❌ ABSENT | **P5 (separate epic)** |
 | §16 Use-case template format + instantiate (S-B) | §16,§19 | ❌ ABSENT | **P5** |
 | §17–18 Connector pattern + `type:secret` encryption (S-C) | §17,§18 | ❌ ABSENT (3/3 parts) | **P5** |
@@ -141,19 +141,51 @@ manually-logged ones. **Acceptance:** E2E — answering an Ask card creates a re
 
 ---
 
-## P4 — Design deviations (decide: accept or reconcile)
+## P4 — Design deviations (decide: accept or reconcile) — RESOLVED 2026-06-24
 
 These **work** today; listed for a conscious decision, not because they're broken.
 
 **P4-A — Policy block lives in `secretary.config` (owner memory), not on the directives record (§4 said "on the
-directives record, scheduler reads this, never the prose").** The scheduler reads it correctly from config. *Recommend:
-accept* (config is the natural home for the multi-context shape) and amend §4 in the plan to match — unless you want the
-single-record-brain story for the directives API.
+directives record, scheduler reads this, never the prose").** The scheduler reads it correctly from config.
+**DECISION: ACCEPT (developer, 2026-06-24).** Config is the natural home for the multi-context shape (one directives
+record can't carry N per-context policies). No code change; plan §4 amended to say the policy is a structured block in
+`secretary.config` read by the scheduler (the directives record keeps only token-level `budget_limits`).
 
-**P4-B — Company locked brain is written into the agent directives in-place, not as a new ranked
-`source:'enterprise'` merge layer (§4).** It renders read-only in the company UI, so the user-facing promise holds, but
-there is no enterprise tier in the 3-layer merge (`agent-directives.ts`). *Recommend: accept for now* (no functional
-loss) or, if multiple directive layers must coexist for company secretaries later, add the `enterprise` source then.
+**P4-B — Company locked brain was written into the agent directives in-place, not as a ranked `source:'enterprise'`
+merge layer (§4).** **DECISION: RECONCILE (developer, 2026-06-24) — built.** Added a 4th `source:'enterprise'` layer to
+the directives merge (`routes/agent-directives.ts` + pure `resolveEnterpriseDirectiveLayer` in `services/secretary.ts`),
+ranked above owner/agent and read-only. Implemented as a **live overlay** from the seam (`secretaryDirectives(orgId)`,
+resolved per the agent's `org:<slug>` tag) rather than a persisted copy, so brains are **swappable** and **each company
+resolves its own** (multi-company), with the owner/agent layers left free to coexist under the locked layer.
+`ensureCompanySecretary` no longer persists the brain; `ee/` v0.13.0 GET `/v1/orgs/:slug/secretary` now derives the
+brain live (`companySecretaryBrain`). Read-only is enforced because PUT only writes the agent layer. The GET response
+gained `enterprise_locked`. Verified: `secretary` 50/50 + `enterprise-stub` 4/4 (Community unaffected, EE disabled);
+EE-active dev server — both `overscale`/`overscale-oy` merges show 4 read-only `enterprise` rules ranked above the agent
+layer (`enterprise_locked:true`) sourced live (still present after the persisted directives were deleted), and the My
+Company → Secretary panel renders the 🔒 locked brain.
+
+### P4 post-audit residuals — G1, G2 (BUILT & verified 2026-06-24)
+
+**G1 — kill the double-brain for company secretaries provisioned before v0.3.0.** A pre-v0.3.0 company Secretary
+persisted the locked brain into its agent directives; with the live overlay that stale copy would render a *second* time
+next to the enterprise layer. Fixed two ways (belt-and-suspenders): **(ii) merge-time dedup** — `agent-directives.ts`
+drops owner/agent rules whose normalized description duplicates an enterprise rule (`dropEnterpriseDuplicates` in
+`services/secretary.ts`), a no-op when there's no enterprise layer (Community/non-company untouched); **(i) self-heal** —
+`ensureCompanySecretary` (v0.4.0), on re-provision of an existing company Secretary, deletes a persisted directives
+record that is *purely* a copy of the locked brain (`isStalePersistedBrain`), preserving any genuine per-owner rules.
+Verified — E2E (unit: dedup collapses a stale copy/keeps genuine rules/no-op without a layer + `isStalePersistedBrain`;
+HTTP: a personal Secretary's agent rules survive the merge) `secretary` 53/53 (SQLite + MongoDB), `agent-directives`
+13/13, `enterprise-stub` 4/4; EE-active browser — persisting the brain into `secretary-overscale-oy`'s agent layer then
+GETting the merge shows `system:2, enterprise:4, agent:0` (the stale copy deduped, renders once); re-provision logged
+`stripped stale persisted brain` (self-heal deleted it); a persisted copy *plus* a genuine rule → `agent:1` (the genuine
+rule preserved). My Company → Secretary panel shows the locked brain once (4 distinct rules, 🔒 chip).
+
+**G2 — bare-org offerings 500 (pre-existing, not caused by P4).** `GET /v1/orgs/:owner/:slug/offerings` 500'd for an org
+whose offerings doc predates the `{refs:[]}` schema (legacy `{offerings:[]}`, e.g. `overscale`) — `for (const ref of
+doc.refs)` threw on `undefined`. `ee/` v0.14.0 guards the refs array (`Array.isArray(doc?.refs) ? … : []` → empty
+catalog) + validates/resolves each ref defensively. Verified EE-active — `overscale` offerings now `200 {offerings:[]}`
+(was 500), `overscale-oy` unchanged 200; the My Company catalog subtab for `overscale` loads ("Catalog is empty …")
+instead of the error boundary.
 
 ---
 

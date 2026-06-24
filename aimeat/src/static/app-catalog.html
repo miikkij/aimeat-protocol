@@ -1556,6 +1556,12 @@
       border: 1px solid rgba(148, 163, 184, .3);
     }
 
+    .published-source-badge.operator-hidden {
+      background: rgba(239, 68, 68, .14);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, .35);
+    }
+
     /* A parked app is hidden from the public catalogue — dim its card to signal that. */
     .published-card.parked {
       opacity: .82;
@@ -2239,6 +2245,7 @@
       'card.unparkHint': 'Publish again — moves back to Published Apps, visible to everyone.',
       'card.parkedBadge': 'PARKED',
       'card.parkedHint': 'Only you can see and use this — hidden from the public catalogue.',
+      'card.operatorHidden': 'MODERATED BY OPERATOR: HIDDEN',
       'common.loading': 'Loading…',
       'consents.title': 'App permissions',
       'consents.none': 'You haven’t granted this app access.',
@@ -2469,6 +2476,7 @@
       'card.unparkHint': 'Julkaise uudelleen — siirtyy takaisin Julkaistuihin, näkyy kaikille.',
       'card.parkedBadge': 'PARKISSA',
       'card.parkedHint': 'Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.',
+      'card.operatorHidden': 'MODEROITU OPERAATTORIN TOIMESTA: PIILOTETTU',
       'common.loading': 'Ladataan…',
       'consents.title': 'Appin oikeudet',
       'consents.none': 'Et ole antanut tälle apille pääsyä.',
@@ -5350,6 +5358,8 @@
         localId: localMatch ? localMatch.id : null,
         versionNumber: sa.version_number || null,
         parked: !!sa.parked,
+        operatorHidden: !!sa.operator_hidden,
+        operatorHideReason: sa.operator_hide_reason || '',
         isOwn: true
       });
     }
@@ -5417,6 +5427,7 @@
         '<div class="published-card">' +
           '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
             ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+            (app.operatorHidden ? ' <span class="published-source-badge operator-hidden" title="' + escapeHtml(app.operatorHideReason || '') + '">' + t('card.operatorHidden') + '</span>' : '') +
           '</div>' +
           '<div class="published-card-meta">' +
             '<span>' + escapeHtml(app.filename) + '</span>' +

@@ -477,6 +477,16 @@ export interface AppRecord {
   // usable by their owner (and the owner's agents). A property of the app
   // (owner+filename), mirrored onto every version row. Default false = published.
   parked?: boolean;
+  // Operator moderation: when true, the app is removed from EVERY public surface
+  // (catalogue/gallery/search/discovery) AND from public download — only the owner
+  // (who sees a "moderated by operator: hidden" badge) and operators can still see
+  // it. Unlike `parked`, the OWNER cannot lift this; only an operator can. A
+  // property of the app (owner+filename), mirrored onto every version row. The
+  // audit fields record who hid it, when, and why. Default false = visible.
+  operatorHidden?: boolean;
+  operatorHiddenBy?: string;   // operator owner name who hid it
+  operatorHiddenAt?: string;   // ISO timestamp
+  operatorHideReason?: string; // optional operator-supplied reason (shown to owner)
 }
 
 export interface AppListOptions {
@@ -490,8 +500,12 @@ export interface AppListOptions {
   freeOnly?: boolean;
   // When set, parked apps are excluded UNLESS they belong to this GHII, so an
   // owner sees their own parked apps in listings while everyone else does not.
-  // Omitted = exclude every parked app (anonymous/public view).
+  // The same rule applies to operator-hidden apps (owner sees their own, badged).
+  // Omitted = exclude every parked / operator-hidden app (anonymous/public view).
   viewerGhii?: string;
+  // Operator-only listing: when true, return EVERY app regardless of parked or
+  // operator-hidden state (the admin moderation view). Bypasses both filters.
+  adminView?: boolean;
 }
 
 // Subdomain → published-app / redirect mapping (operator-managed).

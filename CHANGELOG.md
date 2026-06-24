@@ -4,6 +4,78 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-06-25
+
+The Secretary grows from a personal assistant into a full agent-orchestration layer: the autonomous tick
+becomes a real action loop, the Secretary gains its named capability corners + cross-context routing,
+specialist agents arrive as a reusable type, use-case templates package whole organisms as data, and
+extension connectors get encrypted secret config.
+
+### Added
+
+- **Secretary autonomous action loop + cost budget + reliability.** The `secretary` scheduler tick (which
+  in 1.33.0 only wrote a free-text briefing) now runs a real **action loop**: each fire loads the active
+  context's open goals + a bounded self-organism slice, asks the model for a **structured action list**, and
+  routes each proposed action through the context's autonomy bands — `act` files a note / appends a feed
+  entry, `draft`/`ask` posts an inbox decision card, `off`/unsupported is dropped. A cheap **"anything to
+  do?" pre-check** skips the paid call when there are no open goals or due decisions; a per-day
+  **morsel-budget ledger** caps autonomous spend (hard stop-spending still wins); and a self-facing
+  **reliability** chip surfaces the mean score over reviewed decisions (distinct from marketplace trust).
+- **Secretary capability reach (§21) + context routing (§22).** The Secretary can now **create, not just
+  find** (when discovery is empty it drafts a capability), **curate the knowledge graph**, help manage
+  **sharing/consent**, and **set up the owner's other agents** (the "crew" card). Intake is classified
+  **across all of the owner's contexts** (cheap word-overlap, biased by recorded corrections): a clear
+  non-active match auto-routes into that context's organism, an ambiguous one becomes an Ask card, and an
+  owner's correction teaches future routing.
+- **Doc/image intake + auto-logged decisions.** The Secretary chat accepts file/image attachments — uploaded
+  to storage, **vision-summarised** for images (a new optional `images[]` on the AI-completion stack →
+  OpenAI-compatible multimodal `/v1/ai/complete`, ≤8 per request), classified, and filed as discoverable
+  records. Answered Ask cards and approved guided plans now **auto-create decision contracts**, so the
+  learning loop measures real choices, not only manually-logged ones.
+- **Specialist agents — a reusable system-agent type.** Alongside the personal + company Secretaries, the
+  Secretary machinery (GAII, brain of prose + policy, autonomy bands, cost guard, self-organism) is
+  generalised into **specialists** (`sdr#`/`prep#`/`finance#`/`recruiter#…`, never named "secretary"), each
+  with its own brain + operating-model policy + scope profile. New `POST/GET/PUT/DELETE /v1/specialists`,
+  shared provisioning (`provisionSystemAgent`), a name-collision guard (a specialist can never collide with
+  either Secretary GAII), an Agents-tab "Specialist · <role>" badge, and an "Add a specialist" form on the
+  Secretary crew card.
+- **Specialist scope-consent at provisioning.** A role **declares the extra scopes it would like** beyond
+  the conservative baseline; when those exceed the baseline the owner is shown them (plain-language
+  descriptions) and **approves a subset** — never wider than requested (mirrors the app-grant model).
+  Default is conservative (no consent step); approved extras are stored on the agent and remain editable via
+  the existing `PATCH /v1/agents/:name/scopes`. Templates carry the same declaration.
+- **Use-case templates — packaged organism blueprints as pure data.** A template is the organism-export ZIP
+  with content stripped (a **content-free skeleton** — objects + image binaries removed, schemas/purpose
+  kept, safe to publish) plus a `template.json` carrying specialist directives + extension-dependency refs +
+  scope presets. Generic `POST /v1/organism-templates/export` + `/instantiate` (ZIP-safety quarantined)
+  build the organism + workspaces + specialists and **report unmet extension deps without crashing** — each
+  unmet dep carries a generated **build-prompt** (paste to Claude Code → installs the connector over the
+  appdev MCP). Published templates are discoverable via a new `templates` source in `GET /v1/discover`. Ships
+  a reference **"B2B Sales Hub (FI/SE)"** template (data only; Vainu/Alma surface as unmet deps with build
+  prompts — connector code is gated on their ToS).
+- **Encrypted extension secret config (connector pattern).** Extension manifest config fields can be marked
+  `type: secret`; they are **encrypted at rest** (AES-256-GCM with the node key, the OpenRouter pattern),
+  decrypted **only just before the sandbox VM** (both the action route and the scheduled-cron path), and
+  **masked** on read (ciphertext/plaintext never leave the server). Ships a reference REST connector
+  (bring-your-own-key per instance, SSRF-guarded `ctx.fetch`, action + optional cron sync).
+
+### Changed
+
+- **Company Secretary locked brain is now a live overlay (P4-B).** The edition-locked company brain is no
+  longer persisted onto the agent's directives record — it is resolved **live, read-only, from the
+  Enterprise seam** as a `source: 'enterprise'` layer in the directives merge (ranked above owner/agent),
+  so a company's brain is swappable and each company secretary resolves its own org's brain. A merge-time
+  dedup + a provisioning self-heal strip any stale persisted copy from agents created under the old code.
+
+### Fixed
+
+- **Org offerings endpoint resilient to legacy/malformed data.** `GET /v1/orgs/:owner/:slug/offerings` no
+  longer 500s for an org whose offerings doc predates the `{refs:[]}` schema — it guards the refs array
+  (empty catalog) and validates each ref defensively.
+- **Least-privilege specialist scope profiles.** The per-role default profiles (`sdr`/`finance`/`recruiter`)
+  were trimmed so every specialist role is a strict subset of the conservative `secretary` Community
+  baseline; broader scopes are granted only via the new scope-consent flow above, never by default.
+
 ## [1.33.1] - 2026-06-24
 
 ### Fixed

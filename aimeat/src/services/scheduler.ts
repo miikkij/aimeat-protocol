@@ -5,6 +5,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.8.0 — 2026-06-24 — Secretary P5 (S-C): scheduled extension jobs decrypt `type: secret` config
+ *     before the sandbox VM, and an instance-scoped job loads the instance's (decrypted) config so a
+ *     cron sync uses the same bring-your-own-key secret a live action would. See extension-secrets.ts.
  *   v2.7.0 — 2026-06-24 — Secretary P1: the `secretary` tick is now a real action loop. Each working
  *     fire runs a cheap "anything to do?" pre-check (skips the paid call when there are no open goals /
  *     due decisions), enforces the soft per-day `dailyMorselBudget` (skip + notify on trip), loads the
@@ -39,6 +42,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
 import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
 import type { ExtensionCtx } from './extension-runtime.js';
+import { getEncryptionKey } from './encryption.js';
+import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
@@ -1142,6 +1147,21 @@ export class Scheduler {
       ? `ext:${ext.name}.${job.instanceId}`
       : `ext:${ext.name}`;
 
+    // For an instance-scoped job, load the instance and decrypt its secret config so a scheduled
+    // sync gets the same bring-your-own-key config a live instance action would. `type: 'secret'`
+    // fields are decrypted just before the VM (see services/extension-secrets.ts).
+    const encKey = getEncryptionKey(this.config);
+    let instanceCtx: { id: string; config: Record<string, unknown> } | undefined;
+    if (job.instanceId) {
+      const inst = await this.storage.getExtensionInstance(ext.name, job.instanceId);
+      instanceCtx = {
+        id: job.instanceId,
+        config: inst
+          ? decryptSecretFields(inst.config, getInstanceSecretKeys(ext), encKey)
+          : (job.input ?? {}),
+      };
+    }
+
     const baseCtx: ExtensionCtx = {
       memory: {
         get: async (key) => {
@@ -1253,11 +1273,8 @@ export class Scheduler {
         owner: ext.installedBy,
         roles: ['operator'],
       },
-      config: ext.config,
-      instance: job.instanceId ? {
-        id: job.instanceId,
-        config: job.input ?? {},
-      } : undefined,
+      config: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
+      instance: instanceCtx,
       log: {
         info: (msg, data) => logger.info(`[ext:${ext.name}:scheduler] ${msg}`, data),
         warn: (msg, data) => logger.warn(`[ext:${ext.name}:scheduler] ${msg}`, data),

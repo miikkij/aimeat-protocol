@@ -714,7 +714,18 @@
       "denied": "Pyyntö hylätty.",
       "approveError": "Pyynnön hyväksyntä epäonnistui",
       "configured": "Agentti päivitetty.",
-      "configError": "Agentin päivitys epäonnistui"
+      "configError": "Agentin päivitys epäonnistui",
+      "addSpecTitle": "Lisää erikoisagentti",
+      "addSpecHint": "Ota käyttöön työrooliin erikoistunut agentti. Se toimii turvallisilla, vähimmäisoikeuksilla — jotkin roolit voivat pyytää lisäoikeuksia, jotka sinä hyväksyt.",
+      "specName": "nimi",
+      "specCreate": "Luo",
+      "specCreated": "Erikoisagentti luotu.",
+      "specError": "Erikoisagentin luonti epäonnistui",
+      "consentTitle": "Hyväksy lisäoikeudet agentille",
+      "consentNote": "Nämä ylittävät turvallisen oletuksen. Hyväksy vain se, mitä tämä agentti tarvitsee — voit muuttaa tätä myöhemmin.",
+      "consentSkip": "Pidä turvallinen oletus",
+      "consentGrant": "Myönnä valitut",
+      "extrasGranted": "Lisäoikeudet myönnetty."
     },
     "noteTitle": "Tallenna muistiinpano tilaasi",
     "noteHint": "Kirjoita mitä vain — sihteeri arkistoi sen oikeaan työtilaan. Sinä vahvistat minne.",
@@ -1561,6 +1572,7 @@
     },
     "agents": {
       "title": "Agenttisi",
+      "specialistBadge": "Asiantuntija",
       "active": {
         "title": "Käynnissä nyt",
         "empty": "Ei käynnissä olevia taskeja juuri nyt.",
@@ -2758,7 +2770,9 @@
       "parkedBadge": "Parkissa",
       "parkedHint": "Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.",
       "parked": "Sovellus parkissa",
-      "unparked": "Sovellus julkaistu"
+      "unparked": "Sovellus julkaistu",
+      "operatorHiddenBadge": "Moderoitu operaattorin toimesta: piilotettu",
+      "operatorHiddenHint": "Operaattori on piilottanut tämän sovelluksen julkisesta näkymästä. Vain sinä näet sen edelleen. Ota yhteyttä operaattoriin valittaaksesi."
     },
     "v8ext": {
       "title": "Palvelinlaajennukset",
@@ -2772,6 +2786,7 @@
       "instancesTitle": "Instanssit",
       "noInstances": "Ei instansseja vielä. Luo instanssi käyttääksesi tätä laajennusta.",
       "instanceIdPlaceholder": "instanssi-id (pienet kirjaimet, väliviivat ok)",
+      "secretField": "salaisuus — salattu levyllä",
       "createInstance": "Luo instanssi",
       "deleteInstance": "Poista",
       "copyId": "Kopioi ID",
@@ -7809,6 +7824,32 @@
       "delete": "Poista",
       "deleteTitle": "Poista alidomain-liitos",
       "deleteConfirm": "Tämä poistaa liitoksen ja alidomain lakkaa toimimasta heti. Vahvista kirjoittamalla alidomainin nimi:"
+    },
+    "apps": {
+      "title": "Sovellukset",
+      "desc": "Kaikki tähän solmuun julkaistut sovellukset. Piilota sovellus poistaaksesi sen kaikilta julkisilta pinnoilta (katalogi, galleria, haku ja suora lataus). Omistaja näkee sen edelleen merkinnällä \"moderoitu operaattorin toimesta: piilotettu\", mutta ei voi poistaa piilotusta — vain operaattori voi.",
+      "searchPlaceholder": "Hae nimellä, omistajalla tai tiedostonimellä…",
+      "hiddenOnly": "Vain piilotetut",
+      "hiddenChip": "piilotettu",
+      "empty": "Ei sovelluksia hakuehdoilla.",
+      "colApp": "Sovellus",
+      "colOwner": "Omistaja",
+      "colSize": "Koko",
+      "colDownloads": "Latauksia",
+      "colStatus": "Tila",
+      "statusHidden": "Operaattorin piilottama",
+      "statusParked": "Parkissa",
+      "statusLive": "Julkaistu",
+      "byAt": "{by} · {at}",
+      "hide": "Piilota",
+      "restore": "Palauta",
+      "hiddenOk": "Sovellus piilotettu julkisesta näkymästä.",
+      "restoredOk": "Sovellus palautettu julkiseen näkymään.",
+      "hideTitle": "Piilota sovellus",
+      "hideConfirm": "Piilota",
+      "hideExplain": "Tämä poistaa sovelluksen julkisesta katalogista, galleriasta, hausta ja suorasta latauksesta. Omistaja säilyttää kopion merkinnällä \"moderoitu operaattorin toimesta: piilotettu\", mutta ei voi poistaa piilotusta.",
+      "reasonLabel": "Syy (näytetään omistajalle, valinnainen)",
+      "reasonPlaceholder": "esim. Anonyymi / käytäntörikkomus"
     },
     "security": {
       "title": "Tietoturva",

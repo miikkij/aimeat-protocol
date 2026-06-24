@@ -9,6 +9,9 @@
  * @structure createResourceCard · knowledgeCard · accessCard · crewCard
  * @usage import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
  * @version-history
+ *   v0.3.0 — 2026-06-25 — crewCard gains an "Add a specialist" form + an app-style scope-CONSENT checklist:
+ *     when the chosen role declares requestable extras, the owner approves a subset before they are granted
+ *     (declare→consent→grant). No extras → no consent step.
  *   v0.2.0 — 2026-06-24 — G2: createResourceCard shows a clear "disabled on this node" message when the
  *     session can't create a capability; G3: knowledgeCard adds a Draft-band knowledge-link sub-section.
  *   v0.1.0 — 2026-06-24 — P2: create-resource / knowledge / access / crew cards.
@@ -154,12 +157,49 @@ export function accessCard(p) {
     </section>`;
 }
 
-/** P2-D — approve a pending agent + set its mode/tags (the crew on-ramp). */
+/** P2-D — approve a pending agent + set its mode/tags (the crew on-ramp). Plus: provision a SPECIALIST
+ *  with an app-style declare→consent→grant scope flow (the role's requestable extras need owner consent). */
 export function crewCard(p) {
+  const ns = p.newSpec;
+  const c = p.consent;
   return html`
     <section class="sec-card sec-crew">
       <h2 class="sec-h2">${t('secretary.crew.title')}</h2>
       <p class="sec-hint">${t('secretary.crew.hint')}</p>
+
+      <h3 class="sec-h3">${t('secretary.crew.addSpecTitle')}</h3>
+      <p class="sec-hint">${t('secretary.crew.addSpecHint')}</p>
+      <div class="sec-form">
+        <div class="sec-note-bar">
+          <input class="sec-input sec-input-sm" placeholder=${t('secretary.crew.specName')} value=${ns.name}
+            onInput=${(e) => p.setNewSpec({ ...ns, name: e.target.value })} />
+          <select class="sec-band" value=${ns.role} onChange=${(e) => p.setNewSpec({ ...ns, role: e.target.value })}>
+            ${p.SPECIALIST_ROLES.map((r) => html`<option value=${r} selected=${ns.role === r}>${r}</option>`)}
+          </select>
+          <button class="btn-primary btn-sm" disabled=${!ns.name.trim() || ns.creating}
+            onClick=${p.createSpec}>${ns.creating ? t('secretary.applying') : t('secretary.crew.specCreate')}</button>
+        </div>
+      </div>
+
+      ${c ? html`
+        <div class="sec-form sec-consent">
+          <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.crew.consentTitle')} <code>${escHtml(c.name)}</code></div>
+          <p class="sec-hint">${t('secretary.crew.consentNote')}</p>
+          <ul class="sec-goal-list">
+            ${c.extras.map((x) => html`<li class="sec-goal-row" key=${x.scope}>
+              <label class="sec-goal-main">
+                <input type="checkbox" checked=${c.checked.includes(x.scope)} onChange=${() => p.toggleExtra(x.scope)} />
+                <span class="sec-goal-title">${escHtml(x.description)}</span>
+                <span class="sec-hint"><code>${escHtml(x.scope)}</code></span>
+              </label>
+            </li>`)}
+          </ul>
+          <div class="sec-actions">
+            <button class="btn-ghost btn-sm" onClick=${p.dismissConsent}>${t('secretary.crew.consentSkip')}</button>
+            <button class="btn-primary btn-sm" disabled=${!c.checked.length || c.granting}
+              onClick=${p.grantExtras}>${c.granting ? t('secretary.applying') : t('secretary.crew.consentGrant')}</button>
+          </div>
+        </div>` : null}
 
       ${p.pending.length > 0 ? html`
         <h3 class="sec-h3">${t('secretary.crew.pendingTitle')}</h3>

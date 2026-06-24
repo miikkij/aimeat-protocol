@@ -44,6 +44,7 @@ import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
+import { organismTemplatesRouter } from '../routes/organism-templates.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin-security.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
@@ -103,6 +104,7 @@ import { schedulesRouter } from '../routes/schedules.js';
 import { workflowsRouter } from '../routes/workflows.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
+import { specialistsRouter } from '../routes/specialists.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
 import { adminAgentIntegrationRouter } from '../routes/admin-agent-integration.js';
 import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
@@ -287,11 +289,17 @@ export async function mountRoutes(
     next();
   });
 
+  // Enterprise edition (open-core seam): load the active provider ONCE up front so the agent-directives
+  // merge can overlay a company Secretary's locked enterprise brain (Secretary P4-B) using the same
+  // instance whose routes are mounted near the end of this function. Community degrades to the stub.
+  const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
+
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
   app.use(schedulesRouter(config, storage, scheduler));
   app.use(workflowsRouter(config, storage, scheduler, workflowEngine));
-  app.use(agentDirectivesRouter(config, storage, webhookDispatcher));
+  app.use(agentDirectivesRouter(config, storage, webhookDispatcher, enterprise));
+  app.use(specialistsRouter(config, storage));
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
@@ -374,6 +382,7 @@ export async function mountRoutes(
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage, maintenanceState, provenance, consulService, peers));
   app.use(organismsRouter(config, storage));
+  app.use(organismTemplatesRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
@@ -405,8 +414,8 @@ export async function mountRoutes(
   }
 
   // Enterprise edition (open-core seam): mount the proprietary `ee/` module if dropped in, else the
-  // Community stub (returns ENTERPRISE_REQUIRED for gated namespaces). See src/enterprise/.
-  const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
+  // Community stub (returns ENTERPRISE_REQUIRED for gated namespaces). The provider was loaded once
+  // near the top of this function (so the agent-directives merge can share it); mount its routes here.
   await enterprise.mountRoutes(app);
 
   app.use(portalRouter(config, storage));

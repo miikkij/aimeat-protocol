@@ -14,6 +14,8 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.2.0 — 2026-06-24 — Secretary P5 (S-D): exclude template.catalog.* (owned by the `templates`
+ *     source) so a published template surfaces once, as type 'template', not also as generic 'memory'.
  *   v0.1.0 — 2026-06-23 — Phase 1: memory/FTS source over searchText + listing (design doc 2026-06-23).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -25,6 +27,12 @@ import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullO
 
 export const MEMORY_SOURCE_ID = 'memory-fts';
 const MAX_LIMIT = 100;
+
+/** Memory-backed domains that have their OWN DiscoverySource own their records — exclude them here so a
+ *  record is surfaced once, with its canonical type, not also as a generic 'memory' hit. (Secretary P5 / S-D:
+ *  published use-case templates live at template.catalog.* and are owned by the `templates` source.) */
+const OWNED_BY_OTHER_SOURCE = ['template.catalog.'];
+const isOwnedElsewhere = (key: string) => OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p));
 
 /** The uniform internal row both paths (searchText / listing) produce before normalization. */
 interface MemHit {
@@ -201,7 +209,9 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
         hits = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => toMemHit(rec, 0));
       }
 
-      return hits.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
+      return hits
+        .filter(h => !isOwnedElsewhere(h.key))
+        .map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
     },
 
     toEntry(raw: RawHit, _ctx: DiscoveryContext): DiscoveryEntry {

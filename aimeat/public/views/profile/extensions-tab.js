@@ -12,6 +12,8 @@
  *     - Install modal      — upload/paste manifest + libs
  * @usage Loaded as a lazy tab in profile.js via dynamic import.
  * @version-history
+ *   v1.3.0 — 2026-06-24 — Secretary P5 (S-C): instance-create form renders per-instance config
+ *     fields from configSchema; `type: secret` fields show a masked (password) input + 🔒 tag.
  *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + Server extension management
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#2): both install modals use the
@@ -370,6 +372,7 @@ export default function ExtensionsTab({ session, showToast }) {
   const [srvDetail, setSrvDetail] = useState(null);
   const [srvInstances, setSrvInstances] = useState(null);
   const [newInstanceId, setNewInstanceId] = useState('');
+  const [newInstanceCfg, setNewInstanceCfg] = useState({}); // per-instance config-field values (incl. secrets)
   const [testAction, setTestAction] = useState(null); // { actionId }
   const [testInput, setTestInput] = useState('{}');
   const [testResult, setTestResult] = useState(null);
@@ -484,10 +487,14 @@ export default function ExtensionsTab({ session, showToast }) {
     const id = newInstanceId.trim();
     if (!id) { showToast(t('profile.v8ext.instanceIdRequired'), true); return; }
     try {
-      const resp = await v8Ext.createInstance(name, id, {});
+      // Drop empty config values so unset optional fields aren't stored as "".
+      const cfg = {};
+      for (const [k, v] of Object.entries(newInstanceCfg)) { if (v !== '' && v != null) cfg[k] = v; }
+      const resp = await v8Ext.createInstance(name, id, cfg);
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
       showToast(t('profile.v8ext.instanceCreated'));
       setNewInstanceId('');
+      setNewInstanceCfg({});
       setSrvInstances(await v8Ext.listInstances(name));
     } catch(e) { showToast(e.message, true); }
   }
@@ -846,6 +853,28 @@ export default function ExtensionsTab({ session, showToast }) {
           ${isActive ? html`
             <div class="ext-instance-create">
               <input class="input-field ext-instance-input" placeholder=${t('profile.v8ext.instanceIdPlaceholder')} value=${newInstanceId} onInput=${e => setNewInstanceId(e.target.value)} />
+              ${(() => {
+                const props = ext.instances?.configSchema?.properties || {};
+                const keys = Object.keys(props);
+                if (!keys.length) return null;
+                return keys.map(k => {
+                  const p = props[k] || {};
+                  const isSecret = p.type === 'secret';
+                  return html`<div class="ext-instance-cfg-field" key=${k}>
+                    <label class="ext-instance-cfg-label">
+                      ${p.label || k}
+                      ${isSecret ? html`<span class="ext-instance-cfg-secret">🔒 ${t('profile.v8ext.secretField')}</span>` : null}
+                      ${p.description ? html`<span class="ext-instance-cfg-desc">${p.description}</span>` : null}
+                    </label>
+                    <input class="input-field ext-instance-input"
+                      type=${isSecret ? 'password' : 'text'}
+                      autocomplete=${isSecret ? 'new-password' : 'off'}
+                      placeholder=${isSecret ? '••••••••' : (p.label || k)}
+                      value=${newInstanceCfg[k] || ''}
+                      onInput=${e => setNewInstanceCfg({ ...newInstanceCfg, [k]: e.target.value })} />
+                  </div>`;
+                });
+              })()}
               <button class="btn-primary btn-sm" onClick=${() => handleCreateInstance(ext.name)}>${t('profile.v8ext.createInstance')}</button>
             </div>` : html`<div class="ext-hint">${t('profile.v8ext.activateFirst')}</div>`}
         </div>` : html`

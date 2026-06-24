@@ -8,6 +8,10 @@
  *   manifest→record validator used by both POST and PUT.
  * @usage app.use(extensionsRouter(config, storage, scheduler, emailService)) in server.ts
  * @version-history
+ *   v1.2.0 — 2026-06-24 — Secretary P5 (S-C / §18): config fields marked `type: secret` (manifest
+ *     `config:` or per-instance `config_per_instance`) are encrypted at rest (AES-256-GCM, node key)
+ *     on install/update + instance create/update, decrypted only just before the sandbox VM, and
+ *     masked in API responses. See services/extension-secrets.ts.
  *   v1.1.0 — 2026-06-05 — Add PUT /v1/extensions/:name idempotent upsert: redeploy in place
  *     (preserving ext:{name} memory + instances) instead of DELETE→re-POST; extract shared
  *     manifest validator so POST and PUT stay in sync.
@@ -31,6 +35,11 @@ import { safeFetch } from '../utils/url-validator.js';
 import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { ExtensionInstallSchema, validateBody } from '../models/schemas.js';
+import { getEncryptionKey } from '../services/encryption.js';
+import {
+  SECRET_KEYS_FIELD, computeManifestSecretKeys, getExtSecretKeys, getInstanceSecretKeys,
+  encryptSecretFields, decryptSecretFields, maskSecretFields, preserveMaskedSecrets,
+} from '../services/extension-secrets.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 type ExtBuildResult =
@@ -136,6 +145,13 @@ function buildExtensionRecordFromManifest(
           )
         : {}),
       ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+      // Record which config fields are `type: 'secret'` so the route can encrypt their values
+      // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
+      // lost by the flatten above). See services/extension-secrets.ts.
+      ...((): Record<string, unknown> => {
+        const secretKeys = computeManifestSecretKeys(manifestConfig);
+        return secretKeys.length ? { [SECRET_KEYS_FIELD]: secretKeys } : {};
+      })(),
     },
     limits: {
       memoryMb: Math.min((manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb, config.extensionMaxMemoryMb),
@@ -284,6 +300,15 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
+      // Encrypt any extension-level `type: 'secret'` config values before storing at rest.
+      const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
+      if (encConfig === null) {
+        res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+          'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
+        return;
+      }
+      record.config = encConfig;
+
       const created = await storage.createExtension(record);
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
 
@@ -359,6 +384,13 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return;
           }
         }
+        const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
+        if (encConfig === null) {
+          res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+            'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
+          return;
+        }
+        record.config = encConfig;
         const created = await storage.createExtension(record);
         logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
         res.status(201).json(success(config.nodeId, { extension: created, action: 'created' }, [
@@ -373,9 +405,13 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       // stableStringify (not JSON.stringify): config/actions/limits/federation/instances
       // are Json fields, and PostgreSQL jsonb does not preserve object key order — a naive
       // stringify would see identical data as "changed" on Postgres. See utils/stable-json.ts.
+      // Compare on PLAINTEXT-normalized config (decrypt existing secrets, strip __secretKeys) so a
+      // redeploy of an identical manifest is a no-op despite secret ciphertext changing IV each call.
+      const encKeyForSig = getEncryptionKey(config);
       const signature = (r: ExtensionRecord) => stableStringify({
         version: r.version, description: r.description, author: r.author,
-        requiredApis: r.requiredApis, actions: r.actions, config: r.config,
+        requiredApis: r.requiredApis, actions: r.actions,
+        config: decryptSecretFields(r.config, getExtSecretKeys(r), encKeyForSig),
         limits: r.limits, federation: r.federation, instances: r.instances ?? null,
       });
       if (signature(record) === signature(existing)) {
@@ -386,6 +422,15 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       const wasActive = existing.status === 'active';
+
+      // Encrypt extension-level secret config values before the in-place swap.
+      const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), encKeyForSig);
+      if (encConfig === null) {
+        res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+          'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
+        return;
+      }
+      record.config = encConfig;
 
       // Swap code + metadata in place atomically. Lifecycle fields (status, installedBy,
       // installedAt, activatedAt) and the ext:{name} memory + instances are preserved.
@@ -476,6 +521,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
+          // Never return secret config values (or the internal __secretKeys marker) — masked instead.
+          config: maskSecretFields(ext.config, getExtSecretKeys(ext)),
           actions: ext.actions.map(a => ({
             id: a.id,
             method: a.method,
@@ -802,11 +849,20 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
+      // Encrypt any per-instance `type: 'secret'` config values (bring-your-own-key per tenant).
+      const instSecretKeys = getInstanceSecretKeys(ext);
+      const encInstConfig = encryptSecretFields(instanceConfig ?? {}, instSecretKeys, getEncryptionKey(config));
+      if (encInstConfig === null) {
+        res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+          'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to store secret instance config.'));
+        return;
+      }
+
       const now = new Date().toISOString();
       const record: ExtensionInstanceRecord = {
         id,
         extensionName: name,
-        config: instanceConfig ?? {},
+        config: encInstConfig,
         status: 'active',
         createdBy: req.auth!.sub,
         createdAt: now,
@@ -816,7 +872,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       const created = await storage.createExtensionInstance(record);
       logger.info(`Extension instance created: ${name}/${id}`, { by: req.auth!.sub });
 
-      res.status(201).json(success(config.nodeId, { instance: created }, [
+      res.status(201).json(success(config.nodeId, {
+        instance: { ...created, config: maskSecretFields(created.config, instSecretKeys) },
+      }, [
         { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
         { description: 'Execute action on instance', method: 'POST', url: `/v1/ext/${name}/${id}/<actionId>` },
       ]));
@@ -838,8 +896,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       const instances = await storage.listExtensionInstances(name);
+      const instSecretKeys = getInstanceSecretKeys(ext);
       res.json(success(config.nodeId, {
-        instances,
+        instances: instances.map(i => ({ ...i, config: maskSecretFields(i.config, instSecretKeys) })),
         total: instances.length,
       }, [
         { description: 'Create instance', method: 'POST', url: `/v1/extensions/${name}/instances` },
@@ -869,7 +928,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      res.json(success(config.nodeId, { instance }, [
+      res.json(success(config.nodeId, {
+        instance: { ...instance, config: maskSecretFields(instance.config, getInstanceSecretKeys(ext)) },
+      }, [
         { description: 'Update instance', method: 'PATCH', url: `/v1/extensions/${name}/instances/${instanceId}` },
         { description: 'Delete instance', method: 'DELETE', url: `/v1/extensions/${name}/instances/${instanceId}` },
         { description: 'Execute action on instance', method: 'POST', url: `/v1/ext/${name}/${instanceId}/<actionId>` },
@@ -923,7 +984,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       const updates: Partial<ExtensionInstanceRecord> = {
         updatedAt: new Date().toISOString(),
       };
-      if (newConfig !== undefined) updates.config = newConfig;
+      const instSecretKeys = getInstanceSecretKeys(ext);
+      if (newConfig !== undefined) {
+        // Carry forward existing encrypted secrets the masked UI didn't resubmit, then encrypt.
+        const merged = preserveMaskedSecrets(newConfig, instance.config, instSecretKeys);
+        const encInstConfig = encryptSecretFields(merged, instSecretKeys, getEncryptionKey(config));
+        if (encInstConfig === null) {
+          res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+            'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to store secret instance config.'));
+          return;
+        }
+        updates.config = encInstConfig;
+      }
       if (status !== undefined) updates.status = status;
       if (translations !== undefined) updates.translations = translations;
 
@@ -935,7 +1007,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
 
       logger.info(`Extension instance updated: ${name}/${instanceId}`, { by: req.auth!.sub });
 
-      res.json(success(config.nodeId, { instance: updated }, [
+      res.json(success(config.nodeId, {
+        instance: { ...updated, config: maskSecretFields(updated.config, instSecretKeys) },
+      }, [
         { description: 'View instance', method: 'GET', url: `/v1/extensions/${name}/instances/${instanceId}` },
         { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
       ]));
@@ -1212,8 +1286,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           owner: req.auth!.owner,
           roles: req.auth!.roles,
         },
-        config: ext.config,
-        instance: { id: instanceId, config: instance.config },
+        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
+        config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
         log: {
           info: (msg, data) => logger.info(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
           warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
@@ -1463,7 +1538,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           owner: req.auth!.owner,
           roles: req.auth!.roles,
         },
-        config: ext.config,
+        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
+        config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
         log: {
           info: (msg, data) => logger.info(`[ext:${ext.name}] ${msg}`, data),
           warn: (msg, data) => logger.warn(`[ext:${ext.name}] ${msg}`, data),

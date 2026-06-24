@@ -6,6 +6,7 @@
  * @version-history
  *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.2.0 — 2026-06-24 — Add Applications moderation tab (operator hide/restore apps).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -59,6 +60,7 @@ import AgentTasksAdminTab from './admin/agent-tasks-tab.js';
 import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
 import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
 import SubdomainsAdminTab from './admin/subdomains-tab.js';
+import AppsAdminTab        from './admin/apps-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -92,6 +94,7 @@ const NAV_GROUPS = [
     { id: 'agent-tasks',  icon: '\u{1F4CB}',  key: 'dashboard.agentTasksTab', component: AgentTasksAdminTab },
     { id: 'sharing-groups', icon: '\u{1F465}', key: 'dashboard.sharingGroupsTab', component: SharingGroupsAdminTab },
     { id: 'capabilities', icon: '⚡',     key: 'capabilities.adminTitle', component: CapabilitiesAdminTab },
+    { id: 'apps',         icon: '\u{1F4F1}', key: 'admin.apps.title',        component: AppsAdminTab },
   ]},
   { key: 'dashboard.navInfrastructure', items: [
     { id: 'email',  icon: '\u2709',     key: 'dashboard.email',  component: EmailTab },

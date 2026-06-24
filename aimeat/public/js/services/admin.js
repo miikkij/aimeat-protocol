@@ -78,6 +78,11 @@ export const deleteHook      = (name)   => apiDelete(`/v1/admin/hooks/${encodeUR
 // ── Economy ──
 export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gaii, amount });
 
+// ── Applications (moderation) ──
+export const getAdminApps    = ()       => apiGet('/v1/admin/apps');
+export const moderateApp     = (owner, filename, hidden, reason) =>
+  apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/moderate`, { hidden, reason });
+
 // ── Chat Instances ──
 export const getChatInstances = ()      => apiGet('/v1/chat-instances');
 export const createChatChannel = (name, platform) => apiPost('/v1/chat-instances', { app_name: name, platform: platform || 'admin' });

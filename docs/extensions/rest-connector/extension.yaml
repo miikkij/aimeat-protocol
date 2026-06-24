@@ -1,0 +1,62 @@
+extension: "1.0"
+
+# ── REST Connector (reference) ──────────────────────────────────────────────
+# A minimal, generic third-party data connector that demonstrates the Secretary
+# P5 / §18 "secret config" pattern: a per-instance API key (bring-your-own-key
+# per tenant) marked `type: secret`, encrypted at rest with AES-256-GCM (the node
+# master key) and decrypted only just before the sandbox VM. The same `pull`
+# action works as a live action call AND as a scheduled (cron) sync.
+#
+# Real paid connectors (Vainu/Alma, …) plug their endpoint + auth here, but the
+# redistribution/ToS contract must be settled first — secrets always stay
+# bring-your-own-key per instance, never a node-global key. This file ships the
+# MECHANISM, not a specific paid integration.
+
+metadata:
+  name: rest-connector
+  version: "1.0.0"
+  description: "Generic REST connector — fetch an external endpoint with a per-instance secret API key and cache the result in ext: memory."
+  author: aimeat-core
+
+required_apis:
+  - memory
+
+# Per-tenant config: each instance brings its own secret key + base URL.
+instances:
+  supported: true
+  config_per_instance:
+    type: object
+    properties:
+      apiKey:
+        type: secret
+        label: "API key"
+        description: "Secret API key for the upstream REST service (encrypted at rest)."
+      baseUrl:
+        type: string
+        label: "Base URL"
+        description: "HTTPS endpoint to fetch on each sync (e.g. https://api.example.com/v1/data)."
+    required:
+      - apiKey
+
+actions:
+  - id: pull
+    method: POST
+    path: "/v1/ext/rest-connector/pull"
+    description: "Fetch the configured endpoint (optionally overridden by input.url) using the instance's secret API key, then cache a summary into ext: memory under `latest`."
+    script: "actions/pull.js"
+    input:
+      type: object
+      properties:
+        url:
+          type: string
+          description: "Optional override URL to fetch instead of the instance baseUrl."
+    output:
+      type: object
+
+limits:
+  memory_mb: 16
+  timeout_ms: 10000
+  max_api_calls: 10
+
+federation:
+  advertise: false
