@@ -5,6 +5,13 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.6.0 — 2026-06-24 — Secretary Phase 5 (learning loop): the `secretary` tick now runs a decision
+ *     review sweep (reviewOpenDecisions) before the briefing — scores open decision-log contracts whose
+ *     revisitWhen has passed (actual-vs-expected, 0–100) and advances open→reviewed; cost-guarded by
+ *     stop-spending. Feed-append extracted to appendFeed().
+ *   v2.5.0 — 2026-06-24 — Add the `secretary` kind: the Secretary's autonomous tick (Phase 4) — runs
+ *     the active context's brain on the owner's key and appends a briefing to `secretary.feed`;
+ *     stop-spending skips the paid call.
  *   v1.0.0 — 2026-03-01 — Initial implementation with croner
  *   v2.0.0 — 2026-03-15 — Add @activate trigger, execution log, memory access tracking
  *   v2.1.0 — 2026-06-05 — executeJob/triggerNow return a JobOutcome so a manual
@@ -38,6 +45,20 @@ import { emitResourceUpdated } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+/** Best-effort parse of a JSON object embedded in model output (tolerates prose/fences around it). */
+function extractJsonObject(text: string): Record<string, unknown> | null {
+  if (!text) return null;
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    const obj = JSON.parse(text.slice(start, end + 1));
+    return obj && typeof obj === 'object' ? obj as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Process-wide handle to the active Scheduler. Set once during service init so
@@ -309,6 +330,8 @@ export class Scheduler {
         run = await this.executeWorkflowJob(job);
       } else if (job.type === 'eco-capability') {
         run = await this.executeEcoCapabilityJob(job);
+      } else if (job.type === 'secretary') {
+        run = await this.executeSecretaryJob(job);
       }
     } catch (err) {
       result = 'error';
@@ -497,6 +520,108 @@ export class Scheduler {
     });
 
     return { reads, writes: [outputKey] };
+  }
+
+  /**
+   * `secretary` kind: the autonomous tick (Secretary feature Phase 4). Loads the owner's
+   * `secretary.config`, picks the active context, and — unless stop-spending is on — runs a short
+   * check-in on the owner's OpenRouter key and appends it to the Home feed (`secretary.feed`). Cost
+   * guard: stop-spending skips the paid AI call entirely (returns a skip); per-day budget caps ride
+   * the standard schedule constraints. Runs server-side as the owner (no JWT needed).
+   */
+  private async executeSecretaryJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const owner = job.ownerScope;
+    if (!owner) throw new Error(`secretary job "${job.id}" missing ownerScope`);
+    const cfgRec = await this.storage.getMemory(owner, 'secretary.config');
+    const cfg = (cfgRec?.value ?? {}) as {
+      contexts?: Array<{ id: string; name?: string; brain?: { purpose?: string; rules?: Array<{ description?: string }> }; policy?: { stopSpending?: boolean } }>;
+      activeContextId?: string;
+    };
+    const contexts = Array.isArray(cfg.contexts) ? cfg.contexts : [];
+    const active = contexts.find((c) => c.id === cfg.activeContextId) || contexts[0];
+    if (!active) {
+      return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: 'no secretary context configured' };
+    }
+    // Hard cost guard: stop-spending pauses the paid tick (the owner can re-enable it any time).
+    if (active.policy && active.policy.stopSpending) {
+      return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: 'stop-spending is on' };
+    }
+
+    const ownerName = owner.split('@')[0];
+    const writes: string[] = [];
+
+    // Learning loop (Phase 5): before the briefing, score any open decisions whose revisit time passed.
+    const reviewed = await this.reviewOpenDecisions(owner, active, job.id);
+    if (reviewed.length) {
+      const summary = reviewed.map((r) => `• ${r.decision} — ${r.score}/100`).join('\n');
+      await this.appendFeed(owner, { kind: 'review', contextId: active.id, contextName: active.name || '', text: `Reviewed ${reviewed.length} decision(s):\n${summary}` });
+      writes.push(...reviewed.map((r) => `secretary.decision.${r.id}`));
+    }
+
+    const rules = (active.brain?.rules || []).map((r) => '- ' + (r.description || '')).join('\n');
+    const systemPrompt = `You are ${ownerName}'s personal Secretary, working in the "${active.name || 'personal'}" context.\n${active.brain?.purpose || ''}\n\nOperating rules:\n${rules || '(none)'}\n\nYou are doing an autonomous check-in for the owner (they are not present). Reply in the user's language.`;
+    const prompt = 'Write a short check-in (2–4 sentences): what to focus on in this context right now, and flag anything that needs my attention. Be concrete and concise.';
+    const result = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${job.id}` });
+    await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: result.content });
+    writes.push('secretary.feed');
+
+    return { reads: ['secretary.config'], writes };
+  }
+
+  /** Append one entry to the owner's Home feed (`secretary.feed`, newest first, capped at 50). */
+  private async appendFeed(owner: string, entry: { kind: string; contextId: string; contextName: string; text: string }): Promise<void> {
+    const feedKey = 'secretary.feed';
+    const existing = await this.storage.getMemory(owner, feedKey);
+    const list = Array.isArray((existing?.value as { items?: unknown[] } | undefined)?.items)
+      ? (existing!.value as { items: unknown[] }).items : [];
+    const now = new Date().toISOString();
+    const items = [{ id: randomUUID(), ts: now, ...entry }, ...list].slice(0, 50);
+    await this.storage.setMemory({
+      key: feedKey, ownerGaii: owner, value: { items }, visibility: 'private', tags: ['secretary', 'feed'],
+      ttlHours: null, version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    });
+  }
+
+  /**
+   * Learning-loop review sweep (Phase 5): find open decision-log contracts whose `revisitWhen` has
+   * passed, ask the model (on the owner's key) to assess actual-vs-expected and score 0–100, and
+   * advance open→reviewed. Bounded per tick to cap cost; a per-decision failure leaves the record open
+   * with `lastError` for retry on the next sweep. See docs/specs/secretary-decision-contract.md.
+   */
+  private async reviewOpenDecisions(owner: string, active: { id: string; name?: string }, jobId: string): Promise<Array<{ id: string; decision: string; score: number }>> {
+    const MAX_PER_TICK = 5;
+    const recs = await this.storage.listMemory(owner, { prefix: 'secretary.decision.' });
+    const nowMs = Date.now();
+    const due = recs
+      .map((r) => ({ rec: r, d: (r.value ?? {}) as Record<string, unknown> }))
+      .filter(({ d }) => d.status === 'open' && typeof d.revisitWhen === 'string' && Date.parse(d.revisitWhen as string) <= nowMs)
+      .slice(0, MAX_PER_TICK);
+
+    const done: Array<{ id: string; decision: string; score: number }> = [];
+    for (const { rec, d } of due) {
+      const decision = String(d.decision || '');
+      const systemPrompt = `You are reviewing a past decision for quality, on behalf of the owner. Be honest and concise; reply in the owner's language. Return ONLY a JSON object: {"actualOutcome": string, "score": number (0-100, 100=excellent), "verdict": string (one line)}.`;
+      const prompt = `Decision: ${decision}\nChosen: ${String(d.chosen || '')}\nRationale: ${String(d.rationale || '')}\nExpected outcome: ${String(d.expectedOutcome || '')}\nLogged at: ${String(d.createdAt || '')}\n\nAssess how it actually turned out versus what was expected and score the decision's quality. If you lack information, say so in actualOutcome and give a tentative score.`;
+      const now = new Date().toISOString();
+      try {
+        const out = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${jobId}:review` });
+        const parsed = extractJsonObject(out.content);
+        const score = Math.max(0, Math.min(100, Math.round(Number(parsed?.score ?? 0)) || 0));
+        const updated = { ...d, status: 'reviewed', actualOutcome: String(parsed?.actualOutcome ?? out.content).slice(0, 2000), score, verdict: String(parsed?.verdict ?? '').slice(0, 300), reviewedAt: now, attempts: Number(d.attempts ?? 0) + 1, lastError: null };
+        await this.storage.setMemory({
+          key: rec.key, ownerGaii: owner, value: updated, visibility: 'private', tags: ['secretary', 'decision', 'reviewed', active.id],
+          ttlHours: null, version: rec.version + 1, createdAt: rec.createdAt, updatedAt: now,
+        });
+        done.push({ id: String(d.id || rec.key), decision, score });
+      } catch (err) {
+        const updated = { ...d, attempts: Number(d.attempts ?? 0) + 1, lastError: (err as Error).message };
+        await this.storage.setMemory({
+          key: rec.key, ownerGaii: owner, value: updated, visibility: 'private', tags: ['secretary', 'decision', 'open', active.id],
+          ttlHours: null, version: rec.version + 1, createdAt: rec.createdAt, updatedAt: now,
+        });
+      }
+    }
+    return done;
   }
 
   /**

@@ -133,4 +133,14 @@ docs/internal/
 .playwright-mcp/
 /secretary-phase0-view.png
 /secretary-phase1-hired.png
+/secretary-phase1-complete.png
+/secretary-multicontext.png
+/secretary-phase2a-chat.png
+/secretary-phase2b-finder.png
+/secretary-phase2cd-teach-routing.png
+/secretary-phase3a-note.png
+/secretary-phase3b-decisions.png
+/secretary-phase3cd-plan-gate.png
+/secretary-phase4-tick-feed.png
+/secretary-phase5-learning-loop.png
 /niputus-verify.png
