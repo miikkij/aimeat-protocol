@@ -27,6 +27,8 @@
  *   v1.0.0 — 2026-06-03 — Initial: agent/profile recurring schedules
  *   v1.1.0 — 2026-06-15 — Add the `eco-capability` kind: schedule a connected ecosystem app's
  *     capability; validates the app is connected and the capability is declared.
+ *   v1.2.0 — 2026-06-24 — Add the `secretary` kind (Secretary Phase 4 autonomous tick); no extra body
+ *     fields — the executor reads the owner's secretary.config at fire time.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -43,8 +45,8 @@ import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
 
-type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability';
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability'];
+type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'secretary';
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'secretary'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. */
 function isValidCron(cron: string, timezone?: string): boolean {
