@@ -4,6 +4,52 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-06-24
+
+### Added
+
+- **AIMEAT Secretary — a per-user AI assistant (Phases 0–6).** A heart-shield + quill surface that
+  appears once OpenRouter is configured, backed by a dedicated, unlisted GAII agent
+  (`secretary#<owner>@<node>`) auto-provisioned on key-save — no device-auth dance. It is **pure
+  frontend orchestration over the generic APIs** (memory, organisms, `/v1/ai/complete`, agent-messages,
+  `aimeat_discover`); the backend stays protocol-only. Capabilities:
+  - **Hire onboarding (Phase 1).** An interview (external-prompt **or** in-app on the owner's key) writes
+    the Secretary's **brain** (prose directives, incl. a standing scout-before-build rule) *and* designs
+    and creates its **self-organism** + workspaces — no structural questions to the user. Brain
+    versioning (snapshot history + restore + re-run setup).
+  - **Multi-context (Phase 1.5).** One Secretary identity holds several "hats", each its own
+    brain + self-organism + operating policy + history; a switcher + add-context flow; cheap keyword
+    routing suggests the right context per input.
+  - **Operating model (Phase 1).** Per-capability autonomy **bands** (Act / Draft / Ask / Off) +
+    a hard **stop-spending** switch + a daily morsel budget, over an 11-capability taxonomy.
+  - **Interactive shell (Phase 2).** Context-aware **chat** (brain as system prompt), a **resource
+    finder** over `aimeat_discover`, **teach** mode (a curated AIMEAT primer), and routing-suggest.
+  - **Doing work (Phase 3).** **Save-a-note** (Draft band → files into the right workspace), async
+    **inbox decision cards** (Ask band → the owner answers in Postilaatikko, the Secretary applies the
+    answer), multi-step **guided playbooks**, and a third-party-send gate (Enterprise-only capabilities
+    render locked in Community).
+  - **Autonomous tick + Home feed + calendar (Phase 4).** A new **`secretary` scheduler kind** runs the
+    active context's brain on the owner's key each fire and appends a context-tagged briefing to the Home
+    feed; enable / Run-now / pause the daily check-in. Hard cost guard: stop-spending skips the paid tick
+    entirely.
+  - **Learning loop (Phase 5).** Lightweight **goal** records + a decision-log **Memory Contract**
+    (`secretary.decision.{id}`, see `docs/specs/secretary-decision-contract.md`): a decision stays *open*
+    after the choice with an expected outcome + revisit date, and the tick's **review sweep** scores it
+    actual-vs-expected (0–100) and advances open → reviewed — the loop that turns a list into measurable
+    decision quality.
+- **Company Secretary — Enterprise edition (Phase 6).** The open-core `EnterpriseProvider` seam gained
+  three additive, optional methods (`secretaryScopes()` / `secretaryDirectives(orgId)` /
+  `secretaryCapabilities()`) + `EnterpriseContext.ensureCompanySecretary` — the stub omits them, so
+  Community is unaffected. The `ee/` module provisions a per-org company Secretary
+  (`secretary-<slug>#<owner>@<node>`) with a **read-only locked brain**, the **`secretary-enterprise`
+  scope superset**, and an `org.{slug}.*` consent grant. New **My Company** admin surfaces:
+  - **Secretary** — enable + the locked brain (read-only) + company-admin capabilities + granted scopes.
+  - **Governance** — the CFO-facing cost & ROI surface: revenue, commission income, member payouts, and
+    **cost-per-task per agent** computed from existing orders + wallet + commission (financial terms, not
+    raw tokens).
+  - **Company model** — the real-world org structure (departments, roles, reporting lines, people incl.
+    non-AIMEAT), built prompt-driven (describe → AI-shape → review → apply), stored as `org.{slug}.model`.
+
 ## [1.32.0] - 2026-06-23
 
 ### Added
