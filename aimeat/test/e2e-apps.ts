@@ -26,6 +26,8 @@
  *     anonymous catalogue while the owner still sees it (and a different owner does not); direct
  *     download still works; re-publish inherits parked; cross-owner park 404s; parked-only PATCH
  *     preserves the access code; unpark restores public visibility.
+ *   v1.6.0 — 2026-06-24 — add Phase 10 inline badge: GET ?mode=inline appends the node-branded
+ *     "publish your own app" badge (skips when the app origin 301s); raw download stays byte-exact.
  */
 
 import * as ed from '@noble/ed25519';
@@ -486,6 +488,30 @@ await test('A parked-only PATCH does not clear an existing access code', async (
     assert(park.body.data?.parked === true, 'app is parked');
     // Clean up: unpark + remove the code so later reads are unaffected.
     await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: false, access_code: '' }) }));
+});
+
+// ── Phase 10: inline "publish your own app" badge ──
+// An inline-served HTML app gets a node-branded "back home · publish your own app"
+// badge appended (apps.ts injectAimeatBadge) so a shared-link visitor has a way home
+// + a publish CTA. The raw download (attachment) must stay byte-exact (no badge).
+console.log('\nPhase 10: inline publish-your-own-app badge');
+
+await test('GET ?mode=inline appends the AIMEAT badge', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?mode=inline`, { redirect: 'manual' });
+    // If the app origin is provisioned this 301s instead (covered by e2e-app-origin); skip then.
+    if (res.status === 301) { console.log('    (app origin on — inline 301s; badge covered by app-origin serving)'); return; }
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('id="aimeat-app-badge"'), 'inline body carries the badge element');
+    assert(text.includes('Publish your own app'), 'badge shows the publish CTA');
+    assert(/<\/body\s*>\s*$/i.test(text.trim()) === false || text.indexOf('aimeat-app-badge') < text.lastIndexOf('</body>'), 'badge injected before </body>');
+});
+
+await test('Raw download (no mode) stays byte-exact — no badge', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`);
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(!text.includes('aimeat-app-badge'), 'attachment download is unmodified (no badge)');
 });
 
 // ── Summary ──
