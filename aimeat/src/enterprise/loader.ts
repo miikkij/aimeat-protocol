@@ -18,6 +18,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { ensureCompanySecretary } from '../services/secretary.js';
 import { stubEnterpriseProvider, type EnterpriseContext, type EnterpriseProvider } from './provider.js';
 
 /** Assemble the injected context handed to the EE module (or the stub). */
@@ -36,6 +37,7 @@ export function buildEnterpriseContext(config: AimeatConfig, storage: Storage): 
       // capability/input are typed loosely at the seam; the EE module passes the records it fetched.
       return invokeCapability(config, storage, capability as never, (input ?? {}) as Record<string, unknown>, callerGhii, jwt, mode);
     },
+    ensureCompanySecretary: (opts) => ensureCompanySecretary(storage, config, opts),
     logger,
   };
 }

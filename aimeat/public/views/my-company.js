@@ -16,12 +16,18 @@
  *   v0.2.1 — 2026-06-23 — order tracking (my orders + orders received) with live status
  *   v0.3.0 — 2026-06-23 — members & roles + customers + revenue-split receipt
  *   v0.4.0 — 2026-06-23 — company Settings tab (admin): name, Y-tunnus, description, commission %
+ *   v0.5.0 — 2026-06-24 — Secretary Phase 6 (slice 3): company Secretary admin subtab — enable +
+ *     read-only locked brain + company-admin capabilities + enterprise scopes (GET/POST /v1/orgs/:slug/secretary).
+ *   v0.6.0 — 2026-06-24 — Secretary Phase 6 (slice 2): Governance admin subtab — CFO cost & ROI surface
+ *     (revenue / orders / cost-per-task / commission income + per-agent table) from GET /v1/orgs/:slug/governance.
+ *   v0.7.0 — 2026-06-24 — Secretary Phase 6 (slice 1): Company model admin subtab — prompt-driven builder
+ *     (describe → generate in-app / copy-prompt → review → apply) for departments/roles/people/reporting (GET/PUT /v1/orgs/:slug/model).
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
@@ -501,6 +507,241 @@ function OfferPicker({ slug, alreadyListed, onListed }) {
     </div>`;
 }
 
+/**
+ * Company Secretary panel (Secretary Phase 6, admin-only). Reads GET /v1/orgs/:slug/secretary; if not
+ * yet provisioned, an admin can enable it (POST). Once present it shows the agent identity, the
+ * read-only LOCKED brain (purpose + rules, owned by the Enterprise edition), the company-admin
+ * capabilities, and the granted enterprise scopes.
+ */
+function SecretaryPanel({ slug }) {
+  const [sec, setSec] = useState(undefined); // undefined = loading, null = not provisioned, object = provisioned
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/secretary`); setSec(r.data?.secretary ?? null); }
+    catch (e) { setErr(e.message || ''); setSec(null); }
+  }, [slug]);
+  useEffect(() => { setSec(undefined); load(); }, [load]);
+
+  async function enable() {
+    setBusy(true); setErr('');
+    try { const r = await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/secretary`, {}); setSec(r.data?.secretary ?? null); }
+    catch (e) { setErr(e.message || ''); }
+    finally { setBusy(false); }
+  }
+
+  if (sec === undefined) return html`<p class="mc-empty">${t('myCompany.secLoading')}</p>`;
+
+  if (!sec) return html`
+    <div class="mc-sec">
+      <p class="section-desc">${t('myCompany.secIntro')}</p>
+      <button class="btn-primary" disabled=${busy} onClick=${enable}>${busy ? t('myCompany.secEnabling') : t('myCompany.secEnable')}</button>
+      ${err && html`<p class="mc-err">${err}</p>`}
+    </div>`;
+
+  return html`
+    <div class="mc-sec">
+      <div class="mc-sec-id">
+        <strong>${t('myCompany.secTitle')}</strong>
+        <code class="mc-mini">${sec.gaii}</code>
+      </div>
+      <div class="mc-sec-brain">
+        <div class="mc-section-head">
+          <h3 class="mc-form-title">${t('myCompany.secBrain')}</h3>
+          <span class="mc-lock-chip">🔒 ${t('myCompany.secLocked')}</span>
+        </div>
+        <p class="mc-sec-purpose">${sec.brain?.purpose ?? ''}</p>
+        <ul class="mc-sec-rules">
+          ${(sec.brain?.rules ?? []).map((r, i) => html`<li key=${i}>${r.description}</li>`)}
+        </ul>
+      </div>
+      ${(sec.capabilities ?? []).length ? html`
+        <div class="mc-sec-caps">
+          <h3 class="mc-form-title">${t('myCompany.secCaps')}</h3>
+          <ul class="mc-sec-cap-list">
+            ${sec.capabilities.map(c => html`<li key=${c.id}><strong>${c.title}</strong><span class="mc-mini"> ${c.description}</span>${c.band ? html` <span class="mc-chip">${c.band}</span>` : null}</li>`)}
+          </ul>
+        </div>` : null}
+      <details class="mc-sec-scopes">
+        <summary>${t('myCompany.secScopes')} (${(sec.scopes ?? []).length})</summary>
+        <div class="mc-sec-scope-tags">${(sec.scopes ?? []).map(s => html`<span class="mc-chip" key=${s}>${s}</span>`)}</div>
+      </details>
+      ${err && html`<p class="mc-err">${err}</p>`}
+    </div>`;
+}
+
+/**
+ * Financial governance / cost & ROI panel (Secretary Phase 6 slice 2, admin-only). The CFO-facing
+ * surface: the company's transaction ledger in financial terms (revenue, commission income, member
+ * payouts, cost-per-task per agent) from GET /v1/orgs/:slug/governance. Per-department + token-level
+ * cost attribution + decision-scored ROI land with the company model (slice 1) — noted, not faked.
+ */
+function GovernancePanel({ slug }) {
+  const [gov, setGov] = useState(undefined);
+  const [err, setErr] = useState('');
+  const load = useCallback(async () => {
+    try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/governance`); setGov(r.data?.governance ?? null); }
+    catch (e) { setErr(e.message || ''); setGov(null); }
+  }, [slug]);
+  useEffect(() => { setGov(undefined); load(); }, [load]);
+
+  if (gov === undefined) return html`<p class="mc-empty">${t('myCompany.govLoading')}</p>`;
+  if (!gov) return html`<p class="mc-err">${err || t('myCompany.govLoading')}</p>`;
+
+  const cur = gov.currency || 'morsels';
+  const T = gov.totals;
+  const kpi = (label, value) => html`<div class="mc-gov-kpi"><div class="mc-gov-kpi-value">${value}</div><div class="mc-gov-kpi-label">${label}</div></div>`;
+  return html`
+    <div class="mc-gov">
+      <p class="section-desc">${t('myCompany.govIntro')}</p>
+      <div class="mc-gov-kpis">
+        ${kpi(`${T.revenue} ${cur}`, t('myCompany.govRevenue'))}
+        ${kpi(T.orders, t('myCompany.govOrders'))}
+        ${kpi(`${T.avgPerTask} ${cur}`, t('myCompany.govAvg'))}
+        ${kpi(`${T.orgCommission} ${cur}`, t('myCompany.govCommissionIncome'))}
+      </div>
+      <h3 class="mc-form-title">${t('myCompany.govByAgent')}</h3>
+      ${gov.byAgent.length === 0
+        ? html`<p class="mc-empty">${t('myCompany.govNoActivity')}</p>`
+        : html`<table class="mc-gov-table">
+            <thead><tr>
+              <th>${t('myCompany.govAgent')}</th><th>${t('myCompany.govTasks')}</th>
+              <th>${t('myCompany.govRevenueShort')}</th><th>${t('myCompany.govAvgShort')}</th><th>${t('myCompany.govPayout')}</th>
+            </tr></thead>
+            <tbody>
+              ${gov.byAgent.map(a => html`<tr key=${a.agentName + a.agentOwner}>
+                <td>🤖 ${a.agentName}</td><td>${a.tasks}</td><td>${a.revenue}</td><td>${a.avgPerTask}</td><td>${a.memberCut}</td>
+              </tr>`)}
+            </tbody>
+          </table>`}
+      <div class="mc-gov-levers">
+        <span class="mc-chip">${t('myCompany.govWallet')}: ${gov.walletBalance} ${cur}</span>
+        <span class="mc-chip">${t('myCompany.govCommission')}: ${gov.commissionPercent}%</span>
+        <span class="mc-chip">${t('myCompany.govFee')}: ${gov.feePercent}%</span>
+      </div>
+      <p class="mc-gov-note">${t('myCompany.govRoiNote')}</p>
+    </div>`;
+}
+
+/** Best-effort parse of a JSON object embedded in model output (tolerates prose/fences around it). */
+function extractJsonObject(text) {
+  if (!text) return null;
+  const s = text.indexOf('{'); const e = text.lastIndexOf('}');
+  if (s < 0 || e <= s) return null;
+  try { const o = JSON.parse(text.slice(s, e + 1)); return (o && typeof o === 'object') ? o : null; } catch { return null; }
+}
+
+function buildModelPrompt(desc) {
+  return `You are designing a structured model of a real-world company organisation for the company Secretary. Based on the description, produce ONLY a JSON object (no prose, no code fences) with this exact shape:
+{
+  "departments": [{ "name": string, "purpose": string }],
+  "roles": [{ "title": string, "department": string, "responsibilities": string }],
+  "people": [{ "name": string, "role": string, "department": string, "isAimeatUser": boolean }],
+  "reportingLines": [{ "from": string, "to": string }]
+}
+Include real people/employees (most are NOT AIMEAT users — set isAimeatUser false unless clearly a platform user). Keep it concise and realistic.
+
+Company description:
+${desc}`;
+}
+
+/**
+ * Company model panel (Secretary Phase 6 slice 1, admin-only). The real-world org structure
+ * (departments, roles, reporting lines, people who may not be AIMEAT users) the company Secretary
+ * maintains. Built prompt-driven (same interview → AI-shaped JSON → apply mechanism as the personal
+ * self-organism): describe the company → generate in-app (owner key) or copy the prompt → review → apply.
+ * GET/PUT /v1/orgs/:slug/model.
+ */
+function CompanyModelPanel({ slug }) {
+  const [model, setModel] = useState(undefined);
+  const [desc, setDesc] = useState('');
+  const [draft, setDraft] = useState(null); // AI-proposed model pending review
+  const [generating, setGenerating] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/model`); setModel(r.data?.model ?? null); }
+    catch (e) { setErr(e.message || ''); setModel(null); }
+  }, [slug]);
+  useEffect(() => { setModel(undefined); setDraft(null); load(); }, [load]);
+
+  async function generate() {
+    if (!desc.trim()) return;
+    setGenerating(true); setErr(''); setMsg('');
+    try {
+      // Long AI call on the owner's key — low-level api() with a long timeout + no retries.
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: buildModelPrompt(desc.trim()), systemPrompt: 'Return only valid JSON, no prose.' }), timeoutMs: 1_800_000, retries: 0 });
+      const text = r.data?.content ?? r.data?.completion ?? r.data?.text ?? '';
+      const parsed = extractJsonObject(text);
+      if (!parsed) { setErr(t('myCompany.modelParseErr')); return; }
+      setDraft(parsed);
+    } catch (e) { setErr(e.message || ''); }
+    finally { setGenerating(false); }
+  }
+
+  function tryPaste() {
+    const parsed = extractJsonObject(pasteText);
+    if (!parsed) { setErr(t('myCompany.modelParseErr')); return; }
+    setErr(''); setDraft(parsed); setPasteOpen(false);
+  }
+
+  async function apply() {
+    if (!draft) return;
+    setErr(''); setMsg('');
+    try { const r = await apiPut(`/v1/orgs/${encodeURIComponent(slug)}/model`, draft); setModel(r.data?.model ?? null); setDraft(null); setDesc(''); setMsg(t('myCompany.modelApplied')); }
+    catch (e) { setErr(e.message || ''); }
+  }
+
+  async function copyPrompt() {
+    try { await navigator.clipboard.writeText(buildModelPrompt(desc.trim() || '<describe your company here>')); setMsg(t('myCompany.modelCopied')); } catch { /* clipboard blocked */ }
+  }
+
+  if (model === undefined) return html`<p class="mc-empty">${t('myCompany.modelLoading')}</p>`;
+
+  const view = draft || model;
+  return html`
+    <div class="mc-model">
+      <p class="section-desc">${t('myCompany.modelIntro')}</p>
+
+      <div class="mc-model-build">
+        <textarea class="mc-input" rows="3" placeholder=${t('myCompany.modelDescPlaceholder')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea>
+        <div class="mc-model-actions">
+          <button class="btn-primary" disabled=${!desc.trim() || generating} onClick=${generate}>${generating ? t('myCompany.modelGenerating') : t('myCompany.modelGenerate')}</button>
+          <button class="btn-outline btn-sm" onClick=${copyPrompt}>${t('myCompany.modelCopyPrompt')}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => setPasteOpen(o => !o)}>${t('myCompany.modelPaste')}</button>
+        </div>
+        ${pasteOpen && html`<div class="mc-model-paste">
+          <textarea class="mc-input" rows="4" placeholder=${t('myCompany.modelPastePlaceholder')} value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+          <button class="btn-outline btn-sm" onClick=${tryPaste}>${t('myCompany.modelReview')}</button>
+        </div>`}
+        ${msg && html`<p class="mc-mini">${msg}</p>`}
+        ${err && html`<p class="mc-err">${err}</p>`}
+      </div>
+
+      ${draft && html`<div class="mc-model-review">
+        <span class="mc-chip">${t('myCompany.modelDraft')}</span>
+        <button class="btn-primary btn-sm" onClick=${apply}>${t('myCompany.modelApply')}</button>
+        <button class="btn-ghost btn-sm" onClick=${() => setDraft(null)}>${t('myCompany.modelDiscard')}</button>
+      </div>`}
+
+      ${!view ? html`<p class="mc-empty">${t('myCompany.modelEmpty')}</p>` : html`
+        <div class="mc-model-view">
+          <section><h3 class="mc-form-title">${t('myCompany.modelDepartments')} (${(view.departments || []).length})</h3>
+            <ul class="mc-model-list">${(view.departments || []).map((d, i) => html`<li key=${i}><strong>${d.name}</strong>${d.purpose ? html` — <span class="mc-mini">${d.purpose}</span>` : null}</li>`)}</ul></section>
+          <section><h3 class="mc-form-title">${t('myCompany.modelRoles')} (${(view.roles || []).length})</h3>
+            <ul class="mc-model-list">${(view.roles || []).map((r, i) => html`<li key=${i}><strong>${r.title}</strong>${r.department ? html` <span class="mc-chip">${r.department}</span>` : null}${r.responsibilities ? html`<div class="mc-mini">${r.responsibilities}</div>` : null}</li>`)}</ul></section>
+          <section><h3 class="mc-form-title">${t('myCompany.modelPeople')} (${(view.people || []).length})</h3>
+            <ul class="mc-model-list">${(view.people || []).map((p, i) => html`<li key=${i}><strong>${p.name}</strong>${p.role ? html` <span class="mc-mini">${p.role}${p.department ? ', ' + p.department : ''}</span>` : null}${p.isAimeatUser ? html` <span class="mc-chip">AIMEAT</span>` : null}</li>`)}</ul></section>
+          <section><h3 class="mc-form-title">${t('myCompany.modelReporting')} (${(view.reportingLines || []).length})</h3>
+            <ul class="mc-model-list">${(view.reportingLines || []).map((l, i) => html`<li key=${i}>${l.from} → ${l.to}</li>`)}</ul></section>
+        </div>`}
+    </div>`;
+}
+
 export default function MyCompanyView() {
   useViewCSS('/css/views/my-company.css');
   const callerOwner = (typeof window !== 'undefined' && window.AIMEAT?.auth?.getSession?.()?.owner) || '';
@@ -631,7 +872,7 @@ export default function MyCompanyView() {
             </div>
 
             <div class="mc-subtabs">
-              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'portfolio', 'settings'] : []), 'members'].map(id => html`
+              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'portfolio', 'secretary', 'governance', 'model', 'settings'] : []), 'members'].map(id => html`
                 <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
               <span class="mc-role-chip">${t('myCompany.role' + (selected.role || 'member').charAt(0).toUpperCase() + (selected.role || 'member').slice(1))}</span>
             </div>
@@ -656,6 +897,9 @@ export default function MyCompanyView() {
               setSelected(s => ({ ...s, ...updated }));
               setOrgs(list => list.map(o => (o.slug === updated.slug && o.creatorOwner === updated.creatorOwner) ? { ...o, ...updated } : o));
             }} />`}
+            ${subTab === 'secretary' && html`<${SecretaryPanel} slug=${selected.slug} />`}
+            ${subTab === 'governance' && html`<${GovernancePanel} slug=${selected.slug} />`}
+            ${subTab === 'model' && html`<${CompanyModelPanel} slug=${selected.slug} />`}
             ${subTab === 'members' && html`<${MembersPanel} slug=${selected.slug} creatorOwner=${selected.creatorOwner} viewerRole=${selected.role} />`}
           `}
         </section>

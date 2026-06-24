@@ -7,9 +7,14 @@
  *   conservative `secretary` profile (mcp/catalog/scopes.ts). Idempotent: ensureSecretary only
  *   creates when absent. Full design: docs/plans/2026-06-23-secretary-feature.md.
  * @structure SECRETARY_AGENT_NAME · UNLISTED_TAG · SECRETARY_ROLE_TAG · secretaryGaii() ·
- *   getSecretary() · ensureSecretary()
+ *   getSecretary() · ensureSecretary() · COMPANY_SECRETARY_TAG · companySecretaryName/Gaii() ·
+ *   getCompanySecretary() · ensureCompanySecretary() (Phase 6)
  * @usage await ensureSecretary(storage, config, ownerName)  // after the OpenRouter key is saved
- * @version-history v0.1.0 — 2026-06-23 — Phase 0: Secretary identity + auto-provisioning
+ * @version-history
+ *   v0.2.0 — 2026-06-24 — Phase 6: ensureCompanySecretary() — provision the per-org company Secretary
+ *     (`secretary-<slug>#<owner>@node`) with the EE-supplied enterprise scopes + a locked directives
+ *     brain. Core owns provisioning; the EE module supplies the policy + the org consent grant.
+ *   v0.1.0 — 2026-06-23 — Phase 0: Secretary identity + auto-provisioning
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
@@ -86,4 +91,98 @@ export async function ensureSecretary(
   emitChange('agents', gaii);
   logger.info('[secretary] provisioned', { gaii });
   return record;
+}
+
+// ── Company Secretary (Phase 6) ──────────────────────────────────────────────────────────────────
+
+/** Tag marking the per-org company Secretary (locked brain, enterprise scopes; distinct from personal). */
+export const COMPANY_SECRETARY_TAG = 'system:company-secretary';
+
+/** Bare agent name for an org's company Secretary: one per org slug (`secretary-<slug>`). */
+export function companySecretaryName(orgSlug: string): string {
+  return `secretary-${orgSlug}`;
+}
+
+/** The company Secretary GAII: `secretary-<slug>#<owner>@node` (owned by the org's creator owner). */
+export function companySecretaryGaii(orgSlug: string, ownerName: string, config: AimeatConfig): string {
+  return buildGAII(companySecretaryName(orgSlug), ownerName, config.nodeId);
+}
+
+/** Fetch an org's company Secretary agent, or null if not provisioned. */
+export async function getCompanySecretary(
+  storage: Storage,
+  config: AimeatConfig,
+  orgSlug: string,
+  ownerName: string,
+): Promise<AgentRecord | null> {
+  return storage.getAgent(companySecretaryGaii(orgSlug, ownerName, config));
+}
+
+/**
+ * Provision (idempotently) the company Secretary for an organization. Mirrors {@link ensureSecretary}
+ * but takes the enterprise scope superset + the locked brain from the caller (the EE module), and tags
+ * the agent as a company Secretary. The locked brain is written to the agent's directives store; the
+ * SPA renders it read-only. The `org.{id}` consent grant that attaches it is owned by the EE module
+ * (it knows the org's data namespace), not created here.
+ */
+export async function ensureCompanySecretary(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: {
+    orgId: string;
+    orgSlug: string;
+    ownerName: string;
+    scopes: string[];
+    directives: { purpose: string; rules: Array<{ id?: string; description: string }>; locked?: boolean } | null;
+  },
+): Promise<{ gaii: string; name: string; created: boolean }> {
+  const name = companySecretaryName(opts.orgSlug);
+  const gaii = companySecretaryGaii(opts.orgSlug, opts.ownerName, config);
+  const existing = await storage.getAgent(gaii);
+  if (existing) return { gaii, name, created: false };
+
+  const { publicKey } = await generateKeyPair();
+  const now = new Date().toISOString();
+  const record: AgentRecord = {
+    name,
+    owner: opts.ownerName,
+    gaii,
+    displayName: 'Company Secretary',
+    description: `Company Secretary for ${opts.orgSlug}.`,
+    capabilities: [],
+    publicKey,
+    trustScore: 50,
+    morselBalance: 0,
+    createdAt: now,
+    lastSeen: now,
+    // EE supplies the enterprise scope superset; fall back to the conservative personal profile so a
+    // misconfigured EE module can never widen access beyond the safe default.
+    defaultScopes: opts.scopes.length ? opts.scopes : scopesForProfile('secretary'),
+    mode: 'interactive',
+    tags: [SECRETARY_ROLE_TAG, COMPANY_SECRETARY_TAG, UNLISTED_TAG, `org:${opts.orgSlug}`],
+  };
+
+  try {
+    await storage.createAgent(record);
+  } catch (err) {
+    const again = await storage.getAgent(gaii);
+    if (again) return { gaii, name, created: false };
+    throw err;
+  }
+
+  // Write the locked brain as the agent's directives (read-only in the SPA for company secretaries).
+  if (opts.directives) {
+    await storage.upsertAgentDirectives({
+      agentGaii: gaii,
+      purpose: opts.directives.purpose,
+      rules: opts.directives.rules.map((r, i) => ({ id: r.id ?? `r${i + 1}`, description: r.description })),
+      memoryAreas: [],
+      resources: [],
+      updatedAt: now,
+    });
+  }
+
+  emitChange('agents', gaii);
+  logger.info('[secretary] company secretary provisioned', { gaii, orgId: opts.orgId });
+  return { gaii, name, created: true };
 }
