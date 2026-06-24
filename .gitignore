@@ -131,19 +131,6 @@ docs/internal/
 
 # Local verification artifacts (Playwright MCP browser-drive output + screenshots)
 .playwright-mcp/
-/secretary-phase0-view.png
-/secretary-phase1-hired.png
-/secretary-phase1-complete.png
-/secretary-multicontext.png
-/secretary-phase2a-chat.png
-/secretary-phase2b-finder.png
-/secretary-phase2cd-teach-routing.png
-/secretary-phase3a-note.png
-/secretary-phase3b-decisions.png
-/secretary-phase3cd-plan-gate.png
-/secretary-phase4-tick-feed.png
-/secretary-phase5-learning-loop.png
-/secretary-phase6-company-panel.png
-/secretary-phase6-governance.png
-/secretary-phase6-company-model.png
-/niputus-verify.png
+# Any PNG dropped in the repo ROOT is a local verification screenshot — never commit it.
+# Leading slash = root only, so real assets in subdirs (aimeat-desktop/.../icons, public/) stay tracked.
+/*.png
