@@ -1,17 +1,17 @@
 /**
  * @file agent-management.ts
- * @description MCP tools for owner-managed agent attributes (tags, mode).
- *   Distinct from agent-caps.ts which is for the agent reporting its OWN
- *   capabilities -- these tools let the owner set classification metadata
- *   ON the agent.
- *
- *   These tools call the same REST endpoints the UI uses (PATCH /tags,
- *   PATCH /mode) which require an owner role; agent sessions will get a
- *   403 from the server.
+ * @description MCP tools for agent classification attributes (tags, mode).
+ *   These call the same REST endpoints the UI uses:
+ *   - PATCH /tags is same-owner gated -- an agent may set tags on itself or a
+ *     same-owner sibling (parity with agent-caps self-report). The crew scaffold
+ *     self-tags on every start via this path.
+ *   - PATCH /mode requires an owner role; an agent session gets a 403.
  *
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Initial creation: tags_set + mode_set
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-06-24 -- tags_set is now agent-callable on its own/same-owner record
+ *     (REST PATCH /tags relaxed from owner-role to same-owner). mode_set stays owner-only.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -26,7 +26,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     descriptionFor('aimeat_agent_tags_set'),
     {
       agent_name: agentNameSchema,
-      target_agent_name: z.string().describe('Agent whose tags to update (must be owned by the calling owner).'),
+      target_agent_name: z.string().describe('Agent whose tags to update (same owner as the calling agent; pass the caller\'s own name to self-tag).'),
       tags: z.array(z.string()).describe('Replacement tag list. Empty array clears all tags.'),
     },
     async ({ agent_name, target_agent_name, tags }) => {

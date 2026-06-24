@@ -20,7 +20,7 @@ Existing agents (created before this field existed) default to `interactive` -- 
 
 ## Tags (owner labels)
 
-Field: `AgentRecord.tags: string[]` (already existed -- this work surfaces them in the UI). Each tag is a lowercase string matching `[a-z0-9._-]+`, max 20 tags per agent.
+Field: `AgentRecord.tags: string[]` (already existed -- this work surfaces them in the UI). Each tag is a lowercase string matching `^[a-z0-9][a-z0-9._:-]{0,63}$` (colons allowed, `@` excluded), max 20 tags per agent.
 
 ### Conventions
 
@@ -38,8 +38,19 @@ Common combos: `crew:* + role:*` lets the owner see "everyone in the marketing c
 ### Setting tags
 
 - UI: Data Access tab on the expanded agent card.
-- MCP: `aimeat_agent_tags_set` (owner-only) -- replaces the tag list.
-- REST: `PATCH /v1/agents/:name/tags` body `{ tags: string[] }` (owner-only).
+- MCP: `aimeat_agent_tags_set` -- replaces the tag list.
+- REST: `PATCH /v1/agents/:name/tags` body `{ tags: string[] }`.
+
+**Auth: same-owner.** The owner may tag any of their agents; an agent may set tags on
+itself or a same-owner sibling (the same self-report pattern as
+`aimeat_agent_capabilities_report`). Cross-owner is rejected. Crew scaffolds rely on this
+to self-tag (e.g. `concierge`, `web-search`, `vision`) on every start, which feeds
+tag-based discovery/matching. Contrast with **mode**, which stays owner-only (`PATCH /mode`).
+
+> Validation: tags match `^[a-z0-9][a-z0-9._:-]{0,63}$` — lowercase alphanumerics plus `.`, `_`,
+> `:`, `-`. Colons are allowed so the `prefix:value` facets above (`source:crewai`, `role:editor`)
+> validate and compose with `aimeat_discover`'s `tags` CSV filter (`tags=source:crewai,role:editor`,
+> AND semantics). `@` is excluded so a tag can never be mistaken for a GAII.
 
 Empty array clears all tags. Sending an unchanged list is a no-op.
 

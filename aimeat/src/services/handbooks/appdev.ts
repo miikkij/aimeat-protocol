@@ -58,7 +58,7 @@ manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the c
 "Who works here" + the activity heatmap) and are visible to the whole workspace. **Advertise the
 contract** with owner-managed tags via \`aimeat_agent_tags_set\`: \`workspace-contract\` (the discovery
 marker — the workspace UI surfaces such agents to their owner) + \`contract.<id>\` per contract served
-(dots, NOT colons — tags are \`[a-z0-9._-]\`). Full guide — machine-readable contract template, exact
+(this convention uses dots so \`contract.<id>\` parses by prefix; tags are \`[a-z0-9._:-]\`, no \`@\`). Full guide — machine-readable contract template, exact
 provision calls, the processing loop, schema rules, discovery tags:
 **\`docs/agent-workspace-contracts.md\`**. Read it before building such an agent.
 

@@ -17,6 +17,8 @@
  *   v1.0.0 -- 2026-05-29 -- Initial creation. Closes public/connector parity drift
  *     for mode_set + tags_set (connector-only since 1.12.1).
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-06-24 -- Tag pattern allows ':' (faceted prefix:value tags compose with
+ *     aimeat_discover's tags filter); '@' stays excluded.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -29,7 +31,9 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;
-const TAG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+// Colons are allowed so faceted tags (source:crewai, role:researcher) validate and compose
+// with aimeat_discover's `tags` CSV filter; '@' stays excluded to keep tags distinct from GAII.
+const TAG_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,63}$/;
 const MAX_TAGS = 20;
 
 export function registerAgentManagementTools(
