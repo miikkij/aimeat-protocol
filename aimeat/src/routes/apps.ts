@@ -50,6 +50,11 @@
  *     caller's own parked apps (hidden from everyone else); responses carry `parked`; PATCH accepts
  *     a `parked` boolean (now field-aware so it no longer clears access_code on a parked-only call);
  *     a re-publish inherits the existing parked state.
+ *   v1.11.0 -- 2026-06-24 -- Inline-served HTML apps get a small fixed "aimeat.io · publish your
+ *     own app — free" attribution badge appended (injectAimeatBadge): a shared app link is often a
+ *     visitor's first contact with AIMEAT, so give them a way to the project + a publish CTA.
+ *     Permanent aimeat.io mark (free hosting), idempotent, HTML-only; raw download stays byte-exact.
+ *     Content-Length now reflects the injected body.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -66,6 +71,7 @@ import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { ensureAppSubdomain } from './subdomains.js';
+import { injectAimeatBadge } from '../utils/app-badge.js';
 
 /**
  * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
@@ -447,7 +453,12 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }
 
         res.setHeader('Content-Type', app.mimeType);
-        res.setHeader('Content-Length', app.size.toString());
+
+        // Inline (runnable) HTML gets the viral "back to {node} · publish your own
+        // app" badge appended; the raw download (attachment) is served byte-for-byte.
+        const isHtml = /html/i.test(app.mimeType);
+        const body = (mode === 'inline' && isHtml) ? injectAimeatBadge(app.data) : app.data;
+        res.setHeader('Content-Length', body.length.toString());
 
         if (mode === 'inline') {
             res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
@@ -463,7 +474,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         storage.incrementAppDownloads(app.ownerGaii, filename).catch(() => { });
 
-        res.send(app.data);
+        res.send(body);
     });
 
     // POST /v1/apps — Publish/update an app (requires auth)

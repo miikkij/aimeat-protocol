@@ -22,6 +22,9 @@
  *     app HTML so the owner's own app authenticates via the apex silent bridge (no separate login).
  *   v1.4.0 — 2026-06-20 — Auto-assign a per-app subdomain on first open (ensureAppSubdomain); the
  *     bare-host path form now 302-redirects to it, so seamless SSO works with NO manual subdomain step.
+ *   v1.5.0 — 2026-06-24 — serveApp now appends the permanent "aimeat.io · publish your own app"
+ *     attribution badge to HTML apps (injectAimeatBadge) so visitors landing on a shared app origin
+ *     reach the project + see a publish CTA; Content-Length already reflects the transformed body.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -30,6 +33,7 @@ import type { Storage, AppRecord, SubdomainSiteRecord } from '../storage/interfa
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { injectAimeatBadge } from '../utils/app-badge.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -177,8 +181,14 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
 
-  if (apexOrigin && /text\/html/i.test(app.mimeType)) {
-    const buf = relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin);
+  if (/text\/html/i.test(app.mimeType)) {
+    // Relax the author's CSP meta so the H-2 SSO bridge works (only when apex framing is on),
+    // then append the permanent aimeat.io "publish your own app" attribution badge so an
+    // external visitor who opens a shared app reaches the project + sees the publish hint.
+    const relaxed = apexOrigin
+      ? relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin)
+      : (app.data as Buffer | Uint8Array | string);
+    const buf = injectAimeatBadge(relaxed);
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;

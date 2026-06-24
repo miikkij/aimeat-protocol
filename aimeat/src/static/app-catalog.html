@@ -26,6 +26,13 @@
       goes stale for apps re-owned away from the "anonymous" bucket (screenshot calls 404'd as
       "not found for owner anonymous"). Signed-in owner wins for own/anonymous-bucket apps; the stored
       owner is kept only when browsing another user's published app.
+    v2.3.1 — 2026-06-24 — Fix "View / Edit Source" appearing to do nothing when opened from the
+      detail view: #source-overlay (z-index 500) sat BEHIND the opaque #detail-view (600) and was
+      fully hidden. Raised #source-overlay to z-index 650 (above detail-view, below context-menu).
+    v2.4.0 — 2026-06-24 — Discoverability/virality: add a node-branded "back home" link in the page
+      header (aimeat-home-link, label set from location.host) and a "Publish your own app" CTA in the
+      iframe app-viewer toolbar (.aimeat-cta). Pairs with the inline-app badge injected server-side
+      (apps.ts injectAimeatBadge) so visitors who open a shared app always have a way home + a publish hint.
 -->
 <html lang="en">
 <head>
@@ -826,6 +833,26 @@
       width: 100%;
     }
 
+    /* Shared "publish your own app" call-to-action (iframe toolbar + page header). */
+    .aimeat-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: .8rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      white-space: nowrap;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+    .aimeat-cta:hover { border-color: var(--accent); color: var(--accent); }
+    .aimeat-cta-spark { color: #E8564A; }
+
     /* ── App Detail View (full-screen overlay, reuses iframe-view chrome) ── */
 
     #detail-view {
@@ -1037,7 +1064,9 @@
     #source-overlay {
       position: fixed;
       inset: 0;
-      z-index: 500;
+      /* Above #detail-view (600): View/Edit Source is opened from inside the detail
+         view, whose opaque background would otherwise fully hide a 500-level overlay. */
+      z-index: 650;
       background: rgba(0, 0, 0, .3);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -1637,6 +1666,7 @@
 <body>
 
   <header>
+    <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
     <h1 data-i18n="header.title">My Apps</h1>
     <div class="mode-toggle">
       <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Global</button>
@@ -1844,6 +1874,7 @@
     <div class="iframe-toolbar">
       <button class="icon-btn" onclick="window._launcher.closeIframe()" title="Close">&#x2715;</button>
       <span class="iframe-title" id="iframe-title"></span>
+      <a class="aimeat-cta" href="/" target="_blank" rel="noopener" data-i18n-title="cta.publishOwn" title="Publish your own app — free"><span class="aimeat-cta-spark">⚡</span><span data-i18n="cta.publishOwn">Publish your own app</span></a>
       <button class="icon-btn" id="iframe-external-btn" onclick="window._launcher.openExternal()" title="Open in new tab" style="display:none">&#x2197;</button>
     </div>
     <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
@@ -2095,6 +2126,8 @@
   var I18N = {
     en: {
       'header.title': 'My Apps',
+      'cta.backHome': 'Back to home',
+      'cta.publishOwn': 'Publish your own app',
       'mode.global': '🌐 Global',
       'mode.global.title': 'Shared across all accounts on this browser',
       'mode.personal': '👤 Personal',
@@ -2323,6 +2356,8 @@
     },
     fi: {
       'header.title': 'Omat sovellukset',
+      'cta.backHome': 'Takaisin etusivulle',
+      'cta.publishOwn': 'Julkaise oma sovelluksesi',
       'mode.global': '🌐 Globaali',
       'mode.global.title': 'Jaettu kaikille tämän selaimen tileille',
       'mode.personal': '👤 Henkilökohtainen',
@@ -7115,6 +7150,14 @@
       : ((loadConfig().language === 'fi') ? 'fi' : 'en');
     applyI18n();
     updateModeToggle();
+
+    // Brand the "back home" link with this node's own host (so self-hosted nodes
+    // show their domain, not a hardcoded aimeat.io). The catalog is served from the
+    // node origin, so location.host IS the node.
+    try {
+      var _homeLabel = document.getElementById('aimeat-home-label');
+      if (_homeLabel && location.host) _homeLabel.textContent = location.host.replace(/^apps\./, '');
+    } catch (e) { /* keep default label */ }
 
     renderApps();
     loadPublishedApps();

@@ -116,6 +116,7 @@ await test('Publish a test app', async () => {
             filename: APP_FILENAME,
             content: Buffer.from(APP_HTML).toString('base64'),
             name: 'Sub E2E App',
+            description: 'E2E fixture app for subdomain mapping tests.',
         }),
     }));
     assert(status === 201 || status === 200, `publish status ${status}: ${JSON.stringify(body)}`);
