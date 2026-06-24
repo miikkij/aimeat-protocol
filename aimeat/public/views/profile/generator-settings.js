@@ -8,6 +8,8 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.2.0 — 2026-06-24 — Add a Vision model selector (a vision-capable model, e.g. qwen-2.5-VL) used
+ *     for image inputs — the Secretary's doc/image intake sends attached images to this model.
  *   v1.1.0 — 2026-04-01 — Add temperature, top_p, max_tokens model parameter fields
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js (was inline in v5.1.0+)
  */
@@ -26,6 +28,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [visionModel, setVisionModel] = useState('');
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [autoRetry, setAutoRetry] = useState(false);
@@ -48,6 +51,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
       if (resp.ok !== false && resp.data) {
         setHasApiKey(!!resp.data.hasApiKey);
         setModel(resp.data.model || '');
+        setVisionModel(resp.data.visionModel || '');
         setAutoRetry(!!resp.data.autoRetry);
         setMaxRetries(resp.data.maxRetries || 3);
         setProvider(resp.data.provider || 'openrouter');
@@ -87,7 +91,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const body = { model, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
+      const body = { model, visionModel: visionModel || null, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
       body.temperature = temperature !== '' ? parseFloat(temperature) : null;
       body.top_p = topP !== '' ? parseFloat(topP) : null;
       body.max_tokens = maxTokens !== '' ? parseInt(maxTokens) : null;
@@ -129,6 +133,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
       setHasApiKey(false);
       setApiKey('');
       setModel('');
+      setVisionModel('');
       setModels([]);
       setAutoRetry(false);
       setMaxRetries(3);
@@ -217,6 +222,28 @@ export function OpenRouterSettings({ onSettingsChange }) {
                 </select>
               `
             }
+          </div>
+
+          <!-- Vision model (image inputs — Secretary doc/image intake) -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.visionModel')}</label>
+            ${modelsLoading
+              ? html`<span class="pf-gen-or-loading">${t('profile.loading')}</span>`
+              : html`
+                <select
+                  class="pf-gen-or-select"
+                  value=${visionModel}
+                  onChange=${e => setVisionModel(e.target.value)}
+                  disabled=${!hasApiKey && !apiKey}
+                >
+                  <option value="">${t('profile.generator.openrouter.visionModelNone')}</option>
+                  ${models.map(m => html`
+                    <option value=${m.id}>${m.name || m.id}</option>
+                  `)}
+                </select>
+              `
+            }
+            <span class="pf-gen-or-param-hint">${t('profile.generator.openrouter.visionModel_hint')}</span>
           </div>
 
           <!-- Auto-retry -->

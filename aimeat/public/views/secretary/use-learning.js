@@ -7,13 +7,15 @@
  *   actual-vs-expected and advances open→reviewed. "Review now" triggers that tick immediately.
  * @structure useLearning({ active, auto, showToast }) -> { goals, decisions, loading, goalForm, decForm, ...handlers }
  * @usage const learn = useLearning({ active, auto, showToast }); goalsCard(learn) / decisionLogCard(learn)
- * @version-history v0.1.0 — 2026-06-24 — Phase 5: goals + decision-log contract + review trigger.
+ * @version-history
+ *   v0.2.0 — 2026-06-24 — P3-B: build the decision via the shared buildDecisionRecord helper (one
+ *     contract shape across the manual form, answered Ask cards, and approved guided plans).
+ *   v0.1.0 — 2026-06-24 — Phase 5: goals + decision-log contract + review trigger.
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { t } from '/js/i18n.js';
-
-const DECISION_SPEC = 'docs/specs/secretary-decision-contract.md';
+import { buildDecisionRecord } from '/js/services/secretary-helpers.js';
 
 function genId() { return 'd' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 
@@ -89,24 +91,18 @@ export function useLearning({ active, auto, showToast }) {
     const decision = decForm.decision.trim();
     if (!decision) return;
     setDecForm((f) => ({ ...f, saving: true }));
-    const id = genId();
-    const days = Number(decForm.revisitDays) || 7;
-    const revisitWhen = new Date(Date.now() + days * 86400000).toISOString();
-    const value = {
-      type: 'secretary.decision', spec: DECISION_SPEC, id,
+    const value = buildDecisionRecord({
       decision,
-      goalRef: decForm.goalRef || null,
       options: decForm.options.split('\n').map((s) => s.trim()).filter(Boolean),
       chosen: decForm.chosen.trim(),
       rationale: decForm.rationale.trim(),
       expectedOutcome: decForm.expectedOutcome.trim(),
-      revisitWhen,
-      actualOutcome: null, score: null, verdict: null, status: 'open',
-      reviewedAt: null, attempts: 0, lastError: null,
-      contextId: active?.id || '', contextName: active?.name || '', createdAt: new Date().toISOString(),
-    };
+      goalRef: decForm.goalRef || null,
+      revisitDays: decForm.revisitDays,
+      active,
+    });
     try {
-      await apiPost('/v1/memory', { key: `secretary.decision.${id}`, value, visibility: 'private', tags: ['secretary', 'decision', 'open', active?.id || ''] });
+      await apiPost('/v1/memory', { key: `secretary.decision.${value.id}`, value, visibility: 'private', tags: ['secretary', 'decision', 'open', active?.id || ''] });
       setDecForm({ open: false, decision: '', goalRef: '', options: '', chosen: '', rationale: '', expectedOutcome: '', revisitDays: 7, saving: false });
       await load();
     } catch (e) {

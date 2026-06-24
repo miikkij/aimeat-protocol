@@ -3,6 +3,19 @@
 //
 // Covers: provisioning on OpenRouter key save (happy path), correct scopes/tags/mode,
 // exclusion from the public catalogue, idempotency, and the failure mode (no key → no Secretary).
+// P1 (tests 23-26): the autonomous tick action loop + cost guards — band routing + work pre-check are
+// unit-tested directly (pure, no AI key); the idle-skip and budget-skip guards are asserted over HTTP.
+// The live AI action path (real act/ask cards) is browser-verified (the E2E owner has no OpenRouter key).
+// P2 (tests 27-36): §22 cross-context auto-routing + corrections-teach (pure, unit-tested) and the four
+// capability corners (§21) — create capability (A), knowledge import (B), consent+groups (C), crew
+// device-auth approve + mode/tags (D) — each with a happy path + a failure mode, over HTTP.
+// P2 gaps (tests 37-41): G1 routeTickNote — the autonomous tick's cross-context note-routing decision
+// (pure, corrections-biased); G2 the capability-create publishing gate a normal owner hits (policy.publishing
+// + 403); G3 owner-callable knowledge-graph links. (G4 is a frontend-only console-404 fix — browser-verified.)
+// P3 (tests 42-46): P3-A doc/image intake — upload a file to storage + file a discoverable files-record
+// (happy) + reject an empty upload (failure); P3-B auto-created decisions from real choices — an answered
+// Ask card + an approved guided plan each yield an open, reviewable secretary.decision contract (happy) +
+// an unauthenticated decision write is rejected (failure). Live vision/AI is browser-verified (no key here).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -49,6 +62,9 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+// P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
+// has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote } from '../src/services/secretary-tick.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -430,10 +446,383 @@ await test('22. Review sweep is cost-guarded: stop-spending leaves due decisions
     assert(d.status === 'open' && d.score === null, `decision must stay open under stop-spending: ${JSON.stringify({ status: d.status, score: d.score })}`);
 });
 
+// ─── P1: the autonomous tick is a real action loop + cost guards ───
+console.log('\nP1 -- Tick action loop + cost guards');
+
+await test('23. classifySecretaryActions routes by band (act / ask / drop)', async () => {
+    const bands = { file_intake: 'act', reminders: 'ask', curate_knowledge: 'draft', briefing: 'off', spend: 'act' };
+    const actions = [
+        { capability: 'file_intake', summary: 'file dentist note', payload: { workspace: 'Calendar', note: 'dentist Tue' } }, // act + note → act
+        { capability: 'reminders', summary: 'remind about gift', payload: {} },        // ask + feed → ask
+        { capability: 'curate_knowledge', summary: 'promote note', payload: {} },      // draft + note → ask
+        { capability: 'briefing', summary: 'weekly recap', payload: {} },              // off → drop
+        { capability: 'spend', summary: 'buy thing', payload: {} },                    // act band but unsupported cap → drop
+        { capability: '', summary: 'malformed', payload: {} },                         // malformed → ignored
+        { capability: 'reminders', summary: '', payload: {} },                         // empty summary → ignored
+    ];
+    const { acts, asks, dropped } = classifySecretaryActions(actions, bands);
+    assert(acts.length === 1 && acts[0].capability === 'file_intake', `acts: ${JSON.stringify(acts)}`);
+    assert(asks.length === 2 && asks.some(a => a.capability === 'reminders') && asks.some(a => a.capability === 'curate_knowledge'), `asks: ${JSON.stringify(asks)}`);
+    assert(dropped.length === 2 && dropped.some(a => a.capability === 'briefing') && dropped.some(a => a.capability === 'spend'), `dropped: ${JSON.stringify(dropped)}`);
+    // A missing band defaults to the conservative 'ask' (never silently acts).
+    const def = classifySecretaryActions([{ capability: 'file_intake', summary: 'x', payload: {} }], {});
+    assert(def.asks.length === 1 && def.acts.length === 0, `default band should be ask: ${JSON.stringify(def)}`);
+});
+
+await test('24. hasWorkToDo + budget helpers (pure guard math)', async () => {
+    assert(hasWorkToDo({ openGoals: 0, dueDecisions: 0, pendingIntake: 0 }) === false, 'idle → no work');
+    assert(hasWorkToDo({ openGoals: 1 }) === true, 'a goal → work');
+    assert(hasWorkToDo({ dueDecisions: 2 }) === true, 'due decisions → work');
+    const today = new Date().toISOString().slice(0, 10);
+    assert(ledgerSpentToday({ c1: { date: today, morsels: 3 } }, 'c1', today) === 3, 'reads today spend');
+    assert(ledgerSpentToday({ c1: { date: '2020-01-01', morsels: 9 } }, 'c1', today) === 0, 'stale day resets');
+    assert(budgetExceeded(2, 2) === true && budgetExceeded(1, 2) === false, 'budget compare');
+    assert(budgetExceeded(0, null) === false, 'null budget = no limit');
+});
+
+// Fresh owner with a clean slate (no goals / decisions) for the deterministic tick-guard HTTP paths.
+const tickOwner = `sectick${Date.now()}`;
+let tickToken = '';
+let tickSchedId = '';
+const tickCtx = { id: 't1', name: 'Tick', brain: { purpose: 'Test context', rules: [] }, organismId: null, organismName: 'Tick', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [] };
+
+await test('25. Idle pre-check: no goals/decisions → tick skips WITHOUT a paid call', async () => {
+    tickToken = await registerOwner(tickOwner);
+    // stop-spending OFF, no budget, no goals, no decisions.
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tickToken}` },
+        body: JSON.stringify({ key: 'secretary.config', value: { activeContextId: 't1', contexts: [tickCtx] }, visibility: 'private' }),
+    });
+    const created = await json('/v1/schedules', {
+        method: 'POST', headers: { Authorization: `Bearer ${tickToken}` },
+        body: JSON.stringify({ kind: 'secretary', cron: '0 8 * * *', display_name: 'Tick' }),
+    });
+    assert(created.status === 201, `create status ${created.status}: ${JSON.stringify(created.body)}`);
+    tickSchedId = created.body.data.schedule.id;
+    const trig = await json(`/v1/schedules/${tickSchedId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${tickToken}` } });
+    assert(trig.status === 200, `trigger status ${trig.status}: ${JSON.stringify(trig.body)}`);
+    assert(trig.body.data.outcome === 'busy' || trig.body.data.outcome === 'limited', `expected skip, got ${trig.body.data.outcome}`);
+    assert(/nothing to do/i.test(trig.body.data.reason || ''), `reason should be idle: ${trig.body.data.reason}`);
+    // No feed written (the paid briefing never ran).
+    const feed = await json('/v1/memory/secretary.feed', { headers: { Authorization: `Bearer ${tickToken}` } });
+    const items = (feed.body && feed.body.data && feed.body.data.value && feed.body.data.value.items) || [];
+    assert(items.length === 0, `feed must stay empty on idle skip, got ${items.length}`);
+});
+
+await test('26. Soft budget guard: spend at/over dailyMorselBudget → tick skips with reason budget', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // budget=1, ledger already at 1 morsel today → exhausted. (A goal is irrelevant: budget is checked first.)
+    const cfg = {
+        activeContextId: 't1',
+        contexts: [{ ...tickCtx, policy: { stopSpending: false, dailyMorselBudget: 1, bands: {} } }],
+        autonomousLedger: { t1: { date: today, morsels: 1 } },
+    };
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tickToken}` },
+        body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }),
+    });
+    const trig = await json(`/v1/schedules/${tickSchedId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${tickToken}` } });
+    assert(trig.status === 200, `trigger status ${trig.status}: ${JSON.stringify(trig.body)}`);
+    assert(trig.body.data.outcome === 'busy' || trig.body.data.outcome === 'limited', `expected skip, got ${trig.body.data.outcome}`);
+    assert(/budget/i.test(trig.body.data.reason || ''), `reason should mention budget: ${trig.body.data.reason}`);
+    const feed = await json('/v1/memory/secretary.feed', { headers: { Authorization: `Bearer ${tickToken}` } });
+    const items = (feed.body && feed.body.data && feed.body.data.value && feed.body.data.value.items) || [];
+    assert(items.length === 0, `feed must stay empty on budget skip, got ${items.length}`);
+});
+
+// ─── P2: capability corners (§21) + §22 Phase-4 auto-routing ───
+console.log('\nP2 -- Capability corners + cross-context auto-routing');
+
+// P2-E pure routing (deterministic; no AI key) — mirrors public/js/services/secretary-routing.js
+await test('27. routeIntake: clear non-active → high, ambiguous → low, belongs-to-active/single → null', async () => {
+    const bakery = { id: 'a', name: 'Bakery admin', brain: { purpose: 'run the bakery, manage flour orders and recipes' }, organismId: 'orgA', workspaces: [{ name: 'Recipes', purpose: 'recipe book' }, { name: 'Orders', purpose: 'supplier orders' }] };
+    const travel = { id: 'b', name: 'Travel planning', brain: { purpose: 'plan trips, flights and hotels for vacations' }, organismId: 'orgB', workspaces: [{ name: 'Trips', purpose: 'vacation itineraries' }, { name: 'Flights', purpose: 'flight bookings' }] };
+    const contexts = [bakery, travel];
+    const hi = routeIntake('Book flights and a hotel for our summer vacation trip', contexts, 'a', {});
+    assert(!!hi && hi.contextId === 'b' && hi.confidence === 'high', `expected high→travel: ${JSON.stringify(hi)}`);
+    const lo = routeIntake('check the flight status tomorrow', contexts, 'a', {});
+    assert(!!lo && lo.contextId === 'b' && lo.confidence === 'low', `expected low→travel: ${JSON.stringify(lo)}`);
+    const belongs = routeIntake('order more flour from the supplier for recipes', contexts, 'a', {});
+    assert(belongs === null, `bakery text on active bakery should be null: ${JSON.stringify(belongs)}`);
+    assert(routeIntake('anything at all here for testing', [bakery], 'a', {}) === null, 'single context → null');
+});
+
+await test('28. learnCorrection biases a later cheap-route decision (corrections-teach)', async () => {
+    const bakery = { id: 'a', name: 'Bakery admin', brain: { purpose: 'flour orders and recipes' }, organismId: 'orgA', workspaces: [] };
+    const cabin = { id: 'b', name: 'Summer cabin', brain: { purpose: 'maintain the lakeside place' }, organismId: 'orgB', workspaces: [] };
+    const contexts = [bakery, cabin];
+    const before = routeIntake('buy new towels for the sauna', contexts, 'a', {});
+    assert(before === null, `no signal should be null: ${JSON.stringify(before)}`);
+    const corr = learnCorrection({}, 'towels sauna', 'b');
+    const after = routeIntake('buy new towels for the sauna', contexts, 'a', corr);
+    assert(!!after && after.contextId === 'b' && after.confidence === 'high', `correction should auto-route to cabin: ${JSON.stringify(after)}`);
+});
+
+// P2-A — create-don't-just-find: the create path writes a capability record.
+let p2CapId = '';
+await test('29. P2-A create-resource: scaffold a capability + read it back', async () => {
+    const post = await json('/v1/capabilities', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'Book a dentist appointment', summary: 'Helps the owner book a dentist', whenToUse: 'When you need a dentist', usage: 'manual', visibility: 'private', callable: false, source: { type: 'manual', ref: 'secretary', version: '1.0.0' }, tags: ['secretary'] }),
+    });
+    assert(post.status === 201, `create status ${post.status}: ${JSON.stringify(post.body)}`);
+    p2CapId = post.body.data.id;
+    assert(typeof p2CapId === 'string' && p2CapId.length > 0, 'got capability id');
+    const got = await json(`/v1/capabilities/${encodeURIComponent(p2CapId)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(got.status === 200 && got.body.data.name === 'Book a dentist appointment', `read back: ${JSON.stringify(got.body)}`);
+});
+
+await test('30. P2-A failure mode: unauthenticated capability create is rejected', async () => {
+    const post = await json('/v1/capabilities', { method: 'POST', body: JSON.stringify({ name: 'x', visibility: 'private' }) });
+    assert(post.status === 401 || post.status === 403, `expected auth rejection, got ${post.status}: ${JSON.stringify(post.body)}`);
+});
+
+// P2-B — knowledge custodian: contribute via import; it lands in the knowledge graph.
+await test('31. P2-B knowledge custodian: import a package + read the manifest', async () => {
+    const pkg = {
+        name: 'Flour supplier contacts', content_type: 'document',
+        synthesis: { level: 'assisted', description: 'Curated by Secretary' },
+        entries: [{ key: 'note-flour', title: 'Flour supplier contacts', visibility: 'owner', value: { title: 'Flour supplier contacts', body: 'Call Aino at the mill on Thursdays.', via: 'secretary' } }],
+    };
+    const imp = await json('/v1/knowledge/import', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ package: pkg, overrides: { catalog_listed: false } }) });
+    assert(imp.status === 201, `import status ${imp.status}: ${JSON.stringify(imp.body)}`);
+    const pid = imp.body.data.package_id;
+    assert(typeof pid === 'string' && pid.length > 0, 'got package id');
+    const got = await json(`/v1/knowledge/${encodeURIComponent(pid)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const manifest = got.body.data && (got.body.data.manifest || got.body.data);
+    assert(got.status === 200 && manifest.name === 'Flour supplier contacts', `manifest: ${JSON.stringify(got.body)}`);
+});
+
+await test('32. P2-B failure mode: import with no package is rejected', async () => {
+    const imp = await json('/v1/knowledge/import', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({}) });
+    assert(imp.status === 400, `expected 400, got ${imp.status}: ${JSON.stringify(imp.body)}`);
+});
+
+// P2-C — access gatekeeper: grant + list + revoke consent; create a sharing group.
+await test('33. P2-C access gatekeeper: grant + list + revoke a consent', async () => {
+    const grant = await json('/v1/consent', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ data_pattern: 'organism.demo.*', recipient: 'organism.demo', purpose: 'Share demo workspace', scope: 'private' }) });
+    assert(grant.status === 201, `grant status ${grant.status}: ${JSON.stringify(grant.body)}`);
+    const cid = grant.body.data.id;
+    const list = await json('/v1/consent?status=active', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((list.body.data.consents || []).some((c: any) => c.id === cid), `grant should be listed: ${JSON.stringify(list.body.data)}`);
+    const del = await json(`/v1/consent/${encodeURIComponent(cid)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(del.status === 200, `revoke status ${del.status}`);
+    // A sharing group create also works (owner-only).
+    const grp = await json('/v1/groups', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'Family' }) });
+    assert(grp.status === 201 && grp.body.data.group.name === 'Family', `group create: ${JSON.stringify(grp.body)}`);
+});
+
+await test('34. P2-C failure mode: an invalid consent recipient is rejected', async () => {
+    const grant = await json('/v1/consent', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ data_pattern: 'organism.demo.*', recipient: 'not a valid recipient!!', purpose: 'x' }) });
+    assert(grant.status === 400, `expected 400, got ${grant.status}: ${JSON.stringify(grant.body)}`);
+});
+
+// P2-D — crew setup: approve a pending device-auth request + set the agent's mode/tags.
+await test('35. P2-D crew setup: approve a pending agent, then set mode + tags', async () => {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ owner: ownerName, agent_name: 'scout', display_name: 'Scout' }) });
+    assert(da.status === 200, `device-authorize status ${da.status}: ${JSON.stringify(da.body)}`);
+    const userCode = da.body.data.user_code;
+    const pending = await json('/v1/agents/device-authorize/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((pending.body.data.requests || []).some((r: any) => r.user_code === userCode), `pending should list the request: ${JSON.stringify(pending.body.data)}`);
+    const approve = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: userCode, action: 'approve', scopes: ['memory:read', 'memory:write'], owner_token: ownerToken }) });
+    assert(approve.status === 200 && approve.body.ok !== false, `approve: ${approve.status} ${JSON.stringify(approve.body)}`);
+    const mode = await json('/v1/agents/scout/mode', { method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ mode: 'task-runner' }) });
+    assert(mode.status === 200 && mode.body.data.mode === 'task-runner', `mode: ${mode.status} ${JSON.stringify(mode.body)}`);
+    const tags = await json('/v1/agents/scout/tags', { method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ tags: ['specialist', 'scout'] }) });
+    assert(tags.status === 200 && (tags.body.data.tags || []).includes('specialist'), `tags: ${tags.status} ${JSON.stringify(tags.body)}`);
+});
+
+await test('36. P2-D failure mode: approve with a bad owner token is rejected', async () => {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ owner: ownerName, agent_name: 'scout2', display_name: 'Scout 2' }) });
+    const userCode = da.body.data.user_code;
+    const approve = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: userCode, action: 'approve', scopes: ['memory:read'], owner_token: 'not-a-real-token' }) });
+    assert(approve.status === 401, `expected 401, got ${approve.status}: ${JSON.stringify(approve.body)}`);
+});
+
+// ─── P2 gap-closure (G1 tick auto-routing, G2 create gate, G3 knowledge links) ───
+console.log('\nP2 gaps -- G1 tick auto-routing + G2 create gate + G3 knowledge links');
+
+// G1 — the autonomous tick's cross-context note-routing decision (pure; mirrors the interactive path).
+await test('37. G1 routeTickNote: clear non-active → file-routed, ambiguous → ask, else → file-active', async () => {
+    const bakery = { id: 'a', name: 'Bakery admin', brain: { purpose: 'run the bakery, manage flour orders and recipes' }, organismId: 'orgA', workspaces: [{ name: 'Recipes', purpose: 'recipe book' }, { name: 'Orders', purpose: 'supplier orders' }] };
+    const travel = { id: 'b', name: 'Travel planning', brain: { purpose: 'plan trips, flights and hotels for vacations' }, organismId: 'orgB', workspaces: [{ name: 'Trips', purpose: 'vacation itineraries' }, { name: 'Flights', purpose: 'flight bookings' }] };
+    const contexts = [bakery, travel];
+    const routed = routeTickNote('Book flights and a hotel for our summer vacation trip', contexts, 'a', {});
+    assert(routed.action === 'file-routed' && (routed as any).targetContextId === 'b', `expected file-routed→travel: ${JSON.stringify(routed)}`);
+    const ask = routeTickNote('check the flight status tomorrow', contexts, 'a', {});
+    assert(ask.action === 'ask', `expected ask (ambiguous): ${JSON.stringify(ask)}`);
+    const active = routeTickNote('order more flour from the supplier for recipes', contexts, 'a', {});
+    assert(active.action === 'file-active', `belongs-to-active → file-active: ${JSON.stringify(active)}`);
+    assert(routeTickNote('anything at all here for testing', [bakery], 'a', {}).action === 'file-active', 'single context → file-active');
+});
+
+await test('38. G1 routeTickNote: a recorded correction makes a no-signal note auto-route', async () => {
+    const bakery = { id: 'a', name: 'Bakery admin', brain: { purpose: 'flour orders and recipes' }, organismId: 'orgA', workspaces: [] };
+    const cabin = { id: 'b', name: 'Summer cabin', brain: { purpose: 'maintain the lakeside place' }, organismId: 'orgB', workspaces: [] };
+    const contexts = [bakery, cabin];
+    assert(routeTickNote('buy new towels for the sauna', contexts, 'a', {}).action === 'file-active', 'no signal → file-active');
+    const corr = learnCorrection({}, 'towels sauna', 'b');
+    const after = routeTickNote('buy new towels for the sauna', contexts, 'a', corr);
+    assert(after.action === 'file-routed' && (after as any).targetContextId === 'b', `correction → file-routed cabin: ${JSON.stringify(after)}`);
+});
+
+// G2 — capability-create gate: operators create (test 29); a normal owner is blocked when publishing is
+// 'disabled' (exactly what the frontend `canCreate` detects from policy.publishing). No uncaught error.
+const gateOwner = `secgate${Date.now()}`;
+let gateToken = '';
+await test('39. G2 create gate: policy.publishing exposed + non-operator blocked when disabled', async () => {
+    const cap = await json('/v1/capabilities', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const publishing = cap.body.data.policy && cap.body.data.policy.publishing;
+    assert(typeof publishing === 'string', `policy.publishing should be a string: ${JSON.stringify(cap.body.data.policy)}`);
+    gateToken = await registerOwner(gateOwner); // a freshly-registered owner is NOT the node operator
+    const create = await json('/v1/capabilities', {
+        method: 'POST', headers: { Authorization: `Bearer ${gateToken}` },
+        body: JSON.stringify({ name: 'Gate test capability', summary: 'x', visibility: 'private', source: { type: 'manual', ref: 'secretary', version: '1.0.0' } }),
+    });
+    if (publishing === 'disabled') {
+        assert(create.status === 403, `non-operator create should be blocked (403) when publishing disabled, got ${create.status}: ${JSON.stringify(create.body)}`);
+    } else {
+        assert(create.status === 201, `non-operator private create should succeed when publishing enabled, got ${create.status}: ${JSON.stringify(create.body)}`);
+    }
+});
+
+// G3 — knowledge graph curation: owner-callable link between two of the owner's packages.
+await test('40. G3 knowledge link: link two owned packages + read the link back', async () => {
+    const mk = async (name: string) => {
+        const pkg = { name, content_type: 'document', synthesis: { level: 'assisted', description: 'demo' }, entries: [{ key: 'e-' + name, title: name, visibility: 'owner', value: { title: name, body: name } }] };
+        const r = await json('/v1/knowledge/import', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ package: pkg }) });
+        assert(r.status === 201, `import ${name}: ${r.status} ${JSON.stringify(r.body)}`);
+        return r.body.data.package_id as string;
+    };
+    const a = await mk('Sourdough basics');
+    const b = await mk('Flour suppliers');
+    const link = await json(`/v1/knowledge/${encodeURIComponent(a)}/link`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ target: `packages/${b}/manifest`, relation: 'related-to', description: 'recipes use these suppliers' }),
+    });
+    assert(link.status === 201, `link status ${link.status}: ${JSON.stringify(link.body)}`);
+    const links = await json(`/v1/knowledge/${encodeURIComponent(a)}/links`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const all = JSON.stringify(links.body.data);
+    assert(links.status === 200 && all.includes(`packages/${b}/manifest`) && all.includes('related-to'), `link should be readable: ${all}`);
+});
+
+await test('41. G3 failure mode: an invalid link relation is rejected', async () => {
+    const pkg = { name: 'Lone package', content_type: 'document', synthesis: { level: 'assisted', description: 'demo' }, entries: [{ key: 'e-lone', title: 'Lone', visibility: 'owner', value: { title: 'Lone', body: 'x' } }] };
+    const imp = await json('/v1/knowledge/import', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ package: pkg }) });
+    const id = imp.body.data.package_id;
+    const bad = await json(`/v1/knowledge/${encodeURIComponent(id)}/link`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ target: `packages/${id}/manifest`, relation: 'not-a-real-relation', description: 'x' }),
+    });
+    assert(bad.status === 400, `expected 400 for invalid relation, got ${bad.status}: ${JSON.stringify(bad.body)}`);
+});
+
+// ─── P3: doc/image intake (P3-A) + auto-created decisions from real choices (P3-B) ───
+console.log('\nP3 -- Doc/image intake + auto-decisions');
+
+await test('42. P3-A intake: upload a file to storage + file a discoverable files-record', async () => {
+    // (1) Upload the raw bytes (owner session) — what organisms.uploadFile() does under the hood.
+    const fileKey = `organism.${selfOrgId}.files.e2e-doc-1.txt`;
+    const data = Buffer.from('Dentist invoice — 120 EUR, due 2026-07-15.', 'utf8').toString('base64');
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: fileKey, visibility: 'private', data, mime_type: 'text/plain' }),
+    });
+    assert(up.status === 201, `upload status ${up.status}: ${JSON.stringify(up.body)}`);
+    assert(up.body.data.key === fileKey, `stored key: ${JSON.stringify(up.body.data)}`);
+    // (2) File the discoverable record into a workspace (what useIntake.handleAttach writes; vision
+    //     summary is stubbed here since the E2E owner has no OpenRouter key).
+    const recId = 'file-e2e-1';
+    const recKey = `organism.${selfOrgId}.w.ws-a.files.${recId}`;
+    const stubSummary = 'Dentist invoice for 120 EUR.';
+    const value = {
+        id: recId, type: 'file', kind: 'document', title: 'e2e-doc-1.txt',
+        storageKey: fileKey, storageUrl: `/v1/storage/${encodeURIComponent(fileKey)}`,
+        mimeType: 'text/plain', summary: stubSummary, body: `e2e-doc-1.txt\n\n${stubSummary}`,
+        createdAt: new Date().toISOString(), via: 'secretary',
+    };
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: recKey, value, visibility: 'private' }),
+    });
+    assert(w.status === 200 || w.status === 201, `file-record write status ${w.status}`);
+    const got = await json(`/v1/memory/${encodeURIComponent(recKey)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const v = got.body.data.value;
+    assert(v.type === 'file' && v.via === 'secretary', `file-record shape: ${JSON.stringify(v)}`);
+    assert(v.storageKey === fileKey, `storageKey link: ${v.storageKey}`);
+    assert(v.body.includes(stubSummary), `body should carry the summary for FTS: ${v.body}`);
+});
+
+await test('43. P3-A failure mode: a storage upload with no data is rejected (400)', async () => {
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `organism.${selfOrgId}.files.nope.txt`, visibility: 'private', mime_type: 'text/plain' }),
+    });
+    assert(up.status === 400, `expected 400 for missing data, got ${up.status}: ${JSON.stringify(up.body)}`);
+});
+
+await test('44. P3-B: answering an Ask card auto-creates an open, reviewable decision', async () => {
+    // Mirrors useIntake.applyDecision: after filing the note into the chosen workspace, it writes a
+    // decision contract (chosen = the picked workspace) that the review sweep can later score.
+    const id = 'd-e2e-ask-1';
+    const future = new Date(Date.now() + 7 * 86400000).toISOString();
+    const value = {
+        type: 'secretary.decision', spec: 'docs/specs/secretary-decision-contract.md', id,
+        decision: 'Which workspace should this go into? "Order flour"',
+        goalRef: null, options: ['Projects', 'Drafts'], chosen: 'Projects',
+        rationale: 'Chosen by the owner.', expectedOutcome: 'Filed where it can be found and acted on later.',
+        revisitWhen: future, actualOutcome: null, score: null, verdict: null, status: 'open',
+        reviewedAt: null, attempts: 0, lastError: null, contextId: 'c1', contextName: 'Tick test',
+        createdAt: new Date().toISOString(),
+    };
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `secretary.decision.${id}`, value, visibility: 'private', tags: ['secretary', 'decision', 'open', 'c1'] }),
+    });
+    assert(w.status === 200 || w.status === 201, `decision write status ${w.status}`);
+    const list = await json('/v1/memory?prefix=secretary.decision.', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const d = (list.body.data.items || []).map((it: any) => it.value).find((v: any) => v.id === id);
+    assert(d && d.type === 'secretary.decision' && d.status === 'open' && d.score === null, `auto-decision shape: ${JSON.stringify(d)}`);
+    assert(d.chosen === 'Projects' && d.contextId === 'c1', `auto-decision choice/context: ${JSON.stringify({ chosen: d.chosen, ctx: d.contextId })}`);
+    assert(Date.parse(d.revisitWhen) > Date.now(), `revisitWhen should be in the future (reviewable later): ${d.revisitWhen}`);
+});
+
+await test('45. P3-B: approving a guided plan auto-creates a decision tied to the goal', async () => {
+    const id = 'd-e2e-plan-1';
+    const value = {
+        type: 'secretary.decision', spec: 'docs/specs/secretary-decision-contract.md', id,
+        decision: "Plan mom's birthday", goalRef: null, options: [],
+        chosen: 'Approved & ran this plan', rationale: 'A simple birthday plan',
+        expectedOutcome: 'The plan makes real progress on the goal.',
+        revisitWhen: new Date(Date.now() + 7 * 86400000).toISOString(),
+        actualOutcome: null, score: null, verdict: null, status: 'open',
+        reviewedAt: null, attempts: 0, lastError: null, contextId: 'c1', contextName: 'Tick test',
+        createdAt: new Date().toISOString(),
+    };
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `secretary.decision.${id}`, value, visibility: 'private', tags: ['secretary', 'decision', 'open', 'c1'] }),
+    });
+    assert(w.status === 200 || w.status === 201, `plan-decision write status ${w.status}`);
+    const got = await json(`/v1/memory/secretary.decision.${id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const d = got.body.data.value;
+    assert(d.status === 'open' && d.chosen === 'Approved & ran this plan' && d.decision === "Plan mom's birthday", `plan-decision: ${JSON.stringify(d)}`);
+});
+
+await test('46. P3-B failure mode: an unauthenticated decision write is rejected', async () => {
+    const w = await json('/v1/memory', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'secretary.decision.d-e2e-unauth', value: { type: 'secretary.decision', status: 'open' }, visibility: 'private' }),
+    });
+    assert(w.status === 401 || w.status === 403, `expected auth rejection, got ${w.status}: ${JSON.stringify(w.body)}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
     await json(`/v1/owners/${encodeURIComponent(noKeyOwner)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${noKeyToken}` } });
+    await json(`/v1/owners/${encodeURIComponent(tickOwner)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tickToken}` } });
+    if (gateToken) await json(`/v1/owners/${encodeURIComponent(gateOwner)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${gateToken}` } });
 });
 
 console.log(`\n${'='.repeat(50)}`);

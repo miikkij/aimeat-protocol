@@ -7,12 +7,15 @@
  *   view stays lean. See docs/plans/2026-06-23-secretary-feature.md (Phase 3 guided playbooks).
  * @structure buildPlanPrompt() · useGuidedPlan({ active, owner, suggestedWsId, wsList, showToast })
  * @usage const plan = useGuidedPlan({...}); ... guidedPlanCard(plan)
- * @version-history v0.1.0 — 2026-06-24 — Phase 3c: propose steps → approve → execute (file + discover) → result.
+ * @version-history
+ *   v0.2.0 — 2026-06-24 — P3-B: approving a plan auto-logs a decision contract (the approval is a
+ *     real choice) so the learning loop reviews how the plan turned out.
+ *   v0.1.0 — 2026-06-24 — Phase 3c: propose steps → approve → execute (file + discover) → result.
  */
 import { useState, useCallback } from 'preact/hooks';
 import { api, apiGet, apiPost } from '/js/api.js';
 import { t } from '/js/i18n.js';
-import { extractJson } from '/js/services/secretary-helpers.js';
+import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers.js';
 
 export function buildPlanPrompt(goal, contextName) {
   return `In the "${contextName || 'personal'}" context, the user's goal is:
@@ -78,6 +81,21 @@ export function useGuidedPlan({ active, suggestedWsId, wsList, showToast }) {
         const d = await apiGet('/v1/discover?' + params.toString());
         found = (d && d.data && Array.isArray(d.data.entries)) ? d.data.entries.length : 0;
       } catch { /* discovery is best-effort */ }
+      // (3) P3-B: approving this plan is a real choice — log it as a decision contract so the
+      //     learning loop later scores whether the plan actually achieved the goal.
+      try {
+        const rec = buildDecisionRecord({
+          decision: goal.trim().slice(0, 200),
+          options: [],
+          chosen: t('secretary.plan.decisionChosen'),
+          rationale: steps.summary || t('secretary.decisionAutoRationale'),
+          expectedOutcome: steps.summary || t('secretary.plan.decisionExpected'),
+          revisitDays: 7,
+          active,
+        });
+        await apiPost('/v1/memory', { key: `secretary.decision.${rec.id}`, value: rec, visibility: 'private', tags: ['secretary', 'decision', 'open', (active && active.id) || ''] });
+        window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+      } catch { /* decision logging is best-effort — never blocks the plan result */ }
       setResult({ wsName, found });
       showToast(t('secretary.plan.ran'));
     } catch (e) {

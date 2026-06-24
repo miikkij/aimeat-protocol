@@ -8,6 +8,12 @@
  * @structure one exported render function per card (props in → htm out)
  * @usage import { chatCard, findCard, ... } from '/views/secretary/cards.js'; ... ${chatCard({...})}
  * @version-history
+ *   v0.6.0 — 2026-06-24 — P3-A: chatCard gains a doc/image attach control (📎) + an in-flight /
+ *     filed status line, driven by the intake hook's handleAttach.
+ *   v0.5.0 — 2026-06-24 — P2-E: noteCard shows the cross-context route banner (auto-route to a
+ *     non-active context on high confidence; "unsure" hint on low) driven by the intake hook.
+ *   v0.4.0 — 2026-06-24 — P1: automationCard shows remaining daily morsel budget; metaCard shows a
+ *     self-facing reliability chip (mean reviewed-decision score); decisionsCard handles tick `text`.
  *   v0.3.0 — 2026-06-24 — Phase 5: goalsCard + decisionLogCard (learning loop).
  *   v0.2.0 — 2026-06-24 — Phase 4: feedCard + automationCard.
  *   v0.1.0 — 2026-06-24 — Extract cards from views/secretary.js (Phase 3 cleanup).
@@ -58,8 +64,9 @@ export function hirePanel(p) {
     </section>`;
 }
 
-/** Context-aware chat (per active context) + the cheap routing suggestion. */
+/** Context-aware chat (per active context) + the cheap routing suggestion + doc/image attach (P3-A). */
 export function chatCard(p) {
+  const canAttach = typeof p.onAttach === 'function' && p.canAttach !== false;
   return html`
     <section class="sec-card sec-chat">
       <h2 class="sec-h2">${t('secretary.chatTitle')} · ${escHtml(p.activeName)}</h2>
@@ -74,10 +81,19 @@ export function chatCard(p) {
           <span>${t('secretary.routeSuggest')} <strong>${escHtml(p.routeSuggestion.name)}</strong></span>
           <button class="btn-ghost btn-sm" onClick=${() => p.switchContext(p.routeSuggestion.id)}>${t('secretary.routeSwitch')}</button>
         </div>` : null}
+      ${canAttach && p.attaching ? html`<div class="sec-hint sec-attach-status">${t('secretary.attaching')}</div>` : null}
+      ${canAttach && !p.attaching && p.attachResult ? html`
+        <div class="sec-route-hint"><span>${t('secretary.attachFiled')} <strong>${escHtml(p.attachResult.wsName)}</strong>${p.attachResult.name ? html` — ${escHtml(p.attachResult.name)}` : null}</span></div>` : null}
       <div class="sec-chat-input">
         <textarea rows="2" placeholder=${t('secretary.chatPlaceholder')} value=${p.chatInput}
           onInput=${(e) => p.setChatInput(e.target.value)}
           onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); p.sendChat(); } }}></textarea>
+        ${canAttach ? html`
+          <label class="btn-outline btn-sm sec-attach-btn ${p.attaching ? 'disabled' : ''}" title=${t('secretary.attachHint')}>
+            📎 ${t('secretary.attach')}
+            <input type="file" accept="image/*,.pdf,.txt,.md,.doc,.docx,.csv" hidden disabled=${p.attaching}
+              onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) p.onAttach(f); }} />
+          </label>` : null}
         <button class="btn-primary" disabled=${!p.chatInput.trim() || p.chatSending} onClick=${p.sendChat}>
           ${p.chatSending ? t('secretary.chatSending') : t('secretary.chatSend')}
         </button>
@@ -124,6 +140,12 @@ export function noteCard(p) {
       <h2 class="sec-h2">${t('secretary.noteTitle')}</h2>
       <p class="sec-hint">${t('secretary.noteHint')}</p>
       <textarea class="sec-paste" rows="3" placeholder=${t('secretary.notePlaceholder')} value=${p.noteText} onInput=${(e) => p.setNoteText(e.target.value)}></textarea>
+      ${p.route && p.route.confidence === 'high' ? html`
+        <div class="sec-route-hint">
+          <span>${t('secretary.routeBelongs')} <strong>${escHtml(p.route.name)}</strong></span>
+          <button class="btn-outline btn-sm" disabled=${p.noteSaving} onClick=${p.autoRouteNote}>${t('secretary.routeFileThere')}</button>
+        </div>` : p.route && p.route.confidence === 'low' ? html`
+        <div class="sec-route-hint"><span class="sec-hint">${t('secretary.routeUnsure')}</span></div>` : null}
       <div class="sec-note-bar">
         <label class="sec-hint">${t('secretary.noteInto')}</label>
         <select class="sec-band" value=${p.effectiveWsId} onChange=${(e) => p.setNoteWsId(e.target.value)}>
@@ -145,7 +167,7 @@ export function decisionsCard(p) {
           const dec = p.pendingDecisions[pid];
           const answer = p.decisionAnswers[pid];
           return html`<li class="sec-hist-row" key=${pid}>
-            <span class="sec-hist-purpose">${escHtml((dec.body || dec.question || '').slice(0, 60))}</span>
+            <span class="sec-hist-purpose">${escHtml((dec.body || dec.text || dec.question || '').slice(0, 60))}</span>
             ${answer
               ? html`<button class="btn-primary btn-sm" onClick=${() => p.applyDecision(pid)}>${t('secretary.decisionApply')}: ${escHtml(answer)}</button>`
               : html`<span class="sec-hint">${t('secretary.decisionAwaiting')}</span>`}
@@ -283,6 +305,7 @@ export function automationCard(p) {
           <div>
             <div><strong>${escHtml(s.displayName || t('secretary.auto.scheduleName'))}</strong>${s.enabled ? null : html` <span class="sec-hint">(${t('secretary.auto.paused')})</span>`}</div>
             <div class="sec-hint">${t('secretary.auto.nextRun')}: ${s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '—'}${s.cron ? ' · ' + escHtml(s.cron) : ''}</div>
+            ${p.budgetInfo ? html`<div class="sec-hint">${t('secretary.auto.budgetLeft')}: ${p.budgetInfo.remaining} / ${p.budgetInfo.budget}</div>` : null}
           </div>
           <div class="sec-auto-actions">
             <button class="btn-ghost btn-sm" onClick=${p.toggleTick}>${s.enabled ? t('secretary.auto.pause') : t('secretary.auto.resume')}</button>
@@ -376,13 +399,19 @@ export function decisionLogCard(p) {
     </section>`;
 }
 
-/** Identity + granted scopes. */
+/** Identity + granted scopes + self-facing reliability (mean reviewed-decision score). */
 export function metaCard(p) {
+  const rel = p.reliability;
+  const relChip = (rel && typeof rel.score === 'number')
+    ? html`<span class="sec-score ${rel.score >= 70 ? 'good' : rel.score >= 40 ? 'mid' : 'bad'}">${rel.score}/100</span> <span class="sec-hint">(${rel.count})</span>`
+    : html`<span class="sec-hint">${t('secretary.reliabilityBuilding')}</span>`;
   return html`
     <section class="sec-card sec-meta-card">
       <dl class="sec-meta">
         <dt>${t('secretary.identity')}</dt>
         <dd><code>${escHtml(p.secretary.gaii)}</code></dd>
+        <dt title=${t('secretary.reliabilityHint')}>${t('secretary.reliability')}</dt>
+        <dd>${relChip}</dd>
         <dt>${t('secretary.scopes')}</dt>
         <dd class="sec-scopes">${(p.secretary.default_scopes || []).map((s) => html`<span class="sec-scope" key=${s}>${s}</span>`)}</dd>
       </dl>

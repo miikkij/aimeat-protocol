@@ -18,6 +18,8 @@
  *   v1.0.0 — 2026-05-29 — Initial: app-level AI calls with budget enforcement
  *   v1.1.0 — 2026-06-03 — Delegate completion to services/ai-completion.ts (shared
  *     with the scheduler); route is now a thin wrapper.
+ *   v1.2.0 — 2026-06-24 — Accept an optional `images` array (data:/https URLs) on
+ *     /v1/ai/complete for vision-capable models (Secretary doc/image intake).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -80,18 +82,30 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       const gaii = resolve(req);
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
-        temperature, top_p, max_tokens, app_id,
+        temperature, top_p, max_tokens, app_id, images,
       } = req.body as {
         prompt?: string; systemPrompt?: string; model?: string;
         modelRole?: 'reasoning' | 'execution';
         temperature?: number; top_p?: number; max_tokens?: number;
-        app_id?: string;
+        app_id?: string; images?: string[];
       };
+
+      // Bound the image payload (vision attachments) — keep a runaway request from ballooning.
+      let imageList: string[] | undefined;
+      if (images !== undefined) {
+        if (!Array.isArray(images) || images.some((u) => typeof u !== 'string')) {
+          return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'images must be an array of URL strings.'));
+        }
+        if (images.length > 8) {
+          return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'images: at most 8 attachments per request.'));
+        }
+        imageList = images.filter((u) => u.length > 0);
+      }
 
       try {
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
-          temperature, topP: top_p, maxTokens: max_tokens, appId: app_id,
+          temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
         });
         res.json(success(config.nodeId, {
           content: r.content,

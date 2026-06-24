@@ -220,6 +220,29 @@ await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still
   assert(body.data?.maxRetries === 2, `maxRetries updated: ${body.data?.maxRetries}`);
 });
 
+await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears', async () => {
+  if (!encryptionAvailable) {
+    console.log('    (Skipped — encryption not available)');
+    return;
+  }
+  // Set a vision-capable model (used for image inputs — the Secretary doc/image intake).
+  const set = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ visionModel: 'qwen/qwen-2.5-vl-72b-instruct' }),
+  });
+  assert(set.status === 200 && set.body.data?.saved === true, `set visionModel: ${set.status} ${JSON.stringify(set.body)}`);
+  const got = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(got.body.data?.visionModel === 'qwen/qwen-2.5-vl-72b-instruct', `visionModel persisted: ${got.body.data?.visionModel}`);
+  // Clearing it (null) falls back to the default model for image requests.
+  const clear = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ visionModel: null }),
+  });
+  assert(clear.status === 200, `clear visionModel: ${clear.status}`);
+  const got2 = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(got2.body.data?.visionModel === null, `visionModel cleared: ${JSON.stringify(got2.body.data?.visionModel)}`);
+});
+
 await test('DELETE /v1/openrouter/settings — removes key and settings', async () => {
   if (!encryptionAvailable) {
     console.log('    (Skipped — encryption not available)');

@@ -17,6 +17,12 @@
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
  *   v1.0.0 — 2026-06-03 — Extracted from routes/ai.ts for reuse by the scheduler
+ *   v1.1.0 — 2026-06-24 — Optional `images` (data:/https URLs) threaded to the
+ *     provider for vision-capable completions (used by the Secretary doc/image
+ *     intake). Text-only callers are unaffected.
+ *   v1.2.0 — 2026-06-24 — When a request carries images, prefer the owner's
+ *     configured `visionModel` (e.g. qwen-2.5-VL) over the (possibly text-only)
+ *     default, so image intake works without an explicit model override.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -88,6 +94,8 @@ export interface CompleteForOwnerOptions {
   maxTokens?: number;
   /** Optional app/source attribution — enables allowlist + per-app quota. */
   appId?: string;
+  /** Optional image attachments (data: or https URLs) for vision-capable models. */
+  images?: string[];
 }
 
 export interface CompleteForOwnerResult {
@@ -203,9 +211,14 @@ export async function completeForOwner(
   }
 
   // ── Model selection ──
+  const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
   let selectedModel: string;
   if (typeof opts.model === 'string' && opts.model) {
     selectedModel = opts.model;
+  } else if (hasImages && typeof prefs.visionModel === 'string' && prefs.visionModel) {
+    // Image inputs need a vision-capable model — the owner's default may be text-only. Use the
+    // configured visionModel (e.g. qwen-2.5-VL) for any request carrying images.
+    selectedModel = prefs.visionModel as string;
   } else if (opts.modelRole === 'reasoning' && prefs.reasoningModel) {
     selectedModel = prefs.reasoningModel as string;
   } else if (opts.modelRole === 'execution' && prefs.executionModel) {
@@ -227,7 +240,7 @@ export async function completeForOwner(
 
   let result;
   try {
-    result = await complete(decryptedKey, selectedModel, opts.prompt, opts.systemPrompt, baseUrl, options);
+    result = await complete(decryptedKey, selectedModel, opts.prompt, opts.systemPrompt, baseUrl, options, opts.images);
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
