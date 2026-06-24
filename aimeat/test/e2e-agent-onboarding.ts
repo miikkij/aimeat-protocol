@@ -1104,6 +1104,67 @@ await test('46. Workstation onboarding completes once all 4 steps pass (happy pa
     assert(ob.status === 'completed', `expected completed (all 4 steps passed), got ${ob.status}`);
 });
 
+// ─── Agent self-tagging (PATCH /tags is same-owner gated, not owner-role) ───
+
+await test('Agent can set tags on its own record', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tags`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ tags: ['concierge', 'web-search'] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const tags: string[] = body.data.tags;
+    assert(tags.includes('concierge') && tags.includes('web-search'),
+        `expected self-set tags to persist, got ${JSON.stringify(tags)}`);
+});
+
+await test('Agent can set tags on a same-owner sibling', async () => {
+    const { status, body } = await json(`/v1/agents/${agent2Name}/tags`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ tags: ['research-crew'] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert((body.data.tags as string[]).includes('research-crew'),
+        `expected sibling tag to persist, got ${JSON.stringify(body.data.tags)}`);
+});
+
+await test('Owner can still set tags (regression guard)', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tags`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ tags: ['demo-project'] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert((body.data.tags as string[]).includes('demo-project'),
+        `expected owner-set tag to persist, got ${JSON.stringify(body.data.tags)}`);
+});
+
+await test('Agent can self-tag faceted prefix:value tags (colons allowed)', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tags`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ tags: ['source:crewai', 'role:researcher'] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const tags: string[] = body.data.tags;
+    assert(tags.includes('source:crewai') && tags.includes('role:researcher'),
+        `expected faceted tags to persist, got ${JSON.stringify(tags)}`);
+});
+
+await test('Self-tag rejects an invalid tag (failure mode)', async () => {
+    // '@' stays excluded so a tag can never be confused with a GAII; spaces/caps also rejected.
+    for (const bad of ['Has Spaces And CAPS', 'owner@node']) {
+        const { status, body } = await json(`/v1/agents/${agentName}/tags`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ tags: [bad] }),
+        });
+        assert(status === 400, `expected 400 for invalid tag '${bad}', got ${status}: ${JSON.stringify(body)}`);
+        assert(body.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${body.error?.code}`);
+    }
+});
+
 // ─── Summary ───
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

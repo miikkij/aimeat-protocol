@@ -11,6 +11,9 @@
  * @version-history
  *   v1.0.0 -- 2026-03-15 -- Initial agent routes
  *   v1.1.0 -- 2026-05-28 -- Expose owner-managed shared-memory tags
+ *   v1.2.0 -- 2026-06-24 -- PATCH /tags is same-owner gated (was owner-role only); agents
+ *     may now self-tag (parity with capabilities self-report + server-MCP tags_set). Tag pattern
+ *     allows ':' so faceted prefix:value tags validate and compose with aimeat_discover.
  */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -906,8 +909,12 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // PATCH /v1/agents/:name/tags — update owner-managed sharing tags
-  router.patch('/v1/agents/:name/tags', requireAuth(), requireRole('owner'), async (req, res) => {
+  // PATCH /v1/agents/:name/tags — set sharing/classification tags.
+  // Same-owner gated (not owner-role): the owner may tag any of their agents, and
+  // an agent may set tags on itself or a same-owner sibling (mirrors how agents
+  // self-report capabilities, and matches the server-MCP aimeat_agent_tags_set
+  // handler). Cross-owner is rejected by the ownership check below.
+  router.patch('/v1/agents/:name/tags', requireAuth(), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
     const agent = await storage.getAgent(gaii);
@@ -916,7 +923,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update tags for your own agents'));
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update tags for agents owned by the same owner'));
       return;
     }
 
@@ -934,7 +941,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const tag = value.trim().toLowerCase();
       if (!tag) continue;
-      if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(tag)) {
+      if (!/^[a-z0-9][a-z0-9._:-]{0,63}$/.test(tag)) {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid tag: ${value}`));
         return;
       }

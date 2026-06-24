@@ -18,9 +18,10 @@ export async function listAgents(owner, opts = {}) {
   return owner ? list.filter(a => a.owner === owner) : list;
 }
 
-/** Workspace-contract advertising via owner-managed agent tags (colon-free — the server tag
- *  pattern allows only [a-z0-9._-]): the tag 'workspace-contract' marks an agent as a contract
- *  provider, and 'contract.<name>' tags name the contract(s) it serves. Convention documented in
+/** Workspace-contract advertising via agent tags (this convention is dot-based so 'contract.<name>'
+ *  parses by prefix; the server tag pattern is [a-z0-9._:-], colons allowed, no '@'): the tag
+ *  'workspace-contract' marks an agent as a contract provider, and 'contract.<name>' tags name the
+ *  contract(s) it serves. Convention documented in
  *  docs/agent-workspace-contracts.md; agents set tags via aimeat_agent_tags_set / PATCH tags. */
 export const offersWorkspaceContract = (a) => (a?.tags || []).includes('workspace-contract');
 

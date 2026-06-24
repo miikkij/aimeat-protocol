@@ -167,11 +167,11 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_tags_set',
-        description: "Owner-only. Replace (set) the tag list on one of your agents. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>' — but any lowercase string of alphanumerics plus `._-` is accepted. Max 20 tags. Empty array clears all tags.",
-        caller: 'owner',
+        description: "Replace (set) the tag list on a same-owner agent. An agent may tag itself (or a same-owner sibling); an owner may tag any of their agents. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>' — but any lowercase string of alphanumerics plus `._:-` is accepted (no `@`). Max 20 tags. Empty array clears all tags.",
+        caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            target_agent_name: { type: 'string', required: true, description: 'Agent whose tags to update (must be owned by the calling owner).' },
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose tags to update (must be owned by the same owner as the caller). Pass the calling agent\'s own name to self-tag.' },
             tags: { type: 'array', required: true, description: 'Replacement tag list. Empty array clears all tags.' },
         },
     },
