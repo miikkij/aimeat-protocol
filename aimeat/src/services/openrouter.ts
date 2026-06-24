@@ -12,6 +12,10 @@
  *     /v1/ai/complete app endpoint in particular) can enforce per-user/per-app
  *     daily budgets. Backwards-compatible: old callers ignoring `usage` are
  *     unaffected. Cost is OpenRouter-reported when present, undefined otherwise.
+ *   v1.3.0 — 2026-06-24 — `complete()` accepts an optional `images` array
+ *     (data: URLs or https URLs). When present the user message is sent as an
+ *     OpenAI-compatible multimodal content array (text + image_url parts) so a
+ *     vision-capable model can read attachments. Text-only callers are unaffected.
  */
 import { logger } from '../utils/logger.js';
 
@@ -57,6 +61,11 @@ export interface CompletionOptions {
   presence_penalty?: number;
 }
 
+/** A user-message content part for OpenAI-compatible multimodal (vision) requests. */
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export async function complete(
   apiKey: string | undefined,
   model: string,
@@ -64,10 +73,21 @@ export async function complete(
   systemPrompt?: string,
   baseUrl: string = OPENROUTER_BASE,
   options?: CompletionOptions,
+  images?: string[],
 ): Promise<OpenRouterCompletionResult> {
-  const messages: Array<{ role: string; content: string }> = [];
+  const messages: Array<{ role: string; content: string | ContentPart[] }> = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  messages.push({ role: 'user', content: prompt });
+  // With image attachments, send the user turn as a multimodal content array (text + image_url
+  // parts). Without, keep the plain-string form so text-only callers are byte-for-byte unchanged.
+  if (Array.isArray(images) && images.length > 0) {
+    const parts: ContentPart[] = [{ type: 'text', text: prompt }];
+    for (const url of images) {
+      if (typeof url === 'string' && url) parts.push({ type: 'image_url', image_url: { url } });
+    }
+    messages.push({ role: 'user', content: parts });
+  } else {
+    messages.push({ role: 'user', content: prompt });
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);

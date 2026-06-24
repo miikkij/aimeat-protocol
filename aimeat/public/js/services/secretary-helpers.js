@@ -5,9 +5,13 @@
  *   from AI text, a brain version-snapshot, a context id generator, and the secretary.config migration
  *   from the old single-context layout to the multi-context `{contexts[], activeContextId}` shape.
  *   See docs/plans/2026-06-23-secretary-feature.md (§5 hire, §22 multi-context).
- * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · migrateConfig
+ * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · migrateConfig · buildDecisionRecord
  * @usage import { buildInterviewPrompt, extractJson, migrateConfig } from '/js/services/secretary-helpers.js';
- * @version-history v0.1.0 — 2026-06-23 — Extracted from views/secretary.js (Phase 2, keep view < 500 lines).
+ * @version-history
+ *   v0.2.0 — 2026-06-24 — P3-B: buildDecisionRecord — the single source of the decision-log contract
+ *     shape, shared by the manual log form (use-learning), answered Ask cards (use-intake), and
+ *     approved guided plans (use-guided-plan) so real choices feed the learning loop.
+ *   v0.1.0 — 2026-06-23 — Extracted from views/secretary.js (Phase 2, keep view < 500 lines).
  */
 import { defaultPolicy } from '/js/services/secretary-policy.js';
 
@@ -114,6 +118,25 @@ export function suggestContextId(text, contexts, activeId) {
   return null;
 }
 
+/** P1-C: remaining autonomous morsel budget for a context today, or null when no limit is set.
+ *  `budget` is the context's policy.dailyMorselBudget (number|null); reads the per-day spend ledger
+ *  the tick maintains on `config.autonomousLedger[contextId]`. */
+export function computeBudgetInfo(budget, config, contextId) {
+  if (budget == null) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const led = (config && config.autonomousLedger && config.autonomousLedger[contextId]) || null;
+  const spent = (led && led.date === today && typeof led.morsels === 'number') ? led.morsels : 0;
+  return { budget, spent, remaining: Math.max(0, budget - spent) };
+}
+
+/** P1-D: self-facing reliability = mean score over REVIEWED decisions (not the marketplace trustScore).
+ *  Returns { count, score } where score is null until at least one decision has been reviewed. */
+export function computeReliability(decisions) {
+  const reviewed = (decisions || []).filter((d) => d && d.status === 'reviewed' && typeof d.score === 'number');
+  if (reviewed.length === 0) return { count: 0, score: null };
+  return { count: reviewed.length, score: Math.round(reviewed.reduce((s, d) => s + d.score, 0) / reviewed.length) };
+}
+
 /** Normalize secretary.config to the multi-context shape, migrating the old single-context layout.
  *  `directives` (merged) seeds the brain for a migrated legacy context. Returns {config, changed}. */
 export function migrateConfig(cfg, directives) {
@@ -140,4 +163,35 @@ export function migrateConfig(cfg, directives) {
     return { config: { contexts: [ctx], activeContextId: ctx.id }, changed: true };
   }
   return { config: { contexts: [], activeContextId: null }, changed: false };
+}
+
+/** Path to the decision-log Memory Contract spec (mirrors use-learning.js). */
+export const DECISION_SPEC = 'docs/specs/secretary-decision-contract.md';
+
+/** Build one `secretary.decision.{id}` Memory Contract value (see docs/specs/secretary-decision-contract.md).
+ *  The SINGLE source of the decision shape — used by the manual log form, answered Ask cards, and
+ *  approved guided plans, so every real choice enters the learning loop the same way. Stays `open`
+ *  (revisitWhen = now + revisitDays) until the tick's review sweep scores it. `active` is the current
+ *  context ({id,name}) for tagging; `options` is an array; goalRef is optional.
+ *  @param {{ decision?: string, options?: string[], chosen?: string, rationale?: string, expectedOutcome?: string, goalRef?: string|null, revisitDays?: number|string, active?: { id?: string, name?: string }|null }} [opts]
+ */
+export function buildDecisionRecord(opts = {}) {
+  const { decision, options, chosen, rationale, expectedOutcome, goalRef, revisitDays, active } = opts;
+  const id = 'd' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  const days = Number(revisitDays) || 7;
+  const revisitWhen = new Date(Date.now() + days * 86400000).toISOString();
+  return {
+    type: 'secretary.decision', spec: DECISION_SPEC, id,
+    decision: String(decision || '').trim(),
+    goalRef: goalRef || null,
+    options: Array.isArray(options) ? options.filter(Boolean) : [],
+    chosen: String(chosen || '').trim(),
+    rationale: String(rationale || '').trim(),
+    expectedOutcome: String(expectedOutcome || '').trim(),
+    revisitWhen,
+    actualOutcome: null, score: null, verdict: null, status: 'open',
+    reviewedAt: null, attempts: 0, lastError: null,
+    contextId: (active && active.id) || '', contextName: (active && active.name) || '',
+    createdAt: new Date().toISOString(),
+  };
 }

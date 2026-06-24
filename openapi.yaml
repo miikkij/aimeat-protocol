@@ -6978,6 +6978,65 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/ai/complete:
+    post:
+      operationId: aiComplete
+      summary: Run one AI completion on the caller's own provider key + budget
+      description: >
+        App/extension-level AI completion. Runs on the owner's encrypted OpenRouter (or compatible)
+        key with their daily/per-app budget enforced. Callable by an owner JWT, or an agent JWT
+        holding the `ai:use` scope. Optionally accepts `images` (data: or https URLs) for a
+        vision-capable model. Long calls: clients should use a large request timeout and no retries.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  description: The user prompt (max 200k characters).
+                systemPrompt:
+                  type: string
+                  description: Optional system prompt.
+                model:
+                  type: string
+                  description: Optional explicit model id (overrides the owner's configured model).
+                modelRole:
+                  type: string
+                  enum: [reasoning, execution]
+                  description: Pick the owner's configured reasoning/execution model.
+                temperature:
+                  type: number
+                top_p:
+                  type: number
+                max_tokens:
+                  type: integer
+                app_id:
+                  type: string
+                  description: App/source attribution — enables the per-app allowlist + quota.
+                images:
+                  type: array
+                  description: >
+                    Optional image attachments (data: or https URLs) sent as multimodal content for
+                    a vision-capable model. At most 8 per request.
+                  items:
+                    type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '402':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/librarian/search:
     get:
       operationId: librarianSearch
@@ -21352,6 +21411,13 @@ paths:
                 model:
                   type: string
                   description: Default model to use (e.g. openai/gpt-4o)
+                visionModel:
+                  type: string
+                  nullable: true
+                  description: >
+                    Vision-capable model (e.g. qwen-2.5-VL) used for requests carrying image inputs
+                    (the Secretary's doc/image intake). null/'' clears it. When unset, image requests
+                    fall back to the default model (which may be text-only).
                 autoRetry:
                   type: boolean
                   description: Whether to automatically retry failed completions

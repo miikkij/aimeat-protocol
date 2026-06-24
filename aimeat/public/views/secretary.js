@@ -8,9 +8,18 @@
  *   Presentational cards live in ./secretary/cards.js; pure helpers in /js/services/secretary-helpers.js.
  *   Pure frontend orchestration over generic endpoints (directives + organisms + memory + ai/complete +
  *   agent-messages + discover). Full design: docs/plans/2026-06-23-secretary-feature.md.
- * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js)
+ * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.10.0 — 2026-06-24 — P3: doc/image intake into the chat (chatCard 📎 → intake.handleAttach:
+ *     upload → vision summary → file into the active context's self-organism) and auto-logged decision
+ *     contracts from answered Ask cards + approved guided plans (learning loop now sees real choices).
+ *   v0.9.0 — 2026-06-24 — P2: extract intake to use-intake.js (+ P2-E cross-context auto-routing) and
+ *     add the reach cards — create-don't-just-find (A), knowledge custodian (B), access gatekeeper (C),
+ *     crew setup (D); new hooks use-create-resource/use-knowledge/use-access/use-crew + cards-reach.js.
+ *   v0.8.0 — 2026-06-24 — P1: surface the autonomous tick's remaining daily morsel budget + a self-facing
+ *     reliability chip (mean reviewed-decision score); re-fetch config on aimeat-live-update so the tick's
+ *     server-written pending decisions appear; applyDecision handles tick-generated `tick-note` cards.
  *   v0.7.0 — 2026-06-24 — Phase 5: learning loop — goals + decision-log contracts + review trigger (useLearning hook, goalsCard/decisionLogCard).
  *   v0.6.0 — 2026-06-24 — Phase 4: autonomous tick + Home feed + calendar (useAutonomy hook, feed/automation cards).
  *   v0.5.0 — 2026-06-24 — Phase 3 cleanup: extract presentational cards to ./secretary/cards.js.
@@ -28,13 +37,18 @@ import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace } from '/js/services/organisms.js';
-import { listMessages } from '/js/services/agent-messages.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
-import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
+import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, guidedPlanCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
+import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
+import { useIntake } from '/views/secretary/use-intake.js';
 import { useGuidedPlan } from '/views/secretary/use-guided-plan.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useLearning } from '/views/secretary/use-learning.js';
+import { useCreateResource } from '/views/secretary/use-create-resource.js';
+import { useKnowledge } from '/views/secretary/use-knowledge.js';
+import { useAccess } from '/views/secretary/use-access.js';
+import { useCrew } from '/views/secretary/use-crew.js';
 
 export const SECRETARY_ICON = html`
   <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
@@ -62,11 +76,6 @@ export default function SecretaryView() {
   const [findScope, setFindScope] = useState('public');
   const [findResults, setFindResults] = useState(null);  // null=not searched, []=none, [...]
   const [finding, setFinding] = useState(false);
-  const [noteText, setNoteText] = useState('');          // file-a-note composer
-  const [noteWsId, setNoteWsId] = useState('');          // user-picked target workspace (else suggested)
-  const [noteSaving, setNoteSaving] = useState(false);
-  const [wsList, setWsList] = useState([]);              // [{id,name}] of the active context's organism
-  const [decisionAnswers, setDecisionAnswers] = useState({}); // promptId -> chosen answer text (from inbox)
 
   const owner = (secretary && secretary.owner)
     || (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession && window.AIMEAT.auth.getSession()?.owner)
@@ -101,6 +110,14 @@ export default function SecretaryView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Re-fetch config on server-reported changes: the autonomous tick writes pending decisions + the
+  // spend ledger into secretary.config server-side, so the decisions card / budget must refresh.
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [load]);
+
   const contexts = useMemo(() => (config && config.contexts) || [], [config]);
   const active = contexts.find((c) => c.id === (config && config.activeContextId)) || contexts[0] || null;
   const hired = contexts.length > 0;
@@ -125,37 +142,9 @@ export default function SecretaryView() {
     return () => { cancelled = true; };
   }, [activeId]);
 
-  // Load the active context's workspaces (id+name) so notes can be filed into one.
-  const activeOrgId = active && active.organismId;
-  useEffect(() => {
-    if (!activeOrgId) { setWsList([]); return; }
-    let cancelled = false;
-    apiGet(`/v1/organisms/${encodeURIComponent(activeOrgId)}/workspaces`)
-      .then((r) => {
-        if (cancelled) return;
-        const list = (r && r.data && r.data.workspaces) || [];
-        setWsList(list.map((w) => ({ id: w.id, name: w.name || w.id })));
-      })
-      .catch(() => { if (!cancelled) setWsList([]); });
-    setNoteWsId('');
-    return () => { cancelled = true; };
-  }, [activeOrgId]);
-
-  // Cheap workspace suggestion: pick the workspace whose name best overlaps the note text.
-  const suggestedWsId = useMemo(() => {
-    if (wsList.length === 0) return '';
-    const words = new Set(String(noteText).toLowerCase().split(/[^a-z0-9äöå]+/i).filter((w) => w.length >= 4));
-    let best = wsList[0];
-    let bestScore = -1;
-    for (const w of wsList) {
-      const hay = String(w.name).toLowerCase();
-      let s = 0;
-      for (const word of words) if (hay.includes(word)) s++;
-      if (s > bestScore) { bestScore = s; best = w; }
-    }
-    return best.id;
-  }, [noteText, wsList]);
-  const effectiveWsId = noteWsId || suggestedWsId;
+  // Intake (note composer + Ask cards + P2-E cross-context auto-routing) lives in its own hook.
+  const intake = useIntake({ active, contexts, config, persistConfig, owner, showToast });
+  const { wsList, suggestedWsId } = intake;
 
   // Phase 3c — guided playbook (propose steps → approve → execute). Logic lives in its own hook.
   const plan = useGuidedPlan({ active, suggestedWsId, wsList, showToast });
@@ -163,30 +152,15 @@ export default function SecretaryView() {
   const auto = useAutonomy({ showToast });
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
   const learn = useLearning({ active, auto, showToast });
+  // P2 reach: create-don't-just-find (A), knowledge custodian (B), access gatekeeper (C), crew setup (D).
+  const create = useCreateResource({ showToast });
+  const knowledge = useKnowledge({ showToast });
+  const access = useAccess({ showToast });
+  const crew = useCrew({ showToast });
 
-  // Pending Ask-band decisions the Secretary posted to the inbox, awaiting the owner's answer.
-  const pendingDecisions = useMemo(() => (config && config.pendingDecisions) || {}, [config]);
-  const pendingIds = useMemo(() => Object.keys(pendingDecisions), [pendingDecisions]);
-  const pendingKey = pendingIds.join(',');
-  // Fetch the owner's inbox answers for any pending decisions (match by prompt_id).
-  useEffect(() => {
-    if (pendingKey === '') { setDecisionAnswers({}); return; }
-    let cancelled = false;
-    listMessages('secretary', { perPage: 100, direction: 'inbound' })
-      .then((r) => {
-        if (cancelled) return;
-        const msgs = (r && r.data && r.data.messages) || [];
-        const map = {};
-        for (const m of msgs) {
-          const pa = m.metadata && (m.metadata.promptAnswer || m.metadata.prompt_answer);
-          const pid = pa && (pa.promptId || pa.prompt_id);
-          if (pid) map[pid] = pa.choice;
-        }
-        setDecisionAnswers(map);
-      })
-      .catch(() => { if (!cancelled) setDecisionAnswers({}); });
-    return () => { cancelled = true; };
-  }, [pendingKey]);
+  // P1-C remaining autonomous budget + P1-D self-facing reliability (computed in helpers; see secretary-helpers.js).
+  const budgetInfo = useMemo(() => computeBudgetInfo(policy.dailyMorselBudget, config, activeId), [policy.dailyMorselBudget, config, activeId]);
+  const reliability = useMemo(() => computeReliability(learn.decisions), [learn.decisions]);
 
   const applyResult = useCallback(async () => {
     setApplying(true);
@@ -312,88 +286,6 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     }
   }, [findQ, findScope, showToast]);
 
-  /** File a note into the active context's self-organism (the chosen workspace) — Draft band. */
-  const saveNote = useCallback(async () => {
-    const body = noteText.trim();
-    if (!body || !activeOrgId || !effectiveWsId) return;
-    setNoteSaving(true);
-    try {
-      const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      const title = body.split('\n')[0].slice(0, 80);
-      await apiPost('/v1/memory', {
-        key: `organism.${activeOrgId}.w.${effectiveWsId}.notes.${id}`,
-        value: { id, title, body, createdAt: new Date().toISOString(), via: 'secretary' },
-        visibility: 'private',
-      });
-      const ws = wsList.find((w) => w.id === effectiveWsId);
-      showToast(`${t('secretary.noteSaved')} ${ws ? ws.name : ''}`.trim());
-      setNoteText(''); setNoteWsId('');
-    } catch (e) {
-      showToast(`${t('secretary.noteError')}: ${e.message}`, true);
-    } finally {
-      setNoteSaving(false);
-    }
-  }, [noteText, activeOrgId, effectiveWsId, wsList, showToast]);
-
-  /** Ask band: post a decision card to the owner's inbox and stash the pending action. */
-  const askDecision = useCallback(async () => {
-    const body = noteText.trim();
-    if (!body || !activeOrgId || wsList.length < 2) return;
-    setNoteSaving(true);
-    try {
-      const promptId = 'notews-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      const options = wsList.slice(0, 8).map((w) => w.name);
-      await apiPost('/v1/agents/secretary/messages', {
-        content: `${t('secretary.askWhereContent')} "${body.slice(0, 80)}"`,
-        direction: 'outbound',
-        metadata: { prompt: { prompt_id: promptId, question: t('secretary.askWhereQ'), options, allow_other: false } },
-      });
-      const base = config || {};
-      const pending = { ...(base.pendingDecisions || {}), [promptId]: { type: 'file-note', body, organismId: activeOrgId, question: t('secretary.askWhereQ'), createdAt: new Date().toISOString() } };
-      await persistConfig({ ...base, pendingDecisions: pending });
-      showToast(t('secretary.askedInInbox'));
-      setNoteText(''); setNoteWsId('');
-    } catch (e) {
-      showToast(`${t('secretary.noteError')}: ${e.message}`, true);
-    } finally {
-      setNoteSaving(false);
-    }
-  }, [noteText, activeOrgId, wsList, config, persistConfig, showToast]);
-
-  /** The owner answered a decision card in the inbox → carry out the stashed action + clear it. */
-  const applyDecision = useCallback(async (promptId) => {
-    const dec = pendingDecisions[promptId];
-    const choice = decisionAnswers[promptId];
-    if (!dec || !choice) return;
-    try {
-      const wr = await apiGet(`/v1/organisms/${encodeURIComponent(dec.organismId)}/workspaces`).catch(() => null);
-      const list = (wr && wr.data && wr.data.workspaces) || [];
-      const ws = list.find((w) => String(w.name || '').toLowerCase() === String(choice).toLowerCase());
-      if (dec.type === 'file-note' && ws) {
-        const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-        await apiPost('/v1/memory', {
-          key: `organism.${dec.organismId}.w.${ws.id}.notes.${id}`,
-          value: { id, title: dec.body.split('\n')[0].slice(0, 80), body: dec.body, createdAt: new Date().toISOString(), via: 'secretary' },
-          visibility: 'private',
-        });
-      }
-      const base = config || {};
-      const next = { ...(base.pendingDecisions || {}) };
-      delete next[promptId];
-      await persistConfig({ ...base, pendingDecisions: next });
-      showToast(`${t('secretary.noteSaved')} ${ws ? ws.name : choice}`.trim());
-    } catch (e) {
-      showToast(`${t('secretary.noteError')}: ${e.message}`, true);
-    }
-  }, [pendingDecisions, decisionAnswers, config, persistConfig, showToast]);
-
-  const dismissDecision = useCallback(async (promptId) => {
-    const base = config || {};
-    const next = { ...(base.pendingDecisions || {}) };
-    delete next[promptId];
-    await persistConfig({ ...base, pendingDecisions: next });
-  }, [config, persistConfig]);
-
   const switchContext = useCallback(async (id) => {
     const ctx = contexts.find((c) => c.id === id);
     if (!ctx) return;
@@ -452,19 +344,24 @@ ${SECRETARY_AIMEAT_PRIMER}`;
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
             ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
             ${hired && !showHire && active ? html`
-              ${chatCard({ activeName: active.name, chat, chatSending, chatInput, setChatInput, sendChat, routeSuggestion, switchContext })}
+              ${chatCard({ activeName: active.name, chat, chatSending, chatInput, setChatInput, sendChat, routeSuggestion, switchContext,
+                onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 })}
               ${findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults })}
-              ${wsList.length > 0 ? noteCard({ wsList, noteText, setNoteText, effectiveWsId, setNoteWsId, noteSaving, saveNote, askDecision }) : null}
+              ${(findResults && findResults.length === 0) || create.draft || create.created ? createResourceCard({ ...create, query: findQ }) : null}
+              ${wsList.length > 0 ? noteCard(intake) : null}
+              ${knowledgeCard(knowledge)}
+              ${accessCard(access)}
+              ${crewCard(crew)}
               ${guidedPlanCard(plan)}
-              ${pendingIds.length > 0 ? decisionsCard({ pendingIds, pendingDecisions, decisionAnswers, applyDecision, dismissDecision }) : null}
+              ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
               ${goalsCard(learn)}
               ${decisionLogCard(learn)}
-              ${automationCard(auto)}
+              ${automationCard({ ...auto, budgetInfo })}
               ${feedCard(auto)}
               ${brainCard({ brain, active, openEdit })}
               ${operatingCard({ policy, toggleStop, setBudget, setBand })}
               ${(Array.isArray(active.brainHistory) && active.brainHistory.length > 0) ? historyCard({ brainHistory: active.brainHistory, applying, restore }) : null}
-              ${metaCard({ secretary })}
+              ${metaCard({ secretary, reliability })}
             ` : null}`}
       <${ToastContainer} />
     </div>`;

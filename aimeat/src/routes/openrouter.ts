@@ -12,6 +12,8 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.4.0 — 2026-06-24 — Add `visionModel` preference (a vision-capable model, e.g. qwen-2.5-VL) used
+ *     for image inputs — the Secretary's doc/image intake. Persisted/returned with the other settings.
  *   v1.3.0 — 2026-06-23 — Auto-provision the owner's Secretary agent when an OpenRouter key is saved (Secretary Phase 0).
  *   v1.2.0 — 2026-04-01 — Add temperature/top_p/max_tokens model parameters
  *   v1.1.0 — 2026-03-21 — Add provider type (openrouter/lmstudio/custom) support
@@ -92,11 +94,12 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, reasoningModel, executionModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, visionModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
         apiKey?: string;
         model?: string;
         reasoningModel?: string;
         executionModel?: string;
+        visionModel?: string;
         autoRetry?: unknown;
         maxRetries?: unknown;
         provider?: string;
@@ -153,6 +156,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       if (model !== undefined) prefs.model = model;
       if (reasoningModel !== undefined) prefs.reasoningModel = reasoningModel;
       if (executionModel !== undefined) prefs.executionModel = executionModel;
+      // visionModel: a vision-capable model (e.g. qwen/qwen-2.5-vl-...) used for image inputs
+      // (the Secretary's doc/image intake). '' / null clears it → image calls fall back to the default.
+      if (visionModel !== undefined) prefs.visionModel = (visionModel === null || visionModel === '') ? null : visionModel;
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
       if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
       // null = clear (use model default), number = set explicit value, undefined = don't change
@@ -194,6 +200,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         model: prefs.model ?? null,
         reasoningModel: prefs.reasoningModel ?? null,
         executionModel: prefs.executionModel ?? null,
+        visionModel: prefs.visionModel ?? null,
         autoRetry: prefs.autoRetry ?? true,
         maxRetries: prefs.maxRetries ?? 3,
         provider: prefs.provider ?? 'openrouter',

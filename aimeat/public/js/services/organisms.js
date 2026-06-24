@@ -6,6 +6,8 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.5.0 — 2026-06-24 — uploadFile(orgId, file): generic blob upload (any document/image) to an
+ *     organism's private storage, returning {key,url,mime} — used by the Secretary doc/image intake.
  *   v1.4.0 — 2026-06-23 — Optional color tags: getAllColors()/saveColors() read/write the per-item
  *     color map at …w.{ws}.meta.colors.{type} (mirrors getAllSections/saveSections).
  *   v1.3.0 — 2026-06-22 — Batch endpoints: discoverWorkspaces({include:'enrichment'}) folds the
@@ -1162,6 +1164,20 @@ export async function uploadImage(orgId, blob, mime) {
   const resp = await apiPost('/v1/storage', { key, visibility: 'private', data: await blobToBase64(blob), mime_type: mime || 'application/octet-stream' });
   if (resp?.ok === false) throw new Error(resp?.error?.message || 'Upload failed');
   return `/v1/storage/${encodeURIComponent(resp?.data?.key || key)}`;
+}
+
+/** Upload any file blob (document or image) to an organism's private storage. Returns
+ *  { key, url, mime } where url is a /v1/storage/<key> path (the owner fetches it with the
+ *  session token). Generic sibling of uploadImage — used by the Secretary doc/image intake. */
+export async function uploadFile(orgId, file) {
+  const mime = (file && file.type) || 'application/octet-stream';
+  const rawName = (file && file.name) || 'file';
+  const safe = rawName.replace(/[^a-z0-9.\-_]/gi, '_').slice(-60);
+  const key = `organism.${orgId}.files.${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}-${safe}`;
+  const resp = await apiPost('/v1/storage', { key, visibility: 'private', data: await blobToBase64(file), mime_type: mime });
+  if (resp?.ok === false) throw new Error(resp?.error?.message || 'Upload failed');
+  const finalKey = resp?.data?.key || key;
+  return { key: finalKey, url: `/v1/storage/${encodeURIComponent(finalKey)}`, mime };
 }
 
 /** Fetch a /v1/storage file with the session token and return an object URL (for <img>). */

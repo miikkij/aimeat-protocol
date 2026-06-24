@@ -5,6 +5,13 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.7.0 — 2026-06-24 — Secretary P1: the `secretary` tick is now a real action loop. Each working
+ *     fire runs a cheap "anything to do?" pre-check (skips the paid call when there are no open goals /
+ *     due decisions), enforces the soft per-day `dailyMorselBudget` (skip + notify on trip), loads the
+ *     active context's open goals + a bounded self-organism slice, asks the model for a STRUCTURED action
+ *     list, and routes each action through the context's autonomy bands (act → file a note / append a
+ *     feed entry; draft|ask → post an inbox decision card; off|unsupported → drop). Pure routing/guard
+ *     math lives in services/secretary-tick.ts. The hard stop-spending guard + review sweep are unchanged.
  *   v2.6.0 — 2026-06-24 — Secretary Phase 5 (learning loop): the `secretary` tick now runs a decision
  *     review sweep (reviewOpenDecisions) before the briefing — scores open decision-log contracts whose
  *     revisitWhen has passed (actual-vs-expected, 0–100) and advances open→reviewed; cost-guarded by
@@ -40,6 +47,8 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections } from './secretary-tick.js';
+import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
@@ -58,6 +67,24 @@ function extractJsonObject(text: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+/** Shape of one Secretary context (the subset the autonomous tick reads). */
+interface SecretaryContextPolicy { stopSpending?: boolean; dailyMorselBudget?: number | null; bands?: Record<string, string>; }
+interface SecretaryContext {
+  id: string;
+  name?: string;
+  brain?: { purpose?: string; rules?: Array<{ description?: string }> };
+  organismId?: string | null;
+  organismName?: string | null;
+  workspaces?: Array<{ name?: string; purpose?: string }>;
+  policy?: SecretaryContextPolicy;
+}
+interface SecretaryConfig {
+  contexts?: SecretaryContext[];
+  activeContextId?: string;
+  pendingDecisions?: Record<string, unknown>;
+  autonomousLedger?: AutonomousLedger;
 }
 
 /**
@@ -523,49 +550,261 @@ export class Scheduler {
   }
 
   /**
-   * `secretary` kind: the autonomous tick (Secretary feature Phase 4). Loads the owner's
-   * `secretary.config`, picks the active context, and — unless stop-spending is on — runs a short
-   * check-in on the owner's OpenRouter key and appends it to the Home feed (`secretary.feed`). Cost
-   * guard: stop-spending skips the paid AI call entirely (returns a skip); per-day budget caps ride
-   * the standard schedule constraints. Runs server-side as the owner (no JWT needed).
+   * `secretary` kind: the autonomous tick (Secretary feature Phase 4 → P1 action loop). Loads the
+   * owner's `secretary.config`, picks the active context, and — unless a cost guard trips — turns the
+   * context's open goals + a bounded self-organism slice into a STRUCTURED action list, routes each
+   * action through the context's autonomy bands (act → file a note / append a feed entry; draft|ask →
+   * post an inbox decision card; off|unsupported → drop), and appends a human-readable briefing.
+   * Cost guards (in order): (1) HARD stop-spending skips all paid work; (2) SOFT per-day morsel budget
+   * (P1-C) skips + notifies on trip; (3) cheap "anything to do?" pre-check (P1-B) skips the paid call
+   * when there are no open goals and no due decisions. Runs server-side as the owner (no JWT needed).
+   * Pure routing/guard math lives in services/secretary-tick.ts.
    */
   private async executeSecretaryJob(job: ScheduledJobRecord): Promise<JobRunResult> {
     const owner = job.ownerScope;
     if (!owner) throw new Error(`secretary job "${job.id}" missing ownerScope`);
     const cfgRec = await this.storage.getMemory(owner, 'secretary.config');
-    const cfg = (cfgRec?.value ?? {}) as {
-      contexts?: Array<{ id: string; name?: string; brain?: { purpose?: string; rules?: Array<{ description?: string }> }; policy?: { stopSpending?: boolean } }>;
-      activeContextId?: string;
-    };
+    const cfg = (cfgRec?.value ?? {}) as SecretaryConfig;
     const contexts = Array.isArray(cfg.contexts) ? cfg.contexts : [];
     const active = contexts.find((c) => c.id === cfg.activeContextId) || contexts[0];
     if (!active) {
       return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: 'no secretary context configured' };
     }
-    // Hard cost guard: stop-spending pauses the paid tick (the owner can re-enable it any time).
-    if (active.policy && active.policy.stopSpending) {
+    // (1) Hard cost guard: stop-spending pauses ALL paid work (the owner can re-enable it any time).
+    if (active.policy?.stopSpending) {
       return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: 'stop-spending is on' };
+    }
+
+    // (2) Soft cost guard (P1-C): the per-day morsel budget caps autonomous spend. One paid autonomous
+    // AI operation (a decision review, or the per-tick action generation) = 1 morsel. On trip, skip the
+    // paid work and notify once — degrading to no paid actions until midnight or the next day's reset.
+    const today = new Date().toISOString().slice(0, 10);
+    const budget = typeof active.policy?.dailyMorselBudget === 'number' ? active.policy.dailyMorselBudget : null;
+    const spentToday = ledgerSpentToday(cfg.autonomousLedger, active.id, today);
+    if (budget !== null && budgetExceeded(spentToday, budget)) {
+      this.notifyOwner(job, 'Secretary paused for today', `daily budget reached (${spentToday}/${budget} morsels)`);
+      return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: `daily morsel budget reached (${spentToday}/${budget})` };
+    }
+
+    // (3) Cheap "anything to do?" pre-check (P1-B): no open goals + no due decisions → skip the paid call.
+    const goalRecs = await this.storage.listMemory(owner, { prefix: 'secretary.goal.' });
+    const openGoals = goalRecs
+      .map((r) => (r.value ?? {}) as Record<string, unknown>)
+      .filter((g) => g.status === 'open' && (!g.contextId || g.contextId === active.id));
+    const decRecs = await this.storage.listMemory(owner, { prefix: 'secretary.decision.' });
+    const nowMs = Date.now();
+    const dueDecisions = decRecs
+      .map((r) => (r.value ?? {}) as Record<string, unknown>)
+      .filter((d) => d.status === 'open' && typeof d.revisitWhen === 'string' && Date.parse(d.revisitWhen as string) <= nowMs);
+    if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length })) {
+      return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals or decisions due)' };
     }
 
     const ownerName = owner.split('@')[0];
     const writes: string[] = [];
+    const newPending: Record<string, unknown> = {};
+    let paidMorsels = 0;
 
-    // Learning loop (Phase 5): before the briefing, score any open decisions whose revisit time passed.
-    const reviewed = await this.reviewOpenDecisions(owner, active, job.id);
-    if (reviewed.length) {
-      const summary = reviewed.map((r) => `• ${r.decision} — ${r.score}/100`).join('\n');
-      await this.appendFeed(owner, { kind: 'review', contextId: active.id, contextName: active.name || '', text: `Reviewed ${reviewed.length} decision(s):\n${summary}` });
-      writes.push(...reviewed.map((r) => `secretary.decision.${r.id}`));
+    try {
+      // Learning loop (Phase 5): score any decisions whose revisit time passed (each = 1 morsel).
+      const reviewed = await this.reviewOpenDecisions(owner, active, job.id);
+      paidMorsels += reviewed.length;
+      if (reviewed.length) {
+        const summary = reviewed.map((r) => `• ${r.decision} — ${r.score}/100`).join('\n');
+        await this.appendFeed(owner, { kind: 'review', contextId: active.id, contextName: active.name || '', text: `Reviewed ${reviewed.length} decision(s):\n${summary}` });
+        writes.push(...reviewed.map((r) => `secretary.decision.${r.id}`));
+      }
+
+      // Action generation (P1-A): ask the model for a STRUCTURED action list tied to the open goals +
+      // a bounded slice of the self-organism (the context's workspaces). 1 paid morsel.
+      const wsList = await this.loadContextWorkspaces(owner, active);
+      const { systemPrompt, prompt } = this.buildTickPrompt(ownerName, active, openGoals, wsList);
+      const result = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${job.id}` });
+      paidMorsels += 1;
+
+      const parsed = extractJsonObject(result.content);
+      const briefingText = (parsed && typeof parsed.briefing === 'string' && parsed.briefing.trim())
+        ? parsed.briefing.trim()
+        : result.content; // parse failure → fall back to the raw text as the briefing (never hard-fail)
+
+      // Route each proposed action through the context's bands and carry it out.
+      const { acts, asks, dropped } = classifySecretaryActions(parsed?.actions, active.policy?.bands);
+      // G1 (§22 Phase-4): no user is present, so a note-filing act must be auto-routed across ALL the
+      // owner's contexts (cheap, corrections-biased) — a clear non-active match files into THAT context;
+      // an ambiguous one becomes an Ask card instead of silently filing into the active context.
+      const corrections = await this.loadRoutingCorrections(owner);
+      for (const a of acts) {
+        if (a.kind === 'note' && contexts.length > 1) {
+          const noteText = String(a.payload.note ?? a.summary).trim();
+          const decision = routeTickNote(noteText, contexts as RoutableContext[], active.id, corrections);
+          if (decision.action === 'file-routed') {
+            const target = contexts.find((c) => c.id === decision.targetContextId);
+            if (target && target.organismId) {
+              const targetWs = await this.loadContextWorkspaces(owner, target);
+              writes.push(...await this.performSecretaryAct(owner, target, a, targetWs, active.name || active.id));
+              continue;
+            }
+          } else if (decision.action === 'ask') {
+            const card = await this.postSecretaryAskCard(owner, ownerName, active, a, wsList);
+            if (card) { newPending[card.id] = card.pending; writes.push('agent-message'); }
+            continue;
+          }
+        }
+        writes.push(...await this.performSecretaryAct(owner, active, a, wsList));
+      }
+      for (const a of asks) {
+        const card = await this.postSecretaryAskCard(owner, ownerName, active, a, wsList);
+        if (card) { newPending[card.id] = card.pending; writes.push('agent-message'); }
+      }
+
+      // Always append a human-readable briefing (+ what was asked/deferred), as before.
+      const deferred = [...asks.map((a) => `· asked: ${a.summary}`), ...dropped.map((a) => `· noted: ${a.summary}`)];
+      const feedText = deferred.length ? `${briefingText}\n\n${deferred.join('\n')}` : briefingText;
+      await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: feedText });
+      writes.push('secretary.feed');
+    } finally {
+      // Persist the spend ledger (+ any new pending decisions) even if generation threw mid-way, so the
+      // soft budget reflects what was actually spent. Read-modify-write a fresh config to avoid clobber.
+      if (paidMorsels > 0 || Object.keys(newPending).length) {
+        await this.persistTickState(owner, active.id, today, paidMorsels, newPending);
+        writes.push('secretary.config');
+      }
     }
 
-    const rules = (active.brain?.rules || []).map((r) => '- ' + (r.description || '')).join('\n');
-    const systemPrompt = `You are ${ownerName}'s personal Secretary, working in the "${active.name || 'personal'}" context.\n${active.brain?.purpose || ''}\n\nOperating rules:\n${rules || '(none)'}\n\nYou are doing an autonomous check-in for the owner (they are not present). Reply in the user's language.`;
-    const prompt = 'Write a short check-in (2–4 sentences): what to focus on in this context right now, and flag anything that needs my attention. Be concrete and concise.';
-    const result = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${job.id}` });
-    await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: result.content });
-    writes.push('secretary.feed');
+    if (Object.keys(newPending).length) emitChange('agent-messages');
+    return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes };
+  }
 
-    return { reads: ['secretary.config'], writes };
+  /** Read the active context's workspaces (id + name) from its self-organism registry. */
+  private async loadContextWorkspaces(owner: string, active: SecretaryContext): Promise<Array<{ id: string; name: string }>> {
+    if (!active.organismId) return [];
+    const rec = await this.storage.getMemory(owner, `organism.${active.organismId}.meta.workspaces`);
+    const list = ((rec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
+    return list.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
+  }
+
+  /** Build the tick's system + user prompt asking for a STRUCTURED action list (P1-A). */
+  private buildTickPrompt(
+    ownerName: string, active: SecretaryContext,
+    openGoals: Array<Record<string, unknown>>, wsList: Array<{ id: string; name: string }>,
+  ): { systemPrompt: string; prompt: string } {
+    const rules = (active.brain?.rules || []).map((r) => '- ' + (r.description || '')).join('\n');
+    const systemPrompt = `You are ${ownerName}'s personal Secretary, working in the "${active.name || 'personal'}" context.\n${active.brain?.purpose || ''}\n\nOperating rules:\n${rules || '(none)'}\n\nYou are doing an autonomous check-in for the owner (they are not present). Reply in the owner's language. Return ONLY a JSON object — no prose around it.`;
+    const goalLines = openGoals.length
+      ? openGoals.map((g) => `- ${String(g.title || '')}${g.why ? ` (why: ${String(g.why)})` : ''}`).join('\n')
+      : '(no open goals)';
+    const wsNames = wsList.map((w) => w.name).join(', ') || '(none yet)';
+    const prompt = `Open goals in this context:\n${goalLines}\n\nThe owner's filing space "${active.organismName || active.name}" has these workspaces: ${wsNames}.\n\nDecide what to do for the owner right now. Return a JSON object EXACTLY like:\n{\n  "briefing": "2-4 sentence check-in: what to focus on and anything needing attention",\n  "actions": [\n    { "capability": "file_intake", "summary": "short label", "payload": { "workspace": "<an existing workspace name>", "note": "the text to file" } },\n    { "capability": "reminders", "summary": "a concrete reminder for the owner", "payload": {} }\n  ]\n}\nRules for actions: propose 0-3 CONCRETE actions that move the open goals forward. Only use these capabilities: "file_intake"/"curate_knowledge" (file a note into a workspace — set payload.workspace to an existing workspace name and payload.note to the text) and "reminders"/"briefing" (surface a note to the owner — payload may be empty). Do not invent other capabilities. If nothing concrete is warranted, return an empty actions array.`;
+    return { systemPrompt, prompt };
+  }
+
+  /** Best-match a workspace by (possibly fuzzy) name; falls back to the first workspace. */
+  private pickWorkspace(wsList: Array<{ id: string; name: string }>, name: unknown): { id: string; name: string } | null {
+    if (!wsList.length) return null;
+    const want = String(name ?? '').trim().toLowerCase();
+    if (want) {
+      const exact = wsList.find((w) => w.name.toLowerCase() === want);
+      if (exact) return exact;
+      const partial = wsList.find((w) => w.name.toLowerCase().includes(want) || want.includes(w.name.toLowerCase()));
+      if (partial) return partial;
+    }
+    return wsList[0];
+  }
+
+  /**
+   * Perform an `act`-band action: file a note (note kind) or append a feed entry (feed kind). `ctx` is
+   * the destination context — normally the active context, but for a G1 auto-routed note it is the
+   * non-active context the note was classified into; `routedFrom` (the source/active context name) makes
+   * the feed entry say it was routed there.
+   */
+  private async performSecretaryAct(
+    owner: string, ctx: SecretaryContext, a: RoutedAction, wsList: Array<{ id: string; name: string }>,
+    routedFrom?: string,
+  ): Promise<string[]> {
+    if (a.kind === 'note') {
+      const ws = this.pickWorkspace(wsList, a.payload.workspace);
+      const noteText = String(a.payload.note ?? a.summary).trim();
+      if (ctx.organismId && ws && noteText) {
+        const id = 'note-' + randomUUID().slice(0, 8);
+        const key = `organism.${ctx.organismId}.w.${ws.id}.notes.${id}`;
+        const now = new Date().toISOString();
+        await this.storage.setMemory({
+          key, ownerGaii: owner, value: { id, title: noteText.split('\n')[0].slice(0, 80), body: noteText, createdAt: now, via: 'secretary-tick' },
+          visibility: 'private', tags: ['secretary', 'note', ctx.id], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+        const text = routedFrom
+          ? `Routed a note to ${ctx.name || ctx.id} → ${ws.name}: ${a.summary}`
+          : `Filed a note → ${ws.name}: ${a.summary}`;
+        await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text });
+        return [key, 'secretary.feed'];
+      }
+    }
+    // feed kind (or a note with no resolvable workspace): surface it in the feed as a performed action.
+    await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text: a.summary });
+    return ['secretary.feed'];
+  }
+
+  /** Load the owner's persisted cross-context routing corrections (G1). Empty map when none exist. */
+  private async loadRoutingCorrections(owner: string): Promise<RoutingCorrections> {
+    const rec = await this.storage.getMemory(owner, 'secretary.routing.corrections');
+    const map = (rec?.value as { map?: Record<string, string> } | undefined)?.map;
+    return (map && typeof map === 'object') ? map : {};
+  }
+
+  /**
+   * Post a draft/ask-band action as an inbox decision card (reusing the Phase-3b prompt rails) and
+   * return the stashed pending action keyed by promptId. Note actions reuse the existing `file-note`
+   * shape (workspace options) so the Secretary view's applyDecision files them on the owner's answer;
+   * other actions use a yes/no `tick-note` shape. Returns null if the Secretary agent isn't provisioned.
+   */
+  private async postSecretaryAskCard(
+    owner: string, ownerName: string, active: SecretaryContext, a: RoutedAction, wsList: Array<{ id: string; name: string }>,
+  ): Promise<{ id: string; pending: Record<string, unknown> } | null> {
+    const secretaryGaii = `secretary#${ownerName}@${this.config.nodeId}`;
+    const agent = await this.storage.getAgent(secretaryGaii);
+    if (!agent) return null;
+    const promptId = 'tick-' + randomUUID().slice(0, 8);
+    const now = new Date().toISOString();
+    let question: string; let options: string[]; let pending: Record<string, unknown>;
+    if (a.kind === 'note' && wsList.length >= 1 && active.organismId) {
+      const noteText = String(a.payload.note ?? a.summary).trim();
+      question = 'Which workspace should I file this into?';
+      options = wsList.slice(0, 8).map((w) => w.name);
+      pending = { type: 'file-note', body: noteText, organismId: active.organismId, question, createdAt: now };
+    } else {
+      question = 'Should I do this?';
+      options = ['Yes, add it', 'No'];
+      pending = { type: 'tick-note', text: a.summary, contextId: active.id, contextName: active.name || '', question, createdAt: now };
+    }
+    const record: AgentMessageRecord = {
+      id: randomUUID(),
+      agentGaii: secretaryGaii,
+      threadId: randomUUID(),
+      direction: 'outbound',
+      senderGaii: owner,
+      content: a.summary,
+      status: 'delivered',
+      metadata: { prompt: { promptId, question, options, allowOther: false } },
+      createdAt: now,
+    };
+    await this.storage.createMessage(record);
+    return { id: promptId, pending };
+  }
+
+  /** Read-modify-write secretary.config to persist the day's spend ledger + any new pending decisions. */
+  private async persistTickState(
+    owner: string, contextId: string, today: string, morsels: number, newPending: Record<string, unknown>,
+  ): Promise<void> {
+    const rec = await this.storage.getMemory(owner, 'secretary.config');
+    const cfg = (rec?.value ?? {}) as SecretaryConfig;
+    const ledger = morsels > 0 ? bumpLedger(cfg.autonomousLedger, contextId, today, morsels) : cfg.autonomousLedger;
+    const pending = Object.keys(newPending).length ? { ...(cfg.pendingDecisions ?? {}), ...newPending } : cfg.pendingDecisions;
+    const next = { ...cfg, autonomousLedger: ledger, pendingDecisions: pending };
+    const now = new Date().toISOString();
+    await this.storage.setMemory({
+      key: 'secretary.config', ownerGaii: owner, value: next, visibility: 'private', tags: ['secretary', 'config'],
+      ttlHours: null, version: rec ? rec.version + 1 : 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
+    });
   }
 
   /** Append one entry to the owner's Home feed (`secretary.feed`, newest first, capped at 50). */
