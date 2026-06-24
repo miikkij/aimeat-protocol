@@ -4,6 +4,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.13.0 -- 2026-06-24 -- Secretary P5 (S-A): add .pf-agd-badge--specialist (specialist agent type badge).
  *   v1.12.0 -- 2026-06-22 -- Add .pf-agd-capwrap rule so the capabilities summary
  *     ("N tools · N skills · N langs") gets the card content inset (1rem) instead of
  *     sitting flush against the edge, plus a small top gap from the tag/badge strip.
@@ -1556,6 +1557,13 @@
 .pf .pf-agd-badge--federation {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success, #10b981);
+}
+
+/* Specialist badge -- marks a specialist agent type (Secretary P5 / S-A) */
+.pf .pf-agd-badge--specialist {
+  background: var(--bg-dim, rgba(99, 102, 241, 0.12));
+  color: var(--accent, #6366f1);
+  font-weight: 600;
 }
 
 /* Mode badge -- distinguishes how the agent is used (added 2026-05-29) */

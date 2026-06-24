@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.8.0 — 2026-06-24 — Secretary P5 (S-C): .ext-instance-cfg-field/-label/-secret/-desc for the
+ *     extension instance-create config form (masked secret fields).
  *   v2.7.0 — 2026-06-22 — Home "Usage & quotas" card: .pf-usage-card/.pf-usage-row/.pf-usage-bar/
  *     .pf-usage-fill (quota bars) + .pf-usage-chips/.pf-usage-chip (count chips).
  *   v2.6.0 — 2026-06-22 — Scalable Memory tab: .pf-mem-quota* (storage-usage bar), .pf-mem-size
@@ -1360,8 +1362,12 @@
 .pf .ext-instance-row        { display: flex; align-items: center; gap: .75rem; padding: .75rem; margin-bottom: .5rem; background: var(--surface, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; }
 .pf .ext-instance-name       { font-weight: 600; font-size: .9rem; flex: 1; }
 .pf .ext-instance-status     { font-size: .8rem; color: var(--muted); }
-.pf .ext-instance-create     { display: flex; gap: .5rem; margin-top: .75rem; align-items: center; }
+.pf .ext-instance-create     { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; align-items: flex-end; }
 .pf .ext-instance-input      { flex: 1; max-width: 300px; }
+.pf .ext-instance-cfg-field  { display: flex; flex-direction: column; gap: .25rem; flex: 1 1 100%; }
+.pf .ext-instance-cfg-label  { font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.pf .ext-instance-cfg-secret { font-size: .72rem; font-weight: 600; color: var(--accent, #E8564A); }
+.pf .ext-instance-cfg-desc   { font-size: .75rem; font-weight: 400; color: var(--muted); }
 .pf .ext-hint                { font-size: .8rem; color: var(--muted); margin-top: .5rem; }
 .pf .ext-no-instances        { font-size: .85rem; color: var(--muted); padding: .5rem 0; }
 .pf .ext-endpoint-box        { font-size: .85rem; padding: .75rem; background: var(--surface, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; font-family: monospace; word-break: break-all; }

@@ -4,8 +4,13 @@
  *   importer becomes creator/admin/member, with a fresh discussion board) and restore every workspace
  *   under it via restoreWorkspace(). Membership/board from the source are NOT restored — only the
  *   organism's settings + its workspace content.
- * @structure importOrganism(storage, config, { importerGaii, importerOwner, zip })
+ * @structure importOrganism(storage, config, { importerGaii, importerOwner, zip }) ·
+ *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files })
  * @version-history
+ *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): extract restoreOrganismFromFiles() (the create-org +
+ *     restore-workspaces core operating on an already-unzipped file map) so the use-case template
+ *     instantiate flow can reuse it without re-implementing organism creation. importOrganism now
+ *     unzips then delegates. Behaviour unchanged for the bundle-import path.
  *   v1.0.0 -- 2026-06-09 -- Initial: organism bundle import (create org + restore all workspaces).
  */
 import { v4 as uuidv4 } from 'uuid';
@@ -35,6 +40,21 @@ export async function importOrganism(
 ): Promise<OrganismImportResult> {
   const { importerGaii, importerOwner, zip } = opts;
   const files = await unzipBuffer(zip, ORGANISM_ALLOW);
+  return restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files });
+}
+
+/**
+ * Create a new organism + restore its workspaces from an ALREADY-UNZIPPED file map (organism.json +
+ * workspaces/{ws}/workspace.json + images/). The importer becomes the new organism's creator. Extracted
+ * so the use-case template instantiate flow (Secretary P5 / S-B) can reuse organism creation without
+ * re-implementing it — it unzips with a broader allowlist (to permit template.json) and then calls this.
+ */
+export async function restoreOrganismFromFiles(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: { importerGaii: string; importerOwner: string; files: Map<string, Buffer> },
+): Promise<OrganismImportResult> {
+  const { importerGaii, importerOwner, files } = opts;
   const ojBuf = files.get('organism.json');
   if (!ojBuf) throw new Error('organism.json missing from the ZIP');
   let oj: OrgJson;

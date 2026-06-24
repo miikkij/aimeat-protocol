@@ -3856,6 +3856,12 @@ export class PrismaStorage implements Storage {
             data: row.data,
             accessCode: row.accessCode ?? undefined,
             parked: row.parked ? true : undefined,
+            operatorHidden: row.operatorHidden ? true : undefined,
+            operatorHiddenBy: row.operatorHiddenBy ?? undefined,
+            operatorHiddenAt: row.operatorHiddenAt
+                ? (row.operatorHiddenAt instanceof Date ? row.operatorHiddenAt.toISOString() : row.operatorHiddenAt)
+                : undefined,
+            operatorHideReason: row.operatorHideReason ?? undefined,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
         };
     }
@@ -3874,6 +3880,10 @@ export class PrismaStorage implements Storage {
                 data: record.data,
                 accessCode: record.accessCode,
                 parked: record.parked ?? false,
+                operatorHidden: record.operatorHidden ?? false,
+                operatorHiddenBy: record.operatorHiddenBy ?? null,
+                operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
+                operatorHideReason: record.operatorHideReason ?? null,
                 createdAt: new Date(record.createdAt),
             },
         });
@@ -3931,11 +3941,13 @@ export class PrismaStorage implements Storage {
             apps = apps.filter((a: AppRecord) => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
         }
         if (opts?.freeOnly) apps = apps.filter((a: AppRecord) => !a.manifest.priceMorsels);
-        // Parked apps are hidden from everyone EXCEPT their owner. A scoped
-        // ownerGaii query already returns only that owner's apps (their "my apps"
-        // view, which should include parked), so only filter the unscoped listing.
-        if (!opts?.ownerGaii) {
+        // Parked + operator-hidden apps are hidden from everyone EXCEPT their
+        // owner. A scoped ownerGaii query already returns only that owner's apps
+        // (their "my apps" view, which should include both), so only filter the
+        // unscoped listing. adminView (operator moderation) bypasses both filters.
+        if (!opts?.ownerGaii && !opts?.adminView) {
             apps = apps.filter((a: AppRecord) => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
+            apps = apps.filter((a: AppRecord) => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
         }
         const total = apps.length;
         apps.sort((a: AppRecord, b: AppRecord) => b.createdAt.localeCompare(a.createdAt));
@@ -3991,6 +4003,27 @@ export class PrismaStorage implements Storage {
         const result = await this.prisma.app.updateMany({
             where: { ownerGaii, filename },
             data: { parked },
+        });
+        return result.count > 0;
+    }
+
+    async setAppOperatorHidden(
+        ownerGaii: string,
+        filename: string,
+        hidden: boolean,
+        meta?: { by?: string; at?: string; reason?: string },
+    ): Promise<boolean> {
+        this.ensureReady();
+        // Operator moderation applies to the whole app — flag every version row.
+        // On un-hide, clear the audit fields so a stale "hidden by" never lingers.
+        const result = await this.prisma.app.updateMany({
+            where: { ownerGaii, filename },
+            data: {
+                operatorHidden: hidden,
+                operatorHiddenBy: hidden ? (meta?.by ?? null) : null,
+                operatorHiddenAt: hidden ? (meta?.at ? new Date(meta.at) : null) : null,
+                operatorHideReason: hidden ? (meta?.reason ?? null) : null,
+            },
         });
         return result.count > 0;
     }

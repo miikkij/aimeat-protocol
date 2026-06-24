@@ -714,7 +714,18 @@
       "denied": "Request denied.",
       "approveError": "Couldn't approve the request",
       "configured": "Agent updated.",
-      "configError": "Couldn't update the agent"
+      "configError": "Couldn't update the agent",
+      "addSpecTitle": "Add a specialist",
+      "addSpecHint": "Provision a job-role specialist. It runs on a safe, least-privilege default — some roles can request extra capabilities, which you approve.",
+      "specName": "name",
+      "specCreate": "Create",
+      "specCreated": "Specialist created.",
+      "specError": "Couldn't create the specialist",
+      "consentTitle": "Approve extra capabilities for",
+      "consentNote": "These go beyond the safe default. Approve only what this specialist needs — you can change this later.",
+      "consentSkip": "Keep safe default",
+      "consentGrant": "Grant selected",
+      "extrasGranted": "Extra capabilities granted."
     },
     "noteTitle": "Save a note to my space",
     "noteHint": "Write anything down — your Secretary files it into the right workspace. You confirm where.",
@@ -1561,6 +1572,7 @@
     },
     "agents": {
       "title": "Your Agents",
+      "specialistBadge": "Specialist",
       "active": {
         "title": "Running now",
         "empty": "No tasks running right now.",
@@ -2758,7 +2770,9 @@
       "parkedBadge": "Parked",
       "parkedHint": "Only you can see and use this — hidden from the public catalogue.",
       "parked": "App parked",
-      "unparked": "App published"
+      "unparked": "App published",
+      "operatorHiddenBadge": "Moderated by operator: hidden",
+      "operatorHiddenHint": "An operator has hidden this app from public view. Only you can still see it. Contact the operator to appeal."
     },
     "v8ext": {
       "title": "Server Extensions",
@@ -2772,6 +2786,7 @@
       "instancesTitle": "Instances",
       "noInstances": "No instances yet. Create one to use this extension.",
       "instanceIdPlaceholder": "instance-id (lowercase, hyphens ok)",
+      "secretField": "secret — encrypted at rest",
       "createInstance": "Create Instance",
       "deleteInstance": "Delete",
       "copyId": "Copy ID",
@@ -7809,6 +7824,32 @@
       "delete": "Delete",
       "deleteTitle": "Delete subdomain mapping",
       "deleteConfirm": "This removes the mapping and the subdomain stops serving immediately. Type the subdomain to confirm:"
+    },
+    "apps": {
+      "title": "Applications",
+      "desc": "Every app published on this node. Hide an app to remove it from all public surfaces (catalogue, gallery, search, and direct download). The owner still sees it with a \"moderated by operator: hidden\" badge but cannot unhide it — only an operator can.",
+      "searchPlaceholder": "Search by name, owner, or filename…",
+      "hiddenOnly": "Hidden only",
+      "hiddenChip": "hidden",
+      "empty": "No applications match.",
+      "colApp": "App",
+      "colOwner": "Owner",
+      "colSize": "Size",
+      "colDownloads": "Downloads",
+      "colStatus": "Status",
+      "statusHidden": "Hidden by operator",
+      "statusParked": "Parked",
+      "statusLive": "Live",
+      "byAt": "by {by} · {at}",
+      "hide": "Hide",
+      "restore": "Restore",
+      "hiddenOk": "App hidden from public view.",
+      "restoredOk": "App restored to public view.",
+      "hideTitle": "Hide application",
+      "hideConfirm": "Hide",
+      "hideExplain": "This removes the app from the public catalogue, gallery, search, and direct download. The owner keeps a copy with a \"moderated by operator: hidden\" badge but cannot unhide it.",
+      "reasonLabel": "Reason (shown to the owner, optional)",
+      "reasonPlaceholder": "e.g. Anonymous / policy violation"
     },
     "security": {
       "title": "Security",

@@ -8,6 +8,16 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   v1.5.0 -- 2026-06-24 -- Secretary G1: dedup the merge against the enterprise layer — drop owner/agent
+ *     rules that duplicate a locked enterprise rule (dropEnterpriseDuplicates) so a company Secretary
+ *     provisioned before the brain became seam-sourced can never render its stale persisted brain twice.
+ *     No-op when there is no enterprise layer (Community / non-company agents unaffected).
+ *   v1.4.0 -- 2026-06-24 -- Add a 4th `enterprise` source to the merge (Secretary P4-B): for a company
+ *     Secretary (tag system:company-secretary) the GET merge overlays the edition's locked brain from
+ *     the Enterprise seam (provider.secretaryDirectives(orgId)), ranked above owner/agent and read-only
+ *     (PUT only ever writes the agent layer). Sourced live (never persisted) so brains are swappable and
+ *     each company resolves its own org. Community/stub omits the seam method → no change for any other
+ *     agent. Response gains `enterprise_locked`.
  *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for directive.updated events
  *   v1.2.0 -- 2026-05-28 -- Include owner-managed shared memory tags in directive reads
  *   v1.3.0 -- 2026-05-31 -- PUT now MERGES instead of full-replace: fields omitted
@@ -28,10 +38,12 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
+import type { EnterpriseProvider } from '../enterprise/provider.js';
+import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates } from '../services/secretary.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
+export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher, enterprise?: EnterpriseProvider): Router {
   const router = Router();
 
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
@@ -77,11 +89,28 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
       source: 'agent' as const,
     }));
 
-    // Merge: system + owner + agent
-    const mergedRules = [...systemRules, ...ownerRules, ...agentRules];
+    // Layer 2.5: Enterprise (edition-locked) rules — ONLY for a company Secretary, sourced live from
+    // the Enterprise edition seam (never persisted, so the edition can swap a company's brain and it
+    // takes effect at once, and each company's secretary resolves its OWN org's brain — multi-company
+    // safe). Ranked above owner/agent and read-only: the owner/agent layers below it stay editable, so
+    // a locked enterprise brain and per-owner customization can coexist. Community (the stub omits
+    // secretaryDirectives) yields an empty layer, so every other agent — and every Community node — is
+    // unaffected. The brain is never editable here: PUT only writes the agent layer.
+    const enterpriseLayer = resolveEnterpriseDirectiveLayer(agent.tags, enterprise, config.nodeId);
+
+    // G1: collapse any stale persisted brain copy. A company Secretary provisioned before the brain
+    // became seam-sourced (≤ v0.2.0) still holds the locked brain in its agent/owner layer; without this
+    // it would render a second time next to the live enterprise overlay. dropEnterpriseDuplicates is a
+    // no-op when there is no enterprise layer, so Community and non-company agents are untouched.
+    const ownerRulesShown = dropEnterpriseDuplicates(ownerRules, enterpriseLayer.rules);
+    const agentRulesShown = dropEnterpriseDuplicates(agentRules, enterpriseLayer.rules);
+
+    // Merge: system + enterprise (locked) + owner + agent
+    const mergedRules = [...systemRules, ...enterpriseLayer.rules, ...ownerRulesShown, ...agentRulesShown];
 
     const responseData: Record<string, unknown> = {
-      purpose: agentDirectives?.purpose ?? '',
+      purpose: enterpriseLayer.purpose || (agentDirectives?.purpose ?? ''),
+      enterprise_locked: enterpriseLayer.rules.length > 0,
       rules: mergedRules,
       memory_areas: (agentDirectives?.memoryAreas ?? []).map(ma => ({
         key_prefix: ma.keyPrefix,

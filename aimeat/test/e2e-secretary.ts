@@ -16,6 +16,17 @@
 // (happy) + reject an empty upload (failure); P3-B auto-created decisions from real choices — an answered
 // Ask card + an approved guided plan each yield an open, reviewable secretary.decision contract (happy) +
 // an unauthenticated decision write is rejected (failure). Live vision/AI is browser-verified (no key here).
+// P4-B (tests 47-48): the read-only Enterprise (edition-locked) directive merge layer — the pure resolver
+// (company-secretary tag + seam → read-only enterprise rules; non-company/no-seam → empty) is unit-tested
+// with a fake seam (happy + failure), and the Community-unaffected contract is asserted over HTTP against
+// the open-core stub (a normal Secretary's merge has no enterprise layer). The live EE-active overlay +
+// merge order (system > enterprise > owner > agent) is browser-verified on the dev server.
+// P4 G1 (tests 49-51): kill the double-brain for company secretaries provisioned before the brain became
+// seam-sourced — dropEnterpriseDuplicates (merge-time dedup: collapses a stale persisted copy, keeps
+// genuine rules, no-op without a layer) + isStalePersistedBrain (self-heal decision) are unit-tested, and
+// the Community-unaffected contract (dedup never strips a personal Secretary's agent rules) is asserted
+// over HTTP. The EE-active end-to-end (stale persisted brain renders once + re-provision self-heal) is
+// browser-verified on the dev server.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -65,6 +76,9 @@ import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
 import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote } from '../src/services/secretary-tick.js';
+// P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
+// (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
+import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -815,6 +829,92 @@ await test('46. P3-B failure mode: an unauthenticated decision write is rejected
         body: JSON.stringify({ key: 'secretary.decision.d-e2e-unauth', value: { type: 'secretary.decision', status: 'open' }, visibility: 'private' }),
     });
     assert(w.status === 401 || w.status === 403, `expected auth rejection, got ${w.status}: ${JSON.stringify(w.body)}`);
+});
+
+// ─── P4-B: the read-only Enterprise (edition-locked) directive merge layer ───
+console.log('\nP4-B -- Enterprise (edition-locked) directive merge layer');
+
+await test('47. P4-B resolver: company-secretary tag + seam → read-only enterprise rules; others empty', async () => {
+    const fakeSeam = {
+        secretaryDirectives: (orgId: string) => ({
+            purpose: `Company brain for ${orgId}`,
+            rules: [{ description: 'Scout before building' }, { id: 'r2', description: 'Spend is band-gated' }],
+            locked: true as const,
+        }),
+    };
+    const companyTags = ['system:company-secretary', 'unlisted', 'org:acme'];
+    const layer = resolveEnterpriseDirectiveLayer(companyTags, fakeSeam, NODE_ID);
+    assert(layer.rules.length === 2, `expected 2 enterprise rules, got ${layer.rules.length}`);
+    // The org is resolved from the agent's `org:<slug>` tag (multi-company: each resolves its own).
+    assert(layer.purpose === `Company brain for org:acme@${NODE_ID}`, `purpose resolves org from tag: ${layer.purpose}`);
+    // Every rule is read-only + marked as the 4th 'enterprise' source.
+    assert(layer.rules.every(r => r.source === 'enterprise' && r.locked === true), `every rule read-only enterprise: ${JSON.stringify(layer.rules)}`);
+    assert(layer.rules[0].id === 'enterprise-1' && layer.rules[1].id === 'r2', `ids default + preserve: ${JSON.stringify(layer.rules.map(r => r.id))}`);
+    // A non-company agent → no enterprise layer (the merge is unchanged for every other agent).
+    assert(resolveEnterpriseDirectiveLayer(['system:secretary', 'unlisted'], fakeSeam, NODE_ID).rules.length === 0, 'non-company agent → empty layer');
+    // Community: the stub omits secretaryDirectives → empty even for a company-secretary-tagged agent.
+    assert(resolveEnterpriseDirectiveLayer(companyTags, undefined, NODE_ID).rules.length === 0, 'no seam (Community) → empty layer');
+    assert(resolveEnterpriseDirectiveLayer(companyTags, {}, NODE_ID).rules.length === 0, 'seam without secretaryDirectives → empty layer');
+    // A company-secretary tag without an org tag can't resolve an org → empty (no half-built layer).
+    assert(resolveEnterpriseDirectiveLayer(['system:company-secretary'], fakeSeam, NODE_ID).rules.length === 0, 'no org tag → empty layer');
+});
+
+await test('48. P4-B Community-unaffected: a normal Secretary directives merge has no enterprise layer', async () => {
+    // Runs against the open-core stub (the E2E server). The new code path must be a no-op here: the
+    // personal Secretary's merge stays system+owner+agent, with the brain set in test 8 as the agent layer.
+    const { status, body } = await json('/v1/agents/secretary/directives', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.enterprise_locked === false, `enterprise_locked must be false for a personal Secretary: ${JSON.stringify(body.data.enterprise_locked)}`);
+    const rules = body.data.rules || [];
+    assert(!rules.some((r: any) => r.source === 'enterprise'), `no enterprise-sourced rules: ${JSON.stringify(rules.map((r: any) => r.source))}`);
+    assert(rules.some((r: any) => r.source === 'agent'), `agent-layer rules still present: ${JSON.stringify(rules.map((r: any) => r.source))}`);
+});
+
+// ─── P4 G1: kill the double-brain for pre-v0.3.0 company secretaries (stale persisted brain copy) ───
+console.log('\nP4 G1 -- de-dup stale persisted company brain against the enterprise layer');
+
+await test('49. G1 dropEnterpriseDuplicates: collapses a stale brain copy, keeps genuine rules, no-op without a layer', async () => {
+    const enterprise = [{ description: 'Scout before building' }, { description: 'Spend is band-gated' }];
+    // A pre-v0.3.0 company secretary persisted the brain into its agent layer → those rows duplicate the
+    // enterprise layer (note the whitespace/case noise: matching is normalized) and must be dropped.
+    const staleAgentRules = [
+        { id: 'a1', description: '  scout   BEFORE building ', source: 'agent' },
+        { id: 'a2', description: 'Spend is band-gated', source: 'agent' },
+        { id: 'a3', description: 'A genuine per-owner rule', source: 'agent' },
+    ];
+    const kept = dropEnterpriseDuplicates(staleAgentRules, enterprise);
+    assert(kept.length === 1 && kept[0].id === 'a3', `only the genuine non-duplicate survives: ${JSON.stringify(kept.map(r => r.id))}`);
+    // No enterprise layer (Community / non-company agent) → never strips anything.
+    assert(dropEnterpriseDuplicates(staleAgentRules, []).length === 3, 'empty enterprise layer → no-op');
+    // Mirror the route merge: system + enterprise + (deduped owner) + (deduped agent) → enterprise once.
+    const merged = [
+        ...[{ description: 'sys', source: 'system' }],
+        ...enterprise.map(r => ({ ...r, source: 'enterprise', locked: true })),
+        ...dropEnterpriseDuplicates([], enterprise),
+        ...dropEnterpriseDuplicates(staleAgentRules, enterprise),
+    ];
+    const lockedTexts = merged.filter((r: any) => r.source === 'enterprise').map((r: any) => r.description.toLowerCase());
+    const dupInLower = merged.filter((r: any) => r.source !== 'enterprise').some((r: any) => lockedTexts.includes((r.description || '').trim().replace(/\s+/g, ' ').toLowerCase()));
+    assert(!dupInLower, `no lower-layer rule duplicates an enterprise rule after merge: ${JSON.stringify(merged.map((r: any) => r.source))}`);
+});
+
+await test('50. G1 isStalePersistedBrain: pure copy → true; extra genuine rule or empty → false', async () => {
+    const brain = [{ description: 'Scout before building' }, { description: 'Spend is band-gated' }];
+    assert(isStalePersistedBrain([{ description: 'scout before building' }, { description: 'SPEND is band-gated' }], brain) === true, 'subset-of-brain (normalized) → stale copy');
+    assert(isStalePersistedBrain([{ description: 'Scout before building' }, { description: 'My own rule' }], brain) === false, 'has a genuine extra rule → not purely stale (keep it)');
+    assert(isStalePersistedBrain([], brain) === false, 'empty persisted → nothing to strip');
+});
+
+await test('51. G1 Community-unaffected: a personal Secretary merge keeps its agent rules (dedup is a no-op)', async () => {
+    // Runs against the open-core stub: no enterprise layer, so the new dedup must not strip the agent
+    // rules the Secretary set in test 8 (a regression guard for the merge change).
+    const { status, body } = await json('/v1/agents/secretary/directives', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.enterprise_locked === false, `enterprise_locked false for a personal Secretary: ${JSON.stringify(body.data.enterprise_locked)}`);
+    const agentRules = (body.data.rules || []).filter((r: any) => r.source === 'agent');
+    // The Secretary set two agent-layer rules in test 8; with no enterprise layer the dedup is a no-op, so both survive.
+    assert(agentRules.length >= 2, `agent-layer rules survive the merge (dedup no-op): ${JSON.stringify(agentRules.map((r: any) => r.description))}`);
+    assert(agentRules.some((r: any) => /aimeat_discover/i.test(r.description)), `the scout-before-build agent rule survives: ${JSON.stringify(agentRules.map((r: any) => r.description))}`);
 });
 
 console.log('\nCleanup');

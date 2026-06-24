@@ -55,12 +55,18 @@
  *     visitor's first contact with AIMEAT, so give them a way to the project + a publish CTA.
  *     Permanent aimeat.io mark (free hosting), idempotent, HTML-only; raw download stays byte-exact.
  *     Content-Length now reflects the injected body.
+ *   v1.12.0 -- 2026-06-24 -- Operator moderation: GET /v1/admin/apps (operator) lists every app
+ *     including parked + operator-hidden; POST /v1/admin/apps/:owner/:filename/moderate hides/
+ *     restores an app from EVERY public surface. operator-hidden apps drop out of /v1/apps for
+ *     everyone but the owner (who gets a "moderated by operator: hidden" badge and cannot lift it)
+ *     and 404 on direct download for non-owner/non-operator; the flag survives a re-publish so an
+ *     owner cannot re-upload to escape moderation. Responses carry operator_hidden + reason.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { requireAuth, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, optionalAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
@@ -153,6 +159,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
                 parked: !!app.parked,
+                operator_hidden: !!app.operatorHidden,
+                operator_hide_reason: app.operatorHideReason ?? null,
                 has_screenshot: hasScreenshot,
                 downloads,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
@@ -200,6 +208,85 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             offset: opts.offset,
             limit: opts.limit,
             ...(peerApps.length > 0 ? { peer_apps: peerApps } : {}),
+        }));
+    });
+
+    // ── Operator moderation ──────────────────────────────────────────────
+    // GET /v1/admin/apps — operator-only: list EVERY app on the node (all owners,
+    // including parked + operator-hidden) for the admin moderation surface. Static
+    // path, registered before the parameterized download route below.
+    router.get('/v1/admin/apps', requireAuth(), requireRole('operator'), async (req, res) => {
+        const limit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+        const offset = parseInt(req.query.offset as string) || 0;
+        const { apps, total } = await storage.listApps({ adminView: true, limit, offset, sort: 'newest' });
+
+        const result = await Promise.all(apps.map(async (app) => {
+            const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
+            return {
+                owner: app.ownerName,
+                filename: app.filename,
+                version_number: app.versionNumber,
+                manifest: app.manifest,
+                size: app.size,
+                mime_type: app.mimeType,
+                protected: !!app.accessCode,
+                parked: !!app.parked,
+                operator_hidden: !!app.operatorHidden,
+                operator_hidden_by: app.operatorHiddenBy ?? null,
+                operator_hidden_at: app.operatorHiddenAt ?? null,
+                operator_hide_reason: app.operatorHideReason ?? null,
+                downloads,
+                download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
+                created_at: app.createdAt,
+            };
+        }));
+
+        res.json(success(config.nodeId, { apps: result, total, offset, limit }));
+    });
+
+    // POST /v1/admin/apps/:owner/:filename/moderate — operator-only: hide or
+    // un-hide an app from every public surface. Body: { hidden: boolean, reason?: string }.
+    // Unlike the owner's `parked` toggle, only an operator can lift this.
+    router.post('/v1/admin/apps/:owner/:filename/moderate', requireAuth(), requireRole('operator'), async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const body = req.body ?? {};
+        if (typeof body.hidden !== 'boolean') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'hidden must be a boolean'));
+            return;
+        }
+        const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : undefined;
+
+        // Resolve the app's canonical bucket from the owner name, then flag every
+        // version row in that bucket.
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        const { owner: operatorName } = await canonicalOwner(req);
+        const ok = await storage.setAppOperatorHidden(app.ownerGaii, filename, body.hidden, {
+            by: operatorName,
+            at: new Date().toISOString(),
+            reason,
+        });
+        if (!ok) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        emitChange('apps');
+        res.json(success(config.nodeId, {
+            owner,
+            filename,
+            operator_hidden: body.hidden,
+            operator_hide_reason: body.hidden ? (reason ?? null) : null,
+            note: body.hidden
+                ? 'App hidden by operator. It is removed from every public surface; the owner sees a "moderated by operator: hidden" badge but cannot unhide it.'
+                : 'App restored. It is visible in the public catalogue again.',
         }));
     });
 
@@ -411,6 +498,24 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
+        // Operator-hidden apps are removed from public view entirely: only the
+        // owner (who still manages it, badged) and operators may fetch it. Anyone
+        // else gets the same 404 as a non-existent app — the moderated app must
+        // not be reachable by direct link either. Mirror the not-found message so
+        // moderation status isn't leaked.
+        if (app.operatorHidden) {
+            const isOperator = !!req.auth?.roles?.includes('operator');
+            let isOwner = false;
+            if (req.auth) {
+                const { owner: viewerOwner } = await canonicalOwner(req);
+                isOwner = viewerOwner === app.ownerName;
+            }
+            if (!isOperator && !isOwner) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
+                return;
+            }
+        }
+
         if (app.accessCode && app.accessCode !== code) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
                 'This app is protected. Provide the access code via ?code= query parameter or X-Access-Code header.'));
@@ -586,9 +691,19 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // parked (hidden) when updated, so an update never silently re-exposes it.
         // New apps are published (not parked) by default.
         let parkedState = false;
+        // Operator-hide must ALSO survive a re-publish — otherwise an owner could
+        // simply re-upload to escape moderation. Carry the flag + audit forward.
+        let operatorHiddenState = false;
+        let operatorHiddenBy: string | undefined;
+        let operatorHiddenAt: string | undefined;
+        let operatorHideReason: string | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
+            operatorHiddenState = !!existingApp?.operatorHidden;
+            operatorHiddenBy = existingApp?.operatorHiddenBy;
+            operatorHiddenAt = existingApp?.operatorHiddenAt;
+            operatorHideReason = existingApp?.operatorHideReason;
         }
 
         const now = new Date().toISOString();
@@ -616,6 +731,10 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             data,
             accessCode,
             parked: parkedState,
+            operatorHidden: operatorHiddenState,
+            operatorHiddenBy,
+            operatorHiddenAt,
+            operatorHideReason,
             createdAt: now,
         });
 

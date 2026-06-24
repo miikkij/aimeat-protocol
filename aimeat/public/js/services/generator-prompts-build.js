@@ -14,6 +14,8 @@
  *   // OLD (deprecated): import { buildComponentPrompt } from '/js/services/generator-prompts-build.js';
  *   // NEW: session.fetch('/v1/generator/${projectId}/prompts/${componentId}')
  * @version-history
+ *   v2.1.0 — 2026-06-24 — Secretary P5 (S-C): emit `type: secret` (not coerced to string) for secret
+ *     settings so the install pipeline encrypts them at rest. See services/extension-secrets.ts.
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
  *   v1.1.0 — 2026-03-24 — Add API URL usage rules + notes to extension data source details
  *   v2.0.0 — 2026-04-02 — DEPRECATED: prompts now served from database. File kept as backup.
@@ -857,7 +859,9 @@ export async function buildComponentPrompt(type, label, projectDescription, blue
       context += 'These settings are injected into `ctx.config` at runtime. Use these EXACT key names:\n\n';
       context += '```yaml\nconfig:\n';
       for (const s of allSettings) {
-        const yamlType = s.type === 'secret' ? 'string' : s.type === 'boolean' ? 'boolean' : s.type === 'number' ? 'number' : 'string';
+        // `secret` is preserved as a first-class config type so the install pipeline encrypts the
+        // value at rest (AES-256-GCM, node key) and decrypts only just before the sandbox VM.
+        const yamlType = s.type === 'secret' ? 'secret' : s.type === 'boolean' ? 'boolean' : s.type === 'number' ? 'number' : 'string';
         context += `  ${s.key}:\n    type: ${yamlType}\n    description: "${s.label}"\n`;
         if (s.required) context += `    required: true\n`;
       }

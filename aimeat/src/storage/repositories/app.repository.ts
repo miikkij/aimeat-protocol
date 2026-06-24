@@ -18,6 +18,9 @@
  *     MCP/PAT full GHII) into one canonical record with a unified version line.
  *   v1.3.0 — 2026-06-20 — Add setAppParked() for the parked-app state (hide from
  *     public listings while keeping the app usable by its owner).
+ *   v1.4.0 — 2026-06-24 — Add setAppOperatorHidden() + AppListOptions.adminView for
+ *     operator moderation (remove an app from every public surface; owner sees a
+ *     badge but cannot lift it).
  */
 import type { AppRecord, AppListOptions } from '../interface.js';
 
@@ -37,6 +40,21 @@ export interface AppRepository {
      * any row was updated.
      */
     setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean>;
+    /**
+     * Operator moderation: hide or un-hide an app from EVERY public surface
+     * (catalogue/gallery/search/discovery + public download). Sets the
+     * `operatorHidden` flag (and audit fields) on EVERY version row of
+     * (ownerGaii, filename). Unlike setAppParked, only an operator may call this
+     * — the owner cannot lift it; they only see a "moderated by operator: hidden"
+     * badge on their own copy. Pass meta on hide; cleared on un-hide. Returns
+     * true if any row was updated.
+     */
+    setAppOperatorHidden(
+        ownerGaii: string,
+        filename: string,
+        hidden: boolean,
+        meta?: { by?: string; at?: string; reason?: string },
+    ): Promise<boolean>;
     getAppDownloads(ownerGaii: string, filename: string): Promise<number>;
     incrementAppDownloads(ownerGaii: string, filename: string): Promise<void>;
     /**

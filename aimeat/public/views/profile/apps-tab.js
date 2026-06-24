@@ -2,6 +2,8 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.3.0 — 2026-06-24 — Show a "moderated by operator: hidden" badge + hint (with reason) on My Apps
+ *     when an operator has hidden the app; the owner sees it but cannot lift it.
  *   v1.2.0 — 2026-06-20 — Add Park/Unpark control + Parked badge/hint to My Apps (hide an app
  *     from the public catalogue while keeping it usable by its owner)
  *   v1.1.0 — 2026-03-19 — Add launch button to My Apps list
@@ -137,8 +139,10 @@ export default function AppsTab({ session, showToast, onStats }) {
               <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
               ${a.parked ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('profile.apps.parkedBadge') || 'Parked'}</span>` : ''}
+              ${a.operator_hidden ? html`<span class="badge badge-danger">\u{1F6AB} ${t('profile.apps.operatorHiddenBadge') || 'Moderated by operator: hidden'}</span>` : ''}
             </div>
           </div>
+          ${a.operator_hidden ? html`<div class="text-meta-sm mb-half">${t('profile.apps.operatorHiddenHint') || 'An operator has hidden this app from public view. Only you can still see it. Contact the operator to appeal.'}${a.operator_hide_reason ? ' — ' + escHtml(a.operator_hide_reason) : ''}</div>` : ''}
           ${a.parked ? html`<div class="text-meta-sm mb-half">${t('profile.apps.parkedHint') || 'Only you can see and use this — hidden from the public catalogue.'}</div>` : ''}
           ${a.manifest?.description ? html`<div class="text-meta mb-half">${escHtml(a.manifest.description)}</div>` : ''}
           <div class="card-subtitle">

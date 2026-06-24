@@ -952,6 +952,10 @@ model App {
   data          Bytes
   accessCode    String?
   parked        Boolean  @default(false)
+  operatorHidden     Boolean   @default(false)
+  operatorHiddenBy   String?
+  operatorHiddenAt   DateTime?
+  operatorHideReason String?
   createdAt     DateTime @default(now())
 
   @@unique([ownerGaii, filename, versionNumber])

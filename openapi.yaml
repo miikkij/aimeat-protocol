@@ -2363,6 +2363,8 @@ components:
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }
         parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
+        operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
+        operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
         downloads: { type: integer }
         download_url: { type: string }
@@ -2752,6 +2754,11 @@ components:
       properties:
         purpose:
           type: string
+        enterprise_locked:
+          type: boolean
+          description: >-
+            True when an edition-locked enterprise directive layer is present (a company Secretary on the
+            AIMEAT Enterprise edition). Such rules carry source 'enterprise' + locked:true and are read-only.
         rules:
           type: array
           items:
@@ -2761,7 +2768,10 @@ components:
                 type: string
               source:
                 type: string
-                enum: [system, owner, agent]
+                enum: [system, enterprise, owner, agent]
+              locked:
+                type: boolean
+                description: True for read-only enterprise-layer rules (cannot be edited via PUT).
         memoryAreas:
           type: array
           items:
@@ -5659,11 +5669,13 @@ paths:
   /v1/agents/{name}/tags:
     patch:
       operationId: updateAgentTags
-      summary: Update owner-managed agent tags
+      summary: Update agent classification tags (same-owner)
       description: |
-        Replace the shared-memory tag list for one of the owner's agents. Tags are
-        used by the profile Data Access view and agent instructions to coordinate
-        same-owner shared memory areas under agents.tag.{tag}.*.
+        Replace the tag list for a same-owner agent. Same-owner gated, not owner-role:
+        the owner may tag any of their agents, and an agent may set tags on itself or a
+        same-owner sibling (parity with agent capability self-report). Cross-owner is
+        rejected with 403. Tags drive the profile Data Access view, agent instructions for
+        same-owner shared memory areas under agents.tag.{tag}.*, and tag-based discovery.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -11684,6 +11696,97 @@ paths:
         '413': { description: File too large }
         '429': { description: Per-owner app quota exceeded }
 
+  /v1/admin/apps:
+    get:
+      operationId: listAdminApps
+      summary: List every app for operator moderation
+      description: |
+        Operator-only. Returns the latest version of EVERY app on the node (all owners), including
+        parked and operator-hidden apps, for the admin moderation surface. Each entry carries
+        `operator_hidden` plus the audit fields (`operator_hidden_by`, `operator_hidden_at`,
+        `operator_hide_reason`).
+      tags: [Apps, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: query, name: limit, required: false, schema: { type: integer, default: 500, maximum: 1000 } }
+        - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: Full app listing
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          apps:
+                            type: array
+                            items: { $ref: '#/components/schemas/AppSummary' }
+                          total: { type: integer }
+                          offset: { type: integer }
+                          limit: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/apps/{owner}/{filename}/moderate:
+    post:
+      operationId: moderateApp
+      summary: Hide or restore an app (operator moderation)
+      description: |
+        Operator-only. Hides an app from EVERY public surface (catalogue, gallery, search, and direct
+        download) or restores it. Unlike the owner's `parked` toggle, only an operator can lift this —
+        the owner keeps the app with a "moderated by operator: hidden" badge but cannot unhide it. The
+        flag survives a re-publish so an owner cannot re-upload to escape moderation.
+      tags: [Apps, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hidden]
+              properties:
+                hidden: { type: boolean, description: True to hide, false to restore }
+                reason: { type: string, description: Optional reason shown to the owner (max 500 chars) }
+      responses:
+        '200':
+          description: Moderation state updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          operator_hidden: { type: boolean }
+                          operator_hide_reason: { type: string, nullable: true }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/apps/{filename}:
     patch:
       operationId: updateApp
@@ -15362,6 +15465,87 @@ paths:
         '201': { description: Imported — returns the new organism id + restored workspaces }
         '400': { $ref: '#/components/responses/BadRequest' }
 
+  /v1/organism-templates/export:
+    post:
+      operationId: exportOrganismTemplate
+      summary: Export an organism as a use-case template
+      description: >-
+        Export an organism as a use-case TEMPLATE (Secretary P5 / S-B) — a content-free SKELETON (each
+        workspace's structure/schema/purpose, with all object records + image binaries stripped, so it
+        round-trips safe to publish) plus a top-level `template.json` carrying specialist directives,
+        extension-dependency refs, and scope presets. Creator/admin only. Returns base64 JSON by default
+        (`format: "binary"` streams the raw ZIP). A template is DATA; instantiate it with the route below.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [org_id]
+              properties:
+                org_id: { type: string }
+                title: { type: string }
+                description: { type: string }
+                specialists:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      role: { type: string, enum: [specialist, sdr, prep, finance, recruiter] }
+                      displayName: { type: string }
+                      description: { type: string }
+                      brain: { type: object, properties: { purpose: { type: string }, rules: { type: array, items: { type: object } } } }
+                      requestedScopes: { type: array, items: { type: string }, description: "Extra scopes (beyond the role baseline) the specialist would LIKE; never granted on instantiate, only reported for owner consent." }
+                extensions:
+                  type: array
+                  items: { type: object, properties: { name: { type: string }, version: { type: string }, reason: { type: string } } }
+                scopePresets: { type: object, additionalProperties: { type: array, items: { type: string } } }
+                format: { type: string, enum: [base64, binary] }
+                publish: { type: boolean, description: "Also catalogue the template as a public record so the `templates` DiscoverySource surfaces it via /v1/discover (S-D)." }
+                tags: { type: array, items: { type: string }, description: "Tags for the published catalog entry." }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organism-templates/instantiate:
+    post:
+      operationId: instantiateOrganismTemplate
+      summary: Instantiate a use-case template ZIP
+      description: >-
+        Instantiate a use-case template ZIP (Secretary P5 / S-B): create a NEW organism + its (empty)
+        workspaces from the skeleton, provision the template's specialists (each with its own brain +
+        operating-model policy + scope profile), and CHECK the extension dependencies — reporting any
+        that are not installed (`unmet_extensions`, each carrying a self-heal `build_prompt` that builds +
+        installs the connector over the appdev MCP) without crashing. The owner becomes the new org's
+        creator. Body is the raw ZIP (Content-Type: application/zip) or JSON `{ zip_base64 }`.
+
+
+        Specialists are provisioned CONSERVATIVELY — a template never grants requested extra scopes
+        silently. Each entry in `specialists` carries `scopes` (the granted baseline) and `requested_scopes`
+        (array of `{ scope, description }`) — the extras the owner can consent to afterward via
+        `POST /v1/specialists { approved_scopes }`.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              required: [zip_base64]
+              properties:
+                zip_base64: { type: string, description: The template ZIP, base64-encoded }
+      responses:
+        '201': { description: Instantiated — new organism id, restored workspaces, specialists, and any unmet extension deps }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422': { description: ZIP rejected by safety checks (quarantined) }
+
   /v1/presence/me:
     get:
       operationId: getMyPresence
@@ -17756,6 +17940,10 @@ paths:
       description: |
         Install an extension from its manifest and script bundle.
         Requires operator role.
+        Manifest `config:` fields declared `type: secret` are encrypted at rest (AES-256-GCM,
+        node master key) and decrypted only just before the sandbox runs — never returned in
+        plaintext (read responses show a mask sentinel). Installing a manifest with a secret
+        value while no encryption key is configured returns 503 ENCRYPTION_NOT_CONFIGURED.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -18132,7 +18320,12 @@ paths:
     post:
       operationId: createExtensionInstance
       summary: Create extension instance
-      description: Create a new instance of an extension. Operator auth required.
+      description: >-
+        Create a new instance of an extension (bring-your-own-key per tenant). Operator auth
+        required. Config fields the manifest declares as `type: secret` (in
+        `instances.config_per_instance`) are encrypted at rest with AES-256-GCM (the node master
+        key) and are NEVER returned in plaintext — read responses show a mask sentinel. The
+        decrypted value is provided only to the extension's sandboxed action code at run time.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -23547,14 +23740,136 @@ paths:
   # Agent Directives
   # ============================================================
 
+  /v1/specialists:
+    post:
+      operationId: createSpecialist
+      summary: Provision a specialist agent
+      description: >-
+        Provision a specialist agent (Secretary P5 / S-A) — a reusable agent type alongside the personal
+        and company Secretaries, NOT named "secretary". Server-side provisioned (no device-auth dance) with
+        its own brain (agent directives), its own operating-model policy (the same bands/cost-guard
+        taxonomy as the Secretary), and its own scope profile selected by `role`. Tagged
+        `system:specialist` + `unlisted` + `role:<role>`, so it shows in the owner's Agents tab but never
+        the public catalogue. Idempotent: re-creating an existing specialist returns it (`created:false`).
+        The name may not be `secretary` or start with `secretary-` (reserved for the Secretaries), and a
+        non-specialist agent already at that name returns 409.
+
+
+        Scope-consent (declare → consent → grant): the granted scope profile is conservative
+        (least-privilege) by default. A role may DECLARE extra scopes it would like beyond that baseline;
+        those are granted ONLY with the owner's explicit consent via `approved_scopes`. The response always
+        carries `requestable_extras` (each scope + a plain-language description) so a client can present a
+        consent checklist. Approved scopes are filtered to a subset of the role's requestable extras and can
+        never widen the grant; an `approved_scopes` entry outside the requested set returns 400.
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: "Bare agent name (lowercase, 3–64 chars); not 'secretary'/'secretary-*'." }
+                role: { type: string, enum: [specialist, sdr, prep, finance, recruiter], description: "Selects the scope profile (default 'specialist')." }
+                display_name: { type: string }
+                description: { type: string }
+                brain:
+                  type: object
+                  description: Optional prose brain written to the specialist's directives layer.
+                  properties:
+                    purpose: { type: string }
+                    rules: { type: array, items: { type: object, properties: { id: { type: string }, description: { type: string } } } }
+                policy:
+                  type: object
+                  description: Optional operating-model policy (defaults to the conservative Secretary model).
+                approved_scopes:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Owner-consented EXTRA scopes (beyond the conservative baseline) to grant. Must be a subset
+                    of the role's `requestable_extras`; anything outside returns 400. Omit to provision
+                    conservatively (nothing beyond the baseline is granted).
+      responses:
+        # 201 created / 200 idempotent re-provision. data.specialist carries `scopes` (granted = baseline ∪
+        # approved) and `requestable_extras` (array of { scope, description }) for the consent checklist.
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      operationId: listSpecialists
+      summary: List the owner's specialist agents
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/specialists/{name}:
+    get:
+      operationId: getSpecialist
+      summary: Get one specialist (brain + policy)
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteSpecialist
+      summary: Remove a specialist (agent + directives + config)
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/specialists/{name}/policy:
+    put:
+      operationId: updateSpecialistPolicy
+      summary: Update a specialist's operating-model policy
+      description: >-
+        Update the bands/cost-guard policy (act/draft/ask/off per capability, `stopSpending`,
+        `dailyMorselBudget`). Merged onto the current defaults; locked capabilities (e.g. `discover`)
+        are forced back to their default band.
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stopSpending: { type: boolean }
+                dailyMorselBudget: { type: number, nullable: true }
+                bands: { type: object, additionalProperties: { type: string, enum: [act, draft, ask, off] } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/agents/{name}/directives:
     get:
       operationId: getAgentDirectives
       summary: Get merged agent directives
       description: |
         Returns the merged view of agent directives combining system defaults,
-        owner defaults, and agent-specific overrides. Rules are ordered by
-        source priority: system, owner, agent.
+        an optional edition-locked enterprise layer (company Secretary on the
+        Enterprise edition), owner defaults, and agent-specific overrides. Rules
+        are ordered by source priority: system, enterprise, owner, agent. The
+        enterprise layer is read-only (`locked:true`); `enterprise_locked` flags
+        its presence.
       tags: [Agent Directives]
       security:
         - BearerAuth: []

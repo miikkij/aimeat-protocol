@@ -1,0 +1,83 @@
+{
+  "title": "B2B Sales Hub (FI/SE)",
+  "description": "A ready-made sales organism: an SDR specialist that researches + qualifies Finnish/Swedish B2B leads, a meeting-prep specialist that briefs you before each meeting, and connector dependencies for Finnish/Swedish company data. The connectors surface as unmet (with build prompts) until you build them — bring-your-own-key per tenant.",
+  "tags": ["sales", "b2b", "fi", "se", "crm"],
+  "organism": {
+    "name": "B2B Sales Hub",
+    "type": "project",
+    "join_policy": "invite_only",
+    "visibility": "private"
+  },
+  "workspaces": [
+    {
+      "id": "leads",
+      "name": "Leads",
+      "readme": "# Leads\nQualified B2B leads — company, contact, source, qualification status.",
+      "objectType": { "name": "lead", "namespace": "shared.leads" },
+      "schema": {
+        "type": "object",
+        "required": ["id", "company"],
+        "properties": {
+          "id": { "type": "string" },
+          "company": { "type": "string" },
+          "country": { "type": "string", "enum": ["FI", "SE"] },
+          "contact": { "type": "string" },
+          "status": { "type": "string", "enum": ["new", "qualifying", "qualified", "dropped"] },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    {
+      "id": "meetings",
+      "name": "Meetings",
+      "readme": "# Meetings\nUpcoming meetings + the prep brief the meeting-prep specialist drafts for each.",
+      "objectType": { "name": "meeting", "namespace": "shared.meetings" },
+      "schema": {
+        "type": "object",
+        "required": ["id", "company"],
+        "properties": {
+          "id": { "type": "string" },
+          "company": { "type": "string" },
+          "when": { "type": "string" },
+          "brief": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "specialists": [
+    {
+      "name": "sdr",
+      "role": "sdr",
+      "displayName": "SDR",
+      "description": "Sales development rep — researches and qualifies B2B leads.",
+      "brain": {
+        "purpose": "Research and qualify Finnish/Swedish B2B leads, and draft outreach for the user to review.",
+        "rules": [
+          { "id": "scout-first", "description": "Scout existing resources (the Leads workspace, the company connectors, discovery) before building anything new." },
+          { "id": "qualify", "description": "For each new lead, fill company + country + a qualification status; never invent contact details." },
+          { "id": "draft-only", "description": "Draft outreach messages for the user to review and send — never send on your own (outbound is owner-approved)." }
+        ]
+      }
+    },
+    {
+      "name": "meeting-prep",
+      "role": "prep",
+      "displayName": "Meeting Prep",
+      "description": "Briefs the user before each meeting from the Leads + Meetings workspaces.",
+      "brain": {
+        "purpose": "Before each meeting, assemble a concise brief: who the company is, the lead's status, and recent context.",
+        "rules": [
+          { "id": "use-workspaces", "description": "Build the brief from the Leads + Meetings workspaces and the company connectors; cite where each fact came from." },
+          { "id": "concise", "description": "Keep the brief to the essentials the user needs in the room — not a data dump." }
+        ]
+      }
+    }
+  ],
+  "extensions": [
+    { "name": "vainu-connector", "reason": "Finnish/Nordic company data (firmographics, signals) for lead research." },
+    { "name": "alma-connector", "reason": "Alma Talent company + financials data for qualification." }
+  ],
+  "scopePresets": {
+    "sdr": ["social:read"]
+  }
+}

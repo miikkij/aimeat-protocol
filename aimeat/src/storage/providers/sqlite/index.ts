@@ -4249,12 +4249,15 @@ export class SqliteStorage implements Storage {
 
   async createApp(record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
-      record.accessCode ?? null, record.parked ? 1 : 0, record.createdAt,
+      record.accessCode ?? null, record.parked ? 1 : 0,
+      record.operatorHidden ? 1 : 0, record.operatorHiddenBy ?? null,
+      record.operatorHiddenAt ?? null, record.operatorHideReason ?? null,
+      record.createdAt,
     );
     return record;
   }
@@ -4311,15 +4314,20 @@ export class SqliteStorage implements Storage {
     if (opts?.freeOnly) {
       conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
     }
-    // Parked apps are hidden from everyone EXCEPT their owner (viewerGhii). An
-    // explicit ownerGaii filter already scopes to one owner, so skip the clause
-    // there (the owner's "my apps" view must include their own parked apps).
-    if (!opts?.ownerGaii) {
+    // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner
+    // (viewerGhii). An explicit ownerGaii filter already scopes to one owner, so
+    // skip the clause there (the owner's "my apps" view must include their own
+    // parked/hidden apps). The operator moderation view passes adminView to see
+    // EVERYTHING regardless of either flag.
+    if (!opts?.ownerGaii && !opts?.adminView) {
       if (opts?.viewerGhii) {
         conditions.push(`(a.parked = 0 OR a.ownerGaii = ?)`);
         params.push(opts.viewerGhii);
+        conditions.push(`(a.operatorHidden = 0 OR a.ownerGaii = ?)`);
+        params.push(opts.viewerGhii);
       } else {
         conditions.push(`a.parked = 0`);
+        conditions.push(`a.operatorHidden = 0`);
       }
     }
 
@@ -4387,6 +4395,27 @@ export class SqliteStorage implements Storage {
     // Park/unpark applies to the whole app — flag every version row.
     const result = this.db.prepare('UPDATE apps SET parked = ? WHERE ownerGaii = ? AND filename = ?')
       .run(parked ? 1 : 0, ownerGaii, filename);
+    return result.changes > 0;
+  }
+
+  async setAppOperatorHidden(
+    ownerGaii: string,
+    filename: string,
+    hidden: boolean,
+    meta?: { by?: string; at?: string; reason?: string },
+  ): Promise<boolean> {
+    // Operator moderation applies to the whole app — flag every version row.
+    // On un-hide, clear the audit fields so a stale "hidden by" never lingers.
+    const result = this.db.prepare(
+      'UPDATE apps SET operatorHidden = ?, operatorHiddenBy = ?, operatorHiddenAt = ?, operatorHideReason = ? WHERE ownerGaii = ? AND filename = ?'
+    ).run(
+      hidden ? 1 : 0,
+      hidden ? (meta?.by ?? null) : null,
+      hidden ? (meta?.at ?? null) : null,
+      hidden ? (meta?.reason ?? null) : null,
+      ownerGaii,
+      filename,
+    );
     return result.changes > 0;
   }
 
@@ -4641,6 +4670,12 @@ export class SqliteStorage implements Storage {
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.parked) record.parked = true;
+    if (row.operatorHidden) {
+      record.operatorHidden = true;
+      if (row.operatorHiddenBy) record.operatorHiddenBy = row.operatorHiddenBy as string;
+      if (row.operatorHiddenAt) record.operatorHiddenAt = row.operatorHiddenAt as string;
+      if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
+    }
     return record;
   }
 

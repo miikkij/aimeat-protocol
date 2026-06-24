@@ -29,6 +29,7 @@ export type DiscoveryType =
   | 'document'
   | 'organism'
   | 'app'
+  | 'template'
   | 'memory';
 
 /** Canonical visibility ladder; every domain's native enum collapses into this (design §5). */

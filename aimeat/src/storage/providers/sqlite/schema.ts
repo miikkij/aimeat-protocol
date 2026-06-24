@@ -816,6 +816,10 @@ export function initializeSchema(db: Database.Database): void {
       data           BLOB,
       accessCode     TEXT,
       parked         INTEGER NOT NULL DEFAULT 0,
+      operatorHidden INTEGER NOT NULL DEFAULT 0,
+      operatorHiddenBy   TEXT,
+      operatorHiddenAt   TEXT,
+      operatorHideReason TEXT,
       createdAt      TEXT NOT NULL,
       PRIMARY KEY (ownerGaii, filename, versionNumber)
     );
@@ -1760,6 +1764,10 @@ export function initializeSchema(db: Database.Database): void {
   // Parked-app state: hides an app from the public catalogue/gallery/search while it
   // stays usable by its owner. Additive/nullable-default; pre-existing apps are published (0).
   safeAddColumn('apps', 'parked', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('apps', 'operatorHidden', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('apps', 'operatorHiddenBy', 'TEXT');
+  safeAddColumn('apps', 'operatorHiddenAt', 'TEXT');
+  safeAddColumn('apps', 'operatorHideReason', 'TEXT');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
