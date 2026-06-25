@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-24 — initial: hide removes from public + download, owner still
  *     sees/downloads, non-op 403, re-publish keeps hidden, restore re-exposes.
+ *   v1.1.0 — 2026-06-25 — add Phase 5 operator hard delete: non-op 403, operator
+ *     200, app gone from admin+public+download, delete-missing 404.
  */
 
 import * as ed from '@noble/ed25519';
@@ -234,6 +236,36 @@ await test('App is visible again in the anonymous catalogue, reason cleared', as
 await test('Anonymous direct download works again', async () => {
     const res = await fetch(`${BASE}/v1/apps/${victimName}/${FILENAME}`);
     assert(res.status === 200, `expected 200, got ${res.status}`);
+});
+
+console.log('\nPhase 5: Operator hard delete');
+
+await test('Non-operator cannot hard-delete (403)', async () => {
+    const { status } = await json(`/v1/admin/apps/${victimName}/${FILENAME}`, victimAuthed({ method: 'DELETE' }));
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('Operator hard-deletes the app (200)', async () => {
+    const { status, body } = await json(`/v1/admin/apps/${victimName}/${FILENAME}`, opAuthed({ method: 'DELETE' }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.deleted === true, 'response says deleted');
+});
+
+await test('Deleted app is gone everywhere', async () => {
+    // Admin listing (operator sees everything) no longer has it.
+    const { body: adminBody } = await json('/v1/admin/apps', opAuthed());
+    assert(!(adminBody.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName), 'absent from admin listing');
+    // Public catalogue no longer has it.
+    const { body: anon } = await json('/v1/apps?limit=200');
+    assert(!(anon.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName), 'absent from public catalogue');
+    // Direct download 404s.
+    const res = await fetch(`${BASE}/v1/apps/${victimName}/${FILENAME}`);
+    assert(res.status === 404, `expected 404 after delete, got ${res.status}`);
+});
+
+await test('Deleting a non-existent app → 404', async () => {
+    const { status } = await json(`/v1/admin/apps/${victimName}/does-not-exist.html`, opAuthed({ method: 'DELETE' }));
+    assert(status === 404, `expected 404, got ${status}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

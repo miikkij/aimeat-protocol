@@ -82,6 +82,8 @@ export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gai
 export const getAdminApps    = ()       => apiGet('/v1/admin/apps');
 export const moderateApp     = (owner, filename, hidden, reason) =>
   apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/moderate`, { hidden, reason });
+export const deleteAppAdmin  = (owner, filename) =>
+  apiDelete(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`);
 
 // ── Chat Instances ──
 export const getChatInstances = ()      => apiGet('/v1/chat-instances');

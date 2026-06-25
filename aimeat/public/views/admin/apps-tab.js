@@ -6,10 +6,13 @@
  *   from every public surface (catalogue/gallery/search + direct download); the
  *   owner still sees it in their "My Apps" with a "moderated by operator: hidden"
  *   badge but cannot lift it — only an operator can.
- * @structure AppsAdminTab (default) — load all apps, filter, table, hide-reason modal.
+ * @structure AppsAdminTab (default) — load all apps, filter, table, hide-reason +
+ *   type-to-confirm delete modals.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
  *   v1.0.0 — 2026-06-24 — Initial: list-all + hide/restore moderation tool.
+ *   v1.1.0 — 2026-06-25 — Add operator hard-delete (type-to-confirm) — removes an
+ *     app permanently from the node.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
@@ -28,6 +31,8 @@ export default function AppsAdminTab() {
   const [hiddenOnly, setHiddenOnly] = useState(false);
   // { owner, filename, name, reason } while the hide-reason modal is open
   const [hiding, setHiding] = useState(null);
+  // { owner, filename, name, typed } while the type-to-confirm delete modal is open
+  const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, showError, showSuccess, clearMsg] = useToast();
 
@@ -89,6 +94,21 @@ export default function AppsAdminTab() {
     }
   }, [load, showSuccess, showError]);
 
+  const doDelete = useCallback(async () => {
+    if (!deleting || deleting.typed !== deleting.filename) return;
+    setBusy(true);
+    try {
+      await adminService.deleteAppAdmin(deleting.owner, deleting.filename);
+      showSuccess(t('admin.apps.deletedOk'));
+      setDeleting(null);
+      await load();
+    } catch (err) {
+      showError(err?.message || String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [deleting, load, showSuccess, showError]);
+
   return html`
     ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
     <p class="adm-text-sm adm-text-dim adm-mb-md">${t('admin.apps.desc')}</p>
@@ -140,9 +160,12 @@ export default function AppsAdminTab() {
                         : html`<span class="badge badge-success">${t('admin.apps.statusLive')}</span>`}
                   </td>
                   <td>
-                    ${a.operator_hidden
-                      ? html`<button class="adm-btn-sm adm-btn-success" onClick=${() => doRestore(a)}>${t('admin.apps.restore')}</button>`
-                      : html`<button class="adm-btn-sm adm-btn-danger" onClick=${() => setHiding({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, reason: '' })}>${t('admin.apps.hide')}</button>`}
+                    <div class="adm-flex adm-apps-rowactions">
+                      ${a.operator_hidden
+                        ? html`<button class="adm-btn-sm adm-btn-success" onClick=${() => doRestore(a)}>${t('admin.apps.restore')}</button>`
+                        : html`<button class="adm-btn-sm adm-btn-danger" onClick=${() => setHiding({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, reason: '' })}>${t('admin.apps.hide')}</button>`}
+                      <button class="adm-btn-sm adm-btn-danger-solid" onClick=${() => setDeleting({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, typed: '' })}>${t('admin.apps.delete')}</button>
+                    </div>
                   </td>
                 </tr>
               `)}
@@ -163,6 +186,21 @@ export default function AppsAdminTab() {
         <div class="adm-flex adm-mt-md adm-apps-modal-actions">
           <button class="btn-ghost" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
           <button class="btn-danger-solid" disabled=${busy} onClick=${doHide}>${t('admin.apps.hide')}</button>
+        </div>
+      `}
+    <//>
+
+    <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${t('admin.apps.deleteTitle')}>
+      ${deleting && html`
+        <p>${t('admin.apps.deleteConfirm')} <strong>${escHtml(deleting.name)}</strong> (<span class="mono">${escHtml(deleting.owner)}</span>)?</p>
+        <p class="adm-text-sm adm-text-error">${t('admin.apps.deleteWarn')}</p>
+        <label class="adm-text-sm adm-mb-half">${t('admin.apps.deleteTypeLabel', { filename: deleting.filename })}</label>
+        <input class="adm-input adm-input-full mono" value=${deleting.typed}
+          placeholder=${deleting.filename}
+          onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
+        <div class="adm-flex adm-mt-md adm-apps-modal-actions">
+          <button class="btn-ghost" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          <button class="btn-danger-solid" disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${t('admin.apps.delete')}</button>
         </div>
       `}
     <//>

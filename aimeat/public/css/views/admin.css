@@ -4,6 +4,7 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.8.0 — 2026-06-25 — Applications tab: .adm-apps-rowactions (Hide/Restore + Delete row).
  *   v1.7.0 — 2026-06-24 — Applications moderation tab: .adm-apps-* (filters row,
  *     hidden-only toggle, dimmed hidden rows, modal actions).
  *   v1.6.0 — 2026-06-12 — Subdomains tab: .adm-subdomain-form create-form grid
@@ -596,6 +597,7 @@
 .adm-apps-toggle { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .adm-apps-row-hidden { opacity: 0.6; }
 .adm-apps-modal-actions { justify-content: flex-end; }
+.adm-apps-rowactions { gap: 6px; flex-wrap: wrap; }
 
 /* Active subtab button */
 .adm-btn-active,

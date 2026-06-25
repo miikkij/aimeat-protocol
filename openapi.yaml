@@ -11787,6 +11787,44 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/admin/apps/{owner}/{filename}:
+    delete:
+      operationId: deleteAppAdmin
+      summary: Permanently delete an app (operator hard delete)
+      description: |
+        Operator-only. Removes the app entirely from the node — every version row across every bucket
+        for that owner+filename, the download counter, and the screenshot. Targets ANY owner. This is
+        irreversible; the moderation hide (POST .../moderate) is the soft, reversible alternative.
+      tags: [Apps, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: App deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          deleted: { type: boolean }
+                          note: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/apps/{filename}:
     patch:
       operationId: updateApp
