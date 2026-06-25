@@ -7,6 +7,9 @@
  * @usage cd aimeat && E2E_BASE=http://localhost:40250 npx tsx test/e2e-oauth-login.ts
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial guard suite.
+ *   v1.1.0 — 2026-06-25 — Guard the first-time-username-choice endpoints: /login/pending 404s
+ *     without the signed cookie, finalize 400s without a pending, and /username-available works
+ *     (valid/available, taken, invalid) — these are usable even without Google configured.
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40250';
@@ -42,6 +45,35 @@ await test('GET /v1/ghii/login/google returns 503 when Google sign-in is not con
 await test('GET /v1/ghii/login/google/callback returns 503 when Google sign-in is not configured', async () => {
   const res = await fetch(`${BASE}/v1/ghii/login/google/callback?code=x&state=y`, { redirect: 'manual' });
   assert(res.status === 503, `expected 503, got ${res.status}`);
+});
+
+await test('GET /v1/ghii/login/pending returns 404 NO_PENDING_SIGNUP without the signed cookie', async () => {
+  const res = await fetch(`${BASE}/v1/ghii/login/pending`, { redirect: 'manual' });
+  assert(res.status === 404, `expected 404, got ${res.status}`);
+  const data = await res.json() as { error?: { code?: string } };
+  assert(data.error?.code === 'NO_PENDING_SIGNUP', `expected NO_PENDING_SIGNUP, got ${data.error?.code}`);
+});
+
+await test('POST /v1/ghii/login/google/finalize returns 400 NO_PENDING_SIGNUP without a pending', async () => {
+  const res = await fetch(`${BASE}/v1/ghii/login/google/finalize`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'whoever' }), redirect: 'manual',
+  });
+  assert(res.status === 400, `expected 400, got ${res.status}`);
+  const data = await res.json() as { error?: { code?: string } };
+  assert(data.error?.code === 'NO_PENDING_SIGNUP', `expected NO_PENDING_SIGNUP, got ${data.error?.code}`);
+});
+
+await test('GET /v1/ghii/username-available reports valid/available, taken, and invalid', async () => {
+  // A random, almost-certainly-free name → valid + available.
+  const freeName = `e2e-free-${Date.now().toString(36)}`;
+  const free = await fetch(`${BASE}/v1/ghii/username-available?name=${encodeURIComponent(freeName)}`);
+  const freeData = (await free.json() as { data?: { valid?: boolean; available?: boolean } }).data;
+  assert(freeData?.valid === true && freeData?.available === true, `expected valid+available, got ${JSON.stringify(freeData)}`);
+
+  // Too short → invalid (format rules).
+  const bad = await fetch(`${BASE}/v1/ghii/username-available?name=ab`);
+  const badData = (await bad.json() as { data?: { valid?: boolean } }).data;
+  assert(badData?.valid === false, `expected invalid, got ${JSON.stringify(badData)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

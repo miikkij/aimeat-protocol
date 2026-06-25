@@ -4,6 +4,12 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.20.0 - 2026-06-25 - aimeat-auth.js: one-time username choice for first-time Google users. A
+ *   brand-new Google account is no longer auto-created from the email local-part; the callback bounces
+ *   back with ?aimeat_signup=1 and showGoogleSignupModal() prompts for a username (suggested, editable,
+ *   live-validated) with a permanence warning, then POSTs /v1/ghii/login/google/finalize. New modal
+ *   i18n keys: signupTitle/Intro/EmailNote/UsernameLabel/SuggestedHint/PermanentWarning/Available/
+ *   Taken/Invalid/CreateBtn/Creating/CancelBtn.
  * v1.19.0 - 2026-06-20 - aimeat-auth.js seamless SSO on app origins (H-2): when the SDK runs on a
  *   *.apps.<domain> host (where the host-only cookie is unreachable), AIMEAT.auth.login() + refresh()
  *   pull a scoped grant token via the same-site silent bridge (hidden iframe → apex), so an app like
@@ -1702,6 +1708,163 @@ function showLoginModal(opts, renderBtn) {
   });
 
   } // end wireModal
+}
+
+// ── One-time username choice after a first Google sign-in ──
+// A brand-new Google user is NOT auto-created server-side. The callback bounced them back here
+// with ?aimeat_signup=1 plus a short-lived signed cookie holding their verified Google identity.
+// This modal shows the suggested username (derived from their Google account), lets them change
+// it, warns that it is PERMANENT, then POSTs to finalize — which creates the account + session.
+var USERNAME_RE = new RegExp('^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$');
+
+function fillTemplate(str, vars) {
+  return String(str || '').replace(/\\{(\\w+)\\}/g, function (_, k) { return vars[k] != null ? vars[k] : ''; });
+}
+
+// Drop ?aimeat_signup=1 from the address bar so a reload doesn't re-open the modal.
+function cleanSignupParam() {
+  try {
+    var url = new URL(location.href);
+    if (!url.searchParams.has('aimeat_signup')) return;
+    url.searchParams.delete('aimeat_signup');
+    history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+  } catch (e) {}
+}
+
+function showGoogleSignupModal(pending, i) {
+  i = i || {};
+  var old = document.getElementById('aimeat-modal');
+  if (old) old.remove();
+  var modal = document.createElement('div');
+  modal.id = 'aimeat-modal';
+  document.body.appendChild(modal);
+
+  var emailNote = pending.email
+    ? '<p style="margin:0 0 14px;font-size:13px;color:#6B7280">' + escHtml(fillTemplate(i.signupEmailNote || 'Signing up as {email}', { email: pending.email })) + '</p>'
+    : '';
+
+  modal.innerHTML = '<style>'
+    + '.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}'
+    + '.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}'
+    + '.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}'
+    + '.aimeat-go:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}'
+    + '.aimeat-label{display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}'
+    + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
+    + '.aimeat-cancel:hover{background:#F3F4F6}'
+    + '</style>'
+    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
+    + '<div style="padding:28px 32px 24px">'
+    + '<h2 style="margin:0 0 8px;font-size:21px;font-weight:800;color:#1A1A2E">' + escHtml(i.signupTitle || 'Choose your username') + '</h2>'
+    + '<p style="margin:0 0 6px;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(i.signupIntro || "You're signing in with Google for the first time. Pick the username for your AIMEAT account.") + '</p>'
+    + emailNote
+    + '<label class="aimeat-label" for="aimeat-su-name">' + escHtml(i.signupUsernameLabel || 'Username') + '</label>'
+    + '<input id="aimeat-su-name" class="aimeat-inp" autocomplete="off" autocapitalize="none" spellcheck="false" value="' + escHtml(pending.suggested || '') + '">'
+    + '<p id="aimeat-su-status" style="margin:6px 0 0;font-size:13px;min-height:18px"></p>'
+    + '<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupSuggestedHint || 'We suggested one from your Google account — change it to anything you like.') + '</p>'
+    + '<div style="margin:16px 0 0;padding:12px 14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;font-size:13px;color:#9A3412;line-height:1.5">' + escHtml(i.signupPermanentWarning || 'This username is permanent. It identifies you across AIMEAT and cannot be changed later — the only way to change it is to delete your account and create a new one.') + '</div>'
+    + '<div style="display:flex;gap:10px;margin-top:20px">'
+    + '<button id="aimeat-su-create" class="aimeat-go">' + escHtml(i.signupCreateBtn || 'Create my account') + '</button>'
+    + '<button id="aimeat-su-cancel" class="aimeat-cancel">' + escHtml(i.signupCancelBtn || 'Cancel') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-su-err" style="margin:10px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '</div></div></div>';
+
+  var input = document.getElementById('aimeat-su-name');
+  var statusEl = document.getElementById('aimeat-su-status');
+  var createBtn = document.getElementById('aimeat-su-create');
+  var cancelBtn = document.getElementById('aimeat-su-cancel');
+  var errEl = document.getElementById('aimeat-su-err');
+  var checkTimer = null;
+  var lastChecked = '';
+
+  function setStatus(text, color) {
+    statusEl.textContent = text || '';
+    statusEl.style.color = color || '#6B7280';
+  }
+
+  // Validate format locally, then confirm availability against the node (debounced).
+  function evaluate() {
+    errEl.style.display = 'none';
+    var name = (input.value || '').trim().toLowerCase();
+    if (!USERNAME_RE.test(name)) {
+      createBtn.disabled = true;
+      setStatus(i.signupInvalid || 'Username must be 3–64 characters: lowercase letters, numbers and hyphens.', '#ef4444');
+      return;
+    }
+    createBtn.disabled = true; // until availability confirms
+    setStatus('…', '#9CA3AF');
+    if (checkTimer) clearTimeout(checkTimer);
+    checkTimer = setTimeout(function () {
+      lastChecked = name;
+      api('/v1/ghii/username-available?name=' + encodeURIComponent(name))
+        .then(function (res) {
+          var d = res && res.data;
+          if (!d || (input.value || '').trim().toLowerCase() !== lastChecked) return; // stale
+          if (d.valid && d.available) { createBtn.disabled = false; setStatus(i.signupAvailable || '✓ Available', '#16a34a'); }
+          else if (!d.valid) { createBtn.disabled = true; setStatus(i.signupInvalid || d.reason || 'Invalid username', '#ef4444'); }
+          else { createBtn.disabled = true; setStatus(i.signupTaken || 'That username is already taken — pick another.', '#ef4444'); }
+        })
+        .catch(function () { /* network blip — allow submit; finalize re-validates */ createBtn.disabled = false; setStatus('', '#6B7280'); });
+    }, 350);
+  }
+
+  input.addEventListener('input', evaluate);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !createBtn.disabled) { e.preventDefault(); createBtn.click(); } });
+
+  function close() { if (checkTimer) clearTimeout(checkTimer); modal.remove(); cleanSignupParam(); }
+  cancelBtn.addEventListener('click', close);
+
+  createBtn.addEventListener('click', async function () {
+    var name = (input.value || '').trim().toLowerCase();
+    if (!USERNAME_RE.test(name)) { evaluate(); return; }
+    createBtn.disabled = true;
+    createBtn.textContent = i.signupCreating || 'Creating account...';
+    errEl.style.display = 'none';
+    try {
+      var res = await api('/v1/ghii/login/google/finalize', {
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ username: name }),
+      });
+      cleanSignupParam();
+      var redirect = (res && res.data && res.data.redirect) || pending.redirect || '/';
+      // Full navigation to the post-login target — the page boots logged-in from the new
+      // refresh cookie (same as the returning-user Google path).
+      location.href = NODE_URL + redirect;
+    } catch (e) {
+      var msg = e && e.message ? e.message : 'Could not create account';
+      if (msg.indexOf('already registered') >= 0 || msg.indexOf('NAME_TAKEN') >= 0) msg = i.signupTaken || msg;
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      createBtn.textContent = i.signupCreateBtn || 'Create my account';
+      evaluate();
+    }
+  });
+
+  // Confirm the pre-filled suggestion's availability on open.
+  evaluate();
+}
+
+// On load, if the Google callback flagged a pending sign-up, fetch it and prompt. Best-effort:
+// if the signed cookie is missing/expired the pending fetch 404s and we simply do nothing.
+function maybeShowGoogleSignup() {
+  var params;
+  try { params = new URLSearchParams(location.search); } catch (e) { return; }
+  if (params.get('aimeat_signup') !== '1') return;
+  api('/v1/ghii/login/pending', { credentials: 'include' })
+    .then(function (res) {
+      var pending = res && res.data;
+      if (!pending) { cleanSignupParam(); return; }
+      loadModalI18n(currentModalLang())
+        .then(function (i) { showGoogleSignupModal(pending, i || {}); })
+        .catch(function () { showGoogleSignupModal(pending, {}); });
+    })
+    .catch(function () { cleanSignupParam(); });
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowGoogleSignup);
+  else maybeShowGoogleSignup();
 }
 
 // ── Refresh on focus / visibility ──
