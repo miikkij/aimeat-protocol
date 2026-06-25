@@ -7849,7 +7849,13 @@
       "hideConfirm": "Piilota",
       "hideExplain": "Tämä poistaa sovelluksen julkisesta katalogista, galleriasta, hausta ja suorasta latauksesta. Omistaja säilyttää kopion merkinnällä \"moderoitu operaattorin toimesta: piilotettu\", mutta ei voi poistaa piilotusta.",
       "reasonLabel": "Syy (näytetään omistajalle, valinnainen)",
-      "reasonPlaceholder": "esim. Anonyymi / käytäntörikkomus"
+      "reasonPlaceholder": "esim. Anonyymi / käytäntörikkomus",
+      "delete": "Poista",
+      "deletedOk": "Sovellus poistettu pysyvästi.",
+      "deleteTitle": "Poista sovellus",
+      "deleteConfirm": "Poista pysyvästi",
+      "deleteWarn": "⚠️ Tämä poistaa sovelluksen ja kaikki sen versiot kokonaan solmusta. Tätä ei voi perua — myös omistaja menettää sen. Jos haluat vain piilottaa, käytä Piilota-toimintoa.",
+      "deleteTypeLabel": "Vahvista kirjoittamalla tiedostonimi: {filename}"
     },
     "security": {
       "title": "Tietoturva",

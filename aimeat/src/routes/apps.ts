@@ -61,6 +61,9 @@
  *     everyone but the owner (who gets a "moderated by operator: hidden" badge and cannot lift it)
  *     and 404 on direct download for non-owner/non-operator; the flag survives a re-publish so an
  *     owner cannot re-upload to escape moderation. Responses carry operator_hidden + reason.
+ *   v1.13.0 -- 2026-06-25 -- Operator hard delete: DELETE /v1/admin/apps/:owner/:filename (operator)
+ *     permanently removes an app (every version + screenshot, any owner) from the node — the
+ *     irreversible counterpart to the moderation hide.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -287,6 +290,50 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             note: body.hidden
                 ? 'App hidden by operator. It is removed from every public surface; the owner sees a "moderated by operator: hidden" badge but cannot unhide it.'
                 : 'App restored. It is visible in the public catalogue again.',
+        }));
+    });
+
+    // DELETE /v1/admin/apps/:owner/:filename — operator-only HARD delete. Removes
+    // the app entirely from the node (every version row across every bucket for
+    // that owner+filename, the download counter, and the screenshot). Unlike the
+    // owner DELETE this targets ANY owner. Irreversible — the moderation hide is
+    // the soft alternative.
+    router.delete('/v1/admin/apps/:owner/:filename', requireAuth(), requireRole('operator'), async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        // Sweep every bucket holding this owner+filename (handles legacy shadow
+        // buckets), deleting all versions + the screenshot each time.
+        let sweepCount = 0;
+        for (;;) {
+            const app = await storage.getAppByOwnerName(owner, filename);
+            if (!app || app.ownerName !== owner) break;
+            await storage.deleteApp(app.ownerGaii, filename);
+            await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(() => {});
+            sweepCount++;
+            if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
+        }
+        if (sweepCount === 0) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        const { owner: operatorName } = await canonicalOwner(req);
+        await storage.addSiteChangeLog({
+            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            action: 'app_delete',
+            summary: `Operator ${operatorName} deleted app "${filename}" owned by "${owner}" (all versions)`,
+            changedBy: operatorName,
+            changedAt: new Date().toISOString(),
+        });
+
+        emitChange('apps');
+        res.json(success(config.nodeId, {
+            owner,
+            filename,
+            deleted: true,
+            note: 'App permanently deleted from the node (all versions + screenshot).',
         }));
     });
 

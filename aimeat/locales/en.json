@@ -7849,7 +7849,13 @@
       "hideConfirm": "Hide",
       "hideExplain": "This removes the app from the public catalogue, gallery, search, and direct download. The owner keeps a copy with a \"moderated by operator: hidden\" badge but cannot unhide it.",
       "reasonLabel": "Reason (shown to the owner, optional)",
-      "reasonPlaceholder": "e.g. Anonymous / policy violation"
+      "reasonPlaceholder": "e.g. Anonymous / policy violation",
+      "delete": "Delete",
+      "deletedOk": "App permanently deleted.",
+      "deleteTitle": "Delete application",
+      "deleteConfirm": "Permanently delete",
+      "deleteWarn": "⚠️ This removes the app and all its versions from the node entirely. This cannot be undone — the owner loses it too. To just hide it, use Hide instead.",
+      "deleteTypeLabel": "Type the filename to confirm: {filename}"
     },
     "security": {
       "title": "Security",
