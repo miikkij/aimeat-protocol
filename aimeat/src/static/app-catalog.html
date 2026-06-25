@@ -262,26 +262,9 @@
       font-size: 1.4rem;
     }
 
-    /* Sign-in control: wider than the square icon buttons because it carries a label. */
-    .auth-btn {
-      width: auto;
-      gap: 6px;
-      padding: 0 12px;
-      font-size: .9rem;
-      font-weight: 600;
-      max-width: 200px;
-    }
-    .auth-btn #auth-btn-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    /* Signed-out state stands out so anonymous users notice they must sign in to publish. */
-    .auth-btn.signed-out {
-      background: #E8564A;
-      border-color: transparent;
-      color: #fff;
-    }
+    /* Mount point for the shared golden login pill (/v1/libs/aimeat-auth.js).
+       The pill carries its own inline styles; this just keeps it inline in the bar. */
+    .header-auth-pill { display: inline-flex; align-items: center; }
 
     #add-btn:hover {
       box-shadow: 0 4px 20px rgba(232, 86, 74, .25);
@@ -334,13 +317,38 @@
       font-weight: 600;
     }
 
+    /* ── Local Apps block ───────────────────────────────
+       A distinct indigo-tinted panel so browser-local apps are visually set apart
+       from the server-backed Published / Community sections above. */
+    .local-apps-block {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      margin: 8px 24px 0;
+      padding: 14px 18px 18px;
+      background: rgba(99, 102, 241, .05);
+      border: 1px dashed rgba(99, 102, 241, .30);
+      border-radius: 14px;
+    }
+    .local-apps-block #local-apps-header { margin: 0 0 6px; }
+    .local-apps-note {
+      margin: 4px 0 0;
+      font-size: .78rem;
+      color: var(--text-muted);
+    }
+    .local-apps-hint {
+      margin: 6px 0 0;
+      font-size: .78rem;
+      color: var(--text-dim);
+    }
+
     /* ── App Grid ───────────────────────────────────── */
 
     #app-grid {
       position: relative;
       z-index: 1;
       flex: 1;
-      padding: 8px 24px 24px;
+      padding: 8px 0 6px;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 16px;
@@ -1394,6 +1402,7 @@
     /* ── Published Apps Section ──────────────────────── */
 
     #published-section,
+    #parked-section,
     #community-section {
       margin: 0 24px 24px;
       position: relative;
@@ -1466,11 +1475,73 @@
       flex-wrap: wrap;
     }
 
-    .published-card-actions {
+    /* "About" line right after the title — the app's description, clamped to 2
+       lines so every card's top block is the same shape. */
+    .published-card-desc {
+      font-size: .75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Operator-moderation note sits just under the title (off the title line). */
+    .published-card-modnote { margin: -2px 0 2px; }
+
+    /* Secondary meta (owner/filename + date) lives in the footer, single line. */
+    .published-card-metaline {
+      font-size: .7rem;
+      color: var(--text-dim);
       display: flex;
-      flex-wrap: wrap;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .published-card-metaline .pcm-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .published-card-metaline .pcm-date { flex: 0 0 auto; white-space: nowrap; }
+
+    /* Footer groups secondary meta + the subdomain chip + the action grid and
+       pins them to the card bottom, so they line up across cards (chip optional). */
+    .published-card-footer {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 6px;
+    }
+    .published-card-footer .subdomain-chip-row { display: flex; }
+
+    /* Very-bottom row: source badge pinned bottom-left, version bottom-right —
+       keeping the title line clean (title only). */
+    .published-card-badgerow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 18px;
+    }
+    .published-card-badgerow .pcb-version {
+      margin-left: auto;
+      font-size: .72rem;
+      color: var(--text-dim);
+      flex: 0 0 auto;
+    }
+
+    /* Even 2-up button grid, pushed to the card bottom (margin-top:auto) so the
+       action block lines up across cards regardless of how many buttons / chips
+       a card has — no more ragged wrapping. */
+    .published-card-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 6px;
-      margin-top: 4px;
+      margin-top: auto;
+      padding-top: 6px;
     }
 
     .published-card-actions button {
@@ -1482,6 +1553,11 @@
       font-size: .72rem;
       font-family: inherit;
       cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
       transition: background var(--transition), border-color var(--transition);
     }
 
@@ -1590,7 +1666,7 @@
     }
 
     .parked-blurb {
-      margin: 0 24px 10px;
+      margin: 0 0 10px;
       font-size: .82rem;
       color: var(--text-muted);
       opacity: .85;
@@ -1701,7 +1777,7 @@
     </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
-      <button class="icon-btn auth-btn" id="auth-btn" onclick="window._launcher.handleAuthClick()" data-i18n-title="auth.signIn" title="Sign in">&#x1F511; <span id="auth-btn-label" data-i18n="auth.signIn">Sign in</span></button>
+      <span id="headerAuth" class="header-auth-pill"></span>
       <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
       <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
       <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
@@ -1808,10 +1884,14 @@
     <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
-  <div id="local-apps-header" style="display:none;margin:0 24px 8px">
-    <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4BE; Local Apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
+  <div id="local-apps-block" class="local-apps-block">
+    <div id="local-apps-header" style="display:none">
+      <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4BE; Local Apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
+      <p class="local-apps-note" data-i18n="sec.localNote">(these apps live in your browser, not on the server — they won't show up on another browser or device)</p>
+      <p class="local-apps-hint" data-i18n="sec.localHint">&#x1F4A1; Publish an app from here to put it on the server — then you can manage it from anywhere.</p>
+    </div>
+    <main id="app-grid"></main>
   </div>
-  <main id="app-grid"></main>
 
   <footer>
     <span id="stats">0 apps</span>
@@ -2184,6 +2264,8 @@
       'sec.parkedBlurb': 'Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.',
       'sec.recent': '🕒 Recently Opened',
       'sec.local': '💾 Local Apps',
+      'sec.localNote': '(these apps live in your browser, not on the server — they won\'t show up on another browser or device)',
+      'sec.localHint': '💡 Publish an app from here to put it on the server — then you can manage it from anywhere.',
       'stats.apps': 'apps',
       'stats.stored': 'stored',
       'addModal.title': 'Add App',
@@ -2245,9 +2327,9 @@
       'publish.accessCodeHint': '4-64 chars. If set, only people with the code can download.',
       'publish.submit': 'Publish',
       'publish.loginRequired': 'Sign in to publish to AIMEAT. Anonymous publishing is disabled — use the Sign in button in the top bar.',
-      'auth.signIn': 'Sign in',
-      'auth.signedInAs': 'Signed in as {owner}',
-      'auth.signOutConfirm': 'Sign out {owner}?',
+      'auth.signIn': '❤️ Sign In',
+      'auth.loggedIn': 'logged in',
+      'auth.logout': 'Logout',
       'versions.title': 'App Versions',
       'versions.help': 'Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.',
       'versions.current': 'current',
@@ -2419,6 +2501,8 @@
       'sec.parkedBlurb': 'Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.',
       'sec.recent': '🕒 Viimeksi avatut',
       'sec.local': '💾 Paikalliset sovellukset',
+      'sec.localNote': '(nämä sovellukset ovat selaimessasi, eivät palvelimella — ne eivät näy toisessa selaimessa tai laitteessa)',
+      'sec.localHint': '💡 Julkaise sovellus täältä, niin se siirtyy palvelimelle — sen jälkeen voit hallita sitä mistä tahansa.',
       'stats.apps': 'sovellusta',
       'stats.stored': 'tallennettu',
       'addModal.title': 'Lisää sovellus',
@@ -2480,9 +2564,9 @@
       'publish.accessCodeHint': '4–64 merkkiä. Jos asetettu, vain koodin tietävät voivat ladata.',
       'publish.submit': 'Julkaise',
       'publish.loginRequired': 'Kirjaudu sisään julkaistaksesi AIMEATiin. Anonyymi julkaisu on poistettu käytöstä — käytä yläpalkin Kirjaudu-painiketta.',
-      'auth.signIn': 'Kirjaudu',
-      'auth.signedInAs': 'Kirjautuneena: {owner}',
-      'auth.signOutConfirm': 'Kirjaudutaanko ulos ({owner})?',
+      'auth.signIn': '❤️ Kirjaudu',
+      'auth.loggedIn': 'kirjautunut',
+      'auth.logout': 'Kirjaudu ulos',
       'versions.title': 'Sovelluksen versiot',
       'versions.help': 'Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.',
       'versions.current': 'nykyinen',
@@ -2644,7 +2728,6 @@
     document.documentElement.lang = currentLang;
     document.title = t('header.title') + ' — AIMEAT';
     updateLangToggle();
-    try { updateAuthUi(); } catch (e) { /* auth button optional during early init */ }
   }
 
   function updateLangToggle() {
@@ -2664,6 +2747,7 @@
     try { loadPublishedApps(); } catch (e) {}
     try { renderRecentlyOpened(); } catch (e) {}
     try { loadCortexExtensions(); } catch (e) {}
+    try { mountLoginPill(); } catch (e) {}  // re-render the golden pill in the new language
   }
 
   // ── IndexedDB wrapper ──────────────────────────────
@@ -4453,7 +4537,7 @@
     if (!token) {
       statusEl.textContent = t('publish.loginRequired');
       statusEl.style.color = 'var(--accent)';
-      updateAuthUi();
+      submitBtn.disabled = false;
       return;
     }
 
@@ -5228,7 +5312,7 @@
       }
 
       if (!aimeatUrl) {
-        renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
+        renderPublishedApps(currentOwner ? localPublished : [], [], localByFilename, aimeatUrl, section, grid, countEl);
         if (communitySection) communitySection.style.display = 'none';
         if (parkedSection) parkedSection.style.display = 'none';
         return;
@@ -5279,7 +5363,11 @@
           });
 
           return loadSubdomainSites().then(function () {
-            renderPublishedApps(localForPublished, ownPublished, localByFilename, aimeatUrl, section, grid, countEl);
+            // "Published Apps" is the signed-in owner's own apps (with owner-only
+            // controls). When logged out we pass no local entries so the section
+            // hides — a logged-out visitor browses everything under Community Apps
+            // instead and never sees non-functional Park/Remove/Subdomain controls.
+            renderPublishedApps(currentOwner ? localForPublished : [], ownPublished, localByFilename, aimeatUrl, section, grid, countEl);
             renderParkedApps(ownParked, aimeatUrl, parkedSection, parkedGrid, parkedCountEl);
             renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
             // Server-published own apps missing from the local catalog are
@@ -5290,7 +5378,7 @@
           });
         })
         .catch(function() {
-          renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
+          renderPublishedApps(currentOwner ? localPublished : [], [], localByFilename, aimeatUrl, section, grid, countEl);
           if (communitySection) communitySection.style.display = 'none';
           if (parkedSection) parkedSection.style.display = 'none';
         });
@@ -5312,24 +5400,24 @@
       var sa = serverApps[i];
       var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : (sa.filename || '');
       var version = sa.version_number ? 'v' + sa.version_number : '';
+      var description = (sa.manifest && sa.manifest.description) ? sa.manifest.description : '';
       var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
       var author = (sa.manifest && sa.manifest.authorDisplay) ? sa.manifest.authorDisplay : (sa.owner || '');
       var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
       html +=
         '<div class="published-card">' +
-          '<div class="published-card-name">' + escapeHtml(name) +
-            (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
-          '</div>' +
-          '<div class="published-card-meta">' +
-            '<span>' + escapeHtml(sa.filename || '') + '</span>' +
-            '<span>' + date + '</span>' +
-          '</div>' +
-          '<div class="published-card-meta" style="margin-top:2px">' +
-            '<span style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
-          '</div>' +
-          '<div class="published-card-actions">' +
-            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
-            '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
+          '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
+          (description ? '<div class="published-card-desc">' + escapeHtml(description) + '</div>' : '') +
+          '<div class="published-card-footer">' +
+            '<div class="published-card-metaline">' +
+              '<span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
+              (date ? '<span class="pcm-date">' + date + '</span>' : '') +
+            '</div>' +
+            '<div class="published-card-actions">' +
+              '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
+              '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
+            '</div>' +
+            (version ? '<div class="published-card-badgerow"><span class="pcb-version">' + escapeHtml(version) + '</span></div>' : '') +
           '</div>' +
         '</div>';
     }
@@ -5392,6 +5480,7 @@
       seenFilenames[filename] = true;
       merged.push({
         name: (sa.manifest && sa.manifest.name) ? sa.manifest.name : filename,
+        description: (sa.manifest && sa.manifest.description) ? sa.manifest.description : '',
         filename: filename,
         owner: sa.owner || '',
         version: sa.version_number ? 'v' + sa.version_number : '',
@@ -5415,6 +5504,7 @@
       var lpUrl = lp.publishedUrl ? (aimeatUrl + lp.publishedUrl) : '';
       merged.push({
         name: lp.name || lpFilename || 'Untitled',
+        description: lp.description || '',
         filename: lpFilename,
         version: lp.publishedVersionNumber ? 'v' + lp.publishedVersionNumber : '',
         date: lp.publishedAt ? new Date(lp.publishedAt).toLocaleDateString() : '',
@@ -5450,7 +5540,7 @@
         var mapping = subdomainsByTarget[targetKey] || null;
         var openModal = 'window._launcher.showSubdomainModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')';
         if (mapping) {
-          subChipHtml = '<div><span class="subdomain-chip" onclick="' + openModal + '" title="' + t('subModal.title') + '">&#x1F310; ' +
+          subChipHtml = '<div class="subdomain-chip-row"><span class="subdomain-chip" onclick="' + openModal + '" title="' + t('subModal.title') + '">&#x1F310; ' +
             escapeHtml(mapping.subdomain + '.' + apexHostLabel()) + '</span></div>';
         } else {
           subBtnHtml = '<button onclick="' + openModal + '">' + t('card.subdomain') + '</button>';
@@ -5468,23 +5558,28 @@
 
       html +=
         '<div class="published-card">' +
-          '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
-            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
-            (app.operatorHidden ? ' <span class="published-source-badge operator-hidden" title="' + escapeHtml(app.operatorHideReason || '') + '">' + t('card.operatorHidden') + '</span>' : '') +
-          '</div>' +
-          '<div class="published-card-meta">' +
-            '<span>' + escapeHtml(app.filename) + '</span>' +
-            '<span>' + app.date + '</span>' +
-          '</div>' +
-          subChipHtml +
-          '<div class="published-card-actions">' +
-            (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
-            (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
-            (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
-            parkBtnHtml +
-            subBtnHtml +
-            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
-             app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
+          '<div class="published-card-name">' + escapeHtml(app.name) + '</div>' +
+          (app.operatorHidden ? '<div class="published-card-modnote"><span class="published-source-badge operator-hidden" title="' + escapeHtml(app.operatorHideReason || '') + '">' + t('card.operatorHidden') + '</span></div>' : '') +
+          (app.description ? '<div class="published-card-desc">' + escapeHtml(app.description) + '</div>' : '') +
+          '<div class="published-card-footer">' +
+            subChipHtml +
+            '<div class="published-card-metaline">' +
+              '<span class="pcm-main" title="' + escapeHtml(app.filename) + '">' + escapeHtml(app.filename) + '</span>' +
+              (app.date ? '<span class="pcm-date">' + app.date + '</span>' : '') +
+            '</div>' +
+            '<div class="published-card-actions">' +
+              (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
+              (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
+              (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
+              parkBtnHtml +
+              subBtnHtml +
+              (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
+               app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
+            '</div>' +
+            '<div class="published-card-badgerow">' +
+              '<span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+              (app.version ? '<span class="pcb-version">' + escapeHtml(app.version) + '</span>' : '') +
+            '</div>' +
           '</div>' +
         '</div>';
     }
@@ -5657,47 +5752,54 @@
     return null;
   }
 
-  // ── Sign-in control (top bar) ────────────────────────────────────────────
-  // The catalog shares its origin with the SPA portal, so an owner who signs in
-  // there has their session in localStorage (aimeat_session). Publishing an app
-  // REQUIRES that session — see submitPublish — so anonymous apps never reach the
-  // node. This button reflects the state and links to the portal to sign in.
-  function updateAuthUi() {
-    var btn = document.getElementById('auth-btn');
-    var label = document.getElementById('auth-btn-label');
-    if (!btn || !label) return;
-    var owner = currentOwnerName();
-    if (owner) {
-      btn.classList.remove('signed-out');
-      btn.firstChild.textContent = '\u{1F464} ';  // 👤
-      label.textContent = owner;
-      btn.title = t('auth.signedInAs').replace('{owner}', owner);
-    } else {
-      btn.classList.add('signed-out');
-      btn.firstChild.textContent = '\u{1F511} ';  // 🔑
-      label.textContent = t('auth.signIn');
-      btn.title = t('auth.signIn');
+  // ── Sign-in control (top bar) — the shared golden login pill ──────────────
+  // Reuses /v1/libs/aimeat-auth.js (the SAME login pill the SPA + standalone
+  // header use), mounted into #headerAuth. It owns the in-page login modal,
+  // session restore, and logout — identical to the rest of AIMEAT. Once it loads,
+  // currentOwnerName()/getCortexOwnerToken() resolve via window.AIMEAT.auth, and
+  // publishing an app REQUIRES that session (see submitPublish) so anonymous apps
+  // never reach the node.
+  function loadScriptOnce(src) {
+    return new Promise(function (resolve, reject) {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('failed to load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function onAuthChanged() {
+    // Re-evaluate the publish gate + refresh the owner's own published apps.
+    try { loadPublishedApps(); } catch (e) {}
+    var sub = document.getElementById('publish-submit-btn');
+    var st = document.getElementById('publish-status');
+    if (sub && document.getElementById('publish-overlay') && !document.getElementById('publish-overlay').hidden) {
+      if (getCortexOwnerToken()) { sub.disabled = false; if (st) st.textContent = ''; }
+      else { sub.disabled = true; if (st) { st.textContent = t('publish.loginRequired'); st.style.color = 'var(--accent)'; } }
     }
   }
 
-  function handleAuthClick() {
-    var owner = currentOwnerName();
-    if (owner) {
-      // Signed in — offer to sign out (clears the local session token for this page).
-      if (confirm(t('auth.signOutConfirm').replace('{owner}', owner))) {
-        try { localStorage.removeItem('aimeat_session'); } catch (e) {}
-        try { if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.signOut) window.AIMEAT.auth.signOut(); } catch (e) {}
-        updateAuthUi();
-        loadPublishedApps();
+  async function mountLoginPill() {
+    try {
+      await loadScriptOnce('/v1/libs/aimeat-auth.js');
+      if (window.AIMEAT && window.AIMEAT.auth) {
+        // Restore any existing session (refresh cookie / persisted token) first.
+        try { await window.AIMEAT.auth.login(); } catch (e) { /* not logged in yet */ }
+        if (window.AIMEAT.auth.mountLoginButton) {
+          window.AIMEAT.auth.mountLoginButton('#headerAuth', {
+            onLogin: onAuthChanged,
+            onLogout: onAuthChanged,
+            i18n: {
+              loggedIn: t('auth.loggedIn'),
+              signInBtn: t('auth.signIn'),
+              logoutBtn: t('auth.logout')
+            }
+          });
+        }
       }
-      return;
-    }
-    // Signed out — open the portal in a new tab to sign in. The catalog stays put;
-    // when the portal writes the session (same origin), our `storage` listener
-    // refreshes this page's sign-in state automatically. Fall back to same-tab nav
-    // if the popup is blocked.
-    var w = window.open('/', '_blank');
-    if (!w) location.href = '/';
+    } catch (e) { /* pill is best-effort; publishing still hard-gates on the token */ }
   }
 
   function fmtSize(bytes) {
@@ -7219,8 +7321,7 @@
     loadConfigFromServer: loadConfigFromServer,
     setLanguage: setLanguage,
     applyI18n: applyI18n,
-    toggleTheme: toggleTheme,
-    handleAuthClick: handleAuthClick
+    toggleTheme: toggleTheme
   };
 
   // Expose cortex functions globally for inline onclick handlers
@@ -7248,15 +7349,8 @@
       : ((loadConfig().language === 'fi') ? 'fi' : 'en');
     applyI18n();
     updateModeToggle();
-    updateAuthUi();
-
-    // Keep the sign-in state fresh: if the owner signs in/out in the portal tab
-    // (same origin), the storage event fires here so the button + published list update.
-    window.addEventListener('storage', function (e) {
-      if (e.key === 'aimeat_session' || e.key === null) { updateAuthUi(); loadPublishedApps(); }
-    });
-    // Re-check on focus too (covers same-tab back-navigation from the portal).
-    window.addEventListener('focus', updateAuthUi);
+    // Mount the shared golden login pill (loads aimeat-auth.js, restores session).
+    mountLoginPill();
 
     // Brand the "back home" link with this node's own host (so self-hosted nodes
     // show their domain, not a hardcoded aimeat.io). The catalog is served from the
