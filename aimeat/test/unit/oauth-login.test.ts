@@ -6,6 +6,9 @@
  *   link-by-verified-email, no-link-when-local-email-unverified, plus the failure redirects.
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial suite (Google sign-in mapping + session establishment).
+ *   v1.1.0 — 2026-06-25 — Brand-new users now go through the one-time username-choice step
+ *     (pending cookie → /login/pending → /login/google/finalize); cover that flow + the
+ *     suggested-name fallback, taken/blank rejects, and /username-available.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -52,8 +55,10 @@ function makeFakeClient() {
   };
 }
 
+interface RawResponse { status: number; location?: string; setCookie?: string[]; body: string }
+
 /** Minimal HTTP GET that does NOT follow redirects — returns status + headers + body. */
-function rawGet(url: string): Promise<{ status: number; location?: string; setCookie?: string[]; body: string }> {
+function rawGet(url: string): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
     http.get(url, (res) => {
       let body = '';
@@ -66,6 +71,33 @@ function rawGet(url: string): Promise<{ status: number; location?: string; setCo
       }));
     }).on('error', reject);
   });
+}
+
+/** HTTP request with an optional Cookie header + JSON body (for the pending/finalize flow). */
+function rawReq(method: string, url: string, opts: { cookie?: string; body?: string } = {}): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const headers: Record<string, string> = {};
+    if (opts.cookie) headers['Cookie'] = opts.cookie;
+    if (opts.body) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = String(Buffer.byteLength(opts.body)); }
+    const req = http.request(
+      { method, hostname: u.hostname, port: u.port, path: u.pathname + u.search, headers },
+      (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, location: res.headers.location, setCookie: res.headers['set-cookie'], body }));
+      },
+    );
+    req.on('error', reject);
+    if (opts.body) req.write(opts.body);
+    req.end();
+  });
+}
+
+/** Pull a single `name=value` cookie pair out of a Set-Cookie header array. */
+function cookieFrom(setCookie: string[] | undefined, name: string): string | null {
+  for (const c of setCookie ?? []) if (c.startsWith(name + '=')) return c.split(';')[0];
+  return null;
 }
 
 describe('Google social login (oauth-login router)', () => {
@@ -111,17 +143,78 @@ describe('Google social login (oauth-login router)', () => {
     return rawGet(`${base}/v1/ghii/login/google/callback?code=abc&state=${encodeURIComponent(state)}`);
   }
 
-  it('creates a new owner + GHII for a first-time Google user (verified email)', async () => {
+  it('first-time Google user gets the one-time username-choice step (no account yet); finalize creates it with the CHOSEN name', async () => {
     const res = await loginWith({ sub: 'g-new-1', email: 'newuser@example.com', email_verified: true, name: 'New User' });
     expect(res.status).toBe(302);
-    expect(res.location).toBe(`${base}/`);
-    expect((res.setCookie ?? []).some((c) => c.startsWith('aimeat_rt='))).toBe(true);
+    // Brand-new user is bounced back flagged for the username-choice step — NOT auto-created.
+    expect(res.location).toBe(`${base}/?aimeat_signup=1`);
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup');
+    expect(pendingCookie).toBeTruthy();
+    // No session cookie and no GHII yet — the account does not exist until finalize.
+    expect((res.setCookie ?? []).some((c) => c.startsWith('aimeat_rt='))).toBe(false);
+    expect(await storage.getGHIIByGoogleSub('g-new-1')).toBeNull();
+
+    // The SPA reads the pending sign-up: a suggested name + which Google email it is for.
+    const pending = await rawReq('GET', `${base}/v1/ghii/login/pending`, { cookie: pendingCookie! });
+    expect(pending.status).toBe(200);
+    const pendingData = JSON.parse(pending.body).data;
+    expect(pendingData.suggested).toBe('newuser'); // derived from the email local-part…
+    expect(pendingData.email).toBe('newuser@example.com');
+
+    // …but the user picks a DIFFERENT username; finalize creates the account + session with it.
+    const fin = await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, {
+      cookie: pendingCookie!, body: JSON.stringify({ username: 'chosenname' }),
+    });
+    expect(fin.status).toBe(200);
+    expect((fin.setCookie ?? []).some((c) => c.startsWith('aimeat_rt='))).toBe(true);
 
     const ghii = await storage.getGHIIByGoogleSub('g-new-1');
     expect(ghii).not.toBeNull();
+    expect(ghii!.username).toBe('chosenname'); // the chosen name, not the email-derived one
     expect(ghii!.emailVerifiedAt).toBeTruthy();
     expect(ghii!.verificationLevel).toBe(1);
     expect(ghii!.emailHash).toBe(emailHashOf('newuser@example.com'));
+  });
+
+  it('finalize falls back to the suggested username when none is provided', async () => {
+    const res = await loginWith({ sub: 'g-blank-1', email: 'blankchoice@example.com', email_verified: true, name: 'Blank Choice' });
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup')!;
+    const fin = await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, { cookie: pendingCookie, body: JSON.stringify({}) });
+    expect(fin.status).toBe(200);
+    const ghii = await storage.getGHIIByGoogleSub('g-blank-1');
+    expect(ghii!.username).toBe('blankchoice'); // suggested name used
+  });
+
+  it('finalize rejects a taken username (409) and a blank pending (400)', async () => {
+    // Taken: a fresh pending, then finalize with an already-registered name.
+    const res = await loginWith({ sub: 'g-dup-1', email: 'dup@example.com', email_verified: true, name: 'Dup' });
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup')!;
+    const dup = await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, { cookie: pendingCookie, body: JSON.stringify({ username: 'chosenname' }) });
+    expect(dup.status).toBe(409);
+    expect(JSON.parse(dup.body).error.code).toBe('NAME_TAKEN');
+    expect(await storage.getGHIIByGoogleSub('g-dup-1')).toBeNull(); // not created
+
+    // No pending cookie at all → 400.
+    const noPending = await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, { body: JSON.stringify({ username: 'whatever' }) });
+    expect(noPending.status).toBe(400);
+    expect(JSON.parse(noPending.body).error.code).toBe('NO_PENDING_SIGNUP');
+  });
+
+  it('GET /v1/ghii/login/pending 404s without the signed cookie', async () => {
+    const res = await rawReq('GET', `${base}/v1/ghii/login/pending`);
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body).error.code).toBe('NO_PENDING_SIGNUP');
+  });
+
+  it('GET /v1/ghii/username-available reports valid/available, taken, and invalid', async () => {
+    const free = await rawReq('GET', `${base}/v1/ghii/username-available?name=brandnewname`);
+    expect(JSON.parse(free.body).data).toMatchObject({ valid: true, available: true });
+
+    const taken = await rawReq('GET', `${base}/v1/ghii/username-available?name=chosenname`);
+    expect(JSON.parse(taken.body).data).toMatchObject({ valid: true, available: false });
+
+    const invalid = await rawReq('GET', `${base}/v1/ghii/username-available?name=ab`);
+    expect(JSON.parse(invalid.body).data.valid).toBe(false);
   });
 
   it('logs a returning Google user into the SAME account (matched by subject)', async () => {
@@ -154,7 +247,7 @@ describe('Google social login (oauth-login router)', () => {
     expect((await storage.listOwners()).length).toBe(ownersBefore); // no new owner
   });
 
-  it('does NOT link (creates a new account) when the matching local email is unverified', async () => {
+  it('does NOT link (sends to the username-choice step) when the matching local email is unverified', async () => {
     // Pre-create an account that merely CLAIMED the email (emailHash set, but never verified).
     const now = new Date().toISOString();
     const kp = await generateKeyPair();
@@ -167,14 +260,14 @@ describe('Google social login (oauth-login router)', () => {
 
     const res = await loginWith({ sub: 'g-claim-1', email: 'claimed@example.com', email_verified: true, name: 'Real Owner' });
     expect(res.status).toBe(302);
+    // Treated as brand-new (no takeover): goes to the username-choice step, not a session.
+    expect(res.location).toBe(`${base}/?aimeat_signup=1`);
 
     // The squatted account must NOT have been linked or taken over.
     const claimer = await storage.getGHII(`claimer@${NODE_ID}`);
     expect(claimer!.googleSub).toBeUndefined();
-    // A separate, new account now owns the Google subject.
-    const fresh = await storage.getGHIIByGoogleSub('g-claim-1');
-    expect(fresh).not.toBeNull();
-    expect(fresh!.ghii).not.toBe(`claimer@${NODE_ID}`);
+    // And no account exists for the Google subject yet (created only on finalize).
+    expect(await storage.getGHIIByGoogleSub('g-claim-1')).toBeNull();
   });
 
   it('redirects with auth_error on an invalid state', async () => {

@@ -58,6 +58,16 @@ extension connectors get encrypted secret config.
   decrypted **only just before the sandbox VM** (both the action route and the scheduled-cron path), and
   **masked** on read (ciphertext/plaintext never leave the server). Ships a reference REST connector
   (bring-your-own-key per instance, SSRF-guarded `ctx.fetch`, action + optional cron sync).
+- **First-time Google sign-in picks its own username (no email-derived leak).** A brand-new Google user
+  is no longer silently created with a username taken from their email local-part (which leaks the address
+  indirectly and locks in a name they never chose). The callback now stashes the verified Google identity in
+  a short-lived **signed, host-only cookie** and bounces back to the SPA with `?aimeat_signup=1`; a one-time
+  **choose-your-username** step (suggested name, live-validated, with a clear **permanence warning** — the
+  only way to change it later is to delete the account and re-create it) then `POST`s the finalize endpoint to
+  create the owner + GHII and establish the session. New endpoints `GET /v1/ghii/login/pending`,
+  `POST /v1/ghii/login/google/finalize`, `GET /v1/ghii/username-available`; the auth-lib modal grows a
+  `showGoogleSignupModal` view. Returning Google users and verified-email account links are unchanged, and
+  there is **no storage-schema change** — the pending state is a stateless EdDSA token, not a DB row.
 
 ### Changed
 

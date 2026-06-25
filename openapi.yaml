@@ -13805,10 +13805,13 @@ paths:
       summary: Google sign-in OIDC redirect callback
       description: |
         Google redirects the browser here with `code` and `state` after consent. The node
-        exchanges the code, maps the Google identity to a GHII (linking to an existing account
-        when Google's verified email matches a locally-verified account, otherwise creating a
-        new account), establishes an owner session (httpOnly refresh cookie + access token),
-        and redirects back to the SPA. On any failure it redirects to `/?auth_error=<CODE>`.
+        exchanges the code and maps the Google identity to a GHII. A returning Google user
+        (matched by provider subject) or a verified-email match links straight to their account
+        and gets an owner session (httpOnly refresh cookie + access token) before redirecting
+        back to the SPA. A BRAND-NEW user is NOT auto-created: the node stashes the verified
+        Google identity in a short-lived signed cookie and redirects back with `?aimeat_signup=1`,
+        and the SPA prompts for a one-time username choice (see `/v1/ghii/login/pending` +
+        `/v1/ghii/login/google/finalize`). On any failure it redirects to `/?auth_error=<CODE>`.
       tags: [GHII-Web]
       parameters:
         - name: code
@@ -13830,6 +13833,155 @@ paths:
             `/?auth_error=<CODE>` on failure.
         '503':
           description: Google sign-in is not available on this node
+
+  /v1/ghii/login/pending:
+    get:
+      operationId: ghiiLoginPending
+      summary: Read the pending Google sign-up (first-time username choice)
+      description: |
+        After a brand-new Google user is bounced back with `?aimeat_signup=1`, the SPA calls
+        this to read the pending sign-up so it can render the one-time username-choice step.
+        Reads the short-lived, signed httpOnly cookie set by the callback (the verified Google
+        identity never leaves the server — only the suggested username, email, display name and
+        post-login redirect are returned). Returns 404 `NO_PENDING_SIGNUP` when absent/expired.
+      tags: [GHII-Web]
+      responses:
+        '200':
+          description: Pending sign-up details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          suggested:
+                            type: string
+                            description: Suggested username (derived from the Google account, free at suggestion time)
+                          email:
+                            type: string
+                            nullable: true
+                          displayName:
+                            type: string
+                          redirect:
+                            type: string
+                            description: Same-site path to return to after finalize
+        '404':
+          description: No pending Google sign-up (cookie absent or expired)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NO_PENDING_SIGNUP
+
+  /v1/ghii/username-available:
+    get:
+      operationId: ghiiUsernameAvailable
+      summary: Check whether an owner username is valid and free
+      description: |
+        Live validation for the username-choice step (and any registration UI). Generic and
+        unauthenticated; rate-limited. Reports whether the name passes the owner-name format
+        rules and whether it is currently unclaimed. A same-node `@suffix` is stripped; a
+        remote-node identity is reported invalid (cannot be registered here).
+      tags: [GHII-Web]
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Candidate username (lowercased; an `@node` suffix for this node is stripped)
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          valid:
+                            type: boolean
+                          available:
+                            type: boolean
+                          reason:
+                            type: string
+                            nullable: true
+
+  /v1/ghii/login/google/finalize:
+    post:
+      operationId: ghiiLoginGoogleFinalize
+      summary: Complete a first-time Google sign-up with the chosen username
+      description: |
+        Finalizes a brand-new Google sign-up. Reads the signed pending-signup cookie, validates
+        the chosen username (falling back to the suggested one when blank), creates the owner +
+        GHII linked to the Google account (with the welcome bonus), and establishes an owner
+        session (httpOnly refresh cookie + access token). Idempotent: if the Google identity has
+        already resolved to a GHII, that session is established instead. Rate-limited.
+      tags: [GHII-Web]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: The username the user chose or confirmed; blank uses the suggested name
+      responses:
+        '200':
+          description: Account created (or resolved) and session established
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          owner:
+                            type: string
+                          displayName:
+                            type: string
+                          redirect:
+                            type: string
+        '400':
+          description: No pending sign-up, or invalid username
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NAME_TAKEN
 
   # ============================================================
   # Phase 1.4: Directories
