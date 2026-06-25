@@ -262,6 +262,27 @@
       font-size: 1.4rem;
     }
 
+    /* Sign-in control: wider than the square icon buttons because it carries a label. */
+    .auth-btn {
+      width: auto;
+      gap: 6px;
+      padding: 0 12px;
+      font-size: .9rem;
+      font-weight: 600;
+      max-width: 200px;
+    }
+    .auth-btn #auth-btn-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* Signed-out state stands out so anonymous users notice they must sign in to publish. */
+    .auth-btn.signed-out {
+      background: #E8564A;
+      border-color: transparent;
+      color: #fff;
+    }
+
     #add-btn:hover {
       box-shadow: 0 4px 20px rgba(232, 86, 74, .25);
       border-color: transparent;
@@ -1680,6 +1701,7 @@
     </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
+      <button class="icon-btn auth-btn" id="auth-btn" onclick="window._launcher.handleAuthClick()" data-i18n-title="auth.signIn" title="Sign in">&#x1F511; <span id="auth-btn-label" data-i18n="auth.signIn">Sign in</span></button>
       <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
       <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
       <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
@@ -2222,6 +2244,10 @@
       'publish.accessCodePh': 'Leave empty for public',
       'publish.accessCodeHint': '4-64 chars. If set, only people with the code can download.',
       'publish.submit': 'Publish',
+      'publish.loginRequired': 'Sign in to publish to AIMEAT. Anonymous publishing is disabled — use the Sign in button in the top bar.',
+      'auth.signIn': 'Sign in',
+      'auth.signedInAs': 'Signed in as {owner}',
+      'auth.signOutConfirm': 'Sign out {owner}?',
       'versions.title': 'App Versions',
       'versions.help': 'Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.',
       'versions.current': 'current',
@@ -2453,6 +2479,10 @@
       'publish.accessCodePh': 'Jätä tyhjäksi julkiseksi',
       'publish.accessCodeHint': '4–64 merkkiä. Jos asetettu, vain koodin tietävät voivat ladata.',
       'publish.submit': 'Julkaise',
+      'publish.loginRequired': 'Kirjaudu sisään julkaistaksesi AIMEATiin. Anonyymi julkaisu on poistettu käytöstä — käytä yläpalkin Kirjaudu-painiketta.',
+      'auth.signIn': 'Kirjaudu',
+      'auth.signedInAs': 'Kirjautuneena: {owner}',
+      'auth.signOutConfirm': 'Kirjaudutaanko ulos ({owner})?',
       'versions.title': 'Sovelluksen versiot',
       'versions.help': 'Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.',
       'versions.current': 'nykyinen',
@@ -2614,6 +2644,7 @@
     document.documentElement.lang = currentLang;
     document.title = t('header.title') + ' — AIMEAT';
     updateLangToggle();
+    try { updateAuthUi(); } catch (e) { /* auth button optional during early init */ }
   }
 
   function updateLangToggle() {
@@ -4349,8 +4380,17 @@
     document.getElementById('publish-filename').value = safeName;
     document.getElementById('publish-description').value = app.description || '';
     document.getElementById('publish-access-code').value = '';
-    document.getElementById('publish-status').textContent = '';
-    document.getElementById('publish-submit-btn').disabled = false;
+    // Surface the sign-in requirement up front: publishing needs a signed-in owner.
+    var pubStatus = document.getElementById('publish-status');
+    var pubSubmit = document.getElementById('publish-submit-btn');
+    if (!getCortexOwnerToken()) {
+      pubStatus.textContent = t('publish.loginRequired');
+      pubStatus.style.color = 'var(--accent)';
+      pubSubmit.disabled = true;
+    } else {
+      pubStatus.textContent = '';
+      pubSubmit.disabled = false;
+    }
     document.getElementById('publish-overlay').hidden = false;
   }
 
@@ -4406,38 +4446,41 @@
       return;
     }
 
+    // Publishing to AIMEAT REQUIRES a signed-in owner. This is the gate that stops
+    // anonymous apps from ever reaching the node — there is NO fallback to an
+    // anonymous token. If not signed in, point the user at the top-bar sign-in.
+    var token = getCortexOwnerToken();
+    if (!token) {
+      statusEl.textContent = t('publish.loginRequired');
+      statusEl.style.color = 'var(--accent)';
+      updateAuthUi();
+      return;
+    }
+
     statusEl.textContent = 'Publishing...';
     statusEl.style.color = '#34d399';
     submitBtn.disabled = true;
 
-    // Get auth token first
-    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
-      .then(function(resp) { return resp.json(); })
-      .then(function(authJson) {
-        var token = authJson.data && authJson.data.token;
-        if (!token) throw new Error('Could not get auth token');
+    var body = {
+      filename: filename,
+      content: htmlContent,
+      mime_type: 'text/html',
+      name: app.name || filename.replace(/\.html?$/i, ''),
+      description: app.description || '',
+      category: 'utility',
+      tags: app.tags || [],
+      uses_cortex: []
+    };
+    if (accessCode) body.access_code = accessCode;
 
-        var body = {
-          filename: filename,
-          content: htmlContent,
-          mime_type: 'text/html',
-          name: app.name || filename.replace(/\.html?$/i, ''),
-          description: app.description || '',
-          category: 'utility',
-          tags: app.tags || [],
-          uses_cortex: []
-        };
-        if (accessCode) body.access_code = accessCode;
-
-        return fetch(aimeatUrl + '/v1/apps', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify(body)
-        });
-      })
+    fetch(aimeatUrl + '/v1/apps', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(body)
+    })
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
@@ -5612,6 +5655,49 @@
       if (stored) return JSON.parse(stored).owner || null;
     } catch (e) {}
     return null;
+  }
+
+  // ── Sign-in control (top bar) ────────────────────────────────────────────
+  // The catalog shares its origin with the SPA portal, so an owner who signs in
+  // there has their session in localStorage (aimeat_session). Publishing an app
+  // REQUIRES that session — see submitPublish — so anonymous apps never reach the
+  // node. This button reflects the state and links to the portal to sign in.
+  function updateAuthUi() {
+    var btn = document.getElementById('auth-btn');
+    var label = document.getElementById('auth-btn-label');
+    if (!btn || !label) return;
+    var owner = currentOwnerName();
+    if (owner) {
+      btn.classList.remove('signed-out');
+      btn.firstChild.textContent = '\u{1F464} ';  // 👤
+      label.textContent = owner;
+      btn.title = t('auth.signedInAs').replace('{owner}', owner);
+    } else {
+      btn.classList.add('signed-out');
+      btn.firstChild.textContent = '\u{1F511} ';  // 🔑
+      label.textContent = t('auth.signIn');
+      btn.title = t('auth.signIn');
+    }
+  }
+
+  function handleAuthClick() {
+    var owner = currentOwnerName();
+    if (owner) {
+      // Signed in — offer to sign out (clears the local session token for this page).
+      if (confirm(t('auth.signOutConfirm').replace('{owner}', owner))) {
+        try { localStorage.removeItem('aimeat_session'); } catch (e) {}
+        try { if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.signOut) window.AIMEAT.auth.signOut(); } catch (e) {}
+        updateAuthUi();
+        loadPublishedApps();
+      }
+      return;
+    }
+    // Signed out — open the portal in a new tab to sign in. The catalog stays put;
+    // when the portal writes the session (same origin), our `storage` listener
+    // refreshes this page's sign-in state automatically. Fall back to same-tab nav
+    // if the popup is blocked.
+    var w = window.open('/', '_blank');
+    if (!w) location.href = '/';
   }
 
   function fmtSize(bytes) {
@@ -7133,7 +7219,8 @@
     loadConfigFromServer: loadConfigFromServer,
     setLanguage: setLanguage,
     applyI18n: applyI18n,
-    toggleTheme: toggleTheme
+    toggleTheme: toggleTheme,
+    handleAuthClick: handleAuthClick
   };
 
   // Expose cortex functions globally for inline onclick handlers
@@ -7161,6 +7248,15 @@
       : ((loadConfig().language === 'fi') ? 'fi' : 'en');
     applyI18n();
     updateModeToggle();
+    updateAuthUi();
+
+    // Keep the sign-in state fresh: if the owner signs in/out in the portal tab
+    // (same origin), the storage event fires here so the button + published list update.
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'aimeat_session' || e.key === null) { updateAuthUi(); loadPublishedApps(); }
+    });
+    // Re-check on focus too (covers same-tab back-navigation from the portal).
+    window.addEventListener('focus', updateAuthUi);
 
     // Brand the "back home" link with this node's own host (so self-hosted nodes
     // show their domain, not a hardcoded aimeat.io). The catalog is served from the
