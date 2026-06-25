@@ -51,6 +51,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'messages:read': 'Read direct messages addressed to you across the federation',
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
+  'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
 };
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s

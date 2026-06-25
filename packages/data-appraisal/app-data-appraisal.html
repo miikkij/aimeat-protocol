@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<!--
+  @file app-data-appraisal.html
+  @description Data Appraisal — a standalone AIMEAT app that reads an organism's
+    workspaces, runs a DIKW analysis per content unit, fills the canonical context
+    frame (consumer · decision · window · return), weighs each row through a
+    falsification gate, and reports the (claimed) value of the data. Pure browser app:
+    uses the existing organism/workspace read endpoints + AIMEAT.ai (user's OpenRouter
+    key, server-side relay) + AIMEAT.data (owner memory). No core/server changes.
+  @structure Single HTML file. Loads aimeat-auth/-data/-ai libs. IIFE app with: auth +
+    AI gate, organism picker, workspace tree, per-unit run pipeline (DIKW → context rows
+    → gate → value), incremental/resumable runner (stop/continue/re-run), editable
+    prompts (stored in owner memory, no republish), and multi-level reports
+    (unit → workspace → organism). All run results persist in owner app memory.
+  @usage Publish with aimeat_app_publish; open from the app catalogue. Requires an
+    OpenRouter key configured in AIMEAT Settings (feature hidden otherwise).
+  @version-history
+    v0.1.0 — 2026-06-25 — Initial build: DIKW-driven data valuation app (Phase 1).
+    v0.1.1 — 2026-06-25 — Workspace list via /workspaces; silent-login boot fallback;
+      declare ai:use scope (meta) so AI works on the isolated app origin under H-2.
+-->
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Declare the scopes this app needs. ai:use lets it spend the owner's AI budget from the
+     isolated app origin (app-grant token, role 'app'); the rest persist appraisals in owner memory. -->
+<meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write ai:use">
+<title>Data Appraisal — AIMEAT</title>
+<style>
+  :root {
+    --bg:#0f1020; --card:#1a1c33; --card2:#12142a; --line:#2a2d4a; --txt:#e8e8f0;
+    --dim:#9aa0c0; --accent:#E8564A; --ok:#10b981; --warn:#F59E0B; --info:#60a5fa;
+    --claimed:#F59E0B;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  a { color:var(--info); }
+  header.da-top { padding:.75rem 1.1rem; border-bottom:1px solid var(--line); display:flex;
+    align-items:center; gap:1rem; flex-wrap:wrap; }
+  header.da-top h1 { margin:0; font-size:1.05rem; }
+  .da-spacer { flex:1; }
+  .da-cost { font-size:.8rem; color:var(--dim); white-space:nowrap; }
+  .da-cost b { color:var(--txt); }
+  nav.da-tabs { display:flex; gap:.25rem; padding:.4rem 1.1rem 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  nav.da-tabs button { background:transparent; border:none; border-bottom:2px solid transparent;
+    color:var(--dim); padding:.5rem .8rem; cursor:pointer; font:inherit; }
+  nav.da-tabs button.active { color:var(--txt); border-bottom-color:var(--accent); }
+  main { max-width:980px; margin:0 auto; padding:1.1rem; }
+  .da-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1rem; margin-bottom:1rem; }
+  label { display:block; font-size:.78rem; color:var(--dim); margin-bottom:.3rem; }
+  select, textarea, input { width:100%; padding:.5rem .6rem; border:1px solid var(--line);
+    border-radius:6px; background:var(--card2); color:var(--txt); font:inherit; }
+  textarea { min-height:6rem; resize:vertical; font-family:ui-monospace,monospace; font-size:.8rem; }
+  .da-btn { padding:.45rem .85rem; border:none; border-radius:6px; background:var(--accent);
+    color:#fff; font:inherit; cursor:pointer; }
+  .da-btn.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
+  .da-btn.small { padding:.25rem .55rem; font-size:.78rem; }
+  .da-btn:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--dim); font-size:.85rem; }
+  .da-err { color:var(--accent); }
+  .da-ws { border:1px solid var(--line); border-radius:8px; margin-bottom:.6rem; overflow:hidden; }
+  .da-ws-head { padding:.6rem .8rem; background:var(--card2); display:flex; align-items:center; gap:.6rem; cursor:pointer; }
+  .da-ws-head h3 { margin:0; font-size:.95rem; flex:1; }
+  .da-ws-body { padding:.6rem .8rem; }
+  .da-unit { display:flex; align-items:center; gap:.5rem; padding:.4rem 0; border-top:1px solid var(--line); font-size:.85rem; }
+  .da-unit:first-child { border-top:none; }
+  .da-unit .ttl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .da-dot { width:.6rem; height:.6rem; border-radius:50%; background:var(--line); flex:none; }
+  .da-dot.done { background:var(--ok); } .da-dot.running { background:var(--info); }
+  .da-dot.error { background:var(--accent); } .da-dot.pending { background:var(--line); }
+  .da-dot.skip { background:transparent; border:1px solid var(--line); }
+  .da-tag { font-size:.68rem; padding:.1rem .4rem; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .da-tag.gran { color:var(--info); border-color:var(--info); }
+  .da-claimed { font-size:.68rem; padding:.05rem .4rem; border-radius:999px; border:1px solid var(--claimed); color:var(--claimed); }
+  table.da-ctx { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:.4rem; }
+  table.da-ctx th, table.da-ctx td { border:1px solid var(--line); padding:.35rem .45rem; text-align:left; vertical-align:top; }
+  table.da-ctx th { color:var(--dim); font-weight:600; }
+  .da-dikw { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.5rem; margin:.4rem 0; }
+  .da-dikw-box { background:var(--card2); border:1px solid var(--line); border-radius:6px; padding:.5rem; }
+  .da-dikw-box h4 { margin:0 0 .3rem; font-size:.78rem; color:var(--info); }
+  .da-dikw-box ul { margin:0; padding-left:1.05rem; font-size:.78rem; }
+  pre.da-json { background:var(--card2); border:1px solid var(--line); border-radius:6px; padding:.5rem; overflow:auto; font-size:.75rem; white-space:pre-wrap; word-break:break-word; }
+  .da-prompt-block { margin-bottom:1rem; }
+  .da-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .da-modal { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1.1rem; max-width:460px; }
+  .da-value { font-weight:600; }
+  .hidden { display:none !important; }
+  .da-gridset { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+  @media(max-width:640px){ .da-gridset{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header class="da-top">
+  <h1>💎 Data Appraisal</h1>
+  <span id="da-orgname" class="muted"></span>
+  <span class="da-spacer"></span>
+  <span id="da-cost" class="da-cost"></span>
+  <span id="header-auth"></span>
+</header>
+
+<nav class="da-tabs" id="da-tabs" hidden>
+  <button data-view="tree" class="active" data-t="tab.tree">Ajopuu</button>
+  <button data-view="reports" data-t="tab.reports">Raportit</button>
+  <button data-view="prompts" data-t="tab.prompts">Promptit</button>
+  <button data-view="settings" data-t="tab.settings">Asetukset</button>
+</nav>
+
+<main>
+  <div id="da-gate" class="da-card hidden"></div>
+  <div id="da-view-tree"></div>
+  <div id="da-view-reports" class="hidden"></div>
+  <div id="da-view-prompts" class="hidden"></div>
+  <div id="da-view-settings" class="hidden"></div>
+</main>
+
+<div id="da-modal-host"></div>
+
+<script src="/v1/libs/aimeat-auth.js"></script>
+<script src="/v1/libs/aimeat-data.js"></script>
+<script src="/v1/libs/aimeat-ai.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var APP_ID = 'data-appraisal';
+
+  // ───────────────────────── i18n ─────────────────────────
+  var I18N = {
+    fi: {
+      'gate.title': 'AI ei käytössä',
+      'gate.body': 'Data Appraisal vaatii OpenRouter-avaimen. Lisää avain AIMEAT-asetuksiin (Asetukset → AI / OpenRouter), niin analyysi tulee käyttöön.',
+      'gate.login': 'Kirjaudu sisään yläoikealta jatkaaksesi.',
+      'tab.tree':'Ajopuu','tab.reports':'Raportit','tab.prompts':'Promptit','tab.settings':'Asetukset',
+      'tree.pickOrg':'Valitse organismi','tree.noOrgs':'Ei organismeja. Liity tai luo organismi ensin.',
+      'tree.loadOverview':'Ladataan organismin rakennetta…',
+      'tree.runOrg':'Arvioi koko organismi','tree.open':'Avaa','tree.close':'Sulje',
+      'tree.runWs':'Arvioi workspace','tree.continue':'Jatka keskeneräiset','tree.stop':'Stop',
+      'tree.loadWs':'Ladataan workspacea…','tree.run':'Aja','tree.rerun':'Aja uudestaan','tree.view':'Näytä',
+      'tree.records':'recordia','tree.documents':'dokumenttia','tree.empty':'tyhjä — ei arvotettavaa',
+      'tree.running':'Ajossa…','tree.stopped':'Pysäytetty.','tree.done':'Valmis.',
+      'unit.set':'koko joukko','unit.schema':'skeema','unit.manifest':'manifesti','unit.document':'dokumentti',
+      'rep.unitTitle':'Yksikkökohtaiset arviot','rep.none':'Ei vielä arvioita. Aja yksiköitä Ajopuu-välilehdellä.',
+      'rep.wsRollup':'Kokoa workspace-raportti','rep.orgRollup':'Kokoa organismiraportti',
+      'rep.value':'Arvo','rep.bestValue':'Paras (väitetty) arvo','rep.consumers':'Kuluttajat','rep.flags':'Liput',
+      'rep.profile':'DIKW-profiili','rep.context':'Kontekstitaulukko','rep.crosscx':'Cross-context-kandidaatit',
+      'ctx.consumer':'Kuluttaja','ctx.decision':'Päätös','ctx.window':'Ikkuna','ctx.return':'Tuotto','ctx.verdict':'Tuomio',
+      'claimed':'Väitetty (ei vahvistettu)',
+      'prompts.intro':'Promptit tallennetaan omistajan muistiin ja luetaan ajohetkellä — muokkaus ei vaadi appin uudelleenjulkaisua. Käytä {{muuttuja}}-paikkamerkkejä.',
+      'prompts.save':'Tallenna','prompts.reset':'Palauta oletus','prompts.saved':'Tallennettu.',
+      'set.intro':'Asetukset tallennetaan omistajan muistiin.',
+      'set.model':'Malli (tyhjä = oletus)','set.modelRole':'Mallin rooli','set.sampleCap':'Record-näytteen katto',
+      'set.chunkChars':'Dokumentin merkkikatto / kutsu','set.warn':'Varoituskynnys (kutsua)',
+      'set.stageDikw':'Aja DIKW-vaihe','set.stageRows':'Aja kontekstirivit',
+      'set.save':'Tallenna asetukset','set.saved':'Tallennettu.',
+      'warn.title':'Iso ajo','warn.body':'Tämä ajaa {n} yksikköä ≈ {c} AI-kutsua. Voi kestää pitkään ja kuluttaa AI-budjettia. Pidä välilehti auki ajon ajan. Jatketaanko?',
+      'warn.go':'Aja','warn.cancel':'Peruuta',
+      'err.generic':'Virhe','runner.busy':'Ajo on jo käynnissä.'
+    },
+    en: {
+      'gate.title':'AI not enabled',
+      'gate.body':'Data Appraisal needs an OpenRouter key. Add one in AIMEAT Settings (Settings → AI / OpenRouter) to enable analysis.',
+      'gate.login':'Sign in (top right) to continue.',
+      'tab.tree':'Run tree','tab.reports':'Reports','tab.prompts':'Prompts','tab.settings':'Settings',
+      'tree.pickOrg':'Pick an organism','tree.noOrgs':'No organisms. Join or create one first.',
+      'tree.loadOverview':'Loading organism structure…',
+      'tree.runOrg':'Appraise whole organism','tree.open':'Open','tree.close':'Close',
+      'tree.runWs':'Appraise workspace','tree.continue':'Continue pending','tree.stop':'Stop',
+      'tree.loadWs':'Loading workspace…','tree.run':'Run','tree.rerun':'Re-run','tree.view':'View',
+      'tree.records':'records','tree.documents':'documents','tree.empty':'empty — nothing to appraise',
+      'tree.running':'Running…','tree.stopped':'Stopped.','tree.done':'Done.',
+      'unit.set':'whole set','unit.schema':'schema','unit.manifest':'manifest','unit.document':'document',
+      'rep.unitTitle':'Per-unit appraisals','rep.none':'No appraisals yet. Run units in the Run tree tab.',
+      'rep.wsRollup':'Build workspace report','rep.orgRollup':'Build organism report',
+      'rep.value':'Value','rep.bestValue':'Best (claimed) value','rep.consumers':'Consumers','rep.flags':'Flags',
+      'rep.profile':'DIKW profile','rep.context':'Context table','rep.crosscx':'Cross-context candidates',
+      'ctx.consumer':'Consumer','ctx.decision':'Decision','ctx.window':'Window','ctx.return':'Return','ctx.verdict':'Verdict',
+      'claimed':'Claimed (unverified)',
+      'prompts.intro':'Prompts are stored in owner memory and read at run time — editing needs no app republish. Use {{variable}} placeholders.',
+      'prompts.save':'Save','prompts.reset':'Reset to default','prompts.saved':'Saved.',
+      'set.intro':'Settings are stored in owner memory.',
+      'set.model':'Model (blank = default)','set.modelRole':'Model role','set.sampleCap':'Record sample cap',
+      'set.chunkChars':'Document char cap / call','set.warn':'Warning threshold (calls)',
+      'set.stageDikw':'Run DIKW stage','set.stageRows':'Run context rows',
+      'set.save':'Save settings','set.saved':'Saved.',
+      'warn.title':'Large run','warn.body':'This runs {n} units ≈ {c} AI calls. May take a while and spend AI budget. Keep the tab open during the run. Proceed?',
+      'warn.go':'Run','warn.cancel':'Cancel',
+      'err.generic':'Error','runner.busy':'A run is already in progress.'
+    }
+  };
+  var lang = (navigator.language || 'fi').slice(0, 2) === 'en' ? 'en' : 'fi';
+  function t(k, vars) {
+    var s = (I18N[lang] && I18N[lang][k]) || (I18N.fi[k]) || k;
+    if (vars) Object.keys(vars).forEach(function (v) { s = s.replace('{' + v + '}', vars[v]); });
+    return s;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c];
+    });
+  }
+
+  // ───────────────────── default prompts ─────────────────────
+  var DEFAULT_PROMPTS = {
+    'dikw.system':
+      'You analyse one unit of data from an AIMEAT organism workspace and decompose it on the DIKW pyramid. '
+      + 'Distinguish the levels strictly: DATA = raw facts/measurements/events ("what happened", no interpretation); '
+      + 'INFORMATION = data with context, relationships, patterns ("what it means"); '
+      + 'KNOWLEDGE = principles, frameworks, causal/explanatory mechanisms ("how and why"); '
+      + 'WISDOM = decision guidance, recommendations, best practices, judgement ("what should be done"). '
+      + 'Also decompose the domain knowledge: domainTerminology (domain-specific terms), '
+      + 'dataTypes {gathered, produced}, desiredInsights (actionable, tied to a goal/metric), '
+      + 'dataToInformationMethods (method/tool turning data into information), '
+      + 'synthesis (integrated frameworks/scenarios), deliverables (reusable artifacts this data enables). '
+      + 'Return ONLY a JSON object with keys: data, information, knowledge, wisdom (arrays of strings), '
+      + 'domainTerminology (array), dataTypes ({gathered:[],produced:[]}), desiredInsights (array), '
+      + 'dataToInformationMethods (array), synthesis (array), deliverables (array). Empty array if a level has nothing.',
+    'dikw.user':
+      'Granularity: {{granularity}} · Space: {{spaceName}}\n\nCONTENT:\n{{content}}',
+    'rows.system':
+      'Given a DIKW profile of one data unit, your job is to find WHO this data is useful for and what it is worth. '
+      + 'Fill the canonical context frame with ALWAYS FOUR slots per row: consumer, decision, window, return. '
+      + 'window and return are properties of the (data×consumer) PAIR, not of the data. '
+      + 'Harvest BOTH consumer families every time: BUILDERS (build with the data; value = usability) and '
+      + 'EXPERIENCERS (experience an outcome derived from the data; value = impact). '
+      + 'Anchor consumers in the USE SITUATION and at the END of the derivation chain, not at the artifact: '
+      + 'SCENE (name the bodies present when a derived outcome is experienced) → CHAIN (walk data → derived outcome → final experiencer) → FLOOR. '
+      + 'The deepest experiencer (farthest from the artifact) is a MANDATORY row. DIKW nesting → one artifact yields rows at several levels (many rows). '
+      + 'DISTANCE TEST: if rows cluster near the artifact, deep experiencers were dropped — the list is not done. '
+      + 'FALSIFICATION GATE: drop any row whose consumer is generic/unnameable or whose decision is not a real decision (no alternatives/stakes). '
+      + 'You never CREDIT value — only claim it. Mark every row verdict:"claimed". '
+      + 'Return ONLY JSON: { "context_table": [ {consumer, decision, window, return_claim, return_unit, validity:true, verdict:"claimed"} ], '
+      + '"value": { "best_valid_return": string, "unit": string, "basis": string } }.',
+    'rows.user':
+      'Granularity: {{granularity}} · Space: {{spaceName}}\n\nDIKW PROFILE (JSON):\n{{dikw}}',
+    'wsRollup.system':
+      'You summarise a workspace from per-unit data appraisals. Return ONLY JSON: '
+      + '{ "best_valid_return": string, "unit": string, "for_whom": string, '
+      + '"flags": [string], "cross_context_candidates": [string], "summary": string }. '
+      + 'flags from: sensitivity, perishable, internal_only, cross_context_candidate. All value is claimed/unverified.',
+    'wsRollup.user':
+      'Workspace: {{spaceName}}\n\nPER-UNIT SUMMARIES (JSON):\n{{unitSummaries}}',
+    'orgRollup.system':
+      'You summarise an organism from per-workspace data appraisals. Return ONLY JSON: '
+      + '{ "most_valuable_data": [ {what, for_whom, claimed_value} ], '
+      + '"top_cross_context_opportunities": [string], "flags": [string], "summary": string }. All value is claimed/unverified.',
+    'orgRollup.user':
+      'Organism: {{spaceName}}\n\nPER-WORKSPACE REPORTS (JSON):\n{{unitSummaries}}'
+  };
+  var PROMPT_LABELS = {
+    'dikw.system':'DIKW · system','dikw.user':'DIKW · user',
+    'rows.system':'Context rows · system','rows.user':'Context rows · user',
+    'wsRollup.system':'Workspace rollup · system','wsRollup.user':'Workspace rollup · user',
+    'orgRollup.system':'Organism rollup · system','orgRollup.user':'Organism rollup · user'
+  };
+
+  var DEFAULT_SETTINGS = {
+    model: '', modelRole: 'reasoning', sampleCap: 50, chunkChars: 40000,
+    warnThreshold: 20, stageDikw: true, stageRows: true
+  };
+
+  // ───────────────────────── state ─────────────────────────
+  var S = {
+    session: null, owner: '',
+    orgs: [], orgId: null, orgName: '',
+    workspaces: [],            // [{ ws, name }] from /v1/organisms/:id/workspaces
+    wsLoaded: {},              // wsId -> { manifest, objects, units:[...] }
+    wsOpen: {},                // wsId -> bool
+    run: { units: {} },        // appraisal.run.{orgId}
+    prompts: {}, settings: {},
+    cost: 0, budget: null,
+    running: false, stopFlag: false,
+    view: 'tree', msg: ''
+  };
+
+  function sf(path, opts) { return S.session.fetch(path, opts); }
+
+  function fmtUsd(n) { return '$' + (Math.round((n || 0) * 10000) / 10000).toFixed(4); }
+  function renderCost() {
+    var el = $('#da-cost'); if (!el) return;
+    var parts = ['AI: ' + '<b>' + fmtUsd(S.cost) + '</b>'];
+    if (S.budget && typeof S.budget.remaining_usd === 'number')
+      parts.push(t('rep.value') === 'Value' ? 'left ' + fmtUsd(S.budget.remaining_usd) : 'jäljellä ' + fmtUsd(S.budget.remaining_usd));
+    el.innerHTML = parts.join(' · ');
+  }
+  function trackUsage(r) {
+    if (r && r.usage && typeof r.usage.cost_usd === 'number') S.cost += r.usage.cost_usd;
+    if (r && r.budget) S.budget = r.budget;
+    renderCost();
+  }
+
+  // ───────────────────── memory helpers ─────────────────────
+  function runKey() { return 'appraisal.run.' + S.orgId; }
+  function unitMemKey(uk) { return 'appraisal.unit.' + S.orgId + '.' + uk; }
+  function wsRepKey(wsId) { return 'appraisal.ws.' + S.orgId + '.' + wsId; }
+  function orgRepKey() { return 'appraisal.org.' + S.orgId; }
+
+  async function loadPrompts() {
+    var stored = null;
+    try { stored = await AIMEAT.data.get('appraisal.prompts'); } catch (e) {}
+    S.prompts = Object.assign({}, DEFAULT_PROMPTS, (stored && typeof stored === 'object') ? stored : {});
+  }
+  async function savePrompts() { await AIMEAT.data.set('appraisal.prompts', S.prompts); }
+  async function loadSettings() {
+    var stored = null;
+    try { stored = await AIMEAT.data.get('appraisal.settings'); } catch (e) {}
+    S.settings = Object.assign({}, DEFAULT_SETTINGS, (stored && typeof stored === 'object') ? stored : {});
+  }
+  async function saveSettings() { await AIMEAT.data.set('appraisal.settings', S.settings); }
+  async function loadRun() {
+    var stored = null;
+    try { stored = await AIMEAT.data.get(runKey()); } catch (e) {}
+    S.run = (stored && stored.units) ? stored : { units: {} };
+  }
+  async function saveRun() { S.run.updatedAt = new Date().toISOString(); await AIMEAT.data.set(runKey(), S.run); }
+
+  // ───────────────────── content + units ─────────────────────
+  function docTitle(v) {
+    if (v && typeof v === 'object') return v.title || v.name || v.id || '(untitled)';
+    return '(untitled)';
+  }
+  function isDocSpace(ot) { return (ot.mode === 'document' || ot.kind === 'document'); }
+
+  // Build the unit list for one loaded workspace from its manifest + objects.
+  function buildUnits(wsId, wsName, manifest, objects) {
+    var units = [];
+    var ots = (manifest && manifest.objectTypes) || [];
+    ots.forEach(function (ot) {
+      var name = ot.name; if (!name) return;
+      var arr = (objects && objects[name]) || [];
+      var doc = isDocSpace(ot);
+      if (!arr.length) return; // empty space → not appraisable (skipped, not listed as a unit)
+      if (doc) {
+        arr.forEach(function (rec) {
+          var idv = rec.id || docTitle(rec);
+          units.push({ key: wsId + '.' + name + '.' + idv, wsId: wsId, wsName: wsName,
+            granularity: 'document', space: name, title: docTitle(rec), rec: rec });
+        });
+      } else {
+        units.push({ key: wsId + '.' + name + '.__set__', wsId: wsId, wsName: wsName,
+          granularity: 'record-set', space: name, title: name + ' (' + arr.length + ')', recs: arr });
+        units.push({ key: wsId + '.' + name + '.__schema__', wsId: wsId, wsName: wsName,
+          granularity: 'schema', space: name, title: name + ' · ' + t('unit.schema'), ot: ot, sample: arr.slice(0, 3) });
+      }
+    });
+    units.push({ key: wsId + '.__manifest__', wsId: wsId, wsName: wsName,
+      granularity: 'manifest', space: '(manifest)', title: wsName + ' · ' + t('unit.manifest'), manifest: manifest });
+    return units;
+  }
+
+  function unitContent(u) {
+    var cap = S.settings.chunkChars || 40000;
+    if (u.granularity === 'document') {
+      var v = u.rec || {};
+      var body = (typeof v.markdown === 'string') ? v.markdown : JSON.stringify(stripMeta(v), null, 2);
+      var s = '# ' + docTitle(v) + '\n\n' + body;
+      return { content: clip(s, cap), truncated: s.length > cap };
+    }
+    if (u.granularity === 'record-set') {
+      var sample = (u.recs || []).slice(0, S.settings.sampleCap || 50).map(stripMeta);
+      var s2 = JSON.stringify(sample, null, 2);
+      return { content: clip(s2, cap), truncated: s2.length > cap, sample_size: sample.length };
+    }
+    if (u.granularity === 'schema') {
+      var s3 = JSON.stringify({ objectType: u.ot, exampleShapes: (u.sample || []).map(function (r) { return Object.keys(stripMeta(r)); }) }, null, 2);
+      return { content: clip(s3, cap), truncated: false };
+    }
+    // manifest
+    var s4 = JSON.stringify(u.manifest, null, 2);
+    return { content: clip(s4, cap), truncated: s4.length > cap };
+  }
+  function stripMeta(v) {
+    if (!v || typeof v !== 'object') return v;
+    var o = {}; Object.keys(v).forEach(function (k) { if (k[0] !== '_') o[k] = v[k]; }); return o;
+  }
+  function clip(s, n) { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+  function render(tpl, vars) {
+    return String(tpl).replace(/\{\{(\w+)\}\}/g, function (_, k) { return vars[k] != null ? vars[k] : ''; });
+  }
+
+  // ───────────────────── the per-unit pipeline ─────────────────────
+  async function appraiseUnit(u) {
+    var c = unitContent(u);
+    var result = { type: 'appraisal', spec: 'docs/specs/appraisal-contract.md', unitKey: u.key,
+      target: { orgId: S.orgId, wsId: u.wsId, wsName: u.wsName, space: u.space, granularity: u.granularity, title: u.title },
+      profile: null, context_table: [], value: null,
+      provenance: { model: '', date: new Date().toISOString(), sample_size: c.sample_size || null, truncated: !!c.truncated },
+      createdAt: new Date().toISOString() };
+
+    var dikwStr = '{}';
+    if (S.settings.stageDikw !== false) {
+      var d = await AIMEAT.ai.completeJson({
+        systemPrompt: S.prompts['dikw.system'], app_id: APP_ID, modelRole: S.settings.modelRole,
+        model: S.settings.model || undefined,
+        prompt: render(S.prompts['dikw.user'], { granularity: u.granularity, spaceName: u.space, content: c.content })
+      });
+      trackUsage(d);
+      result.profile = d.parsed; result.provenance.model = d.model;
+      dikwStr = JSON.stringify(d.parsed);
+    }
+    if (S.settings.stageRows !== false) {
+      var rws = await AIMEAT.ai.completeJson({
+        systemPrompt: S.prompts['rows.system'], app_id: APP_ID, modelRole: S.settings.modelRole,
+        model: S.settings.model || undefined,
+        prompt: render(S.prompts['rows.user'], { granularity: u.granularity, spaceName: u.space, dikw: dikwStr })
+      });
+      trackUsage(rws);
+      var rows = (rws.parsed && rws.parsed.context_table) || [];
+      result.context_table = gateRows(rows);
+      result.value = (rws.parsed && rws.parsed.value) || null;
+      if (!result.provenance.model) result.provenance.model = rws.model;
+    }
+    await AIMEAT.data.set(unitMemKey(u.key), result);
+    return result;
+  }
+
+  // Falsification gate (deterministic): drop rows without a nameable consumer AND a real decision.
+  function gateRows(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(function (r) {
+      if (!r || typeof r !== 'object') return false;
+      var c = (r.consumer || '').toString().trim();
+      var d = (r.decision || '').toString().trim();
+      if (!c || !d) return false;
+      if (/^(anyone|someone|users?|people|stakeholders?|kuka tahansa|kaikki)$/i.test(c)) return false;
+      return true;
+    }).map(function (r) { r.verdict = 'claimed'; if (r.validity == null) r.validity = true; return r; });
+  }
+
+  // ───────────────────── runner (resumable) ─────────────────────
+  function setUnitStatus(u, status, extra) {
+    S.run.units[u.key] = Object.assign({}, S.run.units[u.key], {
+      status: status, wsId: u.wsId, title: u.title, granularity: u.granularity, ranAt: new Date().toISOString()
+    }, extra || {});
+  }
+
+  async function runUnits(units, opts) {
+    opts = opts || {};
+    if (S.running) { toast(t('runner.busy')); return; }
+    var costBefore = S.cost;
+    S.running = true; S.stopFlag = false; renderTree();
+    for (var i = 0; i < units.length; i++) {
+      if (S.stopFlag) break;
+      var u = units[i];
+      if (opts.pendingOnly && S.run.units[u.key] && S.run.units[u.key].status === 'done') continue;
+      setUnitStatus(u, 'running'); renderTree();
+      try {
+        await appraiseUnit(u);
+        setUnitStatus(u, 'done', { cost: round4(S.cost - costBefore), error: null });
+      } catch (e) {
+        setUnitStatus(u, 'error', { error: (e && e.message) || String(e) });
+      }
+      costBefore = S.cost;
+      await saveRun(); renderTree();
+    }
+    S.running = false; renderTree();
+  }
+  function round4(n) { return Math.round((n || 0) * 10000) / 10000; }
+
+  function estimateCalls(units) {
+    var per = (S.settings.stageDikw !== false ? 1 : 0) + (S.settings.stageRows !== false ? 1 : 0);
+    return units.length * (per || 1);
+  }
+  async function runWithWarning(units, opts) {
+    var calls = estimateCalls(units);
+    if (calls > (S.settings.warnThreshold || 20)) {
+      var ok = await confirmModal(t('warn.title'), t('warn.body', { n: units.length, c: calls }), t('warn.go'), t('warn.cancel'));
+      if (!ok) return;
+    }
+    await runUnits(units, opts);
+  }
+
+  // ───────────────────── boot / auth / gate ─────────────────────
+  async function boot() {
+    try { AIMEAT.auth.mountLoginButton('#header-auth'); } catch (e) {}
+    AIMEAT.auth.on && AIMEAT.auth.on('login', onAuth);
+    AIMEAT.auth.on && AIMEAT.auth.on('logout', function () { location.reload(); });
+    await onAuth();
+  }
+
+  async function onAuth() {
+    S.session = AIMEAT.auth.getSession();
+    if (!S.session) {
+      // Owner/app silent login may still be in flight at boot; try once, then
+      // rely on the 'login' event (registered in boot) for late completion.
+      try { await AIMEAT.auth.login(); } catch (e) {}
+      S.session = AIMEAT.auth.getSession();
+    }
+    if (!S.session) { showGate('login'); return; }
+    S.owner = S.session.owner || (S.session.ghii || '').split('@')[0];
+    var ok = await AIMEAT.ai.isAvailable();
+    if (!ok) { showGate('ai'); return; }
+    $('#da-gate').classList.add('hidden');
+    $('#da-tabs').hidden = false;
+    await Promise.all([loadPrompts(), loadSettings()]);
+    await loadOrgs();
+    renderCost();
+    switchView('tree');
+  }
+
+  function showGate(kind) {
+    $('#da-tabs').hidden = true;
+    ['tree','reports','prompts','settings'].forEach(function (v) { $('#da-view-' + v).classList.add('hidden'); });
+    var g = $('#da-gate'); g.classList.remove('hidden');
+    if (kind === 'login') {
+      g.innerHTML = '<p>' + esc(t('gate.login')) + '</p>';
+    } else {
+      g.innerHTML = '<h3>' + esc(t('gate.title')) + '</h3><p class="muted">' + esc(t('gate.body')) + '</p>';
+    }
+  }
+
+  async function loadOrgs() {
+    try {
+      var r = await sf('/v1/organisms?member=' + encodeURIComponent(S.owner) + '&per_page=100');
+      S.orgs = (r && r.ok && r.data && r.data.organisms) ? r.data.organisms : [];
+    } catch (e) { S.orgs = []; }
+  }
+
+  // ───────────────────── views ─────────────────────
+  function switchView(v) {
+    S.view = v;
+    Array.prototype.forEach.call(document.querySelectorAll('nav.da-tabs button'), function (b) {
+      b.classList.toggle('active', b.getAttribute('data-view') === v);
+    });
+    ['tree','reports','prompts','settings'].forEach(function (x) { $('#da-view-' + x).classList.toggle('hidden', x !== v); });
+    if (v === 'tree') renderTree();
+    else if (v === 'reports') renderReports();
+    else if (v === 'prompts') renderPrompts();
+    else if (v === 'settings') renderSettings();
+  }
+
+  // ---- Run tree ----
+  async function selectOrg(id) {
+    S.orgId = id;
+    var o = S.orgs.filter(function (x) { return x.id === id; })[0];
+    S.orgName = o ? (o.name || id) : id;
+    $('#da-orgname').textContent = S.orgName;
+    S.wsLoaded = {}; S.wsOpen = {}; S.workspaces = []; S.wsListLoaded = false;
+    await loadRun();
+    renderTree();
+    try {
+      var r = await sf('/v1/organisms/' + encodeURIComponent(id) + '/workspaces');
+      var list = (r && r.ok && r.data && r.data.workspaces) ? r.data.workspaces : [];
+      S.workspaces = list.map(function (w) { return { ws: w.id, name: w.name || w.id }; });
+    } catch (e) { S.workspaces = []; }
+    S.wsListLoaded = true;
+    renderTree();
+  }
+
+  async function loadWs(wsId, name) {
+    try {
+      var r = await sf('/v1/organisms/' + encodeURIComponent(S.orgId) + '/workspace?ws=' + encodeURIComponent(wsId));
+      var d = (r && r.ok && r.data) ? r.data : {};
+      var units = buildUnits(wsId, name, d.manifest, d.objects);
+      S.wsLoaded[wsId] = { manifest: d.manifest, objects: d.objects, units: units };
+    } catch (e) { S.wsLoaded[wsId] = { units: [], error: (e && e.message) || String(e) }; }
+  }
+
+  function renderTree() {
+    var host = $('#da-view-tree');
+    var h = [];
+    // org picker
+    h.push('<div class="da-card"><label>' + esc(t('tree.pickOrg')) + '</label><div class="row">');
+    h.push('<select id="da-org">');
+    h.push('<option value="">—</option>');
+    S.orgs.forEach(function (o) {
+      h.push('<option value="' + esc(o.id) + '"' + (o.id === S.orgId ? ' selected' : '') + '>' + esc(o.name || o.id) + '</option>');
+    });
+    h.push('</select></div>');
+    if (!S.orgs.length) h.push('<p class="muted">' + esc(t('tree.noOrgs')) + '</p>');
+    h.push('</div>');
+
+    if (S.orgId) {
+      if (!S.wsListLoaded) {
+        h.push('<p class="muted">' + esc(t('tree.loadOverview')) + '</p>');
+      } else {
+        h.push('<div class="row" style="margin-bottom:.7rem">');
+        h.push('<button class="da-btn" id="da-run-org"' + (S.running ? ' disabled' : '') + '>' + esc(t('tree.runOrg')) + '</button>');
+        if (S.running) h.push('<button class="da-btn ghost" id="da-stop">' + esc(t('tree.stop')) + '</button>');
+        h.push('<span class="muted">' + esc(S.running ? t('tree.running') : (S.msg || '')) + '</span>');
+        h.push('</div>');
+        if (!S.workspaces.length) h.push('<p class="muted">—</p>');
+        S.workspaces.forEach(function (w) { h.push(renderWsBlock(w)); });
+      }
+    }
+    host.innerHTML = h.join('');
+    // wire
+    var sel = $('#da-org'); if (sel) sel.addEventListener('change', function () { if (this.value) selectOrg(this.value); });
+    var ro = $('#da-run-org'); if (ro) ro.addEventListener('click', runWholeOrg);
+    var st = $('#da-stop'); if (st) st.addEventListener('click', function () { S.stopFlag = true; S.msg = t('tree.stopped'); });
+    wireWsBlocks();
+  }
+
+  function renderWsBlock(w) {
+    var open = !!S.wsOpen[w.ws];
+    var counts = [];
+    var ldc = S.wsLoaded[w.ws];
+    if (ldc && ldc.units) counts.push(ldc.units.length + ' ' + (lang === 'en' ? 'units' : 'yksikköä'));
+    var h = ['<div class="da-ws"><div class="da-ws-head" data-ws="' + esc(w.ws) + '">'];
+    h.push('<span class="da-dot ' + wsDotClass(w.ws) + '"></span>');
+    h.push('<h3>' + esc(w.name || w.ws) + '</h3>');
+    h.push('<span class="muted">' + esc(counts.join(' · ')) + '</span>');
+    h.push('<span class="da-btn ghost small">' + esc(open ? t('tree.close') : t('tree.open')) + '</span>');
+    h.push('</div>');
+    if (open) {
+      h.push('<div class="da-ws-body">');
+      var ld = S.wsLoaded[w.ws];
+      if (!ld) { h.push('<p class="muted">' + esc(t('tree.loadWs')) + '</p>'); }
+      else if (ld.error) { h.push('<p class="da-err">' + esc(ld.error) + '</p>'); }
+      else {
+        h.push('<div class="row" style="margin-bottom:.5rem">');
+        h.push('<button class="da-btn small" data-runws="' + esc(w.ws) + '"' + (S.running ? ' disabled' : '') + '>' + esc(t('tree.runWs')) + '</button>');
+        h.push('<button class="da-btn ghost small" data-contws="' + esc(w.ws) + '"' + (S.running ? ' disabled' : '') + '>' + esc(t('tree.continue')) + '</button>');
+        h.push('</div>');
+        (ld.units || []).forEach(function (u) {
+          var st = (S.run.units[u.key] || {}).status || 'pending';
+          h.push('<div class="da-unit">');
+          h.push('<span class="da-dot ' + st + '"></span>');
+          h.push('<span class="da-tag gran">' + esc(t('unit.' + (u.granularity === 'record-set' ? 'set' : u.granularity)) || u.granularity) + '</span>');
+          h.push('<span class="ttl">' + esc(u.title) + '</span>');
+          if ((S.run.units[u.key] || {}).error) h.push('<span class="da-err" title="' + esc(S.run.units[u.key].error) + '">!</span>');
+          h.push('<button class="da-btn ghost small" data-run="' + esc(u.key) + '" data-ws="' + esc(w.ws) + '"' + (S.running ? ' disabled' : '') + '>' + esc(st === 'done' ? t('tree.rerun') : t('tree.run')) + '</button>');
+          if (st === 'done') h.push('<button class="da-btn ghost small" data-view-unit="' + esc(u.key) + '">' + esc(t('tree.view')) + '</button>');
+          h.push('</div>');
+        });
+        if (!(ld.units || []).length) h.push('<p class="muted">' + esc(t('tree.empty')) + '</p>');
+      }
+      h.push('</div>');
+    }
+    h.push('</div>');
+    return h.join('');
+  }
+  function wsDotClass(wsId) {
+    var ld = S.wsLoaded[wsId]; if (!ld || !ld.units) return 'pending';
+    var any = false, allDone = true;
+    ld.units.forEach(function (u) { var s = (S.run.units[u.key] || {}).status; if (s === 'done') any = true; else allDone = false; });
+    return allDone && ld.units.length ? 'done' : (any ? 'running' : 'pending');
+  }
+
+  function wireWsBlocks() {
+    Array.prototype.forEach.call(document.querySelectorAll('.da-ws-head'), function (el) {
+      el.addEventListener('click', async function () {
+        var ws = el.getAttribute('data-ws');
+        S.wsOpen[ws] = !S.wsOpen[ws];
+        if (S.wsOpen[ws] && !S.wsLoaded[ws]) { renderTree(); var w = wsMeta(ws); await loadWs(ws, w ? w.name : ws); }
+        renderTree();
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-run]'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var key = b.getAttribute('data-run'), ws = b.getAttribute('data-ws');
+        var u = findUnit(ws, key); if (u) runUnits([u]);
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-runws]'), function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); var ws = b.getAttribute('data-runws');
+        var ld = S.wsLoaded[ws]; if (ld) runWithWarning(ld.units.slice()); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-contws]'), function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); var ws = b.getAttribute('data-contws');
+        var ld = S.wsLoaded[ws]; if (ld) runWithWarning(ld.units.slice(), { pendingOnly: true }); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-view-unit]'), function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); viewUnit(b.getAttribute('data-view-unit')); });
+    });
+  }
+  function wsMeta(ws) { return S.workspaces.filter(function (w) { return w.ws === ws; })[0]; }
+  function findUnit(ws, key) { var ld = S.wsLoaded[ws]; return ld ? ld.units.filter(function (u) { return u.key === key; })[0] : null; }
+
+  async function runWholeOrg() {
+    // load every workspace, enumerate all units, then run with warning
+    var wss = S.workspaces;
+    S.msg = t('tree.loadWs'); renderTree();
+    for (var i = 0; i < wss.length; i++) { if (!S.wsLoaded[wss[i].ws]) await loadWs(wss[i].ws, wss[i].name); }
+    var all = [];
+    wss.forEach(function (w) { var ld = S.wsLoaded[w.ws]; if (ld && ld.units) all = all.concat(ld.units); });
+    S.msg = '';
+    await runWithWarning(all, { pendingOnly: true });
+  }
+
+  // ───────────────────── unit detail / reports ─────────────────────
+  async function viewUnit(uk) {
+    var res = null; try { res = await AIMEAT.data.get(unitMemKey(uk)); } catch (e) {}
+    if (!res) { toast(t('err.generic')); return; }
+    showModal(renderUnitReport(res));
+  }
+  function renderUnitReport(res) {
+    var h = ['<div style="max-width:760px;max-height:80vh;overflow:auto">'];
+    h.push('<h3 style="margin-top:0">' + esc(res.target.title) + '</h3>');
+    h.push('<p class="muted">' + esc(res.target.wsName + ' · ' + res.target.space + ' · ' + res.target.granularity) + '</p>');
+    if (res.value) {
+      h.push('<p class="da-value">' + esc(t('rep.bestValue')) + ': ' + esc(res.value.best_valid_return || '—')
+        + (res.value.unit ? ' (' + esc(res.value.unit) + ')' : '') + ' <span class="da-claimed">' + esc(t('claimed')) + '</span></p>');
+      if (res.value.basis) h.push('<p class="muted">' + esc(res.value.basis) + '</p>');
+    }
+    if (res.profile) {
+      h.push('<h4>' + esc(t('rep.profile')) + '</h4><div class="da-dikw">');
+      ['data','information','knowledge','wisdom'].forEach(function (lv) {
+        var arr = res.profile[lv] || [];
+        h.push('<div class="da-dikw-box"><h4>' + lv.toUpperCase() + '</h4><ul>'
+          + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>');
+      });
+      h.push('</div>');
+    }
+    h.push('<h4>' + esc(t('rep.context')) + '</h4>');
+    h.push(renderCtxTable(res.context_table || []));
+    h.push('</div>');
+    return h.join('');
+  }
+  function renderCtxTable(rows) {
+    if (!rows.length) return '<p class="muted">—</p>';
+    var h = ['<table class="da-ctx"><thead><tr>'
+      + '<th>' + esc(t('ctx.consumer')) + '</th><th>' + esc(t('ctx.decision')) + '</th>'
+      + '<th>' + esc(t('ctx.window')) + '</th><th>' + esc(t('ctx.return')) + '</th><th>' + esc(t('ctx.verdict')) + '</th></tr></thead><tbody>'];
+    rows.forEach(function (r) {
+      h.push('<tr><td>' + esc(r.consumer) + '</td><td>' + esc(r.decision) + '</td><td>' + esc(r.window) + '</td>'
+        + '<td>' + esc(r.return_claim) + (r.return_unit ? ' <span class="muted">(' + esc(r.return_unit) + ')</span>' : '') + '</td>'
+        + '<td><span class="da-claimed">' + esc(t('claimed')) + '</span></td></tr>');
+    });
+    h.push('</tbody></table>');
+    return h.join('');
+  }
+
+  async function renderReports() {
+    var host = $('#da-view-reports');
+    if (!S.orgId) { host.innerHTML = '<div class="da-card"><p class="muted">' + esc(t('tree.pickOrg')) + '</p></div>'; return; }
+    host.innerHTML = '<div class="da-card"><p class="muted">…</p></div>';
+    var listed = [];
+    try { var r = await AIMEAT.data.list({ prefix: 'appraisal.unit.' + S.orgId + '.' }); listed = (r && r.entries) || []; } catch (e) {}
+    var h = [];
+    h.push('<div class="da-card"><div class="row">');
+    h.push('<button class="da-btn small" id="da-orgrollup"' + (S.running ? ' disabled' : '') + '>' + esc(t('rep.orgRollup')) + '</button>');
+    h.push('</div><div id="da-orgrep"></div></div>');
+    h.push('<div class="da-card"><h3 style="margin-top:0">' + esc(t('rep.unitTitle')) + '</h3>');
+    if (!listed.length) h.push('<p class="muted">' + esc(t('rep.none')) + '</p>');
+    else {
+      // group by ws
+      var byWs = {};
+      listed.forEach(function (e) { var v = e.value || {}; var ws = (v.target && v.target.wsName) || '?'; (byWs[ws] = byWs[ws] || []).push(v); });
+      Object.keys(byWs).forEach(function (ws) {
+        h.push('<div class="da-ws"><div class="da-ws-head"><h3>' + esc(ws) + '</h3>'
+          + '<button class="da-btn ghost small" data-wsrollup="' + esc((byWs[ws][0].target||{}).wsId||'') + '" data-wsname="' + esc(ws) + '">' + esc(t('rep.wsRollup')) + '</button></div><div class="da-ws-body">');
+        byWs[ws].forEach(function (v) {
+          h.push('<div class="da-unit"><span class="da-tag gran">' + esc(v.target.granularity) + '</span>'
+            + '<span class="ttl">' + esc(v.target.title) + '</span>'
+            + '<span class="muted">' + esc(v.value ? (v.value.best_valid_return || '') : '') + '</span>'
+            + '<button class="da-btn ghost small" data-vu="' + esc(v.unitKey) + '">' + esc(t('tree.view')) + '</button></div>');
+        });
+        h.push('</div></div>');
+      });
+    }
+    h.push('</div>');
+    host.innerHTML = h.join('');
+    Array.prototype.forEach.call(host.querySelectorAll('[data-vu]'), function (b) {
+      b.addEventListener('click', function () { viewUnit(b.getAttribute('data-vu')); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll('[data-wsrollup]'), function (b) {
+      b.addEventListener('click', function () { wsRollup(b.getAttribute('data-wsrollup'), b.getAttribute('data-wsname')); });
+    });
+    var or = $('#da-orgrollup'); if (or) or.addEventListener('click', orgRollup);
+    // show stored org report if present
+    AIMEAT.data.get(orgRepKey()).then(function (rep) { if (rep) $('#da-orgrep').innerHTML = '<pre class="da-json">' + esc(JSON.stringify(rep, null, 2)) + '</pre>'; }).catch(function(){});
+  }
+
+  async function collectUnitResults(wsId) {
+    var prefix = 'appraisal.unit.' + S.orgId + '.' + (wsId ? wsId + '.' : '');
+    var r = await AIMEAT.data.list({ prefix: prefix });
+    return ((r && r.entries) || []).map(function (e) { return e.value; }).filter(Boolean);
+  }
+  async function wsRollup(wsId, wsName) {
+    if (S.running) { toast(t('runner.busy')); return; }
+    var units = await collectUnitResults(wsId);
+    var summaries = units.map(function (u) { return { title: u.target.title, granularity: u.target.granularity, value: u.value, top_consumers: (u.context_table || []).slice(0, 3).map(function (r) { return r.consumer; }) }; });
+    try {
+      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['wsRollup.system'], app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
+        prompt: render(S.prompts['wsRollup.user'], { spaceName: wsName, unitSummaries: JSON.stringify(summaries) }) });
+      trackUsage(rep);
+      await AIMEAT.data.set(wsRepKey(wsId), rep.parsed);
+      showModal('<div style="max-width:600px"><h3 style="margin-top:0">' + esc(wsName) + '</h3><pre class="da-json">' + esc(JSON.stringify(rep.parsed, null, 2)) + '</pre></div>');
+    } catch (e) { toast((e && e.message) || t('err.generic')); }
+  }
+  async function orgRollup() {
+    if (S.running) { toast(t('runner.busy')); return; }
+    var units = await collectUnitResults(null);
+    var byWs = {};
+    units.forEach(function (u) { var ws = u.target.wsName; (byWs[ws] = byWs[ws] || []).push({ title: u.target.title, value: u.value }); });
+    try {
+      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['orgRollup.system'], app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
+        prompt: render(S.prompts['orgRollup.user'], { spaceName: S.orgName, unitSummaries: JSON.stringify(byWs) }) });
+      trackUsage(rep);
+      await AIMEAT.data.set(orgRepKey(), rep.parsed);
+      $('#da-orgrep').innerHTML = '<pre class="da-json">' + esc(JSON.stringify(rep.parsed, null, 2)) + '</pre>';
+    } catch (e) { toast((e && e.message) || t('err.generic')); }
+  }
+
+  // ───────────────────── prompts editor ─────────────────────
+  function renderPrompts() {
+    var host = $('#da-view-prompts');
+    var h = ['<div class="da-card"><p class="muted">' + esc(t('prompts.intro')) + '</p></div>'];
+    Object.keys(DEFAULT_PROMPTS).forEach(function (k) {
+      h.push('<div class="da-card da-prompt-block"><label>' + esc(PROMPT_LABELS[k] || k) + '</label>');
+      h.push('<textarea data-prompt="' + esc(k) + '">' + esc(S.prompts[k] != null ? S.prompts[k] : DEFAULT_PROMPTS[k]) + '</textarea>');
+      h.push('<div class="row" style="margin-top:.5rem"><button class="da-btn small" data-psave="' + esc(k) + '">' + esc(t('prompts.save')) + '</button>');
+      h.push('<button class="da-btn ghost small" data-preset="' + esc(k) + '">' + esc(t('prompts.reset')) + '</button>');
+      h.push('<span class="muted" data-pmsg="' + esc(k) + '"></span></div></div>');
+    });
+    host.innerHTML = h.join('');
+    Array.prototype.forEach.call(host.querySelectorAll('[data-psave]'), function (b) {
+      b.addEventListener('click', async function () {
+        var k = b.getAttribute('data-psave');
+        S.prompts[k] = host.querySelector('[data-prompt="' + k + '"]').value;
+        await savePrompts(); $('[data-pmsg="' + k + '"]', host).textContent = t('prompts.saved');
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll('[data-preset]'), function (b) {
+      b.addEventListener('click', async function () {
+        var k = b.getAttribute('data-preset');
+        S.prompts[k] = DEFAULT_PROMPTS[k];
+        host.querySelector('[data-prompt="' + k + '"]').value = DEFAULT_PROMPTS[k];
+        await savePrompts(); $('[data-pmsg="' + k + '"]', host).textContent = t('prompts.saved');
+      });
+    });
+  }
+
+  // ───────────────────── settings ─────────────────────
+  function renderSettings() {
+    var host = $('#da-view-settings'); var s = S.settings;
+    var h = ['<div class="da-card"><p class="muted">' + esc(t('set.intro')) + '</p>'];
+    h.push('<div class="da-gridset">');
+    h.push(fld('model', 'set.model', 'text', s.model));
+    h.push('<div><label>' + esc(t('set.modelRole')) + '</label><select data-set="modelRole">'
+      + '<option value="reasoning"' + (s.modelRole === 'reasoning' ? ' selected' : '') + '>reasoning</option>'
+      + '<option value="execution"' + (s.modelRole === 'execution' ? ' selected' : '') + '>execution</option></select></div>');
+    h.push(fld('sampleCap', 'set.sampleCap', 'number', s.sampleCap));
+    h.push(fld('chunkChars', 'set.chunkChars', 'number', s.chunkChars));
+    h.push(fld('warnThreshold', 'set.warn', 'number', s.warnThreshold));
+    h.push('</div>');
+    h.push('<div class="row" style="margin-top:.6rem">'
+      + '<label style="display:flex;gap:.4rem;align-items:center"><input type="checkbox" data-set="stageDikw" style="width:auto"' + (s.stageDikw !== false ? ' checked' : '') + '> ' + esc(t('set.stageDikw')) + '</label>'
+      + '<label style="display:flex;gap:.4rem;align-items:center"><input type="checkbox" data-set="stageRows" style="width:auto"' + (s.stageRows !== false ? ' checked' : '') + '> ' + esc(t('set.stageRows')) + '</label></div>');
+    h.push('<div class="row" style="margin-top:.7rem"><button class="da-btn" id="da-set-save">' + esc(t('set.save')) + '</button><span class="muted" id="da-set-msg"></span></div>');
+    h.push('</div>');
+    host.innerHTML = h.join('');
+    $('#da-set-save').addEventListener('click', async function () {
+      Array.prototype.forEach.call(host.querySelectorAll('[data-set]'), function (el) {
+        var k = el.getAttribute('data-set');
+        if (el.type === 'checkbox') S.settings[k] = el.checked;
+        else if (el.type === 'number') S.settings[k] = Number(el.value) || DEFAULT_SETTINGS[k];
+        else S.settings[k] = el.value;
+      });
+      await saveSettings(); $('#da-set-msg').textContent = t('set.saved');
+    });
+  }
+  function fld(key, label, type, val) {
+    return '<div><label>' + esc(t(label)) + '</label><input type="' + type + '" data-set="' + key + '" value="' + esc(val == null ? '' : val) + '"></div>';
+  }
+
+  // ───────────────────── modal / toast ─────────────────────
+  function showModal(innerHtml) {
+    var host = $('#da-modal-host');
+    host.innerHTML = '<div class="da-modal-bg"><div class="da-modal">' + innerHtml
+      + '<div class="row" style="margin-top:.8rem;justify-content:flex-end"><button class="da-btn ghost" id="da-modal-close">×</button></div></div></div>';
+    $('#da-modal-close').addEventListener('click', function () { host.innerHTML = ''; });
+    host.querySelector('.da-modal-bg').addEventListener('click', function (e) { if (e.target === this) host.innerHTML = ''; });
+  }
+  function confirmModal(title, body, goLabel, cancelLabel) {
+    return new Promise(function (resolve) {
+      var host = $('#da-modal-host');
+      host.innerHTML = '<div class="da-modal-bg"><div class="da-modal"><h3 style="margin-top:0">' + esc(title) + '</h3>'
+        + '<p class="muted">' + esc(body) + '</p><div class="row" style="justify-content:flex-end">'
+        + '<button class="da-btn ghost" id="da-c-cancel">' + esc(cancelLabel) + '</button>'
+        + '<button class="da-btn" id="da-c-go">' + esc(goLabel) + '</button></div></div></div>';
+      $('#da-c-go').addEventListener('click', function () { host.innerHTML = ''; resolve(true); });
+      $('#da-c-cancel').addEventListener('click', function () { host.innerHTML = ''; resolve(false); });
+    });
+  }
+  function toast(m) { S.msg = m; if (S.view === 'tree') renderTree(); }
+
+  // ───────────────────── tabs wiring ─────────────────────
+  Array.prototype.forEach.call(document.querySelectorAll('nav.da-tabs button'), function (b) {
+    b.addEventListener('click', function () { switchView(b.getAttribute('data-view')); });
+  });
+  // localize tab labels
+  Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.textContent = t(el.getAttribute('data-t')); });
+
+  boot();
+})();
+</script>
+</body>
+</html>

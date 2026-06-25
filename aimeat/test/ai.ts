@@ -7,6 +7,8 @@
  *   reference for that.
  * @version-history
  *   v1.0.0 — 2026-05-29 — Initial.
+ *   v1.1.0 — 2026-06-25 — Cover GET /v1/ai/available (auth + keyless-owner false) and assert the
+ *     aimeat-ai.js lib probes it.
  */
 // Run: cd aimeat && pnpm exec tsx test/ai.ts
 // Requires: server running on port 40251 with AIMEAT_ENCRYPTION_KEY set
@@ -107,6 +109,11 @@ await test('GET /v1/ai/usage without auth → 401', async () => {
 
 await test('GET /v1/ai/settings without auth → 401', async () => {
   const { status } = await json('/v1/ai/settings');
+  assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('GET /v1/ai/available without auth → 401', async () => {
+  const { status } = await json('/v1/ai/available');
   assert(status === 401, `expected 401, got ${status}`);
 });
 
@@ -234,6 +241,18 @@ await test('GET /v1/ai/usage shows zero spend for fresh user', async () => {
   assert(d?.total_calls === 0, `expected 0 calls, got ${d?.total_calls}`);
 });
 
+// ─── Availability probe ───
+console.log('\nAvailability');
+
+await test('GET /v1/ai/available (owner, no key) → 200 { available:false }', async () => {
+  const { status, body } = await json('/v1/ai/available', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+  const d = body.data as { available?: boolean };
+  assert(d?.available === false, `expected available:false for a keyless owner, got ${d?.available}`);
+});
+
 // ─── Library availability ───
 console.log('\nLibrary');
 
@@ -243,6 +262,7 @@ await test('GET /v1/libs/aimeat-ai.js serves the lib', async () => {
   const text = await res.text();
   assert(text.includes('AIMEAT.ai'), 'lib defines AIMEAT.ai');
   assert(text.includes('isAvailable'), 'lib exposes isAvailable');
+  assert(text.includes('/v1/ai/available'), 'isAvailable probes /v1/ai/available');
   assert(text.includes('complete'), 'lib exposes complete');
   assert(text.includes('completeJson'), 'lib exposes completeJson');
 });

@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.21.0 - 2026-06-25 - aimeat-auth.js: apps can declare the scopes they need via
+ *   <meta name="aimeat-scopes" content="…">. The H-2 silent bridge + consent popup now request the
+ *   declared set (falling back to APP_DEFAULT_SCOPES), so e.g. an AI app adds "ai:use" to spend the
+ *   owner's AI budget while non-declaring apps are unchanged. authorize still validates every scope.
  * v1.20.0 - 2026-06-25 - aimeat-auth.js: one-time username choice for first-time Google users. A
  *   brand-new Google account is no longer auto-created from the email local-part; the callback bounces
  *   back with ?aimeat_signup=1 and showGoogleSignupModal() prompts for a username (suggested, editable,
@@ -338,6 +342,20 @@ const APEX_URL = '${config.baseUrl}';
 // SEPARATE scope domain from memory — saving an image goes to /v1/storage, not /v1/memory.)
 const APP_DEFAULT_SCOPES = 'memory:read memory:write storage:read storage:write';
 
+// An app declares the scopes it needs with <meta name="aimeat-scopes" content="scope scope …">.
+// Only declared apps deviate from the default set — e.g. an AI app adds "ai:use" so its grant
+// can spend the owner's AI budget. Falls back to APP_DEFAULT_SCOPES when undeclared, so existing
+// apps are unaffected. The authorize endpoint still validates every scope against the node's
+// grantable vocabulary, so a bogus meta value can only ever request LESS than the node allows.
+function appDeclaredScopes() {
+  try {
+    var m = document.querySelector('meta[name="aimeat-scopes"]');
+    var c = m && m.getAttribute('content');
+    if (c && c.trim()) return c.trim().replace(/\\s+/g, ' ');
+  } catch (e) { /* no document / detached */ }
+  return APP_DEFAULT_SCOPES;
+}
+
 const NODE_ID = '${config.nodeId}';
 
 // Social login availability (baked in server-side from node config).
@@ -603,7 +621,7 @@ function silentAppToken() {
     iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.src = apexOrigin + '/app-silent.html?scope=' + encodeURIComponent(APP_DEFAULT_SCOPES);
+    iframe.src = apexOrigin + '/app-silent.html?scope=' + encodeURIComponent(appDeclaredScopes());
     (document.body || document.documentElement).appendChild(iframe);
     timer = setTimeout(function () { finish(null); }, 8000);
   });
@@ -635,7 +653,7 @@ async function requestConsentPopup(app, scopeStr, manage) {
   var p = await _pkce();
   var state = _b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
   var redirectUri = location.origin + '/'; // app origin; never navigated in web_message mode (origin binding only)
-  var scope = scopeStr || APP_DEFAULT_SCOPES;
+  var scope = scopeStr || appDeclaredScopes();
   // manage=1 → the consent page always shows the management screen (the gear). Without it, an app the
   // user already granted just passes straight through (auto-approve) instead of prompting again.
   var url = apexOrigin + '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
