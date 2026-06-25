@@ -18,6 +18,8 @@
     v0.1.0 — 2026-06-25 — Initial build: DIKW-driven data valuation app (Phase 1).
     v0.1.1 — 2026-06-25 — Workspace list via /workspaces; silent-login boot fallback;
       declare ai:use scope (meta) so AI works on the isolated app origin under H-2.
+    v0.1.2 — 2026-06-25 — Wider report modal on desktop (.da-wide, min(1100px,94vw)) so the
+      context table isn't cramped; unit + workspace-rollup reports use it.
 -->
 <html lang="fi">
 <head>
@@ -85,6 +87,8 @@
   .da-prompt-block { margin-bottom:1rem; }
   .da-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
   .da-modal { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1.1rem; max-width:460px; }
+  .da-modal.da-wide { max-width:min(1100px, 94vw); width:min(1100px, 94vw); }
+  .da-modal-inner { max-height:82vh; overflow:auto; }
   .da-value { font-weight:600; }
   .hidden { display:none !important; }
   .da-gridset { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
@@ -684,10 +688,10 @@
   async function viewUnit(uk) {
     var res = null; try { res = await AIMEAT.data.get(unitMemKey(uk)); } catch (e) {}
     if (!res) { toast(t('err.generic')); return; }
-    showModal(renderUnitReport(res));
+    showModal(renderUnitReport(res), true);
   }
   function renderUnitReport(res) {
-    var h = ['<div style="max-width:760px;max-height:80vh;overflow:auto">'];
+    var h = ['<div class="da-modal-inner">'];
     h.push('<h3 style="margin-top:0">' + esc(res.target.title) + '</h3>');
     h.push('<p class="muted">' + esc(res.target.wsName + ' · ' + res.target.space + ' · ' + res.target.granularity) + '</p>');
     if (res.value) {
@@ -778,7 +782,7 @@
         prompt: render(S.prompts['wsRollup.user'], { spaceName: wsName, unitSummaries: JSON.stringify(summaries) }) });
       trackUsage(rep);
       await AIMEAT.data.set(wsRepKey(wsId), rep.parsed);
-      showModal('<div style="max-width:600px"><h3 style="margin-top:0">' + esc(wsName) + '</h3><pre class="da-json">' + esc(JSON.stringify(rep.parsed, null, 2)) + '</pre></div>');
+      showModal('<div class="da-modal-inner"><h3 style="margin-top:0">' + esc(wsName) + '</h3><pre class="da-json">' + esc(JSON.stringify(rep.parsed, null, 2)) + '</pre></div>', true);
     } catch (e) { toast((e && e.message) || t('err.generic')); }
   }
   async function orgRollup() {
@@ -858,9 +862,9 @@
   }
 
   // ───────────────────── modal / toast ─────────────────────
-  function showModal(innerHtml) {
+  function showModal(innerHtml, wide) {
     var host = $('#da-modal-host');
-    host.innerHTML = '<div class="da-modal-bg"><div class="da-modal">' + innerHtml
+    host.innerHTML = '<div class="da-modal-bg"><div class="da-modal' + (wide ? ' da-wide' : '') + '">' + innerHtml
       + '<div class="row" style="margin-top:.8rem;justify-content:flex-end"><button class="da-btn ghost" id="da-modal-close">×</button></div></div></div>';
     $('#da-modal-close').addEventListener('click', function () { host.innerHTML = ''; });
     host.querySelector('.da-modal-bg').addEventListener('click', function (e) { if (e.target === this) host.innerHTML = ''; });
