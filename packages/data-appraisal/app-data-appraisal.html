@@ -20,6 +20,10 @@
       declare ai:use scope (meta) so AI works on the isolated app origin under H-2.
     v0.1.2 — 2026-06-25 — Wider report modal on desktop (.da-wide, min(1100px,94vw)) so the
       context table isn't cramped; unit + workspace-rollup reports use it.
+    v0.1.3 — 2026-06-25 — Language setting (Auto/Suomi/English) controlling both the UI and the
+      AI output language (aiLangDirective appended to every AI call) so DIKW + context table no
+      longer mix languages; Auto follows ?lang= / browser (apex aimeat-lang is host-scoped,
+      unreachable from the app origin under H-2).
 -->
 <html lang="fi">
 <head>
@@ -154,6 +158,8 @@
       'prompts.intro':'Promptit tallennetaan omistajan muistiin ja luetaan ajohetkellä — muokkaus ei vaadi appin uudelleenjulkaisua. Käytä {{muuttuja}}-paikkamerkkejä.',
       'prompts.save':'Tallenna','prompts.reset':'Palauta oletus','prompts.saved':'Tallennettu.',
       'set.intro':'Asetukset tallennetaan omistajan muistiin.',
+      'set.lang':'Kieli (UI + AI-tuotos)','set.langAuto':'Automaattinen (selain)',
+      'set.langNote':'AIMEAT.io:n kieliasetus on host-kohtainen eikä näy tälle app-originille (H-2-eristys); Automaattinen seuraa selainta / ?lang=.',
       'set.model':'Malli (tyhjä = oletus)','set.modelRole':'Mallin rooli','set.sampleCap':'Record-näytteen katto',
       'set.chunkChars':'Dokumentin merkkikatto / kutsu','set.warn':'Varoituskynnys (kutsua)',
       'set.stageDikw':'Aja DIKW-vaihe','set.stageRows':'Aja kontekstirivit',
@@ -184,6 +190,8 @@
       'prompts.intro':'Prompts are stored in owner memory and read at run time — editing needs no app republish. Use {{variable}} placeholders.',
       'prompts.save':'Save','prompts.reset':'Reset to default','prompts.saved':'Saved.',
       'set.intro':'Settings are stored in owner memory.',
+      'set.lang':'Language (UI + AI output)','set.langAuto':'Automatic (browser)',
+      'set.langNote':'aimeat.io\'s language setting is host-scoped and not visible to this app origin (H-2 isolation); Automatic follows the browser / ?lang=.',
       'set.model':'Model (blank = default)','set.modelRole':'Model role','set.sampleCap':'Record sample cap',
       'set.chunkChars':'Document char cap / call','set.warn':'Warning threshold (calls)',
       'set.stageDikw':'Run DIKW stage','set.stageRows':'Run context rows',
@@ -193,7 +201,23 @@
       'err.generic':'Error','runner.busy':'A run is already in progress.'
     }
   };
-  var lang = (navigator.language || 'fi').slice(0, 2) === 'en' ? 'en' : 'fi';
+  function autoLang() {
+    try { var u = new URLSearchParams(location.search).get('lang'); if (u === 'fi' || u === 'en') return u; } catch (e) {}
+    return (navigator.language || 'fi').slice(0, 2) === 'en' ? 'en' : 'fi';
+  }
+  var lang = autoLang();
+  // Re-resolve the effective UI language from the saved setting ('auto' → autoLang()).
+  function applyLangFromSettings() {
+    var s = (S.settings && S.settings.lang) || 'auto';
+    lang = (s === 'fi' || s === 'en') ? s : autoLang();
+  }
+  // One explicit instruction appended to every AI call so DIKW + context rows + rollups all
+  // come back in the SAME language (otherwise the model mixes content-language and prompt-language).
+  function aiLangDirective() {
+    return lang === 'fi'
+      ? '\n\nKirjoita kaikki tuottamasi arvot ja teksti suomeksi.'
+      : '\n\nWrite all values and text you produce in English.';
+  }
   function t(k, vars) {
     var s = (I18N[lang] && I18N[lang][k]) || (I18N.fi[k]) || k;
     if (vars) Object.keys(vars).forEach(function (v) { s = s.replace('{' + v + '}', vars[v]); });
@@ -261,7 +285,10 @@
 
   var DEFAULT_SETTINGS = {
     model: '', modelRole: 'reasoning', sampleCap: 50, chunkChars: 40000,
-    warnThreshold: 20, stageDikw: true, stageRows: true
+    warnThreshold: 20, stageDikw: true, stageRows: true,
+    // 'auto' = follow ?lang= / browser language; otherwise force 'fi' | 'en'.
+    // Controls both the app UI and the language the AI writes its output in.
+    lang: 'auto'
   };
 
   // ───────────────────────── state ─────────────────────────
@@ -395,7 +422,7 @@
     var dikwStr = '{}';
     if (S.settings.stageDikw !== false) {
       var d = await AIMEAT.ai.completeJson({
-        systemPrompt: S.prompts['dikw.system'], app_id: APP_ID, modelRole: S.settings.modelRole,
+        systemPrompt: S.prompts['dikw.system'] + aiLangDirective(), app_id: APP_ID, modelRole: S.settings.modelRole,
         model: S.settings.model || undefined,
         prompt: render(S.prompts['dikw.user'], { granularity: u.granularity, spaceName: u.space, content: c.content })
       });
@@ -405,7 +432,7 @@
     }
     if (S.settings.stageRows !== false) {
       var rws = await AIMEAT.ai.completeJson({
-        systemPrompt: S.prompts['rows.system'], app_id: APP_ID, modelRole: S.settings.modelRole,
+        systemPrompt: S.prompts['rows.system'] + aiLangDirective(), app_id: APP_ID, modelRole: S.settings.modelRole,
         model: S.settings.model || undefined,
         prompt: render(S.prompts['rows.user'], { granularity: u.granularity, spaceName: u.space, dikw: dikwStr })
       });
@@ -498,6 +525,7 @@
     $('#da-gate').classList.add('hidden');
     $('#da-tabs').hidden = false;
     await Promise.all([loadPrompts(), loadSettings()]);
+    applyLangFromSettings(); localizeChrome();
     await loadOrgs();
     renderCost();
     switchView('tree');
@@ -778,7 +806,7 @@
     var units = await collectUnitResults(wsId);
     var summaries = units.map(function (u) { return { title: u.target.title, granularity: u.target.granularity, value: u.value, top_consumers: (u.context_table || []).slice(0, 3).map(function (r) { return r.consumer; }) }; });
     try {
-      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['wsRollup.system'], app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
+      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['wsRollup.system'] + aiLangDirective(), app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
         prompt: render(S.prompts['wsRollup.user'], { spaceName: wsName, unitSummaries: JSON.stringify(summaries) }) });
       trackUsage(rep);
       await AIMEAT.data.set(wsRepKey(wsId), rep.parsed);
@@ -791,7 +819,7 @@
     var byWs = {};
     units.forEach(function (u) { var ws = u.target.wsName; (byWs[ws] = byWs[ws] || []).push({ title: u.target.title, value: u.value }); });
     try {
-      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['orgRollup.system'], app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
+      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['orgRollup.system'] + aiLangDirective(), app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
         prompt: render(S.prompts['orgRollup.user'], { spaceName: S.orgName, unitSummaries: JSON.stringify(byWs) }) });
       trackUsage(rep);
       await AIMEAT.data.set(orgRepKey(), rep.parsed);
@@ -832,6 +860,11 @@
   function renderSettings() {
     var host = $('#da-view-settings'); var s = S.settings;
     var h = ['<div class="da-card"><p class="muted">' + esc(t('set.intro')) + '</p>'];
+    h.push('<div style="margin-bottom:.7rem"><label>' + esc(t('set.lang')) + '</label><select data-set="lang">'
+      + '<option value="auto"' + (s.lang !== 'fi' && s.lang !== 'en' ? ' selected' : '') + '>' + esc(t('set.langAuto')) + '</option>'
+      + '<option value="fi"' + (s.lang === 'fi' ? ' selected' : '') + '>Suomi</option>'
+      + '<option value="en"' + (s.lang === 'en' ? ' selected' : '') + '>English</option></select>'
+      + '<p class="muted" style="margin:.3rem 0 0">' + esc(t('set.langNote')) + '</p></div>');
     h.push('<div class="da-gridset">');
     h.push(fld('model', 'set.model', 'text', s.model));
     h.push('<div><label>' + esc(t('set.modelRole')) + '</label><select data-set="modelRole">'
@@ -854,7 +887,10 @@
         else if (el.type === 'number') S.settings[k] = Number(el.value) || DEFAULT_SETTINGS[k];
         else S.settings[k] = el.value;
       });
-      await saveSettings(); $('#da-set-msg').textContent = t('set.saved');
+      applyLangFromSettings(); localizeChrome();   // update the UI immediately…
+      renderSettings();                              // …rebuild this view with new labels
+      try { await saveSettings(); var m = $('#da-set-msg'); if (m) m.textContent = t('set.saved'); }
+      catch (e) { var m2 = $('#da-set-msg'); if (m2) m2.textContent = (e && e.message) || 'save failed'; }
     });
   }
   function fld(key, label, type, val) {
@@ -886,8 +922,11 @@
   Array.prototype.forEach.call(document.querySelectorAll('nav.da-tabs button'), function (b) {
     b.addEventListener('click', function () { switchView(b.getAttribute('data-view')); });
   });
-  // localize tab labels
-  Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.textContent = t(el.getAttribute('data-t')); });
+  // (re)localize static chrome (tab labels) — called at boot and whenever the language changes
+  function localizeChrome() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.textContent = t(el.getAttribute('data-t')); });
+  }
+  localizeChrome();
 
   boot();
 })();
