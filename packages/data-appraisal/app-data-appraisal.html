@@ -24,6 +24,12 @@
       AI output language (aiLangDirective appended to every AI call) so DIKW + context table no
       longer mix languages; Auto follows ?lang= / browser (apex aimeat-lang is host-scoped,
       unreachable from the app origin under H-2).
+    v0.1.4 — 2026-06-25 — Benefit-type classification per context row (mechanism improve/wrap/sell,
+      nature new/better/stop, realizability financial→observable — Ward&Daniel + Gartner) shown as a
+      column; new Opportunities / action-proposal report (org + per-workspace) grouping concrete
+      next actions by Improve/Wrap/Sell with priority (editable opp.system/opp.user prompts).
+      Fix: AIMEAT.data.list returns {items}, not {entries} — corrected in collectUnitResults +
+      renderReports (Reports list, workspace/organism rollups and opportunities now see units).
 -->
 <html lang="fi">
 <head>
@@ -153,8 +159,11 @@
       'rep.wsRollup':'Kokoa workspace-raportti','rep.orgRollup':'Kokoa organismiraportti',
       'rep.value':'Arvo','rep.bestValue':'Paras (väitetty) arvo','rep.consumers':'Kuluttajat','rep.flags':'Liput',
       'rep.profile':'DIKW-profiili','rep.context':'Kontekstitaulukko','rep.crosscx':'Cross-context-kandidaatit',
-      'ctx.consumer':'Kuluttaja','ctx.decision':'Päätös','ctx.window':'Ikkuna','ctx.return':'Tuotto','ctx.verdict':'Tuomio',
+      'ctx.consumer':'Kuluttaja','ctx.decision':'Päätös','ctx.window':'Ikkuna','ctx.return':'Tuotto','ctx.type':'Hyödyn tyyppi','ctx.verdict':'Tuomio',
       'claimed':'Väitetty (ei vahvistettu)',
+      'opp.title':'Mahdollisuudet / toimenpide-ehdotus','opp.org':'Kokoa mahdollisuudet (organismi)','opp.ws':'Mahdollisuudet',
+      'opp.improve':'Improve — paranna sisäistä päätöstä / operaatiota','opp.wrap':'Wrap — kääri oivallus tuotteeseen / palveluun','opp.sell':'Sell — myy data / oivallus / template',
+      'opp.action':'Toimenpide','opp.none':'Ei mahdollisuuksia (aja ensin yksiköitä).',
       'prompts.intro':'Promptit tallennetaan omistajan muistiin ja luetaan ajohetkellä — muokkaus ei vaadi appin uudelleenjulkaisua. Käytä {{muuttuja}}-paikkamerkkejä.',
       'prompts.save':'Tallenna','prompts.reset':'Palauta oletus','prompts.saved':'Tallennettu.',
       'set.intro':'Asetukset tallennetaan omistajan muistiin.',
@@ -185,8 +194,11 @@
       'rep.wsRollup':'Build workspace report','rep.orgRollup':'Build organism report',
       'rep.value':'Value','rep.bestValue':'Best (claimed) value','rep.consumers':'Consumers','rep.flags':'Flags',
       'rep.profile':'DIKW profile','rep.context':'Context table','rep.crosscx':'Cross-context candidates',
-      'ctx.consumer':'Consumer','ctx.decision':'Decision','ctx.window':'Window','ctx.return':'Return','ctx.verdict':'Verdict',
+      'ctx.consumer':'Consumer','ctx.decision':'Decision','ctx.window':'Window','ctx.return':'Return','ctx.type':'Benefit type','ctx.verdict':'Verdict',
       'claimed':'Claimed (unverified)',
+      'opp.title':'Opportunities / action proposal','opp.org':'Build opportunities (organism)','opp.ws':'Opportunities',
+      'opp.improve':'Improve — better internal decisions / operations','opp.wrap':'Wrap — bundle insight into a product / service','opp.sell':'Sell — sell data / insight / template',
+      'opp.action':'Action','opp.none':'No opportunities yet (run some units first).',
       'prompts.intro':'Prompts are stored in owner memory and read at run time — editing needs no app republish. Use {{variable}} placeholders.',
       'prompts.save':'Save','prompts.reset':'Reset to default','prompts.saved':'Saved.',
       'set.intro':'Settings are stored in owner memory.',
@@ -258,7 +270,11 @@
       + 'DISTANCE TEST: if rows cluster near the artifact, deep experiencers were dropped — the list is not done. '
       + 'FALSIFICATION GATE: drop any row whose consumer is generic/unnameable or whose decision is not a real decision (no alternatives/stakes). '
       + 'You never CREDIT value — only claim it. Mark every row verdict:"claimed". '
-      + 'Return ONLY JSON: { "context_table": [ {consumer, decision, window, return_claim, return_unit, validity:true, verdict:"claimed"} ], '
+      + 'For EACH row classify benefit_type with three fields: '
+      + 'mechanism = "improve" (better internal decision/operation) | "wrap" (bundle the insight into a product/service) | "sell" (sell data/insight/template externally); '
+      + 'nature = "new" (do new things) | "better" (do things better) | "stop" (stop doing something); '
+      + 'realizability = "financial" | "quantifiable" | "measurable" | "observable" (how hard the evidence for the benefit is, financial=strongest). '
+      + 'Return ONLY JSON: { "context_table": [ {consumer, decision, window, return_claim, return_unit, benefit_type:{mechanism,nature,realizability}, validity:true, verdict:"claimed"} ], '
       + '"value": { "best_valid_return": string, "unit": string, "basis": string } }.',
     'rows.user':
       'Granularity: {{granularity}} · Space: {{spaceName}}\n\nDIKW PROFILE (JSON):\n{{dikw}}',
@@ -274,13 +290,26 @@
       + '{ "most_valuable_data": [ {what, for_whom, claimed_value} ], '
       + '"top_cross_context_opportunities": [string], "flags": [string], "summary": string }. All value is claimed/unverified.',
     'orgRollup.user':
-      'Organism: {{spaceName}}\n\nPER-WORKSPACE REPORTS (JSON):\n{{unitSummaries}}'
+      'Organism: {{spaceName}}\n\nPER-WORKSPACE REPORTS (JSON):\n{{unitSummaries}}',
+    'opp.system':
+      'You turn a set of data appraisals into a concrete, PRIORITIZED action proposal for leveraging the data. '
+      + 'Group every opportunity by the Gartner mechanism: "improve" (better internal decisions/operations), '
+      + '"wrap" (bundle an insight into a product/service), "sell" (sell data/insight/template externally). '
+      + 'For each opportunity give: mechanism, a short title, the consumer it serves, the decision it supports, '
+      + 'benefit_type { nature:"new"|"better"|"stop", realizability:"financial"|"quantifiable"|"measurable"|"observable" }, '
+      + 'a CONCRETE next action (e.g. "build X capability", "publish Y as an offer", "wrap Z into a dashboard", "sell the schema as a template"), '
+      + 'priority "high"|"medium"|"low" (higher when it reduces a costly decision\\u2019s opportunity loss, is realizable, and the data is rare/reusable), '
+      + 'and a one-line rationale. Prefer few strong opportunities over many weak ones. '
+      + 'Return ONLY JSON: { "opportunities":[ {mechanism,title,consumer,decision,benefit_type:{nature,realizability},action,priority,rationale} ], "summary": string }.',
+    'opp.user':
+      'Scope: {{spaceName}}\n\nAPPRAISALS (JSON):\n{{unitSummaries}}'
   };
   var PROMPT_LABELS = {
     'dikw.system':'DIKW · system','dikw.user':'DIKW · user',
     'rows.system':'Context rows · system','rows.user':'Context rows · user',
     'wsRollup.system':'Workspace rollup · system','wsRollup.user':'Workspace rollup · user',
-    'orgRollup.system':'Organism rollup · system','orgRollup.user':'Organism rollup · user'
+    'orgRollup.system':'Organism rollup · system','orgRollup.user':'Organism rollup · user',
+    'opp.system':'Opportunities · system','opp.user':'Opportunities · user'
   };
 
   var DEFAULT_SETTINGS = {
@@ -745,10 +774,16 @@
     if (!rows.length) return '<p class="muted">—</p>';
     var h = ['<table class="da-ctx"><thead><tr>'
       + '<th>' + esc(t('ctx.consumer')) + '</th><th>' + esc(t('ctx.decision')) + '</th>'
-      + '<th>' + esc(t('ctx.window')) + '</th><th>' + esc(t('ctx.return')) + '</th><th>' + esc(t('ctx.verdict')) + '</th></tr></thead><tbody>'];
+      + '<th>' + esc(t('ctx.window')) + '</th><th>' + esc(t('ctx.return')) + '</th>'
+      + '<th>' + esc(t('ctx.type')) + '</th><th>' + esc(t('ctx.verdict')) + '</th></tr></thead><tbody>'];
     rows.forEach(function (r) {
+      var bt = r.benefit_type || {};
+      var btCell = (bt.mechanism || bt.nature || bt.realizability)
+        ? '<span class="da-tag gran">' + esc(bt.mechanism || '') + '</span> <span class="da-tag">' + esc(bt.nature || '') + '</span> <span class="da-tag">' + esc(bt.realizability || '') + '</span>'
+        : '—';
       h.push('<tr><td>' + esc(r.consumer) + '</td><td>' + esc(r.decision) + '</td><td>' + esc(r.window) + '</td>'
         + '<td>' + esc(r.return_claim) + (r.return_unit ? ' <span class="muted">(' + esc(r.return_unit) + ')</span>' : '') + '</td>'
+        + '<td>' + btCell + '</td>'
         + '<td><span class="da-claimed">' + esc(t('claimed')) + '</span></td></tr>');
     });
     h.push('</tbody></table>');
@@ -760,11 +795,12 @@
     if (!S.orgId) { host.innerHTML = '<div class="da-card"><p class="muted">' + esc(t('tree.pickOrg')) + '</p></div>'; return; }
     host.innerHTML = '<div class="da-card"><p class="muted">…</p></div>';
     var listed = [];
-    try { var r = await AIMEAT.data.list({ prefix: 'appraisal.unit.' + S.orgId + '.' }); listed = (r && r.entries) || []; } catch (e) {}
+    try { var r = await AIMEAT.data.list({ prefix: 'appraisal.unit.' + S.orgId + '.' }); listed = (r && r.items) || []; } catch (e) {}
     var h = [];
     h.push('<div class="da-card"><div class="row">');
-    h.push('<button class="da-btn small" id="da-orgrollup"' + (S.running ? ' disabled' : '') + '>' + esc(t('rep.orgRollup')) + '</button>');
-    h.push('</div><div id="da-orgrep"></div></div>');
+    h.push('<button class="da-btn small" id="da-opporg"' + (S.running ? ' disabled' : '') + '>' + esc(t('opp.org')) + '</button>');
+    h.push('<button class="da-btn ghost small" id="da-orgrollup"' + (S.running ? ' disabled' : '') + '>' + esc(t('rep.orgRollup')) + '</button>');
+    h.push('</div><div id="da-opprep"></div><div id="da-orgrep"></div></div>');
     h.push('<div class="da-card"><h3 style="margin-top:0">' + esc(t('rep.unitTitle')) + '</h3>');
     if (!listed.length) h.push('<p class="muted">' + esc(t('rep.none')) + '</p>');
     else {
@@ -772,8 +808,10 @@
       var byWs = {};
       listed.forEach(function (e) { var v = e.value || {}; var ws = (v.target && v.target.wsName) || '?'; (byWs[ws] = byWs[ws] || []).push(v); });
       Object.keys(byWs).forEach(function (ws) {
+        var wsIdForWs = esc((byWs[ws][0].target || {}).wsId || '');
         h.push('<div class="da-ws"><div class="da-ws-head"><h3>' + esc(ws) + '</h3>'
-          + '<button class="da-btn ghost small" data-wsrollup="' + esc((byWs[ws][0].target||{}).wsId||'') + '" data-wsname="' + esc(ws) + '">' + esc(t('rep.wsRollup')) + '</button></div><div class="da-ws-body">');
+          + '<button class="da-btn ghost small" data-oppws="' + wsIdForWs + '" data-oppwsname="' + esc(ws) + '">' + esc(t('opp.ws')) + '</button>'
+          + '<button class="da-btn ghost small" data-wsrollup="' + wsIdForWs + '" data-wsname="' + esc(ws) + '">' + esc(t('rep.wsRollup')) + '</button></div><div class="da-ws-body">');
         byWs[ws].forEach(function (v) {
           h.push('<div class="da-unit"><span class="da-tag gran">' + esc(v.target.granularity) + '</span>'
             + '<span class="ttl">' + esc(v.target.title) + '</span>'
@@ -792,14 +830,19 @@
       b.addEventListener('click', function () { wsRollup(b.getAttribute('data-wsrollup'), b.getAttribute('data-wsname')); });
     });
     var or = $('#da-orgrollup'); if (or) or.addEventListener('click', orgRollup);
-    // show stored org report if present
+    var oo = $('#da-opporg'); if (oo) oo.addEventListener('click', function () { buildOpp(null, S.orgName, 'appraisal.opp.' + S.orgId, '#da-opprep'); });
+    Array.prototype.forEach.call(host.querySelectorAll('[data-oppws]'), function (b) {
+      b.addEventListener('click', function () { buildOpp(b.getAttribute('data-oppws'), b.getAttribute('data-oppwsname'), 'appraisal.opp.' + S.orgId + '.' + b.getAttribute('data-oppws'), null); });
+    });
+    // show stored reports if present
+    AIMEAT.data.get('appraisal.opp.' + S.orgId).then(function (rep) { if (rep) { var el = $('#da-opprep'); if (el) el.innerHTML = renderOpp(rep, S.orgName); } }).catch(function () {});
     AIMEAT.data.get(orgRepKey()).then(function (rep) { if (rep) $('#da-orgrep').innerHTML = '<pre class="da-json">' + esc(JSON.stringify(rep, null, 2)) + '</pre>'; }).catch(function(){});
   }
 
   async function collectUnitResults(wsId) {
     var prefix = 'appraisal.unit.' + S.orgId + '.' + (wsId ? wsId + '.' : '');
     var r = await AIMEAT.data.list({ prefix: prefix });
-    return ((r && r.entries) || []).map(function (e) { return e.value; }).filter(Boolean);
+    return ((r && r.items) || []).map(function (e) { return e.value; }).filter(Boolean);
   }
   async function wsRollup(wsId, wsName) {
     if (S.running) { toast(t('runner.busy')); return; }
@@ -825,6 +868,53 @@
       await AIMEAT.data.set(orgRepKey(), rep.parsed);
       $('#da-orgrep').innerHTML = '<pre class="da-json">' + esc(JSON.stringify(rep.parsed, null, 2)) + '</pre>';
     } catch (e) { toast((e && e.message) || t('err.generic')); }
+  }
+
+  // ── Opportunities / action proposal: synthesise appraisals into Improve/Wrap/Sell actions ──
+  function oppSummary(u) {
+    return {
+      title: u.target.title, granularity: u.target.granularity, value: u.value,
+      rows: (u.context_table || []).slice(0, 6).map(function (r) {
+        return { consumer: r.consumer, decision: r.decision, return_claim: r.return_claim, benefit_type: r.benefit_type };
+      })
+    };
+  }
+  async function buildOpp(wsId, scopeName, storeKey, targetSel) {
+    if (S.running) { toast(t('runner.busy')); return; }
+    var units = await collectUnitResults(wsId);
+    if (!units.length) { toast(t('opp.none')); return; }
+    var summaries = units.map(oppSummary);
+    try {
+      var rep = await AIMEAT.ai.completeJson({ systemPrompt: S.prompts['opp.system'] + aiLangDirective(), app_id: APP_ID, modelRole: S.settings.modelRole, model: S.settings.model || undefined,
+        prompt: render(S.prompts['opp.user'], { spaceName: scopeName, unitSummaries: JSON.stringify(summaries) }) });
+      trackUsage(rep);
+      await AIMEAT.data.set(storeKey, rep.parsed);
+      if (targetSel) { var el = $(targetSel); if (el) el.innerHTML = renderOpp(rep.parsed, scopeName); }
+      else showModal(renderOpp(rep.parsed, scopeName), true);
+    } catch (e) { toast((e && e.message) || t('err.generic')); }
+  }
+  function renderOpp(rep, title) {
+    var h = ['<div class="da-modal-inner"><h4 style="margin:.2rem 0">' + esc(t('opp.title')) + ' — ' + esc(title) + '</h4>'];
+    if (rep && rep.summary) h.push('<p class="muted">' + esc(rep.summary) + '</p>');
+    var groups = { improve: [], wrap: [], sell: [] };
+    ((rep && rep.opportunities) || []).forEach(function (o) { (groups[o.mechanism] || groups.improve).push(o); });
+    ['improve', 'wrap', 'sell'].forEach(function (m) {
+      var list = groups[m]; if (!list.length) return;
+      h.push('<h4 style="margin:.7rem 0 .3rem;color:var(--info)">' + esc(t('opp.' + m)) + '</h4>');
+      list.forEach(function (o) {
+        var bt = o.benefit_type || {};
+        h.push('<div class="da-dikw-box" style="margin-bottom:.4rem">'
+          + '<div><strong>' + esc(o.title || '') + '</strong> <span class="da-tag">' + esc(o.priority || '') + '</span> '
+          + '<span class="da-tag gran">' + esc(bt.nature || '') + '</span> <span class="da-tag">' + esc(bt.realizability || '') + '</span></div>'
+          + '<div class="muted" style="font-size:.8rem">' + esc((o.consumer || '') + (o.decision ? ' · ' + o.decision : '')) + '</div>'
+          + '<div style="margin-top:.2rem"><strong>' + esc(t('opp.action')) + ': </strong>' + esc(o.action || '') + '</div>'
+          + (o.rationale ? '<div class="muted" style="font-size:.78rem;margin-top:.2rem">' + esc(o.rationale) + '</div>' : '')
+          + '</div>');
+      });
+    });
+    if (!((rep && rep.opportunities) || []).length) h.push('<p class="muted">—</p>');
+    h.push('</div>');
+    return h.join('');
   }
 
   // ───────────────────── prompts editor ─────────────────────
