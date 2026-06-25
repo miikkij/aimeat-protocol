@@ -7,10 +7,11 @@
  *   services/ai-completion.ts module (also used by the scheduler's `ai` jobs);
  *   this router is a thin HTTP wrapper + the owner-only settings/usage endpoints.
  * @structure
- *   - POST /v1/ai/complete — owner or agent(ai:use), runs one completion
- *   - GET  /v1/ai/usage     — owner-only, today's spend per-app breakdown
- *   - POST /v1/ai/settings  — owner-only, update budget/quotas/allowlist
- *   - GET  /v1/ai/settings  — owner-only, read budget/quotas/allowlist
+ *   - POST /v1/ai/complete   — owner or any token with ai:use scope, runs one completion
+ *   - GET  /v1/ai/available  — owner or ai:use token, boolean "is AI configured?" probe
+ *   - GET  /v1/ai/usage      — owner-only, today's spend per-app breakdown
+ *   - POST /v1/ai/settings   — owner-only, update budget/quotas/allowlist
+ *   - GET  /v1/ai/settings   — owner-only, read budget/quotas/allowlist
  * @usage
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
@@ -20,6 +21,9 @@
  *     with the scheduler); route is now a thin wrapper.
  *   v1.2.0 — 2026-06-24 — Accept an optional `images` array (data:/https URLs) on
  *     /v1/ai/complete for vision-capable models (Secretary doc/image intake).
+ *   v1.3.0 — 2026-06-25 — Gate is role-agnostic on the ai:use scope so app-grant tokens
+ *     (sandboxed apps on the isolated app origin) can spend the owner's AI budget; add
+ *     GET /v1/ai/available so such apps can gate their UI without owner-only settings.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -53,21 +57,20 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   }
 
   /**
-   * Either the caller is an owner JWT (role=owner) OR an agent JWT with the
-   * `ai:use` scope. Reject any other shape.
+   * Either the caller is an owner JWT (role=owner) OR any scoped principal
+   * (agent JWT, or an app-grant token from a sandboxed app) carrying the
+   * `ai:use` scope. The scope check is role-agnostic so a browser app running
+   * on the isolated app origin — which holds an app-grant token (role 'app'),
+   * never an owner session — can still spend the owner's AI budget once the
+   * owner granted `ai:use`. Reject anything else.
    */
   function gateOwnerOrAiUseAgent(req: Request, res: Response): boolean {
     const roles = req.auth?.roles ?? [];
     if (roles.includes('owner')) return true;
-    if (roles.includes('agent')) {
-      const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
-      if (scopes.includes('ai:use') || scopes.includes('*')) return true;
-      res.status(403).json(error(config.nodeId, 'SCOPE_REQUIRED',
-        'Agent JWT missing required scope: ai:use'));
-      return false;
-    }
+    const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
+    if (scopes.includes('ai:use') || scopes.includes('*')) return true;
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-      'AI completion requires owner or agent(ai:use) authentication.'));
+      'AI completion requires an owner session or a token with the ai:use scope.'));
     return false;
   }
 
@@ -129,6 +132,28 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
       }
+    });
+
+  // ── GET /v1/ai/available ── lightweight "can I run AI?" probe.
+  // Owner-only `/v1/ai/settings` (which exposes hasApiKey) is NOT reachable by an app-grant
+  // token, so a sandboxed app cannot use it to decide whether to show its AI affordances. This
+  // endpoint answers just the boolean, gated identically to /complete (owner OR ai:use scope), so
+  // an app can gate its UI without owner privileges. Resolves the owner from the caller's identity
+  // (app tokens resolve to the owner GHII), matching the key completeForOwner will actually read.
+  router.get('/v1/ai/available',
+    requireAuth(), aiRateLimit,
+    async (req: Request, res: Response) => {
+      if (!gateOwnerOrAiUseAgent(req, res)) return;
+      const gaii = resolve(req);
+      const [apiKeyRecord, prefsRecord] = await Promise.all([
+        storage.getMemory(gaii, 'openrouter.apikey'),
+        storage.getMemory(gaii, 'openrouter.settings'),
+      ]);
+      const encrypted = (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted;
+      const provider = ((prefsRecord?.value as Record<string, unknown> | undefined)?.provider as string) || 'openrouter';
+      // openrouter needs a key; self-hosted providers (lmstudio/custom) can run keyless.
+      const available = !!encrypted || provider !== 'openrouter';
+      res.json(success(config.nodeId, { available }));
     });
 
   // ── GET /v1/ai/usage ── today's spend breakdown

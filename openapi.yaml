@@ -6996,9 +6996,10 @@ paths:
       summary: Run one AI completion on the caller's own provider key + budget
       description: >
         App/extension-level AI completion. Runs on the owner's encrypted OpenRouter (or compatible)
-        key with their daily/per-app budget enforced. Callable by an owner JWT, or an agent JWT
-        holding the `ai:use` scope. Optionally accepts `images` (data: or https URLs) for a
-        vision-capable model. Long calls: clients should use a large request timeout and no retries.
+        key with their daily/per-app budget enforced. Callable by an owner JWT, or any token carrying
+        the `ai:use` scope — an agent JWT, or an app-grant token from a sandboxed app on the isolated
+        app origin. Optionally accepts `images` (data: or https URLs) for a vision-capable model.
+        Long calls: clients should use a large request timeout and no retries.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -7045,6 +7046,27 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
         '402':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/available:
+    get:
+      operationId: aiAvailable
+      summary: Probe whether AI is configured for the caller's owner
+      description: >
+        Lightweight boolean probe used by apps to decide whether to show AI affordances. Returns
+        `{ available }` — true when the owner has an OpenRouter key configured (or a keyless
+        self-hosted provider). Gated identically to `/v1/ai/complete` (an owner JWT, or any token
+        with the `ai:use` scope), so a sandboxed app can gate its UI without owner-only access to
+        `/v1/ai/settings`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
