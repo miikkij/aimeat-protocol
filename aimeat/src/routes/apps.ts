@@ -128,18 +128,14 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // GET /v1/apps — Catalogue listing with search/filter/pagination
     router.get('/v1/apps', optionalAuth(), async (req, res) => {
-        // Parked apps are hidden from the public listing but must still show in
-        // their owner's own catalogue. Resolve the authenticated caller's owner
-        // GHII (if any) so listApps can include the caller's own parked apps.
-        //
-        // `public_only=true` forces the strictly-public view even for a logged-in
-        // owner: it drops the viewer exception so the caller's OWN parked and
-        // operator-hidden apps are excluded too. Public proof surfaces (e.g. the
-        // landing wall) must use it — otherwise an owner browsing the front page
-        // sees their own parked/operator-hidden apps that the public must never see.
-        const publicOnly = req.query.public_only === 'true';
+        // Parked + operator-hidden apps are hidden from the public listing but must
+        // still show to their OWNER. Resolve the authenticated caller's owner GHII
+        // (if any) and hand it to listApps as viewerGhii — visibility is decided
+        // purely from who is authenticated: the owner sees their own (hidden ones
+        // carry operator_hidden=true so the client badges them), everyone else does
+        // not. No client flag needed.
         let viewerGhii: string | undefined;
-        if (req.auth && !publicOnly) {
+        if (req.auth) {
             const { ownerGhii } = await canonicalOwner(req);
             viewerGhii = ownerGhii;
         }

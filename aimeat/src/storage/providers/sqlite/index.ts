@@ -4348,10 +4348,10 @@ export class SqliteStorage implements Storage {
       conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
     }
     // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner
-    // (viewerGhii). An explicit ownerGaii filter already scopes to one owner, so
-    // skip the clause there (the owner's "my apps" view must include their own
-    // parked/hidden apps). The operator moderation view passes adminView to see
-    // EVERYTHING regardless of either flag.
+    // (viewerGhii) — decided purely from who is authenticated. The owner sees their
+    // own (operator-hidden ones carry operator_hidden=true so the client can badge
+    // them); everyone else does not. An explicit ownerGaii filter already scopes to
+    // one owner, so skip the clause there. adminView sees EVERYTHING.
     if (!opts?.ownerGaii && !opts?.adminView) {
       if (opts?.viewerGhii) {
         conditions.push(`(a.parked = 0 OR a.ownerGaii = ?)`);

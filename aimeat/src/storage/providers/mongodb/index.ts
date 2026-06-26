@@ -4027,10 +4027,11 @@ export class PrismaStorage implements Storage {
             apps = apps.filter((a: AppRecord) => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
         }
         if (opts?.freeOnly) apps = apps.filter((a: AppRecord) => !a.manifest.priceMorsels);
-        // Parked + operator-hidden apps are hidden from everyone EXCEPT their
-        // owner. A scoped ownerGaii query already returns only that owner's apps
-        // (their "my apps" view, which should include both), so only filter the
-        // unscoped listing. adminView (operator moderation) bypasses both filters.
+        // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner
+        // (viewerGhii) — decided purely from who is authenticated. The owner sees
+        // their own (operator-hidden ones carry operator_hidden=true so the client
+        // can badge them); everyone else does not. A scoped ownerGaii query already
+        // returns only that owner's apps, so skip the filters there. adminView sees all.
         if (!opts?.ownerGaii && !opts?.adminView) {
             apps = apps.filter((a: AppRecord) => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
             apps = apps.filter((a: AppRecord) => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));

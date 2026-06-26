@@ -4,7 +4,9 @@
  */
 import { apiGet, apiDelete, apiPatch, api } from '/js/api.js';
 
-/** List all apps. Returns array. */
+/** List apps. Returns array. The server decides visibility from who is
+ *  authenticated: the owner sees their own parked/operator-hidden apps (the latter
+ *  flagged operator_hidden so the UI can badge them); everyone else does not. */
 export async function listApps() {
   const data = await apiGet('/v1/apps');
   return data?.data?.apps || [];

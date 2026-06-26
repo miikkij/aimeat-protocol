@@ -5379,8 +5379,9 @@
         return;
       }
 
-      // Send the owner token when we have one: the server only returns the caller's OWN
-      // parked apps to an authenticated request, so the Parked Apps section needs it.
+      // Send the owner token when we have one: the server decides visibility from who
+      // is authenticated, so an authenticated owner gets back their OWN parked +
+      // operator-hidden apps (badged) while everyone else never sees them.
       var listHeaders = {};
       var listTok = getCortexOwnerToken();
       if (listTok) listHeaders['Authorization'] = 'Bearer ' + listTok;
