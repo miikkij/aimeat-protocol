@@ -59,7 +59,7 @@ function appCsp(apexOrigin: string): string {
   // /v1/app-grants/token) and the silent bridge, so connect-src must allow the apex origin
   // (https://aimeat.io is covered by `https:`; an http dev apex like http://localtest.me is not).
   const apexAllow = apexOrigin ? ' ' + apexOrigin : '';
-  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
+  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
 }
 
 /**
