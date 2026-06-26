@@ -64,6 +64,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { aimeatDataLib } from './lib-data.js';
 import { aimeatStorageLib } from './lib-storage.js';
+import { aimeatMarkdownLib } from './lib-markdown.js';
 import { aimeatSocialLib } from './lib-social.js';
 import { aimeatWalletLib } from './lib-wallet.js';
 import { aimeatWorkLib } from './lib-work.js';
@@ -108,6 +109,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-storage.js — File storage library
   router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatStorageLib(config));
+  });
+
+  // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (AIMEAT.md.render)
+  router.get('/v1/libs/aimeat-markdown.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatMarkdownLib(config));
   });
 
   // GET /v1/libs/aimeat-social.js — Boards & social library
