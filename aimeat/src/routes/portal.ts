@@ -137,7 +137,7 @@ const BUILD_ID = Date.now().toString(36);
  *    (static + dynamic imports from any view) get fresh URLs after restart
  *  - CSP nonce injected into all script and style tags
  */
-function serveSpa(res: import('express').Response, spaPath: string, appOriginEnabled = false): void {
+export function serveSpa(res: import('express').Response, spaPath: string, appOriginEnabled = false): void {
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
 

@@ -28,6 +28,11 @@
  *     preserves the access code; unpark restores public visibility.
  *   v1.6.0 — 2026-06-24 — add Phase 10 inline badge: GET ?mode=inline appends the node-branded
  *     "publish your own app" badge (skips when the app origin 301s); raw download stays byte-exact.
+ *   v1.7.0 — 2026-06-26 — add Phase 9b rename in place: PATCH { name, description } edits the latest
+ *     version's manifest without re-publishing (no new version), the download URL is unchanged, the
+ *     listing reflects the new name; empty/over-long values 400; cross-owner rename 404s.
+ *   v1.8.0 — 2026-06-26 — add Phase 9c public_only: a logged-in owner sees their own parked app in
+ *     the normal listing but NOT when public_only=true (the strictly-public view for proof surfaces).
  */
 
 import * as ed from '@noble/ed25519';
@@ -488,6 +493,111 @@ await test('A parked-only PATCH does not clear an existing access code', async (
     assert(park.body.data?.parked === true, 'app is parked');
     // Clean up: unpark + remove the code so later reads are unaffected.
     await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: false, access_code: '' }) }));
+});
+
+// ── Phase 9b: rename / edit-details in place (no re-publish, URL unchanged) ──
+// PATCH { name, description } edits the latest version's manifest. The display
+// name is metadata; the URL is keyed off owner/filename, so the link never moves.
+console.log('\nPhase 9b: rename / edit details in place');
+
+await test('Capture version count before rename (rename must NOT add a version)', async () => {
+    const { body } = await json(`/v1/apps/${ownerName}/${PARK_FILE}/versions`);
+    const count = (body.data?.versions ?? []).length;
+    assert(count >= 1, `expected at least one version, got ${count}`);
+    // stash on a module-scoped via closure variable
+    (globalThis as any).__renameVersionCount = count;
+});
+
+await test('PATCH { name } renames in place (200, response carries the new name)', async () => {
+    const { status, body } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ name: 'Renamed App' }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.name === 'Renamed App', `response name "Renamed App", got "${body.data?.name}"`);
+});
+
+await test('The download URL is unchanged after rename (link still works, same content)', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${PARK_FILE}`, { redirect: 'manual' });
+    if (res.status === 301) { console.log('    (app origin on — direct download 301s; covered elsewhere)'); return; }
+    assert(res.status === 200, `download still 200 after rename, got ${res.status}`);
+    assert((await res.text()) === '<h1>park me v2</h1>', 'serves the same content under the same URL');
+});
+
+await test('Catalog listing reflects the new name', async () => {
+    const { body } = await json('/v1/apps?limit=200', authed());
+    const mine = (body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!!mine, 'app still listed');
+    assert(mine.manifest?.name === 'Renamed App', `listing shows the new name, got "${mine.manifest?.name}"`);
+});
+
+await test('Rename did NOT create a new version', async () => {
+    const { body } = await json(`/v1/apps/${ownerName}/${PARK_FILE}/versions`);
+    const count = (body.data?.versions ?? []).length;
+    assert(count === (globalThis as any).__renameVersionCount, `version count unchanged (was ${(globalThis as any).__renameVersionCount}, now ${count})`);
+});
+
+await test('PATCH { name, description } updates both fields at once', async () => {
+    const { status, body } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ name: 'Renamed Again', description: 'a fresh description' }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.name === 'Renamed Again', `name updated, got "${body.data?.name}"`);
+    assert(body.data?.description === 'a fresh description', `description updated, got "${body.data?.description}"`);
+});
+
+await test('PATCH { name: "" } is rejected (400, name cannot be empty)', async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ name: '   ' }),
+    }));
+    assert(status === 400, `empty name must 400, got ${status}`);
+});
+
+await test('PATCH { description: "" } is rejected (400, description cannot be empty)', async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ description: '   ' }),
+    }));
+    assert(status === 400, `empty description must 400, got ${status}`);
+});
+
+await test('PATCH { name } over 120 chars is rejected (400)', async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, authed({
+        method: 'PATCH', body: JSON.stringify({ name: 'x'.repeat(121) }),
+    }));
+    assert(status === 400, `over-long name must 400, got ${status}`);
+});
+
+await test("Another owner cannot rename A's app (PATCH → 404)", async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, bAuthed({
+        method: 'PATCH', body: JSON.stringify({ name: 'hijacked' }),
+    }));
+    assert(status === 404, `cross-owner rename must 404, got ${status}`);
+});
+
+// ── Phase 9c: public_only drops the viewer exception (public proof surfaces) ──
+// A logged-in owner normally sees their OWN parked/operator-hidden apps in the
+// listing (for their catalogue). public_only=true forces the strictly-public view
+// so the landing wall never surfaces the viewer's own hidden apps.
+console.log('\nPhase 9c: public_only strictly-public listing');
+
+await test('Park the app again for the public_only check', async () => {
+    const { status } = await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: true }) }));
+    assert(status === 200, `park status ${status}`);
+});
+
+await test("Normal authed listing DOES include the owner's own parked app", async () => {
+    const list = await json('/v1/apps?limit=200', authed());
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!!mine, "owner sees their own parked app in the normal listing");
+});
+
+await test("public_only=true EXCLUDES the owner's own parked app even when authed", async () => {
+    const list = await json('/v1/apps?limit=200&public_only=true', authed());
+    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
+    assert(!mine, 'public_only must drop the viewer exception (no own parked/hidden apps on public surfaces)');
+});
+
+await test('Unpark after the public_only check (cleanup)', async () => {
+    await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: false }) }));
 });
 
 // ── Phase 10: inline "publish your own app" badge ──

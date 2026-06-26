@@ -12,6 +12,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.5.0 — 2026-06-25 — GET /v1/openrouter/settings now BACKFILLS the Secretary: it ensureSecretary()s
+ *     when a key is configured (best-effort, idempotent). PUT-only provisioning left owners who set up
+ *     OpenRouter before the Secretary feature without an agent (the page wrongly said "configure OpenRouter");
+ *     this GET runs on every SPA load (header button), so it self-heals them transparently.
  *   v1.4.0 — 2026-06-24 — Add `visionModel` preference (a vision-capable model, e.g. qwen-2.5-VL) used
  *     for image inputs — the Secretary's doc/image intake. Persisted/returned with the other settings.
  *   v1.3.0 — 2026-06-23 — Auto-provision the owner's Secretary agent when an OpenRouter key is saved (Secretary Phase 0).
@@ -195,6 +199,17 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       ]);
 
       const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
+
+      // Backfill: provision the owner's Secretary whenever a key is configured. ensureSecretary on PUT
+      // only fires on save, so owners who set OpenRouter up BEFORE the Secretary feature shipped never
+      // got an agent (the Secretary page then wrongly said "configure OpenRouter"). This GET runs on
+      // every SPA load (the header Secretary-button check), so it backfills them transparently.
+      // Best-effort + idempotent — never block reading settings.
+      if ((apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted) {
+        try { await ensureSecretary(storage, config, req.auth!.owner as string); }
+        catch (err) { logger.warn('[secretary] provision-on-settings-read failed', { error: String(err) }); }
+      }
+
       res.json(success(config.nodeId, {
         hasApiKey: !!(apiKeyRecord?.value as { encrypted?: string })?.encrypted,
         model: prefs.model ?? null,

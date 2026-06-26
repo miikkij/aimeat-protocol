@@ -32,6 +32,9 @@
  *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline link.
  *   v3.3.0 — 2026-06-20 — Replace PublicActivityFeed (read as broken when empty) with NodeTotals:
  *     cumulative "this node has X" counters (apps/organisms/agents+online/knowledge/downloads).
+ *   v3.4.0 — 2026-06-26 — Wall fetch now passes public_only=true so a logged-in owner never sees their
+ *     own parked / operator-hidden apps on the PUBLIC proof wall (the viewer exception is for the
+ *     owner's catalogue/My Apps, not the front page).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -90,7 +93,9 @@ function Gallery() {
   const [apps, setApps] = useState([]);
   const [q, setQ] = useState('');
   useEffect(() => {
-    fetch('/v1/apps?sort=popular&limit=60').then(r => r.json())
+    // public_only: this is a PUBLIC proof wall — never surface the viewer's own
+    // parked / operator-hidden apps here, even when an owner is logged in.
+    fetch('/v1/apps?sort=popular&limit=60&public_only=true').then(r => r.json())
       .then(j => setApps(j?.data?.apps || []))
       .catch(() => { /* empty state renders */ });
   }, []);

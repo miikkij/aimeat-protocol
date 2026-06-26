@@ -2,6 +2,8 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.4.0 — 2026-06-26 — Add "Edit details" (rename + edit description) to My Apps — updates the
+ *     display name in place without re-publishing; the app link (owner/filename) stays the same.
  *   v1.3.0 — 2026-06-24 — Show a "moderated by operator: hidden" badge + hint (with reason) on My Apps
  *     when an operator has hidden the app; the owner sees it but cannot lift it.
  *   v1.2.0 — 2026-06-20 — Add Park/Unpark control + Parked badge/hint to My Apps (hide an app
@@ -30,6 +32,9 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [showAppUpload, setShowAppUpload] = useState(false);
   const [editingApp, setEditingApp] = useState(null);
   const [editCode, setEditCode] = useState('');
+  const [editingMeta, setEditingMeta] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   useEffect(() => {
     if (session) loadData();
@@ -76,6 +81,33 @@ export default function AppsTab({ session, showToast, onStats }) {
   function cancelEdit() {
     setEditingApp(null);
     setEditCode('');
+  }
+
+  function startEditMeta(app) {
+    setEditingMeta(app.filename);
+    setEditName(app.manifest?.name || String(app.filename || app.name || '').replace(/\.html?$/i, ''));
+    setEditDesc(app.manifest?.description || '');
+  }
+
+  function cancelEditMeta() {
+    setEditingMeta(null);
+    setEditName('');
+    setEditDesc('');
+  }
+
+  async function handleSaveMeta(filename) {
+    const name = editName.trim();
+    const description = editDesc.trim();
+    if (!name) { showToast(t('profile.apps.nameRequired') || 'Name cannot be empty', true); return; }
+    if (!description) { showToast(t('profile.apps.descRequired') || 'Description cannot be empty', true); return; }
+    const resp = await patchApp(filename, { name, description });
+    if (resp.ok !== false) {
+      showToast(t('profile.apps.detailsUpdated') || 'App details updated');
+      cancelEditMeta();
+      loadData();
+    } else {
+      showToast(resp?.error?.message || t('profile.apps.updateFailed') || 'Update failed', true);
+    }
   }
 
   async function handleTogglePark(app) {
@@ -158,10 +190,24 @@ export default function AppsTab({ session, showToast, onStats }) {
                 data: { owner: a.owner || session.owner, filename: a.filename || a.name } });
               window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank');
             }}>${t('profile.apps.launch') || 'Launch'}</button>
+            <button class="btn-sm" onClick=${() => startEditMeta(a)}>${t('profile.apps.editDetails') || 'Edit Details'}</button>
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
             <button class=${a.parked ? 'btn-success btn-sm' : 'btn-outline btn-sm'} onClick=${() => handleTogglePark(a)}>${a.parked ? (t('profile.apps.unpark') || 'Unpark') : (t('profile.apps.park') || 'Park')}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
+          ${editingMeta === a.filename ? html`
+            <div class="pf-edit-panel">
+              <label class="text-meta mb-half">${t('profile.apps.nameLabel') || 'App Name'}</label>
+              <input class="input-field pf-flex-fill mb-half" maxLength="120" placeholder=${t('profile.apps.namePlaceholder') || 'Display name'} value=${editName} onInput=${e => setEditName(e.target.value)} />
+              <label class="text-meta mb-half">${t('profile.apps.descLabel') || 'Description'}</label>
+              <textarea class="input-field pf-flex-fill mb-half" rows="2" maxLength="2000" placeholder=${t('profile.apps.descPlaceholder') || 'What does this app do?'} value=${editDesc} onInput=${e => setEditDesc(e.target.value)}></textarea>
+              <div class="text-meta-sm mb-half">${t('profile.apps.renameHint') || 'The app link stays the same — only the displayed name and description change.'}</div>
+              <div class="flex-row">
+                <button class="btn-primary btn-sm" onClick=${() => handleSaveMeta(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
+                <button class="btn-outline btn-sm" onClick=${cancelEditMeta}>${t('profile.cancel') || 'Cancel'}</button>
+              </div>
+            </div>
+          ` : ''}
           ${editingApp === a.filename ? html`
             <div class="pf-edit-panel">
               <label class="text-meta mb-half">${t('profile.apps.accessCodeLabel') || 'Access Code'}</label>

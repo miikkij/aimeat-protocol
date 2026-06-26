@@ -917,6 +917,29 @@ await test('51. G1 Community-unaffected: a personal Secretary merge keeps its ag
     assert(agentRules.some((r: any) => /aimeat_discover/i.test(r.description)), `the scout-before-build agent rule survives: ${JSON.stringify(agentRules.map((r: any) => r.description))}`);
 });
 
+await test('Backfill: a pre-existing OpenRouter key provisions the Secretary on GET /settings', async () => {
+    // Simulate an owner who configured OpenRouter BEFORE the Secretary feature shipped: the key exists
+    // in memory but ensureSecretary (which only fired on PUT /settings) never ran, so there is no agent.
+    const bfOwner = `bf${Date.now()}`;
+    const bfToken = await registerOwner(bfOwner);
+    // Write the key record directly (bypassing PUT, so no auto-provision). GET only checks `.encrypted`.
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${bfToken}` },
+        body: JSON.stringify({ key: 'openrouter.apikey', value: { encrypted: 'dummy' }, visibility: 'private' }),
+    });
+    // Precondition: no Secretary agent yet.
+    const before = await json('/v1/agents', { headers: { Authorization: `Bearer ${bfToken}` } });
+    const hasSecBefore = (before.body.data.agents || []).some((a: any) => (a.tags || []).includes('system:secretary'));
+    assert(!hasSecBefore, 'no Secretary agent should exist before the backfill');
+    // Reading settings (the SPA does this on every load for the header button) must backfill the agent.
+    const settings = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${bfToken}` } });
+    assert(settings.body.data.hasApiKey === true, `hasApiKey should be true: ${JSON.stringify(settings.body.data)}`);
+    const after = await json('/v1/agents', { headers: { Authorization: `Bearer ${bfToken}` } });
+    const hasSecAfter = (after.body.data.agents || []).some((a: any) => (a.tags || []).includes('system:secretary'));
+    assert(hasSecAfter, 'GET /v1/openrouter/settings must provision the Secretary when a key exists');
+    await json(`/v1/owners/${encodeURIComponent(bfOwner)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${bfToken}` } });
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

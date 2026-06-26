@@ -33,6 +33,17 @@
       header (aimeat-home-link, label set from location.host) and a "Publish your own app" CTA in the
       iframe app-viewer toolbar (.aimeat-cta). Pairs with the inline-app badge injected server-side
       (apps.ts injectAimeatBadge) so visitors who open a shared app always have a way home + a publish hint.
+    v2.5.0 — 2026-06-26 — Add inline name + description editing in the Detail view's About section
+      (detailAboutEdit/Cancel/Save): edit in place where the details are shown, save PATCHes
+      /v1/apps/:filename { name, description } when published (and persists the local record) — the
+      app link (owner/filename) is unchanged, no re-publish and no new version.
+    v2.5.1 — 2026-06-26 — Fix: app names containing an apostrophe (e.g. "Fatalii's …") or other JS/HTML
+      delimiters broke the View/Fork buttons ("missing ) after argument list") because escapeHtml does
+      not escape quotes for an onclick JS-string context. Add jsArg() and use it for the name/filename
+      arguments interpolated into on* attributes.
+    v2.5.2 — 2026-06-26 — Add a pencil (✏️) next to the app name — on the detail-view title and on the
+      owner's own published + parked cards — that opens the inline name/description editor right where
+      the name is shown (editAppDetails opens the detail view with the About editor pre-opened).
 -->
 <html lang="en">
 <head>
@@ -1467,6 +1478,21 @@
       white-space: nowrap;
     }
 
+    /* Small inline pencil shown next to an editable app name (own cards + the detail
+       title). Pressing it opens the name/description editor where the name shows. */
+    .rename-pencil {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: .8rem;
+      opacity: .5;
+      padding: 0 2px;
+      line-height: 1;
+      vertical-align: middle;
+      transition: opacity var(--transition);
+    }
+    .rename-pencil:hover { opacity: 1; }
+
     .published-card-meta {
       font-size: .72rem;
       color: var(--text-muted);
@@ -2349,6 +2375,15 @@
       'card.subdomain': '🌐 Subdomain',
       'card.park': '🅿 Park',
       'card.unpark': '🚀 Publish',
+      'detail.editDetails': '✏️ Edit',
+      'detail.nameLabel': 'App name',
+      'detail.descLabel': 'Description',
+      'detail.renameHint': 'The app link stays the same — only the displayed name and description change.',
+      'detail.nameRequired': 'Name cannot be empty.',
+      'detail.descRequired': 'Description cannot be empty.',
+      'detail.saveDetails': '💾 Save',
+      'detail.cancelEdit': 'Cancel',
+      'detail.detailsUpdated': 'App details updated.',
       'card.parkHint': 'Hide from the public catalogue — moves to Parked Apps (still usable by you).',
       'card.unparkHint': 'Publish again — moves back to Published Apps, visible to everyone.',
       'card.parkedBadge': 'PARKED',
@@ -2586,6 +2621,15 @@
       'card.subdomain': '🌐 Alidomain',
       'card.park': '🅿 Parkkiin',
       'card.unpark': '🚀 Julkaise',
+      'detail.editDetails': '✏️ Muokkaa',
+      'detail.nameLabel': 'Sovelluksen nimi',
+      'detail.descLabel': 'Kuvaus',
+      'detail.renameHint': 'Sovelluksen linkki pysyy samana — vain näytettävä nimi ja kuvaus muuttuvat.',
+      'detail.nameRequired': 'Nimi ei voi olla tyhjä.',
+      'detail.descRequired': 'Kuvaus ei voi olla tyhjä.',
+      'detail.saveDetails': '💾 Tallenna',
+      'detail.cancelEdit': 'Peruuta',
+      'detail.detailsUpdated': 'Sovelluksen tiedot päivitetty.',
       'card.parkHint': 'Piilota julkisesta katalogista — siirtyy Parkissa-osioon (sinä voit yhä käyttää).',
       'card.unparkHint': 'Julkaise uudelleen — siirtyy takaisin Julkaistuihin, näkyy kaikille.',
       'card.parkedBadge': 'PARKISSA',
@@ -3415,6 +3459,23 @@
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // Escape a user-controlled string for use as a single-quoted JS argument INSIDE a
+  // double-quoted HTML on* attribute (e.g. onclick="window._launcher.foo('<here>')").
+  // escapeHtml only handles < > & — an apostrophe like in "Fatalii's" would otherwise
+  // terminate the JS string and throw "missing ) after argument list", breaking the
+  // button. JS-escape the backslash + single quote; HTML-escape the attribute/markup
+  // delimiters (they decode back to plain chars before the JS engine sees them).
+  function jsArg(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/[\r\n]+/g, ' ');
   }
 
   function sourceLabel(source) {
@@ -5414,7 +5475,7 @@
               (date ? '<span class="pcm-date">' + date + '</span>' : '') +
             '</div>' +
             '<div class="published-card-actions">' +
-              '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
+              '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
               '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
             '</div>' +
             (version ? '<div class="published-card-badgerow"><span class="pcb-version">' + escapeHtml(version) + '</span></div>' : '') +
@@ -5446,6 +5507,7 @@
       html +=
         '<div class="published-card parked">' +
           '<div class="published-card-name">' + escapeHtml(name) +
+            ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(sa.owner || '') + '\', \'' + jsArg(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">✏️</button>' +
             (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
             ' <span class="published-source-badge parked">' + t('card.parkedBadge') + '</span>' +
           '</div>' +
@@ -5456,7 +5518,7 @@
           '<div class="published-card-actions">' +
             '<button class="primary" onclick="window._launcher.toggleParkApp(\'' + escapeHtml(sa.filename || '') + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>' +
             '<button onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">' + t('ctx.details') + '</button>' +
-            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + escapeHtml(name) + '\')">' + t('card.view') + '</button>' +
+            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
             '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">' + t('card.versions') + '</button>' +
             '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(sa.filename || '') + '\')" class="danger">' + t('card.remove') + '</button>' +
           '</div>' +
@@ -5558,7 +5620,9 @@
 
       html +=
         '<div class="published-card">' +
-          '<div class="published-card-name">' + escapeHtml(app.name) + '</div>' +
+          '<div class="published-card-name">' + escapeHtml(app.name) +
+            ((app.isOwn && app.filename) ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(app.owner || '') + '\', \'' + jsArg(app.filename) + '\', \'' + jsArg(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">✏️</button>' : '') +
+          '</div>' +
           (app.operatorHidden ? '<div class="published-card-modnote"><span class="published-source-badge operator-hidden" title="' + escapeHtml(app.operatorHideReason || '') + '">' + t('card.operatorHidden') + '</span></div>' : '') +
           (app.description ? '<div class="published-card-desc">' + escapeHtml(app.description) + '</div>' : '') +
           '<div class="published-card-footer">' +
@@ -5569,7 +5633,7 @@
             '</div>' +
             '<div class="published-card-actions">' +
               (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
-              (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + escapeHtml(app.name) + '\')">' + t('card.view') + '</button>' : '') +
+              (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + jsArg(app.name) + '\')">' + t('card.view') + '</button>' : '') +
               (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
               parkBtnHtml +
               subBtnHtml +
@@ -5682,6 +5746,8 @@
   var detailDraftBlob = null;   // base64 of the pending AI-generated draft (never overwrites app.blob until Keep)
   var detailAiAvailable = false;
   var detailVersionsHtml = null; // cached rendered versions list, survives re-renders
+  var detailEditingAbout = false; // true while the About name/description inline editor is open
+  var detailEditAboutOnOpen = false; // when set, open the About editor as soon as the detail view renders
 
   function detailGetApp() {
     for (var i = 0; i < allApps.length; i++) {
@@ -5718,6 +5784,7 @@
     detailAppId = appId;
     detailDraftBlob = null;
     detailVersionsHtml = null;
+    detailEditingAbout = false;
     var app = detailGetApp();
     if (!app) return;
     document.getElementById('detail-view').hidden = false;
@@ -5728,6 +5795,18 @@
     if (app.published && app.publishedFilename && owner) {
       detailLoadVersions(owner, app.publishedFilename);
     }
+    // Opened via a pencil ("edit the name") → jump straight into the About editor.
+    if (detailEditAboutOnOpen) {
+      detailEditAboutOnOpen = false;
+      detailAboutEdit();
+    }
+  }
+
+  // Open an app's detail view with the name/description editor already open. Used by
+  // the pencil icons on the cards so editing starts right where the name is shown.
+  function editAppDetails(owner, filename, localId, versionNumber) {
+    detailEditAboutOnOpen = true;
+    openPublishedDetail(owner, filename, localId, versionNumber);
   }
 
   function closeDetailView() {
@@ -5816,9 +5895,13 @@
     var hasServer = !!config.aimeatUrl;
     var icon = app.icon || '\u{1F4DD}';
     var isUrlApp = (app.source === 'url' && !app.blob);
+    // The name + description are editable in place (see the About section). A pencil
+    // next to the title opens that editor right where the name is shown.
+    var canEditAbout = !!app.id && !isUrlApp;
 
     document.getElementById('detail-title').innerHTML =
-      '<span style="font-size:1.3rem">' + escapeHtml(icon) + '</span> ' + escapeHtml(app.name || 'App');
+      '<span style="font-size:1.3rem">' + escapeHtml(icon) + '</span> ' + escapeHtml(app.name || 'App') +
+      ((canEditAbout && !detailEditingAbout) ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : '');
 
     // ── STATUS ──
     var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0; // base64 → bytes approx
@@ -5856,12 +5939,32 @@
       '</div>';
 
     // ── ABOUT ──
+    // The display name + description are editable in place here (inline editor) —
+    // the app's URL is keyed off owner/filename, so a rename never moves the link.
+    // Editing is offered for the owner's own apps (a local record always exists once
+    // the detail view is open); Save PATCHes the server when the app is published.
     var tags = (app.tags && app.tags.length) ? app.tags.join(', ') : '—';
     var cortex = (app.usesCortex && app.usesCortex.length) ? app.usesCortex.join(', ') : '—';
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
-    var aboutHtml =
-      '<div class="dtl-section">' +
-        '<h3>' + t('detail.about') + '</h3>' +
+    var aboutHeader =
+      '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
+        '<span>' + t('detail.about') + '</span>' +
+        ((canEditAbout && !detailEditingAbout) ? '<button class="dtl-btn" onclick="window._launcher.detailAboutEdit()">' + t('detail.editDetails') + '</button>' : '') +
+      '</h3>';
+    var aboutBody;
+    if (detailEditingAbout) {
+      aboutBody =
+        '<label class="dtl-stat-label" for="detail-name-input">' + t('detail.nameLabel') + '</label>' +
+        '<input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || '') + '" style="margin:4px 0 10px" />' +
+        '<label class="dtl-stat-label" for="detail-desc-input">' + t('detail.descLabel') + '</label>' +
+        '<textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || '') + '</textarea>' +
+        '<div class="dtl-sync none" style="margin:0 0 10px">' + t('detail.renameHint') + '</div>' +
+        '<div class="dtl-btn-row">' +
+          '<button class="dtl-btn primary" onclick="window._launcher.detailAboutSave()">' + t('detail.saveDetails') + '</button>' +
+          '<button class="dtl-btn" onclick="window._launcher.detailAboutCancel()">' + t('detail.cancelEdit') + '</button>' +
+        '</div>';
+    } else {
+      aboutBody =
         (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + '</p>' : '') +
         '<div class="dtl-meta-grid">' +
           metaItem(t('detail.category'), app.category || 'utility') +
@@ -5871,8 +5974,9 @@
           metaItem(t('detail.size'), app.blob ? fmtSize(localBytes) : '—') +
           metaItem(t('detail.created'), created) +
           metaItem(t('detail.usesCortex'), cortex) +
-        '</div>' +
-      '</div>';
+        '</div>';
+    }
+    var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + '</div>';
 
     // ── EDIT WITH AI ──
     var aiHtml =
@@ -5931,6 +6035,74 @@
 
     document.getElementById('detail-body').innerHTML =
       statusHtml + aboutHtml + aiHtml + versionsHtml + actionsHtml;
+  }
+
+  // ── About: inline name + description editing ──────
+  // Edit the display name/description right where they are shown. The URL is keyed
+  // off owner/filename, so this never changes the app link. Save updates the local
+  // record and, when the app is published, PATCHes /v1/apps/:filename in place.
+  function detailAboutEdit() {
+    if (!detailGetApp()) return;
+    detailEditingAbout = true;
+    renderDetailView();
+    var nameEl = document.getElementById('detail-name-input');
+    if (nameEl) { nameEl.focus(); nameEl.select(); }
+  }
+
+  function detailAboutCancel() {
+    detailEditingAbout = false;
+    renderDetailView();
+  }
+
+  function detailAboutSave() {
+    var app = detailGetApp();
+    if (!app) return;
+    var nameEl = document.getElementById('detail-name-input');
+    var descEl = document.getElementById('detail-desc-input');
+    var newName = nameEl ? nameEl.value.trim() : '';
+    var newDesc = descEl ? descEl.value.trim() : '';
+    if (!newName) { alert(t('detail.nameRequired') || 'Name cannot be empty.'); if (nameEl) nameEl.focus(); return; }
+    if (app.published && !newDesc) { alert(t('detail.descRequired') || 'Description cannot be empty.'); if (descEl) descEl.focus(); return; }
+
+    function finishLocal() {
+      app.name = newName;
+      app.description = newDesc;
+      saveApp(app).then(function() {
+        detailEditingAbout = false;
+        renderApps();
+        loadPublishedApps();
+        renderDetailView();
+      });
+    }
+
+    // Not published on the server → it's a local-only record; just persist locally.
+    if (!app.published || !app.publishedFilename) { finishLocal(); return; }
+
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName, description: newDesc })
+    })
+      .then(function(resp) { return resp.json().then(function(j) { return { ok: resp.ok, j: j }; }); })
+      .then(function(res) {
+        if (res.ok && res.j && res.j.ok !== false) {
+          // Keep the cached server manifest in sync so a re-render shows the new name.
+          var key = owner + '\n' + filename;
+          serverAppManifests[key] = serverAppManifests[key] || {};
+          serverAppManifests[key].name = newName;
+          serverAppManifests[key].description = newDesc;
+          finishLocal();
+        } else {
+          alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
   // Manual override: upload a custom image as this published app's thumbnail. (Bulk auto-capture is
@@ -6066,7 +6238,7 @@
               '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
                 '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + '</span></div>' +
               '<div class="dtl-btn-row">' +
-                '<button class="dtl-btn" onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + escapeHtml(filename) + '\')">' + t('card.view') + '</button>' +
+                '<button class="dtl-btn" onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
                 (isLatest ? '' : '<button class="dtl-btn" onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.restore') + '</button>') +
                 '<button class="dtl-btn" onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.fork') + '</button>' +
               '</div>' +
@@ -6352,7 +6524,7 @@
                 '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + '</span>' +
               '</div>' +
               '<div class="version-actions">' +
-                '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + escapeHtml(filename) + '\')">' + t('card.view') + '</button>' +
+                '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
                 (isLatest ? '' : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Re-publish this version as the new latest">' + t('card.restore') + '</button>') +
                 '<button onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Copy this version into a new app">' + t('card.fork') + '</button>' +
               '</div>' +
@@ -7265,6 +7437,10 @@
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     toggleParkApp: toggleParkApp,
+    detailAboutEdit: detailAboutEdit,
+    detailAboutCancel: detailAboutCancel,
+    detailAboutSave: detailAboutSave,
+    editAppDetails: editAppDetails,
     showSubdomainModal: showSubdomainModal,
     openConsents: openConsents,
     closeConsents: closeConsents,

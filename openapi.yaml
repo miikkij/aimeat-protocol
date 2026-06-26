@@ -11644,6 +11644,7 @@ paths:
         - { in: query, name: limit, required: false, schema: { type: integer, default: 50, maximum: 200 } }
         - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
         - { in: query, name: free_only, required: false, schema: { type: boolean } }
+        - { in: query, name: public_only, required: false, schema: { type: boolean }, description: "Strictly-public view: drop the viewer exception so even a logged-in owner's own parked/operator-hidden apps are excluded (for public proof surfaces like the landing wall)" }
         - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
       responses:
         '200':
@@ -11850,12 +11851,14 @@ paths:
   /v1/apps/{filename}:
     patch:
       operationId: updateApp
-      summary: Update an app you own (access code and/or parked state)
+      summary: Update an app you own (name, description, access code and/or parked state)
       description: |
         Update metadata on an app you own. Each field is independent and applied only when present
         in the body, so a `parked`-only request never clears the access code (and vice-versa).
-        Parking hides the app from the public catalogue/gallery/search while keeping it fully usable
-        by you (and your agents); unparking restores it to the catalogue.
+        `name`/`description` rename or re-describe the app in place on its latest version — the
+        display name is metadata only, so the stable `owner/filename` download URL never changes
+        (no re-publish needed). Parking hides the app from the public catalogue/gallery/search while
+        keeping it fully usable by you (and your agents); unparking restores it to the catalogue.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -11868,6 +11871,12 @@ paths:
             schema:
               type: object
               properties:
+                name:
+                  type: string
+                  description: 1-120 chars; new display name (URL is unchanged)
+                description:
+                  type: string
+                  description: 1-2000 chars; new description (cannot be empty)
                 access_code:
                   type: string
                   nullable: true
@@ -11889,6 +11898,8 @@ paths:
                         type: object
                         properties:
                           filename: { type: string }
+                          name: { type: string }
+                          description: { type: string }
                           protected: { type: boolean }
                           parked: { type: boolean }
                           download_url: { type: string }

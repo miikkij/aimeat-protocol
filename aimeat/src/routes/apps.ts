@@ -131,8 +131,15 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // Parked apps are hidden from the public listing but must still show in
         // their owner's own catalogue. Resolve the authenticated caller's owner
         // GHII (if any) so listApps can include the caller's own parked apps.
+        //
+        // `public_only=true` forces the strictly-public view even for a logged-in
+        // owner: it drops the viewer exception so the caller's OWN parked and
+        // operator-hidden apps are excluded too. Public proof surfaces (e.g. the
+        // landing wall) must use it — otherwise an owner browsing the front page
+        // sees their own parked/operator-hidden apps that the public must never see.
+        const publicOnly = req.query.public_only === 'true';
         let viewerGhii: string | undefined;
-        if (req.auth) {
+        if (req.auth && !publicOnly) {
             const { ownerGhii } = await canonicalOwner(req);
             viewerGhii = ownerGhii;
         }
@@ -869,6 +876,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     });
 
     // PATCH /v1/apps/:filename — Update an app you own (requires auth). Accepts
+    // `name` / `description` (rename / re-describe in place, no re-publish),
     // `access_code` (set/remove protection) and/or `parked` (hide from / restore to
     // the public catalogue). Fields are independent: each is applied only when present.
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
@@ -904,6 +912,49 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // parked-only PATCH never clears the access code (and vice-versa).
         const notes: string[] = [];
 
+        // Rename / re-describe in place: the display name is metadata, the URL is
+        // keyed off owner/filename, so this never changes the link. Only the latest
+        // version's manifest is updated (the version the catalogue surfaces).
+        const metaUpdate: { name?: string; description?: string } = {};
+        if ('name' in body) {
+            if (typeof body.name !== 'string') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name must be a string'));
+                return;
+            }
+            const trimmedName = body.name.trim();
+            if (trimmedName.length < 1 || trimmedName.length > 120) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name must be 1-120 characters'));
+                return;
+            }
+            metaUpdate.name = trimmedName;
+        }
+        if ('description' in body) {
+            if (typeof body.description !== 'string') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be a string'));
+                return;
+            }
+            const trimmedDesc = body.description.trim();
+            if (trimmedDesc.length > 2000) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be at most 2000 characters'));
+                return;
+            }
+            if (trimmedDesc.length === 0) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description cannot be empty — apps require a description'));
+                return;
+            }
+            metaUpdate.description = trimmedDesc;
+        }
+        if (metaUpdate.name !== undefined || metaUpdate.description !== undefined) {
+            await storage.updateAppMeta(effectiveGaii, filename, metaUpdate);
+            if (metaUpdate.name !== undefined && metaUpdate.description !== undefined) {
+                notes.push('Name and description updated. The app link is unchanged.');
+            } else if (metaUpdate.name !== undefined) {
+                notes.push('Name updated. The app link is unchanged.');
+            } else {
+                notes.push('Description updated.');
+            }
+        }
+
         if ('access_code' in body) {
             const access_code = body.access_code;
             const newCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
@@ -929,7 +980,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }
 
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (access_code or parked).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code or parked).'));
             return;
         }
 
@@ -938,6 +989,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         res.json(success(config.nodeId, {
             filename,
+            name: updated?.manifest?.name,
+            description: updated?.manifest?.description,
             protected: !!updated?.accessCode,
             parked: !!updated?.parked,
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,

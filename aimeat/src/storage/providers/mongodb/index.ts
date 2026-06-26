@@ -89,7 +89,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
-    AppRecord, AppListOptions, AppPurchaseRecord,
+    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord,
     SubdomainSiteRecord,
     AppGrantRecord,
     NotificationTemplateRecord,
@@ -4081,6 +4081,33 @@ export class PrismaStorage implements Storage {
             data: { accessCode: accessCode ?? null },
         });
         return result.count > 0;
+    }
+
+    async updateAppMeta(
+        ownerGaii: string,
+        filename: string,
+        meta: { name?: string; description?: string },
+    ): Promise<boolean> {
+        this.ensureReady();
+        // Rename/re-describe in place on the LATEST version (the one the catalogue
+        // shows). Read the current manifest, merge only the supplied fields, write
+        // it back — the URL (owner/filename) is untouched. Older versions keep the
+        // name they were published under.
+        const rows = await this.prisma.app.findMany({
+            where: { ownerGaii, filename },
+            orderBy: { versionNumber: 'desc' },
+            take: 1,
+        });
+        if (rows.length === 0) return false;
+        const latest = rows[0];
+        const manifest = { ...(latest.manifest as any) } as AppManifest;
+        if (meta.name !== undefined) manifest.name = meta.name;
+        if (meta.description !== undefined) manifest.description = meta.description;
+        await this.prisma.app.update({
+            where: { ownerGaii_filename_versionNumber: { ownerGaii, filename, versionNumber: latest.versionNumber } },
+            data: { manifest: manifest as any },
+        });
+        return true;
     }
 
     async setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean> {

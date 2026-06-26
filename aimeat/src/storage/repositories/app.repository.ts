@@ -21,6 +21,8 @@
  *   v1.4.0 — 2026-06-24 — Add setAppOperatorHidden() + AppListOptions.adminView for
  *     operator moderation (remove an app from every public surface; owner sees a
  *     badge but cannot lift it).
+ *   v1.5.0 — 2026-06-26 — Add updateAppMeta() so an owner can rename an app (and
+ *     edit its description) in place — without re-publishing or changing the URL.
  */
 import type { AppRecord, AppListOptions } from '../interface.js';
 
@@ -33,6 +35,20 @@ export interface AppRepository {
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;
     updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean>;
+    /**
+     * Edit an app's display metadata (name and/or description) in place on its
+     * LATEST version row — the version the catalogue/gallery surfaces. This lets
+     * an owner rename an app without re-publishing, so the stable `owner/filename`
+     * URL never changes (the name is display-only; the filename is the identity).
+     * Only the fields present in `meta` are touched; omitted fields are left as-is.
+     * Older version rows keep the name they were published under (historical).
+     * Returns true if the latest row was updated.
+     */
+    updateAppMeta(
+        ownerGaii: string,
+        filename: string,
+        meta: { name?: string; description?: string },
+    ): Promise<boolean>;
     /**
      * Park or unpark an app: set the `parked` flag on EVERY version row of
      * (ownerGaii, filename). Parked apps drop out of the public catalogue,
