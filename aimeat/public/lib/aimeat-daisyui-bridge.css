@@ -1,0 +1,48 @@
+/*
+ * @file aimeat-daisyui-bridge.css
+ * @description Theme-compat layer so the bundled cortex UI libraries cohere with daisyUI.
+ *   (1) Maps AIMEAT theme.css variable NAMES to daisyUI 5 theme variables so libs that read
+ *       --text / --bg-card / --accent / … follow a daisyUI app's `data-theme` automatically.
+ *   (2) Dark-mode polish: a few cortex components hardcode LIGHT colors (no var) — alerts,
+ *       badges, table zebra — so the var-mapping can't reach them. We override those with
+ *       theme-aware tints (`:root .aui-*` wins on specificity). No changes to the libraries.
+ *   Load this AFTER the daisyUI stylesheet. Hardcoded fallbacks keep it working if daisyUI
+ *   vars are absent.
+ * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
+ *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
+ * @version-history
+ *   v1.0.0 — 2026-06-26 — Initial bridge (cortex libs follow daisyUI theme).
+ *   v1.1.0 — 2026-06-26 — Map --bg-surface-dim (table zebra) + theme-aware alert/badge tints.
+ */
+:root {
+  --text:           var(--color-base-content, #1A1A2E);
+  --text-dim:       color-mix(in oklab, var(--color-base-content, #6B7280) 70%, transparent);
+  --text-muted:     color-mix(in oklab, var(--color-base-content, #9CA3AF) 55%, transparent);
+  --bg-card:        var(--color-base-100, #ffffff);
+  --card:           var(--color-base-100, #ffffff);
+  --bg-surface:     var(--color-base-200, #f3f4f6);
+  --bg-surface-dim: color-mix(in oklab, var(--color-base-content, #111827) 5%, var(--color-base-100, #ffffff));
+  --bg-dim:         var(--color-base-200, #f3f4f6);
+  --surface:        var(--color-base-200, #f3f4f6);
+  --border:         var(--color-base-300, #e5e7eb);
+  --accent:         var(--color-primary, #e8564a);
+  --blue:           var(--color-info, #3b82f6);
+  --danger:         var(--color-error, #ef4444);
+  --success:        var(--color-success, #10b981);
+  --warn:           var(--color-warning, #f59e0b);
+  --warning:        var(--color-warning, #f59e0b);
+}
+
+/* ── Dark-mode polish: override the cortex libs' hardcoded light colors with theme-aware
+      tints. `:root .aui-*` (specificity 0,1,1) beats the libs' `.aui-*` (0,1,0) regardless
+      of stylesheet order. Tint = subtle wash of the semantic colour over the card bg; text
+      stays --color-base-content so it's readable in both light and dark. ── */
+:root .aui-alert-info    { background: color-mix(in oklab, var(--color-info,    #3b82f6) 14%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); border: 1px solid color-mix(in oklab, var(--color-info,    #3b82f6) 45%, transparent); }
+:root .aui-alert-success { background: color-mix(in oklab, var(--color-success, #10b981) 14%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); border: 1px solid color-mix(in oklab, var(--color-success, #10b981) 45%, transparent); }
+:root .aui-alert-warn    { background: color-mix(in oklab, var(--color-warning, #f59e0b) 16%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); border: 1px solid color-mix(in oklab, var(--color-warning, #f59e0b) 45%, transparent); }
+:root .aui-alert-error   { background: color-mix(in oklab, var(--color-error,   #ef4444) 14%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); border: 1px solid color-mix(in oklab, var(--color-error,   #ef4444) 45%, transparent); }
+
+:root .aui-badge-info    { background: color-mix(in oklab, var(--color-info,    #3b82f6) 22%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); }
+:root .aui-badge-success { background: color-mix(in oklab, var(--color-success, #10b981) 22%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); }
+:root .aui-badge-warn    { background: color-mix(in oklab, var(--color-warning, #f59e0b) 24%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); }
+:root .aui-badge-danger  { background: color-mix(in oklab, var(--color-error,   #ef4444) 22%, var(--color-base-100, #fff)); color: var(--color-base-content, #1A1A2E); }
