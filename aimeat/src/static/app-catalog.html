@@ -2235,6 +2235,8 @@
         <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
       </div>
       <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do, or what changes to make..." data-i18n-ph="pb.descPh"></textarea>
+      <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; Start from a template (optional)</span></label>
+      <select id="pb-template" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--bg-card,#1e1e2a);color:var(--text,#eee);margin-bottom:8px"><option value="">(none &#x2014; build from scratch)</option></select>
       <label class="pb-ext-toggle"><input type="checkbox" id="pb-ext-checkbox"> <span data-i18n="pb.includeCortex">Include Cortex Extensions</span></label>
       <div class="pb-ext-list" id="pb-ext-list"></div>
       <div class="pb-preview-label" data-i18n="pb.livePreview">Live Preview</div>
@@ -6987,6 +6989,9 @@
     desc.value = '';
     extCheckbox.checked = false;
     extList.classList.remove('open');
+    window.pbTemplate = null;
+    var tplSel0 = document.getElementById('pb-template');
+    if (tplSel0) tplSel0.value = '';
 
     // Set mode based on whether we have a source app
     var radios = document.querySelectorAll('input[name="pb-mode"]');
@@ -7000,6 +7005,8 @@
 
     // Load Cortex extensions into picker
     loadPbExtensions();
+    // Load authoring templates (booster-kit) into the "Start from a template" picker
+    loadPbTemplates();
 
     overlay.style.display = 'flex';
     desc.focus();
@@ -7009,6 +7016,37 @@
   function closePbPanel() {
     document.getElementById('prompt-builder-overlay').style.display = 'none';
     pbSourceApp = null;
+  }
+
+  // Booster-kit: populate the "Start from a template" picker from /v1/app-templates and, on
+  // selection, fetch that template's content into window.pbTemplate (injected by buildPromptFromBuilder).
+  function loadPbTemplates() {
+    var sel = document.getElementById('pb-template');
+    if (!sel) return;
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var base = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(base + '/v1/app-templates')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var list = (d.data && d.data.templates) || [];
+        sel.innerHTML = '<option value="">(none — build from scratch)</option>';
+        list.forEach(function (t) {
+          var o = document.createElement('option');
+          o.value = t.id;
+          o.textContent = t.title + (t.description ? ' — ' + t.description.slice(0, 70) : '');
+          sel.appendChild(o);
+        });
+        sel.onchange = function () {
+          var id = sel.value;
+          if (!id) { window.pbTemplate = null; updatePbPreview(); return; }
+          fetch(base + '/v1/app-templates/' + encodeURIComponent(id))
+            .then(function (r) { return r.json(); })
+            .then(function (d2) { window.pbTemplate = (d2.data && d2.data.template) || null; updatePbPreview(); })
+            .catch(function () { window.pbTemplate = null; });
+        };
+      })
+      .catch(function () { /* templates are optional */ });
   }
 
   function loadPbExtensions() {
@@ -7305,6 +7343,11 @@
     if (mode === 'improve' && pbSourceApp && pbSourceApp.blob) {
       var source = decodeURIComponent(escape(atob(pbSourceApp.blob)));
       prompt += '--- Source Code ---\n' + source;
+    }
+
+    // Booster-kit: if the user picked a starting template, hand the AI the skeleton to copy from.
+    if (window.pbTemplate && window.pbTemplate.content) {
+      prompt += '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring intact; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + window.pbTemplate.content + '\n```\n';
     }
 
     return prompt;

@@ -170,7 +170,7 @@ hosting is the only subscription.`;
 
 // Mirrors buildPromptFromBuilder() in app-catalog.html for the "new app / no description" case,
 // with the current node URL injected. If no idea is given the prompt explicitly tells the AI to ask.
-function buildLandingAppPrompt(nodeUrl) {
+function buildLandingAppPrompt(nodeUrl, templateContent) {
   const base = (nodeUrl || '').replace(/\/+$/, '') || window.location.origin;
   let p = '';
   p += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
@@ -269,12 +269,27 @@ function buildLandingAppPrompt(nodeUrl) {
   p += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
   p += '- Theme with CSS variables and support both light and dark\n';
   p += '- Include error handling and loading states for API calls\n';
+  if (templateContent) {
+    p += '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + templateContent + '\n```\n';
+  }
   return p;
 }
 
 function BuildAppPrompt() {
   const [copied, setCopied] = useState(false);
-  const prompt = buildLandingAppPrompt(window.location.origin);
+  const [templates, setTemplates] = useState([]);
+  const [tplId, setTplId] = useState('');
+  const [tplContent, setTplContent] = useState('');
+  useEffect(() => {
+    fetch('/v1/app-templates').then(r => r.json()).then(d => setTemplates((d.data && d.data.templates) || [])).catch(() => {});
+  }, []);
+  const onPick = async (e) => {
+    const id = e.target.value; setTplId(id);
+    if (!id) { setTplContent(''); return; }
+    try { const d = await (await fetch('/v1/app-templates/' + encodeURIComponent(id))).json(); setTplContent((d.data && d.data.template && d.data.template.content) || ''); }
+    catch { setTplContent(''); }
+  };
+  const prompt = buildLandingAppPrompt(window.location.origin, tplContent);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
@@ -286,6 +301,7 @@ function BuildAppPrompt() {
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.buildTitle', 'Build your app in 10 minutes — copy this prompt')}</h2>
       <p class="ld-askai-sub">${tr('landing.buildSub', 'Paste into Claude, ChatGPT or any AI. It asks about your idea, builds the app and publishes it to your node. Share the link when done.')}</p>
+      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${'✨'} ${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.title}</option>`)}</select></div>` : ''}
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
