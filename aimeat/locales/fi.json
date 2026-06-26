@@ -2662,6 +2662,8 @@
       "tagsPlaceholder": "Lisää tagi ja paina Enter",
       "copyUrls": "Kopioi URL:t",
       "urlsCopied": "URL:t kopioitu leikepöydälle",
+      "copyUrl": "Kopioi URL",
+      "urlCopied": "URL kopioitu leikepöydälle",
       "clearFilter": "Tyhjennä",
       "noMatch": "Ei tiedostoja valituilla tageilla"
     },

@@ -21,6 +21,8 @@
  *   v1.1.0 — 2026-06-20 — Add silent SSO bridge GET /v1/auth/app-grant-silent: when the owner is
  *     logged into the apex, their own app (bound by its per-app subdomain origin) gets a scoped
  *     grant token with no visible login (same-site iframe + postMessage). Others → consent_required.
+ *   v1.2.0 — 2026-06-26 — Silent bridge reply includes the owner's display_name so the app login pill
+ *     can show a human label instead of the raw GHII (non-sensitive; '' when unset).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -323,9 +325,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       });
     }
     const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId });
+    // The owner's display name (if set) so the app's login pill can show a human label instead of the
+    // raw GHII. Non-sensitive (it's the public profile name); falls back to '' → the SDK shows the GHII.
+    const ghiiRec = await storage.getGHII(ownerGhii);
     // Include `app` (owner/filename) + `own` so the SDK can offer in-app grant management (the gear on
     // the login pill re-opens the consent screen for exactly this app).
-    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId, app: site.target, own: isOwnApp });
+    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId, app: site.target, own: isOwnApp, display_name: ghiiRec?.displayName ?? '' });
   });
 
   // ── POST /v1/app-grants/token ── the app (cross-origin, CORS *) exchanges code / refreshes.
