@@ -35,6 +35,7 @@ import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
+import { seedExamplePackages } from '../services/package-seeder.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
@@ -129,6 +130,12 @@ export async function initializeServices(
   seedBundledCortexes(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
     .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
+
+  // Auto-seed bundled example packages (digital-signage, aimeat-iam, …) into the catalog so
+  // every user can install them without an operator running `aimeat seed`. Idempotent.
+  seedExamplePackages(storage, `system@${config.nodeId}`)
+    .then(count => { if (count > 0) logger.info(`Auto-seeded ${count} example package(s)`); })
+    .catch(err => logger.error('Failed to seed example packages', { error: String(err) }));
 
   // Data hygiene: legacy publish paths stored app ownerName as the full GHII
   // (owner@node). The catalog "my apps" filter and the by-owner-name delete
