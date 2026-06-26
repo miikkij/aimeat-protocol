@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!-- AIMEAT App Manifest
 name: aimeat-cortex-showroom
-version: 0.1.0
-description: Live showroom of the bundled AIMEAT cortex UI libraries, styled with self-hosted Tailwind + daisyUI.
+version: 0.2.0
+description: Comprehensive live showroom of every bundled AIMEAT cortex UI component, styled with self-hosted Tailwind + daisyUI.
 entry: index.html
 -->
 <html lang="en" data-theme="dark">
@@ -12,6 +12,8 @@ entry: index.html
   <title>AIMEAT Cortex Library Showroom</title>
   <!-- Self-hosted (vendored) — served from our own node /lib/, not a CDN -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <!-- Bridge: makes the cortex UI libs follow daisyUI's data-theme (maps --text/--bg-card/… → --color-*) -->
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
   <script src="/lib/chartjs@4.js"></script>
   <!-- All logic in an external same-origin file so the apex CSP ('self') allows it
@@ -22,7 +24,7 @@ entry: index.html
   <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-50">
     <div class="flex-1 gap-3">
       <span class="text-lg font-bold">AIME<span style="color:#E8564A">&#9829;</span>AT</span>
-      <span class="opacity-70">Cortex Library Showroom</span>
+      <span class="opacity-70 hidden sm:inline">Cortex Library Showroom</span>
     </div>
     <div class="flex-none gap-2">
       <span class="badge badge-soft badge-success" id="vendor-badge">self-hosted Tailwind + daisyUI</span>
@@ -30,66 +32,67 @@ entry: index.html
     </div>
   </nav>
 
-  <main class="flex-1 w-full max-w-5xl mx-auto p-4 flex flex-col gap-6">
+  <main class="flex-1 w-full max-w-6xl mx-auto p-4 flex flex-col gap-6">
 
-    <section class="card bg-base-200 shadow">
-      <div class="card-body">
-        <h2 class="card-title">daisyUI chrome <span class="badge badge-info badge-sm">Tailwind v4 + daisyUI 5</span></h2>
-        <p class="opacity-70 text-sm">If this is styled (rounded card, colored buttons/badges below), the self-hosted Tailwind + daisyUI loaded correctly from <code>/lib/</code>.</p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <button class="btn btn-primary">Primary</button>
-          <button class="btn btn-secondary">Secondary</button>
-          <button class="btn btn-accent">Accent</button>
-          <button class="btn btn-outline">Outline</button>
-          <span class="badge badge-primary">badge</span>
-          <span class="badge badge-success">ok</span>
-          <span class="badge badge-warning">warn</span>
-          <input type="checkbox" class="toggle toggle-primary" checked />
-          <progress class="progress progress-primary w-40" value="70" max="100"></progress>
-        </div>
+    <section class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">daisyUI chrome <span class="badge badge-info badge-sm">Tailwind v4 + daisyUI 5 (self-hosted)</span></h2>
+      <p class="opacity-70 text-sm">Styled chrome below ⇒ vendored Tailwind + daisyUI loaded from <code>/lib/</code>.</p>
+      <div class="flex flex-wrap items-center gap-2 mt-2">
+        <button class="btn btn-primary btn-sm">Primary</button>
+        <button class="btn btn-secondary btn-sm">Secondary</button>
+        <button class="btn btn-accent btn-sm">Accent</button>
+        <button class="btn btn-outline btn-sm">Outline</button>
+        <span class="badge badge-primary">badge</span>
+        <span class="badge badge-success">ok</span>
+        <span class="badge badge-warning">warn</span>
+        <input type="checkbox" class="toggle toggle-primary" checked />
+        <progress class="progress progress-primary w-32" value="70" max="100"></progress>
       </div>
-    </section>
-
-    <section class="card bg-base-200 shadow">
-      <div class="card-body">
-        <h2 class="card-title">Cortex libraries loaded <span id="load-summary" class="badge badge-sm">…</span></h2>
-        <div id="load-status" class="flex flex-wrap gap-2"></div>
-      </div>
-    </section>
-
-    <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-ui-forms <span class="badge badge-ghost badge-sm">AIMEAT.ui.forms</span></h2>
-      <div id="demo-forms" class="mt-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-ui-dialogs <span class="badge badge-ghost badge-sm">AIMEAT.ui.dialogs</span></h2>
-      <div id="demo-dialogs" class="flex flex-wrap gap-2 mt-2"></div>
+      <h2 class="card-title">Cortex libraries loaded <span id="load-summary" class="badge badge-sm">…</span></h2>
+      <div id="load-status" class="flex flex-wrap gap-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-ui-viewers <span class="badge badge-ghost badge-sm">AIMEAT.ui.viewers</span></h2>
-      <div id="demo-viewers" class="mt-2"></div>
+      <h2 class="card-title">aimeat-ui-forms <span class="badge badge-ghost badge-sm">7 components</span></h2>
+      <div id="demo-forms" class="grid gap-3 md:grid-cols-2 mt-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-ui-nav <span class="badge badge-ghost badge-sm">AIMEAT.ui.nav</span></h2>
-      <div id="demo-nav" class="mt-2"></div>
+      <h2 class="card-title">aimeat-i18n <span class="badge badge-ghost badge-sm">new · AIMEAT.i18n</span></h2>
+      <div id="demo-i18n" class="grid gap-3 md:grid-cols-2 mt-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-ui-layout <span class="badge badge-ghost badge-sm">AIMEAT.ui.layout</span></h2>
-      <div id="demo-layout" class="mt-2"></div>
+      <h2 class="card-title">aimeat-ui-dialogs <span class="badge badge-ghost badge-sm">6 components</span></h2>
+      <div id="demo-dialogs" class="grid gap-3 md:grid-cols-2 mt-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-charts <span class="badge badge-ghost badge-sm">AIMEAT.charts</span></h2>
-      <div id="demo-charts" class="mt-2"><div id="chart-host" style="height:260px"></div></div>
+      <h2 class="card-title">aimeat-ui-viewers <span class="badge badge-ghost badge-sm">6 components</span></h2>
+      <div id="demo-viewers" class="grid gap-3 md:grid-cols-2 mt-2"></div>
     </div></section>
 
     <section class="card bg-base-200 shadow"><div class="card-body">
-      <h2 class="card-title">aimeat-canvas <span class="badge badge-ghost badge-sm">AIMEAT.canvas</span></h2>
-      <div id="demo-canvas" class="mt-2"><div id="canvas-host" style="height:320px"></div></div>
+      <h2 class="card-title">aimeat-ui-nav <span class="badge badge-ghost badge-sm">5 components</span></h2>
+      <div id="demo-nav" class="grid gap-3 md:grid-cols-2 mt-2"></div>
+    </div></section>
+
+    <section class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">aimeat-ui-layout <span class="badge badge-ghost badge-sm">10 components</span></h2>
+      <div id="demo-layout" class="grid gap-3 md:grid-cols-2 mt-2"></div>
+    </div></section>
+
+    <section class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">aimeat-charts <span class="badge badge-ghost badge-sm">self-hosted Chart.js</span></h2>
+      <div id="demo-charts" class="grid gap-3 md:grid-cols-2 mt-2"></div>
+    </div></section>
+
+    <section class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">aimeat-canvas <span class="badge badge-ghost badge-sm">DrawingCanvas</span></h2>
+      <div id="demo-canvas" class="mt-2"></div>
     </div></section>
 
   </main>

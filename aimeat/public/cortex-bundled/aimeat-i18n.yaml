@@ -1,0 +1,64 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-i18n
+  namespace: aimeat
+  description: "Localization helper — load translations (inline or from the user's own memory), translate with flat-key-first t() + {var} interpolation, switch locale with persistence, and a LanguageSwitcher UI."
+  author: AIMEAT
+  tags: [i18n, localization, translation, locale, multilanguage, components]
+  labels:
+    domain: i18n
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: i18n-assistant
+      content: |
+        You are helping build an app that has the aimeat-i18n cortex installed.
+        Use AIMEAT.i18n for ALL user-visible text — never hardcode display strings.
+
+        Setup (once, at boot):
+          await AIMEAT.i18n.init({
+            locales: ['en', 'fi'],
+            default: 'en',
+            // EITHER inline translations:
+            translations: { en: { 'greeting': 'Hello {name}' }, fi: { 'greeting': 'Hei {name}' } }
+            // OR memory-backed (translations are USER data): keyBase: 'myapp.i18n'
+            //   → reads `myapp.i18n.en`, `myapp.i18n.fi` via AIMEAT.data.get()
+          });
+
+        Translate:
+          AIMEAT.i18n.t('greeting', { name: 'Alice' })   // flat key first, then nested dot-path, then fallback locale, then the key itself
+          // Flat keys win: a generator producing { "tab.search": "Haku" } resolves before a nested { tab: { search } }.
+
+        Switch language:
+          AIMEAT.i18n.LanguageSwitcher({ target: '#lang', onChange: render })   // renders a <select>; persists choice
+          AIMEAT.i18n.setLocale('fi')                                            // emits window 'aimeat-i18n-changed'
+          window.addEventListener('aimeat-i18n-changed', render)                 // re-render on change
+
+        Static markup:
+          <span data-i18n="greeting"></span>  then  AIMEAT.i18n.apply()          // fills textContent of every [data-i18n]
+
+        Notes:
+          - Translations are USER data — load them via AIMEAT.data (keyBase), NOT from an ext: namespace.
+          - t() always returns a string (falls back to the key) so the UI never shows blanks.
+        Load via: <script src="{{node_url}}/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-i18n
+      filename: aimeat-i18n.js
+      exports: [init, t, setLocale, getLocale, locales, available, LanguageSwitcher, apply]
+      api_surface: |
+        AIMEAT.i18n.init({ keyBase?, locales, default?, fallback?, translations? }) → Promise<locale>  (inline translations OR memory-backed via keyBase)
+        AIMEAT.i18n.t(key, vars?) → string  (flat key → nested dot-path → fallback locale → key; {var} interpolation)
+        AIMEAT.i18n.setLocale(locale) → Promise<locale>  (persists choice; emits window 'aimeat-i18n-changed')
+        AIMEAT.i18n.getLocale() → string
+        AIMEAT.i18n.locales() → string[]
+        AIMEAT.i18n.available() → boolean
+        AIMEAT.i18n.LanguageSwitcher({ target?, onChange?, labels?, className? }) → { el, destroy() }
+        AIMEAT.i18n.apply(root?) → void  (translates every [data-i18n] element's textContent, or [data-i18n-attr])
