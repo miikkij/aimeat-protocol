@@ -15,6 +15,7 @@
  *   v1.1.0 — 2026-06-26 — app-shells T2 (cortex) + T3 (extension).
  *   v1.2.0 — 2026-06-26 — component library (auth-gated, private-store, shared-feed, ai-action, data-table, settings, dated-archive).
  *   v1.3.0 — 2026-06-26 — components: image-upload, realtime-room, search, list+detail (for marketplace / realtime-social / homepage use-cases).
+ *   v1.4.0 — 2026-06-26 — use-case templates (full working scaffolds) + composes field; first: realtime-social.
  */
 
 export interface AppTemplate {
@@ -28,6 +29,8 @@ export interface AppTemplate {
   description: string;
   /** Client libs the template loads (for the AI's awareness). */
   libs: string[];
+  /** For use-cases: the component/shell ids this scaffold builds on (for the index + matching). */
+  composes?: string[];
   /** The model the AI copies from — a skeleton, not a finished app. */
   content: string;
 }
@@ -329,6 +332,120 @@ function renderListDetail(target, items, rowLabel, renderDetail) {
 }
 // Or use the cortex: AIMEAT.ui.layout.MainDetail({ target, list, detail }).`;
 
+// ── Use-case: realtime-social (full working scaffold) ────────────────
+// A live room: anyone sees persisted history; logged-in users join the realtime room for live
+// presence + posting. Composes realtime-room + shared-feed + auth-gated. Models the proven
+// Presence Board pattern. {{app}} = memory namespace; customise the {{SLOTS}}.
+
+const USECASE_REALTIME_SOCIAL = `<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: {{app-name}}
+version: 1.0.0
+description: {{one-line description — REQUIRED for publishing}}
+entry: index.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{App Title}}</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
+    <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
+    <div class="flex-none"><span id="login"></span></div>
+  </nav>
+
+  <main id="app" class="flex-1 w-full max-w-2xl mx-auto p-4 flex flex-col gap-4">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="text-sm opacity-70">Online:</span>
+      <span id="presence" class="flex gap-1 flex-wrap"></span>
+    </div>
+    <div id="feed" class="flex-1 flex flex-col gap-2 overflow-y-auto" style="min-height:50vh"></div>
+    <form id="composer" class="join w-full" hidden>
+      <input id="msg" class="input input-bordered join-item flex-1" placeholder="Say something…" autocomplete="off" />
+      <button class="btn-primary join-item px-6" type="submit">Send</button>
+    </form>
+    <div id="login-hint" class="alert">Log in to join the live room and post.</div>
+  </main>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <script>
+    // Realtime protocol (server-defined): connect ws with ?room=&token=&nick=, send { type:'chat',
+    // payload }, receive { type:'chat', sender, payload } broadcast to all (incl. sender). Presence
+    // via { type:'joined', peers:[{nick}] } + { type:'participant', action:'join'|'leave', name }.
+    var FEED_KEY = '{{app}}.feed.';     // durable history: each message a public key (anon can read)
+    var ROOM = '{{app}}-lobby';
+    var session = null, ws = null, me = null;
+    var online = {};                    // name -> true
+    var feedEl = document.getElementById('feed');
+    var presEl = document.getElementById('presence');
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function addMessage(by, text) {
+      var row = document.createElement('div');
+      row.className = 'chat ' + (by === me ? 'chat-end' : 'chat-start');
+      row.innerHTML = '<div class="chat-header text-xs opacity-60">' + esc(by) + '</div>' +
+        '<div class="chat-bubble">' + esc(text) + '</div>';
+      feedEl.appendChild(row);
+      feedEl.scrollTop = feedEl.scrollHeight;
+    }
+    function renderPresence() {
+      var names = Object.keys(online);
+      presEl.innerHTML = names.length ? names.map(function (n) { return '<span class="badge badge-success badge-sm">' + esc(n) + '</span>'; }).join('') : '<span class="opacity-50 text-sm">—</span>';
+    }
+
+    async function loadHistory() {
+      try {
+        var hits = await AIMEAT.data.search(FEED_KEY);   // public — works for anon too
+        hits.sort(function (a, b) { return (a.at || '').localeCompare(b.at || ''); });
+        feedEl.innerHTML = '';
+        hits.forEach(function (m) { addMessage(m.by, m.text); });
+      } catch (e) { /* empty feed is fine */ }
+    }
+
+    async function joinLive(s) {
+      session = s; me = s.owner;
+      document.getElementById('login-hint').style.display = 'none';
+      document.getElementById('composer').hidden = false;
+      var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: ROOM }) })).data;
+      // ws_url already has ?room=ID; the WebSocket can't set headers, so pass the JWT + nick as query.
+      var wsUrl = location.origin.replace(/^http/, 'ws') + room.ws_url + '&token=' + encodeURIComponent(s.jwt) + '&nick=' + encodeURIComponent(me);
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = function (e) {
+        var d = JSON.parse(e.data);
+        if (d.type === 'joined') { (d.peers || []).forEach(function (p) { online[p.nick] = true; }); online[me] = true; renderPresence(); }
+        else if (d.type === 'participant') { if (d.action === 'join') online[d.name] = true; else if (d.action === 'leave') delete online[d.name]; renderPresence(); }
+        else if (d.type === 'chat') { addMessage(d.sender, d.payload); }   // server echoes to all incl. sender
+      };
+      ws.onclose = function () { online = {}; renderPresence(); };
+    }
+
+    document.getElementById('composer').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var input = document.getElementById('msg'), text = input.value.trim();
+      if (!text || !ws || ws.readyState !== 1) return;
+      input.value = '';
+      ws.send(JSON.stringify({ type: 'chat', payload: text }));   // live — server echoes back, then we render
+      var id = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      AIMEAT.data.set(FEED_KEY + id, { by: me, text: text, at: new Date().toISOString() }, { visibility: 'public' });  // durable
+    });
+
+    AIMEAT.auth.mountLoginButton('#login', {
+      onLogin: function () { joinLive(AIMEAT.auth.getSession()); },
+      onLogout: function () { location.reload(); }
+    });
+    loadHistory();  // everyone sees history (anon too)
+    var s0 = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
+    if (s0 && s0.jwt) joinLive(s0);
+  </script>
+</body>
+</html>`;
+
 const TEMPLATES: AppTemplate[] = [
   {
     id: 'shell-pure-client',
@@ -368,6 +485,15 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-realtime-room', kind: 'component', title: 'Realtime room', description: 'Live presence + messages over a shared room — multiplayer games, chat, presence boards.', libs: ['aimeat-auth'], content: COMP_REALTIME_ROOM },
   { id: 'comp-search', kind: 'component', title: 'Search / filter', description: 'Instant client-side filter over a list, or server-side memory search.', libs: ['aimeat-data'], content: COMP_SEARCH },
   { id: 'comp-list-detail', kind: 'component', title: 'List + detail', description: 'Master/detail layout: a list, click an item to show its detail (directories, catalogs).', libs: [], content: COMP_LIST_DETAIL },
+  {
+    id: 'usecase-realtime-social',
+    kind: 'use-case',
+    title: 'Realtime social room',
+    description: 'A live room: anyone sees history, logged-in users get live presence + posting. Chat, presence boards, multiplayer lobbies.',
+    libs: ['aimeat-auth', 'aimeat-data'],
+    composes: ['comp-realtime-room', 'comp-shared-feed', 'comp-auth-gated'],
+    content: USECASE_REALTIME_SOCIAL,
+  },
 ];
 
 /** All authoring templates. */
