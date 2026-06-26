@@ -5,7 +5,7 @@
  * components that render responsive, themed Chart.js charts.
  *
  * Requires Chart.js to be loaded first:
- *   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+ *   <script src="/lib/chartjs@4.js"></script>   (self-hosted; vendored in public/lib/)
  *   <script src="/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>
  *
  * Usage:
@@ -274,7 +274,7 @@
     if (!hasChartJs()) {
       showError(el,
         'Chart.js is not loaded. Add this before aimeat-charts.js:\n' +
-        '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>'
+        '<script src="/lib/chartjs@4.js"><\/script>'
       );
       return null;
     }
@@ -348,7 +348,7 @@
     if (!hasChartJs()) {
       showError(el,
         'Chart.js is not loaded. Add this before aimeat-charts.js:\n' +
-        '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>'
+        '<script src="/lib/chartjs@4.js"><\/script>'
       );
       return Promise.resolve(null);
     }

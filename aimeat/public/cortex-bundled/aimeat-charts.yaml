@@ -10,7 +10,7 @@ metadata:
     domain: visualization
 
 spec:
-  version: "1.0.0"
+  version: "1.0.2"
   license: MIT
   components:
     - type: schema
@@ -72,7 +72,7 @@ spec:
         is installed and provides a Chart.js wrapper.
 
         IMPORTANT: When creating apps that use charts, include BOTH script tags:
-        1. <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        1. <script src="/lib/chartjs@4.js"></script>
         2. <script src="{{node_url}}/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>
 
         Available API:
@@ -175,4 +175,4 @@ spec:
 
         AIMEAT.charts.TYPES = ['bar','line','pie','doughnut','radar','scatter','bubble']
 
-        Requires: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        Requires: <script src="/lib/chartjs@4.js"></script>

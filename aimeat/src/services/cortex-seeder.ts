@@ -1,9 +1,12 @@
 /**
  * @file cortex-seeder.ts
  * @description Auto-installs bundled cortex extensions from public/cortex-bundled/ on server startup.
- *   Skips cortexes that are already installed. Activates all newly installed cortexes.
+ *   Activates newly installed cortexes. When a cortex is already installed, refreshes it IN PLACE
+ *   only if the bundled manifest version changed (lib code + components), preserving the owner's
+ *   active/visibility state — so edits to a shipped cortex propagate on upgrade.
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial: auto-install all bundled cortexes
+ *   v1.1.0 — 2026-06-26 — Version-aware refresh of already-installed bundled cortexes on version bump
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -36,6 +39,7 @@ export async function seedBundledCortexes(storage: Storage, systemGaii: string):
 
   const yamlFiles = files.filter(f => f.endsWith('.yaml'));
   let installed = 0;
+  let updated = 0;
 
   for (const yamlFile of yamlFiles) {
     const baseName = yamlFile.replace('.yaml', '');
@@ -45,12 +49,6 @@ export async function seedBundledCortexes(storage: Storage, systemGaii: string):
     if (!files.includes(jsFile)) {
       logger.warn(`Bundled cortex ${baseName}: no matching JS file, skipping`);
       continue;
-    }
-
-    // Check if already installed
-    const existing = await storage.getCortexExtension(baseName);
-    if (existing) {
-      continue; // Already installed, skip silently
     }
 
     try {
@@ -67,6 +65,24 @@ export async function seedBundledCortexes(storage: Storage, systemGaii: string):
       }
 
       const ext = result.extension;
+
+      // Already installed? Refresh IN PLACE only when the bundled version changed, so edits to a
+      // shipped cortex (lib code, api_surface, prompts) propagate on upgrade. Preserve the owner's
+      // active/visibility state — never re-activate or reset it.
+      const existing = await storage.getCortexExtension(baseName);
+      if (existing) {
+        if (existing.version === ext.version) continue; // up to date
+        await storage.setCortexLibFile(ext.name, jsFile, jsContent);
+        await storage.updateCortexExtension(ext.name, {
+          version: ext.version,
+          description: ext.description,
+          manifest: ext.manifest,
+          components: ext.components,
+        });
+        updated++;
+        logger.info(`Updated bundled cortex: ${ext.name} v${existing.version} → v${ext.version}`);
+        continue;
+      }
 
       // Store lib file
       await storage.setCortexLibFile(ext.name, jsFile, jsContent);
@@ -97,5 +113,6 @@ export async function seedBundledCortexes(storage: Storage, systemGaii: string):
     }
   }
 
+  if (updated > 0) logger.info(`Refreshed ${updated} bundled cortex extension(s) on version bump`);
   return installed;
 }
