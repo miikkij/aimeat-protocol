@@ -12,6 +12,9 @@
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
  *   v1.0.0 — 2026-06-26 — initial registry + first app-shell (T1 pure-client).
+ *   v1.1.0 — 2026-06-26 — app-shells T2 (cortex) + T3 (extension).
+ *   v1.2.0 — 2026-06-26 — component library (auth-gated, private-store, shared-feed, ai-action, data-table, settings, dated-archive).
+ *   v1.3.0 — 2026-06-26 — components: image-upload, realtime-room, search, list+detail (for marketplace / realtime-social / homepage use-cases).
  */
 
 export interface AppTemplate {
@@ -285,6 +288,47 @@ async function loadArchive() {
   return Object.keys(byDay).sort().reverse().map(function (d) { return { date: d, items: byDay[d] }; });
 }`;
 
+const COMP_IMAGE_UPLOAD = `// image-upload — upload an image to AIMEAT storage and get a shareable URL (aimeat-storage).
+// Load: <script src="/v1/libs/aimeat-storage.js"></script>  (needs aimeat-auth)
+async function uploadImage(file) {
+  var res = await AIMEAT.storage.upload(file, { public: true }); // public files are served at /v1/pub/...
+  return res.url || res.downloadUrl; // save this URL with your item; render with <img src=url>
+}
+// <input type="file" accept="image/*" onchange="uploadImage(this.files[0]).then(setImageUrl)">`;
+
+const COMP_REALTIME_ROOM = `// realtime-room — live presence + messages over a shared room (no backend to run).
+async function joinRoom(name, onMessage) {
+  var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: name }) })).data; // { id, ws_url }
+  var ws = new WebSocket(location.origin.replace(/^http/, 'ws') + room.ws_url);
+  ws.onmessage = function (e) { onMessage(JSON.parse(e.data)); };
+  return { send: function (msg) { ws.send(JSON.stringify(msg)); }, ws: ws };
+}
+// var room = await joinRoom('lobby', function (m) { /* render presence / messages */ });
+// room.send({ type: 'chat', text: '…' });   // for low-latency P2P use AimeatRealtime (/lib/realtime.js)`;
+
+const COMP_SEARCH = `// search — instant client-side filter, or server-side memory search.
+function filterItems(items, q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return items;
+  return items.filter(function (it) { return JSON.stringify(it).toLowerCase().indexOf(q) !== -1; });
+}
+// Bind: input.addEventListener('input', function () { render(filterItems(all, input.value)); });
+// Server-side across stored entries (aimeat-data): var hits = await AIMEAT.data.search('{{app}}.' + query);`;
+
+const COMP_LIST_DETAIL = `// list+detail — master/detail: a list on the left, the selected item's detail on the right.
+function renderListDetail(target, items, rowLabel, renderDetail) {
+  target.innerHTML = '<div class="flex gap-4"><div id="ld-list" class="w-1/3 flex flex-col gap-1"></div><div id="ld-detail" class="flex-1"></div></div>';
+  var listEl = target.querySelector('#ld-list'), detailEl = target.querySelector('#ld-detail');
+  items.forEach(function (it) {
+    var row = document.createElement('button');
+    row.className = 'btn-ghost text-left px-3 py-2 rounded';
+    row.textContent = rowLabel(it);
+    row.onclick = function () { detailEl.innerHTML = ''; detailEl.appendChild(renderDetail(it)); };
+    listEl.appendChild(row);
+  });
+}
+// Or use the cortex: AIMEAT.ui.layout.MainDetail({ target, list, detail }).`;
+
 const TEMPLATES: AppTemplate[] = [
   {
     id: 'shell-pure-client',
@@ -320,6 +364,10 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-data-table', kind: 'component', title: 'Data table', description: 'Sortable / filterable / paginated table via the viewers cortex.', libs: ['aimeat-ui-viewers'], content: COMP_DATA_TABLE },
   { id: 'comp-settings', kind: 'component', title: 'Settings panel', description: "Read / write the app's settings from memory.", libs: ['aimeat-data'], content: COMP_SETTINGS },
   { id: 'comp-dated-archive', kind: 'component', title: 'Dated archive', description: 'Group entries by date and render newest-first (news/journal).', libs: ['aimeat-data'], content: COMP_DATED_ARCHIVE },
+  { id: 'comp-image-upload', kind: 'component', title: 'Image upload', description: 'Upload an image to storage and get a shareable public URL (marketplace listings, avatars).', libs: ['aimeat-auth', 'aimeat-storage'], content: COMP_IMAGE_UPLOAD },
+  { id: 'comp-realtime-room', kind: 'component', title: 'Realtime room', description: 'Live presence + messages over a shared room — multiplayer games, chat, presence boards.', libs: ['aimeat-auth'], content: COMP_REALTIME_ROOM },
+  { id: 'comp-search', kind: 'component', title: 'Search / filter', description: 'Instant client-side filter over a list, or server-side memory search.', libs: ['aimeat-data'], content: COMP_SEARCH },
+  { id: 'comp-list-detail', kind: 'component', title: 'List + detail', description: 'Master/detail layout: a list, click an item to show its detail (directories, catalogs).', libs: [], content: COMP_LIST_DETAIL },
 ];
 
 /** All authoring templates. */
