@@ -29,7 +29,7 @@ export async function deleteApp(filename) {
   return apiDelete('/v1/apps/' + encodeURIComponent(filename));
 }
 
-/** Update app metadata (e.g. access_code, protected). */
+/** Update app metadata (name, description, access_code, parked). The URL never changes. */
 export async function patchApp(filename, updates) {
   return apiPatch('/v1/apps/' + encodeURIComponent(filename), updates);
 }

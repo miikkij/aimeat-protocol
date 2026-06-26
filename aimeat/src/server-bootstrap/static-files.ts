@@ -23,12 +23,17 @@
  *   v1.5.0 -- 2026-06-20 -- H-2 seamless SSO: serve /app-silent.html (the silent bridge) framable
  *     only by *.appHost (frame-ancestors + drop X-Frame-Options); /app-login.js + /app-silent.js
  *     ride the normal static handler.
+ *   v1.6.0 -- 2026-06-26 -- Serve /spa.html via serveSpa (CSP-nonce + importmap/build stamping)
+ *     before express.static. The raw static file has no per-script nonce, so the strict
+ *     nonce-based CSP blocked all its inline scripts and a direct hit on /spa.html booted to a
+ *     blank page; now it behaves like the /, /v1/portal, /v1/admin SPA routes.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
+import { serveSpa } from '../routes/portal.js';
 
 /**
  * Resolve the public directory from multiple candidate paths.
@@ -119,6 +124,20 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       ].join('; '));
       next();
     });
+
+    // Serve /spa.html through the SPA handler (CSP-nonce + importmap/build-version
+    // stamping) BEFORE express.static, which would otherwise return the raw file —
+    // and the raw inline scripts have no nonce, so the strict CSP (script-src with
+    // 'nonce-…', no 'unsafe-inline') blocks every one of them and the SPA never boots.
+    // The portal routes (/, /v1/portal, /v1/admin…) already use serveSpa; this makes
+    // a direct hit on /spa.html behave identically. The CSP middleware above has
+    // already set res.locals.cspNonce by the time this runs.
+    const spaFile = join(publicDir, 'spa.html');
+    if (existsSync(spaFile)) {
+      app.get('/spa.html', (_req, res) => {
+        serveSpa(res, spaFile, config.appOriginEnabled && !!config.appHost);
+      });
+    }
 
     // JS, CSS, and HTML: Cache-Control: no-cache with ETag.
     // The browser revalidates on every load; if the file hasn't changed the server

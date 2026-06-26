@@ -42,7 +42,7 @@ import type {
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
-  AppRecord, AppListOptions, AppPurchaseRecord,
+  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord,
   SubdomainSiteRecord,
   AppGrantRecord,
   NotificationTemplateRecord,
@@ -4421,6 +4421,28 @@ export class SqliteStorage implements Storage {
     // Update access code on all versions
     const result = this.db.prepare('UPDATE apps SET accessCode = ? WHERE ownerGaii = ? AND filename = ?')
       .run(accessCode ?? null, ownerGaii, filename);
+    return result.changes > 0;
+  }
+
+  async updateAppMeta(
+    ownerGaii: string,
+    filename: string,
+    meta: { name?: string; description?: string },
+  ): Promise<boolean> {
+    // Rename/re-describe in place on the LATEST version (the one the catalogue
+    // shows). Read the current manifest, merge only the supplied fields, write
+    // it back — the URL (owner/filename) is untouched. Older versions keep the
+    // name they were published under.
+    const row = this.db.prepare(
+      'SELECT versionNumber, manifest FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC LIMIT 1'
+    ).get(ownerGaii, filename) as { versionNumber: number; manifest: string } | undefined;
+    if (!row) return false;
+    const manifest = JSON.parse(row.manifest) as AppManifest;
+    if (meta.name !== undefined) manifest.name = meta.name;
+    if (meta.description !== undefined) manifest.description = meta.description;
+    const result = this.db.prepare(
+      'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'
+    ).run(JSON.stringify(manifest), ownerGaii, filename, row.versionNumber);
     return result.changes > 0;
   }
 

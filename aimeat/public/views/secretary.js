@@ -11,6 +11,9 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.11.0 — 2026-06-25 — load() reads OpenRouter settings first (which backfills the Secretary agent
+ *     when a key exists) and tracks hasOpenRouterKey, so a pre-configured owner is provisioned on view
+ *     load and the "not set up" message correctly distinguishes "no key" from "provisioning".
  *   v0.10.0 — 2026-06-24 — P3: doc/image intake into the chat (chatCard 📎 → intake.handleAttach:
  *     upload → vision summary → file into the active context's self-organism) and auto-logged decision
  *     contracts from answered Ask cards + approved guided plans (learning loop now sees real choices).
@@ -62,6 +65,7 @@ export default function SecretaryView() {
   useViewCSS('/css/views/secretary.css');
   const { showToast, ToastContainer } = useToast();
   const [secretary, setSecretary] = useState(undefined); // undefined=loading, null=not provisioned
+  const [hasOpenRouterKey, setHasOpenRouterKey] = useState(false); // owner has an OpenRouter key configured
   const [config, setConfig] = useState(null);            // { contexts:[...], activeContextId }
   const [result, setResult] = useState('');
   const [needs, setNeeds] = useState('');
@@ -92,6 +96,11 @@ export default function SecretaryView() {
   }, []);
 
   const load = useCallback(async () => {
+    // Read OpenRouter settings FIRST: this GET also provisions the Secretary agent when a key exists
+    // (backfill for owners who configured OpenRouter before the feature shipped), so by the time we
+    // list agents below the agent is present. Also tells us whether to show "configure OpenRouter".
+    const settingsResp = await apiGet('/v1/openrouter/settings').catch(() => null);
+    setHasOpenRouterKey(!!(settingsResp && settingsResp.data && settingsResp.data.hasApiKey));
     const agentsResp = await apiGet('/v1/agents').catch(() => null);
     const agents = (agentsResp && agentsResp.data && agentsResp.data.agents) || [];
     const sec = agents.find((a) => (a.tags || []).includes('system:secretary'))
@@ -339,7 +348,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       ${secretary === undefined
         ? html`<div class="sec-empty">…</div>`
         : secretary === null
-        ? html`<div class="sec-empty">${t('secretary.notReady')}</div>`
+        ? html`<div class="sec-empty">${hasOpenRouterKey ? t('secretary.provisioning') : t('secretary.notReady')}</div>`
         : html`
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
             ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
