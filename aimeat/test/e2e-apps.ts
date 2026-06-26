@@ -31,8 +31,6 @@
  *   v1.7.0 — 2026-06-26 — add Phase 9b rename in place: PATCH { name, description } edits the latest
  *     version's manifest without re-publishing (no new version), the download URL is unchanged, the
  *     listing reflects the new name; empty/over-long values 400; cross-owner rename 404s.
- *   v1.8.0 — 2026-06-26 — add Phase 9c public_only: a logged-in owner sees their own parked app in
- *     the normal listing but NOT when public_only=true (the strictly-public view for proof surfaces).
  */
 
 import * as ed from '@noble/ed25519';
@@ -571,33 +569,6 @@ await test("Another owner cannot rename A's app (PATCH → 404)", async () => {
         method: 'PATCH', body: JSON.stringify({ name: 'hijacked' }),
     }));
     assert(status === 404, `cross-owner rename must 404, got ${status}`);
-});
-
-// ── Phase 9c: public_only drops the viewer exception (public proof surfaces) ──
-// A logged-in owner normally sees their OWN parked/operator-hidden apps in the
-// listing (for their catalogue). public_only=true forces the strictly-public view
-// so the landing wall never surfaces the viewer's own hidden apps.
-console.log('\nPhase 9c: public_only strictly-public listing');
-
-await test('Park the app again for the public_only check', async () => {
-    const { status } = await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: true }) }));
-    assert(status === 200, `park status ${status}`);
-});
-
-await test("Normal authed listing DOES include the owner's own parked app", async () => {
-    const list = await json('/v1/apps?limit=200', authed());
-    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
-    assert(!!mine, "owner sees their own parked app in the normal listing");
-});
-
-await test("public_only=true EXCLUDES the owner's own parked app even when authed", async () => {
-    const list = await json('/v1/apps?limit=200&public_only=true', authed());
-    const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === PARK_FILE && a.owner === ownerName);
-    assert(!mine, 'public_only must drop the viewer exception (no own parked/hidden apps on public surfaces)');
-});
-
-await test('Unpark after the public_only check (cleanup)', async () => {
-    await json(`/v1/apps/${PARK_FILE}`, authed({ method: 'PATCH', body: JSON.stringify({ parked: false }) }));
 });
 
 // ── Phase 10: inline "publish your own app" badge ──

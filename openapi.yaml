@@ -11644,7 +11644,6 @@ paths:
         - { in: query, name: limit, required: false, schema: { type: integer, default: 50, maximum: 200 } }
         - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
         - { in: query, name: free_only, required: false, schema: { type: boolean } }
-        - { in: query, name: public_only, required: false, schema: { type: boolean }, description: "Strictly-public view: drop the viewer exception so even a logged-in owner's own parked/operator-hidden apps are excluded (for public proof surfaces like the landing wall)" }
         - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
       responses:
         '200':

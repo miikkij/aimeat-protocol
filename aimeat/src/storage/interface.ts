@@ -525,10 +525,11 @@ export interface AppListOptions {
   limit?: number;
   offset?: number;
   freeOnly?: boolean;
-  // When set, parked apps are excluded UNLESS they belong to this GHII, so an
-  // owner sees their own parked apps in listings while everyone else does not.
-  // The same rule applies to operator-hidden apps (owner sees their own, badged).
-  // Omitted = exclude every parked / operator-hidden app (anonymous/public view).
+  // When set, parked AND operator-hidden apps are excluded UNLESS they belong to
+  // this GHII, so an owner sees their own parked / operator-hidden apps in listings
+  // (the latter carrying operator_hidden=true so the client can badge it) while
+  // everyone else does not. Decided purely from who is authenticated — no client
+  // flag. Omitted = anonymous/public view: exclude every parked / hidden app.
   viewerGhii?: string;
   // Operator-only listing: when true, return EVERY app regardless of parked or
   // operator-hidden state (the admin moderation view). Bypasses both filters.

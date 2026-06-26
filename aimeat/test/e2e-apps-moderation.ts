@@ -3,9 +3,10 @@
  * @description E2E tests for operator app moderation. An operator hides a published
  *   app from EVERY public surface: it drops out of the anonymous catalogue and 404s
  *   on direct download for non-owner/non-operator, while the owner still sees it
- *   (badged with operator_hidden) and can still download it. Covers: the operator-
- *   only admin listing + moderate endpoints (403 for non-operators), the re-publish
- *   cannot-escape invariant (the flag survives an update), and restore.
+ *   (badged with operator_hidden) and can still download it — visibility decided
+ *   purely by who is authenticated (a different owner never sees it). Covers: the
+ *   operator-only admin listing + moderate endpoints (403 for non-operators), the
+ *   re-publish cannot-escape invariant (the flag survives an update), and restore.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-apps-moderation
@@ -14,6 +15,8 @@
  *     sees/downloads, non-op 403, re-publish keeps hidden, restore re-exposes.
  *   v1.1.0 — 2026-06-25 — add Phase 5 operator hard delete: non-op 403, operator
  *     200, app gone from admin+public+download, delete-missing 404.
+ *   v1.2.0 — 2026-06-26 — add assertion that a DIFFERENT authenticated owner never sees another
+ *     owner's hidden app (visibility is decided purely by who is authenticated; no client flag).
  */
 
 import * as ed from '@noble/ed25519';
@@ -174,9 +177,16 @@ await test('App is GONE from the anonymous catalogue', async () => {
 await test('Owner STILL sees the app, badged operator_hidden + reason', async () => {
     const { body } = await json('/v1/apps?limit=200', victimAuthed());
     const found = (body.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName);
-    assert(!!found, 'owner still sees their hidden app');
+    assert(!!found, 'owner still sees their own hidden app (decided by identity)');
     assert(found.operator_hidden === true, 'flag is true for owner');
     assert(found.operator_hide_reason === 'Anonymous / policy violation', `reason carried, got ${found.operator_hide_reason}`);
+});
+
+await test("A DIFFERENT owner never sees someone else's hidden app", async () => {
+    // The operator is a different owner; their authed listing must not include the victim's hidden app.
+    const { body } = await json('/v1/apps?limit=200', opAuthed());
+    const found = (body.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName);
+    assert(!found, "an authenticated non-owner never sees another owner's hidden app");
 });
 
 await test('Anonymous direct download → 404 (not reachable by link)', async () => {
@@ -205,7 +215,7 @@ await test('Victim re-publishes the app → still operator_hidden', async () => 
     }));
     assert(status === 201, `re-publish status ${status}`);
 
-    // Still gone for anonymous, still hidden for owner.
+    // Still gone for anonymous, still hidden (badged) for the owner.
     const { body: anon } = await json('/v1/apps?limit=200');
     assert(!(anon.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName), 'still absent for anonymous after re-publish');
 
