@@ -1007,8 +1007,9 @@ Every AIMEAT app MUST use this starter template:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Name</title>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
+  <script src="/lib/tailwindcss@4.js"></script>
 </head>
 <body class="bg-base-100 min-h-screen flex flex-col">
   <nav class="navbar bg-base-200 shadow-sm px-4">

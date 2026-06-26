@@ -137,8 +137,9 @@ function generateMarkdown(nodeUrl) {
   md += `<!DOCTYPE html>\n<html lang="en">\n<head>\n`;
   md += `  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
   md += `  <title>App Name</title>\n`;
-  md += `  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" />\n`;
-  md += `  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><` + `/script>\n`;
+  md += `  <link href="/lib/daisyui@5.css" rel="stylesheet" />\n`;
+  md += `  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />\n`;
+  md += `  <script src="/lib/tailwindcss@4.js"><` + `/script>\n`;
   md += `</head>\n<body class="bg-base-100 min-h-screen flex flex-col">\n`;
   md += `  <nav class="navbar bg-base-200 shadow-sm px-4">\n`;
   md += `    <div class="flex-1"><span class="text-lg font-bold">App Name</span></div>\n`;
