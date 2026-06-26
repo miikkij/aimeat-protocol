@@ -21,6 +21,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PackageRecord, PackageComponent, TemplateListingRecord } from '../storage/interface.js';
 import { aimeatIamPackage } from './aimeat-iam-package.js';
+import { aimeatMarketplacePackage } from './aimeat-marketplace-package.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function generateVersion(): string {
 
 /** Get all example package definitions. */
 export function getExamplePackages(): ExamplePackageDef[] {
-  return [digitalSignagePackage(), aimeatIamPackage()];
+  return [digitalSignagePackage(), aimeatIamPackage(), aimeatMarketplacePackage()];
 }
 
 /**
