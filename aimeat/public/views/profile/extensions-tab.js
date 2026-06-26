@@ -961,11 +961,13 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-grid">
           ${nodeExts.map(ext => {
             const types = ext.component_types || [];
+            const isLib = types.includes('lib') && !types.some(ct => ['schema','action','board-template','ontology','seed-data'].includes(ct));
             return html`
               <div class="ext-card" onClick=${() => loadDetail(ext.name)}>
                 <div class="ext-card-header">
                   <span class="ext-card-name">${ext.name}</span>
                   <span class="ext-card-version">v${ext.version || '?'}</span>
+                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>
                   <span class="ext-visibility-badge public">${'\u{1F310}'}</span>
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>
@@ -985,6 +987,7 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-grid">
           ${myExts.map(ext => {
             const types = ext.component_types || [];
+            const isLib = types.includes('lib') && !types.some(ct => ['schema','action','board-template','ontology','seed-data'].includes(ct));
             const isActive = ext.status === 'active';
             const vis = ext.visibility || 'private';
             return html`
@@ -992,6 +995,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 <div class="ext-card-header">
                   <span class="ext-card-name">${ext.name}</span>
                   <span class="ext-card-version">v${ext.version || '?'}</span>
+                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>
                   <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'}</span>
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>
