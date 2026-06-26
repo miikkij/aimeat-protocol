@@ -148,20 +148,38 @@ await test('DELETE /v1/memory/test-entry — delete entry', async () => {
     assert(body.ok === true, `delete: ${JSON.stringify(body.error)}`);
 });
 
-await test('POST /v1/memory/files — upload file', async () => {
-    const content = Buffer.from('Hello file content').toString('base64');
+const fileContent = 'Hello file content';
+
+await test('POST /v1/memory/files — upload public file', async () => {
+    const content = Buffer.from(fileContent).toString('base64');
     const { body } = await authJson('/v1/memory/files', agentToken, {
         method: 'POST',
-        body: JSON.stringify({ key: 'test-file.txt', content, mime_type: 'text/plain' }),
+        body: JSON.stringify({ key: 'test-file.txt', content, mime_type: 'text/plain', visibility: 'public' }),
     });
     assert(body.ok === true, `upload: ${JSON.stringify(body.error)}`);
 });
 
-await test('GET /v1/memory/files — list files', async () => {
+await test('GET /v1/memory/files — list files exposes owner_gaii', async () => {
     const { body } = await authJson('/v1/memory/files', agentToken);
     assert(body.ok === true, `list files: ${JSON.stringify(body.error)}`);
     const files = body.data?.files || body.data?.items || body.data;
     assert(Array.isArray(files), 'files is array');
+    const f = files.find((x: any) => x.key === 'test-file.txt');
+    assert(!!f, 'uploaded file present in list');
+    // owner_gaii is required to build the public /v1/pub/:owner/:key URL the Copy URL button emits.
+    assert(typeof f.owner_gaii === 'string' && f.owner_gaii.length > 0, `owner_gaii present: ${JSON.stringify(f)}`);
+});
+
+await test('GET /v1/pub/:owner/:key — public file loads anonymously (Copy URL link)', async () => {
+    const { body: listBody } = await authJson('/v1/memory/files', agentToken);
+    const files = listBody.data?.files || [];
+    const f = files.find((x: any) => x.key === 'test-file.txt');
+    const owner = f.owner_gaii as string;
+    // No Authorization header — exactly what a pasted link / <img src> sends.
+    const res = await fetch(`${BASE}/v1/pub/${encodeURIComponent(owner)}/${encodeURIComponent('test-file.txt')}`);
+    assert(res.status === 200, `expected 200 anonymous, got ${res.status}`);
+    const text = await res.text();
+    assert(text === fileContent, `body mismatch: got "${text}"`);
 });
 
 await test('DELETE /v1/memory/files/test-file.txt — delete file', async () => {

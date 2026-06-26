@@ -41,6 +41,12 @@
  *   v2.3.1 — 2026-06-22 — Toolbar layout: data tools (Load all / Export / Import) grouped in their
  *     own bordered .mem-tools-section up top; content-search + filter on one row; sort + "New memory"
  *     moved to a bottom bar (New-memory pushed right).
+ *   v2.4.0 — 2026-06-26 — Per-row "Copy URL" button in Files actions (canonical <CopyButton>) so a
+ *     single file's URL can be grabbed for embedding without copying all URLs at once. Both the
+ *     per-row and the bulk "Copy URLs" buttons now emit the PUBLIC no-auth URL
+ *     (/v1/pub/:owner/:key, served when visibility==='public') instead of the authenticated,
+ *     owner-scoped /v1/memory/files/:key — so a public file's link actually loads in a browser /
+ *     <img>. Requires owner_gaii from the files list (added to GET /v1/memory/files).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -924,7 +930,19 @@ export default function MemoryTab({ session, showToast, onStats }) {
       });
     };
 
-    const fileUrls = filtered.map(f => `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`).join('\n');
+    // Public, no-auth file URL (mirrors memory's /v1/memory/:gaii/:key public read):
+    // GET /v1/pub/:owner/:key serves the bytes when visibility==='public', so the copied
+    // link is embeddable anywhere (<img src>, another site, a chat). Keeps slashes in keys
+    // literal for the wildcard route; only encodes per-segment. Falls back to the legacy
+    // authenticated URL if the list response predates owner_gaii (server needs a restart).
+    const fileUrl = (f) => {
+      const owner = f.owner_gaii;
+      const keyPath = String(f.key || f.name).split('/').map(encodeURIComponent).join('/');
+      return owner
+        ? `${NODE_URL}/v1/pub/${encodeURIComponent(owner)}/${keyPath}`
+        : `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`;
+    };
+    const fileUrls = filtered.map(fileUrl).join('\n');
 
     return html`
       <div class="action-bar">
@@ -972,6 +990,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       `}
                   </div>
                   <div class="file-actions">
+                    <${CopyButton}
+                      text=${fileUrl(f)}
+                      label=${`\u{1F517} ${t('profile.files.copyUrl') || 'Copy URL'}`}
+                      title=${t('profile.files.copyUrl') || 'Copy URL'}
+                      className="btn-outline btn-sm"
+                      onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied to clipboard')} />
                     <button class="btn-outline btn-sm" onClick=${() => handleDownloadFile(fKey)}>${t('profile.files.download')}</button>
                     <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteFile(fKey)}>${t('profile.files.delete')}</button>
                   </div>

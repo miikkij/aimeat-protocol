@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.22.0 - 2026-06-26 - aimeat-auth.js login pill shows the owner's DISPLAY NAME, falling back to
+ *   the GHII when none is set. The H-2 silent bridge now returns display_name, threaded through
+ *   restoreSessionFromAppOrigin → _buildAppSession so an app-origin pill (e.g. Pesupossu) reads a
+ *   human label instead of the raw "owner@node-id".
  * v1.21.0 - 2026-06-25 - aimeat-auth.js: apps can declare the scopes they need via
  *   <meta name="aimeat-scopes" content="…">. The H-2 silent bridge + consent popup now request the
  *   declared set (falling back to APP_DEFAULT_SCOPES), so e.g. an AI app adds "ai:use" to spend the
@@ -702,14 +706,14 @@ async function requestConsentPopup(app, scopeStr, manage) {
 // Build + install an app-origin session from a freshly issued grant access token (shared by the
 // silent/consent login and the in-app "manage grant" re-issue). appId = owner/filename, own = the
 // user's own app (no consent gear needed).
-function _buildAppSession(accessToken, appId, own) {
+function _buildAppSession(accessToken, appId, own, displayName) {
   var payload = parseJwt(accessToken) || {};
   var ownerName = payload.owner || payload.sub;
   if (!ownerName) return null;
   var session = createSession({
     owner: ownerName,
     ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
-    gaii: null, jwt: accessToken, roles: payload.roles || [], displayName: '',
+    gaii: null, jwt: accessToken, roles: payload.roles || [], displayName: displayName || '',
   });
   session._appOrigin = true;
   session._app = appId || null;
@@ -741,7 +745,7 @@ function restoreSessionFromAppOrigin(interactive) {
       own = false; // the consent flow only runs for apps the user does NOT own
     }
     if (!grant || !grant.access_token) return null;
-    return _buildAppSession(grant.access_token, appId, own);
+    return _buildAppSession(grant.access_token, appId, own, grant.display_name);
   })();
   _appOriginLoginInFlight.finally(function () { _appOriginLoginInFlight = null; });
   return _appOriginLoginInFlight;
@@ -1221,7 +1225,7 @@ const auth = {
           + '<span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;'
           + 'text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);'
           + '-webkit-text-stroke:.2px rgba(120,85,20,.3)">'
-          + escHtml(stored.ghii || stored.owner) + '</span>'
+          + escHtml(stored.displayName || stored.ghii || stored.owner) + '</span>'
           + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;'
             + 'background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">'
             + '\\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')

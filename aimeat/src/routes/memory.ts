@@ -1281,6 +1281,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     res.json(success(config.nodeId, {
       files: files.map(f => ({
         key: f.key,
+        owner_gaii: f.ownerGaii,
         size: f.size,
         mime_type: f.mimeType,
         visibility: f.visibility,

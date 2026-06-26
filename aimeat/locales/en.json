@@ -2662,6 +2662,8 @@
       "tagsPlaceholder": "Add tag and press Enter",
       "copyUrls": "Copy URLs",
       "urlsCopied": "URLs copied to clipboard",
+      "copyUrl": "Copy URL",
+      "urlCopied": "URL copied to clipboard",
       "clearFilter": "Clear",
       "noMatch": "No files match selected tags"
     },
