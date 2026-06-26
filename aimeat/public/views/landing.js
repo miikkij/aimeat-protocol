@@ -281,7 +281,7 @@ function BuildAppPrompt() {
   const [tplId, setTplId] = useState('');
   const [tplContent, setTplContent] = useState('');
   useEffect(() => {
-    fetch('/v1/app-templates').then(r => r.json()).then(d => setTemplates((d.data && d.data.templates) || [])).catch(() => {});
+    fetch('/v1/app-templates?kind=app-shell').then(r => r.json()).then(d => setTemplates((d.data && d.data.templates) || [])).catch(() => {});
   }, []);
   const onPick = async (e) => {
     const id = e.target.value; setTplId(id);
