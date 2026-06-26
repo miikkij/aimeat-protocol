@@ -7026,7 +7026,7 @@
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var base = config.aimeatUrl.replace(/\/+$/, '');
-    fetch(base + '/v1/app-templates')
+    fetch(base + '/v1/app-templates?kind=app-shell')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var list = (d.data && d.data.templates) || [];

@@ -212,6 +212,79 @@ entry: index.html
 </body>
 </html>`;
 
+// ── Component templates ──────────────────────────────────────────────
+// Reusable blocks (snippets + their lib deps) the AI drops into an app-shell. Not full pages —
+// patterns to copy. {{app}} = the app's memory namespace.
+
+const COMP_AUTH_GATED = `// auth-gated section — show content only to logged-in users (aimeat-auth).
+var gate = document.getElementById('members-only');
+function applyAuth(s) { if (gate) gate.style.display = (s && s.jwt) ? '' : 'none'; }
+AIMEAT.auth.mountLoginButton('#login', {
+  onLogin: function () { applyAuth(AIMEAT.auth.getSession()); },
+  onLogout: function () { applyAuth(null); }
+});
+applyAuth(AIMEAT.auth.getSession());`;
+
+const COMP_PRIVATE_STORE = `// private-store — a per-owner private collection (aimeat-data). Only the owner can read it.
+async function listItems() { return (await AIMEAT.data.get('{{app}}.items')) || []; }
+async function addItem(item) {
+  var items = await listItems();
+  items.push(Object.assign({ id: Date.now() + '', createdAt: new Date().toISOString() }, item));
+  await AIMEAT.data.set('{{app}}.items', items, { visibility: 'private' });
+  return items;
+}
+async function removeItem(id) {
+  var items = (await listItems()).filter(function (x) { return x.id !== id; });
+  await AIMEAT.data.set('{{app}}.items', items, { visibility: 'private' });
+  return items;
+}`;
+
+const COMP_SHARED_FEED = `// shared-feed — a public community feed (aimeat-data). Each user writes their OWN key; everyone reads.
+async function post(text) {
+  var id = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  await AIMEAT.data.set('{{app}}.feed.' + id,
+    { id: id, text: text, by: AIMEAT.auth.getSession().owner, at: new Date().toISOString() },
+    { visibility: 'public' });
+}
+async function loadFeed() {
+  var results = await AIMEAT.data.search('{{app}}.feed.'); // public entries across all users
+  return results.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
+}`;
+
+const COMP_AI_ACTION = `// ai-action — run the user's own LLM on demand (aimeat-ai; load it + aimeat-auth).
+async function aiSuggest(promptText, outEl) {
+  if (!(await AIMEAT.ai.isAvailable())) { outEl.value = 'Log in and add an OpenRouter key to enable AI.'; return; }
+  try { var r = await AIMEAT.ai.complete({ app_id: '{{app}}', prompt: promptText, max_tokens: 200 }); outEl.value = r.content; }
+  catch (e) { outEl.value = 'AI error: ' + (e.message || e); }
+}
+// Render into an EDITABLE field so the user reviews before saving. Gate the button on isAvailable().`;
+
+const COMP_DATA_TABLE = `// data-table — sortable / filterable / paginated table (aimeat-ui-viewers cortex).
+// Load: <script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
+AIMEAT.ui.viewers.DataTable({
+  target: document.getElementById('table'),
+  sortable: true, filterable: true, pageSize: 10,
+  columns: [{ key: 'name', label: 'Name' }, { key: 'value', label: 'Value' }],
+  rows: yourRows // [{ name: '…', value: … }]
+});`;
+
+const COMP_SETTINGS = `// settings-panel — read/write the app's settings (aimeat-data).
+async function getSettings() { return (await AIMEAT.data.get('{{app}}.settings')) || { /* defaults */ }; }
+async function saveSettings(patch) {
+  var s = Object.assign(await getSettings(), patch);
+  await AIMEAT.data.set('{{app}}.settings', s, { visibility: 'private' });
+  return s;
+}
+// Bind toggles/selects to saveSettings({ key: value }); re-read on load to populate the form.`;
+
+const COMP_DATED_ARCHIVE = `// dated-archive — show entries by date, newest first (aimeat-data). Keys like {{app}}.YYYY-MM-DD.*
+async function loadArchive() {
+  var entries = await AIMEAT.data.search('{{app}}.'); // matching entries
+  var byDay = {};
+  entries.forEach(function (e) { var d = (e.date || (e.key || '').split('.')[1] || ''); (byDay[d] = byDay[d] || []).push(e); });
+  return Object.keys(byDay).sort().reverse().map(function (d) { return { date: d, items: byDay[d] }; });
+}`;
+
 const TEMPLATES: AppTemplate[] = [
   {
     id: 'shell-pure-client',
@@ -240,6 +313,13 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-data'],
     content: SHELL_EXTENSION,
   },
+  { id: 'comp-auth-gated', kind: 'component', title: 'Auth-gated section', description: 'Show/hide a section based on login state.', libs: ['aimeat-auth'], content: COMP_AUTH_GATED },
+  { id: 'comp-private-store', kind: 'component', title: 'Private store', description: 'Save / list / remove a per-owner private collection.', libs: ['aimeat-data'], content: COMP_PRIVATE_STORE },
+  { id: 'comp-shared-feed', kind: 'component', title: 'Shared feed', description: 'A public community feed — each user writes their own key, everyone reads.', libs: ['aimeat-data'], content: COMP_SHARED_FEED },
+  { id: 'comp-ai-action', kind: 'component', title: 'AI action button', description: "Run the user's own LLM on demand, render into an editable field.", libs: ['aimeat-auth', 'aimeat-ai'], content: COMP_AI_ACTION },
+  { id: 'comp-data-table', kind: 'component', title: 'Data table', description: 'Sortable / filterable / paginated table via the viewers cortex.', libs: ['aimeat-ui-viewers'], content: COMP_DATA_TABLE },
+  { id: 'comp-settings', kind: 'component', title: 'Settings panel', description: "Read / write the app's settings from memory.", libs: ['aimeat-data'], content: COMP_SETTINGS },
+  { id: 'comp-dated-archive', kind: 'component', title: 'Dated archive', description: 'Group entries by date and render newest-first (news/journal).', libs: ['aimeat-data'], content: COMP_DATED_ARCHIVE },
 ];
 
 /** All authoring templates. */
