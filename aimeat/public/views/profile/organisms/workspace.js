@@ -151,6 +151,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
   const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
   const [showRegenerate, setShowRegenerate] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);   // false = active records, true = archived-only view
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
   const [newSpaceName, setNewSpaceName] = useState('');
   const [addingInitial, setAddingInitial] = useState(null);   // record being edited (null = new draft)
@@ -196,7 +197,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   }, [seen, wsEvents]);
 
   const load = useCallback(async () => {
-    const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
+    // In the archived view, request ONLY archived content (read-only); otherwise the normal active set.
+    const w = await orgService.getWorkspace(orgId, wsId, showArchived ? { archived: 'only' } : undefined).catch(() => null);
     if (w && w.manifest) {
       const [ap, cfg, secs, act, cols] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(() => []),
@@ -209,7 +211,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       setWsEvents(act?.events || []); setColorsByType(cols);
     }
     setWs(w && w.manifest ? w : null);
-  }, [orgId, wsId]);
+  }, [orgId, wsId, showArchived]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -575,6 +577,20 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     finally { setBusy(false); }
   }, [orgId, wsId, showToast, load]);
 
+  // Archive / unarchive ONE record or document instance (read-only + hidden from AI; restorable). The
+  // record level archives the whole instance subtree (bare + .draft/.latest/.version.*) by its base key.
+  const setRecordArchived = useCallback(async (ot, instanceId, archived) => {
+    setBusy(true);
+    try {
+      const key = `organism.${orgId}.w.${wsId}.${ot.namespace}.${instanceId}`;
+      if (archived) await orgService.archiveContent(orgId, { level: 'record', ws: wsId, key });
+      else await orgService.unarchiveContent(orgId, { level: 'record', ws: wsId, key });
+      showToast(archived ? (t('organisms.recordArchived') || 'Archived') : (t('organisms.recordUnarchived') || 'Restored'));
+      await load();
+    } catch (e) { showToast((e && e.message) || 'Failed'); }
+    finally { setBusy(false); }
+  }, [orgId, wsId, showToast, load]);
+
   const resolve = useCallback(async (aid, decision) => {
     setBusy(true);
     try { await orgService.resolveApproval(orgId, aid, decision); showToast(decision === 'approve' ? (t('organisms.approved') || 'Approved') : (t('organisms.rejected') || 'Rejected')); await load(); }
@@ -918,6 +934,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
           ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
         </button>
+        ${showArchived
+          ? html`<button class="pj-icon-btn" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, false)}>♻️</button>`
+          : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, true)}>🗄️</button>`}
         <button class="pj-icon-btn pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
       </div>`;
 
@@ -1051,8 +1070,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
               <${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />
               <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
               ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
-              ${!draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
+              ${!showArchived && !draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
                 <button class="btn-ghost btn-sm" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
+              ${showArchived
+                ? html`<button class="btn-ghost btn-sm" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, false)}>${'♻️ '}${t('organisms.unarchive') || 'Unarchive'}</button>`
+                : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, true)}>🗄️</button>`}
               <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
             </div>
             ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
@@ -1364,8 +1386,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       ${back}
       <div class="pj-ws-titlerow">
         <span class="section-title pj-ws-title">${(ws.manifest?.name || org.name || 'Workspace')}</span>
-        <span class="badge badge-success">${(ws.manifest?.status || 'active')}</span>
+        ${showArchived
+          ? html`<span class="pj-tab-pill" title=${t('organisms.archivedViewHint') || 'Showing archived (read-only) records — restore one with ♻️'}>${'🗄️ '}${t('organisms.archivedView') || 'Archived view'}</span>`
+          : html`<span class="badge badge-success">${(ws.manifest?.status || 'active')}</span>`}
         <span class="pj-ws-head-actions">
+          <button class="btn-outline btn-sm ${showArchived ? 'pj-org-btn-active' : ''}" title=${t('organisms.toggleArchivedHint') || 'View/hide archived records'} onClick=${() => setShowArchived(s => !s)}>${showArchived ? `↩ ${t('organisms.viewActive') || 'Active'}` : `🗄️ ${t('organisms.viewArchived') || 'Archived'}`}</button>
           <${KebabMenu} label=${t('organisms.forAgentsHint') || 'Copy a ready prompt that teaches an AI to use this workspace'}
             btnClass="btn-outline btn-sm" trigger=${'🤖 ' + (t('organisms.agentAccess') || 'Agent access') + ' ▾'} items=${agentMenuItems} />
           <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardWsDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>

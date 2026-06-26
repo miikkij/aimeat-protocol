@@ -12,8 +12,17 @@
  *   v1.1.0 — 2026-06-22 — Trackable-memory versioning: archive prior versions to memory_history (Osa D1).
  */
 import type Database from 'better-sqlite3';
-import type { MemoryRecord } from '../../../interface.js';
+import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+
+/** SQL fragment (with leading ` AND`) restricting the `memory.archived` column by filter. Default
+ *  `exclude` → active rows only. Shared by every bulk read so archived content stays out of the
+ *  working set unless a caller explicitly asks for `include`/`only`. */
+export function archivedSql(archived?: ArchiveFilter): string {
+  if (archived === 'include') return '';
+  if (archived === 'only') return ' AND archived = 1';
+  return ' AND archived = 0';
+}
 
 /**
  * Turn a free-text query into an FTS5 MATCH expression: extract unicode word/number tokens,
@@ -44,6 +53,10 @@ function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
   }
   if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
   if (row.trackable) record.trackable = true;
+  if (row.archived) record.archived = true;
+  if (row.archivedAt) record.archivedAt = row.archivedAt as string;
+  if (row.archivedBy) record.archivedBy = row.archivedBy as string;
+  if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
   return record;
 }
 
@@ -144,20 +157,21 @@ export function listMemoryHistory(db: Database.Database, ownerGaii: string, key:
   }));
 }
 
-export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): number {
+export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): number {
   if (ownerGaiis.length === 0) return 0;
   const placeholders = ownerGaiis.map(() => '?').join(',');
   let sql = `SELECT COUNT(DISTINCT key) AS c FROM memory WHERE ownerGaii IN (${placeholders})`;
   const params: unknown[] = [...ownerGaiis];
   if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
   if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+  sql += archivedSql(opts?.archived);
   // NB: does not subtract not-yet-pruned TTL-expired rows (a stat-display approximation); the
   // value-loading list path prunes those lazily. Negligible for a "N Muistit" counter.
   const row = db.prepare(sql).get(...params) as { c: number };
   return row.c;
 }
 
-export function listMemory(db: Database.Database, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): MemoryRecord[] {
+export function listMemory(db: Database.Database, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): MemoryRecord[] {
   let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
   const params: unknown[] = [ownerGaii];
 
@@ -169,6 +183,7 @@ export function listMemory(db: Database.Database, ownerGaii: string, opts?: { pr
     sql += ' AND visibility = ?';
     params.push(opts.visibility);
   }
+  sql += archivedSql(opts?.archived);
 
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
   const results: MemoryRecord[] = [];
@@ -188,7 +203,7 @@ export function listMemory(db: Database.Database, ownerGaii: string, opts?: { pr
   return results;
 }
 
-export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): { items: MemoryRecord[]; total: number } {
+export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): { items: MemoryRecord[]; total: number } {
   let whereClauses = '';
   const params: unknown[] = [];
 
@@ -204,6 +219,7 @@ export function listAllMemory(db: Database.Database, opts?: { prefix?: string; o
     whereClauses += ' AND visibility = ?';
     params.push(opts.visibility);
   }
+  whereClauses += archivedSql(opts?.archived);
 
   const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
 
@@ -244,7 +260,7 @@ export function incrementMemoryFlagCount(db: Database.Database, ownerGaii: strin
   ).run(ownerGaii, key);
 }
 
-export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): MemoryRecord[] {
+export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter }): MemoryRecord[] {
   const q = query.toLowerCase();
   let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
   const params: unknown[] = [ownerGaii];
@@ -258,6 +274,7 @@ export function searchMemory(db: Database.Database, ownerGaii: string, query: st
     sql += ' AND key LIKE ?';
     params.push(opts.prefix + '%');
   }
+  sql += archivedSql(opts?.archived);
 
   const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
   const results: MemoryRecord[] = [];
@@ -280,11 +297,10 @@ export function searchMemory(db: Database.Database, ownerGaii: string, query: st
   return results;
 }
 
-export function searchTextMemory(db: Database.Database, query: string, opts?: MemoryTextSearchOpts): MemoryTextHit[] {
-  const match = toFtsMatch(query);
-  if (!match) return [];
-
-  const where: string[] = ['memory_fts MATCH ?'];
+/** One FTS branch: search a single `*_fts` table joined back to memory. Default `exclude` runs over
+ *  `memory_fts` (active rows only); `only` over `memory_archive_fts`. Returns raw rows + bm25 rank. */
+function searchOneFts(db: Database.Database, ftsTable: string, match: string, opts?: MemoryTextSearchOpts): Record<string, unknown>[] {
+  const where: string[] = [`${ftsTable} MATCH ?`];
   const params: unknown[] = [match];
 
   if (opts?.ownerGaiis?.length) {
@@ -300,17 +316,36 @@ export function searchTextMemory(db: Database.Database, query: string, opts?: Me
     params.push(opts.visibility);
   }
 
-  // bm25(): lower is more relevant → ORDER BY ASC, fetch extra to survive TTL/flag filtering.
   const limit = opts?.limit ?? 50;
+  // bm25(): lower is more relevant → ORDER BY ASC, fetch extra to survive TTL/flag filtering.
   const sql = `
-    SELECT m.*, bm25(memory_fts) AS _rank
-    FROM memory_fts
-    JOIN memory m ON m.rowid = memory_fts.rowid
+    SELECT m.*, bm25(${ftsTable}) AS _rank
+    FROM ${ftsTable}
+    JOIN memory m ON m.rowid = ${ftsTable}.rowid
     WHERE ${where.join(' AND ')}
     ORDER BY _rank
     LIMIT ?`;
-  const rows = db.prepare(sql).all(...params, limit * 2) as Record<string, unknown>[];
+  return db.prepare(sql).all(...params, limit * 2) as Record<string, unknown>[];
+}
 
+export function searchTextMemory(db: Database.Database, query: string, opts?: MemoryTextSearchOpts): MemoryTextHit[] {
+  const match = toFtsMatch(query);
+  if (!match) return [];
+
+  // Route by archive filter. `exclude` (default) → live index only (archived content never scanned);
+  // `only` → archive index; `include` → both, merged best-first by bm25 rank.
+  const archived = opts?.archived;
+  let rows: Record<string, unknown>[];
+  if (archived === 'only') {
+    rows = searchOneFts(db, 'memory_archive_fts', match, opts);
+  } else if (archived === 'include') {
+    rows = [...searchOneFts(db, 'memory_fts', match, opts), ...searchOneFts(db, 'memory_archive_fts', match, opts)]
+      .sort((a, b) => (a._rank as number) - (b._rank as number));
+  } else {
+    rows = searchOneFts(db, 'memory_fts', match, opts);
+  }
+
+  const limit = opts?.limit ?? 50;
   const hits: MemoryTextHit[] = [];
   for (const row of rows) {
     if (hits.length >= limit) break;
@@ -323,4 +358,56 @@ export function searchTextMemory(db: Database.Database, query: string, opts?: Me
     hits.push({ record, score: -(row._rank as number) });
   }
   return hits;
+}
+
+/** ARCHIVE — flag active rows under a key as archived. `match`: `exact` one key; `prefix` everything
+ *  under `key%` (containers, whose prefix ends in `.`); `subtree` an instance (`key` itself + its
+ *  `key.*` children — bare/.draft/.latest/.version.N — without matching a sibling `keyX`). */
+export function archiveMemoryByKey(db: Database.Database, keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): number {
+  const match = opts.match ?? 'prefix';
+  let keyClause: string;
+  const keyParams: unknown[] = [];
+  if (match === 'exact') { keyClause = 'key = ?'; keyParams.push(keyOrPrefix); }
+  else if (match === 'subtree') { keyClause = '(key = ? OR key LIKE ?)'; keyParams.push(keyOrPrefix, keyOrPrefix + '.%'); }
+  else { keyClause = 'key LIKE ?'; keyParams.push(keyOrPrefix + '%'); }
+  const res = db.prepare(
+    `UPDATE memory SET archived = 1, archivedAt = ?, archivedBy = ?, archivedRoot = ?
+     WHERE ${keyClause} AND archived = 0`
+  ).run(opts.archivedAt, opts.archivedBy, opts.archivedRoot, ...keyParams);
+  return res.changes;
+}
+
+/** UNARCHIVE — clear the archive flag on every row whose archivedRoot matches (smart restore). */
+export function unarchiveMemoryByRoot(db: Database.Database, archivedRoot: string): number {
+  const res = db.prepare(
+    `UPDATE memory SET archived = 0, archivedAt = NULL, archivedBy = NULL, archivedRoot = NULL
+     WHERE archived = 1 AND archivedRoot = ?`
+  ).run(archivedRoot);
+  return res.changes;
+}
+
+/** UNARCHIVE BY KEY — clear archive on every archived row under a key (root-independent). See repository. */
+export function unarchiveMemoryByKey(db: Database.Database, keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): number {
+  const match = opts?.match ?? 'subtree';
+  let keyClause: string;
+  const keyParams: unknown[] = [];
+  if (match === 'exact') { keyClause = 'key = ?'; keyParams.push(keyOrPrefix); }
+  else if (match === 'subtree') { keyClause = '(key = ? OR key LIKE ?)'; keyParams.push(keyOrPrefix, keyOrPrefix + '.%'); }
+  else { keyClause = 'key LIKE ?'; keyParams.push(keyOrPrefix + '%'); }
+  const res = db.prepare(
+    `UPDATE memory SET archived = 0, archivedAt = NULL, archivedBy = NULL, archivedRoot = NULL
+     WHERE archived = 1 AND ${keyClause}`
+  ).run(...keyParams);
+  return res.changes;
+}
+
+/** Count active vs archived memory rows under a key prefix. */
+export function countArchivedByKeyPrefix(db: Database.Database, keyPrefix: string): { active: number; archived: number } {
+  const row = db.prepare(
+    `SELECT
+       SUM(CASE WHEN archived = 0 THEN 1 ELSE 0 END) AS active,
+       SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived
+     FROM memory WHERE key LIKE ?`
+  ).get(keyPrefix + '%') as { active: number | null; archived: number | null };
+  return { active: row.active ?? 0, archived: row.archived ?? 0 };
 }

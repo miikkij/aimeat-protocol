@@ -55,6 +55,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [myOrganisms, setMyOrganisms] = useState(null);
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [archivedOpen, setArchivedOpen] = useState(false);   // collapsible "Archived" section (closed by default)
   // organism whose workspaces are open, then the specific workspace within it — both restored from
   // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch (e) { return null; } });
@@ -291,6 +292,28 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     }, { danger: true });
   }, [showToast, loadData]);
 
+  // Archive / unarchive a whole organism (creator/admin). Archived organisms become read-only and
+  // their content is excluded from AI materials (overview/read/search); the workspaces cascade-archive
+  // and unarchive uses smart restore. Reversible — not a delete.
+  const handleArchive = useCallback(async (id, name, archived) => {
+    const verb = archived ? (t('organisms.archive') || 'Archive') : (t('organisms.unarchive') || 'Unarchive');
+    confirm(
+      (archived
+        ? (t('organisms.confirmArchive') || 'Archive “{name}”? It becomes read-only and is hidden from AI operations until you unarchive it. Its workspaces are archived too.')
+        : (t('organisms.confirmUnarchive') || 'Unarchive “{name}”? It and the workspaces archived with it become active again.')
+      ).replace('{name}', name),
+      async () => {
+        try {
+          if (archived) await orgService.archiveContent(id, { level: 'organism' });
+          else await orgService.unarchiveContent(id, { level: 'organism' });
+          showToast(archived ? (t('organisms.organismArchived') || 'Organism archived') : (t('organisms.organismUnarchived') || 'Organism restored'));
+          loadData();
+        } catch (e) { showToast((e && e.message) || 'Failed'); }
+      },
+      { title: verb },
+    );
+  }, [showToast, loadData, confirm]);
+
   const toggleExpand = useCallback((id) => {
     setExpanded(prev => prev === id ? null : id);
   }, []);
@@ -348,6 +371,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     const menuItems = isMine ? [
       canEdit && { label: t('organisms.settings') || 'Settings', icon: '⚙', onClick: () => openHome(true) },
       { label: t('organisms.exportOrg') || 'Export organism', icon: '⬇', onClick: () => exportOrganismZip(org, showToast) },
+      canEdit && (org.archived
+        ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => handleArchive(org.id, org.name, false) }
+        : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => handleArchive(org.id, org.name, true) }),
       !isCreator && { label: t('organisms.leave') || 'Leave', danger: true, onClick: () => handleLeave(org.id, org.name) },
       isCreator && { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => handleDelete(org.id, org.name) },
     ] : [];
@@ -367,6 +393,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             <span class="pj-org-name">${(org.name)}</span>
             <span class="badge badge-info">${typeLabel}</span>
             ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${'🔒'}</span>` : null}
+            ${org.archived ? html`<span class="pj-tab-pill" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
           </div>
           ${org.description ? html`<div class="pj-org-desc">${(org.description)}</div>` : null}
         </div>
@@ -514,14 +541,30 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <button class="btn-primary btn-sm" onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}</button>
       </div>
     </div>
-    ${myOrganisms.length === 0
-      ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
-      : html`
-        <div class="pj-org-list">${sortedMine.map(org => renderOrgRow(org, true))}</div>
-        ${sortMode === 'custom' && sortedMine.length > 1 ? html`
-          <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
-      `
-    }
+    ${(() => {
+      // Active organisms drive the working list; archived ones move into a collapsed "Archived"
+      // section below (read-only/retired — out of the way, but restorable from there).
+      const activeMine = sortedMine.filter(o => !o.archived);
+      const archivedMine = sortedMine.filter(o => o.archived);
+      return html`
+        ${activeMine.length === 0 && archivedMine.length === 0
+          ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
+          : html`
+            ${activeMine.length === 0
+              ? html`<div class="empty">${t('organisms.allArchived') || 'All your organisms are archived.'}</div>`
+              : html`
+                <div class="pj-org-list">${activeMine.map(org => renderOrgRow(org, true))}</div>
+                ${sortMode === 'custom' && activeMine.length > 1 ? html`
+                  <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}`}
+            ${archivedMine.length > 0 ? html`
+              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
+                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
+                <span>${'🗄️ '}${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))}</span>
+              </button>
+              ${archivedOpen ? html`<div class="pj-org-list">${archivedMine.map(org => renderOrgRow(org, true))}</div>` : null}` : null}
+          `}
+      `;
+    })()}
 
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`

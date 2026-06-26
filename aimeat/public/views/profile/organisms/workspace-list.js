@@ -13,6 +13,8 @@
  *   v1.1.0 — 2026-06-22 — Kill the per-workspace fetch storm: one discoverWorkspaces({include:'enrichment'})
  *     replaces the 1 + 3N (getWorkspace+activity+participants) fan-out; pending-review counts come inline;
  *     the 'organisms' live refresh is debounced (1.5s) so an agent-driven event burst is one reload.
+ *   v1.2.0 — 2026-06-26 — Archive/unarchive a workspace (creator/admin) via the kebab menu + an
+ *     "archived" badge; archived workspaces are read-only and hidden from AI materials.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -45,6 +47,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const [openReqWs, setOpenReqWs] = useState(null);       // which owned workspace's request-inbox is open
   const [reqInbox, setReqInbox] = useState([]);           // access requests for openReqWs
   const [openPeopleWs, setOpenPeopleWs] = useState(null); // which workspace's inline participants list is open
+  const [archivedOpen, setArchivedOpen] = useState(false); // collapsible "Archived workspaces" section
   const [wsStats, setWsStats] = useState({});             // wsId → { recs, docs, lastEv, hasManifest }
   const [apprByWs, setApprByWs] = useState({});           // wsId → pending review count
 
@@ -142,6 +145,19 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     );
   };
 
+  // Archive / unarchive a whole workspace (creator/admin). Archived workspaces become read-only and
+  // drop out of AI materials (overview/read/search) but stay searchable in the archive + restorable.
+  const setArchived = async (w, archived) => {
+    setBusy(true);
+    try {
+      const target = { level: 'workspace', ws: w.id };
+      if (archived) await orgService.archiveContent(orgId, target); else await orgService.unarchiveContent(orgId, target);
+      await load();
+      showToast(archived ? (t('organisms.workspaceArchived') || 'Workspace archived') : (t('organisms.workspaceUnarchived') || 'Workspace restored'));
+    } catch (e) { showToast((e && e.message) || 'Failed'); }
+    finally { setBusy(false); }
+  };
+
   // ── Export (download ZIP backup) + Import (upload a ZIP as a new workspace) ──
   const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch { return ''; } };
   const fileRef = useRef(null);
@@ -207,14 +223,16 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
 
       ${list === null ? html`<${Spinner} />`
         : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
-        : html`
-          <div class="pj-org-list">
-          ${list.map(w => {
+        : (() => {
+          const renderWsRow = (w) => {
             const locked = w.access === 'none';
             const reviews = apprByWs[w.id] || 0;
             const menuItems = w.access === 'owner' ? [
               { label: t('organisms.requests') || 'Access requests', icon: '👥', onClick: () => toggleInbox(w) },
               { label: t('organisms.export') || 'Export backup (.zip)', icon: '⬇', onClick: () => doExport(w) },
+              w.archived
+                ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => setArchived(w, false) }
+                : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => setArchived(w, true) },
               { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
             ] : [];
             return html`
@@ -226,6 +244,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
                 <div class="pj-org-titlerow">
                   ${locked ? html`<span class="pj-org-lock">${'🔒'}</span>` : null}
                   <span class="pj-org-name">${(w.name || w.id)}</span>
+                  ${w.archived ? html`<span class="pj-tab-pill" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
                   ${reviews > 0 ? html`<span class="pj-tab-pill">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
                 </div>
                 <div class="pj-org-desc">${locked
@@ -265,8 +284,20 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
                       </div>`)}
                 </div>` : null}
             </div>`;
-          })}
-        </div>`}
+          };
+          // Active workspaces in the main list; archived ones collapse into a section below (restorable).
+          const active = list.filter(w => !w.archived);
+          const archived = list.filter(w => w.archived);
+          return html`
+            <div class="pj-org-list">${active.map(renderWsRow)}</div>
+            ${archived.length > 0 ? html`
+              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
+                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
+                <span>${'🗄️ '}${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))}</span>
+              </button>
+              ${archivedOpen ? html`<div class="pj-org-list">${archived.map(renderWsRow)}</div>` : null}` : null}
+          `;
+        })()}
 
       ${overview && showOverview ? html`
         <div class="pj-chart">

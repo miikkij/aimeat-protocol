@@ -174,6 +174,32 @@ export class PrismaStorage implements Storage {
         }
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
+        await this.backfillArchiveFlag();
+    }
+
+    /**
+     * Backfill `archived: false` onto documents written BEFORE the archive feature added the field.
+     * In MongoDB such docs simply lack the field, and the default-exclude read filter does NOT match a
+     * missing field — so without this, ALL pre-archive content (workspaces, manifests, registries,
+     * records) silently vanishes from every default read. SQLite gets this for free via
+     * `safeAddColumn(... DEFAULT 0)`; MongoDB needs an explicit one-time, idempotent backfill (only
+     * touches docs missing the field; a no-op once every doc has it). Collections are the Prisma model
+     * names (no @@map). Best-effort: logged, never fatal.
+     */
+    private async backfillArchiveFlag(): Promise<void> {
+        if (!this.prisma) return;
+        for (const collection of ['Memory', 'Organism']) {
+            try {
+                const res: any = await this.prisma.$runCommandRaw({
+                    update: collection,
+                    updates: [{ q: { archived: { $exists: false } }, u: { $set: { archived: false } }, multi: true }],
+                });
+                const n = res?.nModified ?? res?.n ?? 0;
+                if (n > 0) logger.info(`Archive backfill: set archived=false on ${n} legacy ${collection} document(s)`);
+            } catch (err: any) {
+                logger.warn(`Archive backfill skipped for ${collection}: ${err?.message ?? err}`);
+            }
+        }
     }
 
     /**
@@ -701,9 +727,9 @@ export class PrismaStorage implements Storage {
         return this.toMemoryRecord(row);
     }
 
-    async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]> {
+    async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: import('../../interface.js').ArchiveFilter }): Promise<MemoryRecord[]> {
         this.ensureReady();
-        const where: any = { ownerGaii };
+        const where: any = { ownerGaii, ...this.archivedWhere(opts?.archived) };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.tags?.length) where.tags = { hasSome: opts.tags };
@@ -721,10 +747,10 @@ export class PrismaStorage implements Storage {
             });
     }
 
-    async countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
+    async countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: import('../../interface.js').ArchiveFilter }): Promise<number> {
         this.ensureReady();
         if (ownerGaiis.length === 0) return 0;
-        const where: any = { ownerGaii: { in: ownerGaiis } };
+        const where: any = { ownerGaii: { in: ownerGaiis }, ...this.archivedWhere(opts?.archived) };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
         // DISTINCT keys (mirrors listOwnerScopeMemory's cross-identity key-dedup); loads only the
@@ -733,9 +759,9 @@ export class PrismaStorage implements Storage {
         return rows.length;
     }
 
-    async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+    async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: import('../../interface.js').ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = {};
+        const where: any = { ...this.archivedWhere(opts?.archived) };
         if (opts?.ownerPrefix) where.ownerGaii = { startsWith: opts.ownerPrefix };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
@@ -783,10 +809,10 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): Promise<MemoryRecord[]> {
+    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: import('../../interface.js').ArchiveFilter }): Promise<MemoryRecord[]> {
         this.ensureReady();
         // MongoDB text search — search keys and string values
-        const where: any = { ownerGaii };
+        const where: any = { ownerGaii, ...this.archivedWhere(opts?.archived) };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
 
@@ -831,7 +857,7 @@ export class PrismaStorage implements Storage {
         const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu);
         if (!tokens || tokens.length === 0) return [];
 
-        const where: Record<string, unknown> = { OR: tokens.map(tok => ({ searchBlob: { contains: tok, mode: 'insensitive' } })) };
+        const where: Record<string, unknown> = { OR: tokens.map(tok => ({ searchBlob: { contains: tok, mode: 'insensitive' } })), ...this.archivedWhere(opts?.archived) };
         if (opts?.ownerGaiis?.length) where.ownerGaii = { in: opts.ownerGaiis };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.keyPrefix) where.key = { startsWith: opts.keyPrefix };
@@ -852,6 +878,52 @@ export class PrismaStorage implements Storage {
             .sort((a, b) => (b.score - a.score) || (b.updatedAt.getTime() - a.updatedAt.getTime()))
             .slice(0, limit)
             .map(({ record, score }) => ({ record, score }));
+    }
+
+    async archiveMemoryByKey(keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
+        this.ensureReady();
+        const match = opts.match ?? 'prefix';
+        const where: any = { archived: { not: true } };
+        if (match === 'exact') where.key = keyOrPrefix;
+        else if (match === 'subtree') where.OR = [{ key: keyOrPrefix }, { key: { startsWith: keyOrPrefix + '.' } }];
+        else where.key = { startsWith: keyOrPrefix };
+        const res = await this.prisma.memory.updateMany({
+            where,
+            data: { archived: true, archivedAt: new Date(opts.archivedAt), archivedBy: opts.archivedBy, archivedRoot: opts.archivedRoot },
+        });
+        return res.count;
+    }
+
+    async unarchiveMemoryByRoot(archivedRoot: string): Promise<number> {
+        this.ensureReady();
+        const res = await this.prisma.memory.updateMany({
+            where: { archived: true, archivedRoot },
+            data: { archived: false, archivedAt: null, archivedBy: null, archivedRoot: null },
+        });
+        return res.count;
+    }
+
+    async unarchiveMemoryByKey(keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
+        this.ensureReady();
+        const match = opts?.match ?? 'subtree';
+        const where: any = { archived: true };
+        if (match === 'exact') where.key = keyOrPrefix;
+        else if (match === 'subtree') where.OR = [{ key: keyOrPrefix }, { key: { startsWith: keyOrPrefix + '.' } }];
+        else where.key = { startsWith: keyOrPrefix };
+        const res = await this.prisma.memory.updateMany({
+            where,
+            data: { archived: false, archivedAt: null, archivedBy: null, archivedRoot: null },
+        });
+        return res.count;
+    }
+
+    async countArchivedByKeyPrefix(keyPrefix: string): Promise<{ active: number; archived: number }> {
+        this.ensureReady();
+        const [active, archived] = await Promise.all([
+            this.prisma.memory.count({ where: { key: { startsWith: keyPrefix }, archived: { not: true } } }),
+            this.prisma.memory.count({ where: { key: { startsWith: keyPrefix }, archived: true } }),
+        ]);
+        return { active, archived };
     }
 
     // ── Actions ─────────────────────────────────────────────────
@@ -1688,7 +1760,16 @@ export class PrismaStorage implements Storage {
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? row.archivedAt.toISOString() : undefined, archivedBy: row.archivedBy ?? undefined, archivedRoot: row.archivedRoot ?? undefined };
+    }
+
+    /** Prisma `where` fragment restricting memory rows by archive filter. Default `exclude` uses
+     *  `{ not: true }` (NOT `false`) so legacy docs written before the field existed — which have no
+     *  `archived` key at all — are still treated as active. Mirrors SQLite's `archived = 0` default. */
+    private archivedWhere(archived?: import('../../interface.js').ArchiveFilter): Record<string, unknown> {
+        if (archived === 'include') return {};
+        if (archived === 'only') return { archived: true };
+        return { archived: { not: true } };
     }
 
     /** Read an optional `_actor` / `_event` annotation off a record value (the structure-timeline
@@ -2529,7 +2610,7 @@ export class PrismaStorage implements Storage {
 
     async createOrganism(record: import('../../interface.js').OrganismRecord): Promise<import('../../interface.js').OrganismRecord> {
         this.ensureReady();
-        await this.prisma.organism.create({ data: { id: record.id, name: record.name, description: record.description, type: record.type, location: record.location as any ?? null, interests: record.interests, creatorGhii: record.creatorGhii, admins: record.admins, members: record.members, agentGaiis: record.agentGaiis, boardId: record.boardId, joinPolicy: record.joinPolicy, maxMembers: record.maxMembers, visibility: record.visibility, moderationConfig: record.moderationConfig as any, memoryNamespace: record.memoryNamespace, semantic: record.semantic as any ?? null, createdAt: new Date(record.createdAt) } });
+        await this.prisma.organism.create({ data: { id: record.id, name: record.name, description: record.description, type: record.type, location: record.location as any ?? null, interests: record.interests, creatorGhii: record.creatorGhii, admins: record.admins, members: record.members, agentGaiis: record.agentGaiis, boardId: record.boardId, joinPolicy: record.joinPolicy, maxMembers: record.maxMembers, visibility: record.visibility, moderationConfig: record.moderationConfig as any, memoryNamespace: record.memoryNamespace, semantic: record.semantic as any ?? null, archived: record.archived ?? false, archivedAt: record.archivedAt ? new Date(record.archivedAt) : null, archivedBy: record.archivedBy ?? null, createdAt: new Date(record.createdAt) } });
         return record;
     }
 
@@ -2539,13 +2620,17 @@ export class PrismaStorage implements Storage {
         return row ? this.toOrganismRecord(row) : null;
     }
 
-    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').OrganismRecord[]> {
+    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: import('../../interface.js').ArchiveFilter }): Promise<import('../../interface.js').OrganismRecord[]> {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
         const where: any = {};
         if (opts?.type) where.type = opts.type;
         if (opts?.visibility) where.visibility = opts.visibility;
+        // Archive filter — default include; `{ not: true }` for exclude also matches legacy docs that
+        // predate the field (belt-and-suspenders alongside the startup backfill).
+        if (opts?.archived === 'exclude') where.archived = { not: true };
+        else if (opts?.archived === 'only') where.archived = true;
         // city and interest filtering done post-query (JSON field)
         const rows = await this.prisma.organism.findMany({ where, orderBy: { createdAt: 'desc' } });
         let results = rows.map((r: any) => this.toOrganismRecord(r));
@@ -2565,6 +2650,7 @@ export class PrismaStorage implements Storage {
             if (data.moderationConfig) data.moderationConfig = data.moderationConfig as any;
             if (data.semantic) data.semantic = data.semantic as any;
             if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
+            if (data.archivedAt && typeof data.archivedAt === 'string') data.archivedAt = new Date(data.archivedAt);
             const row = await this.prisma.organism.update({ where: { id }, data });
             return this.toOrganismRecord(row);
         } catch { return null; }
@@ -2600,7 +2686,7 @@ export class PrismaStorage implements Storage {
     }
 
     private toOrganismRecord(row: any): import('../../interface.js').OrganismRecord {
-        return { id: row.id, name: row.name, description: row.description, type: row.type, location: row.location ?? undefined, interests: row.interests, creatorGhii: row.creatorGhii, admins: row.admins, members: row.members, agentGaiis: row.agentGaiis, boardId: row.boardId, joinPolicy: row.joinPolicy, maxMembers: row.maxMembers, visibility: row.visibility, moderationConfig: row.moderationConfig as any, memoryNamespace: row.memoryNamespace, semantic: row.semantic ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
+        return { id: row.id, name: row.name, description: row.description, type: row.type, location: row.location ?? undefined, interests: row.interests, creatorGhii: row.creatorGhii, admins: row.admins, members: row.members, agentGaiis: row.agentGaiis, boardId: row.boardId, joinPolicy: row.joinPolicy, maxMembers: row.maxMembers, visibility: row.visibility, moderationConfig: row.moderationConfig as any, memoryNamespace: row.memoryNamespace, semantic: row.semantic ?? undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? (row.archivedAt instanceof Date ? row.archivedAt.toISOString() : row.archivedAt) : undefined, archivedBy: row.archivedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
     async createMembership(record: import('../../interface.js').OrganismMembershipRecord): Promise<import('../../interface.js').OrganismMembershipRecord> {

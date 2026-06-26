@@ -12,8 +12,10 @@
  *   v1.0.0 -- 2026-06-09 -- Initial: extracted from the search route so the MCP tool can reuse it.
  *   v1.1.0 -- 2026-06-22 -- Indexed FTS backing (searchText + keyPrefix) instead of an O(n) per-workspace
  *     scan; hits now carry `namespace` (for deep-linking to the record) and `score` (relevance order).
+ *   v1.2.0 -- 2026-06-26 -- Organism archive: optional `archived` filter (exclude default / only / include)
+ *     threaded to searchText, backing archive search (the live FTS index excludes archived rows).
  */
-import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
+import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
@@ -49,6 +51,7 @@ export async function searchOrganismContent(
   callerGaii: string,
   q: string,
   onlyWs?: string,
+  opts?: { archived?: ArchiveFilter },
 ): Promise<{ results: OrganismSearchHit[]; truncated: boolean }> {
   const id = organism.id;
   const needle = q.toLowerCase();
@@ -66,7 +69,7 @@ export async function searchOrganismContent(
 
   // Indexed full-text candidates, scoped to the organism (or one workspace).
   const keyPrefix = onlyWs ? `organism.${id}.w.${onlyWs}.` : `organism.${id}.w.`;
-  const hits = await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES });
+  const hits = await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES, archived: opts?.archived });
 
   // Per-workspace manifest + read-permission cache (resolved once per workspace).
   const wsMeta = new Map<string, { canRead: boolean; types: Array<{ name: string; ns: string }> } | null>();

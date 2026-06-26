@@ -194,6 +194,25 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       } catch { showToast(t('organisms.deleteError') || 'Failed to delete'); }
     }, { danger: true, title: t('organisms.deleteOrganismTitle') || 'Delete this organism' });
   };
+  // Archive / unarchive the whole organism (creator/admin) — read-only + hidden from AI materials,
+  // cascades to its workspaces, fully reversible (smart restore). Unlike delete, nothing is destroyed.
+  const doArchive = (archived) => {
+    confirm(
+      (archived
+        ? (t('organisms.confirmArchive') || 'Archive “{name}”? It becomes read-only and is hidden from AI operations until you unarchive it. Its workspaces are archived too.')
+        : (t('organisms.confirmUnarchive') || 'Unarchive “{name}”? It and the workspaces archived with it become active again.')
+      ).replace('{name}', org.name || org.id),
+      async () => {
+        try {
+          if (archived) await orgService.archiveContent(org.id, { level: 'organism' });
+          else await orgService.unarchiveContent(org.id, { level: 'organism' });
+          showToast(archived ? (t('organisms.organismArchived') || 'Organism archived') : (t('organisms.organismUnarchived') || 'Organism restored'));
+          onChanged?.();
+        } catch (e) { showToast((e && e.message) || 'Failed'); }
+      },
+      { title: archived ? (t('organisms.archive') || 'Archive') : (t('organisms.unarchive') || 'Unarchive') },
+    );
+  };
 
   const extraAdmins = (org.admins || []).filter(a => a !== org.creatorGhii);
   const visHint = t(`organisms.visHint.${form.visibility}`);
@@ -253,6 +272,19 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         </div>
       ` : null}
     </div>
+
+    ${canEdit ? html`
+      <div class="pj-danger-box">
+        <div class="pj-danger-row">
+          <div class="pj-danger-text">
+            <div class="pj-danger-title">${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}</div>
+            <div class="pj-danger-sub">${org.archived
+              ? (t('organisms.unarchiveOrganismSub') || 'Make it active again. Workspaces archived together with it are restored.')
+              : (t('organisms.archiveOrganismSub') || 'Make it read-only and hide it (and its workspaces) from AI operations. Reversible — nothing is deleted.')}</div>
+          </div>
+          <button class="btn-outline btn-sm" onClick=${() => doArchive(!org.archived)}>${org.archived ? `♻️ ${t('organisms.unarchive') || 'Unarchive'}` : `🗄️ ${t('organisms.archive') || 'Archive'}`}</button>
+        </div>
+      </div>` : null}
 
     ${(isCreator || isMember) ? html`
       <div class="pj-danger pj-danger-box">

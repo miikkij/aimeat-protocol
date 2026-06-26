@@ -32,6 +32,9 @@
  *   v1.3.0 — 2026-06-23 — spaceLines() now renders each space's recent entries as a 3-column Markdown
  *     TABLE (Title · ID · Updated) instead of an inline "title · id · date" run-on, so the structure
  *     overview reads as aligned columns (human + agent). Pipe-safe titles via cell().
+ *   v1.4.0 — 2026-06-26 — Organism archive: archived workspaces are excluded by default (listed only
+ *     with includeArchived) and summarised as a count + footer; per-workspace archived-record counts
+ *     surfaced; archived org/workspace flagged with a 🗄️ marker.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -79,6 +82,12 @@ export interface WorkspaceSummary {
   totalRecords: number;
   totalDocuments: number;
   lastActivity: string | null;   // ISO of the most-recently-updated content key, deterministic
+  /** Whether THIS workspace is itself archived (registry marker). The overview lists archived
+   *  workspaces only when explicitly asked (includeArchived); otherwise they are summarised as a count. */
+  archived: boolean;
+  /** Count of archived (hidden-from-AI) memory rows under this workspace — surfaced as a hint so a
+   *  reader/agent knows there is archived content to ask for, without it polluting the working set. */
+  archivedCount: number;
 }
 
 type ObjType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
@@ -131,7 +140,7 @@ function oneLine(md: unknown): string | null {
 export async function collectWorkspaceSummary(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string },
+  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean },
 ): Promise<WorkspaceSummary> {
   const { orgId, ws, viewerGaii } = opts;
   const root = `organism.${orgId}.w.${ws}`;
@@ -141,8 +150,11 @@ export async function collectWorkspaceSummary(
   const summary: WorkspaceSummary = {
     ws, name: opts.name || ws, readme: null, readable: false,
     spaces: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
+    archived: opts.archived ?? false, archivedCount: 0,
   };
   if (!manRec) return summary;   // empty / non-existent workspace
+  // Hint count of archived rows under this workspace (cheap aggregate; default-excluded everywhere else).
+  try { summary.archivedCount = (await storage.countArchivedByKeyPrefix(`${root}.`)).archived; } catch { /* best-effort */ }
 
   let readable = manRec.ownerGaii === viewerGaii || isSameOwner(manRec.ownerGaii, viewerGaii);
   if (!readable) {
@@ -229,14 +241,15 @@ export async function collectWorkspaceSummary(
 
 /** Read the organism's workspace registry, aggregated across every member's record (a workspace is
  *  registered under its creator's own GHII), deduped by id. */
-export async function listWorkspaces(storage: Storage, orgId: string): Promise<Array<{ id: string; name?: string }>> {
+export async function listWorkspaces(storage: Storage, orgId: string): Promise<Array<{ id: string; name?: string; archived: boolean }>> {
   const regKey = `organism.${orgId}.meta.workspaces`;
-  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-  const seen = new Map<string, { id: string; name?: string }>();
+  // `include` so an archived organism's registry (cascade-archived with it) is still listable here.
+  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000, archived: 'include' });
+  const seen = new Map<string, { id: string; name?: string; archived: boolean }>();
   for (const rec of items) {
     if (rec.key !== regKey) continue;
-    const list = (rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [];
-    for (const w of list) if (typeof w?.id === 'string' && !seen.has(w.id)) seen.set(w.id, { id: w.id, name: w.name });
+    const list = (rec.value as { workspaces?: Array<{ id?: string; name?: string; archived?: boolean }> } | null)?.workspaces ?? [];
+    for (const w of list) if (typeof w?.id === 'string' && !seen.has(w.id)) seen.set(w.id, { id: w.id, name: w.name, archived: w.archived === true });
   }
   return [...seen.values()];
 }
@@ -272,8 +285,9 @@ export async function buildWorkspaceOverview(
     out.push('> _You do not have read access to this workspace._\n');
     return { markdown: out.join('\n'), readable: false, summary: s };
   }
+  if (s.archived) out.push('> 🗄️ _This workspace is **archived** (read-only)._\n');
   if (s.readme) out.push(`> ${s.readme}\n`);
-  out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · ${s.spaces.length} spaces · last activity ${date(s.lastActivity)}\n`);
+  out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · ${s.spaces.length} spaces${s.archivedCount ? ` · ${s.archivedCount} archived` : ''} · last activity ${date(s.lastActivity)}\n`);
   out.push(...objectiveLines(s.objectives, '##'));
   if (!s.spaces.length) out.push('_No spaces with content yet._\n');
   for (const sp of s.spaces) out.push(...spaceLines(sp, '##'));
@@ -356,13 +370,17 @@ function objectiveLines(objectives: ObjectiveSummary[], hashes: string): string[
 export async function buildOrganismOverview(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; viewerGaii: string },
-): Promise<{ markdown: string; workspaces: number }> {
-  const { orgId, viewerGaii } = opts;
+  opts: { orgId: string; viewerGaii: string; includeArchived?: boolean },
+): Promise<{ markdown: string; workspaces: number; archivedWorkspaces: number }> {
+  const { orgId, viewerGaii, includeArchived } = opts;
   const org = await storage.getOrganism(orgId);
-  const wss = await listWorkspaces(storage, orgId);
+  const allWss = await listWorkspaces(storage, orgId);
+  // Active workspaces drive the AI working set; archived ones are summarised as a count (or listed
+  // only when includeArchived is set) so they stay out of the materials yet remain discoverable.
+  const archivedWss = allWss.filter(w => w.archived);
+  const wss = includeArchived ? allWss : allWss.filter(w => !w.archived);
   const summaries: WorkspaceSummary[] = [];
-  for (const w of wss) summaries.push(await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii }));
+  for (const w of wss) summaries.push(await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii, archived: w.archived }));
 
   const totalRecords = summaries.reduce((n, s) => n + s.totalRecords, 0);
   const totalDocs = summaries.reduce((n, s) => n + s.totalDocuments, 0);
@@ -378,17 +396,26 @@ export async function buildOrganismOverview(
     documents: totalDocs,
   }));
   out.push(`# ${orgName} — structure overview\n`);
+  if (org?.archived) out.push('> 🗄️ _This organism is **archived** (read-only)._\n');
   if (org?.description) out.push(`> ${clip(org.description, 200)}\n`);
-  out.push(`> ${summaries.length} workspaces · ${totalRecords} records · ${totalDocs} documents\n`);
-  if (!summaries.length) out.push('_No workspaces yet._\n');
+  const activeCount = summaries.filter(s => !s.archived).length;
+  out.push(`> ${activeCount} workspaces · ${totalRecords} records · ${totalDocs} documents${archivedWss.length && !includeArchived ? ` · ${archivedWss.length} archived` : ''}\n`);
+  if (!summaries.length) out.push(includeArchived ? '_No workspaces yet._\n' : '_No active workspaces._\n');
   for (const s of summaries) {
-    out.push(`## ${s.name}  ·  \`${s.ws}\``);
+    out.push(`## ${s.name}  ·  \`${s.ws}\`${s.archived ? '  🗄️ _archived_' : ''}`);
     if (!s.readable) { out.push('_no read access_\n'); continue; }
     if (s.readme) out.push(`> ${s.readme}`);
-    out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · last activity ${date(s.lastActivity)}\n`);
+    const arch = s.archivedCount ? ` · ${s.archivedCount} archived` : '';
+    out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents${arch} · last activity ${date(s.lastActivity)}\n`);
     out.push(...objectiveLines(s.objectives, '###'));
     if (!s.spaces.length && !s.objectives.length) { out.push('_no content yet_\n'); continue; }
     for (const sp of s.spaces) out.push(...spaceLines(sp, '###'));
   }
-  return { markdown: out.join('\n'), workspaces: summaries.length };
+  // Footer: name the archived workspaces (not their content) so a reader knows what to ask for.
+  if (archivedWss.length && !includeArchived) {
+    out.push(`\n---\n_🗄️ ${archivedWss.length} archived workspace${archivedWss.length === 1 ? '' : 's'}: ${archivedWss.map(w => `**${w.name || w.id}**`).join(', ')}. Add \`?includeArchived=true\` to include them._`);
+  }
+  // `workspaces` = the number actually rendered in THIS view (active-only by default; active+archived
+  // when includeArchived). `archivedWorkspaces` is always the archived count regardless of the view.
+  return { markdown: out.join('\n'), workspaces: summaries.length, archivedWorkspaces: archivedWss.length };
 }

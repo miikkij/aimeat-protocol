@@ -14940,6 +14940,16 @@ paths:
             `organism.{id}.w.{ws}.*` (manifest at `organism.{id}.w.{ws}.meta.manifest`). The
             workspace list lives at `organism.{id}.meta.workspaces`. Omitting `ws` reads the
             legacy organism-level root.
+        - name: includeArchived
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Include archived (read-only, normally hidden) content. Default false.
+        - name: archived
+          in: query
+          required: false
+          schema: { type: string, enum: [only] }
+          description: '`only` reads ONLY archived content (the explicit archive view).'
       responses:
         '200':
           description: The aggregated workspace
@@ -15111,6 +15121,13 @@ paths:
             type: string
             enum: [md]
           description: "`md` returns the raw text/markdown body; omit for the JSON envelope."
+        - name: includeArchived
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: >
+            List archived workspaces too. Default false — archived workspaces are summarised as a
+            count (`archivedWorkspaces`) + a footer, keeping them out of the AI working set.
       responses:
         '200':
           description: The structure overview (JSON envelope, or raw markdown when format=md)
@@ -15923,7 +15940,72 @@ paths:
         '202': { description: Publish requires approval — a pending approval was created }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The target organism/workspace is archived (read-only) }
         '422': { description: Draft does not match the schema }
+
+  /v1/organisms/{id}/archive:
+    post:
+      operationId: archiveOrganismContent
+      summary: Archive organism content (read-only, hidden from AI materials)
+      description: |
+        Flag an organism, a workspace, a record-table/document-space, or a single record as archived.
+        Archived content becomes READ-ONLY and is EXCLUDED by default from the AI-facing materials
+        (structure overview, workspace read, organism search) — keeping the working set focused — yet
+        stays findable via archive search (`?archived=only`) and `?includeArchived=true`, and resolvable
+        by key. Archiving a container CASCADES to its contents. Creator/admin only.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level: { type: string, enum: [organism, workspace, space, record], description: What to archive }
+                ws: { type: string, description: Workspace id (required for workspace/space/record) }
+                namespace: { type: string, description: 'objectType namespace (required for level "space"), e.g. shared.tasks' }
+                key: { type: string, description: 'Instance base memory key (required for level "record")' }
+      responses:
+        '200': { description: 'Archived (returns { archived, level, root })' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/unarchive:
+    post:
+      operationId: unarchiveOrganismContent
+      summary: Unarchive organism content (smart restore)
+      description: |
+        Reverse an archive. Uses SMART RESTORE: restores ONLY the content that THIS target's archival
+        flagged (its `archivedRoot`), leaving any item that was archived separately still archived.
+        Same body shape and creator/admin gate as POST /v1/organisms/{id}/archive.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level: { type: string, enum: [organism, workspace, space, record] }
+                ws: { type: string }
+                namespace: { type: string }
+                key: { type: string }
+      responses:
+        '200': { description: 'Restored (returns { restored, level, root })' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/organisms/{id}/revert:
     post:
@@ -19598,6 +19680,8 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
         - { name: q, in: query, required: true, description: Search text (min 2 characters), schema: { type: string } }
         - { name: ws, in: query, required: false, description: Limit the search to a single workspace id, schema: { type: string } }
+        - { name: archived, in: query, required: false, description: '`only` = archive search (archived content only). Default excludes archived.', schema: { type: string, enum: [only] } }
+        - { name: includeArchived, in: query, required: false, description: 'true = search active AND archived content together.', schema: { type: boolean } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

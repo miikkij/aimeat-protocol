@@ -84,11 +84,18 @@ model Memory {
   searchBlob String?
   // Opt-in version tracking: previous value archived to MemoryVersion on overwrite. Default false.
   trackable  Boolean  @default(false)
+  // Organism archive — read-only soft-archive flag (excluded from bulk reads/search by default).
+  archived     Boolean @default(false)
+  archivedAt   DateTime?
+  archivedBy   String?
+  archivedRoot String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([ownerGaii, key])
   @@index([ownerGaii])
+  @@index([archived, key])
+  @@index([archivedRoot])
 }
 
 // Archived prior versions of TRACKABLE memory keys. Append-only; latest value lives in Memory.
@@ -636,6 +643,9 @@ model Organism {
   moderationConfig Json
   memoryNamespace  String
   semantic         Json?
+  archived         Boolean  @default(false)
+  archivedAt       DateTime?
+  archivedBy       String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
