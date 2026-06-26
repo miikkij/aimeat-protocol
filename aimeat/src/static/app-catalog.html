@@ -7026,15 +7026,18 @@
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var base = config.aimeatUrl.replace(/\/+$/, '');
-    fetch(base + '/v1/app-templates?kind=app-shell')
+    fetch(base + '/v1/app-templates')
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        var list = (d.data && d.data.templates) || [];
+        // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
+        var list = ((d.data && d.data.templates) || []).filter(function (t) { return t.kind !== 'component'; });
+        list.sort(function (a, b) { return (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1); });
         sel.innerHTML = '<option value="">(none — build from scratch)</option>';
         list.forEach(function (t) {
           var o = document.createElement('option');
           o.value = t.id;
-          o.textContent = t.title + (t.description ? ' — ' + t.description.slice(0, 70) : '');
+          var prefix = t.kind === 'use-case' ? '★ ' : '';
+          o.textContent = prefix + t.title + (t.description ? ' — ' + t.description.slice(0, 70) : '');
           sel.appendChild(o);
         });
         sel.onchange = function () {

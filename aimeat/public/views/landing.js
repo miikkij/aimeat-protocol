@@ -281,7 +281,12 @@ function BuildAppPrompt() {
   const [tplId, setTplId] = useState('');
   const [tplContent, setTplContent] = useState('');
   useEffect(() => {
-    fetch('/v1/app-templates?kind=app-shell').then(r => r.json()).then(d => setTemplates((d.data && d.data.templates) || [])).catch(() => {});
+    // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
+    fetch('/v1/app-templates').then(r => r.json()).then(d => {
+      const list = ((d.data && d.data.templates) || []).filter(t => t.kind !== 'component');
+      list.sort((a, b) => (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1));
+      setTemplates(list);
+    }).catch(() => {});
   }, []);
   const onPick = async (e) => {
     const id = e.target.value; setTplId(id);
@@ -301,7 +306,7 @@ function BuildAppPrompt() {
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.buildTitle', 'Build your app in 10 minutes — copy this prompt')}</h2>
       <p class="ld-askai-sub">${tr('landing.buildSub', 'Paste into Claude, ChatGPT or any AI. It asks about your idea, builds the app and publishes it to your node. Share the link when done.')}</p>
-      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${'✨'} ${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.title}</option>`)}</select></div>` : ''}
+      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${'✨'} ${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}</select></div>` : ''}
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
