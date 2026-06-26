@@ -17,6 +17,7 @@
  *   v1.3.0 — 2026-06-26 — components: image-upload, realtime-room, search, list+detail (for marketplace / realtime-social / homepage use-cases).
  *   v1.4.0 — 2026-06-26 — use-case templates (full working scaffolds) + composes field; first: realtime-social.
  *   v1.5.0 — 2026-06-26 — use-case: marketplace (anon browse + search + detail + post with image); fix image-upload URL.
+ *   v1.6.0 — 2026-06-26 — component: markdown (AIMEAT.md.render); use-case: homepage (personal site — profile + markdown blog + images + AI stories).
  */
 
 export interface AppTemplate {
@@ -610,6 +611,192 @@ entry: index.html
 </body>
 </html>`;
 
+const COMP_MARKDOWN = `// markdown — render safe GFM markdown (AI stories, blog posts) to styled HTML (aimeat-markdown).
+// Load: <script src="/v1/libs/aimeat-markdown.js"></script>
+AIMEAT.md.render(markdownString, '#target');   // replaces #target content with a rendered .md-body
+// Or get a node: var node = AIMEAT.md.render(text); someEl.appendChild(node);
+// XSS-safe for LLM-authored text (no innerHTML; hrefs/imgs sanitized). Pairs well with aimeat-ai output.`;
+
+// ── Use-case: homepage / personal site (full working scaffold) ───────
+// A single-writer public site: anyone views the owner's profile + blog/feed; the OWNER edits the
+// profile and publishes posts (markdown body, optional image, optional AI-written draft). Profile
+// + posts live in public keys read via getPublic (anon-readable). Composes markdown + image-upload
+// + ai-action + auth-gated. {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII.
+
+const USECASE_HOMEPAGE = `<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: {{app-name}}
+version: 1.0.0
+description: {{one-line description — REQUIRED for publishing}}
+entry: index.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="aimeat-scopes" content="ai:use" />   <!-- lets the owner's "Write with AI" button spend their AI budget -->
+  <title>{{App Title}}</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50 gap-2">
+    <div class="flex-1 min-w-0"><span class="text-lg font-bold">{{App Title}}</span></div>
+    <span id="owner-actions" hidden class="flex gap-2">
+      <button id="edit-btn" class="btn-outline px-3">Edit profile</button>
+      <button id="post-btn" class="btn-primary px-3">+ Post</button>
+    </span>
+    <span id="login"></span>
+  </nav>
+
+  <main class="flex-1 w-full max-w-3xl mx-auto p-4 flex flex-col gap-8">
+    <section id="hero" class="text-center pt-4"></section>
+    <section id="posts" class="flex flex-col gap-6"></section>
+  </main>
+
+  <!-- Profile edit overlay (owner) -->
+  <div id="profile-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
+    <form id="profile-form" class="card bg-base-200 max-w-md w-full">
+      <div class="card-body gap-3">
+        <h3 class="text-lg font-bold">Edit profile</h3>
+        <input id="p-name" class="input input-bordered" placeholder="Your name" />
+        <textarea id="p-bio" class="textarea textarea-bordered" placeholder="Bio (markdown supported)" rows="4"></textarea>
+        <input id="p-avatar" type="file" accept="image/*" class="file-input file-input-bordered" />
+        <div class="flex gap-2 justify-end">
+          <button type="button" class="btn-ghost px-4" onclick="document.getElementById('profile-modal').style.display='none'">Cancel</button>
+          <button type="submit" class="btn-primary px-6">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- New post overlay (owner) -->
+  <div id="post-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4" style="display:none">
+    <form id="post-form" class="card bg-base-200 max-w-lg w-full max-h-[92vh] overflow-y-auto">
+      <div class="card-body gap-3">
+        <h3 class="text-lg font-bold">New post</h3>
+        <input id="f-title" class="input input-bordered" placeholder="Title" required />
+        <div class="flex gap-2 items-center">
+          <input id="f-idea" class="input input-bordered input-sm flex-1" placeholder="Idea for AI (optional)" />
+          <button type="button" id="ai-btn" class="btn-info px-3" hidden>✨ Write with AI</button>
+        </div>
+        <textarea id="f-body" class="textarea textarea-bordered font-mono text-sm" placeholder="Write in markdown… (## heading, **bold**, - lists, links, images)" rows="8"></textarea>
+        <input id="f-image" type="file" accept="image/*" class="file-input file-input-bordered" />
+        <div class="flex gap-2 justify-end">
+          <button type="button" class="btn-ghost px-4" onclick="document.getElementById('post-modal').style.display='none'">Cancel</button>
+          <button type="submit" id="post-submit" class="btn-primary px-6">Publish</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <script src="/v1/libs/aimeat-storage.js"></script>
+  <script src="/v1/libs/aimeat-ai.js"></script>
+  <script src="/v1/libs/aimeat-markdown.js"></script>
+  <script>
+    var OWNER = '{{owner-ghii}}';        // the site owner's GHII (owner@node-id) — content is read from here
+    var PROFILE_KEY = '{{app}}.profile';
+    var POSTS_KEY = '{{app}}.posts';
+    var session = null, profile = {}, posts = [];
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function show(id) { document.getElementById(id).style.display = 'flex'; }
+    function hide(id) { document.getElementById(id).style.display = 'none'; }
+    function isOwner() { return !!session && session.ghii === OWNER; }
+
+    function renderHero() {
+      var h = document.getElementById('hero'); h.innerHTML = '';
+      if (profile.avatarUrl) { var img = document.createElement('img'); img.src = profile.avatarUrl; img.className = 'w-24 h-24 rounded-full object-cover mx-auto'; h.appendChild(img); }
+      var name = document.createElement('h1'); name.className = 'text-3xl font-bold mt-3'; name.textContent = profile.name || '{{Your name}}'; h.appendChild(name);
+      if (profile.bio) { var bio = document.createElement('div'); bio.className = 'max-w-2xl mx-auto mt-2 text-left'; AIMEAT.md.render(profile.bio, bio); h.appendChild(bio); }
+    }
+    function renderPosts() {
+      var c = document.getElementById('posts'); c.innerHTML = '';
+      if (!posts.length) { c.innerHTML = '<div class="text-center opacity-50 py-8">No posts yet.</div>'; return; }
+      posts.forEach(function (p) {
+        var card = document.createElement('article'); card.className = 'card bg-base-200 shadow';
+        card.innerHTML = '<div class="card-body"><h2 class="text-xl font-bold">' + esc(p.title) + '</h2>' +
+          '<div class="text-xs opacity-60">' + esc((p.at || '').slice(0, 10)) + '</div></div>';
+        var body = card.querySelector('.card-body');
+        if (p.imageUrl) { var im = document.createElement('img'); im.src = p.imageUrl; im.className = 'rounded-lg w-full object-cover max-h-96 my-2'; body.appendChild(im); }
+        var md = document.createElement('div'); AIMEAT.md.render(p.body || '', md); body.appendChild(md);
+        c.appendChild(card);
+      });
+    }
+
+    async function load() {
+      try { profile = (await AIMEAT.data.getPublic(OWNER, PROFILE_KEY)) || {}; } catch (e) { profile = {}; }
+      try { var pp = await AIMEAT.data.getPublic(OWNER, POSTS_KEY); posts = Array.isArray(pp) ? pp.slice() : []; } catch (e) { posts = []; }
+      posts.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
+      renderHero(); renderPosts();
+    }
+
+    // ── owner editing ──
+    function applyOwnerUi() {
+      if (OWNER.indexOf('{{') === 0 && session && session.ghii) OWNER = session.ghii; // owner-preview before the GHII is baked in
+      document.getElementById('owner-actions').hidden = !isOwner();
+      document.getElementById('ai-btn').hidden = true;
+      if (isOwner()) AIMEAT.ai.isAvailable().then(function (ok) { if (ok) document.getElementById('ai-btn').hidden = false; });
+    }
+
+    document.getElementById('edit-btn').onclick = function () {
+      document.getElementById('p-name').value = profile.name || '';
+      document.getElementById('p-bio').value = profile.bio || '';
+      show('profile-modal');
+    };
+    document.getElementById('post-btn').onclick = function () { show('post-modal'); };
+
+    document.getElementById('ai-btn').onclick = async function () {
+      var idea = document.getElementById('f-idea').value.trim() || document.getElementById('f-title').value.trim();
+      if (!idea) { alert('Type a title or an idea first.'); return; }
+      this.disabled = true; this.textContent = '✨ Writing…';
+      try {
+        var r = await AIMEAT.ai.complete({ prompt: 'Write a short, engaging blog post in markdown about: ' + idea, max_tokens: 500, app_id: '{{app}}' });
+        document.getElementById('f-body').value = r.content;
+      } catch (e) { alert('AI error: ' + (e.message || e)); }
+      this.disabled = false; this.textContent = '✨ Write with AI';
+    };
+
+    document.getElementById('profile-form').addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      try {
+        var avatarUrl = profile.avatarUrl || '';
+        var af = document.getElementById('p-avatar');
+        if (af.files[0]) { var up = await AIMEAT.storage.upload(af.files[0], { visibility: 'public' }); avatarUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key); }
+        profile = { name: document.getElementById('p-name').value.trim(), bio: document.getElementById('p-bio').value, avatarUrl: avatarUrl };
+        await AIMEAT.data.set(PROFILE_KEY, profile, { visibility: 'public' });
+        hide('profile-modal'); renderHero();
+      } catch (e) { alert('Could not save: ' + (e.message || e)); }
+    });
+
+    document.getElementById('post-form').addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var btn = document.getElementById('post-submit'); btn.disabled = true; btn.textContent = 'Publishing…';
+      try {
+        var imageUrl = '';
+        var fi = document.getElementById('f-image');
+        if (fi.files[0]) { var up = await AIMEAT.storage.upload(fi.files[0], { visibility: 'public' }); imageUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key); }
+        posts.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), title: document.getElementById('f-title').value.trim(), body: document.getElementById('f-body').value, imageUrl: imageUrl, at: new Date().toISOString() });
+        await AIMEAT.data.set(POSTS_KEY, posts, { visibility: 'public' });
+        document.getElementById('post-form').reset(); hide('post-modal'); renderPosts();
+      } catch (e) { alert('Could not publish: ' + (e.message || e)); }
+      btn.disabled = false; btn.textContent = 'Publish';
+    });
+
+    AIMEAT.auth.mountLoginButton('#login', {
+      onLogin: function () { session = AIMEAT.auth.getSession(); applyOwnerUi(); load(); },
+      onLogout: function () { location.reload(); }
+    });
+    var s0 = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
+    if (s0 && s0.jwt) { session = s0; applyOwnerUi(); }
+    load();   // everyone views
+  </script>
+</body>
+</html>`;
+
 const TEMPLATES: AppTemplate[] = [
   {
     id: 'shell-pure-client',
@@ -649,6 +836,7 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-realtime-room', kind: 'component', title: 'Realtime room', description: 'Live presence + messages over a shared room — multiplayer games, chat, presence boards.', libs: ['aimeat-auth'], content: COMP_REALTIME_ROOM },
   { id: 'comp-search', kind: 'component', title: 'Search / filter', description: 'Instant client-side filter over a list, or server-side memory search.', libs: ['aimeat-data'], content: COMP_SEARCH },
   { id: 'comp-list-detail', kind: 'component', title: 'List + detail', description: 'Master/detail layout: a list, click an item to show its detail (directories, catalogs).', libs: [], content: COMP_LIST_DETAIL },
+  { id: 'comp-markdown', kind: 'component', title: 'Markdown render', description: 'Render safe GFM markdown (AI stories, blog posts, docs) to styled HTML.', libs: ['aimeat-markdown'], content: COMP_MARKDOWN },
   {
     id: 'usecase-realtime-social',
     kind: 'use-case',
@@ -666,6 +854,15 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-data', 'aimeat-storage'],
     composes: ['comp-list-detail', 'comp-image-upload', 'comp-search', 'comp-auth-gated'],
     content: USECASE_MARKETPLACE,
+  },
+  {
+    id: 'usecase-homepage',
+    kind: 'use-case',
+    title: 'Homepage / personal site',
+    description: 'A single-writer public site: anyone views the owner profile + blog/feed; the owner edits the profile and publishes posts (markdown body, images, optional AI-written draft).',
+    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-storage', 'aimeat-ai', 'aimeat-markdown'],
+    composes: ['comp-markdown', 'comp-image-upload', 'comp-ai-action', 'comp-auth-gated'],
+    content: USECASE_HOMEPAGE,
   },
 ];
 
