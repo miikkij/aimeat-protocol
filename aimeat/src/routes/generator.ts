@@ -793,8 +793,9 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
       const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Test: ${registeredAs}</title>
-<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+<link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+<script src="/lib/tailwindcss@4.js"></script>
 </head>
 <body class="bg-base-100 min-h-screen flex flex-col">
 <!-- AIMEAT Header — same structure as spa.html -->
