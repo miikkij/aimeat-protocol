@@ -88,6 +88,7 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, deriveWorkspaceEvents, aggregateParticipants } from '../services/workspace-enrichment.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
+import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from '../services/archive.js';
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
@@ -203,6 +204,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       visibility: member ? (selfOrOperator ? (visibility as string) : 'public') : ((visibility as string) || 'public'),
       page: page ? Number(page) : 1,
       perPage: per_page ? Number(per_page) : 20,
+      // The owner's OWN list includes archived (the client splits them into an "Archived" section);
+      // browsing/discovery (anyone else, or no member filter) excludes archived — retired organisms
+      // are read-only and not discoverable.
+      archived: (member && selfOrOperator) ? 'include' : 'exclude',
     });
 
     // ?include=counts — attach workspace_count per org (distinct ids in the registry across all
@@ -1086,13 +1091,33 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     // (No ws → legacy organism-level root, kept only so an un-scoped call still reads something.)
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const nsRoot = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
+    // Archived content is excluded by default (the AI working set); ?includeArchived=true surfaces it
+    // — the explicit "look in archive" escape hatch. ?archived=only reads ONLY archived content.
+    const archived = req.query.archived === 'only' ? 'only' : (req.query.includeArchived === 'true' ? 'include' : undefined);
 
     // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller can
     // read the manifest (they created it, are a same-owner agent, or hold a viewer/contributor grant —
     // see authorizeRead/the workspace-role consents), they see ALL of the workspace's content, whoever
     // wrote it — so a contributor's writes are visible to the creator + other members. If not, they see
     // nothing (org membership alone is discovery-only). The manifest is the single gate record.
-    const { items } = await storage.listAllMemory({ prefix: nsRoot, limit: 5000 });
+    // For the archived views we must still surface the (active) manifest/readme so the workspace can
+    // render — otherwise `archived=only` would drop the manifest and the whole workspace reads empty.
+    // So: include everything, then filter CONTENT by the requested view using each record's own flag
+    // while always keeping the workspace's own meta.* (manifest/readme). Default (active) keeps the
+    // efficient storage-level exclude.
+    let items: MemoryRecord[];
+    if (archived === 'only' || archived === 'include') {
+      const all = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'include' })).items;
+      // Keep ONLY the manifest + readme (so the workspace shell renders) plus the archived content.
+      // NB: must match the manifest/readme EXACTLY, not a `meta.` prefix — an objectType namespace can
+      // itself start with `meta.` (e.g. `meta.goals`), and a prefix filter would leak ACTIVE content
+      // from those spaces into the archived-only view.
+      items = archived === 'only'
+        ? all.filter(r => r.archived || r.key === `${nsRoot}meta.manifest` || r.key === `${nsRoot}meta.readme`)
+        : all;
+    } else {
+      items = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000 })).items;
+    }
     const manRec = items.find(r => r.key === `${nsRoot}meta.manifest`);
     let canReadWorkspace = false;
     if (manRec) {
@@ -1201,10 +1226,12 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const { markdown, workspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii });
+    const includeArchived = req.query.includeArchived === 'true';
+    const { markdown, workspaces, archivedWorkspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
-    res.json(success(config.nodeId, { markdown, workspaces }, [
+    res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces }, [
       { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
+      ...(archivedWorkspaces && !includeArchived ? [{ description: 'Include archived workspaces', method: 'GET', url: `/v1/organisms/${id}/overview?includeArchived=true` }] : []),
     ]));
   });
 
@@ -1339,8 +1366,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const { results, truncated } = await searchOrganismContent(storage, config, organism, callerGaii, q, onlyWs);
-    res.json(success(config.nodeId, { query: q, results, total: results.length, truncated }));
+    // Default excludes archived; ?archived=only is "archive search"; ?includeArchived=true searches both.
+    const archived = req.query.archived === 'only' ? 'only' : (req.query.includeArchived === 'true' ? 'include' : undefined);
+    const { results, truncated } = await searchOrganismContent(storage, config, organism, callerGaii, q, onlyWs, { archived });
+    res.json(success(config.nodeId, { query: q, results, total: results.length, truncated, archived: archived ?? 'exclude' }));
   });
 
   /* ── Comments / threads on workspace records + documents ──
@@ -1751,18 +1780,19 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const ownerName = req.auth!.owner as string;
-    const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
-    const seen = new Map<string, { id: string; name: string; created_by: string; created_at?: string; access: 'owner' | 'granted' | 'none' }>();
+    // `include` so an archived organism's registry (cascade-archived with it) still lists workspaces.
+    const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000, archived: 'include' });
+    const seen = new Map<string, { id: string; name: string; created_by: string; created_at?: string; access: 'owner' | 'granted' | 'none'; archived: boolean }>();
     for (const rec of items) {
       if (rec.key !== wsRegPrefix(id)) continue;
-      const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string; createdAt?: string }> } | null)?.workspaces ?? [];
+      const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string; createdAt?: string; archived?: boolean }> } | null)?.workspaces ?? [];
       for (const w of list) {
         if (!w.id || seen.has(w.id)) continue;
         const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
         let access: 'owner' | 'granted' | 'none' = 'none';
         if (createdBy === ownerName) access = 'owner';
         else if (await canReadWs(id, w.id, callerGaii)) access = 'granted';
-        seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access });
+        seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access, archived: w.archived === true });
       }
     }
 
@@ -2198,6 +2228,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const role = await memberRole(req, organism, id);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    // Archived workspace/organism is read-only — block structure/name/readme edits.
+    const wsGuard = await isKeyArchived(storage, `organism.${id}.w.${ws}.`);
+    if (wsGuard.archived) { res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${wsGuard.level} is archived (read-only). Unarchive it before editing.`)); return; }
     try {
       const result = await updateWorkspaceMeta(storage, config, {
         orgId: id, ws, callerOwner: req.auth!.owner as string,
@@ -2460,6 +2493,54 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (ws) void updateOrganismStructure(storage, config, id, { event: 'workspace deleted', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* timeline best-effort */ });
   });
 
+  /* ── Archive / Unarchive ──────────────────────────────────────────────────────────────────────
+   * Flag an organism, a workspace, a record-table/document-space, or a single record as read-only +
+   * archived so it drops out of every AI-facing material (overview, workspace read, search) yet stays
+   * findable via archive search and resolvable by key. Cascades down a container with smart restore
+   * (see services/archive.ts). Creator/admin only — archiving is a structural, destructive-adjacent op.
+   * Body: { level: 'organism'|'workspace'|'space'|'record', ws?, namespace?, key? }. */
+  const validateArchiveTarget = (id: string, body: Record<string, unknown>): { ok: true; target: { level: ArchiveLevel; orgId: string; ws?: string; namespace?: string; key?: string } } | { ok: false; msg: string } => {
+    const level = body.level as ArchiveLevel;
+    if (!['organism', 'workspace', 'space', 'record'].includes(level)) return { ok: false, msg: 'level must be organism|workspace|space|record' };
+    const ws = typeof body.ws === 'string' ? body.ws : undefined;
+    const namespace = typeof body.namespace === 'string' ? body.namespace : undefined;
+    const key = typeof body.key === 'string' ? body.key : undefined;
+    if ((level === 'workspace' || level === 'space' || level === 'record') && !ws) return { ok: false, msg: 'ws is required for workspace/space/record' };
+    if (level === 'space' && !namespace) return { ok: false, msg: 'namespace is required for space' };
+    if (level === 'record') {
+      if (!key) return { ok: false, msg: 'key is required for record' };
+      if (!key.startsWith(`organism.${id}.w.${ws}.`)) return { ok: false, msg: 'key must be inside organism.{id}.w.{ws}.' };
+    }
+    return { ok: true, target: { level, orgId: id, ws, namespace, key } };
+  };
+
+  const archiveHandler = (mode: 'archive' | 'unarchive') => async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', `Only the creator or an admin can ${mode} organism content`));
+      return;
+    }
+    const v = validateArchiveTarget(id, (req.body ?? {}) as Record<string, unknown>);
+    if (!v.ok) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', v.msg)); return; }
+    const actor = resolveIdentity(req.auth!, config.nodeId);
+    try {
+      const result = mode === 'archive'
+        ? await archiveTarget(storage, v.target, actor)
+        : await unarchiveTarget(storage, v.target, actor);
+      res.json(success(config.nodeId, { [mode === 'archive' ? 'archived' : 'restored']: result.count, level: result.level, root: result.root }));
+      emitChange('organisms');
+      void updateOrganismStructure(storage, config, id, { event: `${v.target.level} ${mode}d`, actor }).catch(() => { /* timeline best-effort */ });
+    } catch (e) {
+      res.status(400).json(error(config.nodeId, 'ARCHIVE_FAILED', (e as Error).message || `Could not ${mode}`));
+    }
+  };
+
+  router.post('/v1/organisms/:id/archive', requireAuth(), requireRole('agent'), archiveHandler('archive'));
+  router.post('/v1/organisms/:id/unarchive', requireAuth(), requireRole('agent'), archiveHandler('unarchive'));
+
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
   router.post('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
@@ -2553,6 +2634,12 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     if (!canWriteNamespace(role, namespace)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
+      return;
+    }
+    // Archived content is read-only — block publishing into an archived organism/workspace.
+    const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
+    if (pubGuard.archived) {
+      res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${pubGuard.level} is archived (read-only). Unarchive it before publishing.`));
       return;
     }
 

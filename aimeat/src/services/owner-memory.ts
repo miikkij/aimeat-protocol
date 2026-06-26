@@ -23,6 +23,7 @@ export interface OwnerScopeListOpts {
   visibility?: string;
   tags?: string[];
   maxFlags?: number;
+  archived?: import('../storage/interface.js').ArchiveFilter;
 }
 
 /**

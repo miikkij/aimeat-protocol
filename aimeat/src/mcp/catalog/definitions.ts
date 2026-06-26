@@ -1055,13 +1055,14 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_search',
-        description: 'Search the records + documents across an organism\'s workspaces by text (case-insensitive substring). Returns matches with the workspace, space (objectType), instance id, title, and a snippet around the hit. Searches only workspaces you may read; scope to one with `ws`. Use this to FIND content before reading it with aimeat_workspace_read.',
+        description: 'Search the records + documents across an organism\'s workspaces by text (case-insensitive substring). Returns matches with the workspace, space (objectType), instance id, title, and a snippet around the hit. Searches only workspaces you may read; scope to one with `ws`. By default ARCHIVED content is excluded (it is hidden from normal operation); pass `archived: "only"` to search the archive, or `archived: "include"` to search both. Use this to FIND content before reading it with aimeat_workspace_read.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             q: { type: 'string', required: true, description: 'Search text (min 2 characters).' },
             ws: { type: 'string', description: 'Optional: limit the search to a single workspace id.' },
+            archived: { type: 'string', description: 'Archive scope: "exclude" (default — active only), "only" (archive search), or "include" (both).' },
         },
     },
     {
@@ -1216,6 +1217,20 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             interests: { type: 'array', required: false, description: 'Interest tags.' },
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
+        },
+    },
+    {
+        name: 'aimeat_organism_archive',
+        description: 'ARCHIVE or UNARCHIVE organism content (creator/admin only). Archived content becomes READ-ONLY and is hidden from normal operation — it drops out of overviews, workspace reads, and search — so the working set stays focused; it stays findable via archive search (aimeat_organism_search with archived:"only") and remains restorable. Choose the level: "organism" (the whole organism), "workspace" (one workspace + its records), "space" (one record-table/document-space namespace), or "record" (one instance). Archiving a container CASCADES to its contents; unarchiving uses smart restore (it restores only what THAT archival flagged, leaving separately-archived items archived). Use action:"unarchive" to reverse.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            action: { type: 'string', required: true, description: '"archive" or "unarchive".' },
+            level: { type: 'string', required: true, description: '"organism" | "workspace" | "space" | "record".' },
+            ws: { type: 'string', required: false, description: 'Workspace id (required for workspace/space/record).' },
+            namespace: { type: 'string', required: false, description: 'The objectType namespace (required for level "space"), e.g. "shared.tasks".' },
+            key: { type: 'string', required: false, description: 'The instance base memory key (required for level "record"), e.g. "organism.{id}.w.{ws}.shared.tasks.{instance}".' },
         },
     },
     {

@@ -88,6 +88,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [mainTab, setMainTab] = useState('own'); // 'own' | 'discover' | 'remote'
   const [browseMode, setBrowseMode] = useState(null); // 'home' | 'remote' | 'discover' | null
   const [filterText, setFilterText] = useState('');
+  const [memArchived, setMemArchived] = useState(false); // false = active working set, true = archived-only view
   const [orgNames, setOrgNames] = useState({});         // organism uuid → display name
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem('aimeat.mem.groups.collapsed') || '[]')); } catch { return new Set(); }
@@ -145,7 +146,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) { loadMemories(); }
-  }, [selectedAgent]);
+  }, [selectedAgent, memArchived]);
 
   async function loadFedConsents() {
     try {
@@ -231,16 +232,18 @@ export default function MemoryTab({ session, showToast, onStats }) {
   async function loadMemories() {
     try {
       const agentGaii = selectedAgent || undefined;
+      const memOpts = memArchived ? { archived: 'only' } : undefined;
       if (fullLoaded) {
-        const list = await memoryService.listMemories(agentGaii);
+        const list = await memoryService.listMemories(agentGaii, memOpts);
         setMemories(Array.isArray(list) ? list : []);
-        onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
+        // Don't report the archived-only count as the headline memory stat (it's a filtered view).
+        if (!memArchived) onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
       } else {
-        const { items, quota } = await memoryService.listMemoriesMeta(agentGaii);
+        const { items, quota } = await memoryService.listMemoriesMeta(agentGaii, memOpts);
         setMemories(items);
         setMemQuota(quota);
         setValueCache({});
-        onStats?.({ memory: items.length });
+        if (!memArchived) onStats?.({ memory: items.length });
       }
     } catch { setMemories([]); }
   }
@@ -829,6 +832,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <input type="text" class="input-field" placeholder=${t('profile.memory.filterType')}
             value=${filterText} onInput=${e => setFilterText(e.target.value)} />
           ${filterText && html`<button class="btn-ghost btn-sm" onClick=${() => setFilterText('')}>✕</button>`}
+        </div>
+        <div class="search-bar">
+          <button class="btn-sm ${!memArchived ? 'btn-primary' : 'btn-outline'}" onClick=${() => setMemArchived(false)}>${t('profile.memory.viewActive') || 'Active'}</button>
+          <button class="btn-sm ${memArchived ? 'btn-primary' : 'btn-outline'}" onClick=${() => setMemArchived(true)}>${'🗄️ '}${t('profile.memory.viewArchived') || 'Archived'}</button>
         </div>
       </div>
       <div class="action-bar mem-bottom-bar">

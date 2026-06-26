@@ -230,8 +230,9 @@ export class DirectoryService {
       }
     }
 
-    // Index organisms (Phase 2.2 — directory unification)
-    const organisms = await this.storage.listOrganisms();
+    // Index organisms (Phase 2.2 — directory unification). Archived organisms are read-only/retired —
+    // never indexed into the public directory/catalogue/discover surfaces.
+    const organisms = await this.storage.listOrganisms({ archived: 'exclude' });
     for (const org of organisms) {
       // Only index public and listed organisms
       if (org.visibility === 'private') continue;

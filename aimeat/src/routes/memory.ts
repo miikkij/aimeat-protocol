@@ -45,6 +45,7 @@ import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../services/ecosystem-access.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
+import { isKeyArchived } from '../services/archive.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -141,6 +142,21 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     if (existing && existing.ownerGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
+    }
+
+    // Archive guard: a record that is itself archived, or sits inside an archived workspace/organism,
+    // is read-only. (isKeyArchived without ownerGaii only checks the cheap container markers; the
+    // record-level case reuses the `existing` we already fetched — no extra getMemory.)
+    if (existing?.archived) {
+      res.status(409).json(error(config.nodeId, 'ARCHIVED', 'This record is archived (read-only). Unarchive it before writing.'));
+      return;
+    }
+    if (key.startsWith('organism.')) {
+      const guard = await isKeyArchived(storage, key);
+      if (guard.archived) {
+        res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${guard.level} is archived (read-only). Unarchive it before writing.`));
+        return;
+      }
     }
 
     // Quota enforcement: configurable per-agent key limit and per-value size limit
@@ -280,6 +296,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const tags = tagsParam ? tagsParam.split(',') : undefined;
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
+    // ?archived=only → ONLY archived records (the Memory tab's "Archived" filter); ?include_archived=true
+    // → active + archived together. Default (omitted) excludes archived — the normal working set.
+    const archived = req.query.archived === 'only' ? 'only' : (req.query.include_archived === 'true' ? 'include' : undefined);
     // ?include=meta — omit the (heavy) `value` from every item and report each entry's size in
     // `bytes` instead. The profile Memory tab uses this so opening the tab with thousands of keys
     // stays fast (groups + filtering work on metadata; values are fetched per-row on expand). The
@@ -324,9 +343,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     if (ownerScope && !agentParam) {
       // Owner-scope: GHII + all the owner's agents (deduped, GHII first). Shared helper so the
       // workflow signal evaluator reads the exact same set (same-owner-access invariant).
-      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags });
+      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
     } else {
-      records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
+      records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
     }
 
     // ?count=true with tag/maxFlags filters — count from the materialized list (rare path).

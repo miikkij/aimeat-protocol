@@ -400,6 +400,16 @@ export async function generateRaw(description, currentManifest) {
   return String(resp?.data?.content || '');
 }
 
+/** Archive / unarchive organism content (creator/admin). `target` = { level, ws?, namespace?, key? }.
+ *  Archived content is read-only and hidden from AI materials (overview/read/search) but stays in the
+ *  archive search; archiving a container cascades, unarchiving uses smart restore. */
+export async function archiveContent(orgId, target) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/archive`, target);
+}
+export async function unarchiveContent(orgId, target) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/unarchive`, target);
+}
+
 /** Delete a workspace entirely — removes all organism.{id}.* memory + its schema locks. The
  *  organism stays (returns to "no workspace yet"). Deliberate typed-confirmation lives in the UI. */
 export async function deleteWorkspace(orgId, wsId) {
@@ -533,8 +543,11 @@ export async function getWorkspaceActivity(orgId, wsId) {
 }
 
 /** Read the manifest-driven workspace. Returns null if the workspace has no manifest yet. */
-export async function getWorkspace(orgId, wsId) {
-  const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);
+export async function getWorkspace(orgId, wsId, opts) {
+  let url = `/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`;
+  if (opts?.archived === 'only') url += '&archived=only';
+  else if (opts?.includeArchived) url += '&includeArchived=true';
+  const resp = await apiGet(url);
   return resp?.data || null;
 }
 

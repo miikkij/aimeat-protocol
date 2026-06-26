@@ -1,9 +1,9 @@
-import type { OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord, PendingApprovalRecord } from '../interface.js';
+import type { ArchiveFilter, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord, PendingApprovalRecord } from '../interface.js';
 
 export interface OrganismRepository {
   createOrganism(record: OrganismRecord): Promise<OrganismRecord>;
   getOrganism(id: string): Promise<OrganismRecord | null>;
-  listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]>;
+  listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]>;
   updateOrganism(id: string, updates: Partial<OrganismRecord>): Promise<OrganismRecord | null>;
   deleteOrganism(id: string): Promise<boolean>;
   createMembership(record: OrganismMembershipRecord): Promise<OrganismMembershipRecord>;

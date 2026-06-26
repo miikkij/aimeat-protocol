@@ -83,11 +83,20 @@ model Memory {
   // Opt-in version tracking: when true, the previous value is archived to MemoryVersion on overwrite
   // (latest stays here, history queried on demand). Default false → no change for existing keys.
   trackable  Boolean  @default(false)
+  // Organism archive — read-only soft-archive flag. Archived rows are excluded from the bulk read/
+  // search primitives by default (drop out of AI materials) yet stay resolvable by key. archivedRoot
+  // records WHICH container's archival flagged the row, so unarchiving it restores only its cascade.
+  archived     Boolean @default(false)
+  archivedAt   DateTime?
+  archivedBy   String?
+  archivedRoot String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([ownerGaii, key])
   @@index([ownerGaii])
+  @@index([archived, key])
+  @@index([archivedRoot])
 }
 
 // Archived prior versions of TRACKABLE memory keys. Append-only; the latest value always lives in
@@ -636,6 +645,9 @@ model Organism {
   moderationConfig Json
   memoryNamespace  String
   semantic         Json?
+  archived         Boolean  @default(false)
+  archivedAt       DateTime?
+  archivedBy       String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

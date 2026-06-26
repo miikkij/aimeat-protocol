@@ -34,6 +34,7 @@ import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
 import { notify } from '../services/notify.js';
 import { searchOrganismContent } from '../services/organism-search.js';
+import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
 import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
 import { setOrganismReadme } from '../services/organism-readme.js';
 import { emitChange } from '../services/event-bus.js';
@@ -70,7 +71,7 @@ export function registerOrganismsTools(
         'organism-details',
         new ResourceTemplate('aimeat://organisms/{id}', {
             list: async () => {
-                const organisms = await storage.listOrganisms({ visibility: 'public' });
+                const organisms = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
                 return {
                     resources: organisms.map(o => ({
                         uri: `aimeat://organisms/${encodeURIComponent(o.id)}`,
@@ -129,10 +130,10 @@ export function registerOrganismsTools(
         annotationsFor('aimeat_organism_list'),
         async () => {
             const ownerName = getOwnerName();
-            // Get public organisms
-            const publicOrgs = await storage.listOrganisms({ visibility: 'public' });
-            // Get organisms the owner is a member of (may include private ones)
-            const memberOrgs = await storage.listOrganisms({ member: ownerName });
+            // Get public organisms (archived ones are read-only/hidden from AI operations — excluded)
+            const publicOrgs = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
+            // Get organisms the owner is a member of (may include private ones); archived excluded too
+            const memberOrgs = await storage.listOrganisms({ member: ownerName, archived: 'exclude' });
             // Merge, deduplicate by id
             const seen = new Set<string>();
             const all = [...publicOrgs, ...memberOrgs].filter(o => {
@@ -489,9 +490,10 @@ export function registerOrganismsTools(
             organism_id: z.string().describe('The organism ID'),
             q: z.string().describe('Search text (min 2 characters)'),
             ws: z.string().optional().describe('Optional: limit to a single workspace id'),
+            archived: z.enum(['exclude', 'include', 'only']).optional().describe('Archive scope: exclude (default), only (archive search), or include (both)'),
         },
         annotationsFor('aimeat_organism_search'),
-        async ({ organism_id, q, ws }) => {
+        async ({ organism_id, q, ws, archived }) => {
             const query = (q ?? '').trim();
             if (query.length < 2) return { content: [{ type: 'text' as const, text: 'Query must be at least 2 characters' }], isError: true };
             const organism = await storage.getOrganism(organism_id);
@@ -505,8 +507,46 @@ export function registerOrganismsTools(
             }
             if (!isMember) return { content: [{ type: 'text' as const, text: 'Not an active member of this organism' }], isError: true };
             // Caller identity for the workspace read gate: the full GAII (agent) resolves via same-owner.
-            const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated }, null, 2) }] };
+            const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws, { archived });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated, archived: archived ?? 'exclude' }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_organism_archive ── (archive/unarchive content; read-only + hidden from AI)
+    mcp.tool(
+        'aimeat_organism_archive',
+        descriptionFor('aimeat_organism_archive'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            action: z.enum(['archive', 'unarchive']).describe('archive or unarchive'),
+            level: z.enum(['organism', 'workspace', 'space', 'record']).describe('What to (un)archive'),
+            ws: z.string().optional().describe('Workspace id (required for workspace/space/record)'),
+            namespace: z.string().optional().describe('objectType namespace (required for level "space")'),
+            key: z.string().optional().describe('Instance base memory key (required for level "record")'),
+        },
+        annotationsFor('aimeat_organism_archive'),
+        async ({ organism_id, action, level, ws, namespace, key }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            // Creator/admin only — archiving is a structural, destructive-adjacent op.
+            const isAdmin = organism.creatorGhii === ownerName || organism.admins.includes(ownerName) || organism.agentGaiis.includes(agentGaii);
+            if (!isAdmin) return { content: [{ type: 'text' as const, text: `Only the creator or an admin can ${action} organism content` }], isError: true };
+            // Validate required fields per level (mirrors the REST validator).
+            if ((level === 'workspace' || level === 'space' || level === 'record') && !ws) return { content: [{ type: 'text' as const, text: 'ws is required for workspace/space/record' }], isError: true };
+            if (level === 'space' && !namespace) return { content: [{ type: 'text' as const, text: 'namespace is required for level "space"' }], isError: true };
+            if (level === 'record') {
+                if (!key) return { content: [{ type: 'text' as const, text: 'key is required for level "record"' }], isError: true };
+                if (!key.startsWith(`organism.${organism_id}.w.${ws}.`)) return { content: [{ type: 'text' as const, text: 'key must be inside organism.{id}.w.{ws}.' }], isError: true };
+            }
+            const target = { level: level as ArchiveLevel, orgId: organism_id, ws, namespace, key };
+            try {
+                const result = action === 'archive' ? await archiveTarget(storage, target, agentGaii) : await unarchiveTarget(storage, target, agentGaii);
+                emitChange('organisms');
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: result.level, [action === 'archive' ? 'archived' : 'restored']: result.count, root: result.root }, null, 2) }] };
+            } catch (e) {
+                return { content: [{ type: 'text' as const, text: `Could not ${action}: ${(e as Error).message}` }], isError: true };
+            }
         },
     );
 

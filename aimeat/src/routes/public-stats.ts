@@ -105,7 +105,7 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
       } catch { /* 0 */ }
       try {
-        const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000 });
+        const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000, archived: 'exclude' });
         organisms = orgs.length;
       } catch { /* 0 */ }
       try {

@@ -25,7 +25,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type {
-  Storage, OwnerRecord, AgentRecord, MemoryRecord,
+  Storage, OwnerRecord, AgentRecord, MemoryRecord, ArchiveFilter,
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe,
   ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord,
@@ -88,7 +88,7 @@ import * as agentActivityRepo from './repos/agent-activity.js';
 import * as agentMessageRepo from './repos/agent-message.js';
 import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
-import { searchTextMemory, countMemory as countMemoryRepo } from './repos/memory.js';
+import { searchTextMemory, countMemory as countMemoryRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from './repos/memory.js';
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../repositories/memory.repository.js';
 
 export class SqliteStorage implements Storage {
@@ -623,7 +623,7 @@ export class SqliteStorage implements Storage {
     return record;
   }
 
-  async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]> {
+  async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
     let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
     const params: unknown[] = [ownerGaii];
 
@@ -635,6 +635,7 @@ export class SqliteStorage implements Storage {
       sql += ' AND visibility = ?';
       params.push(opts.visibility);
     }
+    sql += archivedSql(opts?.archived);
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     const results: MemoryRecord[] = [];
@@ -658,7 +659,7 @@ export class SqliteStorage implements Storage {
     return countMemoryRepo(this.db, ownerGaiis, opts);
   }
 
-  async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+  async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {
     let whereClauses = '';
     const params: unknown[] = [];
 
@@ -674,6 +675,7 @@ export class SqliteStorage implements Storage {
       whereClauses += ' AND visibility = ?';
       params.push(opts.visibility);
     }
+    whereClauses += archivedSql(opts?.archived);
 
     const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
 
@@ -712,7 +714,7 @@ export class SqliteStorage implements Storage {
     ).run(ownerGaii, key);
   }
 
-  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string }): Promise<MemoryRecord[]> {
+  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
     const q = query.toLowerCase();
     let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
     const params: unknown[] = [ownerGaii];
@@ -726,6 +728,7 @@ export class SqliteStorage implements Storage {
       sql += ' AND key LIKE ?';
       params.push(opts.prefix + '%');
     }
+    sql += archivedSql(opts?.archived);
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     const results: MemoryRecord[] = [];
@@ -752,6 +755,22 @@ export class SqliteStorage implements Storage {
     return searchTextMemory(this.db, query, opts);
   }
 
+  async archiveMemoryByKey(keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
+    return archiveMemoryByKeyRepo(this.db, keyOrPrefix, opts);
+  }
+
+  async unarchiveMemoryByRoot(archivedRoot: string): Promise<number> {
+    return unarchiveMemoryByRootRepo(this.db, archivedRoot);
+  }
+
+  async unarchiveMemoryByKey(keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
+    return unarchiveMemoryByKeyRepo(this.db, keyOrPrefix, opts);
+  }
+
+  async countArchivedByKeyPrefix(keyPrefix: string): Promise<{ active: number; archived: number }> {
+    return countArchivedByKeyPrefixRepo(this.db, keyPrefix);
+  }
+
   private deserializeMemory(row: Record<string, unknown>): MemoryRecord {
     const record: MemoryRecord = {
       key: row.key as string,
@@ -770,6 +789,10 @@ export class SqliteStorage implements Storage {
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.groupId) record.groupId = row.groupId as string;
     if (row.trackable) record.trackable = true;
+    if (row.archived) record.archived = true;
+    if (row.archivedAt) record.archivedAt = row.archivedAt as string;
+    if (row.archivedBy) record.archivedBy = row.archivedBy as string;
+    if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
     return record;
   }
 
@@ -2758,8 +2781,8 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `INSERT INTO organisms (id, name, description, type, location, interests, creatorGhii, admins,
        members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, moderationConfig,
-       memoryNamespace, semantic, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       memoryNamespace, semantic, createdAt, updatedAt, archived, archivedAt, archivedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.name, record.description, record.type,
       record.location ? JSON.stringify(record.location) : null,
@@ -2770,6 +2793,7 @@ export class SqliteStorage implements Storage {
       JSON.stringify(record.moderationConfig), record.memoryNamespace,
       record.semantic ? JSON.stringify(record.semantic) : null,
       record.createdAt, record.updatedAt,
+      record.archived ? 1 : 0, record.archivedAt ?? null, record.archivedBy ?? null,
     );
     return record;
   }
@@ -2779,13 +2803,17 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeOrganism(row) : null;
   }
 
-  async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]> {
+  async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]> {
     const page = opts?.page ?? 1;
     const perPage = opts?.perPage ?? 20;
 
     const rows = this.db.prepare('SELECT * FROM organisms ORDER BY createdAt DESC').all() as Record<string, unknown>[];
     let results = rows.map(r => this.deserializeOrganism(r));
 
+    // Archive filter (default 'include' — preserve legacy behaviour; callers that browse/discover pass
+    // 'exclude' so archived organisms drop out; 'only' powers an "Archived" view).
+    if (opts?.archived === 'exclude') results = results.filter(o => !o.archived);
+    else if (opts?.archived === 'only') results = results.filter(o => !!o.archived);
     if (opts?.type) results = results.filter(o => o.type === opts.type);
     if (opts?.city) results = results.filter(o => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
     if (opts?.interest) results = results.filter(o => o.interests.some(i => i.toLowerCase() === opts.interest!.toLowerCase()));
@@ -2804,7 +2832,8 @@ export class SqliteStorage implements Storage {
       `UPDATE organisms SET name = ?, description = ?, type = ?, location = ?, interests = ?,
        creatorGhii = ?, admins = ?, members = ?, agentGaiis = ?, boardId = ?,
        joinPolicy = ?, maxMembers = ?, visibility = ?, moderationConfig = ?,
-       memoryNamespace = ?, semantic = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+       memoryNamespace = ?, semantic = ?, createdAt = ?, updatedAt = ?,
+       archived = ?, archivedAt = ?, archivedBy = ? WHERE id = ?`
     ).run(
       updated.name, updated.description, updated.type,
       updated.location ? JSON.stringify(updated.location) : null,
@@ -2814,7 +2843,8 @@ export class SqliteStorage implements Storage {
       updated.joinPolicy, updated.maxMembers, updated.visibility,
       JSON.stringify(updated.moderationConfig), updated.memoryNamespace,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
-      updated.createdAt, updated.updatedAt, id,
+      updated.createdAt, updated.updatedAt,
+      updated.archived ? 1 : 0, updated.archivedAt ?? null, updated.archivedBy ?? null, id,
     );
     return updated;
   }
@@ -2877,6 +2907,9 @@ export class SqliteStorage implements Storage {
     };
     if (row.location) record.location = JSON.parse(row.location as string);
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+    if (row.archived) record.archived = true;
+    if (row.archivedAt) record.archivedAt = row.archivedAt as string;
+    if (row.archivedBy) record.archivedBy = row.archivedBy as string;
     return record;
   }
 

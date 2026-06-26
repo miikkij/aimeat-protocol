@@ -11,8 +11,12 @@
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
 /** List all memory entries. Returns array. Optional agentGaii to view another agent's memory. */
-export async function listMemories(agentGaii) {
-  const url = agentGaii ? `/v1/memory?agent=${encodeURIComponent(agentGaii)}` : '/v1/memory';
+export async function listMemories(agentGaii, opts) {
+  const p = new URLSearchParams();
+  if (agentGaii) p.set('agent', agentGaii);
+  if (opts?.archived === 'only') p.set('archived', 'only');
+  else if (opts?.archived === 'include') p.set('include_archived', 'true');
+  const url = '/v1/memory' + (p.toString() ? '?' + p.toString() : '');
   const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return Array.isArray(list) ? list : [];
@@ -23,9 +27,11 @@ export async function listMemories(agentGaii) {
  * (include=meta). Fast for thousands of keys; values are fetched per-key on expand via getMemory().
  * Returns { items, quota } so the tab can render the storage-usage bar.
  */
-export async function listMemoriesMeta(agentGaii) {
+export async function listMemoriesMeta(agentGaii, opts) {
   let url = '/v1/memory?include=meta';
   if (agentGaii) url += `&agent=${encodeURIComponent(agentGaii)}`;
+  if (opts?.archived === 'only') url += '&archived=only';
+  else if (opts?.archived === 'include') url += '&include_archived=true';
   const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return { items: Array.isArray(list) ? list : [], quota: data?.data?.quota || null };

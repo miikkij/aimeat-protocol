@@ -239,16 +239,17 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_read ──
     mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
-        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)') },
+        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
+          include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false — archived content is excluded from normal reads.') },
         annotationsFor('aimeat_workspace_read'),
-        async ({ organism_id, ws }): Promise<TextResult> => {
+        async ({ organism_id, ws, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller
             // can read the manifest (creator / same-owner agent / a viewer|contributor grant), they see ALL
             // of the workspace's content whoever wrote it — so a contributor's writes are visible to the
             // creator + other members. Otherwise nothing (org membership alone is discovery-only).
-            const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
+            const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: include_archived ? 'include' : undefined });
             const manRec = items.find(r => r.key === `${root}.meta.manifest`);
             let canRead = false;
             if (manRec) {
@@ -286,11 +287,12 @@ export function registerWorkspaceTools(
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
     mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'),
-        { organism_id: z.string().describe('Organism id') },
+        { organism_id: z.string().describe('Organism id'),
+          include_archived: z.boolean().optional().describe('Include archived workspaces. Default false — archived workspaces are summarised as a count.') },
         annotationsFor('aimeat_organism_overview'),
-        async ({ organism_id }): Promise<TextResult> => {
+        async ({ organism_id, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii });
+            const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii, includeArchived: include_archived });
             return { content: [{ type: 'text', text: markdown }] };
         });
 

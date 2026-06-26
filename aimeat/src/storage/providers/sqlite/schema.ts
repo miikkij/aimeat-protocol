@@ -14,6 +14,9 @@
  *   v1.0.1 — 2026-06-21 — Fix self-host upgrade crash: move idx_ghii_googleSub creation
  *     to after safeAddColumn('ghiis','googleSub') so upgraded DBs index a column that
  *     exists (was in block 1 → "no such column: googleSub" crash loop on 1.25→1.27).
+ *   v1.1.0 — 2026-06-26 — Organism archive: memory.archived/archivedAt/archivedBy/archivedRoot +
+ *     organisms.archived/At/By; partial index on the active set; FTS SPLIT (live memory_fts =
+ *     active rows only, archived rows in memory_archive_fts, trigger-routed by archived).
  */
 import type Database from 'better-sqlite3';
 
@@ -73,6 +76,10 @@ export function initializeSchema(db: Database.Database): void {
       flagCount      INTEGER DEFAULT 0,
       allowedOrigins TEXT,
       trackable      INTEGER NOT NULL DEFAULT 0,
+      archived       INTEGER NOT NULL DEFAULT 0,
+      archivedAt     TEXT,
+      archivedBy     TEXT,
+      archivedRoot   TEXT,
       PRIMARY KEY (ownerGaii, key)
     );
 
@@ -485,7 +492,10 @@ export function initializeSchema(db: Database.Database): void {
       memoryNamespace  TEXT NOT NULL,
       semantic         TEXT,
       createdAt        TEXT NOT NULL,
-      updatedAt        TEXT NOT NULL
+      updatedAt        TEXT NOT NULL,
+      archived         INTEGER NOT NULL DEFAULT 0,
+      archivedAt       TEXT,
+      archivedBy       TEXT
     );
 
     -- ── Organism Memberships ──
@@ -1627,6 +1637,19 @@ export function initializeSchema(db: Database.Database): void {
   // for existing keys. No index needed on this column (filter happens at write time, not query time).
   safeAddColumn('memory', 'trackable', 'INTEGER NOT NULL DEFAULT 0');
 
+  // Organism archive — read-only soft-archive flag. Archived rows are excluded from the bulk read/
+  // search primitives by default (drop out of AI materials) yet stay resolvable by key and findable
+  // via archive search. archivedRoot records WHICH container's archival flagged the row, so unarchiving
+  // that container restores only its own cascade (smart restore). The partial index for the active
+  // working set is created AFTER these ALTERs (see below) per the index-ordering rule.
+  safeAddColumn('memory', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('memory', 'archivedAt', 'TEXT');
+  safeAddColumn('memory', 'archivedBy', 'TEXT');
+  safeAddColumn('memory', 'archivedRoot', 'TEXT');
+  safeAddColumn('organisms', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('organisms', 'archivedAt', 'TEXT');
+  safeAddColumn('organisms', 'archivedBy', 'TEXT');
+
   // MCP session tracking — agent and OAuth client binding
   safeAddColumn('chat_instances', 'agentGaii', 'TEXT');
   safeAddColumn('chat_instances', 'mcpClientId', 'TEXT');
@@ -1682,6 +1705,12 @@ export function initializeSchema(db: Database.Database): void {
   // "no such column: googleSub" before the ALTER below could run.
   safeAddColumn('ghiis', 'googleSub', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ghii_googleSub ON ghiis(googleSub)');
+
+  // Organism archive — partial index over the ACTIVE working set only. Keeps the live owner/prefix
+  // scans (the AI-material reads) physically small as archived rows accumulate. Created AFTER the
+  // safeAddColumn('memory','archived') ALTER above, or upgraded DBs crash with "no such column".
+  db.exec('CREATE INDEX IF NOT EXISTS idx_memory_active ON memory(ownerGaii, key) WHERE archived = 0');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_memory_archived_root ON memory(archivedRoot) WHERE archived = 1');
 
   // Security audit — per-peer federation auth policy
   safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');
@@ -1776,32 +1805,63 @@ export function initializeSchema(db: Database.Database): void {
   // immediately findable (the librarian "capture → ask" loop tolerates no indexing lag). Search
   // uses `memory_fts MATCH ?` joined back to memory by rowid, ranked by bm25.
   // See docs/internal/design-organism-notebook-and-librarian.md §4 (Tier 1).
+  //
+  // ARCHIVE SPLIT: the live index `memory_fts` holds ONLY active rows; archived rows live in a
+  // parallel `memory_archive_fts`. So a normal librarian search (over memory_fts) never even scans
+  // archived content — the working set is physically smaller — while "archive search" runs against
+  // memory_archive_fts. The triggers route each row by `new.archived`; archiving a row (an UPDATE
+  // setting archived=1) moves its FTS entry from the live index to the archive index automatically.
+  // The triggers are DROPped + recreated (not IF NOT EXISTS) so upgraded DBs that already carry the
+  // pre-split single-table triggers pick up the archive-aware bodies.
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
       key, value, tags,
       tokenize = 'unicode61 remove_diacritics 2'
     );
+    CREATE VIRTUAL TABLE IF NOT EXISTS memory_archive_fts USING fts5(
+      key, value, tags,
+      tokenize = 'unicode61 remove_diacritics 2'
+    );
 
-    CREATE TRIGGER IF NOT EXISTS memory_fts_ai AFTER INSERT ON memory BEGIN
+    DROP TRIGGER IF EXISTS memory_fts_ai;
+    DROP TRIGGER IF EXISTS memory_fts_ad;
+    DROP TRIGGER IF EXISTS memory_fts_au;
+
+    CREATE TRIGGER memory_fts_ai AFTER INSERT ON memory BEGIN
       INSERT INTO memory_fts(rowid, key, value, tags)
-      VALUES (new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, ''));
+      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
+      INSERT INTO memory_archive_fts(rowid, key, value, tags)
+      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
     END;
-    CREATE TRIGGER IF NOT EXISTS memory_fts_ad AFTER DELETE ON memory BEGIN
+    CREATE TRIGGER memory_fts_ad AFTER DELETE ON memory BEGIN
       DELETE FROM memory_fts WHERE rowid = old.rowid;
+      DELETE FROM memory_archive_fts WHERE rowid = old.rowid;
     END;
-    CREATE TRIGGER IF NOT EXISTS memory_fts_au AFTER UPDATE ON memory BEGIN
+    CREATE TRIGGER memory_fts_au AFTER UPDATE ON memory BEGIN
       DELETE FROM memory_fts WHERE rowid = old.rowid;
+      DELETE FROM memory_archive_fts WHERE rowid = old.rowid;
       INSERT INTO memory_fts(rowid, key, value, tags)
-      VALUES (new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, ''));
+      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
+      INSERT INTO memory_archive_fts(rowid, key, value, tags)
+      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
     END;
   `);
 
-  // Backfill rows written before the FTS table / triggers existed (pure SQL — idempotent: only
-  // inserts memory rows whose rowid is missing from the index).
+  // Backfill — idempotent + archive-aware + self-healing. Inserts only missing rowids into whichever
+  // index matches the row's archived state, and evicts any row that landed in the wrong index (e.g.
+  // archived before the split triggers existed). Cheap on every boot (NOT IN over a small index).
   db.exec(`
     INSERT INTO memory_fts(rowid, key, value, tags)
     SELECT m.rowid, m.key, COALESCE(m.value, ''), COALESCE(m.tags, '')
     FROM memory m
-    WHERE m.rowid NOT IN (SELECT rowid FROM memory_fts);
+    WHERE m.archived = 0 AND m.rowid NOT IN (SELECT rowid FROM memory_fts);
+
+    INSERT INTO memory_archive_fts(rowid, key, value, tags)
+    SELECT m.rowid, m.key, COALESCE(m.value, ''), COALESCE(m.tags, '')
+    FROM memory m
+    WHERE m.archived = 1 AND m.rowid NOT IN (SELECT rowid FROM memory_archive_fts);
+
+    DELETE FROM memory_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 1);
+    DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
 }

@@ -193,7 +193,34 @@ export interface MemoryRecord {
   /** Opt-in version tracking: when true, the PREVIOUS value is archived to the memory_history table on
    *  overwrite (latest stays here, history queried via listMemoryHistory). Default/absent = false. */
   trackable?: boolean;
+  /**
+   * Archive flag (organism archive feature). When true the record is read-only and EXCLUDED from the
+   * bulk read/search primitives (listMemory/listAllMemory/searchText/searchMemory/countMemory) by
+   * default — so it drops out of every AI-facing material assembly — yet stays resolvable by key via
+   * getMemory and findable via an explicit archive search (`archived: 'only'|'include'`). Default
+   * /absent = false (active). See src/services/archive.ts.
+   */
+  archived?: boolean;
+  /** ISO timestamp the record was archived (set with `archived`). */
+  archivedAt?: string;
+  /** Identity (GHII/GAII) that archived the record. */
+  archivedBy?: string;
+  /**
+   * The "archive root" — the id/key of the thing whose archival flagged this record. For a directly
+   * archived single record this is its own key; for cascade archival (a record-table, workspace, or
+   * organism) it is that container's ref. Unarchiving a root restores ONLY records carrying that root
+   * (smart restore): a record independently archived earlier keeps its own root and stays archived.
+   */
+  archivedRoot?: string;
 }
+
+/**
+ * How the memory read/search primitives treat archived rows.
+ * - `exclude` (default): active rows only — the AI working set.
+ * - `include`: active + archived together.
+ * - `only`: archived rows only — backs "archive search".
+ */
+export type ArchiveFilter = 'exclude' | 'include' | 'only';
 
 export interface ActionRecord {
   id: string;
@@ -851,6 +878,13 @@ export interface OrganismRecord {
   semantic?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  /** Archive flag (organism archive feature). When true the organism is read-only and its content is
+   *  excluded from AI-facing materials by default; its workspaces/records are cascade-archived. */
+  archived?: boolean;
+  /** ISO timestamp the organism was archived. */
+  archivedAt?: string;
+  /** Identity (GHII/GAII) that archived the organism. */
+  archivedBy?: string;
 }
 
 export interface OrganismMembershipRecord {
