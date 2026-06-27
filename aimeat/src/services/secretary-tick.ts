@@ -21,8 +21,13 @@
  *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
  * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
- *   v0.5.0 — 2026-06-27 — B3: sanitizeProposedQuickActions() — the security boundary for dynamic quick
- *     actions (brain/secretary may only propose prompt|compose, never a run verb); asserted in e2e-secretary.
+ *   v0.6.0 — 2026-06-28 — B5: deriveRoutineActions() — band-driven routine advancement for the tick
+ *     (act+file → run, act+discover/delegate & draft|ask → action-item, delegated → check-result) +
+ *     actionItemKey() de-dup. routeRoutineStep now has a production caller (the tick), not just E2E.
+ *   v0.5.0 — 2026-06-27 — B3: sanitizeProposedQuickActions() — the canonical security RULE for dynamic
+ *     quick actions (brain/secretary may only propose prompt|compose, never a run verb). The frontend
+ *     (sanitizeQuickActions) enforces it at author time; secretary.config is the owner's own private blob
+ *     (no server-side write validation), so this is the tested reference spec, asserted in e2e-secretary.
  *   v0.4.0 — 2026-06-27 — B2: routeRoutineStep() — pure band-gating for a "What's next" Routine step
  *     (act → run · draft|ask → confirm · off → skip), shared by the view + asserted in e2e-secretary.
  *   v0.3.0 — 2026-06-24 — G1: routeTickNote() — the autonomous tick's cross-context note-routing decision.
@@ -122,6 +127,62 @@ export function routeRoutineStep(
     ?? ((bands && typeof bands[capability] === 'string') ? bands[capability] : 'ask');
   const disposition: StepDisposition = band === 'off' ? 'skip' : band === 'act' ? 'run' : 'confirm';
   return { band, disposition };
+}
+
+/** Loose shapes for the view-authored Routine + ActionItem records the tick reads/advances (B2/B5). */
+export interface RoutineStepLike { id?: string; capability?: string; summary?: string; band?: string; status?: string; result?: { taskId?: string; agentName?: string; summary?: string } | null; }
+export interface RoutineLike { id?: string; title?: string; status?: string; steps?: RoutineStepLike[]; results?: Array<{ ts?: string; summary?: string }>; }
+export interface ActionItem { id: string; text: string; suggestedAction: { kind: string; routineId?: string; stepId?: string }; source: string; createdAt: string; status: 'open' | 'done'; }
+/** An action-item the tick wants to surface, before the tick stamps id/createdAt/status. */
+export interface ActionItemDraft { text: string; suggestedAction: { kind: 'advance' | 'check-delegate'; routineId: string; stepId?: string }; source: string; }
+
+/** Routine-step capabilities the tick can perform autonomously today (note-filing into the self-organism). */
+const TICK_FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
+
+/** A stable key for an action item (so the tick doesn't re-add the same one every fire). */
+export function actionItemKey(a: { suggestedAction?: { kind?: string; routineId?: string; stepId?: string }; source?: string }): string {
+  const sa = a.suggestedAction || {};
+  return `${sa.kind || ''}:${sa.routineId || a.source || ''}:${sa.stepId || ''}`;
+}
+
+/**
+ * B5 — band-driven routine advancement for the autonomous tick. For each ACTIVE routine in a context,
+ * decide (purely, from the step's band via routeRoutineStep) what the tick should do with its next
+ * pending step, plus surface any delegated step whose result should be checked:
+ *   - act + a tick-performable file capability → `runFileSteps` (the tick files the note + advances).
+ *   - act + discover/delegate (needs a target/plumbing the tick lacks) → an "advance" action-item.
+ *   - draft|ask → an "approve" action-item (the owner decides).
+ *   - off → nothing.
+ *   - any step already 'delegated' (a task is out) → a "check-delegate" action-item.
+ * Pure: no storage/AI. The tick stamps ids + dedupes against existing open items (actionItemKey).
+ */
+export function deriveRoutineActions(
+  context: { routines?: RoutineLike[]; policy?: { bands?: Record<string, string> } },
+): { items: ActionItemDraft[]; runFileSteps: Array<{ routineId: string; stepId: string }> } {
+  const items: ActionItemDraft[] = [];
+  const runFileSteps: Array<{ routineId: string; stepId: string }> = [];
+  const bands = context.policy?.bands;
+  for (const r of (context.routines || [])) {
+    if (r.status !== 'active' || !r.id) continue;
+    // Delegated steps with a task out → surface a check-result item (the result flowing home).
+    for (const s of (r.steps || [])) {
+      if (s.status === 'delegated' && s.result?.taskId && s.id) {
+        items.push({ text: `Check delegated result: ${s.summary || ''}`.trim(), suggestedAction: { kind: 'check-delegate', routineId: r.id, stepId: s.id }, source: r.id });
+      }
+    }
+    const next = (r.steps || []).find((s) => s.status === 'pending');
+    if (!next || !next.id) continue;
+    const route = routeRoutineStep(next, bands);
+    if (route.disposition === 'run' && TICK_FILE_CAPS.has(String(next.capability))) {
+      runFileSteps.push({ routineId: r.id, stepId: next.id });
+    } else if (route.disposition === 'run') {
+      items.push({ text: `Ready to run: ${next.summary || ''}`.trim(), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
+    } else if (route.disposition === 'confirm') {
+      items.push({ text: `Approve: ${next.summary || ''}`.trim(), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
+    }
+    // disposition === 'skip' (off) → nothing to surface.
+  }
+  return { items, runFileSteps };
 }
 
 /** A dynamic quick action (B3): brain-seeded or secretary-proposed shortcut shown in the quick-action row. */

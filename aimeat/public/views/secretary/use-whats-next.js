@@ -12,6 +12,8 @@
  * @structure ROUTINE_CAPABILITIES · buildRoutinePrompt · useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast })
  * @usage const next = useWhatsNext({...}); whatsNextCard(next) / routinesCard(next)
  * @version-history
+ *   v0.3.0 — 2026-06-28 — B5: action-items — handle (advance routine / check delegate) + dismiss the
+ *     follow-ups the tick derived (active context's actionItems[]); delegated steps stay active until done.
  *   v0.2.0 — 2026-06-28 — B4: a delegate step creates an agent task for an owner-picked target agent
  *     (POST /v1/agents/:name/tasks, queued, parent_task_id = routine id); checkDelegateResult pulls the
  *     task status back into the routine. delegate removed from the deferred set.
@@ -184,7 +186,9 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
       // Delegated steps carry the agent-task ref (taskId + agent) so the result can be checked later.
       const resultObj = { summary: outcome.summary, ts, ...(outcome.taskId ? { taskId: outcome.taskId, agentName: outcome.agentName } : {}) };
       const nextSteps = routine.steps.map((s) => (s.id === step.id ? { ...s, status: outcome.status, result: resultObj } : s));
-      const allSettled = nextSteps.every((s) => s.status !== 'pending' && s.status !== 'running');
+      // B4/B5 fix: a 'delegated' step is NOT settled (its task is still out) — keep the routine active
+      // (on the dashboard) until checkDelegateResult marks it done once the delegated task completes.
+      const allSettled = nextSteps.every((s) => s.status !== 'pending' && s.status !== 'running' && s.status !== 'delegated');
       const updater = (r) => ({
         ...r, steps: nextSteps, lastRunAt: ts,
         results: outcome.status === 'skipped' ? r.results : [{ ts, summary: outcome.summary }, ...(r.results || [])].slice(0, 20),
@@ -211,8 +215,12 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
 
   const nextPendingStep = useCallback((routine) => (routine.steps || []).find((s) => s.status === 'pending') || null, []);
 
-  /** B4: pull a delegated step's agent-task status back into the routine (the result flowing home). */
-  const checkDelegateResult = useCallback(async (routine, step) => {
+  /**
+   * B4: pull a delegated step's agent-task status back into the routine (the result flowing home).
+   * `closeItemId` (B5) optionally marks an action-item done in the SAME config write — one persist, so a
+   * handled "check result" action-item can't clobber the routine update with a stale second write.
+   */
+  const checkDelegateResult = useCallback(async (routine, step, closeItemId = null) => {
     const ref = step.result || {};
     if (!ref.taskId || !ref.agentName || checkingStepId) return;
     setCheckingStepId(step.id);
@@ -222,23 +230,55 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
       const status = (task && task.status) || 'unknown';
       const ts = new Date().toISOString();
       const summary = t('secretary.next.resultDelegateStatus', { agent: ref.agentName, status });
-      await patchRoutine(routine.id, (rt) => ({
-        ...rt,
-        steps: rt.steps.map((s) => (s.id === step.id ? { ...s, result: { ...s.result, summary, checkedAt: ts } } : s)),
-        results: [{ ts, summary }, ...(rt.results || [])].slice(0, 20),
-      }));
+      // B4/B5: once the delegated task reaches a terminal state, settle the step → the routine can complete.
+      const done = ['completed', 'done', 'closed', 'failed', 'cancelled'].includes(String(status).toLowerCase());
+      const next = { ...config, contexts: (config.contexts || []).map((c) => {
+        if (!active || c.id !== active.id) return c;
+        const nextRoutines = (c.routines || []).map((rt) => {
+          if (rt.id !== routine.id) return rt;
+          const steps = (rt.steps || []).map((s) => (s.id === step.id ? { ...s, status: done ? 'done' : s.status, result: { ...s.result, summary, checkedAt: ts } } : s));
+          const allSettled = steps.every((s) => s.status !== 'pending' && s.status !== 'running' && s.status !== 'delegated');
+          return { ...rt, steps, results: [{ ts, summary }, ...(rt.results || [])].slice(0, 20), status: allSettled ? 'done' : rt.status };
+        });
+        const nextItems = closeItemId ? (c.actionItems || []).map((a) => (a.id === closeItemId ? { ...a, status: 'done' } : a)) : c.actionItems;
+        return { ...c, routines: nextRoutines, actionItems: nextItems };
+      }) };
+      await persistConfig(next);
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
     } catch (e) {
       showToast(`${t('secretary.next.error')}: ${e.message}`, true);
     } finally {
       setCheckingStepId(null);
     }
-  }, [checkingStepId, patchRoutine, showToast]);
+  }, [active, config, persistConfig, checkingStepId, showToast]);
+
+  // ── B5: action-items (the tick-derived follow-ups) live on the active context; handle/dismiss them ──
+  const allActionItems = useMemo(() => (active && Array.isArray(active.actionItems)) ? active.actionItems : [], [active]);
+  const actionItems = useMemo(() => allActionItems.filter((a) => a.status === 'open'), [allActionItems]);
+  const writeActionItems = useCallback(async (nextItems) => {
+    if (!active) return;
+    const next = { ...config, contexts: (config.contexts || []).map((c) => (c.id === active.id ? { ...c, actionItems: nextItems } : c)) };
+    await persistConfig(next);
+  }, [active, config, persistConfig]);
+  const dismissActionItem = useCallback((item) => writeActionItems(allActionItems.map((a) => (a.id === item.id ? { ...a, status: 'done' } : a))), [allActionItems, writeActionItems]);
+  /** One-click handle: 'advance' opens the routine here (local state) then dismisses the item; 'check-delegate'
+   *  pulls the task result home AND closes the item in one config write (no stale-config clobber). */
+  const handleActionItem = useCallback(async (item) => {
+    const sa = item.suggestedAction || {};
+    const routine = routines.find((r) => r.id === sa.routineId);
+    if (sa.kind === 'check-delegate' && routine) {
+      const step = (routine.steps || []).find((s) => s.id === sa.stepId);
+      if (step && step.result && step.result.taskId) { await checkDelegateResult(routine, step, item.id); return; }
+    }
+    if (sa.kind === 'advance' && routine) advance(routine); // local state only — no persist before the dismiss
+    await dismissActionItem(item);
+  }, [routines, advance, checkDelegateResult, dismissActionItem]);
 
   return {
     goal, setGoal, proposing, proposeRoutine,
     routines, activeRoutines, selected, selectedId, setSelectedId,
     busyStepId, approveStep, setRoutineStatus, deleteRoutine, advance, nextPendingStep,
     delegateAgent, setDelegateAgent, checkingStepId, checkDelegateResult,
+    actionItems, handleActionItem, dismissActionItem,
   };
 }

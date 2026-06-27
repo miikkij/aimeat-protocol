@@ -7,9 +7,10 @@
  *   collapsible "Manage & setup" disclosure header that tucks the set-up-once config cards away.
  *   The view (views/secretary.js) owns all state/handlers and passes them in; the config cards
  *   themselves still live in ./cards.js / ./cards-reach.js. Redesign: docs/internal/2026-06-25-secretary-view-redesign.md.
- * @structure quickActionRow · dashStatus · standPanel · routinesCard · quickActionsManager · manageHeader (one render function each)
- * @usage import { quickActionRow, dashStatus, standPanel, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
+ * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
+ * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.4.0 — 2026-06-28 — B5: actionItemsCard — the tick-derived follow-up action-items, one-click handle/dismiss.
  *   v0.3.0 — 2026-06-27 — B3: quickActionsManager — pin/dismiss proposed shortcuts, rename/remove/reorder
  *     active ones, "Suggest shortcuts".
  *   v0.2.0 — 2026-06-27 — B2: routinesCard — active Routines on the dashboard (status · last result ·
@@ -85,6 +86,28 @@ export function standPanel(p) {
       ${s.loading
         ? html`<div class="sec-hint">${t('secretary.dash.standThinking')}</div>`
         : html`<div class="sec-stand-body">${escHtml(s.text)}</div>`}
+    </section>`;
+}
+
+/** Action-items the tick derived (B5): one-click handle (open routine / check delegate result) or dismiss. */
+export function actionItemsCard(p) {
+  if (!p.actionItems || p.actionItems.length === 0) return null;
+  return html`
+    <section class="sec-card sec-action-items">
+      <h2 class="sec-h2">${t('secretary.items.title')}</h2>
+      <ul class="sec-item-list">
+        ${p.actionItems.map((it) => {
+          const kind = (it.suggestedAction && it.suggestedAction.kind) || 'advance';
+          return html`
+            <li class="sec-item-row" key=${it.id}>
+              <div class="sec-item-text">${escHtml(it.text)}</div>
+              <div class="sec-item-actions">
+                <button class="btn-primary btn-sm" onClick=${() => p.handleActionItem(it)}>${t('secretary.items.handle.' + kind)}</button>
+                <button class="btn-ghost btn-sm" onClick=${() => p.dismissActionItem(it)}>${t('secretary.items.dismiss')}</button>
+              </div>
+            </li>`;
+        })}
+      </ul>
     </section>`;
 }
 
