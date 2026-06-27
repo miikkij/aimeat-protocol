@@ -16,10 +16,13 @@
  *   capabilities file a note into the self-organism; FEED capabilities append to the Home feed; anything
  *   else is "unsupported" and dropped (surfaced in the briefing instead of fake-acting). See
  *   docs/plans/2026-06-24-secretary-p1-fix-prompt.md and docs/plans/2026-06-23-secretary-feature.md (§6/§7).
- * @structure ACTION_KINDS · actionKind · classifySecretaryActions · routeRoutineStep · hasWorkToDo ·
- *   ledgerSpentToday · budgetExceeded · (P2-E) tokenize · scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
- * @usage import { classifySecretaryActions, routeRoutineStep, hasWorkToDo, budgetExceeded, routeIntake, routeTickNote } from './secretary-tick.js';
+ * @structure ACTION_KINDS · actionKind · classifySecretaryActions · routeRoutineStep ·
+ *   sanitizeProposedQuickActions · hasWorkToDo · ledgerSpentToday · budgetExceeded · (P2-E) tokenize ·
+ *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
+ * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
+ *   v0.5.0 — 2026-06-27 — B3: sanitizeProposedQuickActions() — the security boundary for dynamic quick
+ *     actions (brain/secretary may only propose prompt|compose, never a run verb); asserted in e2e-secretary.
  *   v0.4.0 — 2026-06-27 — B2: routeRoutineStep() — pure band-gating for a "What's next" Routine step
  *     (act → run · draft|ask → confirm · off → skip), shared by the view + asserted in e2e-secretary.
  *   v0.3.0 — 2026-06-24 — G1: routeTickNote() — the autonomous tick's cross-context note-routing decision.
@@ -119,6 +122,49 @@ export function routeRoutineStep(
     ?? ((bands && typeof bands[capability] === 'string') ? bands[capability] : 'ask');
   const disposition: StepDisposition = band === 'off' ? 'skip' : band === 'act' ? 'run' : 'confirm';
   return { band, disposition };
+}
+
+/** A dynamic quick action (B3): brain-seeded or secretary-proposed shortcut shown in the quick-action row. */
+export interface QuickAction {
+  label: string;
+  kind: 'compose' | 'prompt';
+  target?: string; // compose → which input to focus: 'plan' | 'find' | 'note'
+  prompt?: string; // prompt → canned message sent to the chat
+  source: string;  // 'brain' | 'secretary'
+  status: 'proposed' | 'active';
+}
+
+/** Inputs a `compose` quick action may focus (must match the working cards the view renders). */
+const QUICK_COMPOSE_TARGETS = new Set(['plan', 'find', 'note']);
+
+/**
+ * Sanitize brain-seeded / secretary-proposed quick actions (B3). The SECURITY boundary: a non-core
+ * action may ONLY be 'prompt' (a canned chat message) or 'compose' (focus an existing input) — never a
+ * 'run' verb (those are app-defined core actions). Anything that isn't a well-formed prompt/compose is
+ * dropped. Pure: no storage/AI — the view mirrors this rule and e2e-secretary asserts it directly.
+ * `id`/`createdAt` are added by the caller (kept out so the function stays deterministic for tests).
+ */
+export function sanitizeProposedQuickActions(raw: unknown, source: string, status: 'proposed' | 'active' = 'proposed'): QuickAction[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const out: QuickAction[] = [];
+  for (const r of list) {
+    if (!r || typeof r !== 'object') continue;
+    const o = r as Record<string, unknown>;
+    const label = String(o.label ?? '').trim().slice(0, 40);
+    const kind = String(o.kind ?? '').trim();
+    if (!label) continue;
+    if (kind === 'compose') {
+      const target = String(o.target ?? '').trim();
+      if (!QUICK_COMPOSE_TARGETS.has(target)) continue;
+      out.push({ label, kind: 'compose', target, source, status });
+    } else if (kind === 'prompt') {
+      const prompt = String(o.prompt ?? '').trim().slice(0, 500);
+      if (!prompt) continue;
+      out.push({ label, kind: 'prompt', prompt, source, status });
+    }
+    // kind === 'run' (or anything else) → dropped: the explicit security boundary.
+  }
+  return out.slice(0, 6);
 }
 
 /**

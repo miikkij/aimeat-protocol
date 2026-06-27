@@ -849,6 +849,28 @@
         "pending": "odottaa"
       }
     },
+    "qa": {
+      "title": "Pikatoiminnot",
+      "close": "Sulje",
+      "hint": "Tämän kontekstin pikanapit. Kiinnitä sihteerin ehdotukset; nimeä, järjestä tai poista omat.",
+      "proposedTitle": "Ehdotukset — kiinnitä haluamasi",
+      "activeTitle": "Pikatoimintosi",
+      "empty": "Ei pikatoimintoja vielä — kokeile Ehdota pikatoimintoja.",
+      "pin": "Kiinnitä",
+      "dismiss": "Hylkää",
+      "rename": "Nimeä uudelleen",
+      "remove": "Poista",
+      "save": "Tallenna",
+      "moveUp": "Siirrä ylös",
+      "moveDown": "Siirrä alas",
+      "suggest": "Ehdota pikatoimintoja",
+      "suggesting": "Mietitään…",
+      "suggested": "Ehdotettu {n} pikatoimintoa — kiinnitä haluamasi",
+      "suggestEmpty": "Ei uusia ehdotuksia",
+      "error": "Pikatoiminnot epäonnistui",
+      "composeTarget": "avaa",
+      "kind": { "prompt": "viesti", "compose": "avaa" }
+    },
     "plan": {
       "title": "Ohjattu suunnitelma",
       "hint": "Kerro tavoite — ehdotan muutaman askeleen. Hyväksy ne, niin arkistoin suunnitelman ja kartoitan mitä on jo olemassa.",

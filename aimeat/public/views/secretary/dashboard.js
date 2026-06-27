@@ -7,9 +7,11 @@
  *   collapsible "Manage & setup" disclosure header that tucks the set-up-once config cards away.
  *   The view (views/secretary.js) owns all state/handlers and passes them in; the config cards
  *   themselves still live in ./cards.js / ./cards-reach.js. Redesign: docs/internal/2026-06-25-secretary-view-redesign.md.
- * @structure quickActionRow · dashStatus · standPanel · routinesCard · manageHeader (one render function each)
- * @usage import { quickActionRow, dashStatus, standPanel, routinesCard, manageHeader } from '/views/secretary/dashboard.js';
+ * @structure quickActionRow · dashStatus · standPanel · routinesCard · quickActionsManager · manageHeader (one render function each)
+ * @usage import { quickActionRow, dashStatus, standPanel, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.3.0 — 2026-06-27 — B3: quickActionsManager — pin/dismiss proposed shortcuts, rename/remove/reorder
+ *     active ones, "Suggest shortcuts".
  *   v0.2.0 — 2026-06-27 — B2: routinesCard — active Routines on the dashboard (status · last result ·
  *     next step · Advance).
  *   v0.1.0 — 2026-06-27 — B1: dashboard-first IA — quick-action row, Today status strip, where-things-stand
@@ -109,6 +111,61 @@ export function routinesCard(p) {
             </li>`;
         })}
       </ul>
+    </section>`;
+}
+
+/** B3 quick-actions manager (✎): pin/dismiss proposed shortcuts, rename/remove/reorder active ones, suggest more. */
+export function quickActionsManager(p) {
+  if (!p.managing) return null;
+  return html`
+    <section class="sec-card sec-qa-manage">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.qa.title')}</h2>
+        <button class="btn-ghost btn-sm" onClick=${p.toggleManage}>${t('secretary.qa.close')}</button>
+      </div>
+      <p class="sec-hint">${t('secretary.qa.hint')}</p>
+
+      ${p.proposed.length > 0 ? html`
+        <h3 class="sec-h3">${t('secretary.qa.proposedTitle')}</h3>
+        <ul class="sec-qa-list">
+          ${p.proposed.map((a) => html`
+            <li class="sec-qa-row proposed" key=${a.id}>
+              <div class="sec-qa-main">
+                <span class="sec-qa-label">${escHtml(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>
+                <div class="sec-hint">${a.kind === 'prompt' ? escHtml(a.prompt) : t('secretary.qa.composeTarget') + ': ' + escHtml(a.target)}</div>
+              </div>
+              <button class="btn-primary btn-sm" onClick=${() => p.approve(a)}>${t('secretary.qa.pin')}</button>
+              <button class="btn-ghost btn-sm" onClick=${() => p.dismiss(a)}>${t('secretary.qa.dismiss')}</button>
+            </li>`)}
+        </ul>` : null}
+
+      <h3 class="sec-h3">${t('secretary.qa.activeTitle')}</h3>
+      ${p.activeActions.length === 0
+        ? html`<div class="sec-hint">${t('secretary.qa.empty')}</div>`
+        : html`<ul class="sec-qa-list">
+            ${p.activeActions.map((a) => html`
+              <li class="sec-qa-row" key=${a.id}>
+                <div class="sec-qa-main">
+                  ${p.editingId === a.id
+                    ? html`<input class="sec-input" value=${p.editLabel} onInput=${(e) => p.setEditLabel(e.target.value)}
+                        onKeyDown=${(e) => { if (e.key === 'Enter') p.saveRename(a); if (e.key === 'Escape') p.cancelRename(); }} />`
+                    : html`<span class="sec-qa-label">${escHtml(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>`}
+                </div>
+                ${p.editingId === a.id
+                  ? html`
+                    <button class="btn-primary btn-sm" onClick=${() => p.saveRename(a)}>${t('secretary.qa.save')}</button>
+                    <button class="btn-ghost btn-sm" onClick=${p.cancelRename}>${t('secretary.cancel')}</button>`
+                  : html`
+                    <button class="btn-ghost btn-sm" title=${t('secretary.qa.moveUp')} onClick=${() => p.move(a, -1)}>↑</button>
+                    <button class="btn-ghost btn-sm" title=${t('secretary.qa.moveDown')} onClick=${() => p.move(a, 1)}>↓</button>
+                    <button class="btn-ghost btn-sm" onClick=${() => p.startRename(a)}>${t('secretary.qa.rename')}</button>
+                    <button class="btn-ghost btn-sm" onClick=${() => p.dismiss(a)}>${t('secretary.qa.remove')}</button>`}
+              </li>`)}
+          </ul>`}
+
+      <div class="sec-actions">
+        <button class="btn-outline btn-sm" disabled=${p.suggesting} onClick=${p.suggest}>${p.suggesting ? t('secretary.qa.suggesting') : t('secretary.qa.suggest')}</button>
+      </div>
     </section>`;
 }
 

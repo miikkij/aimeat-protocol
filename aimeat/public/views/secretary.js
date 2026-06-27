@@ -11,6 +11,11 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.14.0 — 2026-06-27 — B3 (secretary-view-redesign): dynamic quick actions. useQuickActions manages
+ *     per-context quickActions[] — 2–3 brain-seeded shortcuts (active on hire) + secretary-PROPOSED ones
+ *     the owner pins. Active dynamic actions render in the quick row (prompt → canned chat message, compose
+ *     → focus an input); a ✎ panel (quickActionsManager) pins/dismisses proposals + renames/reorders/removes.
+ *     Security: the Secretary may seed/propose only prompt|compose, never a run verb (sanitizeQuickActions).
  *   v0.13.0 — 2026-06-27 — B2 (secretary-view-redesign): Routines + "What's next". The guided plan is
  *     generalised into useWhatsNext — propose a new Routine from a goal OR advance an active one, approve
  *     each step band-gated (act → run · draft|ask → approve + log a decision · off → skip), execute the
@@ -51,12 +56,13 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
-import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
+import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, routinesCard, manageHeader } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
+import { useQuickActions } from '/views/secretary/use-quick-actions.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
@@ -171,6 +177,8 @@ export default function SecretaryView() {
 
   // B2 — Routines + "What's next" (generalises the guided plan): propose/advance band-gated routines.
   const next = useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast });
+  // B3 — dynamic quick actions (brain-seeded + secretary-proposed, owner-pinned).
+  const qa = useQuickActions({ active, config, persistConfig, owner, showToast });
   // Phase 4 — autonomous tick + Home feed + calendar (own hook).
   const auto = useAutonomy({ showToast });
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
@@ -218,7 +226,9 @@ export default function SecretaryView() {
             wsSummary.push({ name, purpose: ws.purpose || '' });
           }
         }
-        const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [] };
+        // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
+        const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
+        const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
       } else {
         // Re-run on the active context: update its brain, snapshot the old one. Keep its organism.
@@ -257,13 +267,14 @@ export default function SecretaryView() {
 
   /** One chat turn: assemble the active context's brain as the system prompt + the transcript,
    *  complete on the owner's key, append + persist. Per-context conversation (secretary.chat.{id}). */
-  const sendChat = useCallback(async () => {
-    const text = chatInput.trim();
+  const sendChat = useCallback(async (override) => {
+    // `override` lets a dynamic quick action (kind:'prompt') send a canned message without touching the input.
+    const text = (typeof override === 'string' ? override : chatInput).trim();
     if (!text || !active) return;
     setChatSending(true);
     const history = [...chat, { role: 'user', content: text }];
     setChat(history);
-    setChatInput('');
+    if (typeof override !== 'string') setChatInput('');
     try {
       const rules = (active.brain.rules || []).map((r) => '- ' + r.description).join('\n');
       const wsNames = (active.workspaces || []).map((w) => w.name).join(', ');
@@ -337,6 +348,16 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     const now = Date.now();
     return (learn.decisions || []).some((d) => d && d.status === 'open' && d.revisitWhen && new Date(d.revisitWhen).getTime() <= now);
   }, [learn.decisions]);
+
+  // B3: active dynamic quick actions → row items. prompt → send a canned chat message; compose → focus an input.
+  const dynamicQuickItems = useMemo(() => qa.activeActions.map((a) => ({
+    key: a.id,
+    label: a.label,
+    title: a.kind === 'prompt' ? a.prompt : `${t('secretary.qa.composeTarget')}: ${a.target}`,
+    onClick: a.kind === 'prompt'
+      ? () => { focusInto('.sec-chat', null); sendChat(a.prompt); }
+      : () => focusInto(a.target === 'find' ? '.sec-find' : a.target === 'note' ? '.sec-note' : '.sec-next', a.target === 'find' ? '.sec-find-in' : 'textarea'),
+  })), [qa.activeActions, focusInto, sendChat]);
 
   // "Where do things stand?" — a read-only orientation summary (NOT the acting tick): no actions, just
   // a status readout grounded in the active context's brain + open goals/decisions + recent activity.
@@ -424,7 +445,10 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
                 { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
                 { key: 'review', label: t('secretary.dash.quickReview'), title: t('secretary.learn.reviewNow'), hidden: !decisionsDue, onClick: () => focusInto('.sec-decisions-log', null) },
+                ...dynamicQuickItems,
+                { key: 'manage-qa', label: '✎', title: t('secretary.qa.title'), onClick: qa.toggleManage },
               ] })}
+              ${quickActionsManager(qa)}
 
               ${/* Today / dashboard — where are we + is this current */ ''}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
