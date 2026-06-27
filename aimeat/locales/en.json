@@ -797,6 +797,8 @@
     "dash": {
       "todayTitle": "Today",
       "refresh": "Refresh",
+      "reconcile": "Scan",
+      "scanning": "Scanning…",
       "budgetLabel": "Budget today",
       "nextRunLabel": "Next run",
       "lastScanLabel": "Last activity",

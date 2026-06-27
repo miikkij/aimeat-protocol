@@ -10,6 +10,8 @@
  * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
  * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.6.0 — 2026-06-28 — G3: dashStatus "Scan" button calls onReconcile (a real discover scan that
+ *     stamps lastScanAt) with a scanning state, replacing the bare re-fetch; G2 cadence badge on routines.
  *   v0.5.0 — 2026-06-28 — G5: actionItemsCard renders the action-item label via t() from the item's
  *     structured labelKind + summary (legacy server-composed `text` kept as a fallback).
  *   v0.4.0 — 2026-06-28 — B5: actionItemsCard — the tick-derived follow-up action-items, one-click handle/dismiss.
@@ -52,7 +54,7 @@ export function dashStatus(p) {
     <section class="sec-card sec-dash">
       <div class="sec-card-head">
         <h2 class="sec-h2">${t('secretary.dash.todayTitle')}</h2>
-        <button class="btn-ghost btn-sm" onClick=${p.onRefresh}>↻ ${t('secretary.dash.refresh')}</button>
+        <button class="btn-ghost btn-sm" disabled=${!!p.scanning} onClick=${p.onReconcile}>↻ ${p.scanning ? t('secretary.dash.scanning') : t('secretary.dash.reconcile')}</button>
       </div>
       <div class="sec-dash-strip">
         <div class="sec-chip">
