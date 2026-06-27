@@ -52,7 +52,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -606,10 +606,27 @@ export class Scheduler {
     const dueDecisions = decRecs
       .map((r) => (r.value ?? {}) as Record<string, unknown>)
       .filter((d) => d.status === 'open' && typeof d.revisitWhen === 'string' && Date.parse(d.revisitWhen as string) <= nowMs);
+    // (3a) G2: re-arm any RECURRING routine whose cadence has elapsed since its last completed run —
+    // reset its steps to 'pending' + re-activate it (FREE, no AI). Applied to the working `active` so the
+    // advancement pass below picks up the freshly-pending steps; persisted via persistTickState.
+    const rearmNowIso = new Date().toISOString();
+    const rearmNowMs = Date.now();
+    const rearmedRoutines: Array<{ id: string; routine: RoutineLike }> = [];
+    if (Array.isArray(active.routines)) {
+      active.routines = active.routines.map((r) => {
+        if (r.id && routineDueForRearm(r, rearmNowMs)) {
+          const armed = rearmRoutine(r, rearmNowIso, rearmNowMs);
+          rearmedRoutines.push({ id: r.id, routine: armed });
+          return armed;
+        }
+        return r;
+      });
+    }
+
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runFileSteps.length > 0;
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runFileSteps.length > 0 || rearmedRoutines.length > 0;
     if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
       return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
@@ -700,14 +717,14 @@ export class Scheduler {
       // Persist the spend ledger (+ any new pending decisions, routine step completions, and derived
       // action-items) even if generation threw mid-way, so the soft budget reflects what was actually
       // spent. Read-modify-write a fresh config to avoid clobber.
-      if (paidMorsels > 0 || Object.keys(newPending).length || stepCompletions.length || newActionItems.length) {
-        await this.persistTickState(owner, active.id, today, paidMorsels, newPending, stepCompletions, newActionItems);
+      if (paidMorsels > 0 || Object.keys(newPending).length || stepCompletions.length || newActionItems.length || rearmedRoutines.length) {
+        await this.persistTickState(owner, active.id, today, paidMorsels, newPending, stepCompletions, newActionItems, rearmedRoutines);
         writes.push('secretary.config');
       }
     }
 
     if (Object.keys(newPending).length) emitChange('agent-messages');
-    if (stepCompletions.length || newActionItems.length) emitChange('agent-tasks', owner);
+    if (stepCompletions.length || newActionItems.length || rearmedRoutines.length) emitChange('agent-tasks', owner);
     return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes };
   }
 
@@ -836,18 +853,27 @@ export class Scheduler {
     owner: string, contextId: string, today: string, morsels: number, newPending: Record<string, unknown>,
     stepCompletions: Array<{ routineId: string; stepId: string; status: string; summary: string }> = [],
     newActionItems: ActionItem[] = [],
+    rearmedRoutines: Array<{ id: string; routine: RoutineLike }> = [],
   ): Promise<void> {
     const rec = await this.storage.getMemory(owner, 'secretary.config');
     const cfg = (rec?.value ?? {}) as SecretaryConfig;
     const ledger = morsels > 0 ? bumpLedger(cfg.autonomousLedger, contextId, today, morsels) : cfg.autonomousLedger;
     const pending = Object.keys(newPending).length ? { ...(cfg.pendingDecisions ?? {}), ...newPending } : cfg.pendingDecisions;
     const now = new Date().toISOString();
-    // B5: apply routine step completions + merge derived action-items into the active context.
+    // B5/G2: apply routine re-arms (full replace by id) + step completions + merge action-items.
     let contexts = cfg.contexts;
-    if ((stepCompletions.length || newActionItems.length) && Array.isArray(cfg.contexts)) {
+    if ((stepCompletions.length || newActionItems.length || rearmedRoutines.length) && Array.isArray(cfg.contexts)) {
       contexts = cfg.contexts.map((c) => {
         if (c.id !== contextId) return c;
         let routines: RoutineLike[] | undefined = c.routines;
+        // G2: replace re-armed routines first (steps reset to pending) so a same-tick file-step
+        // completion below lands on the freshly-armed step.
+        if (rearmedRoutines.length && Array.isArray(routines)) {
+          routines = routines.map((r) => {
+            const armed = rearmedRoutines.find((x) => x.id === r.id);
+            return armed ? armed.routine : r;
+          });
+        }
         if (stepCompletions.length && Array.isArray(routines)) {
           routines = routines.map((r) => {
             const comps = stepCompletions.filter((sc) => sc.routineId === r.id);

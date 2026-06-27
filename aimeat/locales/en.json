@@ -849,6 +849,9 @@
       "delegateNoAgent": "Pick an agent to delegate to first",
       "delegateNoAgents": "No other agents to delegate to — connect one in Manage → crew.",
       "checkResult": "Check result",
+      "repeats": "Repeats",
+      "nextRun": "Next run",
+      "cadence": { "none": "Once (no repeat)", "daily": "Daily", "weekly": "Weekly" },
       "status": {
         "done": "done",
         "skipped": "skipped",

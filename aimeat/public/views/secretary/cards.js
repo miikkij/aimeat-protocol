@@ -309,6 +309,15 @@ export function whatsNextCard(p) {
             </div>
             ${r.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.status.done')}</span>` : null}
           </div>
+          <div class="sec-routine-cadence">
+            <label class="sec-hint">${t('secretary.next.repeats')}</label>
+            <select class="sec-band" value=${r.cadence || ''} onChange=${(e) => p.setRoutineCadence(r, e.target.value)}>
+              <option value="" selected=${!r.cadence}>${t('secretary.next.cadence.none')}</option>
+              <option value="daily" selected=${r.cadence === 'daily'}>${t('secretary.next.cadence.daily')}</option>
+              <option value="weekly" selected=${r.cadence === 'weekly'}>${t('secretary.next.cadence.weekly')}</option>
+            </select>
+            ${r.cadence && r.nextRunAt ? html`<span class="sec-hint">${t('secretary.next.nextRun')}: ${new Date(r.nextRunAt).toLocaleDateString()}</span>` : null}
+          </div>
           <ul class="sec-step-list">${r.steps.map((s) => routineStepRow(p, r, s))}</ul>
           <div class="sec-actions sec-routine-actions">
             <button class="btn-ghost btn-sm" onClick=${() => p.setSelectedId(null)}>${t('secretary.next.startNew')}</button>

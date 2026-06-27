@@ -12,6 +12,8 @@
  * @structure ROUTINE_CAPABILITIES · buildRoutinePrompt · useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast })
  * @usage const next = useWhatsNext({...}); whatsNextCard(next) / routinesCard(next)
  * @version-history
+ *   v0.4.0 — 2026-06-28 — G2: recurring routines — setRoutineCadence (none/daily/weekly); the tick
+ *     re-arms a completed routine once its cadence elapses (services/secretary-tick.ts).
  *   v0.3.0 — 2026-06-28 — B5: action-items — handle (advance routine / check delegate) + dismiss the
  *     follow-ups the tick derived (active context's actionItems[]); delegated steps stay active until done.
  *   v0.2.0 — 2026-06-28 — B4: a delegate step creates an agent task for an owner-picked target agent
@@ -205,6 +207,9 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
 
   const setRoutineStatus = useCallback((routine, status) => patchRoutine(routine.id, (r) => ({ ...r, status })), [patchRoutine]);
   const deleteRoutine = useCallback((routine) => writeRoutines(routines.filter((r) => r.id !== routine.id)), [routines, writeRoutines]);
+  // G2: set a routine's cadence (recurrence). The tick re-arms a completed routine once its cadence
+  // elapses (services/secretary-tick.ts routineDueForRearm); '' clears it back to run-once.
+  const setRoutineCadence = useCallback((routine, cadence) => patchRoutine(routine.id, (r) => ({ ...r, cadence: cadence || null })), [patchRoutine]);
 
   /** "Advance" from the dashboard: select the routine + scroll the working card into view. */
   const advance = useCallback((routine) => {
@@ -277,7 +282,7 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
   return {
     goal, setGoal, proposing, proposeRoutine,
     routines, activeRoutines, selected, selectedId, setSelectedId,
-    busyStepId, approveStep, setRoutineStatus, deleteRoutine, advance, nextPendingStep,
+    busyStepId, approveStep, setRoutineStatus, deleteRoutine, setRoutineCadence, advance, nextPendingStep,
     delegateAgent, setDelegateAgent, checkingStepId, checkDelegateResult,
     actionItems, handleActionItem, dismissActionItem,
   };

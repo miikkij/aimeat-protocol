@@ -849,6 +849,9 @@
       "delegateNoAgent": "Valitse ensin agentti, jolle delegoidaan",
       "delegateNoAgents": "Ei muita agentteja delegoitavaksi — yhdistä sellainen kohdassa Hallinta → tiimi.",
       "checkResult": "Tarkista tulos",
+      "repeats": "Toistuu",
+      "nextRun": "Seuraava ajo",
+      "cadence": { "none": "Kerran (ei toistoa)", "daily": "Päivittäin", "weekly": "Viikoittain" },
       "status": {
         "done": "valmis",
         "skipped": "ohitettu",
