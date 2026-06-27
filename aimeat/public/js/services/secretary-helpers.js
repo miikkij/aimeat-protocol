@@ -5,9 +5,11 @@
  *   from AI text, a brain version-snapshot, a context id generator, and the secretary.config migration
  *   from the old single-context layout to the multi-context `{contexts[], activeContextId}` shape.
  *   See docs/plans/2026-06-23-secretary-feature.md (§5 hire, §22 multi-context).
- * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · migrateConfig · buildDecisionRecord
- * @usage import { buildInterviewPrompt, extractJson, migrateConfig } from '/js/services/secretary-helpers.js';
+ * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · sanitizeQuickActions · migrateConfig · buildDecisionRecord
+ * @usage import { buildInterviewPrompt, extractJson, sanitizeQuickActions, migrateConfig } from '/js/services/secretary-helpers.js';
  * @version-history
+ *   v0.3.0 — 2026-06-27 — B3: CONTRACT gains quickActions (2–3 role-specific shortcuts) + sanitizeQuickActions
+ *     — the frontend security mirror (brain/secretary may only seed prompt|compose, never a run verb).
  *   v0.2.0 — 2026-06-24 — P3-B: buildDecisionRecord — the single source of the decision-log contract
  *     shape, shared by the manual log form (use-learning), answered Ask cards (use-intake), and
  *     approved guided plans (use-guided-plan) so real choices feed the learning loop.
@@ -37,7 +39,8 @@ export const CONTRACT = `\`\`\`json
     "name": "a short name for this space",
     "description": "one line describing it",
     "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why" } ]
-  }
+  },
+  "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ]
 }
 \`\`\``;
 
@@ -51,7 +54,7 @@ When you have enough, design two things and output them as ONE JSON object insid
 
 ${CONTRACT}
 
-Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs. Output ONLY the JSON code block.`;
+Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block.`;
 }
 
 /** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). */
@@ -65,7 +68,7 @@ The user's needs:
 ${needs}
 """
 
-Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs). Output ONLY the JSON code block — no commentary.`;
+Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block — no commentary.`;
 }
 
 /** Pull a JSON object out of an AI's text (may be fenced / surrounded by prose). */
@@ -90,6 +93,38 @@ export function snapshotOf(brain) {
 
 export function genCtxId() {
   return 'ctx-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+/** B3 quick-action targets a `compose` action may focus (must match the working cards in the view). */
+const QA_COMPOSE_TARGETS = new Set(['plan', 'find', 'note']);
+function genActionId() { return 'qa-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+
+/**
+ * Sanitize brain-seeded / secretary-proposed dynamic quick actions (B3). SECURITY boundary: a non-core
+ * action may ONLY be 'prompt' (a canned chat message) or 'compose' (focus an input: target plan|find|note)
+ * — never a 'run' verb (those are app-defined core actions). Malformed entries are dropped. Mirrors the
+ * server helper `sanitizeProposedQuickActions` (secretary-tick.ts), which e2e-secretary asserts.
+ */
+export function sanitizeQuickActions(raw, source, status = 'proposed') {
+  const list = Array.isArray(raw) ? raw : [];
+  const out = [];
+  for (const r of list) {
+    if (!r || typeof r !== 'object') continue;
+    const label = String(r.label || '').trim().slice(0, 40);
+    const kind = String(r.kind || '').trim();
+    if (!label) continue;
+    if (kind === 'compose') {
+      const target = String(r.target || '').trim();
+      if (!QA_COMPOSE_TARGETS.has(target)) continue;
+      out.push({ id: genActionId(), label, kind: 'compose', target, source, status, createdAt: new Date().toISOString() });
+    } else if (kind === 'prompt') {
+      const prompt = String(r.prompt || '').trim().slice(0, 500);
+      if (!prompt) continue;
+      out.push({ id: genActionId(), label, kind: 'prompt', prompt, source, status, createdAt: new Date().toISOString() });
+    }
+    // kind 'run' or anything else → dropped (the security boundary).
+  }
+  return out.slice(0, 6);
 }
 
 /** Cheap, AI-free context routing (plan §22 step 2): score `text` against each context's name +

@@ -849,6 +849,28 @@
         "pending": "pending"
       }
     },
+    "qa": {
+      "title": "Shortcuts",
+      "close": "Close",
+      "hint": "One-tap buttons for this context. Pin the Secretary's suggestions; rename, reorder or remove your own.",
+      "proposedTitle": "Suggested — pin the ones you want",
+      "activeTitle": "Your shortcuts",
+      "empty": "No shortcuts yet — try Suggest shortcuts.",
+      "pin": "Pin",
+      "dismiss": "Dismiss",
+      "rename": "Rename",
+      "remove": "Remove",
+      "save": "Save",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "suggest": "Suggest shortcuts",
+      "suggesting": "Thinking…",
+      "suggested": "Proposed {n} shortcut(s) — pin the ones you want",
+      "suggestEmpty": "No new shortcuts to suggest",
+      "error": "Shortcuts failed",
+      "composeTarget": "focuses",
+      "kind": { "prompt": "message", "compose": "open" }
+    },
     "plan": {
       "title": "Guided plan",
       "hint": "Tell me a goal — I'll propose a few steps. Approve them and I'll file the plan and scout what already exists.",

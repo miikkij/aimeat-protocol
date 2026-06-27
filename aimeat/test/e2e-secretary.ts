@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions } from '../src/services/secretary-tick.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -998,6 +998,53 @@ await test('54. Advancing a routine persists step status + result (and flips sta
 await test('55. Failure mode: an unauthenticated routine (secretary.config) write is rejected', async () => {
     const { status } = await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'secretary.config', value: { contexts: [] }, visibility: 'private' }) });
     assert(status === 401 || status === 403, `expected 401/403, got ${status}`);
+});
+
+console.log('\nB3 -- Dynamic quick actions');
+
+await test('56. sanitizeProposedQuickActions: keeps prompt/compose, DROPS run + malformed (security boundary)', async () => {
+    const raw = [
+        { label: 'Daily recap', kind: 'prompt', prompt: 'Give me a recap of today' },     // ok
+        { label: 'New plan', kind: 'compose', target: 'plan' },                            // ok
+        { label: 'Spend 100', kind: 'run', action: 'spend' },                              // run → DROPPED (security)
+        { label: 'Bad target', kind: 'compose', target: 'wallet' },                        // invalid target → dropped
+        { label: '', kind: 'prompt', prompt: 'x' },                                        // empty label → dropped
+        { label: 'No prompt', kind: 'prompt', prompt: '   ' },                             // empty prompt → dropped
+    ];
+    const clean = sanitizeProposedQuickActions(raw, 'secretary', 'proposed');
+    assert(clean.length === 2, `expected 2 kept, got ${clean.length}: ${JSON.stringify(clean)}`);
+    assert(clean.every(a => a.kind === 'prompt' || a.kind === 'compose'), `non prompt/compose survived: ${JSON.stringify(clean)}`);
+    assert(!clean.some((a: any) => a.kind === 'run'), 'a run action must never survive');
+    assert(clean.every(a => a.source === 'secretary' && a.status === 'proposed'), `source/status: ${JSON.stringify(clean)}`);
+    // Brain seeds are the same security boundary, just active.
+    const seeded = sanitizeProposedQuickActions([{ label: 'Scout', kind: 'compose', target: 'find' }, { label: 'x', kind: 'run' }], 'brain', 'active');
+    assert(seeded.length === 1 && seeded[0].status === 'active' && seeded[0].source === 'brain', `seeded: ${JSON.stringify(seeded)}`);
+});
+
+await test('57. quickActions round-trip: a proposed action persists, approval flips it to active', async () => {
+    const cfg = {
+        activeContextId: 'qc1',
+        contexts: [{
+            id: 'qc1', name: 'QA', brain: { purpose: 'x', rules: [] }, organismId: selfOrgId, organismName: 'QA', workspaces: [],
+            policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [],
+            quickActions: [
+                { id: 'qa-a', label: 'Pinned recap', kind: 'prompt', prompt: 'recap', source: 'brain', status: 'active', createdAt: new Date().toISOString() },
+                { id: 'qa-b', label: 'Suggested scout', kind: 'compose', target: 'find', source: 'secretary', status: 'proposed', createdAt: new Date().toISOString() },
+            ],
+        }],
+    };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    let r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    let qas = r.body.data.value.contexts[0].quickActions;
+    assert(qas.length === 2 && qas.find((a: any) => a.id === 'qa-b').status === 'proposed', `proposed not stored: ${JSON.stringify(qas)}`);
+    // Owner pins the proposed one → status flips to active (mirrors the view's approve()).
+    const cur = r.body.data.value;
+    cur.contexts[0].quickActions = qas.map((a: any) => (a.id === 'qa-b' ? { ...a, status: 'active' } : a));
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cur, visibility: 'private' }) });
+    r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    qas = r.body.data.value.contexts[0].quickActions;
+    assert(qas.find((a: any) => a.id === 'qa-b').status === 'active', `pin did not persist: ${JSON.stringify(qas)}`);
+    assert(qas.every((a: any) => a.kind !== 'run'), 'no run action should ever be present');
 });
 
 console.log('\nCleanup');
