@@ -1111,9 +1111,11 @@ await test('61. deriveRoutineActions: band-driven (act+file→run, draft/ask→i
     const { items, runFileSteps } = deriveRoutineActions(ctx);
     assert(runFileSteps.length === 2 && runFileSteps.some(f => f.routineId === 'ra') && runFileSteps.some(f => f.routineId === 'rd'), `runFileSteps: ${JSON.stringify(runFileSteps)}`);
     assert(items.length === 3, `items: ${JSON.stringify(items)}`);
-    assert(items.some(i => i.suggestedAction.kind === 'check-delegate' && i.suggestedAction.routineId === 'rd'), 'delegated → check-delegate item');
-    assert(items.some(i => i.suggestedAction.routineId === 'rb' && /Approve/.test(i.text)), 'draft → approve item');
-    assert(items.some(i => i.suggestedAction.routineId === 'rc' && /Ready/.test(i.text)), 'act+discover → ready item');
+    // G5: items carry a structured labelKind + summary (NOT a server-composed English string).
+    assert(items.every(i => typeof i.labelKind === 'string' && typeof i.summary === 'string' && !('text' in i)), `structured, no text: ${JSON.stringify(items)}`);
+    assert(items.some(i => i.suggestedAction.kind === 'check-delegate' && i.labelKind === 'check-delegate' && i.suggestedAction.routineId === 'rd'), 'delegated → check-delegate item');
+    assert(items.some(i => i.suggestedAction.routineId === 'rb' && i.labelKind === 'approve' && i.summary === 'curate it'), 'draft → approve item w/ summary');
+    assert(items.some(i => i.suggestedAction.routineId === 'rc' && i.labelKind === 'ready' && i.summary === 'scout it'), 'act+discover → ready item w/ summary');
 });
 
 await test('62. A completed routine step yields the NEXT action-item; actionItems round-trip + dismiss', async () => {

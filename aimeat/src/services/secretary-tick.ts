@@ -21,6 +21,8 @@
  *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
  * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
+ *   v0.7.0 — 2026-06-28 — G5: deriveRoutineActions emits a structured `labelKind` + `summary` (not a
+ *     server-composed English `text`) so the frontend renders the action-item label via t() (en+fi).
  *   v0.6.0 — 2026-06-28 — B5: deriveRoutineActions() — band-driven routine advancement for the tick
  *     (act+file → run, act+discover/delegate & draft|ask → action-item, delegated → check-result) +
  *     actionItemKey() de-dup. routeRoutineStep now has a production caller (the tick), not just E2E.
@@ -132,9 +134,12 @@ export function routeRoutineStep(
 /** Loose shapes for the view-authored Routine + ActionItem records the tick reads/advances (B2/B5). */
 export interface RoutineStepLike { id?: string; capability?: string; summary?: string; band?: string; status?: string; result?: { taskId?: string; agentName?: string; summary?: string } | null; }
 export interface RoutineLike { id?: string; title?: string; status?: string; steps?: RoutineStepLike[]; results?: Array<{ ts?: string; summary?: string }>; }
-export interface ActionItem { id: string; text: string; suggestedAction: { kind: string; routineId?: string; stepId?: string }; source: string; createdAt: string; status: 'open' | 'done'; }
+// G5: action-items carry a STRUCTURED `labelKind` + the step `summary` so the FRONTEND renders the label
+// via t() (the tick is server-side and must not compose a fixed-language string). `text` is kept optional
+// for any legacy item written before G5 (the frontend falls back to it).
+export interface ActionItem { id: string; labelKind?: string; summary?: string; text?: string; suggestedAction: { kind: string; routineId?: string; stepId?: string }; source: string; createdAt: string; status: 'open' | 'done'; }
 /** An action-item the tick wants to surface, before the tick stamps id/createdAt/status. */
-export interface ActionItemDraft { text: string; suggestedAction: { kind: 'advance' | 'check-delegate'; routineId: string; stepId?: string }; source: string; }
+export interface ActionItemDraft { labelKind: 'approve' | 'ready' | 'check-delegate'; summary: string; suggestedAction: { kind: 'advance' | 'check-delegate'; routineId: string; stepId?: string }; source: string; }
 
 /** Routine-step capabilities the tick can perform autonomously today (note-filing into the self-organism). */
 const TICK_FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
@@ -167,7 +172,7 @@ export function deriveRoutineActions(
     // Delegated steps with a task out → surface a check-result item (the result flowing home).
     for (const s of (r.steps || [])) {
       if (s.status === 'delegated' && s.result?.taskId && s.id) {
-        items.push({ text: `Check delegated result: ${s.summary || ''}`.trim(), suggestedAction: { kind: 'check-delegate', routineId: r.id, stepId: s.id }, source: r.id });
+        items.push({ labelKind: 'check-delegate', summary: String(s.summary || ''), suggestedAction: { kind: 'check-delegate', routineId: r.id, stepId: s.id }, source: r.id });
       }
     }
     const next = (r.steps || []).find((s) => s.status === 'pending');
@@ -176,9 +181,9 @@ export function deriveRoutineActions(
     if (route.disposition === 'run' && TICK_FILE_CAPS.has(String(next.capability))) {
       runFileSteps.push({ routineId: r.id, stepId: next.id });
     } else if (route.disposition === 'run') {
-      items.push({ text: `Ready to run: ${next.summary || ''}`.trim(), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
+      items.push({ labelKind: 'ready', summary: String(next.summary || ''), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
     } else if (route.disposition === 'confirm') {
-      items.push({ text: `Approve: ${next.summary || ''}`.trim(), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
+      items.push({ labelKind: 'approve', summary: String(next.summary || ''), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
     }
     // disposition === 'skip' (off) → nothing to surface.
   }

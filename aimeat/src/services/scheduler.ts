@@ -647,7 +647,7 @@ export class Scheduler {
         stepCompletions.push({ routineId: fs.routineId as string, stepId: fs.stepId as string, status: 'done', summary: `Filed: ${String(step.summary || '')}`.slice(0, 200) });
       }
       newActionItems = routineActions.items.map((it) => ({
-        id: 'ai-' + randomUUID().slice(0, 8), text: it.text, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,
+        id: 'ai-' + randomUUID().slice(0, 8), labelKind: it.labelKind, summary: it.summary, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,
       }));
 
       // Action generation (P1-A): ask the model for a STRUCTURED action list tied to the open goals +
