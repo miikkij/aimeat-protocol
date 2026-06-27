@@ -465,7 +465,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 })}
 
               ${/* Working area — the inputs the quick verbs focus */ ''}
-              ${whatsNextCard(next)}
+              ${whatsNextCard({ ...next, agents: crew.agents })}
               ${findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults })}
               ${(findResults && findResults.length === 0) || create.draft || create.created ? createResourceCard({ ...create, query: findQ }) : null}
               ${wsList.length > 0 ? noteCard(intake) : null}

@@ -8,6 +8,8 @@
  * @structure one exported render function per card (props in → htm out)
  * @usage import { chatCard, findCard, ... } from '/views/secretary/cards.js'; ... ${chatCard({...})}
  * @version-history
+ *   v0.8.0 — 2026-06-28 — B4: routineStepRow gains the delegate control (pick a target agent → create an
+ *     agent task) + a "Check result" action on delegated steps.
  *   v0.7.0 — 2026-06-27 — B2: replace guidedPlanCard with whatsNextCard (Routine propose/advance,
  *     band-gated steps + per-step approve/run); guided-plan flow folded into "What's next".
  *   v0.6.0 — 2026-06-24 — P3-A: chatCard gains a doc/image attach control (📎) + an in-flight /
@@ -245,12 +247,26 @@ export function historyCard(p) {
     </section>`;
 }
 
-/** A single Routine step row (B2): capability + band + summary + result, with the approve/run control. */
+/** A single Routine step row (B2 + B4): capability + band + summary + result, with the approve/run/delegate control. */
 function routineStepRow(p, r, s) {
   const next = p.nextPendingStep(r);
   const isNext = next && next.id === s.id;
   const busy = p.busyStepId === s.id;
   const runLabel = s.band === 'off' ? t('secretary.next.skip') : s.band === 'act' ? t('secretary.next.run') : t('secretary.next.approve');
+  const isDelegate = s.capability === 'delegate';
+  const agents = p.agents || [];
+  // B4: the next pending delegate step needs the owner to pick a target agent before approving.
+  const delegateControl = html`
+    <div class="sec-delegate">
+      ${agents.length === 0
+        ? html`<span class="sec-hint">${t('secretary.next.delegateNoAgents')}</span>`
+        : html`
+          <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
+            <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
+            ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${escHtml(a.name)}</option>`)}
+          </select>
+          <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>`}
+    </div>`;
   return html`
     <li class="sec-step-row ${s.status}" key=${s.id}>
       <div class="sec-step-main">
@@ -260,10 +276,14 @@ function routineStepRow(p, r, s) {
         </div>
         <div class="sec-step-summary">${escHtml(s.summary)}</div>
         ${s.result ? html`<div class="sec-hint">→ ${escHtml(s.result.summary)}</div>` : null}
+        ${s.status === 'delegated' && s.result && s.result.taskId ? html`
+          <button class="btn-ghost btn-sm" disabled=${p.checkingStepId === s.id} onClick=${() => p.checkDelegateResult(r, s)}>${p.checkingStepId === s.id ? t('secretary.next.running') : t('secretary.next.checkResult')}</button>` : null}
       </div>
       ${s.status === 'pending'
         ? (isNext
-          ? html`<button class="btn-primary btn-sm" disabled=${busy} onClick=${() => p.approveStep(r, s)}>${busy ? t('secretary.next.running') : runLabel}</button>`
+          ? (isDelegate
+            ? delegateControl
+            : html`<button class="btn-primary btn-sm" disabled=${busy} onClick=${() => p.approveStep(r, s)}>${busy ? t('secretary.next.running') : runLabel}</button>`)
           : html`<span class="sec-hint">${t('secretary.next.queued')}</span>`)
         : html`<span class="sec-step-status sec-${s.status}">${t('secretary.next.status.' + s.status)}</span>`}
     </li>`;

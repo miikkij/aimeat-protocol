@@ -1047,6 +1047,53 @@ await test('57. quickActions round-trip: a proposed action persists, approval fl
     assert(qas.every((a: any) => a.kind !== 'run'), 'no run action should ever be present');
 });
 
+console.log('\nB4 -- Delegation in routines');
+
+await test('58. Delegate step creates an agent task for the target agent (queued, parent = routine)', async () => {
+    // `scout` was connected for ownerName in test 35 (device-auth approve). Delegate to it.
+    const create = await json('/v1/agents/scout/tasks', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Research competitor pricing', description: 'From the Outreach routine', status: 'queued', parent_task_id: 'r-deleg1' }),
+    });
+    assert(create.status === 201, `create task status ${create.status}: ${JSON.stringify(create.body)}`);
+    const task = create.body.data.task;
+    assert(typeof task.id === 'string' && task.id.length > 0, 'got a task id');
+    assert(task.parentTaskId === 'r-deleg1', `parent lineage: ${task.parentTaskId}`);
+    assert(task.title === 'Research competitor pricing', `title: ${task.title}`);
+    // Read it back as the target agent's task (this is what checkDelegateResult does).
+    const got = await json(`/v1/agents/scout/tasks/${task.id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(got.status === 200 && got.body.data.task.id === task.id, `task readback: ${got.status}`);
+    assert(['queued', 'active'].includes(got.body.data.task.status), `task status: ${got.body.data.task.status}`);
+});
+
+await test('59. Routine tracks the delegated step (status delegated + task ref persist)', async () => {
+    const create = await json('/v1/agents/scout/tasks', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Draft outreach email', status: 'queued', parent_task_id: 'r-deleg2' }),
+    });
+    const taskId = create.body.data.task.id;
+    const ts = new Date().toISOString();
+    const routine = {
+        id: 'r-deleg2', title: 'Outreach', purpose: 'reach out',
+        steps: [{ id: 's1', capability: 'delegate', summary: 'Draft outreach email', band: 'ask', status: 'delegated', result: { summary: 'Delegated to scout', taskId, agentName: 'scout', ts } }],
+        cadence: null, status: 'active', lastRunAt: ts, nextRunAt: null, results: [{ ts, summary: 'Delegated to scout' }], createdBy: 'owner', createdAt: ts,
+    };
+    const cfg = { activeContextId: 'dc1', contexts: [{ id: 'dc1', name: 'Deleg', brain: { purpose: 'x', rules: [] }, organismId: selfOrgId, organismName: 'D', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [], routines: [routine] }] };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    const r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const st = r.body.data.value.contexts[0].routines[0].steps[0];
+    assert(st.status === 'delegated', `step status: ${st.status}`);
+    assert(st.result.taskId === taskId && st.result.agentName === 'scout', `task ref: ${JSON.stringify(st.result)}`);
+});
+
+await test('60. Failure mode: delegating to an unknown agent is rejected', async () => {
+    const r = await json('/v1/agents/nope-not-an-agent/tasks', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'x', status: 'queued' }),
+    });
+    assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

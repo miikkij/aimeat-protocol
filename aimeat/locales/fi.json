@@ -840,12 +840,20 @@
       "resultFound": "Löytyi {n} olemassa olevaa resurssia",
       "resultFiled": "Arkistoitu: {ws}",
       "resultNoted": "Kirjattu",
-      "resultDeferred": "Lykätty — vaatii delegoinnin (tulossa)",
+      "resultDeferred": "Lykätty — ei vielä saatavilla",
       "resultSkipped": "Ohitettu (kaista off)",
+      "resultDelegated": "Delegoitu agentille {agent}",
+      "resultDelegateStatus": "{agent}: tehtävä {status}",
+      "delegatePick": "Valitse agentti…",
+      "delegateGo": "Delegoi",
+      "delegateNoAgent": "Valitse ensin agentti, jolle delegoidaan",
+      "delegateNoAgents": "Ei muita agentteja delegoitavaksi — yhdistä sellainen kohdassa Hallinta → tiimi.",
+      "checkResult": "Tarkista tulos",
       "status": {
         "done": "valmis",
         "skipped": "ohitettu",
         "deferred": "lykätty",
+        "delegated": "delegoitu",
         "pending": "odottaa"
       }
     },
