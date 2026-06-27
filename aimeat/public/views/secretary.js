@@ -8,9 +8,14 @@
  *   Presentational cards live in ./secretary/cards.js; pure helpers in /js/services/secretary-helpers.js.
  *   Pure frontend orchestration over generic endpoints (directives + organisms + memory + ai/complete +
  *   agent-messages + discover). Full design: docs/plans/2026-06-23-secretary-feature.md.
- * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js)
+ * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.12.0 — 2026-06-27 — B1 (secretary-view-redesign): dashboard-first IA. A core quick-action row
+ *     ("Where do things stand?" read-only orientation · Plan/Find/Note focus · Review decisions when
+ *     due), a "Today" status strip (reliability · budget · next run · last-scan + stale + refresh) above
+ *     the feed/decision-log, chat below, and the set-up-once config cards (brain/operating/crew/knowledge/
+ *     access/history/permissions) moved into a collapsed "Manage & setup" disclosure. Chrome in dashboard.js.
  *   v0.11.0 — 2026-06-25 — load() reads OpenRouter settings first (which backfills the Secretary agent
  *     when a key exists) and tracks hasOpenRouterKey, so a pre-configured owner is provisioned on view
  *     load and the "not set up" message correctly distinguishes "no key" from "provisioning".
@@ -44,6 +49,7 @@ import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, guidedPlanCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
+import { quickActionRow, dashStatus, standPanel, manageHeader } from '/views/secretary/dashboard.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useGuidedPlan } from '/views/secretary/use-guided-plan.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
@@ -80,6 +86,8 @@ export default function SecretaryView() {
   const [findScope, setFindScope] = useState('public');
   const [findResults, setFindResults] = useState(null);  // null=not searched, []=none, [...]
   const [finding, setFinding] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);   // B1: collapsed "Manage & setup" disclosure
+  const [stand, setStand] = useState(null);              // B1: read-only "where things stand" summary { loading } | { text }
 
   const owner = (secretary && secretary.owner)
     || (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession && window.AIMEAT.auth.getSession()?.owner)
@@ -138,6 +146,7 @@ export default function SecretaryView() {
 
   // Load the active context's conversation (chat is per-context).
   useEffect(() => {
+    setStand(null);
     if (!activeId) { setChat([]); return; }
     let cancelled = false;
     setChat([]);
@@ -295,6 +304,56 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     }
   }, [findQ, findScope, showToast]);
 
+  // ── B1 dashboard: freshness, refresh, focus-scroll, and the read-only orientation summary ──
+  // Last "scan" = newest of the autonomous feed entry / the tick's last run (no new backend in B1);
+  // stale once it's older than a daily cadence (28h of slack).
+  const lastScan = useMemo(() => {
+    const feedTs = (auto.feed[0] && auto.feed[0].ts) ? new Date(auto.feed[0].ts).getTime() : 0;
+    const runTs = (auto.schedule && auto.schedule.lastRunAt) ? new Date(auto.schedule.lastRunAt).getTime() : 0;
+    const ts = Math.max(feedTs, runTs);
+    return ts ? new Date(ts).toISOString() : null;
+  }, [auto.feed, auto.schedule]);
+  const stale = useMemo(() => !lastScan || (Date.now() - new Date(lastScan).getTime()) > 28 * 3600 * 1000, [lastScan]);
+
+  // Reconcile/scan = refresh the snapshot. Dispatching the live-update event re-fires every hook's
+  // listener (config + feed/schedule + goals/decisions) in one shot — no new wiring needed.
+  const refreshAll = useCallback(() => { window.dispatchEvent(new CustomEvent('aimeat-live-update')); }, []);
+
+  // Quick-action "focus" verbs: smooth-scroll a working card into view and focus its input.
+  const focusInto = useCallback((sel, inputSel) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (inputSel) { const i = el.querySelector(inputSel); if (i) setTimeout(() => i.focus(), 250); }
+  }, []);
+
+  // "Review decisions" is only offered when an open decision is due for its revisit.
+  const decisionsDue = useMemo(() => {
+    const now = Date.now();
+    return (learn.decisions || []).some((d) => d && d.status === 'open' && d.revisitWhen && new Date(d.revisitWhen).getTime() <= now);
+  }, [learn.decisions]);
+
+  // "Where do things stand?" — a read-only orientation summary (NOT the acting tick): no actions, just
+  // a status readout grounded in the active context's brain + open goals/decisions + recent activity.
+  const runStand = useCallback(async () => {
+    if (!active) return;
+    setStand({ loading: true });
+    try {
+      const openGoals = (learn.goals || []).filter((g) => g.status !== 'done').map((g) => '- ' + g.title).join('\n');
+      const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
+      const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
+      const wsNames = (active.workspaces || []).map((w) => w.name).join(', ');
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now and what the user might want to look at next. This is a status readout only — do NOT propose to take actions yourself and do NOT claim to have done anything. 3–6 sentences of plain prose, in the user's language.`;
+      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspaces: ${wsNames || '(none)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
+      const text = (r && r.data && r.data.content) ? r.data.content.trim() : '';
+      setStand({ text: text || '…' });
+    } catch (e) {
+      setStand(null);
+      showToast(`${t('secretary.dash.standError')}: ${e.message}`, true);
+    }
+  }, [active, owner, learn.goals, learn.decisions, auto.feed, showToast]);
+
   const switchContext = useCallback(async (id) => {
     const ctx = contexts.find((c) => c.id === id);
     if (!ctx) return;
@@ -353,24 +412,46 @@ ${SECRETARY_AIMEAT_PRIMER}`;
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
             ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
             ${hired && !showHire && active ? html`
+              ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
+              ${quickActionRow({ items: [
+                { key: 'stand', label: t('secretary.dash.quickStand'), primary: true, disabled: !!(stand && stand.loading), onClick: runStand },
+                { key: 'plan', label: t('secretary.dash.quickPlan'), title: t('secretary.plan.title'), onClick: () => focusInto('.sec-plan', 'textarea') },
+                { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
+                { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
+                { key: 'review', label: t('secretary.dash.quickReview'), title: t('secretary.learn.reviewNow'), hidden: !decisionsDue, onClick: () => focusInto('.sec-decisions-log', null) },
+              ] })}
+
+              ${/* Today / dashboard — where are we + is this current */ ''}
+              ${standPanel({ stand, onDismiss: () => setStand(null) })}
+              ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onRefresh: refreshAll })}
+              ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
+              ${automationCard({ ...auto, budgetInfo })}
+              ${feedCard(auto)}
+              ${goalsCard(learn)}
+              ${decisionLogCard(learn)}
+
+              ${/* Chat (free-form, per context) */ ''}
               ${chatCard({ activeName: active.name, chat, chatSending, chatInput, setChatInput, sendChat, routeSuggestion, switchContext,
                 onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 })}
+
+              ${/* Working area — the inputs the quick verbs focus */ ''}
+              ${guidedPlanCard(plan)}
               ${findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults })}
               ${(findResults && findResults.length === 0) || create.draft || create.created ? createResourceCard({ ...create, query: findQ }) : null}
               ${wsList.length > 0 ? noteCard(intake) : null}
-              ${knowledgeCard(knowledge)}
-              ${accessCard(access)}
-              ${crewCard(crew)}
-              ${guidedPlanCard(plan)}
-              ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
-              ${goalsCard(learn)}
-              ${decisionLogCard(learn)}
-              ${automationCard({ ...auto, budgetInfo })}
-              ${feedCard(auto)}
-              ${brainCard({ brain, active, openEdit })}
-              ${operatingCard({ policy, toggleStop, setBudget, setBand })}
-              ${(Array.isArray(active.brainHistory) && active.brainHistory.length > 0) ? historyCard({ brainHistory: active.brainHistory, applying, restore }) : null}
-              ${metaCard({ secretary, reliability })}
+
+              ${/* Manage & setup — collapsed disclosure (set up once) */ ''}
+              ${manageHeader({ open: manageOpen, onToggle: () => setManageOpen((v) => !v),
+                crewSummary: crew.agents && crew.agents.length ? `${crew.agents.length} ${t('secretary.dash.crewAgents')}` : '' })}
+              ${manageOpen ? html`
+                ${brainCard({ brain, active, openEdit })}
+                ${operatingCard({ policy, toggleStop, setBudget, setBand })}
+                ${crewCard(crew)}
+                ${knowledgeCard(knowledge)}
+                ${accessCard(access)}
+                ${(Array.isArray(active.brainHistory) && active.brainHistory.length > 0) ? historyCard({ brainHistory: active.brainHistory, applying, restore }) : null}
+                ${metaCard({ secretary, reliability })}
+              ` : null}
             ` : null}`}
       <${ToastContainer} />
     </div>`;
