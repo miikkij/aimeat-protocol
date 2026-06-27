@@ -16,10 +16,12 @@
  *   capabilities file a note into the self-organism; FEED capabilities append to the Home feed; anything
  *   else is "unsupported" and dropped (surfaced in the briefing instead of fake-acting). See
  *   docs/plans/2026-06-24-secretary-p1-fix-prompt.md and docs/plans/2026-06-23-secretary-feature.md (§6/§7).
- * @structure ACTION_KINDS · actionKind · classifySecretaryActions · hasWorkToDo · ledgerSpentToday ·
- *   budgetExceeded · (P2-E) tokenize · scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
- * @usage import { classifySecretaryActions, hasWorkToDo, budgetExceeded, routeIntake, routeTickNote } from './secretary-tick.js';
+ * @structure ACTION_KINDS · actionKind · classifySecretaryActions · routeRoutineStep · hasWorkToDo ·
+ *   ledgerSpentToday · budgetExceeded · (P2-E) tokenize · scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
+ * @usage import { classifySecretaryActions, routeRoutineStep, hasWorkToDo, budgetExceeded, routeIntake, routeTickNote } from './secretary-tick.js';
  * @version-history
+ *   v0.4.0 — 2026-06-27 — B2: routeRoutineStep() — pure band-gating for a "What's next" Routine step
+ *     (act → run · draft|ask → confirm · off → skip), shared by the view + asserted in e2e-secretary.
  *   v0.3.0 — 2026-06-24 — G1: routeTickNote() — the autonomous tick's cross-context note-routing decision.
  *   v0.2.0 — 2026-06-24 — P2-E: cross-context intake routing + corrections-teach (pure, AI-free).
  *   v0.1.0 — 2026-06-24 — P1: tick action loop + idle pre-check + soft budget guard.
@@ -84,6 +86,39 @@ export function classifySecretaryActions(
     else asks.push(item); // 'draft' and 'ask' both surface a decision card
   }
   return { acts, asks, dropped };
+}
+
+/** Autonomy bands, least → most restrictive (mirrors public/js/services/secretary-policy.js BANDS). */
+export const BANDS = ['act', 'draft', 'ask', 'off'] as const;
+
+/** How an approved Routine step should be carried out, decided purely from its band (B2). */
+export type StepDisposition = 'run' | 'confirm' | 'skip';
+
+/** Result of band-gating one Routine step (the "What's next" approve flow). */
+export interface RoutineStepRoute {
+  /** The effective band: a valid step-level override wins, else the policy band, else conservative 'ask'. */
+  band: string;
+  /** run = act (perform when reached) · confirm = draft|ask (owner approves first) · skip = off (not run). */
+  disposition: StepDisposition;
+}
+
+/**
+ * Band-gate a single Routine step (B2 "What's next"). A step may carry its own `band` (seeded from the
+ * policy taxonomy when the routine is proposed); if absent or invalid, fall back to the context's
+ * `policy.bands[capability]`, else the conservative 'ask'. The disposition is band-only — act → run,
+ * draft|ask → confirm (owner approves first), off → skip — so it can be unit-tested without storage or AI.
+ * (Whether a capability has a B2 executor is a separate, frontend concern; delegation lands in B4.)
+ */
+export function routeRoutineStep(
+  step: { capability?: unknown; band?: unknown } | null | undefined,
+  bands: Record<string, string> | undefined,
+): RoutineStepRoute {
+  const capability = String(step?.capability ?? '').trim();
+  const override = typeof step?.band === 'string' && (BANDS as readonly string[]).includes(step.band) ? step.band : null;
+  const band = override
+    ?? ((bands && typeof bands[capability] === 'string') ? bands[capability] : 'ask');
+  const disposition: StepDisposition = band === 'off' ? 'skip' : band === 'act' ? 'run' : 'confirm';
+  return { band, disposition };
 }
 
 /**

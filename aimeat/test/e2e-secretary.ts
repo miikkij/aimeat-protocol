@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep } from '../src/services/secretary-tick.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -938,6 +938,66 @@ await test('Backfill: a pre-existing OpenRouter key provisions the Secretary on 
     const hasSecAfter = (after.body.data.agents || []).some((a: any) => (a.tags || []).includes('system:secretary'));
     assert(hasSecAfter, 'GET /v1/openrouter/settings must provision the Secretary when a key exists');
     await json(`/v1/owners/${encodeURIComponent(bfOwner)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${bfToken}` } });
+});
+
+console.log('\nB2 -- Routines + "What\'s next"');
+
+await test('52. routeRoutineStep band-gates a step (act→run, draft|ask→confirm, off→skip)', async () => {
+    const bands = { discover: 'act', file_intake: 'draft', create_resource: 'ask', delegate: 'off' };
+    assert(routeRoutineStep({ capability: 'discover' }, bands).disposition === 'run', 'act → run');
+    assert(routeRoutineStep({ capability: 'file_intake' }, bands).disposition === 'confirm', 'draft → confirm');
+    assert(routeRoutineStep({ capability: 'create_resource' }, bands).disposition === 'confirm', 'ask → confirm');
+    assert(routeRoutineStep({ capability: 'delegate' }, bands).disposition === 'skip', 'off → skip');
+    // A valid step-level band override wins over the policy band.
+    const ovr = routeRoutineStep({ capability: 'discover', band: 'off' }, bands);
+    assert(ovr.band === 'off' && ovr.disposition === 'skip', `override: ${JSON.stringify(ovr)}`);
+    // No override + capability absent from policy → conservative 'ask' → confirm (never a silent run).
+    const miss = routeRoutineStep({ capability: 'unknown_cap' }, {});
+    assert(miss.band === 'ask' && miss.disposition === 'confirm', `missing band: ${JSON.stringify(miss)}`);
+});
+
+await test('53. Routine entity round-trips on secretary.config (contexts[i].routines[])', async () => {
+    const routine = {
+        id: 'r-test1', title: 'Weekly scout', purpose: 'Find what exists before building',
+        steps: [
+            { id: 's1', capability: 'discover', summary: 'Scout existing services', band: 'act', status: 'pending', result: null },
+            { id: 's2', capability: 'file_intake', summary: 'File the findings', band: 'draft', status: 'pending', result: null },
+        ],
+        cadence: null, status: 'active', lastRunAt: null, nextRunAt: null, results: [], createdBy: 'owner', createdAt: new Date().toISOString(),
+    };
+    const cfg = { activeContextId: 'rc1', contexts: [{ id: 'rc1', name: 'Routines', brain: { purpose: 'x', rules: [] }, organismId: selfOrgId, organismName: 'R', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [], routines: [routine] }] };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    const { body } = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const r = body.data.value.contexts[0].routines[0];
+    assert(!!r && r.id === 'r-test1' && Array.isArray(r.steps) && r.steps.length === 2, `routine: ${JSON.stringify(r)}`);
+    assert(r.steps[0].capability === 'discover' && r.steps[0].band === 'act' && r.steps[0].status === 'pending', `step0: ${JSON.stringify(r.steps[0])}`);
+    assert(r.status === 'active' && r.createdBy === 'owner', `routine meta: ${JSON.stringify({ status: r.status, createdBy: r.createdBy })}`);
+});
+
+await test('54. Advancing a routine persists step status + result (and flips status=done when all settled)', async () => {
+    // Read the current config + advance both steps — mirrors the view's read-modify-write via /v1/memory.
+    const cur = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const cfg = cur.body.data.value;
+    const ctx = cfg.contexts[0];
+    const ts = new Date().toISOString();
+    const advanced = {
+        ...ctx.routines[0],
+        steps: ctx.routines[0].steps.map((s: any) => ({ ...s, status: 'done', result: { summary: `ran ${s.capability}`, ts } })),
+        results: [{ ts, summary: 'ran file_intake' }, { ts, summary: 'ran discover' }],
+        lastRunAt: ts, status: 'done',
+    };
+    const next = { ...cfg, contexts: cfg.contexts.map((c: any) => (c.id === ctx.id ? { ...c, routines: [advanced] } : c)) };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: next, visibility: 'private' }) });
+    const { body } = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const r = body.data.value.contexts[0].routines[0];
+    assert(r.steps.every((s: any) => s.status === 'done'), `steps not all done: ${JSON.stringify(r.steps.map((s: any) => s.status))}`);
+    assert(!!r.steps[0].result && /discover/.test(r.steps[0].result.summary), `step0 result: ${JSON.stringify(r.steps[0].result)}`);
+    assert(r.status === 'done' && r.results.length === 2 && r.lastRunAt === ts, `routine final: ${JSON.stringify({ status: r.status, results: r.results.length })}`);
+});
+
+await test('55. Failure mode: an unauthenticated routine (secretary.config) write is rejected', async () => {
+    const { status } = await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'secretary.config', value: { contexts: [] }, visibility: 'private' }) });
+    assert(status === 401 || status === 403, `expected 401/403, got ${status}`);
 });
 
 console.log('\nCleanup');

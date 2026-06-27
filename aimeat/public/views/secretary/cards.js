@@ -4,10 +4,12 @@
  *   main component focused on state + logic (and under the file-size limit). Each export is a PURE render
  *   function taking a props bag — no hooks, no state — so the view owns all state/handlers and passes
  *   them in. Cards: contextSwitcher · hirePanel · chatCard · findCard · noteCard · decisionsCard ·
- *   brainCard · operatingCard · historyCard · metaCard. See views/secretary.js + docs/plans/2026-06-23-secretary-feature.md.
+ *   brainCard · operatingCard · historyCard · metaCard · whatsNextCard. See views/secretary.js + docs/plans/2026-06-23-secretary-feature.md.
  * @structure one exported render function per card (props in → htm out)
  * @usage import { chatCard, findCard, ... } from '/views/secretary/cards.js'; ... ${chatCard({...})}
  * @version-history
+ *   v0.7.0 — 2026-06-27 — B2: replace guidedPlanCard with whatsNextCard (Routine propose/advance,
+ *     band-gated steps + per-step approve/run); guided-plan flow folded into "What's next".
  *   v0.6.0 — 2026-06-24 — P3-A: chatCard gains a doc/image attach control (📎) + an in-flight /
  *     filed status line, driven by the intake hook's handleAttach.
  *   v0.5.0 — 2026-06-24 — P2-E: noteCard shows the cross-context route banner (auto-route to a
@@ -243,35 +245,56 @@ export function historyCard(p) {
     </section>`;
 }
 
-/** Guided playbook (Phase 3c): propose steps → approve → execute (file + discover) → result. */
-export function guidedPlanCard(p) {
+/** A single Routine step row (B2): capability + band + summary + result, with the approve/run control. */
+function routineStepRow(p, r, s) {
+  const next = p.nextPendingStep(r);
+  const isNext = next && next.id === s.id;
+  const busy = p.busyStepId === s.id;
+  const runLabel = s.band === 'off' ? t('secretary.next.skip') : s.band === 'act' ? t('secretary.next.run') : t('secretary.next.approve');
   return html`
-    <section class="sec-card sec-plan">
-      <h2 class="sec-h2">${t('secretary.plan.title')}</h2>
-      <p class="sec-hint">${t('secretary.plan.hint')}</p>
-      ${!p.steps && !p.result ? html`
-        <textarea class="sec-paste" rows="2" placeholder=${t('secretary.plan.placeholder')} value=${p.goal} onInput=${(e) => p.setGoal(e.target.value)}></textarea>
+    <li class="sec-step-row ${s.status}" key=${s.id}>
+      <div class="sec-step-main">
+        <div class="sec-step-tags">
+          <span class="sec-step-cap">${t('secretary.cap.' + s.capability)}</span>
+          <span class="sec-band-tag band-${s.band}">${t('secretary.band.' + s.band)}</span>
+        </div>
+        <div class="sec-step-summary">${escHtml(s.summary)}</div>
+        ${s.result ? html`<div class="sec-hint">→ ${escHtml(s.result.summary)}</div>` : null}
+      </div>
+      ${s.status === 'pending'
+        ? (isNext
+          ? html`<button class="btn-primary btn-sm" disabled=${busy} onClick=${() => p.approveStep(r, s)}>${busy ? t('secretary.next.running') : runLabel}</button>`
+          : html`<span class="sec-hint">${t('secretary.next.queued')}</span>`)
+        : html`<span class="sec-step-status sec-${s.status}">${t('secretary.next.status.' + s.status)}</span>`}
+    </li>`;
+}
+
+/** B2 "What's next": propose a NEW routine from a goal, or walk the selected one step-by-step (band-gated). */
+export function whatsNextCard(p) {
+  const r = p.selected;
+  return html`
+    <section class="sec-card sec-next">
+      <h2 class="sec-h2">${t('secretary.next.title')}</h2>
+      <p class="sec-hint">${t('secretary.next.hint')}</p>
+      ${!r ? html`
+        <textarea class="sec-paste" rows="2" placeholder=${t('secretary.next.placeholder')} value=${p.goal} onInput=${(e) => p.setGoal(e.target.value)}></textarea>
         <div class="sec-actions">
-          <button class="btn-primary" disabled=${!p.goal.trim() || p.planning} onClick=${p.planIt}>${p.planning ? t('secretary.plan.planning') : t('secretary.plan.go')}</button>
-        </div>` : null}
-      ${p.steps && !p.result ? html`
-        <div class="sec-plan-steps">
-          ${p.steps.summary ? html`<p class="sec-purpose">${escHtml(p.steps.summary)}</p>` : null}
-          <ol class="sec-rules">
-            ${p.steps.steps.map((s, i) => html`<li key=${i}><strong>${escHtml(s.title)}</strong>${s.detail ? html` — ${escHtml(s.detail)}` : null}</li>`)}
-          </ol>
-          <div class="sec-actions">
-            <button class="btn-ghost btn-sm" onClick=${p.cancelPlan}>${t('secretary.cancel')}</button>
-            <button class="btn-primary" disabled=${p.running} onClick=${p.runPlan}>${p.running ? t('secretary.plan.running') : t('secretary.plan.approve')}</button>
+          <button class="btn-primary" disabled=${!p.goal.trim() || p.proposing} onClick=${p.proposeRoutine}>${p.proposing ? t('secretary.next.proposing') : t('secretary.next.propose')}</button>
+        </div>` : html`
+        <div class="sec-routine">
+          <div class="sec-routine-head">
+            <div>
+              <div class="sec-routine-title">${escHtml(r.title)}</div>
+              ${r.purpose ? html`<div class="sec-hint">${escHtml(r.purpose)}</div>` : null}
+            </div>
+            ${r.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.status.done')}</span>` : null}
           </div>
-        </div>` : null}
-      ${p.result ? html`
-        <div class="sec-plan-result">
-          <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.plan.ran')}</div>
-          ${p.result.wsName ? html`<p class="sec-hint">${t('secretary.plan.filed')} <strong>${escHtml(p.result.wsName)}</strong></p>` : null}
-          <p class="sec-hint">${t('secretary.plan.found')} ${p.result.found}</p>
-          <button class="btn-ghost btn-sm" onClick=${p.resetPlan}>${t('secretary.plan.new')}</button>
-        </div>` : null}
+          <ul class="sec-step-list">${r.steps.map((s) => routineStepRow(p, r, s))}</ul>
+          <div class="sec-actions sec-routine-actions">
+            <button class="btn-ghost btn-sm" onClick=${() => p.setSelectedId(null)}>${t('secretary.next.startNew')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => p.deleteRoutine(r)}>${t('secretary.next.discard')}</button>
+          </div>
+        </div>`}
     </section>`;
 }
 
