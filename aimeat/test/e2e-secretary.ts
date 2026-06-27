@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -1141,6 +1141,28 @@ await test('63. actionItemKey de-dups identical items; a delegated step stays su
     assert(k1 === k2 && k1 !== k3, `keys: ${k1} ${k2} ${k3}`);
     const { items, runFileSteps } = deriveRoutineActions({ policy: { bands: {} }, routines: [{ id: 'rdel', status: 'active', steps: [{ id: 's1', capability: 'delegate', status: 'delegated', summary: 'd', result: { taskId: 'tk' } }] }] });
     assert(runFileSteps.length === 0 && items.length === 1 && items[0].suggestedAction.kind === 'check-delegate', `delegated surfaced: ${JSON.stringify(items)}`);
+});
+
+console.log('\nG2 -- Recurring routines (cadence re-arm)');
+
+await test('64. routineDueForRearm + rearmRoutine: a completed daily routine re-arms after its interval', async () => {
+    assert(cadenceMs('daily') === 86400000 && cadenceMs('weekly') === 604800000 && cadenceMs(null) === null, 'cadenceMs');
+    const nowMs = Date.parse('2026-06-28T12:00:00.000Z');
+    const base = { id: 'r1', status: 'done', steps: [{ id: 's1', capability: 'file_intake', status: 'done', result: { summary: 'did it' } }] };
+    // done + daily + last run 2 days ago → due.
+    assert(routineDueForRearm({ ...base, cadence: 'daily', lastRunAt: '2026-06-26T12:00:00.000Z' }, nowMs) === true, 'elapsed daily → due');
+    // done + daily + last run 1h ago → NOT due.
+    assert(routineDueForRearm({ ...base, cadence: 'daily', lastRunAt: '2026-06-28T11:00:00.000Z' }, nowMs) === false, 'fresh daily → not due');
+    // no cadence / not done → never due.
+    assert(routineDueForRearm({ ...base, cadence: null, lastRunAt: '2020-01-01T00:00:00.000Z' }, nowMs) === false, 'no cadence → not due');
+    assert(routineDueForRearm({ ...base, status: 'active', cadence: 'daily', lastRunAt: '2020-01-01T00:00:00.000Z' }, nowMs) === false, 'not-done → not due');
+    // nextRunAt in the past → due even if lastRunAt is recent.
+    assert(routineDueForRearm({ ...base, cadence: 'weekly', lastRunAt: '2026-06-28T11:00:00.000Z', nextRunAt: '2026-06-28T11:30:00.000Z' }, nowMs) === true, 'past nextRunAt → due');
+    // rearmRoutine resets steps to pending, re-activates, schedules the next run, keeps results log.
+    const armed = rearmRoutine({ ...base, cadence: 'daily', lastRunAt: '2026-06-26T12:00:00.000Z', results: [{ ts: 'x', summary: 'prev' }] }, '2026-06-28T12:00:00.000Z', nowMs);
+    assert(armed.status === 'active' && armed.steps.every(s => s.status === 'pending' && s.result === null), `re-armed steps: ${JSON.stringify(armed.steps)}`);
+    assert(armed.nextRunAt === '2026-06-29T12:00:00.000Z', `nextRunAt: ${armed.nextRunAt}`);
+    assert(Array.isArray(armed.results) && armed.results.length === 1, 'keeps the prior run results log');
 });
 
 console.log('\nCleanup');

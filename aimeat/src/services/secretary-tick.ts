@@ -21,6 +21,8 @@
  *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
  * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
+ *   v0.8.0 — 2026-06-28 — G2: recurring routines — cadenceMs / routineDueForRearm / rearmRoutine (the
+ *     tick re-arms a completed routine on its cadence: steps → pending, re-activated, next run scheduled).
  *   v0.7.0 — 2026-06-28 — G5: deriveRoutineActions emits a structured `labelKind` + `summary` (not a
  *     server-composed English `text`) so the frontend renders the action-item label via t() (en+fi).
  *   v0.6.0 — 2026-06-28 — B5: deriveRoutineActions() — band-driven routine advancement for the tick
@@ -133,7 +135,7 @@ export function routeRoutineStep(
 
 /** Loose shapes for the view-authored Routine + ActionItem records the tick reads/advances (B2/B5). */
 export interface RoutineStepLike { id?: string; capability?: string; summary?: string; band?: string; status?: string; result?: { taskId?: string; agentName?: string; summary?: string } | null; }
-export interface RoutineLike { id?: string; title?: string; status?: string; steps?: RoutineStepLike[]; results?: Array<{ ts?: string; summary?: string }>; }
+export interface RoutineLike { id?: string; title?: string; status?: string; steps?: RoutineStepLike[]; results?: Array<{ ts?: string; summary?: string }>; cadence?: string | null; lastRunAt?: string | null; nextRunAt?: string | null; }
 // G5: action-items carry a STRUCTURED `labelKind` + the step `summary` so the FRONTEND renders the label
 // via t() (the tick is server-side and must not compose a fixed-language string). `text` is kept optional
 // for any legacy item written before G5 (the frontend falls back to it).
@@ -143,6 +145,36 @@ export interface ActionItemDraft { labelKind: 'approve' | 'ready' | 'check-deleg
 
 /** Routine-step capabilities the tick can perform autonomously today (note-filing into the self-organism). */
 const TICK_FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
+
+// ── G2: recurring routines ── the tick re-arms a completed routine on its cadence so it runs again.
+/** Supported routine cadences → their interval in ms (null = run-once / no recurrence). */
+export function cadenceMs(cadence: string | null | undefined): number | null {
+  if (cadence === 'daily') return 24 * 3600 * 1000;
+  if (cadence === 'weekly') return 7 * 24 * 3600 * 1000;
+  return null;
+}
+
+/**
+ * Is a routine due to be re-armed (G2)? True iff it has a real cadence, a full run has COMPLETED
+ * (status 'done'), and the cadence interval has elapsed since its last run (nextRunAt if set, else
+ * lastRunAt + interval). Pure — the tick calls this, then rearmRoutine, then persists.
+ */
+export function routineDueForRearm(routine: RoutineLike, nowMs: number): boolean {
+  const ms = cadenceMs(routine.cadence);
+  if (ms === null) return false;
+  if (routine.status !== 'done') return false;
+  const next = routine.nextRunAt ? Date.parse(routine.nextRunAt)
+    : (routine.lastRunAt ? Date.parse(routine.lastRunAt) + ms : nowMs);
+  return !Number.isNaN(next) && next <= nowMs;
+}
+
+/** Re-arm a due routine (G2): reset every step to 'pending' (clearing its result), re-activate the
+ *  routine, and schedule the next run. The prior run's `results` log is kept. Pure. */
+export function rearmRoutine(routine: RoutineLike, nowIso: string, nowMs: number): RoutineLike {
+  const ms = cadenceMs(routine.cadence) ?? 0;
+  const steps = (routine.steps || []).map((s) => ({ ...s, status: 'pending', result: null }));
+  return { ...routine, steps, status: 'active', lastRunAt: nowIso, nextRunAt: new Date(nowMs + ms).toISOString() };
+}
 
 /** A stable key for an action item (so the tick doesn't re-add the same one every fire). */
 export function actionItemKey(a: { suggestedAction?: { kind?: string; routineId?: string; stepId?: string }; source?: string }): string {

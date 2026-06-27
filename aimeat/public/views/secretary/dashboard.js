@@ -129,7 +129,7 @@ export function routinesCard(p) {
           return html`
             <li class="sec-routine-row" key=${r.id}>
               <div class="sec-routine-main">
-                <div class="sec-routine-title">${escHtml(r.title)}</div>
+                <div class="sec-routine-title">${escHtml(r.title)}${r.cadence ? html` <span class="sec-cadence-badge">${t('secretary.next.cadence.' + r.cadence)}</span>` : null}</div>
                 ${last ? html`<div class="sec-hint">${t('secretary.next.last')}: ${escHtml(last.summary)}</div>` : null}
                 ${next
                   ? html`<div class="sec-hint">${t('secretary.next.next')}: ${escHtml(next.summary)}</div>`
