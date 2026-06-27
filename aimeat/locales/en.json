@@ -879,6 +879,11 @@
       "composeTarget": "focuses",
       "kind": { "prompt": "message", "compose": "open" }
     },
+    "items": {
+      "title": "Action items",
+      "dismiss": "Dismiss",
+      "handle": { "advance": "Open", "check-delegate": "Check result" }
+    },
     "plan": {
       "title": "Guided plan",
       "hint": "Tell me a goal — I'll propose a few steps. Approve them and I'll file the plan and scout what already exists.",

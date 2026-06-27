@@ -11,6 +11,10 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.15.0 — 2026-06-28 — B5 (secretary-view-redesign): action-items. The autonomous tick now advances
+ *     active routines band-driven (act-band file steps auto-run; draft/ask/delegate → action-items) and
+ *     writes contexts[i].actionItems[]; the dashboard renders them (actionItemsCard) with a one-click
+ *     handle (open the routine / check a delegated result) or dismiss. Handlers in useWhatsNext.
  *   v0.14.0 — 2026-06-27 — B3 (secretary-view-redesign): dynamic quick actions. useQuickActions manages
  *     per-context quickActions[] — 2–3 brain-seeded shortcuts (active on hire) + secretary-PROPOSED ones
  *     the owner pins. Active dynamic actions render in the quick row (prompt → canned chat message, compose
@@ -59,7 +63,7 @@ import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
@@ -453,6 +457,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Today / dashboard — where are we + is this current */ ''}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onRefresh: refreshAll })}
+              ${actionItemsCard(next)}
               ${routinesCard(next)}
               ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
               ${automationCard({ ...auto, budgetInfo })}

@@ -879,6 +879,11 @@
       "composeTarget": "avaa",
       "kind": { "prompt": "viesti", "compose": "avaa" }
     },
+    "items": {
+      "title": "Toimenpiteet",
+      "dismiss": "Hylkää",
+      "handle": { "advance": "Avaa", "check-delegate": "Tarkista tulos" }
+    },
     "plan": {
       "title": "Ohjattu suunnitelma",
       "hint": "Kerro tavoite — ehdotan muutaman askeleen. Hyväksy ne, niin arkistoin suunnitelman ja kartoitan mitä on jo olemassa.",

@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey } from '../src/services/secretary-tick.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -1092,6 +1092,53 @@ await test('60. Failure mode: delegating to an unknown agent is rejected', async
         body: JSON.stringify({ title: 'x', status: 'queued' }),
     });
     assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+console.log('\nB5 -- Supervise = action-items + tick re-target');
+
+await test('61. deriveRoutineActions: band-driven (act+file→run, draft/ask→item, act+discover→ready, delegated→check, off→skip)', async () => {
+    const ctx = {
+        policy: { bands: { file_intake: 'act', curate_knowledge: 'draft', discover: 'act', delegate: 'ask', reminders: 'off' } },
+        routines: [
+            { id: 'ra', status: 'active', steps: [{ id: 's1', capability: 'file_intake', status: 'pending', summary: 'file it' }] },
+            { id: 'rb', status: 'active', steps: [{ id: 's1', capability: 'curate_knowledge', status: 'pending', summary: 'curate it' }] },
+            { id: 'rc', status: 'active', steps: [{ id: 's1', capability: 'discover', status: 'pending', summary: 'scout it' }] },
+            { id: 'rd', status: 'active', steps: [{ id: 's1', capability: 'delegate', status: 'delegated', summary: 'deleg', result: { taskId: 't1' } }, { id: 's2', capability: 'file_intake', status: 'pending', summary: 'next' }] },
+            { id: 're', status: 'done', steps: [{ id: 's1', capability: 'file_intake', status: 'done', summary: 'x' }] },
+            { id: 'rf', status: 'active', steps: [{ id: 's1', capability: 'reminders', status: 'pending', summary: 'off step' }] },
+        ],
+    };
+    const { items, runFileSteps } = deriveRoutineActions(ctx);
+    assert(runFileSteps.length === 2 && runFileSteps.some(f => f.routineId === 'ra') && runFileSteps.some(f => f.routineId === 'rd'), `runFileSteps: ${JSON.stringify(runFileSteps)}`);
+    assert(items.length === 3, `items: ${JSON.stringify(items)}`);
+    assert(items.some(i => i.suggestedAction.kind === 'check-delegate' && i.suggestedAction.routineId === 'rd'), 'delegated → check-delegate item');
+    assert(items.some(i => i.suggestedAction.routineId === 'rb' && /Approve/.test(i.text)), 'draft → approve item');
+    assert(items.some(i => i.suggestedAction.routineId === 'rc' && /Ready/.test(i.text)), 'act+discover → ready item');
+});
+
+await test('62. A completed routine step yields the NEXT action-item; actionItems round-trip + dismiss', async () => {
+    const ctx = { policy: { bands: { file_intake: 'act', curate_knowledge: 'draft' } }, routines: [{ id: 'rx', status: 'active', steps: [{ id: 's1', capability: 'file_intake', status: 'done', summary: 'did 1' }, { id: 's2', capability: 'curate_knowledge', status: 'pending', summary: 'do 2' }] }] };
+    const { items } = deriveRoutineActions(ctx);
+    assert(items.length === 1 && items[0].suggestedAction.stepId === 's2', `expected next-step item: ${JSON.stringify(items)}`);
+    const item = { id: 'ai1', text: 'Approve: do 2', suggestedAction: { kind: 'advance', routineId: 'rx', stepId: 's2' }, source: 'rx', createdAt: new Date().toISOString(), status: 'open' };
+    const cfg = { activeContextId: 'ac1', contexts: [{ id: 'ac1', name: 'AI', brain: { purpose: 'x', rules: [] }, organismId: selfOrgId, organismName: 'AI', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [], actionItems: [item] }] };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    let r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.body.data.value.contexts[0].actionItems[0].status === 'open', 'item stored open');
+    const cur = r.body.data.value;
+    cur.contexts[0].actionItems = cur.contexts[0].actionItems.map((a: any) => ({ ...a, status: 'done' }));
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cur, visibility: 'private' }) });
+    r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.body.data.value.contexts[0].actionItems[0].status === 'done', 'item flips to done');
+});
+
+await test('63. actionItemKey de-dups identical items; a delegated step stays surfaced (B4/B5 fix)', async () => {
+    const k1 = actionItemKey({ suggestedAction: { kind: 'advance', routineId: 'r1', stepId: 's1' } });
+    const k2 = actionItemKey({ suggestedAction: { kind: 'advance', routineId: 'r1', stepId: 's1' } });
+    const k3 = actionItemKey({ suggestedAction: { kind: 'check-delegate', routineId: 'r1', stepId: 's1' } });
+    assert(k1 === k2 && k1 !== k3, `keys: ${k1} ${k2} ${k3}`);
+    const { items, runFileSteps } = deriveRoutineActions({ policy: { bands: {} }, routines: [{ id: 'rdel', status: 'active', steps: [{ id: 's1', capability: 'delegate', status: 'delegated', summary: 'd', result: { taskId: 'tk' } }] }] });
+    assert(runFileSteps.length === 0 && items.length === 1 && items[0].suggestedAction.kind === 'check-delegate', `delegated surfaced: ${JSON.stringify(items)}`);
 });
 
 console.log('\nCleanup');

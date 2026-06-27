@@ -52,7 +52,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections } from './secretary-tick.js';
+import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -84,6 +84,11 @@ interface SecretaryContext {
   organismName?: string | null;
   workspaces?: Array<{ name?: string; purpose?: string }>;
   policy?: SecretaryContextPolicy;
+  // B2/B5: Routines the Secretary runs + the follow-up action-items the tick derives (authored by the
+  // view; the tick advances act-band routine steps + appends action-items). Loosely typed — see
+  // RoutineLike/ActionItem in services/secretary-tick.ts and the frontend hooks for the full shape.
+  routines?: RoutineLike[];
+  actionItems?: ActionItem[];
 }
 interface SecretaryConfig {
   contexts?: SecretaryContext[];
@@ -601,13 +606,20 @@ export class Scheduler {
     const dueDecisions = decRecs
       .map((r) => (r.value ?? {}) as Record<string, unknown>)
       .filter((d) => d.status === 'open' && typeof d.revisitWhen === 'string' && Date.parse(d.revisitWhen as string) <= nowMs);
-    if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length })) {
-      return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals or decisions due)' };
+    // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
+    // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
+    const routineActions = deriveRoutineActions(active);
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runFileSteps.length > 0;
+    if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
+      return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
 
     const ownerName = owner.split('@')[0];
     const writes: string[] = [];
     const newPending: Record<string, unknown> = {};
+    // B5: routine step completions (act-band file steps the tick ran) + the action-items it derived.
+    const stepCompletions: Array<{ routineId: string; stepId: string; status: string; summary: string }> = [];
+    let newActionItems: ActionItem[] = [];
     let paidMorsels = 0;
 
     try {
@@ -620,9 +632,26 @@ export class Scheduler {
         writes.push(...reviewed.map((r) => `secretary.decision.${r.id}`));
       }
 
+      const wsList = await this.loadContextWorkspaces(owner, active);
+
+      // B5 routine pass (FREE — no AI): auto-run each act-band file step (file a note + mark the step
+      // done), and stamp the derived follow-up action-items. draft/ask/delegate steps were already turned
+      // into action-items by deriveRoutineActions — the owner handles those from the dashboard.
+      const nowIso = new Date().toISOString();
+      for (const fs of routineActions.runFileSteps) {
+        const routine = (active.routines || []).find((r) => r.id === fs.routineId);
+        const step = (routine?.steps || []).find((s) => s.id === fs.stepId);
+        if (!step) continue;
+        const a: RoutedAction = { capability: String(step.capability), summary: String(step.summary || ''), payload: { note: String(step.summary || '') }, kind: 'note', band: 'act' };
+        writes.push(...await this.performSecretaryAct(owner, active, a, wsList));
+        stepCompletions.push({ routineId: fs.routineId as string, stepId: fs.stepId as string, status: 'done', summary: `Filed: ${String(step.summary || '')}`.slice(0, 200) });
+      }
+      newActionItems = routineActions.items.map((it) => ({
+        id: 'ai-' + randomUUID().slice(0, 8), text: it.text, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,
+      }));
+
       // Action generation (P1-A): ask the model for a STRUCTURED action list tied to the open goals +
       // a bounded slice of the self-organism (the context's workspaces). 1 paid morsel.
-      const wsList = await this.loadContextWorkspaces(owner, active);
       const { systemPrompt, prompt } = this.buildTickPrompt(ownerName, active, openGoals, wsList);
       const result = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${job.id}` });
       paidMorsels += 1;
@@ -668,15 +697,17 @@ export class Scheduler {
       await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: feedText });
       writes.push('secretary.feed');
     } finally {
-      // Persist the spend ledger (+ any new pending decisions) even if generation threw mid-way, so the
-      // soft budget reflects what was actually spent. Read-modify-write a fresh config to avoid clobber.
-      if (paidMorsels > 0 || Object.keys(newPending).length) {
-        await this.persistTickState(owner, active.id, today, paidMorsels, newPending);
+      // Persist the spend ledger (+ any new pending decisions, routine step completions, and derived
+      // action-items) even if generation threw mid-way, so the soft budget reflects what was actually
+      // spent. Read-modify-write a fresh config to avoid clobber.
+      if (paidMorsels > 0 || Object.keys(newPending).length || stepCompletions.length || newActionItems.length) {
+        await this.persistTickState(owner, active.id, today, paidMorsels, newPending, stepCompletions, newActionItems);
         writes.push('secretary.config');
       }
     }
 
     if (Object.keys(newPending).length) emitChange('agent-messages');
+    if (stepCompletions.length || newActionItems.length) emitChange('agent-tasks', owner);
     return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes };
   }
 
@@ -796,16 +827,52 @@ export class Scheduler {
     return { id: promptId, pending };
   }
 
-  /** Read-modify-write secretary.config to persist the day's spend ledger + any new pending decisions. */
+  /**
+   * Read-modify-write secretary.config to persist the day's spend ledger + any new pending decisions,
+   * plus (B5) routine step completions the tick performed and the action-items it derived. Applied to a
+   * FRESH read (targeted by routine/step id) to avoid clobbering concurrent view edits.
+   */
   private async persistTickState(
     owner: string, contextId: string, today: string, morsels: number, newPending: Record<string, unknown>,
+    stepCompletions: Array<{ routineId: string; stepId: string; status: string; summary: string }> = [],
+    newActionItems: ActionItem[] = [],
   ): Promise<void> {
     const rec = await this.storage.getMemory(owner, 'secretary.config');
     const cfg = (rec?.value ?? {}) as SecretaryConfig;
     const ledger = morsels > 0 ? bumpLedger(cfg.autonomousLedger, contextId, today, morsels) : cfg.autonomousLedger;
     const pending = Object.keys(newPending).length ? { ...(cfg.pendingDecisions ?? {}), ...newPending } : cfg.pendingDecisions;
-    const next = { ...cfg, autonomousLedger: ledger, pendingDecisions: pending };
     const now = new Date().toISOString();
+    // B5: apply routine step completions + merge derived action-items into the active context.
+    let contexts = cfg.contexts;
+    if ((stepCompletions.length || newActionItems.length) && Array.isArray(cfg.contexts)) {
+      contexts = cfg.contexts.map((c) => {
+        if (c.id !== contextId) return c;
+        let routines: RoutineLike[] | undefined = c.routines;
+        if (stepCompletions.length && Array.isArray(routines)) {
+          routines = routines.map((r) => {
+            const comps = stepCompletions.filter((sc) => sc.routineId === r.id);
+            if (!comps.length) return r;
+            const steps = (r.steps || []).map((s) => {
+              const comp = comps.find((x) => x.stepId === s.id);
+              return comp ? { ...s, status: comp.status, result: { summary: comp.summary, ts: now } } : s;
+            });
+            // B4 fix: a 'delegated' step is NOT settled (its task is still out) — the routine stays active.
+            const settled = steps.every((s) => s.status !== 'pending' && s.status !== 'running' && s.status !== 'delegated');
+            const results = [...comps.map((x) => ({ ts: now, summary: x.summary })), ...(r.results || [])].slice(0, 20);
+            return { ...r, steps, results, lastRunAt: now, status: settled ? 'done' : r.status };
+          });
+        }
+        let actionItems: ActionItem[] | undefined = c.actionItems;
+        if (newActionItems.length) {
+          const existing = Array.isArray(c.actionItems) ? c.actionItems : [];
+          const seenOpen = new Set(existing.filter((a) => a.status === 'open').map((a) => actionItemKey(a)));
+          const fresh = newActionItems.filter((a) => !seenOpen.has(actionItemKey(a)));
+          actionItems = [...fresh, ...existing].slice(0, 50);
+        }
+        return { ...c, routines, actionItems };
+      });
+    }
+    const next = { ...cfg, contexts, autonomousLedger: ledger, pendingDecisions: pending };
     await this.storage.setMemory({
       key: 'secretary.config', ownerGaii: owner, value: next, visibility: 'private', tags: ['secretary', 'config'],
       ttlHours: null, version: rec ? rec.version + 1 : 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
