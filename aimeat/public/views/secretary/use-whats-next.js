@@ -12,6 +12,9 @@
  * @structure ROUTINE_CAPABILITIES · buildRoutinePrompt · useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast })
  * @usage const next = useWhatsNext({...}); whatsNextCard(next) / routinesCard(next)
  * @version-history
+ *   v0.2.0 — 2026-06-28 — B4: a delegate step creates an agent task for an owner-picked target agent
+ *     (POST /v1/agents/:name/tasks, queued, parent_task_id = routine id); checkDelegateResult pulls the
+ *     task status back into the routine. delegate removed from the deferred set.
  *   v0.1.0 — 2026-06-27 — B2: Routine entity + "What's next" propose/advance with band-gated, persisted steps.
  */
 import { useState, useCallback, useMemo } from 'preact/hooks';
@@ -23,8 +26,8 @@ import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers
 export const ROUTINE_CAPABILITIES = ['discover', 'file_intake', 'briefing', 'reminders', 'curate_knowledge', 'create_resource', 'delegate'];
 /** Steps that file a note into the self-organism (B2-executable). */
 const FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
-/** Steps that are proposed + band-gated but whose execution is deferred to B4 (delegation) / later. */
-const DEFERRED_CAPS = new Set(['create_resource', 'delegate', 'resource_invoke', 'third_party_message', 'spend']);
+/** Steps proposed + band-gated but whose execution is still deferred (create lands later; spend/messaging are Enterprise). */
+const DEFERRED_CAPS = new Set(['create_resource', 'resource_invoke', 'third_party_message', 'spend']);
 
 function genId(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -51,6 +54,8 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
   const [proposing, setProposing] = useState(false);
   const [selectedId, setSelectedId] = useState(null); // routine being walked in the card
   const [busyStepId, setBusyStepId] = useState(null);
+  const [delegateAgent, setDelegateAgent] = useState(''); // owner's chosen target for the next delegate step
+  const [checkingStepId, setCheckingStepId] = useState(null);
 
   const routines = useMemo(() => (active && Array.isArray(active.routines)) ? active.routines : [], [active]);
   const activeRoutines = useMemo(() => routines.filter((r) => r.status === 'active'), [routines]);
@@ -98,8 +103,23 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
     }
   }, [goal, active, bands, routines, writeRoutines, showToast]);
 
-  /** Carry out one step's capability (B2: discover scouts, file caps file a note, others defer). */
-  const performStep = useCallback(async (step) => {
+  /** Carry out one step's capability (B2: discover scouts, file caps file a note; B4: delegate creates an agent task). */
+  const performStep = useCallback(async (step, opts = {}) => {
+    if (step.capability === 'delegate') {
+      // B4: hand the step off to one of the owner's other agents as an agent task (queued so it's runnable;
+      // parent_task_id links it back to this routine). The owner picked the target when approving.
+      const agentName = String(opts.agentName || '').trim();
+      if (!agentName) throw new Error(t('secretary.next.delegateNoAgent'));
+      const ctxLine = opts.routinePurpose ? `${opts.routinePurpose}\n\n` : '';
+      const resp = await apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks`, {
+        title: step.summary.slice(0, 200),
+        description: `${ctxLine}${step.summary}`.slice(0, 2000),
+        status: 'queued',
+        parent_task_id: opts.routineId || undefined,
+      });
+      const taskId = resp && resp.data && resp.data.task && resp.data.task.id;
+      return { status: 'delegated', summary: t('secretary.next.resultDelegated', { agent: agentName }), taskId: taskId || null, agentName };
+    }
     if (step.capability === 'discover') {
       const params = new URLSearchParams({ scope: 'public', per_page: '10' });
       if (step.summary) params.set('q', step.summary);
@@ -135,7 +155,7 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
    * Approve + run a step, band-gated. Skip (off) marks it skipped without acting; confirm (draft|ask)
    * also logs a decision contract so the learning loop later scores how the routine turned out.
    */
-  const approveStep = useCallback(async (routine, step) => {
+  const approveStep = useCallback(async (routine, step, opts = {}) => {
     if (!active || busyStepId) return;
     // Band routing mirrors the server helper; recompute here from the live policy so a band change applies.
     const band = (typeof step.band === 'string' && ['act', 'draft', 'ask', 'off'].includes(step.band)) ? step.band
@@ -147,7 +167,7 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
       if (disposition === 'skip') {
         outcome = { status: 'skipped', summary: t('secretary.next.resultSkipped') || 'Skipped (off)' };
       } else {
-        outcome = await performStep(step);
+        outcome = await performStep(step, { ...opts, routineId: routine.id, routinePurpose: routine.purpose });
         if (disposition === 'confirm') {
           // The approval is a real choice — log a decision contract (reuses the Phase-5 learning loop).
           try {
@@ -161,7 +181,9 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
         }
       }
       const ts = new Date().toISOString();
-      const nextSteps = routine.steps.map((s) => (s.id === step.id ? { ...s, status: outcome.status, result: { summary: outcome.summary, ts } } : s));
+      // Delegated steps carry the agent-task ref (taskId + agent) so the result can be checked later.
+      const resultObj = { summary: outcome.summary, ts, ...(outcome.taskId ? { taskId: outcome.taskId, agentName: outcome.agentName } : {}) };
+      const nextSteps = routine.steps.map((s) => (s.id === step.id ? { ...s, status: outcome.status, result: resultObj } : s));
       const allSettled = nextSteps.every((s) => s.status !== 'pending' && s.status !== 'running');
       const updater = (r) => ({
         ...r, steps: nextSteps, lastRunAt: ts,
@@ -189,9 +211,34 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
 
   const nextPendingStep = useCallback((routine) => (routine.steps || []).find((s) => s.status === 'pending') || null, []);
 
+  /** B4: pull a delegated step's agent-task status back into the routine (the result flowing home). */
+  const checkDelegateResult = useCallback(async (routine, step) => {
+    const ref = step.result || {};
+    if (!ref.taskId || !ref.agentName || checkingStepId) return;
+    setCheckingStepId(step.id);
+    try {
+      const r = await apiGet(`/v1/agents/${encodeURIComponent(ref.agentName)}/tasks/${encodeURIComponent(ref.taskId)}`);
+      const task = r && r.data && r.data.task;
+      const status = (task && task.status) || 'unknown';
+      const ts = new Date().toISOString();
+      const summary = t('secretary.next.resultDelegateStatus', { agent: ref.agentName, status });
+      await patchRoutine(routine.id, (rt) => ({
+        ...rt,
+        steps: rt.steps.map((s) => (s.id === step.id ? { ...s, result: { ...s.result, summary, checkedAt: ts } } : s)),
+        results: [{ ts, summary }, ...(rt.results || [])].slice(0, 20),
+      }));
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+    } catch (e) {
+      showToast(`${t('secretary.next.error')}: ${e.message}`, true);
+    } finally {
+      setCheckingStepId(null);
+    }
+  }, [checkingStepId, patchRoutine, showToast]);
+
   return {
     goal, setGoal, proposing, proposeRoutine,
     routines, activeRoutines, selected, selectedId, setSelectedId,
     busyStepId, approveStep, setRoutineStatus, deleteRoutine, advance, nextPendingStep,
+    delegateAgent, setDelegateAgent, checkingStepId, checkDelegateResult,
   };
 }

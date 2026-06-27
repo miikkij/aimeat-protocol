@@ -840,12 +840,20 @@
       "resultFound": "Found {n} existing resource(s)",
       "resultFiled": "Filed into {ws}",
       "resultNoted": "Noted",
-      "resultDeferred": "Deferred — needs delegation (coming soon)",
+      "resultDeferred": "Deferred — not available yet",
       "resultSkipped": "Skipped (band off)",
+      "resultDelegated": "Delegated to {agent}",
+      "resultDelegateStatus": "{agent}: task {status}",
+      "delegatePick": "Pick an agent…",
+      "delegateGo": "Delegate",
+      "delegateNoAgent": "Pick an agent to delegate to first",
+      "delegateNoAgents": "No other agents to delegate to — connect one in Manage → crew.",
+      "checkResult": "Check result",
       "status": {
         "done": "done",
         "skipped": "skipped",
         "deferred": "deferred",
+        "delegated": "delegated",
         "pending": "pending"
       }
     },
