@@ -882,7 +882,12 @@
     "items": {
       "title": "Action items",
       "dismiss": "Dismiss",
-      "handle": { "advance": "Open", "check-delegate": "Check result" }
+      "handle": { "advance": "Open", "check-delegate": "Check result" },
+      "text": {
+        "approve": "Approve: {summary}",
+        "ready": "Ready to run: {summary}",
+        "check-delegate": "Check delegated result: {summary}"
+      }
     },
     "plan": {
       "title": "Guided plan",

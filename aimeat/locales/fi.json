@@ -882,7 +882,12 @@
     "items": {
       "title": "Toimenpiteet",
       "dismiss": "Hylkää",
-      "handle": { "advance": "Avaa", "check-delegate": "Tarkista tulos" }
+      "handle": { "advance": "Avaa", "check-delegate": "Tarkista tulos" },
+      "text": {
+        "approve": "Hyväksy: {summary}",
+        "ready": "Valmis ajettavaksi: {summary}",
+        "check-delegate": "Tarkista delegoinnin tulos: {summary}"
+      }
     },
     "plan": {
       "title": "Ohjattu suunnitelma",

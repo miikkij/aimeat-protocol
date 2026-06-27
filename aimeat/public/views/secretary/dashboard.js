@@ -10,6 +10,8 @@
  * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
  * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.5.0 — 2026-06-28 — G5: actionItemsCard renders the action-item label via t() from the item's
+ *     structured labelKind + summary (legacy server-composed `text` kept as a fallback).
  *   v0.4.0 — 2026-06-28 — B5: actionItemsCard — the tick-derived follow-up action-items, one-click handle/dismiss.
  *   v0.3.0 — 2026-06-27 — B3: quickActionsManager — pin/dismiss proposed shortcuts, rename/remove/reorder
  *     active ones, "Suggest shortcuts".
@@ -98,9 +100,12 @@ export function actionItemsCard(p) {
       <ul class="sec-item-list">
         ${p.actionItems.map((it) => {
           const kind = (it.suggestedAction && it.suggestedAction.kind) || 'advance';
+          // G5: the tick stores a structured labelKind + summary — render the label in the user's language
+          // here. Fall back to a legacy server-composed `text` for any item written before G5.
+          const label = it.labelKind ? t('secretary.items.text.' + it.labelKind, { summary: it.summary || '' }) : (it.text || '');
           return html`
             <li class="sec-item-row" key=${it.id}>
-              <div class="sec-item-text">${escHtml(it.text)}</div>
+              <div class="sec-item-text">${escHtml(label)}</div>
               <div class="sec-item-actions">
                 <button class="btn-primary btn-sm" onClick=${() => p.handleActionItem(it)}>${t('secretary.items.handle.' + kind)}</button>
                 <button class="btn-ghost btn-sm" onClick=${() => p.dismissActionItem(it)}>${t('secretary.items.dismiss')}</button>
