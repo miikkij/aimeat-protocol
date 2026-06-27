@@ -12,6 +12,8 @@
  * @structure ROUTINE_CAPABILITIES · buildRoutinePrompt · useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast })
  * @usage const next = useWhatsNext({...}); whatsNextCard(next) / routinesCard(next)
  * @version-history
+ *   v0.5.0 — 2026-06-28 — G4: split FILE_CAPS into NOTE_CAPS (file a note) + FEED_CAPS (briefing/reminders
+ *     surface in the Home feed), mirroring actionKind() — consistent with the tick + legacy action-loop.
  *   v0.4.0 — 2026-06-28 — G2: recurring routines — setRoutineCadence (none/daily/weekly); the tick
  *     re-arms a completed routine once its cadence elapses (services/secretary-tick.ts).
  *   v0.3.0 — 2026-06-28 — B5: action-items — handle (advance routine / check delegate) + dismiss the
@@ -28,8 +30,11 @@ import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers
 
 /** Capabilities a routine step may use (subset of the policy taxonomy the Secretary can plan with). */
 export const ROUTINE_CAPABILITIES = ['discover', 'file_intake', 'briefing', 'reminders', 'curate_knowledge', 'create_resource', 'delegate'];
-/** Steps that file a note into the self-organism (B2-executable). */
-const FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
+// G4: the capability→kind split MIRRORS actionKind() in services/secretary-tick.ts — keep in sync.
+// NOTE caps file a note into the self-organism; FEED caps (briefing/reminders are nudges, not documents)
+// surface in the Home feed — exactly how the tick + the legacy action-loop treat them.
+const NOTE_CAPS = new Set(['file_intake', 'curate_knowledge']);
+const FEED_CAPS = new Set(['briefing', 'reminders']);
 /** Steps proposed + band-gated but whose execution is still deferred (create lands later; spend/messaging are Enterprise). */
 const DEFERRED_CAPS = new Set(['create_resource', 'resource_invoke', 'third_party_message', 'spend']);
 
@@ -134,7 +139,7 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
       } catch { /* discovery is best-effort */ }
       return { status: 'done', summary: t('secretary.next.resultFound', { n: found }) || `Found ${found}` };
     }
-    if (FILE_CAPS.has(step.capability)) {
+    if (NOTE_CAPS.has(step.capability)) {
       const wsId = suggestedWsId || (wsList[0] && wsList[0].id);
       if (active.organismId && wsId) {
         const id = genId('n');
@@ -147,6 +152,14 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
         return { status: 'done', summary: t('secretary.next.resultFiled', { ws: (w && w.name) || '' }) || `Filed into ${(w && w.name) || ''}` };
       }
       return { status: 'done', summary: t('secretary.next.resultNoted') || 'Noted' };
+    }
+    if (FEED_CAPS.has(step.capability)) {
+      // G4: briefing/reminders surface in the Home feed (newest first, cap 50) — same shape as the tick's appendFeed.
+      const r = await apiGet('/v1/memory/secretary.feed').catch(() => null);
+      const existing = (r && r.data && r.data.value && Array.isArray(r.data.value.items)) ? r.data.value.items : [];
+      const entry = { id: genId('f'), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text: step.summary };
+      await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...existing].slice(0, 50) }, visibility: 'private' });
+      return { status: 'done', summary: t('secretary.next.resultSurfaced') || 'Surfaced in the feed' };
     }
     if (DEFERRED_CAPS.has(step.capability)) {
       return { status: 'deferred', summary: t('secretary.next.resultDeferred') || 'Deferred' };

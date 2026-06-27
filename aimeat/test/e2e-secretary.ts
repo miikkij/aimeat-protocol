@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -1108,8 +1108,12 @@ await test('61. deriveRoutineActions: band-driven (act+file→run, draft/ask→i
             { id: 'rf', status: 'active', steps: [{ id: 's1', capability: 'reminders', status: 'pending', summary: 'off step' }] },
         ],
     };
-    const { items, runFileSteps } = deriveRoutineActions(ctx);
-    assert(runFileSteps.length === 2 && runFileSteps.some(f => f.routineId === 'ra') && runFileSteps.some(f => f.routineId === 'rd'), `runFileSteps: ${JSON.stringify(runFileSteps)}`);
+    // G4: the capability→execution-kind is the single actionKind() map; deriveRoutineActions uses it.
+    assert(actionKind('file_intake') === 'note' && actionKind('curate_knowledge') === 'note', 'file caps → note');
+    assert(actionKind('briefing') === 'feed' && actionKind('reminders') === 'feed', 'briefing/reminders → feed');
+    assert(actionKind('discover') === 'unsupported' && actionKind('delegate') === 'unsupported', 'discover/delegate not tick-performable');
+    const { items, runSteps } = deriveRoutineActions(ctx);
+    assert(runSteps.length === 2 && runSteps.some(f => f.routineId === 'ra') && runSteps.some(f => f.routineId === 'rd'), `runSteps: ${JSON.stringify(runSteps)}`);
     assert(items.length === 3, `items: ${JSON.stringify(items)}`);
     // G5: items carry a structured labelKind + summary (NOT a server-composed English string).
     assert(items.every(i => typeof i.labelKind === 'string' && typeof i.summary === 'string' && !('text' in i)), `structured, no text: ${JSON.stringify(items)}`);
@@ -1139,8 +1143,8 @@ await test('63. actionItemKey de-dups identical items; a delegated step stays su
     const k2 = actionItemKey({ suggestedAction: { kind: 'advance', routineId: 'r1', stepId: 's1' } });
     const k3 = actionItemKey({ suggestedAction: { kind: 'check-delegate', routineId: 'r1', stepId: 's1' } });
     assert(k1 === k2 && k1 !== k3, `keys: ${k1} ${k2} ${k3}`);
-    const { items, runFileSteps } = deriveRoutineActions({ policy: { bands: {} }, routines: [{ id: 'rdel', status: 'active', steps: [{ id: 's1', capability: 'delegate', status: 'delegated', summary: 'd', result: { taskId: 'tk' } }] }] });
-    assert(runFileSteps.length === 0 && items.length === 1 && items[0].suggestedAction.kind === 'check-delegate', `delegated surfaced: ${JSON.stringify(items)}`);
+    const { items, runSteps } = deriveRoutineActions({ policy: { bands: {} }, routines: [{ id: 'rdel', status: 'active', steps: [{ id: 's1', capability: 'delegate', status: 'delegated', summary: 'd', result: { taskId: 'tk' } }] }] });
+    assert(runSteps.length === 0 && items.length === 1 && items[0].suggestedAction.kind === 'check-delegate', `delegated surfaced: ${JSON.stringify(items)}`);
 });
 
 console.log('\nG2 -- Recurring routines (cadence re-arm)');

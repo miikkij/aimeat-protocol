@@ -52,7 +52,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -626,7 +626,7 @@ export class Scheduler {
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runFileSteps.length > 0 || rearmedRoutines.length > 0;
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0;
     if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
       return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
@@ -651,17 +651,21 @@ export class Scheduler {
 
       const wsList = await this.loadContextWorkspaces(owner, active);
 
-      // B5 routine pass (FREE — no AI): auto-run each act-band file step (file a note + mark the step
-      // done), and stamp the derived follow-up action-items. draft/ask/delegate steps were already turned
-      // into action-items by deriveRoutineActions — the owner handles those from the dashboard.
+      // B5 routine pass (FREE — no AI): auto-run each act-band performable step + mark it done, and stamp
+      // the derived follow-up action-items. draft/ask/delegate steps were already turned into action-items
+      // by deriveRoutineActions — the owner handles those from the dashboard. G4: the step's kind comes
+      // from actionKind (note caps file a note; briefing/reminders append a feed entry) — performSecretaryAct
+      // carries out the right one, so briefing/reminders are FED here exactly as in the legacy action-loop.
       const nowIso = new Date().toISOString();
-      for (const fs of routineActions.runFileSteps) {
+      for (const fs of routineActions.runSteps) {
         const routine = (active.routines || []).find((r) => r.id === fs.routineId);
         const step = (routine?.steps || []).find((s) => s.id === fs.stepId);
         if (!step) continue;
-        const a: RoutedAction = { capability: String(step.capability), summary: String(step.summary || ''), payload: { note: String(step.summary || '') }, kind: 'note', band: 'act' };
+        const kind = actionKind(String(step.capability)); // 'note' | 'feed'
+        const a: RoutedAction = { capability: String(step.capability), summary: String(step.summary || ''), payload: { note: String(step.summary || '') }, kind, band: 'act' };
         writes.push(...await this.performSecretaryAct(owner, active, a, wsList));
-        stepCompletions.push({ routineId: fs.routineId as string, stepId: fs.stepId as string, status: 'done', summary: `Filed: ${String(step.summary || '')}`.slice(0, 200) });
+        const verb = kind === 'feed' ? 'Surfaced' : 'Filed';
+        stepCompletions.push({ routineId: fs.routineId as string, stepId: fs.stepId as string, status: 'done', summary: `${verb}: ${String(step.summary || '')}`.slice(0, 200) });
       }
       newActionItems = routineActions.items.map((it) => ({
         id: 'ai-' + randomUUID().slice(0, 8), labelKind: it.labelKind, summary: it.summary, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,

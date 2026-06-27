@@ -842,6 +842,7 @@
       "resultFound": "Löytyi {n} olemassa olevaa resurssia",
       "resultFiled": "Arkistoitu: {ws}",
       "resultNoted": "Kirjattu",
+      "resultSurfaced": "Nostettu syötteeseen",
       "resultDeferred": "Lykätty — ei vielä saatavilla",
       "resultSkipped": "Ohitettu (kaista off)",
       "resultDelegated": "Delegoitu agentille {agent}",
