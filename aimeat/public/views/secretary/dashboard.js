@@ -7,9 +7,11 @@
  *   collapsible "Manage & setup" disclosure header that tucks the set-up-once config cards away.
  *   The view (views/secretary.js) owns all state/handlers and passes them in; the config cards
  *   themselves still live in ./cards.js / ./cards-reach.js. Redesign: docs/internal/2026-06-25-secretary-view-redesign.md.
- * @structure quickActionRow · dashStatus · standPanel · manageHeader (one render function each)
- * @usage import { quickActionRow, dashStatus, standPanel, manageHeader } from '/views/secretary/dashboard.js';
+ * @structure quickActionRow · dashStatus · standPanel · routinesCard · manageHeader (one render function each)
+ * @usage import { quickActionRow, dashStatus, standPanel, routinesCard, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.2.0 — 2026-06-27 — B2: routinesCard — active Routines on the dashboard (status · last result ·
+ *     next step · Advance).
  *   v0.1.0 — 2026-06-27 — B1: dashboard-first IA — quick-action row, Today status strip, where-things-stand
  *     panel, Manage disclosure header.
  */
@@ -81,6 +83,32 @@ export function standPanel(p) {
       ${s.loading
         ? html`<div class="sec-hint">${t('secretary.dash.standThinking')}</div>`
         : html`<div class="sec-stand-body">${escHtml(s.text)}</div>`}
+    </section>`;
+}
+
+/** Active Routines on the dashboard (B2): title · status · last result · next step, with Advance. */
+export function routinesCard(p) {
+  if (!p.activeRoutines || p.activeRoutines.length === 0) return null;
+  return html`
+    <section class="sec-card sec-routines">
+      <h2 class="sec-h2">${t('secretary.next.routinesTitle')}</h2>
+      <ul class="sec-routine-list">
+        ${p.activeRoutines.map((r) => {
+          const next = p.nextPendingStep(r);
+          const last = (r.results && r.results[0]) || null;
+          return html`
+            <li class="sec-routine-row" key=${r.id}>
+              <div class="sec-routine-main">
+                <div class="sec-routine-title">${escHtml(r.title)}</div>
+                ${last ? html`<div class="sec-hint">${t('secretary.next.last')}: ${escHtml(last.summary)}</div>` : null}
+                ${next
+                  ? html`<div class="sec-hint">${t('secretary.next.next')}: ${escHtml(next.summary)}</div>`
+                  : html`<div class="sec-hint">${t('secretary.next.allDone')}</div>`}
+              </div>
+              ${next ? html`<button class="btn-outline btn-sm" onClick=${() => p.advance(r)}>${t('secretary.next.advance')}</button>` : null}
+            </li>`;
+        })}
+      </ul>
     </section>`;
 }
 

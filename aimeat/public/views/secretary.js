@@ -11,6 +11,11 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.13.0 — 2026-06-27 — B2 (secretary-view-redesign): Routines + "What's next". The guided plan is
+ *     generalised into useWhatsNext — propose a new Routine from a goal OR advance an active one, approve
+ *     each step band-gated (act → run · draft|ask → approve + log a decision · off → skip), execute the
+ *     automatable part (discover/file; delegation deferred to B4), and persist under
+ *     contexts[i].routines[]. Active routines render on the dashboard (routinesCard).
  *   v0.12.0 — 2026-06-27 — B1 (secretary-view-redesign): dashboard-first IA. A core quick-action row
  *     ("Where do things stand?" read-only orientation · Plan/Find/Note focus · Review decisions when
  *     due), a "Today" status strip (reliability · budget · next run · last-scan + stale + refresh) above
@@ -47,11 +52,11 @@ import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
-import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, guidedPlanCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
+import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, manageHeader } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, routinesCard, manageHeader } from '/views/secretary/dashboard.js';
 import { useIntake } from '/views/secretary/use-intake.js';
-import { useGuidedPlan } from '/views/secretary/use-guided-plan.js';
+import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
@@ -164,8 +169,8 @@ export default function SecretaryView() {
   const intake = useIntake({ active, contexts, config, persistConfig, owner, showToast });
   const { wsList, suggestedWsId } = intake;
 
-  // Phase 3c — guided playbook (propose steps → approve → execute). Logic lives in its own hook.
-  const plan = useGuidedPlan({ active, suggestedWsId, wsList, showToast });
+  // B2 — Routines + "What's next" (generalises the guided plan): propose/advance band-gated routines.
+  const next = useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast });
   // Phase 4 — autonomous tick + Home feed + calendar (own hook).
   const auto = useAutonomy({ showToast });
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
@@ -415,7 +420,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
               ${quickActionRow({ items: [
                 { key: 'stand', label: t('secretary.dash.quickStand'), primary: true, disabled: !!(stand && stand.loading), onClick: runStand },
-                { key: 'plan', label: t('secretary.dash.quickPlan'), title: t('secretary.plan.title'), onClick: () => focusInto('.sec-plan', 'textarea') },
+                { key: 'plan', label: t('secretary.dash.quickPlan'), title: t('secretary.next.title'), onClick: () => focusInto('.sec-next', 'textarea') },
                 { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
                 { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
                 { key: 'review', label: t('secretary.dash.quickReview'), title: t('secretary.learn.reviewNow'), hidden: !decisionsDue, onClick: () => focusInto('.sec-decisions-log', null) },
@@ -424,6 +429,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Today / dashboard — where are we + is this current */ ''}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onRefresh: refreshAll })}
+              ${routinesCard(next)}
               ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
               ${automationCard({ ...auto, budgetInfo })}
               ${feedCard(auto)}
@@ -435,7 +441,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 })}
 
               ${/* Working area — the inputs the quick verbs focus */ ''}
-              ${guidedPlanCard(plan)}
+              ${whatsNextCard(next)}
               ${findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults })}
               ${(findResults && findResults.length === 0) || create.draft || create.created ? createResourceCard({ ...create, query: findQ }) : null}
               ${wsList.length > 0 ? noteCard(intake) : null}
