@@ -842,6 +842,7 @@
       "resultFound": "Found {n} existing resource(s)",
       "resultFiled": "Filed into {ws}",
       "resultNoted": "Noted",
+      "resultSurfaced": "Surfaced in the feed",
       "resultDeferred": "Deferred — not available yet",
       "resultSkipped": "Skipped (band off)",
       "resultDelegated": "Delegated to {agent}",

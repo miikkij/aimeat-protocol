@@ -21,6 +21,9 @@
  *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
  * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
+ *   v0.9.0 — 2026-06-28 — G4: deriveRoutineActions uses actionKind() (note|feed) as the single
+ *     capability→kind map for tick-performability + renames runFileSteps→runSteps; the tick carries out
+ *     briefing/reminders as FEED entries (not notes), aligning all three call sites.
  *   v0.8.0 — 2026-06-28 — G2: recurring routines — cadenceMs / routineDueForRearm / rearmRoutine (the
  *     tick re-arms a completed routine on its cadence: steps → pending, re-activated, next run scheduled).
  *   v0.7.0 — 2026-06-28 — G5: deriveRoutineActions emits a structured `labelKind` + `summary` (not a
@@ -143,9 +146,6 @@ export interface ActionItem { id: string; labelKind?: string; summary?: string; 
 /** An action-item the tick wants to surface, before the tick stamps id/createdAt/status. */
 export interface ActionItemDraft { labelKind: 'approve' | 'ready' | 'check-delegate'; summary: string; suggestedAction: { kind: 'advance' | 'check-delegate'; routineId: string; stepId?: string }; source: string; }
 
-/** Routine-step capabilities the tick can perform autonomously today (note-filing into the self-organism). */
-const TICK_FILE_CAPS = new Set(['file_intake', 'curate_knowledge', 'briefing', 'reminders']);
-
 // ── G2: recurring routines ── the tick re-arms a completed routine on its cadence so it runs again.
 /** Supported routine cadences → their interval in ms (null = run-once / no recurrence). */
 export function cadenceMs(cadence: string | null | undefined): number | null {
@@ -186,7 +186,8 @@ export function actionItemKey(a: { suggestedAction?: { kind?: string; routineId?
  * B5 — band-driven routine advancement for the autonomous tick. For each ACTIVE routine in a context,
  * decide (purely, from the step's band via routeRoutineStep) what the tick should do with its next
  * pending step, plus surface any delegated step whose result should be checked:
- *   - act + a tick-performable file capability → `runFileSteps` (the tick files the note + advances).
+ *   - act + a tick-PERFORMABLE capability (G4: actionKind ∈ note|feed — file a note OR append a feed
+ *     entry; the tick carries out the right one) → `runSteps` (the tick performs it + advances).
  *   - act + discover/delegate (needs a target/plumbing the tick lacks) → an "advance" action-item.
  *   - draft|ask → an "approve" action-item (the owner decides).
  *   - off → nothing.
@@ -195,9 +196,9 @@ export function actionItemKey(a: { suggestedAction?: { kind?: string; routineId?
  */
 export function deriveRoutineActions(
   context: { routines?: RoutineLike[]; policy?: { bands?: Record<string, string> } },
-): { items: ActionItemDraft[]; runFileSteps: Array<{ routineId: string; stepId: string }> } {
+): { items: ActionItemDraft[]; runSteps: Array<{ routineId: string; stepId: string }> } {
   const items: ActionItemDraft[] = [];
-  const runFileSteps: Array<{ routineId: string; stepId: string }> = [];
+  const runSteps: Array<{ routineId: string; stepId: string }> = [];
   const bands = context.policy?.bands;
   for (const r of (context.routines || [])) {
     if (r.status !== 'active' || !r.id) continue;
@@ -210,8 +211,9 @@ export function deriveRoutineActions(
     const next = (r.steps || []).find((s) => s.status === 'pending');
     if (!next || !next.id) continue;
     const route = routeRoutineStep(next, bands);
-    if (route.disposition === 'run' && TICK_FILE_CAPS.has(String(next.capability))) {
-      runFileSteps.push({ routineId: r.id, stepId: next.id });
+    // G4: a step is tick-performable iff actionKind says note OR feed (the single capability→kind map).
+    if (route.disposition === 'run' && actionKind(String(next.capability)) !== 'unsupported') {
+      runSteps.push({ routineId: r.id, stepId: next.id });
     } else if (route.disposition === 'run') {
       items.push({ labelKind: 'ready', summary: String(next.summary || ''), suggestedAction: { kind: 'advance', routineId: r.id, stepId: next.id }, source: r.id });
     } else if (route.disposition === 'confirm') {
@@ -219,7 +221,7 @@ export function deriveRoutineActions(
     }
     // disposition === 'skip' (off) → nothing to surface.
   }
-  return { items, runFileSteps };
+  return { items, runSteps };
 }
 
 /** A dynamic quick action (B3): brain-seeded or secretary-proposed shortcut shown in the quick-action row. */
