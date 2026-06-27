@@ -187,6 +187,12 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
+  // System agents (Secretary / company Secretary / specialists) are auto-provisioned and never run the
+  // device-auth "Hello Integration" onboarding — show a short note instead of the 0/11 checklist.
+  if (state === 'system') {
+    return html`<div class="pf-agd-empty">${t('profile.agents.detail.internalAgentNote')}</div>`;
+  }
+
   const isOnboarding = state === 'new' || state === 'onboarding';
 
   if (isOnboarding) {

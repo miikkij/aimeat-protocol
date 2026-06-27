@@ -555,6 +555,7 @@
     "provisioning": "Sihteeriä otetaan käyttöön… päivitä sivu hetken kuluttua.",
     "identity": "Identiteetti",
     "scopes": "Oikeudet",
+    "managePermissions": "Hallinnoi Agents-näkymässä",
     "soon": "Chat, kalenteri ja päätökset tulossa pian.",
     "hireTitle": "Pystytä sihteerisi",
     "hireIntro": "Tee nopea haastattelu omassa AI-chatissasi, jotta sihteerisi oppii mitä tarvitset — sitten se pystyttää aivonsa ja järjestää tiedoillesi tilan automaattisesti.",
@@ -2103,8 +2104,10 @@
           "newSummary": "Odottaa taitopaketin asennusta",
           "problemSummary": "Toimitushäiriö havaittu",
           "idle": "Toimeton",
-          "next": "Seuraava"
+          "next": "Seuraava",
+          "internal": "Sisäinen"
         },
+        "internalAgentNote": "Tämä on sisäinen AIMEAT-agentti (auto-provisioitu — Sihteeri / specialist). Se ei käy Hello Integration -perehdytystä.",
         "sharedTags": "Jaetut tunnisteet",
         "lastSeen": "Viimeksi nähty",
         "popOut": "Avaa omaan ikkunaan",

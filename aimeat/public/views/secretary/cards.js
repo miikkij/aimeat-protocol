@@ -413,7 +413,10 @@ export function metaCard(p) {
         <dt title=${t('secretary.reliabilityHint')}>${t('secretary.reliability')}</dt>
         <dd>${relChip}</dd>
         <dt>${t('secretary.scopes')}</dt>
-        <dd class="sec-scopes">${(p.secretary.default_scopes || []).map((s) => html`<span class="sec-scope" key=${s}>${s}</span>`)}</dd>
+        <dd class="sec-scopes">
+          ${(p.secretary.default_scopes || []).map((s) => html`<span class="sec-scope" key=${s}>${s}</span>`)}
+          <a class="sec-perm-link" href="/v1/profile?tab=agents">${t('secretary.managePermissions')} ↗</a>
+        </dd>
       </dl>
     </section>`;
 }
