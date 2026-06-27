@@ -16,6 +16,10 @@
  * Checked in priority order: new > onboarding > problem > idle > production.
  */
 export function detectAgentState(agent, onboarding) {
+  // System agents (Secretary, company Secretary, specialists) are auto-provisioned and never run the
+  // device-auth "Hello Integration" onboarding — so they must never show the 0/11 "onboarding not
+  // started" state. Any `system:*` tag marks an internal agent.
+  if ((agent.tags || []).some((tag) => typeof tag === 'string' && tag.startsWith('system:'))) return 'system';
   if (!onboarding || onboarding.status === 'pending' || onboarding.status === 'not_started') return 'new';
   if (onboarding.status === 'in_progress') return 'onboarding';
 
@@ -34,6 +38,7 @@ export function getDefaultTab(state) {
     case 'new': return 'integration';
     case 'onboarding': return 'integration';
     case 'problem': return 'integration';
+    case 'system': return 'directives'; // internal agents: brain, not onboarding
     case 'idle': return 'tasks';
     case 'production': return 'tasks';
     default: return 'tasks';
@@ -45,6 +50,7 @@ export function getStateColor(state) {
     case 'new': return 'var(--warning)';
     case 'onboarding': return 'var(--warning)';
     case 'problem': return 'var(--danger)';
+    case 'system': return 'var(--success)';
     case 'idle': return 'var(--text-muted)';
     case 'production': return 'var(--success)';
     default: return 'var(--text-muted)';

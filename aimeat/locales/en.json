@@ -555,6 +555,7 @@
     "provisioning": "Setting up your Secretary… reload the page in a moment.",
     "identity": "Identity",
     "scopes": "Permissions",
+    "managePermissions": "Manage in Agents",
     "soon": "Chat, schedule, and decisions are coming soon.",
     "hireTitle": "Set up your Secretary",
     "hireIntro": "Run a quick interview in your own AI chat so your Secretary learns what you need — then it sets up its brain and organizes a space for your information automatically.",
@@ -2103,8 +2104,10 @@
           "newSummary": "Awaiting skill bundle install",
           "problemSummary": "Delivery issue detected",
           "idle": "Idle",
-          "next": "Next"
+          "next": "Next",
+          "internal": "Internal"
         },
+        "internalAgentNote": "This is an internal AIMEAT agent (auto-provisioned — Secretary / specialist). It doesn't go through Hello Integration onboarding.",
         "sharedTags": "Shared tags",
         "lastSeen": "Last seen",
         "popOut": "Open in its own window",

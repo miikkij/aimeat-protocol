@@ -402,6 +402,10 @@ function renderPlatformBadge(onboarding) {
 const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };
 
 function renderReadinessBadge(state, onboarding) {
+  if (state === 'system') {
+    // Internal (auto-provisioned) agent — no device-auth onboarding / readiness.
+    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">${t('profile.agents.detail.state.internal')}</span>`;
+  }
   if (state === 'new') {
     return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
   }
@@ -454,6 +458,9 @@ function renderCollapsedStats(state, agent, onboarding) {
 
 function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
   switch (state) {
+    case 'system':
+      // Internal agents (Secretary / company Secretary / specialists) skip the Hello Integration banner.
+      return null;
     case 'new':
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--new">
