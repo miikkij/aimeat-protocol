@@ -67,6 +67,7 @@ import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, 
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
+import { useFreshness } from '/views/secretary/use-freshness.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
@@ -324,20 +325,8 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     }
   }, [findQ, findScope, showToast]);
 
-  // ── B1 dashboard: freshness, refresh, focus-scroll, and the read-only orientation summary ──
-  // Last "scan" = newest of the autonomous feed entry / the tick's last run (no new backend in B1);
-  // stale once it's older than a daily cadence (28h of slack).
-  const lastScan = useMemo(() => {
-    const feedTs = (auto.feed[0] && auto.feed[0].ts) ? new Date(auto.feed[0].ts).getTime() : 0;
-    const runTs = (auto.schedule && auto.schedule.lastRunAt) ? new Date(auto.schedule.lastRunAt).getTime() : 0;
-    const ts = Math.max(feedTs, runTs);
-    return ts ? new Date(ts).toISOString() : null;
-  }, [auto.feed, auto.schedule]);
-  const stale = useMemo(() => !lastScan || (Date.now() - new Date(lastScan).getTime()) > 28 * 3600 * 1000, [lastScan]);
-
-  // Reconcile/scan = refresh the snapshot. Dispatching the live-update event re-fires every hook's
-  // listener (config + feed/schedule + goals/decisions) in one shot — no new wiring needed.
-  const refreshAll = useCallback(() => { window.dispatchEvent(new CustomEvent('aimeat-live-update')); }, []);
+  // ── B1/G3 dashboard freshness (lastScan + stale + the real discover Reconcile) — in its own hook ──
+  const { lastScan, stale, scanning, reconcile } = useFreshness({ active, config, contexts, persistConfig, auto, showToast });
 
   // Quick-action "focus" verbs: smooth-scroll a working card into view and focus its input.
   const focusInto = useCallback((sel, inputSel) => {
@@ -456,7 +445,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
 
               ${/* Today / dashboard — where are we + is this current */ ''}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
-              ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onRefresh: refreshAll })}
+              ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}
               ${routinesCard(next)}
               ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}

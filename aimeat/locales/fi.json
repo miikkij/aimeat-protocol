@@ -797,6 +797,8 @@
     "dash": {
       "todayTitle": "Tänään",
       "refresh": "Päivitä",
+      "reconcile": "Skannaa",
+      "scanning": "Skannataan…",
       "budgetLabel": "Budjetti tänään",
       "nextRunLabel": "Seuraava ajo",
       "lastScanLabel": "Viimeksi",
