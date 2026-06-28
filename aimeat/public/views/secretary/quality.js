@@ -74,6 +74,9 @@ const triageUser = (action, space) => `Task: ${action.summary}${action.why ? `\n
 const produceSys = (owner, contextName, locale) => `You are ${owner || 'the user'}'s personal Secretary in the "${contextName}" context. Produce the requested deliverable as a usable, high-quality DRAFT, grounded ONLY in the facts provided below. STRICT — never invent or embellish: no made-up numbers, metrics, statistics, quotes, testimonials, names, dates, events, deals, or outcomes. If a needed detail is not in the facts, insert a [bracketed placeholder] for the owner to fill — never fabricate one. If the facts are too thin, produce a clearly-labelled skeleton with placeholders and a short "what's missing" note rather than fiction. Markdown is fine. Reply in ${lang(locale)}. Output only the deliverable, no preamble.`;
 const produceUser = (action, facts) => `Task: ${action.summary}${action.why ? `\n(${action.why})` : ''}\n\nFacts — the ONLY information you may use:\n${facts || '(no facts available — produce a skeleton with placeholders)'}`;
 
+const clarifySys = (locale) => `You decide whether a deliverable task is missing facts that ONLY the owner can provide, and if so, what to ask — so the Secretary asks instead of guessing. Return ONLY JSON: {"ask":boolean,"questions":[{"id":"q1","header":"short chip","prompt":"the question","options":[{"id":"o1","label":"..."}],"multiSelect":false,"allowOther":true}]}. ask=true ONLY if producing well genuinely needs the owner's input (a preference, a specific fact, a choice) that is NOT in the facts and that you must NOT invent — do NOT ask about things you can reasonably infer or that don't matter. 1–5 questions, each with 2–5 concrete options (always allowOther so they can type their own). Headers/prompts/labels in ${lang(locale)}.`;
+const clarifyUser = (action, space) => `Task: ${action.summary}${action.why ? `\n(${action.why})` : ''}\n\nWorkspace context available:\n${space || '(none)'}`;
+
 const verifySys = (locale) => `You fact-check a Secretary's draft against the facts it was given. Return ONLY JSON: {"ok":boolean,"issues":[string]}. "ok": false if the draft states any specific fact (number, metric, quote, name, date, event, outcome) NOT supported by the facts. List each unsupported claim in "issues" (short). Bracketed [placeholders] are fine, not issues. Write issues in ${lang(locale)}.`;
 const verifyUser = (content, facts) => `Facts provided:\n${facts || '(none)'}\n\nDraft to check:\n${content}`;
 
@@ -108,6 +111,23 @@ export async function produceDeliverable({ action, owner, contextName, locale, s
   const temperature = typeof triage.temperature === 'number'
     ? Math.min(1, Math.max(0, triage.temperature))
     : (taskType === 'creative' ? 0.7 : taskType === 'mixed' ? 0.45 : 0.2);
+  // 1b. Clarify — when triage found missing facts, ask the owner (a batch of option questions) instead
+  // of guessing. Only when the gap genuinely needs the owner's input; otherwise fall through to produce.
+  if (Array.isArray(triage.missing) && triage.missing.length) {
+    /** @type {any} */
+    const clarify = (await reasonJson(clarifySys(locale), clarifyUser(action, space), 'secretary-quality-clarify')) || {};
+    if (clarify.ask && Array.isArray(clarify.questions) && clarify.questions.length) {
+      const questions = clarify.questions.slice(0, 5).map((q, i) => ({
+        id: String(q.id || `q${i + 1}`).slice(0, 64),
+        header: String(q.header || `Q${i + 1}`).slice(0, 80),
+        prompt: String(q.prompt || '').slice(0, 2000),
+        options: (Array.isArray(q.options) ? q.options : []).slice(0, 20).map((o, j) => ({ id: String(o.id || `o${j + 1}`).slice(0, 64), label: String(o.label || o.id || '').slice(0, 500) })).filter((o) => o.label),
+        multiSelect: !!q.multiSelect,
+        allowOther: q.allowOther !== false,
+      })).filter((q) => q.prompt && q.options.length);
+      if (questions.length) return { mode: 'clarify', questions, facts: space || '', cap };
+    }
+  }
   // 2. Gather (search the directory if triage asked) — grounding facts.
   let facts = space || '';
   let searched = false;

@@ -646,10 +646,15 @@ export class Scheduler {
       firedTriggers = evaluateTriggers(triggers, { completed, memoryCounts, lastActivityMs }, nowMs).map((f) => f.trigger);
     }
 
+    // (3a2) Clarify jobs the owner may have answered: the Secretary asked questions instead of guessing;
+    // once answered (in the inbox) the tick produces the deliverable grounded in those answers.
+    const clarifyRecs = await this.storage.listMemory(owner, { prefix: 'secretary.clarify.' });
+    const askedClarify = clarifyRecs.map((r) => (r.value ?? {}) as Record<string, unknown>).filter((j) => j && j.status === 'asked');
+
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0;
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0 || askedClarify.length > 0;
     if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
       return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
@@ -673,6 +678,11 @@ export class Scheduler {
       }
 
       const wsList = await this.loadContextWorkspaces(owner, active);
+
+      // Resume any answered clarify jobs: produce the deliverable grounded in the owner's answers (+ facts).
+      const clarifyWrites = await this.resumeClarifyJobs(owner, ownerName, askedClarify);
+      writes.push(...clarifyWrites);
+      paidMorsels += clarifyWrites.filter((w) => w.startsWith('organism.')).length;
 
       // B5 routine pass (FREE — no AI): auto-run each act-band performable step + mark it done, and stamp
       // the derived follow-up action-items. draft/ask/delegate steps were already turned into action-items
@@ -802,6 +812,72 @@ export class Scheduler {
       if (partial) return partial;
     }
     return wsList[0];
+  }
+
+  /** Render the owner's interactive answers as readable text for the clarify-resume produce prompt. */
+  private buildClarifyAnswers(
+    questions: Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }> }>,
+    answers: Record<string, { selected?: string[]; other?: string | null }>,
+  ): string {
+    return (questions || []).map((q) => {
+      const a = answers[q.id] || {};
+      const labels = (a.selected || []).map((sid) => (q.options || []).find((o) => o.id === sid)?.label || sid);
+      const parts = [...labels];
+      if (a.other) parts.push(String(a.other));
+      return `- ${q.prompt} → ${parts.join(', ') || '(no answer)'}`;
+    }).join('\n');
+  }
+
+  /**
+   * Resume answered clarify jobs (ask-don't-hallucinate): for each job whose inbox questions the owner
+   * answered, produce the deliverable grounded ONLY in the stored facts + those answers, file it into the
+   * job's workspace, and mark the job done. Unanswered jobs are left untouched.
+   */
+  private async resumeClarifyJobs(owner: string, ownerName: string, jobs: Array<Record<string, unknown>>): Promise<string[]> {
+    const writes: string[] = [];
+    if (!jobs.length) return writes;
+    const secretaryGaii = `secretary#${ownerName}@${this.config.nodeId}`;
+    for (const job of jobs) {
+      const conversationId = job.conversationId as string;
+      const questionId = job.questionId as string;
+      if (!conversationId || !questionId) continue;
+      const thread = await this.storage.listAgentDmThread(secretaryGaii, conversationId, { perPage: 50 }).catch(() => null);
+      const msgs = thread?.messages || [];
+      const ans = msgs.find((m) => m.interactive?.role === 'answers' && m.interactive.answersFor === questionId);
+      if (!ans || ans.interactive?.role !== 'answers') continue;   // not answered yet
+
+      const action = (job.action ?? {}) as { summary?: string; why?: string };
+      const questions = (job.questions ?? []) as Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }> }>;
+      const answersText = this.buildClarifyAnswers(questions, ans.interactive.answers);
+      const sys = `You are ${ownerName}'s personal Secretary. Produce the deliverable the owner asked for as a usable DRAFT, grounded ONLY in the facts and the owner's answers below. Never invent numbers, metrics, quotes, names, dates, events, or outcomes; if something is still unknown, use a [bracketed placeholder]. Markdown is fine. Output only the deliverable, no preamble.`;
+      const prompt = `Task: ${action.summary || ''}${action.why ? `\n(${action.why})` : ''}\n\nFacts:\n${(job.facts as string) || '(none)'}\n\nThe owner answered your questions:\n${answersText}`;
+      let content = action.summary || '';
+      try {
+        const r = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt: sys, appId: 'secretary-clarify-produce' });
+        content = ((r && r.content) || '').trim() || content;
+      } catch { continue; }   // spending paused / error → leave the job 'asked' to retry next tick
+
+      const now = new Date().toISOString();
+      const organismId = job.organismId as string;
+      const wsId = job.wsId as string;
+      if (organismId && wsId) {
+        const id = 'note-' + randomUUID().slice(0, 8);
+        const key = `organism.${organismId}.w.${wsId}.notes.${id}`;
+        await this.storage.setMemory({
+          key, ownerGaii: owner, value: { id, title: String(action.summary || '').slice(0, 80), body: content, createdAt: now, via: 'secretary-clarify' },
+          visibility: 'private', tags: ['secretary', 'note', String(job.contextId || '')], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+        await this.appendFeed(owner, { kind: 'act', contextId: String(job.contextId || ''), contextName: String(job.contextName || ''), text: `✍️ ${action.summary || ''} — filed after your answers`, href: `/v1/profile?tab=organisms&org=${organismId}&ws=${wsId}` });
+        writes.push(key, 'secretary.feed');
+      }
+      const jobKey = `secretary.clarify.${String(job.id)}`;
+      await this.storage.setMemory({
+        key: jobKey, ownerGaii: owner, value: { ...job, status: 'done', producedAt: now },
+        visibility: 'private', tags: ['secretary', 'clarify', 'done'], ttlHours: null, version: 1, createdAt: String(job.createdAt || now), updatedAt: now,
+      });
+      writes.push(jobKey);
+    }
+    return writes;
   }
 
   /**

@@ -590,6 +590,14 @@ ${SECRETARY_AIMEAT_PRIMER}`;
           return es.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
         };
         const out = await produceDeliverable({ action, owner, contextName: active.name, locale: getLocale(), space, runDiscover });
+        if (out.mode === 'clarify') {
+          // Missing facts only the owner has → ask in the inbox (batch questions); the tick produces the
+          // deliverable once answered. Never guess.
+          await apiPost('/v1/secretary/clarify', { contextId: active.id, contextName: active.name || '', action: { summary: action.summary, why: action.why || '' }, questions: out.questions, facts: out.facts || space, organismId: active.organismId || '', wsId: (ws && ws.id) || '' });
+          patch('asked', {});
+          window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+          return;
+        }
         if (out.mode === 'prompt-driven') {
           // No ≥200k model — never run a degraded completion; show the composed multi-step prompt to
           // copy into a big AI chat, with a paste-back box to save the result.

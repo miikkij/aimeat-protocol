@@ -923,6 +923,8 @@
       "discard": "Discard",
       "discarded": "Discarded",
       "verifyFlag": "Check these — not supported by your data",
+      "asked": "I asked you a few questions — I'll produce this once you answer.",
+      "openInbox": "Open inbox",
       "needBigModel": "No ≥200k-context model is set, so I won't run a degraded answer. Copy this multi-step prompt into a big AI chat (e.g. owl-alpha, Claude, GPT), then paste the result back below.",
       "copyPrompt": "Copy prompt",
       "pastePlaceholder": "Paste the AI's result here…",

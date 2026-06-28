@@ -923,6 +923,8 @@
       "discard": "Hylkää",
       "discarded": "Hylätty",
       "verifyFlag": "Tarkista nämä — eivät perustu dataasi",
+      "asked": "Kysyin sinulta muutaman kysymyksen — tuotan tämän kun vastaat.",
+      "openInbox": "Avaa inbox",
       "needBigModel": "≥200k context -mallia ei ole asetettu, joten en aja heikennettyä vastausta. Kopioi tämä monivaiheinen prompt isoon AI-chattiin (esim. owl-alpha, Claude, GPT) ja liitä tulos takaisin alle.",
       "copyPrompt": "Kopioi prompt",
       "pastePlaceholder": "Liitä AI:n tulos tähän…",

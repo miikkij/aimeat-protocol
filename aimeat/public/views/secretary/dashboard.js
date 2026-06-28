@@ -144,6 +144,7 @@ export function whatsNextPanel(p) {
                   ${a.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.done')}</span>`
                     : a.status === 'skipped' ? html`<span class="sec-hint">${t('secretary.next.skipped')}</span>`
                     : a.status === 'discarded' ? html`<span class="sec-hint">${t('secretary.next.discarded')}</span>`
+                    : a.status === 'asked' ? html`<span class="sec-hint">⏳ ${t('secretary.next.asked')} · <a href="/v1/profile?tab=inbox" target="_blank" rel="noopener">${t('secretary.next.openInbox')}</a></span>`
                     : a.status === 'prompt' ? null
                     : html`<div class="sec-next-action-btns">
                         <button class="btn-primary btn-sm" disabled=${a.status === 'doing'} onClick=${() => p.onDo(a)}>${a.status === 'doing' ? t('secretary.next.running') : t('secretary.next.doIt')}</button>

@@ -1285,6 +1285,21 @@ await test('70. Trigger round-trips on secretary.trigger.* (recurring shape pres
     assert(un.status === 401 || un.status === 403, `unauth: ${un.status}`);
 });
 
+await test('71. Secretary clarify posts inbox questions + stores a produce job; invalid payload rejected', async () => {
+    const questions = [{ id: 'q1', header: 'Budget', prompt: 'What is the budget?', options: [{ id: 'lo', label: 'Under 50' }, { id: 'hi', label: 'Over 50' }], allowOther: true }];
+    const r = await json('/v1/secretary/clarify', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ contextId: 'c1', contextName: 'Test', action: { summary: 'Draft a gift plan' }, questions, facts: 'some facts', organismId: selfOrgId, wsId: 'ws-1' }) });
+    assert(r.status === 200, `clarify: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    const mid = r.body.data.messageId;
+    assert(mid && r.body.data.status === 'asked', `messageId+status: ${JSON.stringify(r.body.data)}`);
+    const job = await json(`/v1/memory/${encodeURIComponent('secretary.clarify.' + mid)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(job.status === 200 && job.body.data.value.status === 'asked' && job.body.data.value.organismId === selfOrgId, `job: ${JSON.stringify(job.body).slice(0, 200)}`);
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const found = (inbox.body.data?.messages || []).some((m: { interactive?: { role?: string } }) => m.interactive?.role === 'questions');
+    assert(found, 'question message in inbox');
+    const bad = await json('/v1/secretary/clarify', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ contextId: 'c1', action: { summary: 'x' }, questions: [] }) });
+    assert(bad.status === 400, `bad: ${bad.status}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
