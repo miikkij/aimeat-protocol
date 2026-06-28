@@ -22,7 +22,8 @@ export function appTemplatesRouter(config: AimeatConfig, _storage: Storage): Rou
   router.get('/v1/app-templates', (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     const kind = typeof req.query.kind === 'string' ? req.query.kind : undefined;
-    let index = getAppTemplateIndex();
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
+    let index = getAppTemplateIndex(lang);
     if (kind) index = index.filter(t => t.kind === kind);
     res.json(success(config.nodeId, { templates: index }));
   });
