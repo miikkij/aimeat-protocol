@@ -126,6 +126,13 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
 
 ### Fixed
 
+- **Landing "knowledge packages" counter no longer undercounts to 0.** `GET /v1/public/node-totals` counted
+  public package manifests by pulling the 1000 most-recent public memory rows and regex-matching
+  `packages/{id}/manifest`. On a busy node the public **activity feed** (`activity/…` entries) fills that window,
+  pushing older manifests out, so a node with real catalog-listed packages reported `knowledge_packages: 0` while
+  the Public Knowledge Library (which queries per-owner with a `packages/` prefix) showed them. The count query is
+  now scoped to the `packages/` prefix so the activity feed can't crowd the manifests out. Regression covered in
+  the `public-totals` E2E suite (import a catalog-listed package → assert `knowledge_packages >= 1`).
 - **Secretary "Do it" no longer fabricates.** The deliverable generation ran with no grounding data (just the
   action title) and no anti-fabrication instruction, so a "draft a story/pitch" task invented users, metrics,
   quotes, and a publisher deal out of thin air. It now feeds the **real workspace content as the only facts** and
