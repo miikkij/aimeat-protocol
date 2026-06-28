@@ -37,7 +37,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import NodeTotals from './landing-node-totals.js';
@@ -172,7 +172,11 @@ hosting is the only subscription.`;
 // with the current node URL injected. If no idea is given the prompt explicitly tells the AI to ask.
 function buildLandingAppPrompt(nodeUrl, templateContent) {
   const base = (nodeUrl || '').replace(/\/+$/, '') || window.location.origin;
+  const LANGS = { en: 'English', fi: 'Finnish (Suomi)' };
+  const langName = LANGS[getLocale()] || 'English';
   let p = '';
+  // Converse + build the UI in the visitor's site language (instructions stay English).
+  p += 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + langName + '. These build instructions are in English, but converse with me and build the app interface in ' + langName + '.\n\n';
   p += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
   p += 'My initial idea: (not given yet — ask me what to build)\n\n';
   p += '## Step 1 — Interview me first\n';
@@ -268,7 +272,14 @@ function buildLandingAppPrompt(nodeUrl, templateContent) {
   p += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
   p += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
   p += '- Theme with CSS variables and support both light and dark\n';
-  p += '- Include error handling and loading states for API calls\n';
+  p += '- Include error handling and loading states for API calls\n\n';
+  p += '## When the app is ready — tell me how to publish it\n';
+  p += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
+  p += '1. Open ' + base + '/app-catalog.html\n';
+  p += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
+  p += '3. Click Publish.\n';
+  p += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
+  p += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
   if (templateContent) {
     p += '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + templateContent + '\n```\n';
   }
@@ -282,7 +293,7 @@ function BuildAppPrompt() {
   const [tplContent, setTplContent] = useState('');
   useEffect(() => {
     // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
-    fetch('/v1/app-templates').then(r => r.json()).then(d => {
+    fetch('/v1/app-templates?lang=' + encodeURIComponent(getLocale())).then(r => r.json()).then(d => {
       const list = ((d.data && d.data.templates) || []).filter(t => t.kind !== 'component');
       list.sort((a, b) => (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1));
       setTemplates(list);
@@ -452,6 +463,7 @@ function BuildHero() {
         <button class="btn-primary" type="button" onClick=${copy}>${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI') : tr('landing.buildHeroCopy', 'Copy the build prompt →')}</button>
         <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>
       </div>
+      ${copied ? html`<p class="ld-hero2-after">${tr('landing.buildHeroAfter', 'Paste it into your AI and answer its questions. When your app is ready,')} <a href="/app-catalog.html">${tr('landing.openAppsToPublish', 'open your apps to add & publish it →')}</a> ${tr('landing.buildHeroAfter2', '(signing in takes seconds — Google or email).')}</p>` : ''}
     </section>
   `;
 }

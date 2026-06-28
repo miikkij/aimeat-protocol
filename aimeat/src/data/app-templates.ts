@@ -18,6 +18,8 @@
  *   v1.4.0 — 2026-06-26 — use-case templates (full working scaffolds) + composes field; first: realtime-social.
  *   v1.5.0 — 2026-06-26 — use-case: marketplace (anon browse + search + detail + post with image); fix image-upload URL.
  *   v1.6.0 — 2026-06-26 — component: markdown (AIMEAT.md.render); use-case: homepage (personal site — profile + markdown blog + images + AI stories).
+ *   v1.7.0 — 2026-06-26 — plain-language app-shell titles (drop T1/T2/T3 jargon): "Standard app",
+ *     "Data app", "Connected app" — what a non-technical user gets, not the architecture.
  */
 
 export interface AppTemplate {
@@ -802,7 +804,7 @@ const TEMPLATES: AppTemplate[] = [
     id: 'shell-pure-client',
     kind: 'app-shell',
     tier: 'T1',
-    title: 'Pure client app (T1)',
+    title: 'Standard app — login + saves your data',
     description: 'Single-file HTML app: login + private/shared memory, self-hosted Tailwind + daisyUI, light/dark theme. The 80% case — notes, trackers, boards, dashboards.',
     libs: ['aimeat-auth', 'aimeat-data'],
     content: SHELL_PURE_CLIENT,
@@ -811,8 +813,8 @@ const TEMPLATES: AppTemplate[] = [
     id: 'shell-cortex',
     kind: 'app-shell',
     tier: 'T2',
-    title: 'Client + cortex UI (T2)',
-    description: 'T1 plus the bundled cortex UI libraries (DataTable, forms, layouts, charts) for richer structured UIs without hand-rolling components.',
+    title: 'Data app — built-in tables, forms & charts',
+    description: 'Standard app plus the bundled cortex UI libraries (DataTable, forms, layouts, charts) for richer structured UIs without hand-rolling components.',
     libs: ['aimeat-auth', 'aimeat-data', 'aimeat-ui-viewers', 'aimeat-ui-forms'],
     content: SHELL_CORTEX,
   },
@@ -820,7 +822,7 @@ const TEMPLATES: AppTemplate[] = [
     id: 'shell-extension',
     kind: 'app-shell',
     tier: 'T3',
-    title: 'Client + server extension (T3)',
+    title: 'Connected app — fetches outside data / runs on a schedule (advanced)',
     description: 'For apps needing server-side work (external API fetch, scheduled jobs): the client calls a sandboxed extension. Build the extension separately or ship it in a package.',
     libs: ['aimeat-auth', 'aimeat-data'],
     content: SHELL_EXTENSION,
@@ -866,12 +868,34 @@ const TEMPLATES: AppTemplate[] = [
   },
 ];
 
+// Localized title/description for the picker (the templates a non-technical user
+// actually sees). English lives on the template itself; other languages overlay
+// here, keyed by id. Only the picker-visible templates (shells + use-cases) need it.
+const TRANSLATIONS: Record<string, Record<string, { title: string; description?: string }>> = {
+  fi: {
+    'shell-pure-client': { title: 'Vakiosovellus — kirjautuminen + tallentaa tietosi' },
+    'shell-cortex': { title: 'Datasovellus — valmiit taulukot, lomakkeet & kaaviot' },
+    'shell-extension': { title: 'Yhdistetty sovellus — hakee ulkoista dataa / ajastetut tehtävät (edistynyt)' },
+    'usecase-realtime-social': { title: 'Reaaliaikainen yhteisöhuone', description: 'Live-huone: kirjautuneet käyttäjät saavat live-läsnäolon + chatin pysyvällä historialla. Chatit, läsnäolotaulut, moninpeliaulat.' },
+    'usecase-marketplace': { title: 'Kauppapaikka (yhden myyjän myymälä)', description: 'Kuka tahansa selaa + hakee julkisia ilmoituksia ja avaa yksityiskohdat; myyjä lisää ilmoituksia kuvilla.' },
+    'usecase-homepage': { title: 'Kotisivu / henkilökohtainen sivusto', description: 'Yhden kirjoittajan julkinen sivusto: kuka tahansa katselee profiilia + blogia; omistaja muokkaa ja julkaisee.' },
+  },
+};
+
 /** All authoring templates. */
 export function getAppTemplates(): AppTemplate[] {
   return TEMPLATES;
 }
 
-/** Lightweight index (no content) — for injecting a menu into a prompt or rendering a picker. */
-export function getAppTemplateIndex(): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'title' | 'description' | 'libs'>> {
-  return TEMPLATES.map(({ id, kind, tier, title, description, libs }) => ({ id, kind, tier, title, description, libs }));
+/**
+ * Lightweight index (no content) — for injecting a menu into a prompt or rendering
+ * a picker. Pass a `lang` (e.g. 'fi') to get localized title/description where a
+ * translation exists; everything else falls back to the canonical English.
+ */
+export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'title' | 'description' | 'libs'>> {
+  const tr = (lang && TRANSLATIONS[lang]) || null;
+  return TEMPLATES.map(({ id, kind, tier, title, description, libs }) => {
+    const o = tr && tr[id];
+    return { id, kind, tier, title: (o && o.title) || title, description: (o && o.description) || description, libs };
+  });
 }

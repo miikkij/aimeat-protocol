@@ -710,6 +710,7 @@
       background: var(--surface);
       color: var(--text);
     }
+    .pb-template-select { margin-bottom: 8px; }
 
     .modal-fields {
       display: flex;
@@ -1751,8 +1752,8 @@
     .prompt-builder-modal {
       background: var(--surface);
       border: 1px solid var(--border-subtle); border-radius: 16px;
-      padding: 28px; max-width: 900px; width: 96vw; max-height: 90vh;
-      display: flex; flex-direction: column; overflow: hidden;
+      padding: 28px; max-width: 720px; width: 96vw; max-height: 90vh;
+      display: flex; flex-direction: column; overflow-y: auto;
       box-shadow: 0 8px 40px rgba(0,0,0,.12);
     }
     .prompt-builder-modal h2 { margin: 0 0 16px; font-size: 1.1rem; }
@@ -1783,13 +1784,26 @@
     .pb-ext-chip.selected { background: rgba(232,86,74,.08); border-color: rgba(232,86,74,.35); }
     .pb-ext-chip input { accent-color: #E8564A; pointer-events: none; }
     .pb-preview {
-      flex: 1; min-height: 120px; overflow-y: auto; margin-bottom: 14px; padding: 12px;
+      min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;
       background: var(--bg-subtle); border: 1px solid var(--border-subtle);
       border-radius: 10px; font-family: 'Consolas','Monaco','Courier New',monospace;
       font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
       color: var(--text-muted);
     }
     .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
+    /* Guided-steps layout for "Generate App with AI" */
+    .pb-intro { font-size: .82rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 18px; }
+    .pb-step { border-top: 1px solid var(--border-subtle); padding-top: 16px; margin-bottom: 16px; }
+    .pb-step:first-of-type { border-top: none; padding-top: 0; }
+    .pb-step-head { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: .98rem; margin-bottom: 12px; }
+    .pb-step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
+      background: #E8564A; color: #fff; font-size: .82rem; font-weight: 700;
+    }
+    .pb-step-hint { font-size: .8rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 12px; }
+    .pb-improving { font-size: .85rem; font-weight: 600; color: #E8564A; margin: 0 0 12px; }
+    .pb-step-btn { width: 100%; justify-content: center; }
   </style>
 </head>
 <body>
@@ -2226,24 +2240,41 @@
     </div>
   </div>
 
-  <!-- Prompt Builder Panel -->
+  <!-- Generate App with AI — guided steps -->
   <div id="prompt-builder-overlay">
     <div class="prompt-builder-modal">
-      <h2 id="pb-title" data-i18n="pb.title">&#x2728; Generate App Prompt</h2>
-      <div class="pb-mode-row">
-        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
-        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
+      <h2 id="pb-title" data-i18n="pb.title">&#x2728; Generate App with AI</h2>
+      <p class="pb-intro" data-i18n="pb.intro">No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.</p>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">1</span><span data-i18n="pb.step1">Describe your app</span></div>
+        <!-- Mode is implicit (new vs improve) — radios kept hidden for state; an "Improving:" note shows instead. -->
+        <div class="pb-mode-row" id="pb-mode-row" style="display:none">
+          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
+          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
+        </div>
+        <div id="pb-improving" class="pb-improving" style="display:none"></div>
+        <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
+        <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; <span data-i18n="pb.template">Start from a template (optional)</span></span></label>
+        <select id="pb-template" class="modal-input pb-template-select"><option value="">(none &#x2014; build from scratch)</option></select>
       </div>
-      <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do, or what changes to make..." data-i18n-ph="pb.descPh"></textarea>
-      <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; Start from a template (optional)</span></label>
-      <select id="pb-template" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--bg-card,#1e1e2a);color:var(--text,#eee);margin-bottom:8px"><option value="">(none &#x2014; build from scratch)</option></select>
-      <label class="pb-ext-toggle"><input type="checkbox" id="pb-ext-checkbox"> <span data-i18n="pb.includeCortex">Include Cortex Extensions</span></label>
-      <div class="pb-ext-list" id="pb-ext-list"></div>
-      <div class="pb-preview-label" data-i18n="pb.livePreview">Live Preview</div>
-      <div class="pb-preview" id="pb-preview"></div>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">2</span><span data-i18n="pb.step2">Copy the prompt &amp; paste it into your AI</span></div>
+        <p class="pb-step-hint" data-i18n="pb.step2hint">Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.</p>
+        <div class="pb-preview-label" data-i18n="pb.promptPreview">Prompt preview</div>
+        <div class="pb-preview" id="pb-preview"></div>
+        <button class="modal-btn primary pb-step-btn" id="pb-copy-btn" data-i18n="pb.copy">&#x1F4CB; Copy Prompt</button>
+      </div>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">3</span><span data-i18n="pb.step3">Add &amp; publish your app</span></div>
+        <p class="pb-step-hint" data-i18n="pb.step3hint">Got the HTML file from the AI? Add it here — it goes live on your node and you get a link to share.</p>
+        <button class="modal-btn pb-step-btn" id="pb-add-btn" data-i18n="pb.addBtn">&#x2795; I have my app file — add it</button>
+      </div>
+
       <div class="modal-actions">
-        <button class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.cancel">Cancel</button>
-        <button class="modal-btn primary" id="pb-copy-btn" data-i18n="pb.copy">Copy Prompt</button>
+        <button class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
       </div>
     </div>
   </div>
@@ -2362,13 +2393,25 @@
       'versions.help': 'Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.',
       'versions.current': 'current',
       'versions.stored': 'versions stored',
-      'pb.title': '✨ Generate App Prompt',
+      'pb.title': '✨ Generate App with AI',
+      'pb.intro': 'No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.',
+      'pb.step1': 'Describe your app',
+      'pb.step2': 'Copy the prompt & paste it into your AI',
+      'pb.step2hint': 'Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.',
+      'pb.step3': 'Add & publish your app',
+      'pb.step3hint': 'Got the code or HTML file from the AI? Paste it (or upload the file) here — it goes live on your node and you get a shareable link.',
+      'pb.template': 'Start from a template (optional)',
+      'pb.noneTemplate': '(none — build from scratch)',
+      'pb.promptPreview': 'Prompt preview',
+      'pb.addBtn': '➕ Add your app — paste it or upload the file',
+      'pb.improving': 'Improving',
+      'pb.copied': 'Copied!',
       'pb.new': 'New App',
       'pb.improve': 'Improve This App',
       'pb.descPh': 'Describe what the app should do, or what changes to make...',
       'pb.includeCortex': 'Include Cortex Extensions',
       'pb.livePreview': 'Live Preview',
-      'pb.copy': 'Copy Prompt',
+      'pb.copy': '📋 Copy Prompt',
       'card.view': '👁 View',
       'card.remove': '🗑 Remove',
       'card.versions': '🕑 Versions',
@@ -2608,13 +2651,25 @@
       'versions.help': 'Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.',
       'versions.current': 'nykyinen',
       'versions.stored': 'versiota tallennettu',
-      'pb.title': '✨ Luo sovellusprompti',
+      'pb.title': '✨ Luo sovellus tekoälyllä',
+      'pb.intro': 'Ei koodausta. Kuvaile ideasi, kopioi prompti ja liitä se mihin tahansa tekoälykeskusteluun (Claude, ChatGPT…). Tekoäly kysyy muutaman kysymyksen, rakentaa valmiin sovelluksen ja antaa sinulle yhden HTML-tiedoston — lisää se sitten tästä julkaistaksesi.',
+      'pb.step1': 'Kuvaile sovelluksesi',
+      'pb.step2': 'Kopioi prompti & liitä se tekoälyysi',
+      'pb.step2hint': 'Avaa Claude, ChatGPT tai mikä tahansa tekoälykeskustelu, liitä tämä ja vastaa kysymyksiin. Se rakentaa sovelluksesi ja antaa sinulle yhden HTML-tiedoston.',
+      'pb.step3': 'Lisää & julkaise sovelluksesi',
+      'pb.step3hint': 'Saitko koodin tai HTML-tiedoston tekoälyltä? Liitä se (tai lataa tiedosto) tästä — se tulee live-tilaan solmuusi ja saat jaettavan linkin.',
+      'pb.template': 'Aloita mallipohjasta (valinnainen)',
+      'pb.noneTemplate': '(ei mitään — rakenna tyhjästä)',
+      'pb.promptPreview': 'Promptin esikatselu',
+      'pb.addBtn': '➕ Lisää sovelluksesi — liitä se tai lataa tiedosto',
+      'pb.improving': 'Parannetaan',
+      'pb.copied': 'Kopioitu!',
       'pb.new': 'Uusi sovellus',
       'pb.improve': 'Paranna tätä sovellusta',
       'pb.descPh': 'Kuvaile mitä sovelluksen tulisi tehdä, tai mitä muutoksia haluat...',
       'pb.includeCortex': 'Sisällytä Cortex-laajennukset',
       'pb.livePreview': 'Esikatselu',
-      'pb.copy': 'Kopioi prompti',
+      'pb.copy': '📋 Kopioi prompti',
       'card.view': '👁 Näytä',
       'card.remove': '🗑 Poista',
       'card.versions': '🕑 Versiot',
@@ -3259,7 +3314,7 @@
     var app = {
       id: generateId(),
       name: name,
-      description: '',
+      description: parseAppMeta(sourceCode).description || '',
       source: 'local',
       url: null,
       blob: encoded,
@@ -3283,9 +3338,48 @@
 
   function showModal() {
     document.getElementById('modal-overlay').hidden = false;
-    document.getElementById('modal-title').textContent = 'Add App';
+    document.getElementById('modal-title').textContent = t('addModal.title');
     // Default to URL tab
     switchTab('url');
+  }
+
+  // Step 0 for not-yet-signed-in users: adding/publishing an app needs an account, so
+  // open the shared sign-in/register dialog (the SAME one the golden pill opens —
+  // Google one-click or email+password, full registration) and continue once logged in.
+  function requireSignInThen(next) {
+    if (getCortexOwnerToken()) { next(); return; }
+    var done = false;
+    function onLogin() {
+      if (done) return; done = true;
+      try { window.AIMEAT.auth.off('login', onLogin); } catch (e) {}
+      next();
+    }
+    try {
+      window.AIMEAT.auth.on('login', onLogin);
+      window.AIMEAT.auth.showLoginModal({});
+    } catch (e) {
+      // Auth lib not ready yet — fall back to the pill's own Sign In button.
+      var b = document.querySelector('#headerAuth .aimeat-sign-btn');
+      if (b) b.click(); else next();
+    }
+  }
+
+  // Read the app name + description the templates embed (AIMEAT App Manifest comment),
+  // falling back to <title>, so the Add dialog can pre-fill them from pasted code.
+  function parseAppMeta(html) {
+    var meta = { name: '', description: '' };
+    try {
+      var m = (html || '').match(/AIMEAT App Manifest([\s\S]*?)-->/i);
+      if (m) {
+        var nm = m[1].match(/\bname:\s*(.+)/i); if (nm) meta.name = nm[1].trim();
+        var dm = m[1].match(/\bdescription:\s*(.+)/i); if (dm) meta.description = dm[1].trim();
+      }
+      if (!meta.name) { var tt = (html || '').match(/<title>([^<]+)<\/title>/i); if (tt) meta.name = tt[1].trim(); }
+    } catch (e) {}
+    // Drop unfilled {{template}} placeholders.
+    if (/\{\{.*\}\}/.test(meta.name)) meta.name = '';
+    if (/\{\{.*\}\}/.test(meta.description)) meta.description = '';
+    return meta;
   }
 
   function closeModal() {
@@ -6982,29 +7076,30 @@
     pbSourceApp = app || null;
     var overlay = document.getElementById('prompt-builder-overlay');
     var desc = document.getElementById('pb-description');
-    var extCheckbox = document.getElementById('pb-ext-checkbox');
-    var extList = document.getElementById('pb-ext-list');
 
     // Reset state
     desc.value = '';
-    extCheckbox.checked = false;
-    extList.classList.remove('open');
     window.pbTemplate = null;
     var tplSel0 = document.getElementById('pb-template');
     if (tplSel0) tplSel0.value = '';
 
-    // Set mode based on whether we have a source app
+    // Mode is implicit: "improve" when opened from an app, else "new". The radios
+    // stay in the DOM (hidden) so buildPromptFromBuilder reads the right mode; instead
+    // of a confusing toggle we show a plain "Improving: <name>" note when relevant.
     var radios = document.querySelectorAll('input[name="pb-mode"]');
+    var improving = document.getElementById('pb-improving');
     if (pbSourceApp) {
-      radios[1].checked = true; // Improve This App
-      desc.placeholder = 'Describe what changes to make to "' + (pbSourceApp.name || 'this app') + '"...';
+      radios[1].checked = true;
+      if (improving) {
+        improving.textContent = '✏️ ' + (t('pb.improving') || 'Improving') + ': ' + (pbSourceApp.name || pbSourceApp.filename || 'this app');
+        improving.style.display = '';
+      }
     } else {
-      radios[0].checked = true; // New App
-      desc.placeholder = 'Describe what the app should do...';
+      radios[0].checked = true;
+      if (improving) improving.style.display = 'none';
     }
+    desc.placeholder = t('pb.descPh');
 
-    // Load Cortex extensions into picker
-    loadPbExtensions();
     // Load authoring templates (booster-kit) into the "Start from a template" picker
     loadPbTemplates();
 
@@ -7026,18 +7121,21 @@
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var base = config.aimeatUrl.replace(/\/+$/, '');
-    fetch(base + '/v1/app-templates')
+    fetch(base + '/v1/app-templates?lang=' + encodeURIComponent(currentLang))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
         var list = ((d.data && d.data.templates) || []).filter(function (t) { return t.kind !== 'component'; });
         list.sort(function (a, b) { return (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1); });
-        sel.innerHTML = '<option value="">(none — build from scratch)</option>';
+        sel.innerHTML = '<option value="">' + t('pb.noneTemplate') + '</option>';
         list.forEach(function (t) {
           var o = document.createElement('option');
           o.value = t.id;
           var prefix = t.kind === 'use-case' ? '★ ' : '';
-          o.textContent = prefix + t.title + (t.description ? ' — ' + t.description.slice(0, 70) : '');
+          // Use-case titles are short ("Marketplace") so append a snippet of their description;
+          // app-shell titles are now self-describing ("Standard app — login + saves your data"),
+          // so don't tack on a second em-dash clause.
+          o.textContent = prefix + t.title + (t.kind === 'use-case' && t.description ? ' — ' + t.description.slice(0, 70) : '');
           sel.appendChild(o);
         });
         sel.onchange = function () {
@@ -7177,9 +7275,14 @@
     var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : 'https://your-aimeat-node.example';
     var mode = document.querySelector('input[name="pb-mode"]:checked').value;
     var description = document.getElementById('pb-description').value.trim();
-    var selectedExts = document.getElementById('pb-ext-checkbox').checked ? getSelectedExtensions() : [];
 
     var prompt = '';
+
+    // Converse + build the UI in the language the user is browsing in (the build
+    // instructions below stay in English, but the conversation + app text should match).
+    var PB_LANGS = { en: 'English', fi: 'Finnish (Suomi)' };
+    var pbLang = PB_LANGS[currentLang] || 'English';
+    prompt += 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + pbLang + '. These build instructions are in English, but converse with me and build the app interface in ' + pbLang + '.\n\n';
 
     // Header
     var isImprove = (mode === 'improve' && pbSourceApp);
@@ -7222,49 +7325,21 @@
     prompt += 'Media & misc:\n';
     prompt += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
     prompt += '- aimeat-speech.js — text-to-speech / speech helpers\n';
+    prompt += '- aimeat-markdown.js — render safe markdown to HTML (`AIMEAT.md.render`)\n';
     prompt += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
     prompt += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
 
-    // Cortex extension instructions
-    if (selectedExts.length > 0) {
-      prompt += '### Cortex Extensions (include these)\n\n';
-      selectedExts.forEach(function(ext) {
-        prompt += '#### ' + ext.name + '\n';
-        prompt += ext.description ? ext.description + '\n' : '';
-
-        // Use detailed components if available
-        var comps = ext.components;
-        if (comps && comps.length) {
-          comps.forEach(function(c) {
-            if (c.type === 'lib' && c.filename) {
-              prompt += 'Load the library:\n```html\n';
-              prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(c.filename) + '"></' + 'script>\n';
-              prompt += '```\n';
-              if (c.api_surface) {
-                prompt += 'API Surface:\n```\n' + c.api_surface + '\n```\n';
-              }
-            } else if (c.type === 'schema') {
-              prompt += 'Data schema: `' + (c.key_pattern || '') + '` — data is validated automatically.\n';
-            } else if (c.type === 'prompt') {
-              prompt += 'Prompt template: ' + (c.name || '') + '\n';
-            }
-          });
-        } else {
-          // Fallback: only list-level type info
-          var types = ext.component_types || [];
-          if (types.indexOf('lib') !== -1) {
-            prompt += 'Includes a JS library (load via `<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/...">`).\n';
-          }
-          if (types.indexOf('schema') !== -1) {
-            prompt += 'Provides validated data schemas.\n';
-          }
-          if (types.indexOf('prompt') !== -1) {
-            prompt += 'Includes prompt templates.\n';
-          }
-        }
-        prompt += '\n';
-      });
-    }
+    // Ready-made UI building blocks (node-bundled cortex) — ALWAYS offered so the AI can
+    // reach for them instead of hand-rolling tables/forms/charts. Load only what's used.
+    prompt += 'Ready-made UI (node-bundled — load from ' + nodeUrl + '/v1/cortex/<name>/libs/<name>.js, use only what you need):\n';
+    prompt += '- aimeat-ui-viewers — sortable/filterable DataTable + viewers (`AIMEAT.ui.viewers`)\n';
+    prompt += '- aimeat-ui-forms — form builder with validation (`AIMEAT.ui.forms`)\n';
+    prompt += '- aimeat-ui-layout — responsive layout helpers, master/detail (`AIMEAT.ui.layout`)\n';
+    prompt += '- aimeat-ui-nav — navbars, tabs, menus (`AIMEAT.ui.nav`)\n';
+    prompt += '- aimeat-ui-dialogs — modals, toasts, confirms (`AIMEAT.ui.dialogs`)\n';
+    prompt += '- aimeat-charts — charts / graphs (`AIMEAT.charts`)\n';
+    prompt += '- aimeat-canvas — drawing / freeform canvas (`AIMEAT.canvas`)\n';
+    prompt += 'Example: <script src="' + nodeUrl + '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></' + 'script>\n\n';
 
     // Auth pattern
     prompt += '### Auth Pattern\n';
@@ -7324,11 +7399,15 @@
 
     // Design guidelines
     prompt += '### Design Guidelines\n';
-    prompt += 'Use CSS variables so the app themes cleanly. Support light AND dark:\n';
+    prompt += 'Use CSS variables so the app themes cleanly, and RESPECT the user\'s AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage "aimeat-theme" ("light"|"dark"). Define light as the default and dark under [data-theme="dark"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):\n';
     prompt += '```css\n';
     prompt += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
-    prompt += '@media (prefers-color-scheme: dark) {\n';
-    prompt += '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n';
+    prompt += ':root[data-theme="dark"] { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; }\n';
+    prompt += '```\n';
+    prompt += '```js\n';
+    prompt += '(function(){ function apply(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n';
+    prompt += '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
+    prompt += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
     prompt += '```\n';
     prompt += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
 
@@ -7339,8 +7418,19 @@
     prompt += '- Keep it as a single self-contained HTML file\n';
     prompt += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
     prompt += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
-    prompt += '- Theme with CSS variables and support both light and dark\n';
+    prompt += '- Theme with CSS variables; respect the user\'s AIMEAT light/dark choice (localStorage "aimeat-theme") with an OS-preference fallback\n';
     prompt += '- Include error handling and loading states for API calls\n\n';
+
+    // After-build: have the AI walk me through publishing — closes the loop for newcomers.
+    if (!isImprove) {
+      prompt += '## When the app is ready — tell me how to publish it\n';
+      prompt += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
+      prompt += '1. Open ' + nodeUrl + '/app-catalog.html\n';
+      prompt += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
+      prompt += '3. Click Publish.\n';
+      prompt += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
+      prompt += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
+    }
 
     // Source code for improve mode
     if (mode === 'improve' && pbSourceApp && pbSourceApp.blob) {
@@ -7600,8 +7690,9 @@
     });
 
     // ── Add App button ──────────────────────────────
+    // Step 0: not signed in → open the sign-in/register dialog first, then the Add dialog.
     document.getElementById('add-btn').addEventListener('click', function () {
-      showModal();
+      requireSignInThen(showModal);
     });
 
     // ── Generate with AI button ─────────────────────
@@ -7719,6 +7810,19 @@
     var dropZone = document.getElementById('drop-zone');
     var fileInput = document.getElementById('file-input');
     var browseBtn = document.getElementById('browse-btn');
+
+    // Auto-fill the app name from pasted code (AIMEAT manifest / <title>) when the
+    // name field is still empty — the description rides along into the publish step.
+    var pasteArea = document.getElementById('app-paste-code');
+    if (pasteArea) {
+      pasteArea.addEventListener('input', function () {
+        var nameInput = document.getElementById('app-name');
+        if (nameInput && !nameInput.value.trim()) {
+          var meta = parseAppMeta(pasteArea.value);
+          if (meta.name) nameInput.value = meta.name;
+        }
+      });
+    }
 
     dropZone.addEventListener('dragover', function (e) {
       e.preventDefault();
@@ -7961,11 +8065,15 @@
         'Notifications, Drag & Drop, Clipboard, Speech API, Fullscreen, Web Workers,\n' +
         'CSS Animations, SVG, Gamepad API, Share API.\n\n' +
         '### Design Guidelines\n' +
-        'Use CSS variables and support light AND dark:\n' +
+        'Use CSS variables and RESPECT the user\'s AIMEAT theme: their light/dark choice from the AIMEAT pill is saved in localStorage "aimeat-theme" ("light"|"dark"). Light is the default; dark lives under [data-theme="dark"]; set that attribute from the saved choice on load (OS preference as fallback, live-update on change):\n' +
         '```css\n' +
         ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n' +
-        '@media (prefers-color-scheme: dark) {\n' +
-        '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n' +
+        ':root[data-theme="dark"] { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; }\n' +
+        '```\n' +
+        '```js\n' +
+        '(function(){ function apply(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n' +
+        '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n' +
+        '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n' +
         '```\n' +
         'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
         'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n' +
@@ -7974,7 +8082,7 @@
         '- Never use literal closing script tags in JS comments or strings (breaks HTML parser)\n' +
         '- Keep it as a single self-contained HTML file\n' +
         '- Gate AI features on AIMEAT.ai.isAvailable(); never hardcode an API key\n' +
-        '- Theme with CSS variables; support light and dark\n' +
+        '- Theme with CSS variables; respect the user\'s AIMEAT light/dark choice (localStorage "aimeat-theme") with an OS-preference fallback\n' +
         '- Include error handling and loading states for API calls\n\n' +
         '--- Source Code ---\n' + code;
     }
@@ -8073,11 +8181,10 @@
     document.getElementById('pb-copy-btn').addEventListener('click', function() {
       var prompt = buildPromptFromBuilder();
       var btn = this;
+      // Keep the dialog OPEN after copying so the user can read Step 3 (add & publish).
+      var revert = function () { setTimeout(function () { btn.textContent = t('pb.copy'); }, 1400); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(prompt).then(function() {
-          btn.textContent = 'Copied!';
-          setTimeout(function() { btn.textContent = 'Copy Prompt'; closePbPanel(); }, 1200);
-        });
+        navigator.clipboard.writeText(prompt).then(function() { btn.textContent = '✔ ' + (t('pb.copied') || 'Copied!'); revert(); });
       } else {
         var ta = document.createElement('textarea');
         ta.value = prompt;
@@ -8085,26 +8192,27 @@
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        btn.textContent = 'Copied!';
-        setTimeout(function() { btn.textContent = 'Copy Prompt'; closePbPanel(); }, 1200);
+        btn.textContent = '✔ ' + (t('pb.copied') || 'Copied!');
+        revert();
       }
     });
 
-    document.getElementById('pb-ext-checkbox').addEventListener('change', function() {
-      document.getElementById('pb-ext-list').classList.toggle('open', this.checked);
-      updatePbPreview();
+    // Step 3 — close the prompt builder and open the Add App flow on the PASTE tab
+    // (the AI hands back ready-to-paste code; the File tab is right there for a file).
+    document.getElementById('pb-add-btn').addEventListener('click', function() {
+      // Step 0 (sign-in/register) if needed, then open Add on the Paste tab.
+      requireSignInThen(function () {
+        closePbPanel();
+        showModal();
+        try { switchTab('paste'); } catch (e) { /* tab switch is best-effort */ }
+      });
     });
 
+    // Mode radios are hidden (mode is implicit) and the cortex-extensions toggle was
+    // removed — the helpful aimeat-* cortex UI libs are now always documented in the
+    // prompt. Keep the mode radios in sync only for buildPromptFromBuilder's state.
     document.querySelectorAll('input[name="pb-mode"]').forEach(function(radio) {
-      radio.addEventListener('change', function() {
-        var desc = document.getElementById('pb-description');
-        if (this.value === 'improve' && pbSourceApp) {
-          desc.placeholder = 'Describe what changes to make to "' + (pbSourceApp.name || 'this app') + '"...';
-        } else {
-          desc.placeholder = 'Describe what the app should do...';
-        }
-        updatePbPreview();
-      });
+      radio.addEventListener('change', updatePbPreview);
     });
 
     document.getElementById('pb-description').addEventListener('input', updatePbPreview);
