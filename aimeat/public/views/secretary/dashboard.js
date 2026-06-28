@@ -26,7 +26,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 
 /** Core (+ later dynamic) quick actions: a button row above the chat. `items` are descriptors
  *  `{ key, label, title?, primary?, disabled?, hidden?, onClick }` so B3 can extend with dynamic actions. */
@@ -89,7 +88,7 @@ export function standPanel(p) {
       </div>
       ${s.loading
         ? html`<div class="sec-hint">${t('secretary.dash.standThinking')}</div>`
-        : html`<div class="sec-stand-body">${escHtml(s.text)}</div>`}
+        : html`<div class="sec-stand-body">${(s.text)}</div>`}
     </section>`;
 }
 
@@ -107,7 +106,7 @@ export function actionItemsCard(p) {
           const label = it.labelKind ? t('secretary.items.text.' + it.labelKind, { summary: it.summary || '' }) : (it.text || '');
           return html`
             <li class="sec-item-row" key=${it.id}>
-              <div class="sec-item-text">${escHtml(label)}</div>
+              <div class="sec-item-text">${(label)}</div>
               <div class="sec-item-actions">
                 <button class="btn-primary btn-sm" onClick=${() => p.handleActionItem(it)}>${t('secretary.items.handle.' + kind)}</button>
                 <button class="btn-ghost btn-sm" onClick=${() => p.dismissActionItem(it)}>${t('secretary.items.dismiss')}</button>
@@ -131,10 +130,10 @@ export function routinesCard(p) {
           return html`
             <li class="sec-routine-row" key=${r.id}>
               <div class="sec-routine-main">
-                <div class="sec-routine-title">${escHtml(r.title)}${r.cadence ? html` <span class="sec-cadence-badge">${t('secretary.next.cadence.' + r.cadence)}</span>` : null}</div>
-                ${last ? html`<div class="sec-hint">${t('secretary.next.last')}: ${escHtml(last.summary)}</div>` : null}
+                <div class="sec-routine-title">${(r.title)}${r.cadence ? html` <span class="sec-cadence-badge">${t('secretary.next.cadence.' + r.cadence)}</span>` : null}</div>
+                ${last ? html`<div class="sec-hint">${t('secretary.next.last')}: ${(last.summary)}</div>` : null}
                 ${next
-                  ? html`<div class="sec-hint">${t('secretary.next.next')}: ${escHtml(next.summary)}</div>`
+                  ? html`<div class="sec-hint">${t('secretary.next.next')}: ${(next.summary)}</div>`
                   : html`<div class="sec-hint">${t('secretary.next.allDone')}</div>`}
               </div>
               ${/* Always offer to open the routine — even with no pending step, so a delegated/waiting routine can be reopened to Check result. */ ''}
@@ -162,8 +161,8 @@ export function quickActionsManager(p) {
           ${p.proposed.map((a) => html`
             <li class="sec-qa-row proposed" key=${a.id}>
               <div class="sec-qa-main">
-                <span class="sec-qa-label">${escHtml(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>
-                <div class="sec-hint">${a.kind === 'prompt' ? escHtml(a.prompt) : t('secretary.qa.composeTarget') + ': ' + escHtml(a.target)}</div>
+                <span class="sec-qa-label">${(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>
+                <div class="sec-hint">${a.kind === 'prompt' ? (a.prompt) : t('secretary.qa.composeTarget') + ': ' + (a.target)}</div>
               </div>
               <button class="btn-primary btn-sm" onClick=${() => p.approve(a)}>${t('secretary.qa.pin')}</button>
               <button class="btn-ghost btn-sm" onClick=${() => p.dismiss(a)}>${t('secretary.qa.dismiss')}</button>
@@ -180,7 +179,7 @@ export function quickActionsManager(p) {
                   ${p.editingId === a.id
                     ? html`<input class="sec-input" value=${p.editLabel} onInput=${(e) => p.setEditLabel(e.target.value)}
                         onKeyDown=${(e) => { if (e.key === 'Enter') p.saveRename(a); if (e.key === 'Escape') p.cancelRename(); }} />`
-                    : html`<span class="sec-qa-label">${escHtml(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>`}
+                    : html`<span class="sec-qa-label">${(a.label)} <span class="sec-qa-kind">${t('secretary.qa.kind.' + a.kind)}</span></span>`}
                 </div>
                 ${p.editingId === a.id
                   ? html`

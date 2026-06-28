@@ -20,7 +20,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 
 /** P2-A — when discover finds nothing, offer to CREATE the missing capability (Draft → approve). */
 export function createResourceCard(p) {
@@ -30,8 +29,8 @@ export function createResourceCard(p) {
       ${p.created ? html`
         <div class="sec-plan-result">
           <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.create.done')}</div>
-          <p class="sec-purpose">${escHtml(p.created.name)}</p>
-          <p class="sec-hint"><code>${escHtml(p.created.id)}</code></p>
+          <p class="sec-purpose">${(p.created.name)}</p>
+          <p class="sec-hint"><code>${(p.created.id)}</code></p>
           <button class="btn-ghost btn-sm" onClick=${p.reset}>${t('secretary.plan.new')}</button>
         </div>`
       : p.draft ? html`
@@ -73,8 +72,8 @@ export function knowledgeCard(p) {
       ${p.created ? html`
         <div class="sec-plan-result">
           <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.knowledge.done')}</div>
-          <p class="sec-purpose">${escHtml(p.created.name)}</p>
-          <p class="sec-hint"><code>${escHtml(p.created.package_id)}</code></p>
+          <p class="sec-purpose">${(p.created.name)}</p>
+          <p class="sec-hint"><code>${(p.created.package_id)}</code></p>
         </div>` : null}
 
       ${(p.packages || []).length >= 2 ? html`
@@ -87,21 +86,21 @@ export function knowledgeCard(p) {
             <div class="sec-note-bar">
               <select class="sec-band" value=${p.linkForm.sourceId} onChange=${(e) => p.setLinkForm({ ...p.linkForm, sourceId: e.target.value })}>
                 <option value="">${t('secretary.knowledge.linkSource')}</option>
-                ${p.packages.map((pk) => html`<option value=${pk.id} selected=${p.linkForm.sourceId === pk.id}>${escHtml(pk.name)}</option>`)}
+                ${p.packages.map((pk) => html`<option value=${pk.id} selected=${p.linkForm.sourceId === pk.id}>${(pk.name)}</option>`)}
               </select>
               <select class="sec-band" value=${p.linkForm.relation} onChange=${(e) => p.setLinkForm({ ...p.linkForm, relation: e.target.value })}>
                 ${(p.LINK_RELATIONS || []).map((rel) => html`<option value=${rel} selected=${p.linkForm.relation === rel}>${rel}</option>`)}
               </select>
               <select class="sec-band" value=${p.linkForm.targetId} onChange=${(e) => p.setLinkForm({ ...p.linkForm, targetId: e.target.value })}>
                 <option value="">${t('secretary.knowledge.linkTarget')}</option>
-                ${p.packages.map((pk) => html`<option value=${pk.id} selected=${p.linkForm.targetId === pk.id}>${escHtml(pk.name)}</option>`)}
+                ${p.packages.map((pk) => html`<option value=${pk.id} selected=${p.linkForm.targetId === pk.id}>${(pk.name)}</option>`)}
               </select>
             </div>
             <input class="sec-input" placeholder=${t('secretary.knowledge.linkDesc')} value=${p.linkForm.description} onInput=${(e) => p.setLinkForm({ ...p.linkForm, description: e.target.value })} />
             <button class="btn-primary" disabled=${!p.linkForm.sourceId || !p.linkForm.targetId || p.linkForm.sourceId === p.linkForm.targetId || !p.linkForm.description.trim() || p.linkForm.saving} onClick=${p.createLink}>${p.linkForm.saving ? t('secretary.applying') : t('secretary.knowledge.linkApprove')}</button>
           </div>` : null}
         ${p.linkResult ? html`
-          <div class="sec-status"><span class="sec-dot"></span> ${escHtml(p.linkResult.sourceName)} <em>${escHtml(p.linkResult.relation)}</em> ${escHtml(p.linkResult.targetName)}</div>` : null}` : null}
+          <div class="sec-status"><span class="sec-dot"></span> ${(p.linkResult.sourceName)} <em>${(p.linkResult.relation)}</em> ${(p.linkResult.targetName)}</div>` : null}` : null}
     </section>`;
 }
 
@@ -130,8 +129,8 @@ export function accessCard(p) {
         : html`<ul class="sec-goal-list">
             ${p.consents.map((c) => html`<li class="sec-goal-row" key=${c.id}>
               <div class="sec-goal-main">
-                <div class="sec-goal-title">${escHtml(c.recipient)}</div>
-                <div class="sec-hint"><code>${escHtml(c.data_pattern)}</code> · ${escHtml(c.purpose)}</div>
+                <div class="sec-goal-title">${(c.recipient)}</div>
+                <div class="sec-hint"><code>${(c.data_pattern)}</code> · ${(c.purpose)}</div>
               </div>
               <button class="btn-ghost btn-sm" onClick=${() => p.revokeGrant(c.id)}>${t('secretary.access.revoke')}</button>
             </li>`)}
@@ -150,7 +149,7 @@ export function accessCard(p) {
         ? html`<div class="sec-hint">${t('secretary.access.noGroups')}</div>`
         : html`<ul class="sec-goal-list">
             ${p.groups.map((g) => html`<li class="sec-goal-row" key=${g.id}>
-              <div class="sec-goal-main"><div class="sec-goal-title">${escHtml(g.name)}</div>
+              <div class="sec-goal-main"><div class="sec-goal-title">${(g.name)}</div>
                 <div class="sec-hint">${(g.members || []).length} ${t('secretary.access.members')}</div></div>
             </li>`)}
           </ul>`}
@@ -183,14 +182,14 @@ export function crewCard(p) {
 
       ${c ? html`
         <div class="sec-form sec-consent">
-          <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.crew.consentTitle')} <code>${escHtml(c.name)}</code></div>
+          <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.crew.consentTitle')} <code>${(c.name)}</code></div>
           <p class="sec-hint">${t('secretary.crew.consentNote')}</p>
           <ul class="sec-goal-list">
             ${c.extras.map((x) => html`<li class="sec-goal-row" key=${x.scope}>
               <label class="sec-goal-main">
                 <input type="checkbox" checked=${c.checked.includes(x.scope)} onChange=${() => p.toggleExtra(x.scope)} />
-                <span class="sec-goal-title">${escHtml(x.description)}</span>
-                <span class="sec-hint"><code>${escHtml(x.scope)}</code></span>
+                <span class="sec-goal-title">${(x.description)}</span>
+                <span class="sec-hint"><code>${(x.scope)}</code></span>
               </label>
             </li>`)}
           </ul>
@@ -206,8 +205,8 @@ export function crewCard(p) {
         <ul class="sec-goal-list">
           ${p.pending.map((r) => html`<li class="sec-goal-row" key=${r.user_code}>
             <div class="sec-goal-main">
-              <div class="sec-goal-title">${escHtml(r.display_name || r.agent_name || t('secretary.crew.unnamed'))}</div>
-              <div class="sec-hint"><code>${escHtml(r.user_code)}</code> · ${t('secretary.crew.expiresIn')} ${Math.floor((r.expires_in || 0) / 60)}m</div>
+              <div class="sec-goal-title">${(r.display_name || r.agent_name || t('secretary.crew.unnamed'))}</div>
+              <div class="sec-hint"><code>${(r.user_code)}</code> · ${t('secretary.crew.expiresIn')} ${Math.floor((r.expires_in || 0) / 60)}m</div>
             </div>
             <button class="btn-primary btn-sm" onClick=${() => p.approve(r.user_code, 'standard')}>${t('secretary.crew.approve')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => p.deny(r.user_code)}>${t('secretary.crew.deny')}</button>
@@ -220,7 +219,7 @@ export function crewCard(p) {
         : html`<ul class="sec-goal-list">
             ${p.agents.map((a) => html`<li class="sec-goal-row" key=${a.gaii || a.name}>
               <div class="sec-goal-main">
-                <div class="sec-goal-title">${escHtml(a.name)}</div>
+                <div class="sec-goal-title">${(a.name)}</div>
                 <div class="sec-note-bar">
                   <select class="sec-band" value=${a.mode || 'interactive'} onChange=${(e) => p.setMode(a.name, e.target.value)}>
                     ${p.MODES.map((m) => html`<option value=${m} selected=${(a.mode || 'interactive') === m}>${m}</option>`)}
