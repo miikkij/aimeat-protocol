@@ -12,6 +12,8 @@
  * @structure ROUTINE_CAPABILITIES · buildRoutinePrompt · useWhatsNext({ active, config, persistConfig, policy, wsList, suggestedWsId, showToast })
  * @usage const next = useWhatsNext({...}); whatsNextCard(next) / routinesCard(next)
  * @version-history
+ *   v0.6.0 — 2026-06-28 — G7: a delegate step can run an Agent Workflow (chaining specialists) instead of a
+ *     single agent task — loads the owner's workflows, POST /v1/workflows/:id/run, tracks the runId; checkDelegateResult polls it.
  *   v0.5.0 — 2026-06-28 — G4: split FILE_CAPS into NOTE_CAPS (file a note) + FEED_CAPS (briefing/reminders
  *     surface in the Home feed), mirroring actionKind() — consistent with the tick + legacy action-loop.
  *   v0.4.0 — 2026-06-28 — G2: recurring routines — setRoutineCadence (none/daily/weekly); the tick
@@ -23,7 +25,7 @@
  *     task status back into the routine. delegate removed from the deferred set.
  *   v0.1.0 — 2026-06-27 — B2: Routine entity + "What's next" propose/advance with band-gated, persisted steps.
  */
-import { useState, useCallback, useMemo } from 'preact/hooks';
+import { useState, useCallback, useMemo, useEffect } from 'preact/hooks';
 import { api, apiGet, apiPost } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers.js';
@@ -64,8 +66,17 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
   const [proposing, setProposing] = useState(false);
   const [selectedId, setSelectedId] = useState(null); // routine being walked in the card
   const [busyStepId, setBusyStepId] = useState(null);
-  const [delegateAgent, setDelegateAgent] = useState(''); // owner's chosen target for the next delegate step
+  const [delegateAgent, setDelegateAgent] = useState(''); // owner's chosen agent target for the next delegate step
+  const [delegateWorkflow, setDelegateWorkflow] = useState(''); // G7: owner's chosen workflow to run for a delegate step
   const [checkingStepId, setCheckingStepId] = useState(null);
+  const [workflows, setWorkflows] = useState([]); // G7: the owner's Agent Workflows (delegate can run one)
+
+  // G7: load the owner's workflows so a delegate step can run one (chaining specialists) instead of a single agent task.
+  useEffect(() => {
+    let cancelled = false;
+    apiGet('/v1/workflows').then((r) => { if (!cancelled) setWorkflows((r && r.data && r.data.workflows) || []); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const routines = useMemo(() => (active && Array.isArray(active.routines)) ? active.routines : [], [active]);
   const activeRoutines = useMemo(() => routines.filter((r) => r.status === 'active'), [routines]);
@@ -115,6 +126,13 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
 
   /** Carry out one step's capability (B2: discover scouts, file caps file a note; B4: delegate creates an agent task). */
   const performStep = useCallback(async (step, opts = {}) => {
+    if (step.capability === 'delegate' && opts.workflowId) {
+      // G7: run an Agent Workflow (chaining specialists) instead of a single agent task. The run executes
+      // server-side over the workflow's steps; the routine tracks its runId (checkDelegateResult polls it).
+      const resp = await apiPost(`/v1/workflows/${encodeURIComponent(opts.workflowId)}/run`, { mode: 'full' });
+      const runId = resp && resp.data && resp.data.runId;
+      return { status: 'delegated', summary: t('secretary.next.resultWorkflow', { wf: opts.workflowName || opts.workflowId }), workflowId: opts.workflowId, runId: runId || null };
+    }
     if (step.capability === 'delegate') {
       // B4: hand the step off to one of the owner's other agents as an agent task (queued so it's runnable;
       // parent_task_id links it back to this routine). The owner picked the target when approving.
@@ -198,8 +216,10 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
         }
       }
       const ts = new Date().toISOString();
-      // Delegated steps carry the agent-task ref (taskId + agent) so the result can be checked later.
-      const resultObj = { summary: outcome.summary, ts, ...(outcome.taskId ? { taskId: outcome.taskId, agentName: outcome.agentName } : {}) };
+      // Delegated steps carry the agent-task ref (taskId + agent) OR the workflow run ref (G7) for later checking.
+      const resultObj = { summary: outcome.summary, ts,
+        ...(outcome.taskId ? { taskId: outcome.taskId, agentName: outcome.agentName } : {}),
+        ...(outcome.workflowId ? { workflowId: outcome.workflowId, runId: outcome.runId } : {}) };
       const nextSteps = routine.steps.map((s) => (s.id === step.id ? { ...s, status: outcome.status, result: resultObj } : s));
       // B4/B5 fix: a 'delegated' step is NOT settled (its task is still out) — keep the routine active
       // (on the dashboard) until checkDelegateResult marks it done once the delegated task completes.
@@ -240,16 +260,26 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
    */
   const checkDelegateResult = useCallback(async (routine, step, closeItemId = null) => {
     const ref = step.result || {};
-    if (!ref.taskId || !ref.agentName || checkingStepId) return;
+    const isWorkflow = !!(ref.workflowId && ref.runId);
+    if ((!isWorkflow && (!ref.taskId || !ref.agentName)) || checkingStepId) return;
     setCheckingStepId(step.id);
     try {
-      const r = await apiGet(`/v1/agents/${encodeURIComponent(ref.agentName)}/tasks/${encodeURIComponent(ref.taskId)}`);
-      const task = r && r.data && r.data.task;
-      const status = (task && task.status) || 'unknown';
+      let status; let summary;
+      if (isWorkflow) {
+        // G7: poll the workflow run's outcome.
+        const r = await apiGet(`/v1/workflows/${encodeURIComponent(ref.workflowId)}/runs/${encodeURIComponent(ref.runId)}`);
+        const run = (r && r.data) || {};
+        status = run.status || run.outcome || 'unknown';
+        summary = t('secretary.next.resultWorkflowStatus', { wf: ref.workflowId, status });
+      } else {
+        const r = await apiGet(`/v1/agents/${encodeURIComponent(ref.agentName)}/tasks/${encodeURIComponent(ref.taskId)}`);
+        const task = r && r.data && r.data.task;
+        status = (task && task.status) || 'unknown';
+        summary = t('secretary.next.resultDelegateStatus', { agent: ref.agentName, status });
+      }
       const ts = new Date().toISOString();
-      const summary = t('secretary.next.resultDelegateStatus', { agent: ref.agentName, status });
-      // B4/B5: once the delegated task reaches a terminal state, settle the step → the routine can complete.
-      const done = ['completed', 'done', 'closed', 'failed', 'cancelled'].includes(String(status).toLowerCase());
+      // B4/B5/G7: once the delegated task / workflow run reaches a terminal state, settle the step.
+      const done = ['completed', 'done', 'closed', 'failed', 'cancelled', 'partial', 'error'].includes(String(status).toLowerCase());
       const next = { ...config, contexts: (config.contexts || []).map((c) => {
         if (!active || c.id !== active.id) return c;
         const nextRoutines = (c.routines || []).map((rt) => {
@@ -297,6 +327,7 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
     routines, activeRoutines, selected, selectedId, setSelectedId,
     busyStepId, approveStep, setRoutineStatus, deleteRoutine, setRoutineCadence, advance, nextPendingStep,
     delegateAgent, setDelegateAgent, checkingStepId, checkDelegateResult,
+    workflows, delegateWorkflow, setDelegateWorkflow,
     actionItems, handleActionItem, dismissActionItem,
   };
 }

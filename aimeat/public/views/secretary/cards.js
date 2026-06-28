@@ -8,6 +8,7 @@
  * @structure one exported render function per card (props in → htm out)
  * @usage import { chatCard, findCard, ... } from '/views/secretary/cards.js'; ... ${chatCard({...})}
  * @version-history
+ *   v0.10.0 — 2026-06-28 — G7: the delegate control gains a workflow picker (run an Agent Workflow chaining specialists).
  *   v0.9.0 — 2026-06-28 — G10: feedCard groups entries by day (Today / Yesterday / date) with per-day counts.
  *   v0.8.0 — 2026-06-28 — B4: routineStepRow gains the delegate control (pick a target agent → create an
  *     agent task) + a "Check result" action on delegated steps.
@@ -256,17 +257,25 @@ function routineStepRow(p, r, s) {
   const runLabel = s.band === 'off' ? t('secretary.next.skip') : s.band === 'act' ? t('secretary.next.run') : t('secretary.next.approve');
   const isDelegate = s.capability === 'delegate';
   const agents = p.agents || [];
-  // B4: the next pending delegate step needs the owner to pick a target agent before approving.
+  const workflows = p.workflows || [];
+  // B4: delegate to one agent (agent task) · G7: OR run an Agent Workflow chaining specialists.
   const delegateControl = html`
     <div class="sec-delegate">
-      ${agents.length === 0
+      ${agents.length === 0 && workflows.length === 0
         ? html`<span class="sec-hint">${t('secretary.next.delegateNoAgents')}</span>`
         : html`
-          <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
-            <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
-            ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${escHtml(a.name)}</option>`)}
-          </select>
-          <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>`}
+          ${agents.length > 0 ? html`
+            <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
+              <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
+              ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${escHtml(a.name)}</option>`)}
+            </select>
+            <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>` : null}
+          ${workflows.length > 0 ? html`
+            <select class="sec-band" value=${p.delegateWorkflow} onChange=${(e) => p.setDelegateWorkflow(e.target.value)}>
+              <option value="" selected=${!p.delegateWorkflow}>${t('secretary.next.delegateWorkflowPick')}</option>
+              ${workflows.map((w) => html`<option value=${w.id} selected=${p.delegateWorkflow === w.id}>${escHtml((w.title && (w.title.en_US || w.title)) || w.id)}</option>`)}
+            </select>
+            <button class="btn-outline btn-sm" disabled=${busy || !p.delegateWorkflow} onClick=${() => p.approveStep(r, s, { workflowId: p.delegateWorkflow, workflowName: (workflows.find((w) => w.id === p.delegateWorkflow) || {}).title?.en_US })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateWorkflowGo')}</button>` : null}`}
     </div>`;
   return html`
     <li class="sec-step-row ${s.status}" key=${s.id}>
@@ -277,7 +286,7 @@ function routineStepRow(p, r, s) {
         </div>
         <div class="sec-step-summary">${escHtml(s.summary)}</div>
         ${s.result ? html`<div class="sec-hint">→ ${escHtml(s.result.summary)}</div>` : null}
-        ${s.status === 'delegated' && s.result && s.result.taskId ? html`
+        ${s.status === 'delegated' && s.result && (s.result.taskId || s.result.runId) ? html`
           <button class="btn-ghost btn-sm" disabled=${p.checkingStepId === s.id} onClick=${() => p.checkDelegateResult(r, s)}>${p.checkingStepId === s.id ? t('secretary.next.running') : t('secretary.next.checkResult')}</button>` : null}
       </div>
       ${s.status === 'pending'
