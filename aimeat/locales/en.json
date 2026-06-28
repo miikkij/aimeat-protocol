@@ -598,8 +598,23 @@
         "whatsNextCard": "Suggestions",
         "find": "Find",
         "createResource": "Create",
-        "note": "Note"
+        "note": "Note",
+        "specialists": "Specialists"
       }
+    },
+    "spec": {
+      "title": "Specialists",
+      "add": "+ Create",
+      "cancel": "Cancel",
+      "empty": "No specialists yet. Create one — it's a focused mini-Secretary you can chain into workflows.",
+      "run": "Run",
+      "remove": "Remove",
+      "namePh": "Name (e.g. researcher)",
+      "purposePh": "What is this specialist for? (its brain)",
+      "create": "Create specialist",
+      "created": "Specialist created.",
+      "ran": "Ran {n} task(s).",
+      "error": "Specialist error"
     },
     "cal": {
       "title": "Calendar",
@@ -984,6 +999,7 @@
       "resultWorkflowStatus": "Workflow {wf}: {status}",
       "delegateWorkflowPick": "Run a workflow…",
       "delegateWorkflowGo": "Run workflow",
+      "delegateDesignWf": "Design new workflow",
       "delegatePick": "Pick an agent…",
       "delegateGo": "Delegate",
       "delegateNoAgent": "Pick an agent to delegate to first",
@@ -8350,6 +8366,9 @@
     "buildHeroSub": "Copy one prompt into Claude, ChatGPT or any AI. It builds you a working app on AIMEAT, published live and yours to keep. Then let your agents run it for you, the way AIMEAT Sanomat writes itself every evening.",
     "buildHeroCopy": "Copy the build prompt →",
     "buildHeroCopied": "Copied ✓. Paste into your AI",
+    "buildHeroAfter": "Paste it into your AI and answer its questions. When your app is ready,",
+    "buildHeroAfter2": "(signing in takes seconds — Google or email).",
+    "openAppsToPublish": "open your apps to add & publish it →",
     "wallTitle": "Built by people with their AI. Yours goes here too.",
     "wallEmpty": "Be the first: copy the prompt above, build something, and it lands here.",
     "wallAnon": "someone",

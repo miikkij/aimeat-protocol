@@ -598,8 +598,23 @@
         "whatsNextCard": "Ehdotukset",
         "find": "Haku",
         "createResource": "Luo",
-        "note": "Muistiinpano"
+        "note": "Muistiinpano",
+        "specialists": "Specialistit"
       }
+    },
+    "spec": {
+      "title": "Specialistit",
+      "add": "+ Luo",
+      "cancel": "Peruuta",
+      "empty": "Ei specialisteja vielä. Luo yksi — se on keskittynyt mini-sihteeri jonka voit ketjuttaa workflow:hin.",
+      "run": "Aja",
+      "remove": "Poista",
+      "namePh": "Nimi (esim. researcher)",
+      "purposePh": "Mihin tämä specialisti on? (sen aivot)",
+      "create": "Luo specialisti",
+      "created": "Specialisti luotu.",
+      "ran": "Ajoi {n} tehtävää.",
+      "error": "Specialisti-virhe"
     },
     "cal": {
       "title": "Kalenteri",
@@ -984,6 +999,7 @@
       "resultWorkflowStatus": "Työnkulku {wf}: {status}",
       "delegateWorkflowPick": "Aja työnkulku…",
       "delegateWorkflowGo": "Aja työnkulku",
+      "delegateDesignWf": "Suunnittele uusi workflow",
       "delegatePick": "Valitse agentti…",
       "delegateGo": "Delegoi",
       "delegateNoAgent": "Valitse ensin agentti, jolle delegoidaan",
@@ -8350,6 +8366,9 @@
     "buildHeroSub": "Kopioi yksi prompti Claudeen, ChatGPT:hen tai mihin tahansa AI:hin. Se rakentaa sinulle toimivan appsin AIMEATiin, julkaistuna heti ja sinun pidettäväksi. Anna sitten agenttiesi pyörittää sitä puolestasi, kuten AIMEAT Sanomat kirjoittaa itsensä joka ilta.",
     "buildHeroCopy": "Kopioi build-prompti →",
     "buildHeroCopied": "Kopioitu ✓, liitä AI:hisi",
+    "buildHeroAfter": "Liitä se AI:hisi ja vastaa sen kysymyksiin. Kun appsi on valmis,",
+    "buildHeroAfter2": "(sisäänkirjautuminen vie sekunteja — Google tai sähköposti).",
+    "openAppsToPublish": "avaa sovelluksesi lisätäksesi & julkaistaksesi sen →",
     "wallTitle": "Ihmisten AI:llaan rakentamia. Sinun tulee tähän.",
     "wallEmpty": "Ole ensimmäinen: kopioi prompti yltä, rakenna jotain, ja se ilmestyy tähän.",
     "wallAnon": "joku",

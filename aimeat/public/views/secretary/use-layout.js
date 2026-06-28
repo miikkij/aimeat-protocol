@@ -44,6 +44,7 @@ export const DASH_DEFAULT = [
   { key: 'calendar', col: 'right' },
   { key: 'automation', col: 'right' },
   { key: 'triggers', col: 'right' },
+  { key: 'specialists', col: 'right' },
 ];
 
 // Merge a saved layout with the defaults: keep saved entries (col/hidden/order), drop unknown keys,

@@ -281,21 +281,20 @@ function routineStepRow(p, r, s) {
   // B4: delegate to one agent (agent task) · G7: OR run an Agent Workflow chaining specialists.
   const delegateControl = html`
     <div class="sec-delegate">
-      ${agents.length === 0 && workflows.length === 0
-        ? html`<span class="sec-hint">${t('secretary.next.delegateNoAgents')}</span>`
-        : html`
-          ${agents.length > 0 ? html`
-            <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
-              <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
-              ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
-            </select>
-            <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>` : null}
-          ${workflows.length > 0 ? html`
-            <select class="sec-band" value=${p.delegateWorkflow} onChange=${(e) => p.setDelegateWorkflow(e.target.value)}>
-              <option value="" selected=${!p.delegateWorkflow}>${t('secretary.next.delegateWorkflowPick')}</option>
-              ${workflows.map((w) => html`<option value=${w.id} selected=${p.delegateWorkflow === w.id}>${((w.title && (w.title.en_US || w.title)) || w.id)}</option>`)}
-            </select>
-            <button class="btn-outline btn-sm" disabled=${busy || !p.delegateWorkflow} onClick=${() => p.approveStep(r, s, { workflowId: p.delegateWorkflow, workflowName: (workflows.find((w) => w.id === p.delegateWorkflow) || {}).title?.en_US })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateWorkflowGo')}</button>` : null}`}
+      ${agents.length > 0 ? html`
+        <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
+          <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
+          ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
+        </select>
+        <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>` : null}
+      ${workflows.length > 0 ? html`
+        <select class="sec-band" value=${p.delegateWorkflow} onChange=${(e) => p.setDelegateWorkflow(e.target.value)}>
+          <option value="" selected=${!p.delegateWorkflow}>${t('secretary.next.delegateWorkflowPick')}</option>
+          ${workflows.map((w) => html`<option value=${w.id} selected=${p.delegateWorkflow === w.id}>${((w.title && (w.title.en_US || w.title)) || w.id)}</option>`)}
+        </select>
+        <button class="btn-outline btn-sm" disabled=${busy || !p.delegateWorkflow} onClick=${() => p.approveStep(r, s, { workflowId: p.delegateWorkflow, workflowName: (workflows.find((w) => w.id === p.delegateWorkflow) || {}).title?.en_US })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateWorkflowGo')}</button>` : null}
+      ${p.onDesignWorkflow ? html`<button class="btn-ghost btn-sm" disabled=${busy} title=${t('secretary.wf.title')} onClick=${() => p.onDesignWorkflow(s)}>${t('secretary.next.delegateDesignWf')}</button>` : null}
+      ${agents.length === 0 && workflows.length === 0 && !p.onDesignWorkflow ? html`<span class="sec-hint">${t('secretary.next.delegateNoAgents')}</span>` : null}
     </div>`;
   return html`
     <li class="sec-step-row ${s.status}" key=${s.id}>

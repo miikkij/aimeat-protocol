@@ -65,6 +65,7 @@ import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
 import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel } from '/views/secretary/dashboard.js';
 import { fetchWorkflowOffers, designWorkflow, saveDesignedWorkflow, slugifyWorkflowId } from '/views/secretary/workflow-design.js';
+import { useSpecialists, specialistsCard } from '/views/secretary/use-specialists.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
@@ -217,6 +218,7 @@ export default function SecretaryView() {
   // Decision B — real calendar (month/week/day) of feed (past) + tick & routine cadence (future).
   const cal = useCalendar();
   const lay = useLayout();   // customizable dashboard layout (pin to column / reorder / hide; persisted)
+  const spec = useSpecialists({ showToast });   // create/list/run the owner's specialists (Phase 3 building blocks)
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
   const learn = useLearning({ active, auto, showToast });
   // P2 reach: create-don't-just-find (A), knowledge custodian (B), access gatekeeper (C), crew setup (D).
@@ -535,6 +537,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
   // ── Phase 3: "Design a workflow" — the Secretary composes a chain of agent+offer steps toward an
   // outcome, proposes how to arm it, and saves it. ──
   const openWfDesign = useCallback(() => setWfDesign((s) => s || { outcome: '' }), []);
+  const designWfFromStep = useCallback((step) => { setWfDesign({ outcome: (step && (step.summary || step.description)) || '' }); try { document.querySelector('.sec-wf')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* noop */ } }, []);
   const discardWfDesign = useCallback(() => setWfDesign(null), []);
   const redoWfDesign = useCallback(() => setWfDesign((s) => ({ outcome: (s && s.outcome) || '' })), []);
   const setWfOutcome = useCallback((v) => setWfDesign((s) => ({ ...(s || {}), outcome: v })), []);
@@ -775,10 +778,11 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                   whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDiscard: discardProposedAction, pasteDrafts, onPasteInput: setPasteDraft, onSavePrompt: savePromptResult, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
                   stand: standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) }),
                   actionItems: actionItemsCard(next),
-                  routines: routinesCard(next),
+                  routines: routinesCard({ ...next, onDesignWorkflow: designWfFromStep }),
                   decisions: intake.pendingIds.length > 0 ? decisionsCard(intake) : null,
                   automation: automationCard({ ...auto, budgetInfo }),
                   triggers: triggersCard({ ...trig, goals: learn.goals, routines: next.routines }),
+                  specialists: specialistsCard({ ...spec }),
                   calendar: calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed }),
                   feed: feedCard(auto),
                   goals: goalsCard(learn),
