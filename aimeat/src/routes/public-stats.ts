@@ -14,6 +14,9 @@
  *     panel that replaced the often-empty activity feed.
  *   v1.3.0 — 2026-06-22 — Migrate the three hand-rolled CacheSlot caches onto the generic cache
  *     layer (services/cache.ts): same 10/60/30s TTLs, now also event-bus invalidated by domain tag.
+ *   v1.3.1 — 2026-06-28 — Fix node-totals knowledge_packages reading 0 on busy nodes: scope the
+ *     count query to the packages/ prefix so it isn't swamped out of the recent-1000 window by
+ *     public activity-feed writes.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -116,7 +119,11 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
       } catch { /* 0 */ }
       try {
         // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
-        const mem = await storage.listAllMemory({ visibility: 'public', limit: 1000 });
+        // Scope the query to the packages/ prefix — an unscoped recent-1000 scan of all public
+        // memory gets swamped by the public activity feed (activity/…) on busy nodes, pushing
+        // the manifests past the limit and undercounting to 0 (catalogue is unaffected: it
+        // queries per-owner with the same prefix).
+        const mem = await storage.listAllMemory({ visibility: 'public', prefix: 'packages/', limit: 1000 });
         knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
       } catch { /* 0 */ }
       return {

@@ -17,6 +17,8 @@
  *   v1.0.0 — 2026-06-20 — Initial: node-totals shape + reflects-real-state + public-access.
  *   v1.1.0 — 2026-06-22 — Assert the generic cache layer invalidates node-totals on a relevant
  *     write (new public organism reflected before the 30s TTL).
+ *   v1.2.0 — 2026-06-28 — Import a catalog-listed knowledge package as a fixture and assert
+ *     knowledge_packages >= 1 (regression: the counter undercounted to 0 on busy nodes).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -90,6 +92,19 @@ await test('Publish a public app + create a public organism', async () => {
   assert(org.status === 201, `org status ${org.status}: ${JSON.stringify(org.body)}`);
 });
 
+await test('Import a public (catalog-listed) knowledge package', async () => {
+  const pkg = {
+    type: 'knowledge-package',
+    name: `PT Knowledge ${stamp}`,
+    content_type: 'research',
+    tags: ['pt'],
+    entries: [{ key: 'note', title: 'A note', visibility: 'public', value: { body: 'hello' } }],
+  };
+  const imp = await json('/v1/knowledge/import', ownerAuth({ method: 'POST', body: JSON.stringify({ package: pkg, overrides: { catalog_listed: true } }) }));
+  assert(imp.status === 201, `import status ${imp.status}: ${JSON.stringify(imp.body)}`);
+  assert(imp.body.data?.catalog_listed === true, `package is catalog-listed, got ${JSON.stringify(imp.body.data)}`);
+});
+
 console.log('\nPhase 1: node-totals shape + reflects real state');
 
 await test('GET /v1/public/node-totals returns ok with all six non-negative integer counters', async () => {
@@ -107,6 +122,7 @@ await test('Counters reflect the fixtures just published (apps/organisms/agents 
   assert(d.apps >= 1, `at least the published app is counted, got apps=${d.apps}`);
   assert(d.organisms >= 1, `at least the public organism is counted, got organisms=${d.organisms}`);
   assert(d.agents >= 1, `at least the registered agent is counted, got agents=${d.agents}`);
+  assert(d.knowledge_packages >= 1, `at least the catalog-listed knowledge package is counted, got knowledge_packages=${d.knowledge_packages}`);
 });
 
 await test('Cache invalidates on a relevant write (new public organism reflected before the 30s TTL)', async () => {
