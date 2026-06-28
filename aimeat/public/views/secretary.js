@@ -69,6 +69,7 @@ import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
 import { useFreshness } from '/views/secretary/use-freshness.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
+import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
 import { useKnowledge } from '/views/secretary/use-knowledge.js';
@@ -104,6 +105,8 @@ export default function SecretaryView() {
   const [finding, setFinding] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);   // B1: collapsed "Manage & setup" disclosure
   const [stand, setStand] = useState(null);              // B1: read-only "where things stand" summary { loading } | { text }
+  const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
+  const [savingBrain, setSavingBrain] = useState(false);
 
   const owner = (secretary && secretary.owner)
     || (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession && window.AIMEAT.auth.getSession()?.owner)
@@ -186,6 +189,8 @@ export default function SecretaryView() {
   const qa = useQuickActions({ active, config, persistConfig, owner, showToast });
   // Phase 4 — autonomous tick + Home feed + calendar (own hook).
   const auto = useAutonomy({ showToast });
+  // Decision B — real calendar (month/week/day) of feed (past) + tick & routine cadence (future).
+  const cal = useCalendar();
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
   const learn = useLearning({ active, auto, showToast });
   // P2 reach: create-don't-just-find (A), knowledge custodian (B), access gatekeeper (C), crew setup (D).
@@ -197,6 +202,17 @@ export default function SecretaryView() {
   // P1-C remaining autonomous budget + P1-D self-facing reliability (computed in helpers; see secretary-helpers.js).
   const budgetInfo = useMemo(() => computeBudgetInfo(policy.dailyMorselBudget, config, activeId), [policy.dailyMorselBudget, config, activeId]);
   const reliability = useMemo(() => computeReliability(learn.decisions), [learn.decisions]);
+
+  /** C3: seed the hire-proposed goals as standalone goal records (so the learning loop isn't empty). */
+  const seedGoals = useCallback(async (goals, contextId, contextName) => {
+    const arr = Array.isArray(goals) ? goals.slice(0, 4) : [];
+    for (const g of arr) {
+      const title = String((g && g.title) || '').trim();
+      if (!title) continue;
+      const gid = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      await apiPost('/v1/memory', { key: `secretary.goal.${gid}`, value: { id: gid, title: title.slice(0, 200), why: String((g && g.why) || '').trim().slice(0, 300), status: 'open', contextId, contextName, createdAt: new Date().toISOString() }, visibility: 'private', tags: ['secretary', 'goal', 'open', contextId] }).catch(() => {});
+    }
+  }, []);
 
   const applyResult = useCallback(async () => {
     setApplying(true);
@@ -235,15 +251,33 @@ export default function SecretaryView() {
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
         const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
+        // C3: seed the proposed goals so the learning loop starts populated (not "no goals yet").
+        await seedGoals(json.goals, ctx.id, ctx.name);
       } else {
-        // Re-run on the active context: update its brain, snapshot the old one. Keep its organism.
+        // Re-run on the active context (reshape): update its brain, snapshot the old one, KEEP its
+        // organism. C1: ADD any newly-proposed workspaces (additive — never rename/remove existing;
+        // removal stays a manual decision in the Organisms view, so no data is ever auto-deleted).
         const prev = snapshotOf(active.brain);
         const history = [prev, ...(active.brainHistory || [])].filter(Boolean).slice(0, 10);
-        const updated = { ...active, brain: newBrain, brainHistory: history };
+        const existingNames = new Set((active.workspaces || []).map((w) => String(w.name).toLowerCase()));
+        const addedWs = [];
+        if (active.organismId && Array.isArray(org.workspaces)) {
+          for (const ws of org.workspaces.slice(0, 12)) {
+            const name = String(ws.name || '').trim();
+            if (!name || existingNames.has(name.toLowerCase())) continue;
+            const entry = await createWorkspace(active.organismId, name);
+            if (entry && entry.id && ws.purpose) {
+              await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${entry.id}.meta.readme`, value: `# ${name}\n\n${ws.purpose}`, visibility: 'private' });
+            }
+            addedWs.push({ name, purpose: ws.purpose || '' });
+          }
+        }
+        const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs] };
         next = { ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) };
       }
       await persistConfig(next);
       await syncDirectives(newBrain);
+      window.dispatchEvent(new CustomEvent('aimeat-live-update')); // refresh goals/learning + cards
       showToast(t('secretary.hireDone'));
       setResult(''); setNeeds(''); setShowHire(false);
     } catch (e) {
@@ -251,14 +285,44 @@ export default function SecretaryView() {
     } finally {
       setApplying(false);
     }
-  }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, showToast]);
+  }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, seedGoals, showToast]);
+
+  // C2 — direct brain editor: edit the active context's purpose + rules in place (no AI re-run).
+  const startBrainEdit = useCallback(() => {
+    if (!active) return;
+    setBrainDraft({ purpose: (active.brain && active.brain.purpose) || '', rules: ((active.brain && active.brain.rules) || []).map((r) => ({ id: r.id, description: r.description })) });
+  }, [active]);
+  const cancelBrainEdit = useCallback(() => setBrainDraft(null), []);
+  const saveBrain = useCallback(async () => {
+    if (!active || !brainDraft) return;
+    const purpose = String(brainDraft.purpose || '').trim();
+    if (!purpose) { showToast(t('secretary.brainEmptyPurpose'), true); return; }
+    const rules = (brainDraft.rules || [])
+      .map((r) => ({ id: r.id || ('r' + Math.random().toString(36).slice(2, 6)), description: String(r.description || '').trim() }))
+      .filter((r) => r.description);
+    setSavingBrain(true);
+    try {
+      const newBrain = { purpose, rules };
+      const prev = snapshotOf(active.brain);
+      const history = [prev, ...(active.brainHistory || [])].filter(Boolean).slice(0, 10);
+      const updated = { ...active, brain: newBrain, brainHistory: history };
+      await persistConfig({ ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) });
+      await syncDirectives(newBrain);
+      setBrainDraft(null);
+      showToast(t('secretary.brainSaved'));
+    } catch (e) {
+      showToast(`${t('secretary.hireError')}: ${e.message}`, true);
+    } finally {
+      setSavingBrain(false);
+    }
+  }, [active, brainDraft, config, contexts, persistConfig, syncDirectives, showToast]);
 
   const generateInApp = useCallback(async () => {
     if (!needs.trim()) return;
     setGenerating(true);
     try {
       // Long AI completion: low-level api() with a large timeout + no retries (apiPost's 30s would abort a slow model).
-      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: buildDesignPrompt(owner, needs.trim()), app_id: 'secretary-setup' }), timeoutMs: 1_800_000, retries: 0 });
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: buildDesignPrompt(owner, needs.trim(), hireMode === 'edit' ? active : null), app_id: 'secretary-setup' }), timeoutMs: 1_800_000, retries: 0 });
       const content = r && r.data && r.data.content;
       if (!content) throw new Error(t('secretary.inappEmpty'));
       setResult(content);
@@ -268,7 +332,7 @@ export default function SecretaryView() {
     } finally {
       setGenerating(false);
     }
-  }, [needs, owner, showToast]);
+  }, [needs, owner, hireMode, active, showToast]);
 
   /** One chat turn: assemble the active context's brain as the system prompt + the transcript,
    *  complete on the owner's key, append + persist. Per-context conversation (secretary.chat.{id}). */
@@ -429,12 +493,12 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         ? html`<div class="sec-empty">${hasOpenRouterKey ? t('secretary.provisioning') : t('secretary.notReady')}</div>`
         : html`
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
-            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
+            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, current: hireMode === 'edit' ? active : null, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
             ${hired && !showHire && active ? html`
               ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
               ${quickActionRow({ items: [
-                { key: 'stand', label: t('secretary.dash.quickStand'), primary: true, disabled: !!(stand && stand.loading), onClick: runStand },
-                { key: 'plan', label: t('secretary.dash.quickPlan'), title: t('secretary.next.title'), onClick: () => focusInto('.sec-next', 'textarea') },
+                { key: 'next', label: t('secretary.next.title'), primary: true, title: t('secretary.next.hint'), onClick: () => focusInto('.sec-next', 'textarea') },
+                { key: 'stand', label: t('secretary.dash.quickStand'), disabled: !!(stand && stand.loading), onClick: runStand },
                 { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
                 { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
                 { key: 'review', label: t('secretary.dash.quickReview'), title: t('secretary.learn.reviewNow'), hidden: !decisionsDue, onClick: () => focusInto('.sec-decisions-log', null) },
@@ -450,6 +514,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${routinesCard(next)}
               ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
               ${automationCard({ ...auto, budgetInfo })}
+              ${calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines })}
               ${feedCard(auto)}
               ${goalsCard(learn)}
               ${decisionLogCard(learn)}
@@ -468,7 +533,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${manageHeader({ open: manageOpen, onToggle: () => setManageOpen((v) => !v),
                 crewSummary: crew.agents && crew.agents.length ? `${crew.agents.length} ${t('secretary.dash.crewAgents')}` : '' })}
               ${manageOpen ? html`
-                ${brainCard({ brain, active, openEdit })}
+                ${brainCard({ brain, active, openEdit, brainDraft, setBrainDraft, startBrainEdit, saveBrain, cancelBrainEdit, savingBrain })}
                 ${operatingCard({ policy, toggleStop, setBudget, setBand })}
                 ${crewCard(crew)}
                 ${knowledgeCard(knowledge)}
