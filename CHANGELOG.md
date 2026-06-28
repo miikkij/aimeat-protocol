@@ -108,6 +108,14 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   it into a designed workflow. Its node-run executor writes each deliverable to the offer's location key
   (`specialist.{name}.out`) too, so a workflow step dispatched to the specialist satisfies the signal.
   Verified: a workflow referencing a specialist's `do` offer passes save-time validation.
+- **The Secretary designs workflows (Phase 3).** A "Design workflow" flow: state the desired outcome →
+  the Secretary reads the available workflow-compatible offers (specialists + shared/external agents) and
+  composes a chain — a DAG of agent+offer steps ordered via `after` — with the reasoning model, using
+  ONLY real offers from the catalogue (it never invents a step). It proposes how to arm it (manual =
+  callable / schedule = cron / event), the owner reviews/adjusts, and on save it is written via
+  `PUT /v1/workflows/:id` (validated against the offer contract + DAG, then armed per its trigger). New
+  `views/secretary/workflow-design.js`. Verified in-browser: an outcome → a chain using a specialist's
+  offer → saved & armed on a schedule.
 
 ### Changed
 
