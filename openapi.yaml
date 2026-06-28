@@ -5254,6 +5254,87 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ── Secretary ─────────────────────────────────────────────
+  /v1/secretary/clarify:
+    post:
+      operationId: secretaryClarify
+      summary: Secretary asks the owner clarifying questions (ask-don't-hallucinate)
+      description: >-
+        When a Secretary "Do it" task lacks facts only the owner can supply, the Secretary asks rather
+        than guesses: this sends a batch of structured questions (a federated AskUserQuestion) from the
+        secretary agent to the owner's inbox and records a pending "produce" job. The autonomous tick
+        resumes the job — producing the deliverable grounded in the owner's answers — once they reply.
+        Owner-only.
+      tags: [Secretary]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contextId, action, questions]
+              properties:
+                contextId: { type: string }
+                contextName: { type: string }
+                action:
+                  type: object
+                  required: [summary]
+                  properties:
+                    summary: { type: string }
+                    why: { type: string }
+                questions:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [id, header, prompt, options]
+                    properties:
+                      id: { type: string }
+                      header: { type: string, maxLength: 80 }
+                      prompt: { type: string }
+                      options:
+                        type: array
+                        minItems: 1
+                        maxItems: 20
+                        items:
+                          type: object
+                          required: [id, label]
+                          properties:
+                            id: { type: string }
+                            label: { type: string }
+                      multiSelect: { type: boolean }
+                      allowOther: { type: boolean }
+                      required: { type: boolean }
+                facts: { type: string, description: The grounding facts stored on the job for the tick to produce from. }
+                organismId: { type: string }
+                wsId: { type: string }
+                body: { type: string, description: Optional intro shown above the questions. }
+      responses:
+        '200':
+          description: Questions sent; produce job stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messageId: { type: string }
+                          conversationId: { type: string }
+                          status: { type: string, example: asked }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Could not deliver the questions to the inbox
+
   # ── Device Authorization Flow (RFC 8628) ──────────────────
   /v1/agents/device-authorize:
     post:
