@@ -18,7 +18,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord } from '../storage/interface.js';
 import { completeForOwner } from './ai-completion.js';
-import { listSpecialists, specialistRole } from './specialist.js';
+import { listSpecialists, specialistRole, specialistOutKey } from './specialist.js';
 import { logger } from '../utils/logger.js';
 
 /** The quality contract baked into every specialist run — same standard the Secretary works to. */
@@ -71,6 +71,16 @@ export async function executeSpecialistTask(
     key: deliverableKey, ownerGaii: specialist.gaii,
     value: { taskId: task.id, title: task.title, content, createdAt: now },
     visibility: 'private', tags: ['specialist', 'deliverable'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  });
+  // Also write the offer's deliverable location (the latest output) so the specialist's workflow offer
+  // (success_signal = nonempty at this key) is satisfied when a workflow step dispatches to it.
+  const outKey = specialistOutKey(specialist.name);
+  const outPrev = await storage.getMemory(specialist.gaii, outKey);
+  await storage.setMemory({
+    key: outKey, ownerGaii: specialist.gaii,
+    value: { taskId: task.id, title: task.title, content, createdAt: now },
+    visibility: 'owner', tags: ['specialist', 'deliverable'], ttlHours: null,
+    version: outPrev ? outPrev.version + 1 : 1, createdAt: outPrev?.createdAt ?? now, updatedAt: now,
   });
   await storage.updateAgentTask(task.id, { status: 'done', completedAt: now, deliverableKey, lastEventAt: now });
   logger.info('[specialist-runner] task done', { gaii: specialist.gaii, taskId: task.id, deliverableKey });

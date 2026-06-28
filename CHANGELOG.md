@@ -102,6 +102,12 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   prompt), writes it to the specialist's memory, and marks the task done. Driven by the Secretary tick
   (it directs its specialists) and on-demand via `POST /v1/specialists/:name/run`. Spending-paused/error
   leaves a task queued to retry. This is the foundation for chaining specialists into designed workflows.
+- **Specialists are workflow-chainable (publish a workflow-compatible offer).** On provision, each
+  specialist now publishes an offer (id `do`) declaring `success_signal` + `required_to_function` +
+  `deliverable.location` — exactly what makes an agent workflow-compatible — so the Secretary can chain
+  it into a designed workflow. Its node-run executor writes each deliverable to the offer's location key
+  (`specialist.{name}.out`) too, so a workflow step dispatched to the specialist satisfies the signal.
+  Verified: a workflow referencing a specialist's `do` offer passes save-time validation.
 
 ### Changed
 
