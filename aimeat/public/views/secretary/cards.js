@@ -8,6 +8,7 @@
  * @structure one exported render function per card (props in → htm out)
  * @usage import { chatCard, findCard, ... } from '/views/secretary/cards.js'; ... ${chatCard({...})}
  * @version-history
+ *   v0.9.0 — 2026-06-28 — G10: feedCard groups entries by day (Today / Yesterday / date) with per-day counts.
  *   v0.8.0 — 2026-06-28 — B4: routineStepRow gains the delegate control (pick a target agent → create an
  *     agent task) + a "Check result" action on delegated steps.
  *   v0.7.0 — 2026-06-27 — B2: replace guidedPlanCard with whatsNextCard (Routine propose/advance,
@@ -29,7 +30,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { SECRETARY_CAPABILITIES, BANDS } from '/js/services/secretary-policy.js';
-import { buildInterviewPrompt } from '/js/services/secretary-helpers.js';
+import { buildInterviewPrompt, groupFeedByDay } from '/js/services/secretary-helpers.js';
 
 /** Context "hats" switcher chips + add. */
 export function contextSwitcher(p) {
@@ -327,19 +328,23 @@ export function whatsNextCard(p) {
     </section>`;
 }
 
-/** Home feed (Phase 4): what the Secretary did on its own (autonomous briefings). */
+/** Home feed (Phase 4 + G10): what the Secretary did on its own, grouped by day (today + previous days). */
 export function feedCard(p) {
   return html`
     <section class="sec-card sec-feed">
       <h2 class="sec-h2">${t('secretary.feed.title')}</h2>
       ${p.feed.length === 0
         ? html`<div class="sec-hint">${t('secretary.feed.empty')}</div>`
-        : html`<ul class="sec-feed-list">
-            ${p.feed.map((it, i) => html`<li class="sec-feed-item" key=${it.id || i}>
-              <div class="sec-feed-meta">${it.contextName ? escHtml(it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleString() : ''}</div>
-              <div class="sec-feed-text">${escHtml(it.text || '')}</div>
-            </li>`)}
-          </ul>`}
+        : groupFeedByDay(p.feed).map((g) => html`
+            <div class="sec-feed-day" key=${g.key}>
+              <div class="sec-feed-day-head">${escHtml(g.label)} <span class="sec-feed-day-count">${g.items.length}</span></div>
+              <ul class="sec-feed-list">
+                ${g.items.map((it, i) => html`<li class="sec-feed-item" key=${it.id || i}>
+                  <div class="sec-feed-meta">${it.contextName ? escHtml(it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleTimeString() : ''}</div>
+                  <div class="sec-feed-text">${escHtml(it.text || '')}</div>
+                </li>`)}
+              </ul>
+            </div>`)}
     </section>`;
 }
 

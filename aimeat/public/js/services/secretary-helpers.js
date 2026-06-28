@@ -17,6 +17,32 @@
  */
 import { defaultPolicy } from '/js/services/secretary-policy.js';
 import { sanitizeProposedQuickActions } from '/js/services/secretary-rules.js';
+import { t } from '/js/i18n.js';
+
+/** G10: a human day label for a feed timestamp — Today / Yesterday / locale date. */
+export function feedDayLabel(ts) {
+  const d = new Date(ts);
+  const startOf = (x) => { const y = new Date(x); y.setHours(0, 0, 0, 0); return y.getTime(); };
+  const diffDays = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+  if (diffDays === 0) return t('secretary.feed.today');
+  if (diffDays === 1) return t('secretary.feed.yesterday');
+  return d.toLocaleDateString();
+}
+
+/** G10: group a newest-first feed list into consecutive day buckets [{ key, label, items }]. The key is
+ *  the LOCAL midnight timestamp (NOT the UTC date) so it matches the local-day label — otherwise items
+ *  straddling UTC midnight on the same local day would split into two same-labelled groups. */
+export function groupFeedByDay(feed) {
+  const groups = [];
+  let cur = null;
+  for (const it of (feed || [])) {
+    let key = 'unknown';
+    if (it.ts) { const d = new Date(it.ts); d.setHours(0, 0, 0, 0); key = String(d.getTime()); }
+    if (!cur || cur.key !== key) { cur = { key, label: it.ts ? feedDayLabel(it.ts) : '—', items: [] }; groups.push(cur); }
+    cur.items.push(it);
+  }
+  return groups;
+}
 
 /** Concise, accurate AIMEAT primer fed to the chat so the Secretary can teach/guide the user
  *  ("tutustuta AIMEATiin"). Concept-level (avoids brittle exact UI paths so it doesn't drift). */

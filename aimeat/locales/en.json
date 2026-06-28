@@ -747,7 +747,9 @@
     "decisionAwaiting": "Awaiting your answer in the inbox…",
     "feed": {
       "title": "What I've done",
-      "empty": "Nothing yet. Enable the daily check-in below and I'll start keeping you posted here."
+      "empty": "Nothing yet. Enable the daily check-in below and I'll start keeping you posted here.",
+      "today": "Today",
+      "yesterday": "Yesterday"
     },
     "learn": {
       "goalsTitle": "Goals",
