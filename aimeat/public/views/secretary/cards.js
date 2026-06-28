@@ -323,7 +323,7 @@ export function whatsNextCard(p) {
   const r = p.selected;
   return html`
     <section class="sec-card sec-next">
-      <h2 class="sec-h2">${t('secretary.next.title')}</h2>
+      <h2 class="sec-h2">${t('secretary.next.cardTitle')}</h2>
       <p class="sec-hint">${t('secretary.next.hint')}</p>
       ${!r ? html`
         <p class="sec-hint">${t('secretary.next.explain')}</p>

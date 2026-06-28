@@ -844,6 +844,8 @@
     "next": {
       "title": "Mitä seuraavaksi",
       "explain": "Voin viedä eteenpäin jo aloitettua tai aloittaa jotain uutta. Rutiini = toistettava askelsarja jonka ajan ja jota seuraan puolestasi.",
+      "thinking": "Mietin mitä seuraavaksi…",
+      "cardTitle": "Pystytä rutiini",
       "followups": "{n} käsiteltävää jatkotoimea yllä",
       "continueTitle": "Jatka",
       "startNewTitle": "Aloita jotain uutta",
