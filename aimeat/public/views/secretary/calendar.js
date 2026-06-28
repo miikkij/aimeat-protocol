@@ -273,13 +273,16 @@ export function CalendarEventDialog(p) {
         <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => run(() => p.tick.toggle())}>${t('secretary.auto.pause')}</button>
       </div>`;
   } else {
-    // feed entry — historical; show the full content read-only.
+    // feed entry — a past activity item; show its content, open its result, or remove it from the log.
     title = t('secretary.cal.dlg.activity');
     const item = ref.item || {};
     body = html`
       <div class="sec-hint">${new Date(ev.at).toLocaleString()}</div>
       <div class="sec-stand-body"><${Markdown} text=${ev.text || ''} /></div>
-      ${item.href ? html`<a href=${item.href} target="_blank" rel="noopener">${t('secretary.next.openResult')} ↗</a>` : null}`;
+      <div class="sec-next-action-btns">
+        ${item.href ? html`<a class="btn-outline btn-sm" href=${item.href} target="_blank" rel="noopener">${t('secretary.next.openResult')} ↗</a>` : null}
+        ${item.id && p.feed && p.feed.remove ? html`<button class="btn-ghost btn-sm sec-next-discard" disabled=${busy} onClick=${() => run(() => p.feed.remove(item.id))}>${t('secretary.cal.dlg.delete')}</button>` : null}
+      </div>`;
   }
 
   return html`

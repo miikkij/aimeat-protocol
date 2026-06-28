@@ -144,6 +144,13 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   `applyGeneratedWorkspace`. Manifests are generated in parallel across a context's workspaces; a
   generation that still fails validation leaves that one manifest-less (set up manually) rather than
   blocking the rest. Verified in-browser: a previously-empty workspace gained a valid object-type schema.
+  The setup JSON may also carry a workspace's `manifest` + `schemas` inline (the copy-paste / prompt-driven
+  path can produce them in one shot) — `applyResult` applies a provided manifest when it's valid and only
+  falls back to in-app generation when it's missing or invalid; the interview contract requests them as
+  OPTIONAL fields.
+- **Calendar activity (feed) entries can be removed.** The calendar's Activity dialog (a past feed entry)
+  gained a Delete that removes the item from `secretary.feed`, so the owner can clear the activity log
+  instead of only viewing it. Verified in-browser.
 
 ### Changed
 

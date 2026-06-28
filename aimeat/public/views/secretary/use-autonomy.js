@@ -46,6 +46,16 @@ export function useAutonomy({ showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [refresh]);
 
+  // Remove one entry from the activity feed (an item in the single secretary.feed memory record).
+  const deleteFeedItem = useCallback(async (id) => {
+    if (!id) return;
+    const r = await apiGet('/v1/memory/secretary.feed').catch(() => null);
+    const items = (r && r.data && r.data.value && Array.isArray(r.data.value.items)) ? r.data.value.items : [];
+    const next = items.filter((it) => it && it.id !== id);
+    await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: next }, visibility: 'private' }).catch(() => {});
+    setFeed(next);
+  }, []);
+
   const enableTick = useCallback(async () => {
     try {
       await apiPost('/v1/schedules', { kind: 'secretary', cron: DAILY_CRON, display_name: t('secretary.auto.scheduleName') });
@@ -93,5 +103,5 @@ export function useAutonomy({ showToast }) {
     }
   }, [schedule, refresh, showToast]);
 
-  return { feed, schedule, loading, running, refresh, enableTick, runTick, toggleTick };
+  return { feed, schedule, loading, running, refresh, enableTick, runTick, toggleTick, deleteFeedItem };
 }
