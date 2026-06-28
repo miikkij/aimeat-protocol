@@ -1330,6 +1330,69 @@ await test('73. Specialist publishes a workflow-compatible offer; a workflow ref
     await json('/v1/workflows/test-wfspec?withRuns=true', { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
 });
 
+// ── Live responder + system-agent presence (P-live) ──────────────────────────────────────────────
+// The personal Secretary is a NODE-RUN agent: no connect tunnel, no lastSeen heartbeat. These cover
+// (a) presence reading its OWN usability (available when AI configured + not paused, away when
+// stop-spending) instead of perpetual "offline", and (b) the live DM responder replying in real time —
+// a paused note (feedback, not silence) and an immediate clarify-answer acknowledgement. The actual
+// AI-produced reply/deliverable needs a real OpenRouter key (the CI owner's key is a dummy), so the
+// content generation is browser-verified; here we assert the deterministic, non-AI behaviour.
+
+/** Write the owner's secretary.config with one active context at a chosen stop-spending state. */
+async function setSecretaryStopSpending(stop: boolean) {
+    const cfg = { activeContextId: 'live1', contexts: [{ id: 'live1', name: 'Live', brain: { purpose: 'Assist', rules: [] }, organismId: selfOrgId, organismName: 'Live', workspaces: [], policy: { stopSpending: stop, dailyMorselBudget: null, bands: {} }, brainHistory: [] }] };
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `set secretary.config: ${w.status}`);
+}
+
+async function presenceOf(gaii: string): Promise<string> {
+    const r = await json(`/v1/presence/${encodeURIComponent(gaii)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.status === 200, `presence: ${r.status} ${JSON.stringify(r.body).slice(0, 160)}`);
+    return r.body.data.status;
+}
+
+/** Poll a conversation for a reply FROM the secretary whose body contains `needle`. */
+async function waitForSecretaryReply(conversationId: string, needle: string, tries = 20): Promise<boolean> {
+    for (let i = 0; i < tries; i++) {
+        const c = await json(`/v1/messages/conversations/${conversationId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const msgs = (c.body.data?.messages || []) as Array<{ senderGhii?: string; body?: string }>;
+        if (msgs.some(m => m.senderGhii === secretaryGaii && (m.body || '').includes(needle))) return true;
+        await sleep(500);
+    }
+    return false;
+}
+
+await test('74. Presence: node-run Secretary reads available (AI configured) / away (stop-spending)', async () => {
+    await setSecretaryStopSpending(false);
+    assert(await presenceOf(secretaryGaii) === 'available', `expected available when configured + not paused`);
+    await setSecretaryStopSpending(true);
+    assert(await presenceOf(secretaryGaii) === 'away', `expected away when stop-spending is on`);
+    await setSecretaryStopSpending(false);
+    assert(await presenceOf(secretaryGaii) === 'available', `expected available again after re-enabling`);
+});
+
+await test('75. Live responder: a DM while paused (stop-spending) gets a non-AI note, not silence', async () => {
+    await setSecretaryStopSpending(true);
+    const send = await json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ to: secretaryGaii, body: 'Voitko auttaa?' }) });
+    assert(send.status === 201, `send: ${send.status} ${JSON.stringify(send.body).slice(0, 160)}`);
+    const convId = send.body.data.message.conversationId;
+    assert(await waitForSecretaryReply(convId, 'stop-spending'), 'expected a paused note reply from the Secretary');
+    await setSecretaryStopSpending(false);
+});
+
+await test('76. Live responder: answering a clarify question gets an immediate acknowledgement', async () => {
+    await setSecretaryStopSpending(false);
+    const questions = [{ id: 'q1', header: 'Budget', prompt: 'What is the budget?', options: [{ id: 'lo', label: 'Under 50' }, { id: 'hi', label: 'Over 50' }], allowOther: true }];
+    const ask = await json('/v1/secretary/clarify', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ contextId: 'live1', contextName: 'Live', action: { summary: 'Draft a plan' }, questions, facts: 'facts', organismId: selfOrgId, wsId: 'ws-1' }) });
+    assert(ask.status === 200, `clarify: ${ask.status} ${JSON.stringify(ask.body).slice(0, 160)}`);
+    const { messageId: questionId, conversationId } = ask.body.data;
+    const answer = await json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({
+        to: secretaryGaii, conversation_id: conversationId, body: 'Vastaukset', interactive: { role: 'answers', v: 1, answersFor: questionId, answers: { q1: { selected: ['lo'], other: null } } },
+    }) });
+    assert(answer.status === 201, `answer: ${answer.status} ${JSON.stringify(answer.body).slice(0, 200)}`);
+    assert(await waitForSecretaryReply(conversationId, 'Got your answers'), 'expected an acknowledgement reply from the Secretary');
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
