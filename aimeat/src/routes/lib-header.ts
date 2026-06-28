@@ -15,6 +15,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-03 — Initial: faithful embeddable header with live login pill,
  *     theme toggle, language switch, and morsel balance.
+ *   v1.1.0 — 2026-06-28 — Theme toggle moved into the login pill (mountLoginButton); pass
+ *     nav.themeTo* labels through to the pill i18n. Header no longer renders its own toggle.
  */
 import type { AimeatConfig } from '../config.js';
 
@@ -146,7 +148,7 @@ export function aimeatHeaderLib(_config: AimeatConfig): string {
           '<a href="/v1/profile" class="profile-link visible" data-auth-only style="display:none">' + label('nav.profile') + '</a>' +
           '<a href="/v1/admin" data-operator-only style="display:none">' + label('nav.admin') + '</a>' +
           '<div class="topnav-center">' +
-            '<button class="theme-toggle-btn" data-theme-toggle></button>' +
+            // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
             '<button class="lang-btn" data-lang="en">EN</button>' +
             '<button class="lang-btn" data-lang="fi">FI</button>' +
           '</div>' +
@@ -162,20 +164,7 @@ export function aimeatHeaderLib(_config: AimeatConfig): string {
     var menu = nav.querySelector('[data-menu]');
     burger.addEventListener('click', function () { menu.classList.toggle('open'); });
 
-    // Theme toggle
-    var themeBtn = nav.querySelector('[data-theme-toggle]');
-    function paintTheme() {
-      var dark = (document.documentElement.dataset.theme === 'dark');
-      themeBtn.textContent = dark ? '\\u2600' : '\\u263E';
-      var lbl = dark ? (t['nav.themeToLight'] || NAV_FALLBACK['nav.themeToLight'])
-                     : (t['nav.themeToDark'] || NAV_FALLBACK['nav.themeToDark']);
-      themeBtn.title = lbl; themeBtn.setAttribute('aria-label', lbl);
-    }
-    paintTheme();
-    themeBtn.addEventListener('click', function () {
-      applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-      paintTheme();
-    });
+    // (Theme toggle moved into the login pill — see mountLoginButton in init().)
 
     // Language buttons
     nav.querySelectorAll('[data-lang]').forEach(function (b) {
@@ -240,10 +229,14 @@ export function aimeatHeaderLib(_config: AimeatConfig): string {
     function mountPill() {
       try {
         if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.mountLoginButton) {
+          var pillI18n = modalI18n(t);
+          // Labels for the theme toggle the pill now renders.
+          pillI18n.themeToDark = t['nav.themeToDark'] || NAV_FALLBACK['nav.themeToDark'];
+          pillI18n.themeToLight = t['nav.themeToLight'] || NAV_FALLBACK['nav.themeToLight'];
           window.AIMEAT.auth.mountLoginButton('#headerAuth', {
             onLogin: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
             onLogout: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
-            i18n: modalI18n(t)
+            i18n: pillI18n
           });
         }
       } catch (e) { console.error('AIMEAT header: auth mount failed', e); }

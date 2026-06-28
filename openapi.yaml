@@ -4667,7 +4667,8 @@ paths:
           * **Owner session (cookie):** send the httpOnly `aimeat_rt` refresh cookie (set at
             login) plus the `X-AIMEAT-Refresh: 1` header (CSRF guard). The refresh token is
             rotated one-time-use with a short grace window and a new cookie is set; replaying
-            a consumed token revokes the whole session. Returns `{ token, expires_in }`.
+            a consumed token revokes the whole session. Returns `{ token, expires_in, display_name }`
+            (the owner's current display name, so the client login pill picks up profile edits).
           * **Legacy (Bearer):** send a valid Bearer access token (agents / pre-cookie clients).
       tags: [Auth]
       parameters:

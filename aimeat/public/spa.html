@@ -312,7 +312,7 @@
     import { useState, useEffect, useCallback } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
-    import { initThemeSystem, getTheme, toggleTheme, onThemeChange } from '/js/theme.js';
+    import { initThemeSystem } from '/js/theme.js';
     import { NotificationBell } from '/components/NotificationBell.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
@@ -517,19 +517,9 @@
     }
 
     // ── Theme Toggle ──
-    // Renders next to the language buttons; flips light <-> dark and persists.
-    // Shows a moon in light mode (click → dark) and a sun in dark mode.
-    function ThemeToggle() {
-      const [theme, setThemeState] = useState(getTheme());
-      useEffect(() => onThemeChange((next) => setThemeState(next)), []);
-      const isDark = theme === 'dark';
-      const label = isDark ? t('nav.themeToLight') : t('nav.themeToDark');
-      return html`
-        <button class="theme-toggle-btn" onClick=${toggleTheme} title=${label} aria-label=${label}>
-          ${isDark ? '☀' : '☾'}
-        </button>
-      `;
-    }
+    // The light/dark switch now lives INSIDE the golden login pill (served by libs.ts →
+    // mountLoginButton) so every app embedding the pill inherits it for free. theme.js still
+    // runs (initThemeSystem) to track OS preference and adopt the pill's theme changes.
 
     // ── Header Component ──
     // Built-in public links. Operators can show/hide and reorder these via the admin
@@ -674,7 +664,6 @@
                 `}
               `}
               <div class="topnav-center">
-                <${ThemeToggle} />
                 <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
                 <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
               </div>
@@ -752,6 +741,9 @@
           const v = t('modal.' + k);
           if (v !== 'modal.' + k) obj[k] = v;
         }
+        // Labels for the theme toggle that now lives inside the login pill.
+        obj.themeToDark = t('nav.themeToDark');
+        obj.themeToLight = t('nav.themeToLight');
         return obj;
       }
 
