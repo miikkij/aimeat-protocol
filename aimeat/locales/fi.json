@@ -747,7 +747,9 @@
     "decisionAwaiting": "Odottaa vastaustasi inboxissa…",
     "feed": {
       "title": "Mitä olen tehnyt",
-      "empty": "Ei vielä mitään. Ota alla päivittäinen tilannekatsaus käyttöön, niin alan pitää sinut ajan tasalla täällä."
+      "empty": "Ei vielä mitään. Ota alla päivittäinen tilannekatsaus käyttöön, niin alan pitää sinut ajan tasalla täällä.",
+      "today": "Tänään",
+      "yesterday": "Eilen"
     },
     "learn": {
       "goalsTitle": "Tavoitteet",
