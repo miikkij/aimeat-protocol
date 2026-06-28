@@ -87,6 +87,21 @@ export function useTriggers({ active, showToast }) {
     await load();
   }, [writeTrigger, load]);
 
+  /** Edit a trigger in place (label/cadence) — writes the memory record. Recomputes nextFireAt when a
+   *  recurring trigger's cadence changes. Used by the calendar's inline editor + the triggers card. */
+  const updateTrigger = useCallback(async (id, patch) => {
+    const cur = triggers.find((x) => x.id === id);
+    if (!cur) return;
+    const next = { ...cur, ...patch };
+    if (patch.label) { next.label = String(patch.label).slice(0, 200); next.action = { ...(next.action || {}), summary: next.label }; }
+    if (patch.cadence && next.kind === 'recurring' && patch.cadence !== cur.cadence) {
+      next.cadence = patch.cadence;
+      next.nextFireAt = new Date(Date.now() + (CADENCE_MS[patch.cadence] || CADENCE_MS.weekly)).toISOString();
+    }
+    await writeTrigger(next).catch(() => {});
+    await load();
+  }, [triggers, writeTrigger, load]);
+
   const removeTrigger = useCallback(async (tr) => {
     await apiDelete(`/v1/memory/${encodeURIComponent(PREFIX + tr.id)}`).catch(() => {});
     await load();
@@ -125,5 +140,5 @@ export function useTriggers({ active, showToast }) {
 
   const armed = useMemo(() => triggers.filter((tr) => tr.status === 'armed'), [triggers]);
   const proposed = useMemo(() => triggers.filter((tr) => tr.status === 'proposed'), [triggers]);
-  return { triggers, armed, proposed, form, openForm, closeForm, setField, createTrigger, adding, togglePause, removeTrigger, armTrigger, proposeTriggerFromText };
+  return { triggers, armed, proposed, form, openForm, closeForm, setField, createTrigger, adding, togglePause, updateTrigger, removeTrigger, armTrigger, proposeTriggerFromText };
 }

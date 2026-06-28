@@ -629,7 +629,15 @@
       "noEvents": "Nothing scheduled this day.",
       "earlier": "Earlier",
       "later": "Later",
-      "triggerEvent": "Trigger"
+      "triggerEvent": "Trigger",
+      "dlg": {
+        "trigger": "Edit trigger",
+        "cadence": "Repeats",
+        "save": "Save",
+        "delete": "Delete",
+        "tickDesc": "Your daily check-in — a briefing + suggested next actions.",
+        "activity": "Activity"
+      }
     },
     "trig": {
       "title": "Triggers",
@@ -658,7 +666,7 @@
       "created": "Trigger created",
       "error": "Trigger failed",
       "kind": { "time": "On a date", "recurring": "Recurring", "completion": "When something completes", "condition": "When a condition is met" },
-      "cad": { "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly" },
+      "cad": { "none": "Don't repeat", "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly" },
       "ct": { "memory_count": "Item count reaches", "workspace_count": "Workspace items reach", "no_activity": "No activity for N days", "memory_exists": "Something appears" }
     },
     "editBrain": "Edit brain",

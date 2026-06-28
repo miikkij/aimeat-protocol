@@ -71,7 +71,7 @@ import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
 import { useFreshness } from '/views/secretary/use-freshness.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
-import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
+import { useCalendar, calendarCard, CalendarEventDialog } from '/views/secretary/calendar.js';
 import { useTriggers } from '/views/secretary/use-triggers.js';
 import { useLayout, LayoutCard } from '/views/secretary/use-layout.js';
 import { produceDeliverable, getAiCapability, reasonJson } from '/views/secretary/quality.js';
@@ -113,6 +113,7 @@ export default function SecretaryView() {
   const [nextAns, setNextAns] = useState(null);          // "What's next?" — the Secretary's forward answer { loading } | { text }
   const [pasteDrafts, setPasteDrafts] = useState({});    // prompt-driven path: pasted-back result text, keyed by action id
   const [wfDesign, setWfDesign] = useState(null);        // "Design a workflow" flow: null | { outcome, designing, draft, trigger, error, saving, saved, errors }
+  const [calEvent, setCalEvent] = useState(null);        // clicked calendar entry → inline type-specific editor dialog
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -783,7 +784,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                   automation: automationCard({ ...auto, budgetInfo }),
                   triggers: triggersCard({ ...trig, goals: learn.goals, routines: next.routines }),
                   specialists: specialistsCard({ ...spec }),
-                  calendar: calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed }),
+                  calendar: calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed, onEventClick: setCalEvent }),
                   feed: feedCard(auto),
                   goals: goalsCard(learn),
                   decisionLog: decisionLogCard(learn),
@@ -822,6 +823,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 ${metaCard({ secretary, reliability })}
               ` : null}
             ` : null}`}
+      ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} />` : null}
       <${ToastContainer} />
     </div>`;
 }

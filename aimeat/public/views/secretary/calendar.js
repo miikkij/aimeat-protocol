@@ -16,6 +16,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { useState, useMemo, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
+import { Markdown } from '/components/Markdown.js';
 const html = htm.bind(h);
 
 // ── date helpers (browser — real Date is fine) ──
@@ -43,7 +44,7 @@ export function buildCalendarEvents({ feed, schedule, routines, triggers, start,
   for (const it of (feed || [])) {
     if (!it || !it.ts) continue;
     const d = new Date(it.ts);
-    if (d >= start && d < end) events.push({ at: d, type: 'done', kind: it.kind || 'act', text: it.text || '' });
+    if (d >= start && d < end) events.push({ at: d, type: 'done', kind: it.kind || 'act', text: it.text || '', ref: { srcType: 'feed', item: it } });
   }
   if (schedule && schedule.enabled !== false) {
     const hour = cronHour(schedule.cron);
@@ -51,7 +52,7 @@ export function buildCalendarEvents({ feed, schedule, routines, triggers, start,
       let d = startOfDay(now > start ? now : start); d.setHours(hour, 0, 0, 0);
       if (d < now) d = addDays(d, 1);
       for (let i = 0; i < 370 && d < end; i++, d = addDays(d, 1)) {
-        events.push({ at: new Date(d), type: 'scheduled', kind: 'tick', text: t('secretary.cal.tickEvent') });
+        events.push({ at: new Date(d), type: 'scheduled', kind: 'tick', text: t('secretary.cal.tickEvent'), ref: { srcType: 'tick' } });
       }
     }
   }
@@ -60,19 +61,19 @@ export function buildCalendarEvents({ feed, schedule, routines, triggers, start,
     const step = r.cadence === 'weekly' ? 7 : 1;
     let d = new Date(r.nextRunAt);
     for (let i = 0; i < 370 && d < end; i++, d = addDays(d, step)) {
-      if (d >= start && d >= now) events.push({ at: new Date(d), type: 'scheduled', kind: 'routine', text: r.title || t('secretary.cal.routineRun') });
+      if (d >= start && d >= now) events.push({ at: new Date(d), type: 'scheduled', kind: 'routine', text: r.title || t('secretary.cal.routineRun'), ref: { srcType: 'routine', id: r.id, routine: r } });
     }
   }
   for (const tr of (triggers || [])) {
     if (!tr || tr.status !== 'armed' || !tr.nextFireAt) continue;
     if (tr.kind === 'time') {
       const d = new Date(tr.nextFireAt);
-      if (d >= start && d < end) events.push({ at: d, type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent') });
+      if (d >= start && d < end) events.push({ at: d, type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent'), ref: { srcType: 'trigger', id: tr.id, trigger: tr } });
     } else if (tr.kind === 'recurring') {
       const stepMs = tr.cadence === 'monthly' ? 30 * DAY_MS : tr.cadence === 'weekly' ? 7 * DAY_MS : DAY_MS;
       let d = new Date(tr.nextFireAt);
       for (let i = 0; i < 370 && d < end; i++, d = new Date(d.getTime() + stepMs)) {
-        if (d >= start) events.push({ at: new Date(d), type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent') });
+        if (d >= start) events.push({ at: new Date(d), type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent'), ref: { srcType: 'trigger', id: tr.id, trigger: tr } });
       }
     }
   }
@@ -146,7 +147,8 @@ export function calendarCard(p) {
       <div class="sec-cal-range">${title}</div>
     </div>`;
 
-  const dot = (e, i) => html`<span class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${i} title=${`${fmtTime(e.at)} · ${e.text}`}>${e.text}</span>`;
+  const onEv = (e) => (ev) => { ev.stopPropagation(); if (p.onEventClick) p.onEventClick(e); };
+  const dot = (e, i) => html`<span class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${i} title=${`${fmtTime(e.at)} · ${e.text}`} onClick=${onEv(e)}>${e.text}</span>`;
 
   if (mode === 'month') {
     const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
@@ -184,7 +186,7 @@ export function calendarCard(p) {
                 </button>
                 <div class="sec-cal-weekcol-evs">
                   ${evs.length === 0 ? html`<span class="sec-hint sec-cal-empty">·</span>`
-                    : evs.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${j} title=${e.text}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}
+                    : evs.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind} sec-cal-ev--click" key=${j} onClick=${onEv(e)} title=${e.text}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}
                 </div>
               </div>`;
           })}
@@ -202,17 +204,89 @@ export function calendarCard(p) {
     <section class="sec-card sec-cal">
       ${head}
       ${dayEvents.length === 0 ? html`<div class="sec-hint sec-cal-empty">${t('secretary.cal.noEvents')}</div>` : null}
-      ${earlier.length ? html`<div class="sec-cal-bucket"><span class="sec-cal-hour">${t('secretary.cal.earlier')}</span><div class="sec-cal-hour-evs">${earlier.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${j}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div></div>` : null}
+      ${earlier.length ? html`<div class="sec-cal-bucket"><span class="sec-cal-hour">${t('secretary.cal.earlier')}</span><div class="sec-cal-hour-evs">${earlier.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind} sec-cal-ev--click" key=${j} onClick=${onEv(e)}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div></div>` : null}
       <div class="sec-cal-day">
         ${hours.map((hr) => {
           const evs = dayEvents.filter((e) => e.at.getHours() === hr);
           return html`
             <div class="sec-cal-hourrow" key=${hr}>
               <span class="sec-cal-hour">${String(hr).padStart(2, '0')}:00</span>
-              <div class="sec-cal-hour-evs">${evs.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${j}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div>
+              <div class="sec-cal-hour-evs">${evs.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind} sec-cal-ev--click" key=${j} onClick=${onEv(e)}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div>
             </div>`;
         })}
       </div>
-      ${later.length ? html`<div class="sec-cal-bucket"><span class="sec-cal-hour">${t('secretary.cal.later')}</span><div class="sec-cal-hour-evs">${later.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind}" key=${j}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div></div>` : null}
+      ${later.length ? html`<div class="sec-cal-bucket"><span class="sec-cal-hour">${t('secretary.cal.later')}</span><div class="sec-cal-hour-evs">${later.map((e, j) => html`<div class="sec-cal-ev sec-cal-ev--${e.type} sec-cal-ev--${e.kind} sec-cal-ev--click" key=${j} onClick=${onEv(e)}><span class="sec-cal-evtime">${fmtTime(e.at)}</span> ${e.text}</div>`)}</div></div>` : null}
     </section>`;
+}
+
+/**
+ * Type-specific editor for a clicked calendar entry — edit it IN PLACE (no navigation). The entries are
+ * heterogeneous (trigger = memory record · routine = secretary.config sub-object · tick = a schedule ·
+ * feed = an item in secretary.feed), so this dispatches by ref.srcType and drives the SAME domain hooks
+ * the dedicated cards use, so a change persists to the right backing store and shows everywhere.
+ * p = { event, onClose, triggers:{update,togglePause,remove}, routines:{setCadence,setStatus}, tick:{toggle,run} }
+ */
+export function CalendarEventDialog(p) {
+  const ev = p.event;
+  const ref = (ev && ev.ref) || {};
+  const tr = ref.trigger || {};
+  const ro = ref.routine || {};
+  const [label, setLabel] = useState(tr.label || '');
+  const [cadence, setCadence] = useState(tr.cadence || ro.cadence || 'weekly');
+  const [busy, setBusy] = useState(false);
+  if (!ev) return null;
+  const run = async (fn) => { setBusy(true); try { await fn(); } finally { setBusy(false); p.onClose(); } };
+
+  let title = ev.text || t('secretary.cal.title');
+  let body = null;
+  if (ref.srcType === 'trigger') {
+    title = t('secretary.cal.dlg.trigger');
+    body = html`
+      <label class="sec-hint">${t('secretary.trig.labelPlaceholder')}</label>
+      <input class="sec-input" value=${label} onInput=${(e) => setLabel(e.target.value)} />
+      ${tr.kind === 'recurring' ? html`
+        <label class="sec-hint">${t('secretary.cal.dlg.cadence')}</label>
+        <select class="sec-input" value=${cadence} onChange=${(e) => setCadence(e.target.value)}>
+          ${['daily', 'weekly', 'monthly'].map((c) => html`<option value=${c} selected=${cadence === c}>${t('secretary.trig.cad.' + c)}</option>`)}
+        </select>` : html`<div class="sec-hint">${new Date(tr.nextFireAt || ev.at).toLocaleString()}</div>`}
+      <div class="sec-next-action-btns">
+        <button class="btn-primary btn-sm" disabled=${busy} onClick=${() => run(() => p.triggers.update(ref.id, { label: label.trim() || tr.label, cadence }))}>${t('secretary.cal.dlg.save')}</button>
+        <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => run(() => p.triggers.togglePause(tr))}>${tr.status === 'paused' ? t('secretary.trig.resume') : t('secretary.trig.pause')}</button>
+        <button class="btn-ghost btn-sm sec-next-discard" disabled=${busy} onClick=${() => run(() => p.triggers.remove(tr))}>${t('secretary.cal.dlg.delete')}</button>
+      </div>`;
+  } else if (ref.srcType === 'routine') {
+    title = ro.title || t('secretary.cal.routineRun');
+    body = html`
+      <label class="sec-hint">${t('secretary.cal.dlg.cadence')}</label>
+      <select class="sec-input" value=${ro.cadence || 'none'} onChange=${(e) => run(() => p.routines.setCadence(ro, e.target.value))}>
+        ${['none', 'daily', 'weekly'].map((c) => html`<option value=${c} selected=${(ro.cadence || 'none') === c}>${t('secretary.trig.cad.' + c) || c}</option>`)}
+      </select>
+      <div class="sec-next-action-btns">
+        <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => run(() => p.routines.setStatus(ro, ro.status === 'paused' ? 'active' : 'paused'))}>${ro.status === 'paused' ? t('secretary.trig.resume') : t('secretary.trig.pause')}</button>
+      </div>`;
+  } else if (ref.srcType === 'tick') {
+    title = t('secretary.cal.tickEvent');
+    body = html`
+      <p class="sec-hint">${t('secretary.cal.dlg.tickDesc')}</p>
+      <div class="sec-next-action-btns">
+        <button class="btn-primary btn-sm" disabled=${busy} onClick=${() => run(() => p.tick.run())}>${t('secretary.auto.runNow')}</button>
+        <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => run(() => p.tick.toggle())}>${t('secretary.auto.pause')}</button>
+      </div>`;
+  } else {
+    // feed entry — historical; show the full content read-only.
+    title = t('secretary.cal.dlg.activity');
+    const item = ref.item || {};
+    body = html`
+      <div class="sec-hint">${new Date(ev.at).toLocaleString()}</div>
+      <div class="sec-stand-body"><${Markdown} text=${ev.text || ''} /></div>
+      ${item.href ? html`<a href=${item.href} target="_blank" rel="noopener">${t('secretary.next.openResult')} ↗</a>` : null}`;
+  }
+
+  return html`
+    <div class="sec-modal-backdrop" onClick=${p.onClose}>
+      <div class="sec-modal" onClick=${(e) => e.stopPropagation()}>
+        <div class="sec-card-head"><h2 class="sec-h2">${title}</h2><button class="btn-ghost btn-sm" onClick=${p.onClose}>✕</button></div>
+        ${body}
+      </div>
+    </div>`;
 }

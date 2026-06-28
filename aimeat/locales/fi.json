@@ -629,7 +629,15 @@
       "noEvents": "Ei mitään ajastettuna tälle päivälle.",
       "earlier": "Aiemmin",
       "later": "Myöhemmin",
-      "triggerEvent": "Triggeri"
+      "triggerEvent": "Triggeri",
+      "dlg": {
+        "trigger": "Muokkaa triggeriä",
+        "cadence": "Toistuu",
+        "save": "Tallenna",
+        "delete": "Poista",
+        "tickDesc": "Päivittäinen katsauksesi — briefing + ehdotetut seuraavat toimet.",
+        "activity": "Tapahtuma"
+      }
     },
     "trig": {
       "title": "Triggerit",
@@ -658,7 +666,7 @@
       "created": "Triggeri luotu",
       "error": "Triggeri epäonnistui",
       "kind": { "time": "Tiettynä päivänä", "recurring": "Toistuva", "completion": "Kun jokin valmistuu", "condition": "Kun ehto täyttyy" },
-      "cad": { "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain" },
+      "cad": { "none": "Ei toistoa", "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain" },
       "ct": { "memory_count": "Kohteiden määrä saavuttaa", "workspace_count": "Työtilan kohteet saavuttavat", "no_activity": "Ei aktiviteettia N päivään", "memory_exists": "Jotain ilmestyy" }
     },
     "editBrain": "Muokkaa aivoja",
