@@ -72,7 +72,7 @@ import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
 import { useTriggers } from '/views/secretary/use-triggers.js';
 import { useLayout, LayoutCard } from '/views/secretary/use-layout.js';
-import { produceDeliverable } from '/views/secretary/quality.js';
+import { produceDeliverable, getAiCapability, reasonJson } from '/views/secretary/quality.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
 import { useKnowledge } from '/views/secretary/use-knowledge.js';
@@ -464,6 +464,10 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     if (!active) return;
     setStand({ loading: true });
     try {
+      // Quality policy: orientation needs a ≥200k model too (it reads the whole space). No big model →
+      // tell the owner instead of running a degraded read.
+      const cap = await getAiCapability();
+      if (!cap.bigEnough) { setStand({ needModel: true }); return; }
       const openGoals = (learn.goals || []).filter((g) => g.status !== 'done').map((g) => '- ' + g.title).join('\n');
       const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
@@ -472,12 +476,16 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const wsLinks = active.organismId ? (wsList || []).map((w) => `- "${w.name}" → ${wsUrl(w.id)}`).join('\n') : '';
       const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, ORGANIZED orientation of where things stand right now. Use Markdown with 2–4 short sections or bullet groups (e.g. In progress / Open items / Needs attention / Recent) — NOT one long paragraph. Ground it in what's ACTUALLY in the workspaces below; do NOT say the space is empty if a workspace has content. When you mention a workspace, write it as a Markdown link using the "Workspace links" below so the owner can jump to it. Do NOT propose actions or claim to have done anything. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nWorkspace links:\n${wsLinks || '(none)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
-      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
+      // Fact-based read → execution model, low temperature.
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, modelRole: 'execution', temperature: 0.2, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
       const text = ((r && r.data && r.data.content) || '…').trim();
+      // Verify the orientation against the facts (reasoning, temp 0) — flag any invented progress/items.
+      const check = await reasonJson('You fact-check a status orientation against the facts it was given. Return ONLY JSON {"ok":boolean,"issues":[string]}. ok=false if it states any progress, item, number, or outcome NOT present in the facts. Bracketed [placeholders] are fine.', `Facts:\n${snapshot}\n\nOrientation:\n${text}`, 'secretary-orient-verify');
+      const issues = (check && check.ok === false && Array.isArray(check.issues)) ? check.issues.slice(0, 5) : [];
       const generatedAt = new Date().toISOString();
-      setStand({ text, generatedAt });
+      setStand({ text, generatedAt, issues });
       // Persist so it stays visible across reloads (with its timestamp) — no need to regenerate each time.
-      if (active.id) await apiPost('/v1/memory', { key: `secretary.stand.${active.id}`, value: { text, generatedAt }, visibility: 'private' }).catch(() => {});
+      if (active.id) await apiPost('/v1/memory', { key: `secretary.stand.${active.id}`, value: { text, generatedAt, issues }, visibility: 'private' }).catch(() => {});
     } catch (e) {
       setStand(null);
       showToast(`${t('secretary.dash.standError')}: ${e.message}`, true);
@@ -492,6 +500,9 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     if (!active) return;
     setNextAns({ loading: true });
     try {
+      // Deciding the next actions is a reasoning task → requires a ≥200k model. No big model → notice.
+      const cap = await getAiCapability();
+      if (!cap.bigEnough) { setNextAns({ needModel: true }); return; }
       const openGoals = (learn.goals || []).filter((g) => g.status !== 'done').map((g) => '- ' + g.title).join('\n');
       const dueDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const routines = (next.activeRoutines || []).map((r) => { const s = next.nextPendingStep(r); return `- ${r.title}${s ? ` (next: ${s.summary})` : ''}`; }).join('\n');
@@ -499,7 +510,8 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const space = await loadSpaceSnapshot();
       const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Propose the concrete NEXT ACTIONS to take now, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Each action is something the owner can approve with one click. Return ONLY a JSON object EXACTLY like {"actions":[{"summary":"a short imperative action (in the user's language)","capability":"discover","why":"one short line why, in the user's language"}]}. Propose 2–5 actions. "capability" MUST be one of: ${NEXT_CAPS.join(', ')} — prefer "discover" to gather info on something, "file_intake"/"curate_knowledge" to record a plan/note, "reminders"/"briefing" to flag something. Do NOT invent capabilities. CRUCIAL: do NOT propose anything already present in the workspace content above — if a deliverable already exists there, propose the genuine NEXT step instead (use, refine, or move it forward), never redo it. Write every "summary" and "why" in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output ONLY the JSON object.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${dueDecs || '(none)'}\nActive routines:\n${routines || '(none)'}\nOpen follow-ups:\n${followups || '(none)'}`;
-      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-next' }), timeoutMs: 1_800_000, retries: 0 });
+      // Reasoning/decision task → reasoning model, temperature 0 for sound, repeatable choices.
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, modelRole: 'reasoning', temperature: 0, app_id: 'secretary-next' }), timeoutMs: 1_800_000, retries: 0 });
       let parsed = null;
       try { parsed = extractJson((r && r.data && r.data.content) || ''); } catch { /* fall through */ }
       const raw = (parsed && Array.isArray(parsed.actions)) ? parsed.actions : [];
