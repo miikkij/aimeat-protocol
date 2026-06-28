@@ -71,6 +71,19 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   ~1100px it collapses to one column. Every card has a ⋮ **arrange** menu — move to the other column, reorder, or
   hide — and the arrangement is **persisted per owner** (`secretary.layout`); a layout bar offers Reset and a chip
   to restore each hidden section.
+- **Quality pipeline for the Secretary's interactive AI (≥200k models, multi-step, fact-checked).** The
+  single-shot prompts that hallucinated (users, metrics, quotes, a publisher deal) are replaced by a
+  grounded, reasoned pipeline; cost is accepted in exchange for quality. New `views/secretary/quality.js`
+  gates on a **≥200k-context model** (e.g. owl-alpha; reads the owner's execution/reasoning model
+  `context_length`) — small/local models can't hold the grounding context, so with no big-enough model the
+  Secretary **does not run a degraded answer**: it composes a multi-step **copy-paste prompt** for the
+  prompt-driven path (run it in a big AI chat, paste the result back). "Do it" now runs **triage →
+  gather → produce → verify**: triage (reasoning model, temp 0) classifies fact-vs-creative, decides
+  whether to search, and picks the **temperature** (fact ≈0.2, creative ≈0.7); gather pulls the workspace
+  + an optional directory search; produce (execution model, task temperature) writes grounded only in
+  those facts with `[placeholders]` for unknowns; verify (reasoning model, temp 0) fact-checks the draft
+  and **flags unsupported claims**. "What's next" now runs on the **reasoning** model at temp 0 (a
+  decision task); "Where things stand" on the **execution** model at temp 0.2 with a **verify** pass.
 
 ### Changed
 

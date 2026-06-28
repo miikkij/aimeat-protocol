@@ -80,7 +80,7 @@ export function dashStatus(p) {
 /** Read-only "where things stand" orientation summary (the core "Missä mennään?" quick action). */
 export function standPanel(p) {
   const s = p.stand;
-  if (!s || (!s.loading && !s.text)) return null;
+  if (!s || (!s.loading && !s.text && !s.needModel)) return null;
   const title = p.title || t('secretary.dash.standTitle');
   const thinking = p.thinking || t('secretary.dash.standThinking');
   return html`
@@ -91,8 +91,11 @@ export function standPanel(p) {
       </div>
       ${s.loading
         ? html`<div class="sec-hint">${thinking}</div>`
+        : s.needModel
+        ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
         : html`
           ${s.generatedAt ? html`<div class="sec-hint sec-stand-when">${t('secretary.dash.standAt')} ${new Date(s.generatedAt).toLocaleString()} · <button class="sec-linkbtn" onClick=${p.onRefresh}>${t('secretary.dash.refreshStand')}</button></div>` : null}
+          ${s.issues && s.issues.length ? html`<div class="sec-hint sec-warn">⚠ ${t('secretary.next.verifyFlag')}: ${s.issues.join('; ')}</div>` : null}
           <div class="sec-stand-body"><${Markdown} text=${s.text} /></div>`}
     </section>`;
 }
@@ -109,6 +112,8 @@ export function whatsNextPanel(p) {
       </div>
       ${n.loading
         ? html`<div class="sec-hint">${t('secretary.next.thinking')}</div>`
+        : n.needModel
+        ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
         : (n.actions && n.actions.length
           ? html`<ul class="sec-next-actions">
               ${n.actions.map((a) => html`
