@@ -123,6 +123,8 @@ export interface RoutineStepRoute {
  * `policy.bands[capability]`, else the conservative 'ask'. The disposition is band-only — act → run,
  * draft|ask → confirm (owner approves first), off → skip — so it can be unit-tested without storage or AI.
  * (Whether a capability has a B2 executor is a separate, frontend concern; delegation lands in B4.)
+ * G6 MIRROR: public/js/services/secretary-rules.js::routeRoutineStep — keep IDENTICAL; e2e-secretary's
+ * parity test imports both and asserts they agree on a shared vector table.
  */
 export function routeRoutineStep(
   step: { capability?: unknown; band?: unknown } | null | undefined,
@@ -241,8 +243,9 @@ const QUICK_COMPOSE_TARGETS = new Set(['plan', 'find', 'note']);
  * Sanitize brain-seeded / secretary-proposed quick actions (B3). The SECURITY boundary: a non-core
  * action may ONLY be 'prompt' (a canned chat message) or 'compose' (focus an existing input) — never a
  * 'run' verb (those are app-defined core actions). Anything that isn't a well-formed prompt/compose is
- * dropped. Pure: no storage/AI — the view mirrors this rule and e2e-secretary asserts it directly.
- * `id`/`createdAt` are added by the caller (kept out so the function stays deterministic for tests).
+ * dropped. Pure: no storage/AI. `id`/`createdAt` are added by the caller (kept out so the function stays
+ * deterministic for tests). G6 MIRROR: public/js/services/secretary-rules.js::sanitizeProposedQuickActions
+ * — keep IDENTICAL; e2e-secretary's parity test imports both and asserts identical output.
  */
 export function sanitizeProposedQuickActions(raw: unknown, source: string, status: 'proposed' | 'active' = 'proposed'): QuickAction[] {
   const list = Array.isArray(raw) ? raw : [];

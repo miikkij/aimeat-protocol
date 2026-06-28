@@ -76,6 +76,9 @@ import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
 import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
+// G6: the FRONTEND copy of the shared rules (pure, dependency-free) — imported directly so the parity
+// test below proves it agrees with the TS server helpers above. (test/ is excluded from tsc; tsx runs it.)
+import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as feSanitizeQuickActions } from '../public/js/services/secretary-rules.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -1167,6 +1170,38 @@ await test('64. routineDueForRearm + rearmRoutine: a completed daily routine re-
     assert(armed.status === 'active' && armed.steps.every(s => s.status === 'pending' && s.result === null), `re-armed steps: ${JSON.stringify(armed.steps)}`);
     assert(armed.nextRunAt === '2026-06-29T12:00:00.000Z', `nextRunAt: ${armed.nextRunAt}`);
     assert(Array.isArray(armed.results) && armed.results.length === 1, 'keeps the prior run results log');
+});
+
+console.log('\nG6 -- Cross-runtime rule parity (frontend secretary-rules.js === backend secretary-tick.ts)');
+
+await test('65. routeRoutineStep + sanitizeProposedQuickActions: frontend mirror agrees with the server', async () => {
+    const bands = { a: 'act', d: 'draft', k: 'ask', o: 'off' };
+    const routeVectors: any[] = [
+        { capability: 'a' }, { capability: 'd' }, { capability: 'k' }, { capability: 'o' }, { capability: 'missing' },
+        { capability: 'a', band: 'off' }, { capability: 'a', band: 'bogus' }, { capability: 'o', band: 'act' },
+        { band: 'act' }, {}, null,
+    ];
+    for (const v of routeVectors) {
+        const be = routeRoutineStep(v, bands);
+        const fe = feRouteRoutineStep(v, bands);
+        assert(be.band === fe.band && be.disposition === fe.disposition, `route mismatch ${JSON.stringify(v)}: be=${JSON.stringify(be)} fe=${JSON.stringify(fe)}`);
+    }
+    const sanitizeVectors: any[] = [
+        { label: 'p', kind: 'prompt', prompt: 'hi' },
+        { label: 'c', kind: 'compose', target: 'find' },
+        { label: 'r', kind: 'run', action: 'spend' },        // dropped (security)
+        { label: 'bt', kind: 'compose', target: 'wallet' },  // dropped (bad target)
+        { label: '', kind: 'prompt', prompt: 'x' },           // dropped (no label)
+        { label: 'noP', kind: 'prompt', prompt: '   ' },      // dropped (empty prompt)
+        { label: 'X'.repeat(60), kind: 'prompt', prompt: 'y' }, // label trimmed to 40
+        'not-an-object', null, 42,
+    ];
+    const be = sanitizeProposedQuickActions(sanitizeVectors, 'secretary', 'proposed');
+    const fe = feSanitizeQuickActions(sanitizeVectors, 'secretary', 'proposed');
+    assert(JSON.stringify(be) === JSON.stringify(fe), `sanitize mismatch: be=${JSON.stringify(be)} fe=${JSON.stringify(fe)}`);
+    // 3 valid kept (prompt, compose, long-label-trimmed prompt); the security invariant: no 'run' survives.
+    assert(be.length === 3 && !be.some((a: any) => a.kind === 'run'), `security invariant: ${JSON.stringify(be)}`);
+    assert(be[2].label.length === 40, `long label trimmed to 40: ${be[2].label.length}`);
 });
 
 console.log('\nCleanup');

@@ -16,6 +16,7 @@
  *   v0.1.0 — 2026-06-23 — Extracted from views/secretary.js (Phase 2, keep view < 500 lines).
  */
 import { defaultPolicy } from '/js/services/secretary-policy.js';
+import { sanitizeProposedQuickActions } from '/js/services/secretary-rules.js';
 
 /** Concise, accurate AIMEAT primer fed to the chat so the Secretary can teach/guide the user
  *  ("tutustuta AIMEATiin"). Concept-level (avoids brittle exact UI paths so it doesn't drift). */
@@ -95,36 +96,16 @@ export function genCtxId() {
   return 'ctx-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
-/** B3 quick-action targets a `compose` action may focus (must match the working cards in the view). */
-const QA_COMPOSE_TARGETS = new Set(['plan', 'find', 'note']);
 function genActionId() { return 'qa-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
 /**
- * Sanitize brain-seeded / secretary-proposed dynamic quick actions (B3). SECURITY boundary: a non-core
- * action may ONLY be 'prompt' (a canned chat message) or 'compose' (focus an input: target plan|find|note)
- * — never a 'run' verb (those are app-defined core actions). Malformed entries are dropped. Mirrors the
- * server helper `sanitizeProposedQuickActions` (secretary-tick.ts), which e2e-secretary asserts.
+ * Sanitize brain-seeded / secretary-proposed dynamic quick actions (B3). The SECURITY boundary (only
+ * prompt|compose, never a 'run' verb) lives in the shared, dependency-free rules module
+ * (/js/services/secretary-rules.js), which MIRRORS the server's secretary-tick.ts and is proven equal by
+ * e2e-secretary's G6 parity test. Here we just stamp an id + createdAt onto each sanitized action.
  */
 export function sanitizeQuickActions(raw, source, status = 'proposed') {
-  const list = Array.isArray(raw) ? raw : [];
-  const out = [];
-  for (const r of list) {
-    if (!r || typeof r !== 'object') continue;
-    const label = String(r.label || '').trim().slice(0, 40);
-    const kind = String(r.kind || '').trim();
-    if (!label) continue;
-    if (kind === 'compose') {
-      const target = String(r.target || '').trim();
-      if (!QA_COMPOSE_TARGETS.has(target)) continue;
-      out.push({ id: genActionId(), label, kind: 'compose', target, source, status, createdAt: new Date().toISOString() });
-    } else if (kind === 'prompt') {
-      const prompt = String(r.prompt || '').trim().slice(0, 500);
-      if (!prompt) continue;
-      out.push({ id: genActionId(), label, kind: 'prompt', prompt, source, status, createdAt: new Date().toISOString() });
-    }
-    // kind 'run' or anything else → dropped (the security boundary).
-  }
-  return out.slice(0, 6);
+  return sanitizeProposedQuickActions(raw, source, status).map((a) => ({ id: genActionId(), ...a, createdAt: new Date().toISOString() }));
 }
 
 /** Cheap, AI-free context routing (plan §22 step 2): score `text` against each context's name +
