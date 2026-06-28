@@ -73,15 +73,20 @@ export async function executeSpecialistTask(
     visibility: 'private', tags: ['specialist', 'deliverable'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   });
   // Also write the offer's deliverable location (the latest output) so the specialist's workflow offer
-  // (success_signal = nonempty at this key) is satisfied when a workflow step dispatches to it.
+  // (success_signal = nonempty at this key) is satisfied when a workflow step dispatches to it. When the
+  // task is a SANDBOX workflow dispatch, the engine passes a `wf-key-prefix` scope — write under it too
+  // so the sandbox signal (which reads prefix+key) passes without clobbering production keys.
   const outKey = specialistOutKey(specialist.name);
-  const outPrev = await storage.getMemory(specialist.gaii, outKey);
-  await storage.setMemory({
-    key: outKey, ownerGaii: specialist.gaii,
-    value: { taskId: task.id, title: task.title, content, createdAt: now },
-    visibility: 'owner', tags: ['specialist', 'deliverable'], ttlHours: null,
-    version: outPrev ? outPrev.version + 1 : 1, createdAt: outPrev?.createdAt ?? now, updatedAt: now,
-  });
+  const prefix = (task.scope || []).find((sc) => sc.name === 'wf-key-prefix')?.value || '';
+  const outVal = { taskId: task.id, title: task.title, content, createdAt: now };
+  for (const k of prefix ? [outKey, prefix + outKey] : [outKey]) {
+    const prev = await storage.getMemory(specialist.gaii, k);
+    await storage.setMemory({
+      key: k, ownerGaii: specialist.gaii, value: outVal,
+      visibility: 'owner', tags: ['specialist', 'deliverable'], ttlHours: null,
+      version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
+    });
+  }
   await storage.updateAgentTask(task.id, { status: 'done', completedAt: now, deliverableKey, lastEventAt: now });
   logger.info('[specialist-runner] task done', { gaii: specialist.gaii, taskId: task.id, deliverableKey });
   return { ok: true, deliverableKey };

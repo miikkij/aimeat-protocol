@@ -116,6 +116,14 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   `PUT /v1/workflows/:id` (validated against the offer contract + DAG, then armed per its trigger). New
   `views/secretary/workflow-design.js`. Verified in-browser: an outcome → a chain using a specialist's
   offer → saved & armed on a schedule.
+- **Create specialists from the Secretary; design a workflow from a routine step; sandbox key alignment.**
+  A "Specialists" card lists the owner's specialists and creates one from a role template (specialist /
+  sdr / prep / finance / recruiter) + a brain purpose (it auto-publishes its workflow-compatible offer,
+  so it's immediately chainable), with run-now and remove. A routine step's delegate control gains a
+  "Design new workflow" button (the second entry point) that opens the design flow seeded from the step.
+  The specialist executor now honors a workflow run's `wf-key-prefix` scope — in a sandbox run it also
+  writes the deliverable under the prefixed key, so the sandbox success-signal passes without touching
+  production keys.
 
 ### Changed
 
