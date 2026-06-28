@@ -58,7 +58,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
-import { createOrganism, createWorkspace } from '/js/services/organisms.js';
+import { createOrganism, createWorkspace, generateRaw, parseGenerated, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
@@ -243,6 +243,27 @@ export default function SecretaryView() {
     }
   }, []);
 
+  // Give a freshly-created workspace a PROPER manifest (AI-designed object types) so it's immediately
+  // usable, not an empty "set up workspace" shell. Reuses the proven organism workspace generator.
+  // Best-effort: a manifest-less workspace still exists and can be set up manually.
+  const genAndApplyManifest = useCallback(async (orgId, wsId, name, purpose) => {
+    try {
+      const raw = await generateRaw(`${name} — ${purpose || ''}`.trim(), null);
+      const generated = parseGenerated(raw);                 // raw AI text → { manifest, schemas }
+      // Backfill the envelope fields the model sometimes omits, so a valid objectTypes set still applies.
+      if (generated && generated.manifest) {
+        const mf = generated.manifest;
+        mf.manifestVersion = mf.manifestVersion || '1.0';
+        mf.id = mf.id || wsId;
+        mf.name = mf.name || name;
+        mf.kind = mf.kind || 'project';
+        mf.status = ['active', 'paused', 'done', 'archived'].includes(mf.status) ? mf.status : 'active';
+      }
+      const errs = validateGenerated(generated);
+      if (!errs.length) await applyGeneratedWorkspace(orgId, wsId, generated);
+    } catch { /* leave it manifest-less; the owner can set it up manually */ }
+  }, []);
+
   const applyResult = useCallback(async () => {
     setApplying(true);
     try {
@@ -266,6 +287,7 @@ export default function SecretaryView() {
         const orgId = created && created.data && created.data.organism && created.data.organism.id;
         const wsSummary = [];
         if (orgId) {
+          const created = [];
           for (const ws of org.workspaces.slice(0, 12)) {
             const name = String(ws.name || '').trim();
             if (!name) continue;
@@ -273,8 +295,11 @@ export default function SecretaryView() {
             if (entry && entry.id && ws.purpose) {
               await apiPost('/v1/memory', { key: `organism.${orgId}.w.${entry.id}.meta.readme`, value: `# ${name}\n\n${ws.purpose}`, visibility: 'private' });
             }
+            if (entry && entry.id) created.push({ wsId: entry.id, name, purpose: ws.purpose || '' });
             wsSummary.push({ name, purpose: ws.purpose || '' });
           }
+          // Design + apply each workspace's manifest in parallel so they come out usable, not empty shells.
+          await Promise.all(created.map((c) => genAndApplyManifest(orgId, c.wsId, c.name, c.purpose)));
         }
         // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
@@ -291,6 +316,7 @@ export default function SecretaryView() {
         const existingNames = new Set((active.workspaces || []).map((w) => String(w.name).toLowerCase()));
         const addedWs = [];
         if (active.organismId && Array.isArray(org.workspaces)) {
+          const created = [];
           for (const ws of org.workspaces.slice(0, 12)) {
             const name = String(ws.name || '').trim();
             if (!name || existingNames.has(name.toLowerCase())) continue;
@@ -298,8 +324,10 @@ export default function SecretaryView() {
             if (entry && entry.id && ws.purpose) {
               await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${entry.id}.meta.readme`, value: `# ${name}\n\n${ws.purpose}`, visibility: 'private' });
             }
+            if (entry && entry.id) created.push({ wsId: entry.id, name, purpose: ws.purpose || '' });
             addedWs.push({ name, purpose: ws.purpose || '' });
           }
+          await Promise.all(created.map((c) => genAndApplyManifest(active.organismId, c.wsId, c.name, c.purpose)));
         }
         const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs] };
         next = { ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) };
@@ -314,7 +342,7 @@ export default function SecretaryView() {
     } finally {
       setApplying(false);
     }
-  }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, seedGoals, showToast]);
+  }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, seedGoals, genAndApplyManifest, showToast]);
 
   // C2 — direct brain editor: edit the active context's purpose + rules in place (no AI re-run).
   const startBrainEdit = useCallback(() => {
