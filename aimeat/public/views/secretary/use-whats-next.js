@@ -30,6 +30,7 @@ import { api, apiGet, apiPost } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers.js';
 import { routeRoutineStep } from '/js/services/secretary-rules.js';
+import { SPECIALIST_CONTRACT } from '/views/secretary/quality.js';
 
 /** Capabilities a routine step may use (subset of the policy taxonomy the Secretary can plan with). */
 export const ROUTINE_CAPABILITIES = ['discover', 'file_intake', 'briefing', 'reminders', 'curate_knowledge', 'create_resource', 'delegate'];
@@ -139,9 +140,15 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
       const agentName = String(opts.agentName || '').trim();
       if (!agentName) throw new Error(t('secretary.next.delegateNoAgent'));
       const ctxLine = opts.routinePurpose ? `${opts.routinePurpose}\n\n` : '';
+      // Specialist parity: every delegated task carries the same quality contract the Secretary works to
+      // (grounded, no fabrication, ask via aimeat_dm_ask) + a pointer to where the facts live.
+      const grounding = active.organismId
+        ? `\n\nFacts live in organism ${active.organismId}${wsList.length ? `, workspaces: ${wsList.map((w) => w.name).slice(0, 6).join(', ')}` : ''} — read them with your memory/workspace tools; do not guess.`
+        : '';
+      const description = `${SPECIALIST_CONTRACT}\n\nTASK: ${ctxLine}${step.summary}${grounding}`.slice(0, 8000);
       const resp = await apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks`, {
         title: step.summary.slice(0, 200),
-        description: `${ctxLine}${step.summary}`.slice(0, 2000),
+        description,
         status: 'queued',
         parent_task_id: opts.routineId || undefined,
       });

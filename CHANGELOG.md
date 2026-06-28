@@ -84,6 +84,17 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   those facts with `[placeholders]` for unknowns; verify (reasoning model, temp 0) fact-checks the draft
   and **flags unsupported claims**. "What's next" now runs on the **reasoning** model at temp 0 (a
   decision task); "Where things stand" on the **execution** model at temp 0.2 with a **verify** pass.
+- **Ask-don't-hallucinate (clarifying questions).** When a "Do it" task is missing facts only the owner
+  can supply, the Secretary asks instead of guessing: triage flags the gap, a clarify step generates a
+  batch of option questions (a federated AskUserQuestion) posted to the inbox from the secretary agent
+  (`POST /v1/secretary/clarify`), and a pending produce-job is stored; the autonomous tick resumes it
+  once answered — producing the deliverable grounded ONLY in the facts + answers. The action shows an
+  "asked" state linking to the inbox. The same inbox-question mechanism serves specialists.
+- **Specialist parity.** Every task the Secretary delegates to another agent now carries the same
+  quality contract it works to — ground in the given facts, never fabricate, ask the owner via
+  `aimeat_dm_ask` when a fact is missing, use a ≥200k model, verify before delivering — plus a pointer to
+  where the facts live (the organism + workspaces, read via the agent's memory/workspace tools). So
+  delegated specialists work the same way, not as one-shot guessers.
 
 ### Changed
 
