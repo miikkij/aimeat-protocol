@@ -72,6 +72,7 @@ import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
 import { useTriggers } from '/views/secretary/use-triggers.js';
 import { useLayout, LayoutCard } from '/views/secretary/use-layout.js';
+import { produceDeliverable } from '/views/secretary/quality.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
 import { useKnowledge } from '/views/secretary/use-knowledge.js';
@@ -108,6 +109,7 @@ export default function SecretaryView() {
   const [manageOpen, setManageOpen] = useState(false);   // B1: collapsed "Manage & setup" disclosure
   const [stand, setStand] = useState(null);              // B1: read-only "where things stand" summary { loading } | { text }
   const [nextAns, setNextAns] = useState(null);          // "What's next?" — the Secretary's forward answer { loading } | { text }
+  const [pasteDrafts, setPasteDrafts] = useState({});    // prompt-driven path: pasted-back result text, keyed by action id
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -565,26 +567,34 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         await feedLog(`⚑ ${action.summary}`);
         resultMsg = t('secretary.next.didSurface');
       } else {
-        // file_intake / curate_knowledge / create_resource → actually PRODUCE the deliverable (AI) and
-        // file the real content, not just the action title. GROUND it in the real workspace content and
-        // forbid fabrication — otherwise a "draft a story/pitch" task invents users, metrics and quotes.
+        // file_intake / curate_knowledge / create_resource → run the multi-step QUALITY pipeline
+        // (triage → gather → produce → verify) on a ≥200k model, grounded + no fabrication. If no big
+        // model is configured, hand the owner a copy-paste prompt for the prompt-driven path instead.
         const ws = pickWs();
         const space = await loadSpaceSnapshot();
-        const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Produce the deliverable the owner asked for as a usable DRAFT, grounded ONLY in the facts in the workspace context below. STRICT — do NOT invent or embellish: no made-up numbers, metrics, statistics, quotes, testimonials, names, dates, events, deals, or outcomes. If a needed detail is not in the context, insert a [bracketed placeholder] for the owner to fill — never fabricate one. If the context has too little to go on, produce a short skeleton/outline with placeholders and a note on what's missing, rather than a fictional narrative. Markdown is fine. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output only the content, no preamble.`;
-        const prompt = `Task: ${action.summary}${action.why ? `\n(${action.why})` : ''}\n\nWorkspace context — the ONLY facts you may use:\n${space || '(no workspace content available — produce only a skeleton with placeholders)'}`;
-        let content = action.summary;
-        try {
-          const gen = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, systemPrompt: sys, app_id: 'secretary-next-do' }), timeoutMs: 1_800_000, retries: 0 });
-          content = ((gen && gen.data && gen.data.content) || '').trim() || action.summary;
-        } catch { /* fall back to filing the title if generation fails */ }
-        preview = content;
+        const runDiscover = async (q) => {
+          const d = await apiGet('/v1/discover?scope=public&per_page=10&q=' + encodeURIComponent(q)).catch(() => null);
+          const es = (d && d.data && Array.isArray(d.data.entries)) ? d.data.entries : [];
+          return es.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
+        };
+        const out = await produceDeliverable({ action, owner, contextName: active.name, locale: getLocale(), space, runDiscover });
+        if (out.mode === 'prompt-driven') {
+          // No ≥200k model — never run a degraded completion; show the composed multi-step prompt to
+          // copy into a big AI chat, with a paste-back box to save the result.
+          patch('prompt', { promptText: out.prompt, expanded: true });
+          return;
+        }
+        preview = out.content;
+        const issues = (out.verify && out.verify.ok === false && Array.isArray(out.verify.issues)) ? out.verify.issues.slice(0, 6) : [];
         if (active.organismId && ws) {
-          noteKey = await fileNote(ws, action.summary, content);
+          noteKey = await fileNote(ws, action.summary, out.content);
           resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = spaceUrl(ws.id);
           await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`, href);
-        } else {
-          resultMsg = t('secretary.next.didNoted');
+          patch('done', { result: resultMsg, href, preview, expanded: true, noteKey, issues });
+          window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+          return;
         }
+        resultMsg = t('secretary.next.didNoted');
       }
       patch('done', { result: resultMsg, href, preview, expanded: true, noteKey });
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
@@ -602,6 +612,28 @@ ${SECRETARY_AIMEAT_PRIMER}`;
   const togglePreview = useCallback((action) => {
     setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, expanded: !a.expanded } : a)) } : s);
   }, []);
+
+  const setPasteDraft = useCallback((id, v) => setPasteDrafts((m) => ({ ...m, [id]: v })), []);
+
+  // Prompt-driven path: file the result the owner pasted back from their big AI chat, as a note.
+  const savePromptResult = useCallback(async (action) => {
+    const text = (pasteDrafts[action.id] || '').trim();
+    if (!text || !active) return;
+    const wsl = intake.wsList || [];
+    const words = new Set(String(action.summary).toLowerCase().split(/[^a-z0-9äöå]+/i).filter((w) => w.length >= 4));
+    let ws = wsl[0]; let best = -1;
+    for (const w of wsl) { let sc = 0; const hay = String(w.name).toLowerCase(); for (const wd of words) if (hay.includes(wd)) sc++; if (sc > best) { best = sc; ws = w; } }
+    let noteKey = null;
+    if (active.organismId && ws) {
+      const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      noteKey = `organism.${active.organismId}.w.${ws.id}.notes.${id}`;
+      await apiPost('/v1/memory', { key: noteKey, value: { id, title: action.summary.slice(0, 80), body: text, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' }).catch(() => {});
+    }
+    const href = active.organismId && ws ? `/v1/profile?tab=organisms&org=${encodeURIComponent(active.organismId)}&ws=${encodeURIComponent(ws.id)}` : null;
+    setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'done', promptText: '', preview: text, expanded: true, noteKey, result: ws ? t('secretary.next.didDrafted', { ws: ws.name }) : t('secretary.next.didNoted'), href } : a)) } : s);
+    setPasteDraft(action.id, '');
+    window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+  }, [pasteDrafts, active, intake.wsList, setPasteDraft]);
 
   // Discard a produced deliverable that's no good (e.g. an off-base draft): delete the filed note and
   // clear the result from the list.
@@ -686,7 +718,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Customizable two-column dashboard (pin to column / reorder / hide per card; persisted). */ ''}
               ${(() => {
                 const nodes = {
-                  whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDiscard: discardProposedAction, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
+                  whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDiscard: discardProposedAction, pasteDrafts, onPasteInput: setPasteDraft, onSavePrompt: savePromptResult, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
                   stand: standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) }),
                   actionItems: actionItemsCard(next),
                   routines: routinesCard(next),
