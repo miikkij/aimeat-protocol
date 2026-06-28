@@ -168,9 +168,14 @@ export default function SecretaryView() {
   // Load the active context's conversation (chat is per-context).
   useEffect(() => {
     setStand(null);
+    setNextAns(null);
     if (!activeId) { setChat([]); return; }
     let cancelled = false;
     setChat([]);
+    // Restore the last "where things stand" so it persists across reloads (with its timestamp).
+    apiGet(`/v1/memory/${encodeURIComponent('secretary.stand.' + activeId)}`)
+      .then((r) => { const v = r && r.data && r.data.value; if (!cancelled && v && v.text) setStand({ text: v.text, generatedAt: v.generatedAt }); })
+      .catch(() => {});
     apiGet(`/v1/memory/${encodeURIComponent('secretary.chat.' + activeId)}`)
       .then((r) => {
         if (cancelled) return;
@@ -448,15 +453,21 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
       const space = await loadSpaceSnapshot();
-      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now, grounded in what's ACTUALLY in the workspaces below. Do NOT say the space is empty if any workspace has content. Do NOT propose to take actions or claim to have done anything. 3–6 sentences of plain prose in ${getLocale() === 'fi' ? 'Finnish' : 'English'}.`;
-      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
+      const orgHref = active.organismId ? `/v1/organisms/${encodeURIComponent(active.organismId)}` : '';
+      const wsLinks = orgHref ? (wsList || []).map((w) => `- "${w.name}" → ${orgHref}`).join('\n') : '';
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, ORGANIZED orientation of where things stand right now. Use Markdown with 2–4 short sections or bullet groups (e.g. In progress / Open items / Needs attention / Recent) — NOT one long paragraph. Ground it in what's ACTUALLY in the workspaces below; do NOT say the space is empty if a workspace has content. When you mention a workspace, write it as a Markdown link using the "Workspace links" below so the owner can jump to it. Do NOT propose actions or claim to have done anything. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}.`;
+      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nWorkspace links:\n${wsLinks || '(none)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
-      setStand({ text: ((r && r.data && r.data.content) || '…').trim() });
+      const text = ((r && r.data && r.data.content) || '…').trim();
+      const generatedAt = new Date().toISOString();
+      setStand({ text, generatedAt });
+      // Persist so it stays visible across reloads (with its timestamp) — no need to regenerate each time.
+      if (active.id) await apiPost('/v1/memory', { key: `secretary.stand.${active.id}`, value: { text, generatedAt }, visibility: 'private' }).catch(() => {});
     } catch (e) {
       setStand(null);
       showToast(`${t('secretary.dash.standError')}: ${e.message}`, true);
     }
-  }, [active, owner, learn.goals, learn.decisions, auto.feed, loadSpaceSnapshot, showToast]);
+  }, [active, owner, learn.goals, learn.decisions, auto.feed, wsList, loadSpaceSnapshot, showToast]);
 
   // "What's next?" — the Secretary proposes CONCRETE next actions it can DO (each with Do it / Skip),
   // grounded in the real workspace content + goals/decisions/routines/follow-ups. Not prose to read —
@@ -471,7 +482,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const routines = (next.activeRoutines || []).map((r) => { const s = next.nextPendingStep(r); return `- ${r.title}${s ? ` (next: ${s.summary})` : ''}`; }).join('\n');
       const followups = (next.actionItems || []).map((a) => '- ' + (a.summary || a.text || '')).join('\n');
       const space = await loadSpaceSnapshot();
-      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Propose the concrete NEXT ACTIONS to take now, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Each action is something the owner can approve with one click. Return ONLY a JSON object EXACTLY like {"actions":[{"summary":"a short imperative action (in the user's language)","capability":"discover","why":"one short line why, in the user's language"}]}. Propose 2–5 actions. "capability" MUST be one of: ${NEXT_CAPS.join(', ')} — prefer "discover" to gather info on something, "file_intake"/"curate_knowledge" to record a plan/note, "reminders"/"briefing" to flag something. Do NOT invent capabilities. Write every "summary" and "why" in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output ONLY the JSON object.`;
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Propose the concrete NEXT ACTIONS to take now, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Each action is something the owner can approve with one click. Return ONLY a JSON object EXACTLY like {"actions":[{"summary":"a short imperative action (in the user's language)","capability":"discover","why":"one short line why, in the user's language"}]}. Propose 2–5 actions. "capability" MUST be one of: ${NEXT_CAPS.join(', ')} — prefer "discover" to gather info on something, "file_intake"/"curate_knowledge" to record a plan/note, "reminders"/"briefing" to flag something. Do NOT invent capabilities. CRUCIAL: do NOT propose anything already present in the workspace content above — if a deliverable already exists there, propose the genuine NEXT step instead (use, refine, or move it forward), never redo it. Write every "summary" and "why" in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output ONLY the JSON object.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${dueDecs || '(none)'}\nActive routines:\n${routines || '(none)'}\nOpen follow-ups:\n${followups || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-next' }), timeoutMs: 1_800_000, retries: 0 });
       let parsed = null;
@@ -496,11 +507,12 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     if (!active) return;
     const patch = (st, extra) => setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: st, ...extra } : a)) } : s);
     patch('doing');
-    // Append a visible line to the Home feed ("What I've done") so every Do-it leaves a trail.
-    const feedLog = async (text) => {
+    // Append a visible line to the Home feed ("What I've done") so every Do-it leaves a trail — with a
+    // link to where the result landed when there is one.
+    const feedLog = async (text, href) => {
       const fr = await apiGet('/v1/memory/secretary.feed').catch(() => null);
       const items = (fr && fr.data && fr.data.value && Array.isArray(fr.data.value.items)) ? fr.data.value.items : [];
-      const entry = { id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text };
+      const entry = { id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text, ...(href ? { href } : {}) };
       await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...items].slice(0, 50) }, visibility: 'private' });
     };
     // Best-matching workspace for the action (by word overlap with its summary).
@@ -531,7 +543,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         } else {
           resultMsg = t('secretary.next.didDiscover', { n: entries.length });
         }
-        await feedLog(`🔎 ${action.summary} — ${t('secretary.next.didDiscover', { n: entries.length })}`);
+        await feedLog(`🔎 ${action.summary} — ${t('secretary.next.didDiscover', { n: entries.length })}`, href);
       } else if (cap === 'briefing' || cap === 'reminders') {
         await feedLog(`⚑ ${action.summary}`);
         resultMsg = t('secretary.next.didSurface');
@@ -549,7 +561,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         if (active.organismId && ws) {
           await fileNote(ws, action.summary, content);
           resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = orgHref;
-          await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`);
+          await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`, href);
         } else {
           resultMsg = t('secretary.next.didNoted');
         }
@@ -638,7 +650,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
 
               ${/* Today / dashboard — where are we + is this current */ ''}
               ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onDismiss: () => setNextAns(null) })}
-              ${standPanel({ stand, onDismiss: () => setStand(null) })}
+              ${standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}
               ${routinesCard(next)}
