@@ -347,3 +347,51 @@ export function triggersCard(p) {
         </div>` : null}
     </section>`;
 }
+
+/** Phase 3 — "Design a workflow": state outcome → the Secretary composes a chain of agent+offer steps,
+ *  proposes how to arm it (manual / schedule / event), and saves it. p = { state, on* handlers }. */
+export function workflowDesignPanel(p) {
+  const s = p.state;
+  if (!s) return null;
+  const trig = s.trigger || { kind: 'manual' };
+  return html`
+    <section class="sec-card sec-stand sec-wf">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.wf.title')}</h2>
+        <button class="btn-ghost btn-sm" onClick=${p.onDiscard}>${t('secretary.dash.dismiss')}</button>
+      </div>
+      ${s.saved
+        ? html`<div class="sec-hint">✓ ${t('secretary.wf.saved', { id: s.saved })}</div>`
+        : s.draft
+        ? html`
+          ${s.draft.description ? html`<div class="sec-hint">${s.draft.description}</div>` : null}
+          <div class="sec-h3">${t('secretary.wf.steps')}</div>
+          <ol class="sec-wf-steps">
+            ${s.draft.steps.map((st) => html`<li key=${st.id}><strong>${st.agent}</strong> · ${st.offer} — ${st.description}${st.after && st.after.length ? html` <span class="sec-hint">(${t('secretary.wf.after')} ${st.after.join(', ')})</span>` : null}</li>`)}
+          </ol>
+          <div class="sec-h3">${t('secretary.wf.arming')}</div>
+          <select class="sec-band" value=${trig.kind} onChange=${(e) => p.onTrigKind(e.target.value)}>
+            <option value="manual" selected=${trig.kind === 'manual'}>${t('secretary.wf.trigManual')}</option>
+            <option value="schedule" selected=${trig.kind === 'schedule'}>${t('secretary.wf.trigSchedule')}</option>
+            <option value="event" selected=${trig.kind === 'event'}>${t('secretary.wf.trigEvent')}</option>
+          </select>
+          ${trig.kind === 'schedule' ? html`<input class="sec-input sec-wf-cron" value=${trig.cron || '0 9 * * *'} placeholder="0 18 * * *" onInput=${(e) => p.onCron(e.target.value)} />` : null}
+          ${s.errors && s.errors.length ? html`<div class="sec-hint sec-warn">⚠ ${s.errors.join('; ')}</div>` : null}
+          <div class="sec-next-action-btns">
+            <button class="btn-primary btn-sm" disabled=${s.saving} onClick=${p.onSave}>${s.saving ? t('secretary.saving') : t('secretary.wf.save')}</button>
+            <button class="btn-ghost btn-sm" onClick=${p.onRedo}>${t('secretary.wf.redo')}</button>
+          </div>`
+        : s.designing
+        ? html`<div class="sec-hint">${t('secretary.wf.designing')}</div>`
+        : s.error === 'needModel'
+        ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
+        : s.error === 'noSteps'
+        ? html`<div class="sec-hint sec-warn">${t('secretary.wf.noSteps')}${s.title ? `: ${s.title}` : ''}</div>`
+        : html`
+          <p class="sec-hint">${t('secretary.wf.prompt')}</p>
+          <textarea class="sec-paste sec-wf-outcome" placeholder=${t('secretary.wf.placeholder')} value=${s.outcome || ''} onInput=${(e) => p.onOutcome(e.target.value)}></textarea>
+          <div class="sec-next-action-btns">
+            <button class="btn-primary btn-sm" disabled=${!(s.outcome || '').trim()} onClick=${p.onDesign}>${t('secretary.wf.design')}</button>
+          </div>`}
+    </section>`;
+}

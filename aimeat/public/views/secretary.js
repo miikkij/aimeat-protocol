@@ -63,7 +63,8 @@ import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel } from '/views/secretary/dashboard.js';
+import { fetchWorkflowOffers, designWorkflow, saveDesignedWorkflow, slugifyWorkflowId } from '/views/secretary/workflow-design.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
@@ -110,6 +111,7 @@ export default function SecretaryView() {
   const [stand, setStand] = useState(null);              // B1: read-only "where things stand" summary { loading } | { text }
   const [nextAns, setNextAns] = useState(null);          // "What's next?" — the Secretary's forward answer { loading } | { text }
   const [pasteDrafts, setPasteDrafts] = useState({});    // prompt-driven path: pasted-back result text, keyed by action id
+  const [wfDesign, setWfDesign] = useState(null);        // "Design a workflow" flow: null | { outcome, designing, draft, trigger, error, saving, saved, errors }
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -530,6 +532,36 @@ ${SECRETARY_AIMEAT_PRIMER}`;
   }, [active, owner, learn.goals, learn.decisions, next, loadSpaceSnapshot, showToast]);
 
   // Carry out one proposed "What's next" action (band-spirit: gather/record/surface). Marks it done.
+  // ── Phase 3: "Design a workflow" — the Secretary composes a chain of agent+offer steps toward an
+  // outcome, proposes how to arm it, and saves it. ──
+  const openWfDesign = useCallback(() => setWfDesign((s) => s || { outcome: '' }), []);
+  const discardWfDesign = useCallback(() => setWfDesign(null), []);
+  const redoWfDesign = useCallback(() => setWfDesign((s) => ({ outcome: (s && s.outcome) || '' })), []);
+  const setWfOutcome = useCallback((v) => setWfDesign((s) => ({ ...(s || {}), outcome: v })), []);
+  const setWfTrigKind = useCallback((kind) => setWfDesign((s) => ({ ...s, trigger: kind === 'schedule' ? { kind: 'schedule', cron: (s.trigger && s.trigger.cron) || '0 9 * * *' } : kind === 'event' ? { kind: 'event', on: 'memory.write', match: {} } : { kind: 'manual' } })), []);
+  const setWfCron = useCallback((cron) => setWfDesign((s) => ({ ...s, trigger: { kind: 'schedule', cron } })), []);
+  const runWfDesign = useCallback(async () => {
+    const outcome = ((wfDesign && wfDesign.outcome) || '').trim();
+    if (!outcome) return;
+    setWfDesign((s) => ({ ...s, designing: true, error: null, draft: null }));
+    try {
+      const offers = await fetchWorkflowOffers();
+      const r = await designWorkflow({ outcome, offers, locale: getLocale() });
+      if (!r.ok) { setWfDesign((s) => ({ ...s, designing: false, error: r.error, title: r.title })); return; }
+      setWfDesign((s) => ({ ...s, designing: false, draft: r.def, trigger: r.def.trigger, errors: null }));
+    } catch (e) { setWfDesign((s) => ({ ...s, designing: false, error: 'fail' })); showToast(e.message, true); }
+  }, [wfDesign, showToast]);
+  const saveWfDesign = useCallback(async () => {
+    const d = wfDesign && wfDesign.draft;
+    if (!d) return;
+    setWfDesign((s) => ({ ...s, saving: true, errors: null }));
+    const id = slugifyWorkflowId(d.title || (wfDesign && wfDesign.outcome) || 'workflow');
+    const r = await saveDesignedWorkflow(id, { ...d, trigger: (wfDesign && wfDesign.trigger) || d.trigger });
+    if (!r.ok) { setWfDesign((s) => ({ ...s, saving: false, errors: r.errors })); return; }
+    setWfDesign((s) => ({ ...s, saving: false, saved: id }));
+    window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+  }, [wfDesign]);
+
   const doProposedAction = useCallback(async (action) => {
     if (!active) return;
     const patch = (st, extra) => setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: st, ...extra } : a)) } : s);
@@ -727,10 +759,12 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
                 { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
                 { key: 'review', label: t('secretary.dash.quickReview'), title: t('secretary.learn.reviewNow'), hidden: !decisionsDue, onClick: () => focusInto('.sec-decisions-log', null) },
+                { key: 'design-wf', label: t('secretary.wf.quick'), title: t('secretary.wf.title'), onClick: openWfDesign },
                 ...dynamicQuickItems,
                 { key: 'manage-qa', label: '✎', title: t('secretary.qa.title'), onClick: qa.toggleManage },
               ] })}
               ${quickActionsManager(qa)}
+              ${workflowDesignPanel({ state: wfDesign, onOutcome: setWfOutcome, onDesign: runWfDesign, onTrigKind: setWfTrigKind, onCron: setWfCron, onSave: saveWfDesign, onRedo: redoWfDesign, onDiscard: discardWfDesign })}
 
               ${/* Today — full-width status band, always on top */ ''}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
