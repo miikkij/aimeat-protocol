@@ -4,6 +4,69 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+The Secretary view is redesigned around the owner's daily loop — a dashboard-first page with a forward-driver
+("What's next"), recurring **Routines** the Secretary runs and supervises, dynamic quick actions, delegation to
+other agents *or* multi-specialist workflows, and a band-driven autonomous tick that advances routines and
+derives one-click follow-up **action-items**. An independent audit then closed ten gaps (recurrence, i18n of
+tick output, a real reconcile scan, execution consistency, cross-runtime parity, and more).
+
+### Added
+
+- **Secretary dashboard-first information architecture.** The old flat ~15-card stack is re-laid around the
+  daily loop: a **quick-action row** (core verbs — "Where do things stand?" read-only orientation, Plan/Find/Note
+  focus, Review-decisions when due — plus dynamic actions), a **"Today" status strip** (reliability · budget ·
+  next scheduled run · last-scan + stale flag + a Scan action), the feed + decision-log surfaced, free-form chat,
+  and a collapsed **"Manage & setup"** disclosure that tucks the set-up-once config (brain, bands, crew,
+  knowledge, access, history, permissions) out of the default view.
+- **Routines + "What's next" (the forward-driver).** The Phase-3 guided plan is generalised into a Routine: a
+  named, **recurring**, multi-step workflow stored per-context (`secretary.config.contexts[i].routines[]`).
+  "What's next" proposes a new routine from a goal (or advances an active one); each step carries a capability
+  from the policy taxonomy + a band, and the owner approves **step-by-step, band-gated** (act → run · draft|ask →
+  approve · off → skip). Steps execute the automatable part — `discover` scouts, file capabilities file a note —
+  and results persist; the dashboard renders active routines (status · last result · next step). Recurring
+  routines carry a **cadence** (none/daily/weekly); the tick re-arms a completed routine once its cadence elapses.
+- **Dynamic quick actions.** Per-context `quickActions[]`: 2–3 **brain-seeded** shortcuts (active at hire) plus
+  **secretary-proposed** ones the owner pins via a ✎ manager (rename/reorder/remove). A `prompt` action sends a
+  canned chat message; a `compose` action focuses an input. Security: the Secretary may only ever seed/propose
+  `prompt`/`compose`, never a `run` verb.
+- **Delegation in routines — agent task or Agent Workflow.** A `delegate` step hands work to one of the owner's
+  other agents as an **agent task** (`POST /v1/agents/:name/tasks`, `parent_task_id` = routine, for lineage), or
+  (new) runs an **Agent Workflow chaining specialists** (`POST /v1/workflows/:id/run`). Either way the step
+  records the run/task ref and a "Check result" pulls the outcome back into the routine; a delegated step keeps
+  the routine active/waiting until its work reaches a terminal state.
+- **Supervise = analyse → action-items, with a band-driven autonomous tick.** The `secretary` tick stops emitting
+  only a free-text briefing: it now **advances active routines** by band (act-band performable steps run
+  autonomously; draft/ask/delegate/discover and completed delegations surface as follow-ups), **re-arms due
+  recurring routines**, and **derives action-items** written to `secretary.config.contexts[i].actionItems[]`. The
+  dashboard renders open action-items with a one-click handle (open the routine / check a delegated result) or
+  dismiss.
+- **Day-grouped activity feed.** "What I've done" groups entries by day (Today / Yesterday / date) with per-day
+  counts, instead of a flat chronological list.
+
+### Changed
+
+- **Dashboard freshness is a real reconcile, not a re-fetch.** The "Today" Scan action now runs `discover` (the
+  Secretary's read-only sensory organ) and stamps a real `lastScanAt` on the active context, so the **stale flag
+  clears after a scan** (it previously only re-fetched and never cleared).
+- **`briefing`/`reminders` execute consistently everywhere.** These capabilities are now treated as **feed
+  entries** (nudges, not filed documents) across the interactive routine path, the routine tick, and the legacy
+  action loop — all driven by the single `actionKind` map (`note` for `file_intake`/`curate_knowledge`, `feed`
+  for `briefing`/`reminders`).
+- **Tick-derived action-items are localised.** The server-side tick stores a structured `{ labelKind, summary }`
+  instead of an English string; the frontend renders the label via `t()` (en + fi), so a Finnish owner sees
+  Finnish action-items.
+- **Cross-runtime rule parity, proven by a test.** The band-gating (`routeRoutineStep`) and the quick-action
+  security gate (`sanitizeProposedQuickActions`) live in a pure, dependency-free `secretary-rules.js` imported by
+  the browser; a parity test imports **both** that module and the server's TS helpers and asserts identical
+  output across an edge-case vector table, so the two copies can't drift silently.
+
+### Security
+
+- **Server-side quick-action scrub (defense-in-depth).** When the tick writes `secretary.config`, it filters each
+  context's `quickActions[]` through `isAllowedQuickAction`, dropping any disallowed (e.g. smuggled `run`) action
+  — `secretary.config` is the owner's private blob with no generic write-validation, and a dynamic action's
+  `run` verb has no execution path, so this is belt-and-suspenders, not a fix for an exploitable hole.
+
 ## [1.34.0] - 2026-06-25
 
 The Secretary grows from a personal assistant into a full agent-orchestration layer: the autonomous tick
