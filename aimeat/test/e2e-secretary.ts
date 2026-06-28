@@ -1214,6 +1214,22 @@ await test('65. routeRoutineStep + sanitizeProposedQuickActions: frontend mirror
     assert(kept.length === 2 && !kept.some((a) => a.kind === 'run'), `G8 scrub keeps only prompt/compose: ${JSON.stringify(kept.map((a) => a.label))}`);
 });
 
+console.log('\nG7 -- Workflow-chaining delegation');
+
+await test('66. Delegate-via-workflow: records the run ref + rejects an unknown workflow', async () => {
+    // The failure path the delegate guards: running a non-existent workflow → 4xx (handled, not a crash).
+    const bad = await json('/v1/workflows/no-such-wf/run', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ mode: 'signals-only' }) });
+    assert(bad.status === 400 || bad.status === 404, `expected 4xx for unknown workflow, got ${bad.status}: ${JSON.stringify(bad.body)}`);
+    // Tracking: a routine delegate step records the workflow run ref (workflowId + runId), like the agent-task ref.
+    const ts = new Date().toISOString();
+    const routine = { id: 'r-wf', title: 'WF deleg', purpose: 'x', steps: [{ id: 's1', capability: 'delegate', summary: 'Run the pipeline', band: 'ask', status: 'delegated', result: { summary: 'Started workflow news', workflowId: 'news', runId: 'run-123', ts } }], cadence: null, status: 'active', lastRunAt: ts, nextRunAt: null, results: [{ ts, summary: 'Started workflow news' }], createdBy: 'owner', createdAt: ts };
+    const cfg = { activeContextId: 'wc1', contexts: [{ id: 'wc1', name: 'WF', brain: { purpose: 'x', rules: [] }, organismId: selfOrgId, organismName: 'WF', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [], routines: [routine] }] };
+    await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    const r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const st = r.body.data.value.contexts[0].routines[0].steps[0];
+    assert(st.status === 'delegated' && st.result.workflowId === 'news' && st.result.runId === 'run-123', `wf ref: ${JSON.stringify(st.result)}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

@@ -137,7 +137,8 @@ export function routinesCard(p) {
                   ? html`<div class="sec-hint">${t('secretary.next.next')}: ${escHtml(next.summary)}</div>`
                   : html`<div class="sec-hint">${t('secretary.next.allDone')}</div>`}
               </div>
-              ${next ? html`<button class="btn-outline btn-sm" onClick=${() => p.advance(r)}>${t('secretary.next.advance')}</button>` : null}
+              ${/* Always offer to open the routine — even with no pending step, so a delegated/waiting routine can be reopened to Check result. */ ''}
+              <button class="btn-outline btn-sm" onClick=${() => p.advance(r)}>${t('secretary.next.advance')}</button>
             </li>`;
         })}
       </ul>
