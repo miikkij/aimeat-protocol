@@ -66,7 +66,12 @@ export function useAutonomy({ showToast }) {
       const outcome = r && r.data && r.data.outcome;
       // 'busy'/'limited'/'error' come back with a reason; 'ran' means a feed entry was produced.
       if (outcome && outcome !== 'ran' && outcome !== 'created') {
-        showToast(`${t('secretary.auto.skipped')}: ${(r.data && r.data.reason) || outcome}`);
+        const reason = String((r.data && r.data.reason) || outcome);
+        const human = /stop-spending/i.test(reason) ? t('secretary.auto.skipStopSpending')
+          : /budget/i.test(reason) ? t('secretary.auto.skipBudget')
+          : /no secretary context/i.test(reason) ? t('secretary.auto.skipNoContext')
+          : reason;
+        showToast(`${t('secretary.auto.skipped')}: ${human}`);
       } else {
         showToast(t('secretary.auto.ran'));
       }

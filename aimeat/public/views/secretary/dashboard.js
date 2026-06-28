@@ -90,7 +90,7 @@ export function standPanel(p) {
         ${!s.loading ? html`<button class="btn-ghost btn-sm" onClick=${p.onDismiss}>${t('secretary.dash.dismiss')}</button>` : null}
       </div>
       ${s.loading
-        ? html`<div class="sec-hint">${thinking}</div>`
+        ? html`<div class="sec-hint">${thinking}<span class="sec-spin"></span></div>`
         : s.needModel
         ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
         : html`
@@ -111,7 +111,7 @@ export function whatsNextPanel(p) {
         ${!n.loading ? html`<button class="btn-ghost btn-sm" onClick=${p.onDismiss}>${t('secretary.dash.dismiss')}</button>` : null}
       </div>
       ${n.loading
-        ? html`<div class="sec-hint">${t('secretary.next.thinking')}</div>`
+        ? html`<div class="sec-hint">${t('secretary.next.thinking')}<span class="sec-spin"></span></div>`
         : n.needModel
         ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
         : (n.actions && n.actions.length
@@ -144,10 +144,10 @@ export function whatsNextPanel(p) {
                   ${a.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.done')}</span>`
                     : a.status === 'skipped' ? html`<span class="sec-hint">${t('secretary.next.skipped')}</span>`
                     : a.status === 'discarded' ? html`<span class="sec-hint">${t('secretary.next.discarded')}</span>`
-                    : a.status === 'asked' ? html`<span class="sec-hint">⏳ ${t('secretary.next.asked')} · <a href="/v1/profile?tab=inbox" target="_blank" rel="noopener">${t('secretary.next.openInbox')}</a></span>`
+                    : a.status === 'asked' ? html`<span class="sec-hint">⏳ ${t('secretary.next.asked')} · <a href="/v1/profile?tab=messages" target="_blank" rel="noopener">${t('secretary.next.openInbox')}</a></span>`
                     : a.status === 'prompt' ? null
                     : html`<div class="sec-next-action-btns">
-                        <button class="btn-primary btn-sm" disabled=${a.status === 'doing'} onClick=${() => p.onDo(a)}>${a.status === 'doing' ? t('secretary.next.running') : t('secretary.next.doIt')}</button>
+                        <button class="btn-primary btn-sm" disabled=${a.status === 'doing'} onClick=${() => p.onDo(a)}>${a.status === 'doing' ? html`${t('secretary.next.running')}<span class="sec-spin"></span>` : t('secretary.next.doIt')}</button>
                         <button class="btn-ghost btn-sm" onClick=${() => p.onSkip(a)}>${t('secretary.next.skipIt')}</button>
                       </div>`}
                 </li>`)}
@@ -382,7 +382,7 @@ export function workflowDesignPanel(p) {
             <button class="btn-ghost btn-sm" onClick=${p.onRedo}>${t('secretary.wf.redo')}</button>
           </div>`
         : s.designing
-        ? html`<div class="sec-hint">${t('secretary.wf.designing')}</div>`
+        ? html`<div class="sec-hint">${t('secretary.wf.designing')}<span class="sec-spin"></span></div>`
         : s.error === 'needModel'
         ? html`<div class="sec-hint sec-warn">${t('secretary.next.needBigModel')}</div>`
         : s.error === 'noSteps'

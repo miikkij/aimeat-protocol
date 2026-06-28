@@ -54,7 +54,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, evaluateTriggers, settleFiredTrigger, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction, type TriggerLike } from './secretary-tick.js';
+import { classifySecretaryActions, actionKind, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, evaluateTriggers, settleFiredTrigger, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction, type TriggerLike } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -661,10 +661,8 @@ export class Scheduler {
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0 || askedClarify.length > 0 || hasSpecialistWork;
-    if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
-      return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
-    }
+    // The daily check-in always produces a briefing + proposed next actions (its whole purpose) — it never
+    // skips for "nothing to do". Cost is bounded by the earlier stop-spending + daily-budget guards.
 
     const ownerName = owner.split('@')[0];
     const writes: string[] = [];
