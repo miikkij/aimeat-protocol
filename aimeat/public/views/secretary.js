@@ -540,11 +540,13 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     const spaceUrl = (wsId) => (active.organismId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(active.organismId)}${wsId ? `&ws=${encodeURIComponent(wsId)}` : ''}` : null);
     const fileNote = async (ws, title, body) => {
       const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${ws.id}.notes.${id}`, value: { id, title: String(title).slice(0, 80), body, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
+      const key = `organism.${active.organismId}.w.${ws.id}.notes.${id}`;
+      await apiPost('/v1/memory', { key, value: { id, title: String(title).slice(0, 80), body, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
+      return key;
     };
     try {
       const cap = action.capability;
-      let resultMsg = ''; let href = null; let preview = '';
+      let resultMsg = ''; let href = null; let preview = ''; let noteKey = null;
       if (cap === 'discover') {
         // Scout AND KEEP the results: file the top hits as a list the owner can open.
         const d = await apiGet('/v1/discover?scope=public&per_page=10&q=' + encodeURIComponent(action.summary)).catch(() => null);
@@ -553,7 +555,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         if (active.organismId && ws && entries.length) {
           const list = entries.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
           preview = `Found ${entries.length}:\n\n${list}`;
-          await fileNote(ws, `Scouted: ${action.summary}`, preview);
+          noteKey = await fileNote(ws, `Scouted: ${action.summary}`, preview);
           resultMsg = t('secretary.next.didScoutedSaved', { n: entries.length, ws: ws.name }); href = spaceUrl(ws.id);
         } else {
           resultMsg = t('secretary.next.didDiscover', { n: entries.length });
@@ -564,10 +566,12 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         resultMsg = t('secretary.next.didSurface');
       } else {
         // file_intake / curate_knowledge / create_resource → actually PRODUCE the deliverable (AI) and
-        // file the real content, not just the action title. Then link to where it landed.
+        // file the real content, not just the action title. GROUND it in the real workspace content and
+        // forbid fabrication — otherwise a "draft a story/pitch" task invents users, metrics and quotes.
         const ws = pickWs();
-        const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Produce the deliverable the owner asked for, ready to use — concrete and genuinely useful, NOT a description of it. Markdown is fine. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output only the content, no preamble.`;
-        const prompt = action.why ? `${action.summary}\n\n(${action.why})` : action.summary;
+        const space = await loadSpaceSnapshot();
+        const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Produce the deliverable the owner asked for as a usable DRAFT, grounded ONLY in the facts in the workspace context below. STRICT — do NOT invent or embellish: no made-up numbers, metrics, statistics, quotes, testimonials, names, dates, events, deals, or outcomes. If a needed detail is not in the context, insert a [bracketed placeholder] for the owner to fill — never fabricate one. If the context has too little to go on, produce a short skeleton/outline with placeholders and a note on what's missing, rather than a fictional narrative. Markdown is fine. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output only the content, no preamble.`;
+        const prompt = `Task: ${action.summary}${action.why ? `\n(${action.why})` : ''}\n\nWorkspace context — the ONLY facts you may use:\n${space || '(no workspace content available — produce only a skeleton with placeholders)'}`;
         let content = action.summary;
         try {
           const gen = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, systemPrompt: sys, app_id: 'secretary-next-do' }), timeoutMs: 1_800_000, retries: 0 });
@@ -575,20 +579,20 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         } catch { /* fall back to filing the title if generation fails */ }
         preview = content;
         if (active.organismId && ws) {
-          await fileNote(ws, action.summary, content);
+          noteKey = await fileNote(ws, action.summary, content);
           resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = spaceUrl(ws.id);
           await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`, href);
         } else {
           resultMsg = t('secretary.next.didNoted');
         }
       }
-      patch('done', { result: resultMsg, href, preview, expanded: true });
+      patch('done', { result: resultMsg, href, preview, expanded: true, noteKey });
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
     } catch (e) {
       patch('open');
       showToast(`${t('secretary.next.error')}: ${e.message}`, true);
     }
-  }, [active, owner, intake.wsList, showToast]);
+  }, [active, owner, intake.wsList, loadSpaceSnapshot, showToast]);
 
   const skipProposedAction = useCallback((action) => {
     setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'skipped' } : a)) } : s);
@@ -597,6 +601,13 @@ ${SECRETARY_AIMEAT_PRIMER}`;
   // Show/hide the produced deliverable inline under a done action (no navigation needed).
   const togglePreview = useCallback((action) => {
     setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, expanded: !a.expanded } : a)) } : s);
+  }, []);
+
+  // Discard a produced deliverable that's no good (e.g. an off-base draft): delete the filed note and
+  // clear the result from the list.
+  const discardProposedAction = useCallback(async (action) => {
+    if (action.noteKey) await apiDelete(`/v1/memory/${encodeURIComponent(action.noteKey)}`).catch(() => {});
+    setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'discarded', preview: '', result: '', href: null, noteKey: null, expanded: false } : a)) } : s);
   }, []);
 
   const switchContext = useCallback(async (id) => {
@@ -675,7 +686,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Customizable two-column dashboard (pin to column / reorder / hide per card; persisted). */ ''}
               ${(() => {
                 const nodes = {
-                  whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
+                  whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDiscard: discardProposedAction, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
                   stand: standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) }),
                   actionItems: actionItemsCard(next),
                   routines: routinesCard(next),

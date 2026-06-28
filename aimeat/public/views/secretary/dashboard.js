@@ -119,10 +119,12 @@ export function whatsNextPanel(p) {
                     ${a.result ? html`<div class="sec-hint">→ ${a.result}${a.href ? html` · <a href=${a.href} target="_blank" rel="noopener">${t('secretary.next.openResult')} ↗</a>` : null}</div>` : null}
                     ${a.preview ? html`
                       <button class="sec-linkbtn sec-next-toggle" onClick=${() => p.onTogglePreview && p.onTogglePreview(a)}>${a.expanded ? t('secretary.next.hideResult') : t('secretary.next.showResult')}</button>
+                      ${a.noteKey ? html` · <button class="sec-linkbtn sec-next-discard" onClick=${() => p.onDiscard && p.onDiscard(a)}>${t('secretary.next.discard')}</button>` : null}
                       ${a.expanded ? html`<div class="sec-next-preview"><${Markdown} text=${a.preview} /></div>` : null}` : null}
                   </div>
                   ${a.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.done')}</span>`
                     : a.status === 'skipped' ? html`<span class="sec-hint">${t('secretary.next.skipped')}</span>`
+                    : a.status === 'discarded' ? html`<span class="sec-hint">${t('secretary.next.discarded')}</span>`
                     : html`<div class="sec-next-action-btns">
                         <button class="btn-primary btn-sm" disabled=${a.status === 'doing'} onClick=${() => p.onDo(a)}>${a.status === 'doing' ? t('secretary.next.running') : t('secretary.next.doIt')}</button>
                         <button class="btn-ghost btn-sm" onClick=${() => p.onSkip(a)}>${t('secretary.next.skipIt')}</button>
