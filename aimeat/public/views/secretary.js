@@ -71,6 +71,7 @@ import { useFreshness } from '/views/secretary/use-freshness.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
 import { useTriggers } from '/views/secretary/use-triggers.js';
+import { useLayout, LayoutCard } from '/views/secretary/use-layout.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
 import { useKnowledge } from '/views/secretary/use-knowledge.js';
@@ -211,6 +212,7 @@ export default function SecretaryView() {
   const auto = useAutonomy({ showToast });
   // Decision B — real calendar (month/week/day) of feed (past) + tick & routine cadence (future).
   const cal = useCalendar();
+  const lay = useLayout();   // customizable dashboard layout (pin to column / reorder / hide; persisted)
   // Phase 5 — learning loop: goals + decision-log contracts + review trigger (own hook).
   const learn = useLearning({ active, auto, showToast });
   // P2 reach: create-don't-just-find (A), knowledge custodian (B), access gatekeeper (C), crew setup (D).
@@ -667,29 +669,44 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ] })}
               ${quickActionsManager(qa)}
 
-              ${/* Today / dashboard — where are we + is this current */ ''}
-              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } })}
-              ${standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) })}
+              ${/* Today — full-width status band, always on top */ ''}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
-              ${actionItemsCard(next)}
-              ${routinesCard(next)}
-              ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
-              ${automationCard({ ...auto, budgetInfo })}
-              ${triggersCard({ ...trig, goals: learn.goals, routines: next.routines })}
-              ${calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed })}
-              ${feedCard(auto)}
-              ${goalsCard(learn)}
-              ${decisionLogCard(learn)}
 
-              ${/* Chat (free-form, per context) */ ''}
-              ${chatCard({ activeName: active.name, chat, chatSending, chatInput, setChatInput, sendChat, routeSuggestion, switchContext,
-                onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 })}
-
-              ${/* Working area — the inputs the quick verbs focus */ ''}
-              ${whatsNextCard({ ...next, agents: crew.agents })}
-              ${findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults })}
-              ${(findResults && findResults.length === 0) || create.draft || create.created ? createResourceCard({ ...create, query: findQ }) : null}
-              ${wsList.length > 0 ? noteCard(intake) : null}
+              ${/* Customizable two-column dashboard (pin to column / reorder / hide per card; persisted). */ ''}
+              ${(() => {
+                const nodes = {
+                  whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
+                  stand: standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) }),
+                  actionItems: actionItemsCard(next),
+                  routines: routinesCard(next),
+                  decisions: intake.pendingIds.length > 0 ? decisionsCard(intake) : null,
+                  automation: automationCard({ ...auto, budgetInfo }),
+                  triggers: triggersCard({ ...trig, goals: learn.goals, routines: next.routines }),
+                  calendar: calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed }),
+                  feed: feedCard(auto),
+                  goals: goalsCard(learn),
+                  decisionLog: decisionLogCard(learn),
+                  chat: chatCard({ activeName: active.name, chat, chatSending, chatInput, setChatInput, sendChat, routeSuggestion, switchContext,
+                    onAttach: intake.handleAttach, attaching: intake.attaching, attachResult: intake.attachResult, canAttach: intake.wsList.length > 0 }),
+                  whatsNextCard: whatsNextCard({ ...next, agents: crew.agents }),
+                  find: findCard({ findQ, setFindQ, findScope, setFindScope, finding, doFind, findResults }),
+                  createResource: ((findResults && findResults.length === 0) || create.draft || create.created) ? createResourceCard({ ...create, query: findQ }) : null,
+                  note: wsList.length > 0 ? noteCard(intake) : null,
+                };
+                const present = lay.layout.filter((e) => nodes[e.key] != null && !e.hidden);
+                const mainCol = present.filter((e) => e.col === 'main');
+                const rightCol = present.filter((e) => e.col === 'right');
+                const renderCol = (list) => list.map((e, i) => LayoutCard({ entry: e, node: nodes[e.key], prevKey: i > 0 ? list[i - 1].key : null, nextKey: i < list.length - 1 ? list[i + 1].key : null, onSwap: lay.swap, onMoveCol: lay.moveCol, onHide: lay.hide }));
+                return html`
+                  <div class="sec-grid">
+                    <div class="sec-col sec-col-main">${renderCol(mainCol)}</div>
+                    <aside class="sec-col sec-col-right">${renderCol(rightCol)}</aside>
+                  </div>
+                  <div class="sec-layout-bar">
+                    ${lay.hidden.map((e) => html`<button class="sec-chip" key=${e.key} onClick=${() => lay.unhide(e.key)}>+ ${t('secretary.layout.section.' + e.key)}</button>`)}
+                    <button class="sec-linkbtn" onClick=${lay.reset}>${t('secretary.layout.reset')}</button>
+                  </div>`;
+              })()}
 
               ${/* Manage & setup — collapsed disclosure (set up once) */ ''}
               ${manageHeader({ open: manageOpen, onToggle: () => setManageOpen((v) => !v),

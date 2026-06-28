@@ -556,6 +556,33 @@
     "identity": "Identiteetti",
     "scopes": "Oikeudet",
     "managePermissions": "Hallinnoi Agents-näkymässä",
+    "layout": {
+      "arrange": "Järjestä",
+      "toRight": "Siirrä oikeaan sarakkeeseen",
+      "toLeft": "Siirrä vasempaan sarakkeeseen",
+      "up": "Siirrä ylös",
+      "down": "Siirrä alas",
+      "hide": "Piilota",
+      "reset": "Palauta oletusasettelu",
+      "section": {
+        "whatsNext": "Mitä seuraavaksi",
+        "stand": "Missä mennään",
+        "actionItems": "Toimenpiteet",
+        "routines": "Rutiinit",
+        "decisions": "Vahvistettavat päätökset",
+        "automation": "Automaattinen check-in",
+        "triggers": "Triggerit",
+        "calendar": "Kalenteri",
+        "feed": "Mitä olen tehnyt",
+        "goals": "Tavoitteet",
+        "decisionLog": "Päätösloki",
+        "chat": "Keskustelu",
+        "whatsNextCard": "Ehdotukset",
+        "find": "Haku",
+        "createResource": "Luo",
+        "note": "Muistiinpano"
+      }
+    },
     "cal": {
       "title": "Kalenteri",
       "month": "Kuukausi",
