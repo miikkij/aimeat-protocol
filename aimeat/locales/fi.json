@@ -891,6 +891,8 @@
       "didDrafted": "Luonnosteltu ja tallennettu: {ws}",
       "didScoutedSaved": "Scoutattu {n} → tallennettu: {ws}",
       "openResult": "Avaa",
+      "showResult": "Näytä tulos",
+      "hideResult": "Piilota tulos",
       "followups": "{n} käsiteltävää jatkotoimea yllä",
       "continueTitle": "Jatka",
       "startNewTitle": "Aloita jotain uutta",

@@ -117,6 +117,9 @@ export function whatsNextPanel(p) {
                     <div class="sec-next-action-sum">${a.summary}</div>
                     ${a.why ? html`<div class="sec-hint">${a.why}</div>` : null}
                     ${a.result ? html`<div class="sec-hint">→ ${a.result}${a.href ? html` · <a href=${a.href} target="_blank" rel="noopener">${t('secretary.next.openResult')} ↗</a>` : null}</div>` : null}
+                    ${a.preview ? html`
+                      <button class="sec-linkbtn sec-next-toggle" onClick=${() => p.onTogglePreview && p.onTogglePreview(a)}>${a.expanded ? t('secretary.next.hideResult') : t('secretary.next.showResult')}</button>
+                      ${a.expanded ? html`<div class="sec-next-preview"><${Markdown} text=${a.preview} /></div>` : null}` : null}
                   </div>
                   ${a.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.done')}</span>`
                     : a.status === 'skipped' ? html`<span class="sec-hint">${t('secretary.next.skipped')}</span>`
