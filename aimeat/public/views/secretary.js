@@ -496,41 +496,71 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     if (!active) return;
     const patch = (st, extra) => setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: st, ...extra } : a)) } : s);
     patch('doing');
+    // Append a visible line to the Home feed ("What I've done") so every Do-it leaves a trail.
+    const feedLog = async (text) => {
+      const fr = await apiGet('/v1/memory/secretary.feed').catch(() => null);
+      const items = (fr && fr.data && fr.data.value && Array.isArray(fr.data.value.items)) ? fr.data.value.items : [];
+      const entry = { id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text };
+      await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...items].slice(0, 50) }, visibility: 'private' });
+    };
+    // Best-matching workspace for the action (by word overlap with its summary).
+    const pickWs = () => {
+      const wsl = intake.wsList || [];
+      const words = new Set(String(action.summary).toLowerCase().split(/[^a-z0-9äöå]+/i).filter((w) => w.length >= 4));
+      let ws = wsl[0]; let best = -1;
+      for (const w of wsl) { let sc = 0; const hay = String(w.name).toLowerCase(); for (const wd of words) if (hay.includes(wd)) sc++; if (sc > best) { best = sc; ws = w; } }
+      return ws;
+    };
+    const orgHref = active.organismId ? `/v1/organisms/${encodeURIComponent(active.organismId)}` : null;
+    const fileNote = async (ws, title, body) => {
+      const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${ws.id}.notes.${id}`, value: { id, title: String(title).slice(0, 80), body, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
+    };
     try {
       const cap = action.capability;
-      let resultMsg = '';
+      let resultMsg = ''; let href = null;
       if (cap === 'discover') {
+        // Scout AND KEEP the results: file the top hits as a list the owner can open.
         const d = await apiGet('/v1/discover?scope=public&per_page=10&q=' + encodeURIComponent(action.summary)).catch(() => null);
-        const n = (d && d.data && Array.isArray(d.data.entries)) ? d.data.entries.length : 0;
-        resultMsg = t('secretary.next.didDiscover', { n });
+        const entries = (d && d.data && Array.isArray(d.data.entries)) ? d.data.entries : [];
+        const ws = pickWs();
+        if (active.organismId && ws && entries.length) {
+          const list = entries.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
+          await fileNote(ws, `Scouted: ${action.summary}`, `Found ${entries.length}:\n\n${list}`);
+          resultMsg = t('secretary.next.didScoutedSaved', { n: entries.length, ws: ws.name }); href = orgHref;
+        } else {
+          resultMsg = t('secretary.next.didDiscover', { n: entries.length });
+        }
+        await feedLog(`🔎 ${action.summary} — ${t('secretary.next.didDiscover', { n: entries.length })}`);
       } else if (cap === 'briefing' || cap === 'reminders') {
-        const fr = await apiGet('/v1/memory/secretary.feed').catch(() => null);
-        const items = (fr && fr.data && fr.data.value && Array.isArray(fr.data.value.items)) ? fr.data.value.items : [];
-        const entry = { id: 'f-' + Date.now().toString(36), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text: action.summary };
-        await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...items].slice(0, 50) }, visibility: 'private' });
+        await feedLog(`⚑ ${action.summary}`);
         resultMsg = t('secretary.next.didSurface');
       } else {
-        // file_intake / curate_knowledge / create_resource / delegate → record it as a note in the best-matching workspace.
-        const wsl = intake.wsList || [];
-        const words = new Set(String(action.summary).toLowerCase().split(/[^a-z0-9äöå]+/i).filter((w) => w.length >= 4));
-        let ws = wsl[0];
-        let best = -1;
-        for (const w of wsl) { let sc = 0; const hay = String(w.name).toLowerCase(); for (const wd of words) if (hay.includes(wd)) sc++; if (sc > best) { best = sc; ws = w; } }
+        // file_intake / curate_knowledge / create_resource → actually PRODUCE the deliverable (AI) and
+        // file the real content, not just the action title. Then link to where it landed.
+        const ws = pickWs();
+        const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Produce the deliverable the owner asked for, ready to use — concrete and genuinely useful, NOT a description of it. Markdown is fine. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output only the content, no preamble.`;
+        const prompt = action.why ? `${action.summary}\n\n(${action.why})` : action.summary;
+        let content = action.summary;
+        try {
+          const gen = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, systemPrompt: sys, app_id: 'secretary-next-do' }), timeoutMs: 1_800_000, retries: 0 });
+          content = ((gen && gen.data && gen.data.content) || '').trim() || action.summary;
+        } catch { /* fall back to filing the title if generation fails */ }
         if (active.organismId && ws) {
-          const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-          await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${ws.id}.notes.${id}`, value: { id, title: action.summary.slice(0, 80), body: action.why ? `${action.summary}\n\n${action.why}` : action.summary, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
-          resultMsg = t('secretary.next.didFiled', { ws: ws.name });
+          await fileNote(ws, action.summary, content);
+          resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = orgHref;
+          await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`);
         } else {
           resultMsg = t('secretary.next.didNoted');
         }
       }
-      patch('done', { result: resultMsg });
+      patch('done', { result: resultMsg, href });
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
     } catch (e) {
       patch('open');
       showToast(`${t('secretary.next.error')}: ${e.message}`, true);
     }
-  }, [active, intake.wsList, showToast]);
+  }, [active, owner, intake.wsList, showToast]);
 
   const skipProposedAction = useCallback((action) => {
     setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'skipped' } : a)) } : s);
