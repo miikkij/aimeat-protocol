@@ -133,6 +133,18 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   aren't one uniform record type (trigger = memory · routine = config sub-object · tick = schedule ·
   feed = an item in `secretary.feed`), so the dialog dispatches by source type.
 
+### Fixed
+
+- **Secretary-created workspaces now come out usable, not empty shells.** When the Secretary set up an
+  organism after the interview it created the workspaces by NAME only — no manifest — so each one opened
+  to the bare "Set up workspace / Generate a custom workspace with AI" prompt. `applyResult` now
+  designs and applies a real manifest (AI-designed object types) for every workspace it creates (and
+  every one a reshape adds), reusing the proven organism workspace generator: generate → `parseGenerated`
+  → backfill the envelope the model sometimes omits (manifestVersion/id/name/kind/status) → validate →
+  `applyGeneratedWorkspace`. Manifests are generated in parallel across a context's workspaces; a
+  generation that still fails validation leaves that one manifest-less (set up manually) rather than
+  blocking the rest. Verified in-browser: a previously-empty workspace gained a valid object-type schema.
+
 ### Changed
 
 - **Dashboard freshness is a real reconcile, not a re-fetch.** The "Today" Scan action now runs `discover` (the
