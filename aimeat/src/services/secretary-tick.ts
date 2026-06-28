@@ -271,6 +271,18 @@ export function sanitizeProposedQuickActions(raw: unknown, source: string, statu
 }
 
 /**
+ * G8: true iff a STORED quick action is allowed (a well-formed prompt|compose, never a run verb).
+ * Derived from sanitizeProposedQuickActions so the rule has a single definition; the tick uses it to
+ * SCRUB secretary.config server-side on write (defense-in-depth — secretary.config is the owner's blob
+ * with no generic write validation). MIRROR: public/js/services/secretary-rules.js::isAllowedQuickAction.
+ */
+export function isAllowedQuickAction(a: unknown): boolean {
+  const src = (a && typeof a === 'object' && 'source' in a) ? String((a as { source?: unknown }).source ?? '') : '';
+  // status doesn't affect validity (only the kind/label/target/prompt do) — pass a fixed valid status.
+  return sanitizeProposedQuickActions([a], src, 'active').length === 1;
+}
+
+/**
  * The cheap "anything to do?" pre-check (P1-B). Returns true iff the active context has any open goals,
  * any decisions due for review, or any pending intake — i.e. work that justifies the paid tick. When
  * false the tick skips the paid completion entirely.

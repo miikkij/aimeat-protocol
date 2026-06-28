@@ -52,7 +52,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem } from './secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -89,6 +89,7 @@ interface SecretaryContext {
   // RoutineLike/ActionItem in services/secretary-tick.ts and the frontend hooks for the full shape.
   routines?: RoutineLike[];
   actionItems?: ActionItem[];
+  quickActions?: QuickAction[];
 }
 interface SecretaryConfig {
   contexts?: SecretaryContext[];
@@ -864,11 +865,13 @@ export class Scheduler {
     const ledger = morsels > 0 ? bumpLedger(cfg.autonomousLedger, contextId, today, morsels) : cfg.autonomousLedger;
     const pending = Object.keys(newPending).length ? { ...(cfg.pendingDecisions ?? {}), ...newPending } : cfg.pendingDecisions;
     const now = new Date().toISOString();
-    // B5/G2: apply routine re-arms (full replace by id) + step completions + merge action-items.
+    // B5/G2: apply routine re-arms + step completions + merge action-items; G8: scrub quick actions.
     let contexts = cfg.contexts;
-    if ((stepCompletions.length || newActionItems.length || rearmedRoutines.length) && Array.isArray(cfg.contexts)) {
+    if (Array.isArray(cfg.contexts)) {
       contexts = cfg.contexts.map((c) => {
         if (c.id !== contextId) return c;
+        // G8 defense-in-depth: drop any disallowed (e.g. smuggled 'run') quick action server-side.
+        const quickActions = Array.isArray(c.quickActions) ? c.quickActions.filter(isAllowedQuickAction) : c.quickActions;
         let routines: RoutineLike[] | undefined = c.routines;
         // G2: replace re-armed routines first (steps reset to pending) so a same-tick file-step
         // completion below lands on the freshly-armed step.
@@ -899,7 +902,7 @@ export class Scheduler {
           const fresh = newActionItems.filter((a) => !seenOpen.has(actionItemKey(a)));
           actionItems = [...fresh, ...existing].slice(0, 50);
         }
-        return { ...c, routines, actionItems };
+        return { ...c, routines, actionItems, quickActions };
       });
     }
     const next = { ...cfg, contexts, autonomousLedger: ledger, pendingDecisions: pending };

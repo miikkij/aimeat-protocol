@@ -61,3 +61,10 @@ export function sanitizeProposedQuickActions(raw, source, status = 'proposed') {
   }
   return out.slice(0, 6);
 }
+
+/** True iff a stored quick action is allowed (a well-formed prompt|compose, never a run verb). Derived
+ *  from sanitizeProposedQuickActions so the rule has a single definition. Used to scrub config server-side. */
+export function isAllowedQuickAction(a) {
+  // status doesn't affect validity (only kind/label/target/prompt do) — pass a fixed valid status.
+  return sanitizeProposedQuickActions([a], (a && a.source) || '', 'active').length === 1;
+}
