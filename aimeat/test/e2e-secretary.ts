@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, isAllowedQuickAction, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, isAllowedQuickAction, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine, triggerNextFireMs, rearmTriggerAt, conditionMet, evaluateTriggers, settleFiredTrigger } from '../src/services/secretary-tick.js';
 // G6: the FRONTEND copy of the shared rules (pure, dependency-free) — imported directly so the parity
 // test below proves it agrees with the TS server helpers above. (test/ is excluded from tsc; tsx runs it.)
 import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as feSanitizeQuickActions, isAllowedQuickAction as feIsAllowedQuickAction } from '../public/js/services/secretary-rules.js';
@@ -1228,6 +1228,61 @@ await test('66. Delegate-via-workflow: records the run ref + rejects an unknown 
     const r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
     const st = r.body.data.value.contexts[0].routines[0].steps[0];
     assert(st.status === 'delegated' && st.result.workflowId === 'news' && st.result.runId === 'run-123', `wf ref: ${JSON.stringify(st.result)}`);
+});
+
+console.log('\nTriggers (slice 1 — pure evaluation)');
+await test('67. evaluateTriggers: time/recurring fire when due; armed-only; paused skipped', async () => {
+    const now = Date.parse('2026-06-28T10:00:00Z');
+    const past = '2026-06-27T10:00:00Z';
+    const future = '2026-06-29T10:00:00Z';
+    const triggers = [
+        { id: 't1', kind: 'time', status: 'armed', when: past },                         // due → fires
+        { id: 't2', kind: 'time', status: 'armed', when: future },                        // not yet
+        { id: 't3', kind: 'recurring', status: 'armed', cadence: 'daily', nextFireAt: past }, // due → fires
+        { id: 't4', kind: 'time', status: 'paused', when: past },                         // paused → never
+    ];
+    const fired = evaluateTriggers(triggers, {}, now);
+    assert(fired.length === 2 && fired.some(f => f.id === 't1') && fired.some(f => f.id === 't3'), `fired: ${JSON.stringify(fired.map(f => f.id))}`);
+    // recurring re-arms (stays armed, new future nextFireAt); one-off settles to 'fired'.
+    const reArmed = settleFiredTrigger(triggers[2], now);
+    assert(reArmed.status === 'armed' && Date.parse(reArmed.nextFireAt!) > now, `recurring re-arm: ${JSON.stringify(reArmed)}`);
+    const settled = settleFiredTrigger(triggers[0], now);
+    assert(settled.status === 'fired', `one-off settle: ${settled.status}`);
+    assert(triggerNextFireMs({ when: future }) === Date.parse(future) && triggerNextFireMs({}) === null, 'nextFireMs');
+    assert(typeof rearmTriggerAt({ cadence: 'weekly' }, now) === 'string' && rearmTriggerAt({ cadence: 'none' }, now) === null, 'rearm cadence');
+});
+
+await test('68. completion trigger fires only when its target is done', async () => {
+    const now = Date.now();
+    const tr = { id: 'tc', kind: 'completion', status: 'armed', target: { type: 'goal', id: 'g-9' } };
+    assert(evaluateTriggers([tr], { completed: {} }, now).length === 0, 'not done → no fire');
+    assert(evaluateTriggers([tr], { completed: { 'g-9': true } }, now).length === 1, 'done → fires');
+});
+
+await test('69. condition trigger: memory_count >=, no_activity, memory_exists', async () => {
+    const now = Date.parse('2026-06-28T00:00:00Z');
+    const cnt = { id: 'c1', kind: 'condition', status: 'armed', condition: { type: 'memory_count', prefix: 'organism.x.w.in.', op: '>=', value: 3 } };
+    assert(!conditionMet(cnt, { memoryCounts: { 'organism.x.w.in.': 2 } }, now), 'count 2 < 3 → no');
+    assert(conditionMet(cnt, { memoryCounts: { 'organism.x.w.in.': 3 } }, now), 'count 3 >= 3 → yes');
+    const quiet = { id: 'c2', kind: 'condition', status: 'armed', condition: { type: 'no_activity', prefix: 'organism.x.w.in.', days: 7 } };
+    assert(!conditionMet(quiet, { lastActivityMs: { 'organism.x.w.in.': now - 3 * 86400000 } }, now), '3d ago → not quiet');
+    assert(conditionMet(quiet, { lastActivityMs: { 'organism.x.w.in.': now - 10 * 86400000 } }, now), '10d ago → quiet');
+    assert(!conditionMet(quiet, {}, now), 'no items → not "went quiet"');
+    const exists = { id: 'c3', kind: 'condition', status: 'armed', condition: { type: 'memory_exists', prefix: 'flag.' } };
+    assert(conditionMet(exists, { memoryCounts: { 'flag.': 1 } }, now) && !conditionMet(exists, { memoryCounts: {} }, now), 'exists');
+    // evaluateTriggers routes a met condition as reason 'condition'.
+    assert(evaluateTriggers([cnt], { memoryCounts: { 'organism.x.w.in.': 5 } }, now)[0]?.reason === 'condition', 'reason condition');
+});
+
+await test('70. Trigger round-trips on secretary.trigger.* (recurring shape preserved); unauth write rejected', async () => {
+    const tr = { id: 'tr-rt1', kind: 'recurring', label: 'Weekly supplies check', cadence: 'weekly', nextFireAt: '2026-07-01T08:00:00Z', status: 'armed', action: { kind: 'remind', summary: 'Check supplies' }, contextId: 'c1', createdBy: 'owner' };
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.trigger.tr-rt1', value: tr, visibility: 'private', tags: ['secretary', 'trigger', 'armed'] }) });
+    assert(w.status === 200 || w.status === 201, `write: ${w.status}`);
+    const r = await json('/v1/memory/secretary.trigger.tr-rt1', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const got = r.body.data.value;
+    assert(got.kind === 'recurring' && got.cadence === 'weekly' && got.status === 'armed' && got.action.kind === 'remind', `shape: ${JSON.stringify(got)}`);
+    const un = await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'secretary.trigger.x', value: {}, visibility: 'private' }) });
+    assert(un.status === 401 || un.status === 403, `unauth: ${un.status}`);
 });
 
 console.log('\nCleanup');

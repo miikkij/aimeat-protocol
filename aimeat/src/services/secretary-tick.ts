@@ -420,3 +420,97 @@ export function routeTickNote(
   if (r.confidence === 'high') return { action: 'file-routed', targetContextId: r.contextId };
   return { action: 'ask' };
 }
+
+// ── Triggers ── proactive follow-ups the Secretary binds to what it tracks. A trigger is declarative
+// metadata (`secretary.trigger.{id}`); the autonomous tick is the ENGINE that evaluates them each run and
+// fires the bound action band-gated. Four kinds: time (a date), recurring (cadence), completion (a goal/
+// routine reaching done), condition (a memory/workspace state — e.g. a prefix gets ≥N items, or no
+// activity for D days). Pure helpers here (no storage/AI) so the firing decision is unit-testable; the
+// tick computes the signals + performs/persists. Frontend mirror is intentionally avoided — the tick owns firing.
+
+/** Cadence → interval in ms (recurring triggers). */
+const TRIGGER_CADENCE_MS: Record<string, number> = { daily: 86400000, weekly: 604800000, monthly: 2592000000 };
+
+export interface TriggerLike {
+  id?: string;
+  kind?: string;               // 'time' | 'recurring' | 'completion' | 'condition'
+  label?: string;
+  contextId?: string;
+  status?: string;             // 'armed' | 'fired' | 'done' | 'paused'
+  when?: string | null;        // ISO date (time)
+  cadence?: string | null;     // 'daily' | 'weekly' | 'monthly' (recurring)
+  nextFireAt?: string | null;  // computed next fire (time/recurring)
+  target?: { type?: string; id?: string } | null;                                   // completion: item to watch
+  condition?: { type?: string; prefix?: string; op?: string; value?: number; days?: number } | null; // condition
+  action?: { kind?: string; summary?: string; band?: string } | null;              // what to do when it fires
+  lastFiredAt?: string | null;
+  createdBy?: string;
+}
+
+/** Signals the condition/completion evaluators need (the tick computes these from storage). */
+export interface TriggerSignals {
+  memoryCounts?: Record<string, number>;   // watched prefix → number of items
+  lastActivityMs?: Record<string, number>; // watched prefix → newest item's time (ms), absent if none
+  completed?: Record<string, boolean>;     // target id → is it done
+}
+
+/** The effective next-fire time (ms) for a time/recurring trigger, or null if not time-based. */
+export function triggerNextFireMs(tr: TriggerLike): number | null {
+  const src = tr.nextFireAt || tr.when;
+  if (!src) return null;
+  const t = Date.parse(src);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Re-arm a recurring trigger: its next fire = now + cadence. Null for non-recurring. */
+export function rearmTriggerAt(tr: TriggerLike, nowMs: number): string | null {
+  const ms = TRIGGER_CADENCE_MS[String(tr.cadence)];
+  return ms ? new Date(nowMs + ms).toISOString() : null;
+}
+
+/** Is a condition trigger's condition currently met? Pure, from the supplied signals. */
+export function conditionMet(tr: TriggerLike, sig: TriggerSignals, nowMs: number): boolean {
+  const c = tr.condition;
+  if (!c || !c.prefix) return false;
+  const counts = sig.memoryCounts || {};
+  if (c.type === 'memory_count' || c.type === 'workspace_count') {
+    const n = counts[c.prefix] ?? 0;
+    const v = Number(c.value) || 0;
+    return c.op === '>' ? n > v : n >= v; // default '>='
+  }
+  if (c.type === 'memory_exists') return (counts[c.prefix] ?? 0) > 0;
+  if (c.type === 'no_activity') {
+    const last = (sig.lastActivityMs || {})[c.prefix];
+    if (last == null) return false; // nothing there → not "went quiet"
+    return (nowMs - last) >= (Number(c.days) || 7) * 86400000;
+  }
+  return false;
+}
+
+/** Pure: which ARMED triggers fire now? The tick then performs each action + re-arms/settles the trigger. */
+export function evaluateTriggers(
+  triggers: TriggerLike[], sig: TriggerSignals, nowMs: number,
+): Array<{ id: string; trigger: TriggerLike; reason: 'time' | 'completion' | 'condition' }> {
+  const fired: Array<{ id: string; trigger: TriggerLike; reason: 'time' | 'completion' | 'condition' }> = [];
+  for (const tr of (triggers || [])) {
+    if (!tr.id || tr.status !== 'armed') continue;
+    if (tr.kind === 'time' || tr.kind === 'recurring') {
+      const next = triggerNextFireMs(tr);
+      if (next != null && next <= nowMs) fired.push({ id: tr.id, trigger: tr, reason: 'time' });
+    } else if (tr.kind === 'completion') {
+      const tid = tr.target?.id;
+      if (tid && (sig.completed || {})[tid]) fired.push({ id: tr.id, trigger: tr, reason: 'completion' });
+    } else if (tr.kind === 'condition') {
+      if (conditionMet(tr, sig, nowMs)) fired.push({ id: tr.id, trigger: tr, reason: 'condition' });
+    }
+  }
+  return fired;
+}
+
+/** After firing: a recurring trigger re-arms (stays armed, new nextFireAt); others settle to 'fired'. */
+export function settleFiredTrigger(tr: TriggerLike, nowMs: number): TriggerLike {
+  if (tr.kind === 'recurring') {
+    return { ...tr, status: 'armed', lastFiredAt: new Date(nowMs).toISOString(), nextFireAt: rearmTriggerAt(tr, nowMs) };
+  }
+  return { ...tr, status: 'fired', lastFiredAt: new Date(nowMs).toISOString() };
+}

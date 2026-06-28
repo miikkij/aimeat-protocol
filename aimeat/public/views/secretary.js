@@ -54,7 +54,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
@@ -63,13 +63,14 @@ import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
 import { useIntake } from '/views/secretary/use-intake.js';
 import { useWhatsNext } from '/views/secretary/use-whats-next.js';
 import { useQuickActions } from '/views/secretary/use-quick-actions.js';
 import { useFreshness } from '/views/secretary/use-freshness.js';
 import { useAutonomy } from '/views/secretary/use-autonomy.js';
 import { useCalendar, calendarCard } from '/views/secretary/calendar.js';
+import { useTriggers } from '/views/secretary/use-triggers.js';
 import { useLearning } from '/views/secretary/use-learning.js';
 import { useCreateResource } from '/views/secretary/use-create-resource.js';
 import { useKnowledge } from '/views/secretary/use-knowledge.js';
@@ -181,7 +182,9 @@ export default function SecretaryView() {
   }, [activeId]);
 
   // Intake (note composer + Ask cards + P2-E cross-context auto-routing) lives in its own hook.
-  const intake = useIntake({ active, contexts, config, persistConfig, owner, showToast });
+  // Triggers (Slice 3/4) — declared before intake so a filed note can ask the Secretary to auto-propose a trigger.
+  const trig = useTriggers({ active, showToast });
+  const intake = useIntake({ active, contexts, config, persistConfig, owner, showToast, onNoteFiled: trig.proposeTriggerFromText });
   const { wsList, suggestedWsId } = intake;
 
   // B2 — Routines + "What's next" (generalises the guided plan): propose/advance band-gated routines.
@@ -445,7 +448,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
       const space = await loadSpaceSnapshot();
-      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now, grounded in what's ACTUALLY in the workspaces below. Do NOT say the space is empty if any workspace has content. Do NOT propose to take actions or claim to have done anything. 3–6 sentences of plain prose, in the user's language.`;
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now, grounded in what's ACTUALLY in the workspaces below. Do NOT say the space is empty if any workspace has content. Do NOT propose to take actions or claim to have done anything. 3–6 sentences of plain prose in ${getLocale() === 'fi' ? 'Finnish' : 'English'}.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
       setStand({ text: ((r && r.data && r.data.content) || '…').trim() });
@@ -455,9 +458,10 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     }
   }, [active, owner, learn.goals, learn.decisions, auto.feed, loadSpaceSnapshot, showToast]);
 
-  // "What's next?" — the Secretary TELLS the owner what to do next (it ANSWERS; it does NOT open an
-  // input box). Concrete, prioritized next actions grounded in real workspace content + goals/decisions
-  // + active routines + open follow-ups. Forward-looking, not a status readout.
+  // "What's next?" — the Secretary proposes CONCRETE next actions it can DO (each with Do it / Skip),
+  // grounded in the real workspace content + goals/decisions/routines/follow-ups. Not prose to read —
+  // an actionable list. Doing one runs it (gather/file/surface); skipping drops it.
+  const NEXT_CAPS = ['discover', 'file_intake', 'curate_knowledge', 'briefing', 'reminders', 'create_resource', 'delegate'];
   const runWhatsNext = useCallback(async () => {
     if (!active) return;
     setNextAns({ loading: true });
@@ -467,15 +471,70 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const routines = (next.activeRoutines || []).map((r) => { const s = next.nextPendingStep(r); return `- ${r.title}${s ? ` (next: ${s.summary})` : ''}`; }).join('\n');
       const followups = (next.actionItems || []).map((a) => '- ' + (a.summary || a.text || '')).join('\n');
       const space = await loadSpaceSnapshot();
-      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Answer "what should I do next?" — a SHORT, prioritized list of the concrete next actions you'd recommend, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Be specific and forward-looking (what to tackle now and why); if something in a workspace needs attention, point to it. Reply in the user's language as 3–6 short bullet points. Do NOT claim to have done anything yourself.`;
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Propose the concrete NEXT ACTIONS to take now, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Each action is something the owner can approve with one click. Return ONLY a JSON object EXACTLY like {"actions":[{"summary":"a short imperative action (in the user's language)","capability":"discover","why":"one short line why, in the user's language"}]}. Propose 2–5 actions. "capability" MUST be one of: ${NEXT_CAPS.join(', ')} — prefer "discover" to gather info on something, "file_intake"/"curate_knowledge" to record a plan/note, "reminders"/"briefing" to flag something. Do NOT invent capabilities. Write every "summary" and "why" in ${getLocale() === 'fi' ? 'Finnish' : 'English'}. Output ONLY the JSON object.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${dueDecs || '(none)'}\nActive routines:\n${routines || '(none)'}\nOpen follow-ups:\n${followups || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-next' }), timeoutMs: 1_800_000, retries: 0 });
-      setNextAns({ text: ((r && r.data && r.data.content) || '…').trim() });
+      let parsed = null;
+      try { parsed = extractJson((r && r.data && r.data.content) || ''); } catch { /* fall through */ }
+      const raw = (parsed && Array.isArray(parsed.actions)) ? parsed.actions : [];
+      const actions = raw.slice(0, 6).map((a) => ({
+        id: 'na-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        summary: String((a && a.summary) || '').trim(),
+        capability: NEXT_CAPS.includes(a && a.capability) ? a.capability : 'file_intake',
+        why: String((a && a.why) || '').trim(),
+        status: 'open',
+      })).filter((a) => a.summary);
+      setNextAns({ actions });
     } catch (e) {
       setNextAns(null);
       showToast(`${t('secretary.next.error')}: ${e.message}`, true);
     }
   }, [active, owner, learn.goals, learn.decisions, next, loadSpaceSnapshot, showToast]);
+
+  // Carry out one proposed "What's next" action (band-spirit: gather/record/surface). Marks it done.
+  const doProposedAction = useCallback(async (action) => {
+    if (!active) return;
+    const patch = (st, extra) => setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: st, ...extra } : a)) } : s);
+    patch('doing');
+    try {
+      const cap = action.capability;
+      let resultMsg = '';
+      if (cap === 'discover') {
+        const d = await apiGet('/v1/discover?scope=public&per_page=10&q=' + encodeURIComponent(action.summary)).catch(() => null);
+        const n = (d && d.data && Array.isArray(d.data.entries)) ? d.data.entries.length : 0;
+        resultMsg = t('secretary.next.didDiscover', { n });
+      } else if (cap === 'briefing' || cap === 'reminders') {
+        const fr = await apiGet('/v1/memory/secretary.feed').catch(() => null);
+        const items = (fr && fr.data && fr.data.value && Array.isArray(fr.data.value.items)) ? fr.data.value.items : [];
+        const entry = { id: 'f-' + Date.now().toString(36), ts: new Date().toISOString(), kind: 'act', contextId: active.id, contextName: active.name || '', text: action.summary };
+        await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...items].slice(0, 50) }, visibility: 'private' });
+        resultMsg = t('secretary.next.didSurface');
+      } else {
+        // file_intake / curate_knowledge / create_resource / delegate → record it as a note in the best-matching workspace.
+        const wsl = intake.wsList || [];
+        const words = new Set(String(action.summary).toLowerCase().split(/[^a-z0-9äöå]+/i).filter((w) => w.length >= 4));
+        let ws = wsl[0];
+        let best = -1;
+        for (const w of wsl) { let sc = 0; const hay = String(w.name).toLowerCase(); for (const wd of words) if (hay.includes(wd)) sc++; if (sc > best) { best = sc; ws = w; } }
+        if (active.organismId && ws) {
+          const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+          await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${ws.id}.notes.${id}`, value: { id, title: action.summary.slice(0, 80), body: action.why ? `${action.summary}\n\n${action.why}` : action.summary, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
+          resultMsg = t('secretary.next.didFiled', { ws: ws.name });
+        } else {
+          resultMsg = t('secretary.next.didNoted');
+        }
+      }
+      patch('done', { result: resultMsg });
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+    } catch (e) {
+      patch('open');
+      showToast(`${t('secretary.next.error')}: ${e.message}`, true);
+    }
+  }, [active, intake.wsList, showToast]);
+
+  const skipProposedAction = useCallback((action) => {
+    setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'skipped' } : a)) } : s);
+  }, []);
 
   const switchContext = useCallback(async (id) => {
     const ctx = contexts.find((c) => c.id === id);
@@ -548,14 +607,15 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${quickActionsManager(qa)}
 
               ${/* Today / dashboard — where are we + is this current */ ''}
-              ${standPanel({ stand: nextAns, title: t('secretary.next.title'), thinking: t('secretary.next.thinking'), onDismiss: () => setNextAns(null) })}
+              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onDismiss: () => setNextAns(null) })}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}
               ${routinesCard(next)}
               ${intake.pendingIds.length > 0 ? decisionsCard(intake) : null}
               ${automationCard({ ...auto, budgetInfo })}
-              ${calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines })}
+              ${triggersCard({ ...trig, goals: learn.goals, routines: next.routines })}
+              ${calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed })}
               ${feedCard(auto)}
               ${goalsCard(learn)}
               ${decisionLogCard(learn)}

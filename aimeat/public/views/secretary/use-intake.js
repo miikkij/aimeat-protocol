@@ -44,7 +44,7 @@ function suggestWorkspace(text, wsList) {
   return best.id;
 }
 
-export function useIntake({ active, contexts, config, persistConfig, owner, showToast }) {
+export function useIntake({ active, contexts, config, persistConfig, owner, showToast, onNoteFiled }) {
   const [noteText, setNoteText] = useState('');
   const [noteWsId, setNoteWsId] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
@@ -149,12 +149,14 @@ export function useIntake({ active, contexts, config, persistConfig, owner, show
       await fileNoteInto(activeOrgId, effectiveWsId, ws ? ws.name : '', body);
       showToast(`${t('secretary.noteSaved')} ${ws ? ws.name : ''}`.trim());
       setNoteText(''); setNoteWsId('');
+      // Slice 4: let the Secretary propose a trigger if this note implies a recurrence/deadline (best-effort).
+      if (onNoteFiled) onNoteFiled(body);
     } catch (e) {
       showToast(`${t('secretary.noteError')}: ${e.message}`, true);
     } finally {
       setNoteSaving(false);
     }
-  }, [noteText, activeOrgId, effectiveWsId, wsList, fileNoteInto, showToast]);
+  }, [noteText, activeOrgId, effectiveWsId, wsList, fileNoteInto, showToast, onNoteFiled]);
 
   /** P3-A: attach a document or image to the active context. Uploads the file to storage, runs a
    *  vision summary for images (owner's key, best-effort), classifies the target workspace from the
