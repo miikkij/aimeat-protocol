@@ -117,6 +117,8 @@ export async function ensureSpecialist(
     defaultScopes,
     tags: [SPECIALIST_ROLE_TAG, UNLISTED_TAG, `role:${role}`],
   });
+  // Publish the specialist's workflow-compatible offer so it can be a workflow step (idempotent).
+  await ensureSpecialistOffer(storage, config, record, role).catch((e) => logger.info('[specialist] offer ensure failed', { gaii, err: (e as Error).message }));
   if (created) {
     logger.info('[specialist] provisioned', { gaii, role, scopes: defaultScopes });
     return { record, created, role };
@@ -133,6 +135,50 @@ export async function ensureSpecialist(
     }
   }
   return { record, created, role };
+}
+
+/** The deterministic memory key a specialist writes its deliverable to (its offer's location). */
+export function specialistOutKey(name: string): string {
+  return `specialist.${name}.out`;
+}
+
+/**
+ * Build + publish the specialist's workflow-compatible offer (id `do`) so it can be a workflow step.
+ * Written server-side (the PUT /offers route needs an agent token); idempotent — replaces the `do`
+ * offer, preserving any others. Declares success_signal + required_to_function + deliverable.location,
+ * which is exactly what makes an agent "workflow-compatible" (services/workflow/store.ts).
+ */
+export async function ensureSpecialistOffer(
+  storage: Storage, config: AimeatConfig, specialist: AgentRecord, role: string,
+): Promise<void> {
+  const gaii = specialist.gaii;
+  const name = specialist.name;
+  const key = `agents.${name}.offers`;
+  const outKey = specialistOutKey(name);
+  const doOffer = {
+    id: 'do',
+    title: `${specialist.displayName || titleCase(name)} — ${titleCase(role)} work`,
+    ask: `${specialist.description || `${titleCase(role)} specialist work`} — produced grounded in the provided facts, never fabricated. Output lands at ${outKey}.`,
+    cost: 'cheap',
+    latency: 'minutes',
+    verification: 'gated',
+    dataHandling: 'llm-provider',
+    deliverable: { format: 'document', location: { key: outKey, visibility: 'owner' }, sample: 'untested' },
+    success_signal: { kind: 'deterministic', key: outKey, op: 'nonempty' },
+    required_to_function: 'none',
+    visibility: 'unlisted',
+  };
+  const existing = await storage.getMemory(gaii, key);
+  const prev = existing?.value as { version?: number; offers?: Array<{ id: string }> } | undefined;
+  const others = (prev?.offers ?? []).filter((o) => o && o.id !== 'do');
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key, ownerGaii: gaii,
+    value: { version: (prev?.version ?? 0) + 1, updatedAt: now, offers: [doOffer, ...others] },
+    visibility: 'owner', tags: ['offers'], ttlHours: null,
+    version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+  });
+  logger.info('[specialist] offer ensured', { gaii, offer: 'do', outKey });
 }
 
 /** Read a specialist's stored policy (merged onto current defaults). */

@@ -1315,6 +1315,21 @@ await test('72. Specialist run endpoint: provision + queue + run contract; 404 u
     assert(un.status === 401 || un.status === 403, `unauth: ${un.status}`);
 });
 
+await test('73. Specialist publishes a workflow-compatible offer; a workflow referencing it validates', async () => {
+    const mk = await json('/v1/specialists', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'wfspec', role: 'specialist', brain: { purpose: 'Do specialized work.' } }) });
+    assert(mk.status === 200 || mk.status === 201, `provision: ${mk.status}`);
+    const off = await json('/v1/agents/wfspec/offers', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const offers = (off.body.data && (off.body.data.offers || (off.body.data.value && off.body.data.value.offers))) || [];
+    const doOffer = offers.find((o: { id?: string }) => o.id === 'do') as { success_signal?: unknown; required_to_function?: unknown; deliverable?: { location?: { key?: string } } } | undefined;
+    assert(!!(doOffer && doOffer.success_signal && doOffer.required_to_function && doOffer.deliverable?.location?.key), `offer: ${JSON.stringify(offers).slice(0, 220)}`);
+    const wf = await json('/v1/workflows/test-wfspec', { method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({
+      title: 'Test WF', description: 'test', trigger: { kind: 'manual' }, vars: [],
+      steps: [{ id: 's1', agent: 'wfspec', offer: 'do', description: 'do it' }], on_step_fail: 'inspect',
+    }) });
+    assert(wf.status === 200, `workflow PUT (compat): ${wf.status} ${JSON.stringify(wf.body).slice(0, 260)}`);
+    await json('/v1/workflows/test-wfspec?withRuns=true', { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
