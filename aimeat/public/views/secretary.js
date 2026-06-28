@@ -105,6 +105,7 @@ export default function SecretaryView() {
   const [finding, setFinding] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);   // B1: collapsed "Manage & setup" disclosure
   const [stand, setStand] = useState(null);              // B1: read-only "where things stand" summary { loading } | { text }
+  const [nextAns, setNextAns] = useState(null);          // "What's next?" — the Secretary's forward answer { loading } | { text }
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -416,8 +417,26 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       : () => focusInto(a.target === 'find' ? '.sec-find' : a.target === 'note' ? '.sec-note' : '.sec-next', a.target === 'find' ? '.sec-find-in' : 'textarea'),
   })), [qa.activeActions, focusInto, sendChat]);
 
-  // "Where do things stand?" — a read-only orientation summary (NOT the acting tick): no actions, just
-  // a status readout grounded in the active context's brain + open goals/decisions + recent activity.
+  // Read what's ACTUALLY in the active context's workspaces (recent items per workspace) so the
+  // Secretary's answers reflect real content — not just goals/decisions/feed. One memory-list call.
+  const loadSpaceSnapshot = useCallback(async () => {
+    if (!active || !active.organismId) return '';
+    const r = await apiGet(`/v1/memory?prefix=${encodeURIComponent('organism.' + active.organismId + '.w.')}&_=${Date.now()}`).catch(() => null);
+    const items = (r && r.data && r.data.items) || [];
+    const byWs = {};
+    for (const it of items) {
+      const m = String(it.key || '').match(/\.w\.([^.]+)\.([^.]+)\./);
+      if (!m || m[2] === 'meta') continue; // skip per-workspace readme/meta records
+      const v = it.value || {};
+      const title = String(v.title || v.name || (v.body ? String(v.body).slice(0, 60) : '') || '').replace(/\s+/g, ' ').trim();
+      if (!title) continue;
+      (byWs[m[1]] = byWs[m[1]] || []).push(title);
+    }
+    return (wsList || []).map((w) => `- ${w.name}: ${(byWs[w.id] || []).slice(0, 6).join('; ') || '(empty)'}`).join('\n');
+  }, [active, wsList]);
+
+  // "Where do things stand?" — read-only orientation grounded in the brain + open goals/decisions +
+  // recent activity AND the real workspace content. No actions taken.
   const runStand = useCallback(async () => {
     if (!active) return;
     setStand({ loading: true });
@@ -425,17 +444,38 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const openGoals = (learn.goals || []).filter((g) => g.status !== 'done').map((g) => '- ' + g.title).join('\n');
       const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
-      const wsNames = (active.workspaces || []).map((w) => w.name).join(', ');
-      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now and what the user might want to look at next. This is a status readout only — do NOT propose to take actions yourself and do NOT claim to have done anything. 3–6 sentences of plain prose, in the user's language.`;
-      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspaces: ${wsNames || '(none)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
+      const space = await loadSpaceSnapshot();
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, read-only orientation of where things stand right now, grounded in what's ACTUALLY in the workspaces below. Do NOT say the space is empty if any workspace has content. Do NOT propose to take actions or claim to have done anything. 3–6 sentences of plain prose, in the user's language.`;
+      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
-      const text = (r && r.data && r.data.content) ? r.data.content.trim() : '';
-      setStand({ text: text || '…' });
+      setStand({ text: ((r && r.data && r.data.content) || '…').trim() });
     } catch (e) {
       setStand(null);
       showToast(`${t('secretary.dash.standError')}: ${e.message}`, true);
     }
-  }, [active, owner, learn.goals, learn.decisions, auto.feed, showToast]);
+  }, [active, owner, learn.goals, learn.decisions, auto.feed, loadSpaceSnapshot, showToast]);
+
+  // "What's next?" — the Secretary TELLS the owner what to do next (it ANSWERS; it does NOT open an
+  // input box). Concrete, prioritized next actions grounded in real workspace content + goals/decisions
+  // + active routines + open follow-ups. Forward-looking, not a status readout.
+  const runWhatsNext = useCallback(async () => {
+    if (!active) return;
+    setNextAns({ loading: true });
+    try {
+      const openGoals = (learn.goals || []).filter((g) => g.status !== 'done').map((g) => '- ' + g.title).join('\n');
+      const dueDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
+      const routines = (next.activeRoutines || []).map((r) => { const s = next.nextPendingStep(r); return `- ${r.title}${s ? ` (next: ${s.summary})` : ''}`; }).join('\n');
+      const followups = (next.actionItems || []).map((a) => '- ' + (a.summary || a.text || '')).join('\n');
+      const space = await loadSpaceSnapshot();
+      const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Answer "what should I do next?" — a SHORT, prioritized list of the concrete next actions you'd recommend, grounded in the real workspace content + goals/decisions/routines/follow-ups below. Be specific and forward-looking (what to tackle now and why); if something in a workspace needs attention, point to it. Reply in the user's language as 3–6 short bullet points. Do NOT claim to have done anything yourself.`;
+      const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${dueDecs || '(none)'}\nActive routines:\n${routines || '(none)'}\nOpen follow-ups:\n${followups || '(none)'}`;
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-next' }), timeoutMs: 1_800_000, retries: 0 });
+      setNextAns({ text: ((r && r.data && r.data.content) || '…').trim() });
+    } catch (e) {
+      setNextAns(null);
+      showToast(`${t('secretary.next.error')}: ${e.message}`, true);
+    }
+  }, [active, owner, learn.goals, learn.decisions, next, loadSpaceSnapshot, showToast]);
 
   const switchContext = useCallback(async (id) => {
     const ctx = contexts.find((c) => c.id === id);
@@ -497,7 +537,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
             ${hired && !showHire && active ? html`
               ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
               ${quickActionRow({ items: [
-                { key: 'next', label: t('secretary.next.title'), primary: true, title: t('secretary.next.hint'), onClick: () => focusInto('.sec-next', 'textarea') },
+                { key: 'next', label: t('secretary.next.title'), primary: true, disabled: !!(nextAns && nextAns.loading), title: t('secretary.next.hint'), onClick: runWhatsNext },
                 { key: 'stand', label: t('secretary.dash.quickStand'), disabled: !!(stand && stand.loading), onClick: runStand },
                 { key: 'find', label: t('secretary.dash.quickFind'), title: t('secretary.findTitle'), onClick: () => focusInto('.sec-find', '.sec-find-in') },
                 { key: 'note', label: t('secretary.dash.quickNote'), title: t('secretary.noteTitle'), hidden: wsList.length === 0, onClick: () => focusInto('.sec-note', 'textarea') },
@@ -508,6 +548,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${quickActionsManager(qa)}
 
               ${/* Today / dashboard — where are we + is this current */ ''}
+              ${standPanel({ stand: nextAns, title: t('secretary.next.title'), thinking: t('secretary.next.thinking'), onDismiss: () => setNextAns(null) })}
               ${standPanel({ stand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}

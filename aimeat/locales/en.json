@@ -844,6 +844,8 @@
     "next": {
       "title": "What's next",
       "explain": "I can advance what's already underway, or start something new. A routine = a repeatable set of steps I run and track for you.",
+      "thinking": "Working out what's next…",
+      "cardTitle": "Set up a routine",
       "followups": "{n} follow-up(s) to handle above",
       "continueTitle": "Continue",
       "startNewTitle": "Start something new",

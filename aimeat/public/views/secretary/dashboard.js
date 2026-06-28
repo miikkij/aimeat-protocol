@@ -80,14 +80,16 @@ export function dashStatus(p) {
 export function standPanel(p) {
   const s = p.stand;
   if (!s || (!s.loading && !s.text)) return null;
+  const title = p.title || t('secretary.dash.standTitle');
+  const thinking = p.thinking || t('secretary.dash.standThinking');
   return html`
     <section class="sec-card sec-stand">
       <div class="sec-card-head">
-        <h2 class="sec-h2">${t('secretary.dash.standTitle')}</h2>
+        <h2 class="sec-h2">${title}</h2>
         ${!s.loading ? html`<button class="btn-ghost btn-sm" onClick=${p.onDismiss}>${t('secretary.dash.dismiss')}</button>` : null}
       </div>
       ${s.loading
-        ? html`<div class="sec-hint">${t('secretary.dash.standThinking')}</div>`
+        ? html`<div class="sec-hint">${thinking}</div>`
         : html`<div class="sec-stand-body">${(s.text)}</div>`}
     </section>`;
 }
