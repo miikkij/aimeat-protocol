@@ -65,12 +65,17 @@ export const CONTRACT = `\`\`\`json
   "organism": {
     "name": "a short name for this space",
     "description": "one line describing it",
-    "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why" } ]
+    "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why", "manifest": "OPTIONAL — see note below", "schemas": "OPTIONAL — see note below" } ]
   },
   "goals": [ { "title": "a concrete goal I'm working toward in this context", "why": "why it matters" } ],
   "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ]
 }
-\`\`\``;
+\`\`\`
+
+Each workspace MAY include a ready-to-use schema so it is useful immediately (recommended when you can design it well):
+- "manifest": { "manifestVersion": "1.0", "name": "<the workspace name>", "kind": "<short-slug>", "status": "active", "objectTypes": [ { "name": "<type>", "namespace": "<ns>", "fields": [ { "name": "<field>", "type": "text|number|date|select|boolean|reference" } ] } ] }
+- "schemas": a JSON-Schema object per objectType, keyed by its namespace.
+If you are NOT confident you can produce a VALID manifest + schemas, OMIT both fields for that workspace — they will be designed automatically afterward. Never output an invalid or half-finished manifest.`;
 
 /** When EVOLVING an existing context (re-run "reshape current"), the current setup fed back so the AI
  *  modifies it instead of starting over — and keeps the existing workspaces stable. Empty for a new context. */

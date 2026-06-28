@@ -246,21 +246,27 @@ export default function SecretaryView() {
   // Give a freshly-created workspace a PROPER manifest (AI-designed object types) so it's immediately
   // usable, not an empty "set up workspace" shell. Reuses the proven organism workspace generator.
   // Best-effort: a manifest-less workspace still exists and can be set up manually.
-  const genAndApplyManifest = useCallback(async (orgId, wsId, name, purpose) => {
+  const backfillEnvelope = (mf, wsId, name) => {
+    if (!mf) return;
+    mf.manifestVersion = mf.manifestVersion || '1.0';
+    mf.id = mf.id || wsId;
+    mf.name = mf.name || name;
+    mf.kind = mf.kind || 'project';
+    mf.status = ['active', 'paused', 'done', 'archived'].includes(mf.status) ? mf.status : 'active';
+  };
+  const genAndApplyManifest = useCallback(async (orgId, wsId, ws) => {
+    const name = String(ws.name || '').trim();
     try {
-      const raw = await generateRaw(`${name} — ${purpose || ''}`.trim(), null);
-      const generated = parseGenerated(raw);                 // raw AI text → { manifest, schemas }
-      // Backfill the envelope fields the model sometimes omits, so a valid objectTypes set still applies.
-      if (generated && generated.manifest) {
-        const mf = generated.manifest;
-        mf.manifestVersion = mf.manifestVersion || '1.0';
-        mf.id = mf.id || wsId;
-        mf.name = mf.name || name;
-        mf.kind = mf.kind || 'project';
-        mf.status = ['active', 'paused', 'done', 'archived'].includes(mf.status) ? mf.status : 'active';
+      // 1) Use a manifest the design JSON already carried (the prompt-driven path can include it inline).
+      if (ws.manifest) {
+        const provided = { manifest: ws.manifest, schemas: ws.schemas || {} };
+        backfillEnvelope(provided.manifest, wsId, name);
+        if (!validateGenerated(provided).length) { await applyGeneratedWorkspace(orgId, wsId, provided); return; }
       }
-      const errs = validateGenerated(generated);
-      if (!errs.length) await applyGeneratedWorkspace(orgId, wsId, generated);
+      // 2) Otherwise (or if the inline one was invalid) design it in-app with the workspace generator.
+      const generated = parseGenerated(await generateRaw(`${name} — ${ws.purpose || ''}`.trim(), null));
+      backfillEnvelope(generated && generated.manifest, wsId, name);
+      if (generated && !validateGenerated(generated).length) await applyGeneratedWorkspace(orgId, wsId, generated);
     } catch { /* leave it manifest-less; the owner can set it up manually */ }
   }, []);
 
@@ -295,11 +301,11 @@ export default function SecretaryView() {
             if (entry && entry.id && ws.purpose) {
               await apiPost('/v1/memory', { key: `organism.${orgId}.w.${entry.id}.meta.readme`, value: `# ${name}\n\n${ws.purpose}`, visibility: 'private' });
             }
-            if (entry && entry.id) created.push({ wsId: entry.id, name, purpose: ws.purpose || '' });
+            if (entry && entry.id) created.push({ wsId: entry.id, ws });
             wsSummary.push({ name, purpose: ws.purpose || '' });
           }
           // Design + apply each workspace's manifest in parallel so they come out usable, not empty shells.
-          await Promise.all(created.map((c) => genAndApplyManifest(orgId, c.wsId, c.name, c.purpose)));
+          await Promise.all(created.map((c) => genAndApplyManifest(orgId, c.wsId, c.ws)));
         }
         // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
@@ -324,10 +330,10 @@ export default function SecretaryView() {
             if (entry && entry.id && ws.purpose) {
               await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${entry.id}.meta.readme`, value: `# ${name}\n\n${ws.purpose}`, visibility: 'private' });
             }
-            if (entry && entry.id) created.push({ wsId: entry.id, name, purpose: ws.purpose || '' });
+            if (entry && entry.id) created.push({ wsId: entry.id, ws });
             addedWs.push({ name, purpose: ws.purpose || '' });
           }
-          await Promise.all(created.map((c) => genAndApplyManifest(active.organismId, c.wsId, c.name, c.purpose)));
+          await Promise.all(created.map((c) => genAndApplyManifest(active.organismId, c.wsId, c.ws)));
         }
         const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs] };
         next = { ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) };
@@ -851,7 +857,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 ${metaCard({ secretary, reliability })}
               ` : null}
             ` : null}`}
-      ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} />` : null}
+      ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
       <${ToastContainer} />
     </div>`;
 }
