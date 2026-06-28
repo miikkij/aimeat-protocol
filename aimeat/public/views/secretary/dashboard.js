@@ -91,7 +91,9 @@ export function standPanel(p) {
       </div>
       ${s.loading
         ? html`<div class="sec-hint">${thinking}</div>`
-        : html`<div class="sec-stand-body"><${Markdown} text=${s.text} /></div>`}
+        : html`
+          ${s.generatedAt ? html`<div class="sec-hint sec-stand-when">${t('secretary.dash.standAt')} ${new Date(s.generatedAt).toLocaleString()} · <button class="sec-linkbtn" onClick=${p.onRefresh}>${t('secretary.dash.refreshStand')}</button></div>` : null}
+          <div class="sec-stand-body"><${Markdown} text=${s.text} /></div>`}
     </section>`;
 }
 

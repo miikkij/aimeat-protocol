@@ -866,6 +866,8 @@
       "quickReview": "Arvioi päätökset",
       "standTitle": "Missä mennään",
       "standThinking": "Katson tilannetta…",
+      "standAt": "Päivitetty",
+      "refreshStand": "Päivitä",
       "standError": "Tilanteen yhteenveto epäonnistui",
       "dismiss": "Sulje",
       "manage": "Hallinta ja asetukset",

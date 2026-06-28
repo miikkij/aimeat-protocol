@@ -828,7 +828,7 @@ export class Scheduler {
         const text = routedFrom
           ? `Routed a note to ${ctx.name || ctx.id} → ${ws.name}: ${a.summary}`
           : `Filed a note → ${ws.name}: ${a.summary}`;
-        await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text });
+        await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text, href: `/v1/organisms/${ctx.organismId}` });
         return [key, 'secretary.feed'];
       }
     }
@@ -948,7 +948,7 @@ export class Scheduler {
   }
 
   /** Append one entry to the owner's Home feed (`secretary.feed`, newest first, capped at 50). */
-  private async appendFeed(owner: string, entry: { kind: string; contextId: string; contextName: string; text: string }): Promise<void> {
+  private async appendFeed(owner: string, entry: { kind: string; contextId: string; contextName: string; text: string; href?: string }): Promise<void> {
     const feedKey = 'secretary.feed';
     const existing = await this.storage.getMemory(owner, feedKey);
     const list = Array.isArray((existing?.value as { items?: unknown[] } | undefined)?.items)

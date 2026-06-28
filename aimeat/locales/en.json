@@ -866,6 +866,8 @@
       "quickReview": "Review decisions",
       "standTitle": "Where things stand",
       "standThinking": "Looking things over…",
+      "standAt": "Updated",
+      "refreshStand": "Refresh",
       "standError": "Couldn't summarise where things stand",
       "dismiss": "Dismiss",
       "manage": "Manage & setup",

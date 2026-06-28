@@ -389,6 +389,7 @@ export function feedCard(p) {
                 ${g.items.map((it, i) => html`<li class="sec-feed-item" key=${it.id || i}>
                   <div class="sec-feed-meta">${it.contextName ? (it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleTimeString() : ''}</div>
                   <div class="sec-feed-text"><${Markdown} text=${it.text || ''} /></div>
+                  ${it.href ? html`<a class="sec-feed-link" href=${it.href}>${t('secretary.next.openResult')} ↗</a>` : null}
                 </li>`)}
               </ul>
             </div>`)}
