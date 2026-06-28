@@ -1,5 +1,5 @@
 {
-  "inbox.title": "Postilaatikko",
+  "inbox.title": "Viestit",
   "inbox.desc": "Suorat viestit muiden kanssa. Tällä solmulla ja federaation yli.",
   "inbox.new": "Uusi viesti",
   "inbox.to": "Vastaanottaja",
@@ -1543,7 +1543,7 @@
       "notifications": "Ilmoitukset",
       "organisms": "Organismit",
       "packages": "Paketit",
-      "inbox": "Postilaatikko"
+      "inbox": "Viestit"
     },
     "offers": {
       "title": "Mitä voin tehdä?",

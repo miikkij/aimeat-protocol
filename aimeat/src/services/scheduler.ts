@@ -48,6 +48,8 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
+import { appendSecretaryFeed } from './secretary-feed.js';
+import { produceClarifyDeliverable, type ClarifyJob } from './secretary-clarify.js';
 import { listSpecialists } from './specialist.js';
 import { runAllSpecialists } from './specialist-runner.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
@@ -830,29 +832,18 @@ export class Scheduler {
     return wsList[0];
   }
 
-  /** Render the owner's interactive answers as readable text for the clarify-resume produce prompt. */
-  private buildClarifyAnswers(
-    questions: Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }> }>,
-    answers: Record<string, { selected?: string[]; other?: string | null }>,
-  ): string {
-    return (questions || []).map((q) => {
-      const a = answers[q.id] || {};
-      const labels = (a.selected || []).map((sid) => (q.options || []).find((o) => o.id === sid)?.label || sid);
-      const parts = [...labels];
-      if (a.other) parts.push(String(a.other));
-      return `- ${q.prompt} → ${parts.join(', ') || '(no answer)'}`;
-    }).join('\n');
-  }
-
   /**
    * Resume answered clarify jobs (ask-don't-hallucinate): for each job whose inbox questions the owner
    * answered, produce the deliverable grounded ONLY in the stored facts + those answers, file it into the
-   * job's workspace, and mark the job done. Unanswered jobs are left untouched.
+   * job's workspace, reply the outcome back into the thread, and mark the job done. Unanswered jobs are
+   * left untouched. Produce logic is shared with the live DM responder (services/secretary-clarify.ts).
    */
   private async resumeClarifyJobs(owner: string, ownerName: string, jobs: Array<Record<string, unknown>>): Promise<string[]> {
     const writes: string[] = [];
     if (!jobs.length) return writes;
     const secretaryGaii = `secretary#${ownerName}@${this.config.nodeId}`;
+    // Local agent→owner delivery never touches federation peers, so an empty map is sufficient here.
+    const ctx = { config: this.config, storage: this.storage, peers: new Map() };
     for (const job of jobs) {
       const conversationId = job.conversationId as string;
       const questionId = job.questionId as string;
@@ -862,36 +853,11 @@ export class Scheduler {
       const ans = msgs.find((m) => m.interactive?.role === 'answers' && m.interactive.answersFor === questionId);
       if (!ans || ans.interactive?.role !== 'answers') continue;   // not answered yet
 
-      const action = (job.action ?? {}) as { summary?: string; why?: string };
-      const questions = (job.questions ?? []) as Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }> }>;
-      const answersText = this.buildClarifyAnswers(questions, ans.interactive.answers);
-      const sys = `You are ${ownerName}'s personal Secretary. Produce the deliverable the owner asked for as a usable DRAFT, grounded ONLY in the facts and the owner's answers below. Never invent numbers, metrics, quotes, names, dates, events, or outcomes; if something is still unknown, use a [bracketed placeholder]. Markdown is fine. Output only the deliverable, no preamble.`;
-      const prompt = `Task: ${action.summary || ''}${action.why ? `\n(${action.why})` : ''}\n\nFacts:\n${(job.facts as string) || '(none)'}\n\nThe owner answered your questions:\n${answersText}`;
-      let content = action.summary || '';
-      try {
-        const r = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt: sys, appId: 'secretary-clarify-produce' });
-        content = ((r && r.content) || '').trim() || content;
-      } catch { continue; }   // spending paused / error → leave the job 'asked' to retry next tick
-
-      const now = new Date().toISOString();
-      const organismId = job.organismId as string;
-      const wsId = job.wsId as string;
-      if (organismId && wsId) {
-        const id = 'note-' + randomUUID().slice(0, 8);
-        const key = `organism.${organismId}.w.${wsId}.notes.${id}`;
-        await this.storage.setMemory({
-          key, ownerGaii: owner, value: { id, title: String(action.summary || '').slice(0, 80), body: content, createdAt: now, via: 'secretary-clarify' },
-          visibility: 'private', tags: ['secretary', 'note', String(job.contextId || '')], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-        });
-        await this.appendFeed(owner, { kind: 'act', contextId: String(job.contextId || ''), contextName: String(job.contextName || ''), text: `✍️ ${action.summary || ''} — filed after your answers`, href: `/v1/profile?tab=organisms&org=${organismId}&ws=${wsId}` });
-        writes.push(key, 'secretary.feed');
-      }
-      const jobKey = `secretary.clarify.${String(job.id)}`;
-      await this.storage.setMemory({
-        key: jobKey, ownerGaii: owner, value: { ...job, status: 'done', producedAt: now },
-        visibility: 'private', tags: ['secretary', 'clarify', 'done'], ttlHours: null, version: 1, createdAt: String(job.createdAt || now), updatedAt: now,
+      const { writes: w } = await produceClarifyDeliverable(ctx, {
+        ownerGhii: owner, ownerName, agentGaii: secretaryGaii,
+        job: job as unknown as ClarifyJob, answers: ans.interactive.answers,
       });
-      writes.push(jobKey);
+      writes.push(...w);
     }
     return writes;
   }
@@ -1039,18 +1005,10 @@ export class Scheduler {
     });
   }
 
-  /** Append one entry to the owner's Home feed (`secretary.feed`, newest first, capped at 50). */
+  /** Append one entry to the owner's Home feed (`secretary.feed`, newest first, capped). Delegates to the
+   *  shared helper so the live DM responder / clarify-produce write the SAME feed. */
   private async appendFeed(owner: string, entry: { kind: string; contextId: string; contextName: string; text: string; href?: string }): Promise<void> {
-    const feedKey = 'secretary.feed';
-    const existing = await this.storage.getMemory(owner, feedKey);
-    const list = Array.isArray((existing?.value as { items?: unknown[] } | undefined)?.items)
-      ? (existing!.value as { items: unknown[] }).items : [];
-    const now = new Date().toISOString();
-    const items = [{ id: randomUUID(), ts: now, ...entry }, ...list].slice(0, 50);
-    await this.storage.setMemory({
-      key: feedKey, ownerGaii: owner, value: { items }, visibility: 'private', tags: ['secretary', 'feed'],
-      ttlHours: null, version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
+    await appendSecretaryFeed(this.storage, owner, entry);
   }
 
   /**

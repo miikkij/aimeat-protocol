@@ -1,5 +1,5 @@
 {
-  "inbox.title": "Inbox",
+  "inbox.title": "Messages",
   "inbox.desc": "Direct messages with other people, on this node and across the federation.",
   "inbox.new": "New message",
   "inbox.to": "To",
@@ -1543,7 +1543,7 @@
       "notifications": "Notifications",
       "organisms": "Organisms",
       "packages": "Packages",
-      "inbox": "Inbox"
+      "inbox": "Messages"
     },
     "offers": {
       "title": "What can I do?",
