@@ -27,6 +27,7 @@ import { useState, useCallback, useMemo } from 'preact/hooks';
 import { api, apiGet, apiPost } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { extractJson, buildDecisionRecord } from '/js/services/secretary-helpers.js';
+import { routeRoutineStep } from '/js/services/secretary-rules.js';
 
 /** Capabilities a routine step may use (subset of the policy taxonomy the Secretary can plan with). */
 export const ROUTINE_CAPABILITIES = ['discover', 'file_intake', 'briefing', 'reminders', 'curate_knowledge', 'create_resource', 'delegate'];
@@ -174,10 +175,9 @@ export function useWhatsNext({ active, config, persistConfig, policy, wsList, su
    */
   const approveStep = useCallback(async (routine, step, opts = {}) => {
     if (!active || busyStepId) return;
-    // Band routing mirrors the server helper; recompute here from the live policy so a band change applies.
-    const band = (typeof step.band === 'string' && ['act', 'draft', 'ask', 'off'].includes(step.band)) ? step.band
-      : (typeof bands[step.capability] === 'string' ? bands[step.capability] : 'ask');
-    const disposition = band === 'off' ? 'skip' : band === 'act' ? 'run' : 'confirm';
+    // Band routing via the shared rules module (proven equal to the server's secretary-tick.ts by the G6
+    // parity test) — recomputed from the live policy so a band change applies before approval.
+    const { disposition } = routeRoutineStep(step, bands);
     setBusyStepId(step.id);
     try {
       let outcome;
