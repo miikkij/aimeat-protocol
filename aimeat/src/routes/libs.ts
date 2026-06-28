@@ -4,6 +4,13 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.23.0 - 2026-06-28 - aimeat-auth.js: (1) owner session refresh() adopts the display_name the
+ *   server now returns from /v1/auth/refresh, so the apex login pill picks up profile edits without a
+ *   re-login. (2) new auth.updateSessionMeta(patch) + a 'session-updated' event re-render the pill
+ *   live after a profile save. (3) the light/dark THEME TOGGLE now lives inside the pill (both
+ *   signed-in and signed-out states) so every embedding app inherits it for free; self-contained
+ *   (data-theme + 'aimeat-theme' localStorage) and fires 'aimeat-theme-change' to sync the SPA.
+ *   New pill i18n keys: themeToDark/themeToLight.
  * v1.22.0 - 2026-06-26 - aimeat-auth.js login pill shows the owner's DISPLAY NAME, falling back to
  *   the GHII when none is set. The H-2 silent bridge now returns display_name, threaded through
  *   restoreSessionFromAppOrigin → _buildAppSession so an app-origin pill (e.g. Pesupossu) reads a
@@ -857,6 +864,9 @@ function createSession(data) {
         }
         session.jwt = data.data.token;
         session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        // The owner may have edited their profile since login — adopt the fresh display
+        // name the server returns so the login pill stays current without a re-login.
+        if (typeof data.data.display_name === 'string') session.displayName = data.data.display_name;
         persistSession(session);
         scheduleAutoRefresh(session);
         return session;
@@ -1060,6 +1070,18 @@ const auth = {
     return currentSession;
   },
 
+  /**
+   * Patch mutable, non-secret session metadata in place (e.g. displayName after a profile
+   * edit), persist it, and notify the login pill so it re-renders live — no page reload.
+   * Ignored when there is no active session.
+   */
+  updateSessionMeta(patch) {
+    if (!currentSession || !patch) return;
+    Object.assign(currentSession, patch);
+    persistSession(currentSession);
+    emit('session-updated', currentSession);
+  },
+
   /** Logout — clear stored credentials from localStorage and IndexedDB */
   async logout() {
     if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
@@ -1237,6 +1259,8 @@ const auth = {
               + 'background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);'
               + 'border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">\\u2699\\uFE0F</button>'
             : '')
+          // Light/dark toggle — lives inside the pill so embedding apps inherit it for free.
+          + themeToggleHtml(i)
           + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="'
           + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
           + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
@@ -1267,8 +1291,12 @@ const auth = {
           + 'transition:transform .15s,box-shadow .15s}'
           + '.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}'
           + '</style>'
+          // Keep the light/dark toggle reachable even when signed out.
+          + '<span style="display:inline-flex;align-items:center;gap:10px">'
+          + themeToggleHtml(i)
           + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
-          + (opts.buttonText || i.signInBtn || '\\u2764\\ufe0f Sign In') + '</button>';
+          + (opts.buttonText || i.signInBtn || '\\u2764\\ufe0f Sign In') + '</button>'
+          + '</span>';
         document.getElementById('aimeat-login-btn').addEventListener('click', () => {
           // On an app origin, the Sign In click is the user gesture that opens the consent popup
           // for a non-owned app (interactive). On the apex it's the normal owner login modal.
@@ -1276,6 +1304,7 @@ const auth = {
           else { showLoginModal(opts, render); }
         });
       }
+      wireThemeToggle(container, i); // present in both signed-in and signed-out markup
     }
     render();
     // Re-render when the session changes out-of-band — e.g. the H-2 silent SSO on an app origin
@@ -1284,6 +1313,7 @@ const auth = {
     // location.reload(), which would loop with the auto silent login).
     auth.on('login', render);
     auth.on('logout', render);
+    auth.on('session-updated', render); // live display-name (etc.) edits
     // Seamless SSO: on an app origin (*.apps.<domain>) with no session yet, attempt the silent
     // bridge ourselves so the owner's own app is logged in even if it never calls auth.login()
     // explicitly. Best-effort + idempotent: if the bridge yields a session it fires 'login' (→ the
@@ -1301,6 +1331,50 @@ const auth = {
 };
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Theme toggle (travels with the login pill) ───────────────────────────────────────────────
+// The light/dark switch lives INSIDE the login pill so every app that embeds the pill gets the
+// toggle for free — no per-app theming code. Self-contained: it reads/writes the same
+// 'aimeat-theme' localStorage key + <html data-theme> attribute the SPA uses, and dispatches an
+// 'aimeat-theme-change' window event so the SPA's theme system (and any chart subscribers) stay
+// in sync. In a standalone app (no SPA theme module) the data-theme + theme.css alone repaint.
+var AIMEAT_THEME_KEY = 'aimeat-theme';
+
+function aimeatReadTheme() {
+  try { var s = localStorage.getItem(AIMEAT_THEME_KEY); if (s === 'light' || s === 'dark') return s; } catch (e) {}
+  var attr = document.documentElement.dataset.theme;
+  if (attr === 'light' || attr === 'dark') return attr;
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+function aimeatApplyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem(AIMEAT_THEME_KEY, t); } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('aimeat-theme-change', { detail: { theme: t } })); } catch (e) {}
+}
+
+function themeToggleHtml(i) {
+  var dark = aimeatReadTheme() === 'dark';
+  var title = dark ? (i.themeToLight || 'Switch to light mode') : (i.themeToDark || 'Switch to dark mode');
+  return '<button id="aimeat-theme-toggle" class="aimeat-theme-toggle" title="' + escHtml(title) + '" '
+    + 'aria-label="' + escHtml(title) + '" style="display:inline-flex;align-items:center;justify-content:center;'
+    + 'width:30px;height:30px;flex:0 0 auto;background:transparent;border:1px solid rgba(127,127,127,.4);'
+    + 'border-radius:8px;cursor:pointer;font-size:15px;line-height:1;padding:0;color:currentColor">'
+    + (dark ? '\\u2600' : '\\u263E') + '</button>';
+}
+
+function wireThemeToggle(container, i) {
+  var btn = container.querySelector('#aimeat-theme-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var next = aimeatReadTheme() === 'dark' ? 'light' : 'dark';
+    aimeatApplyTheme(next);
+    var dark = next === 'dark';
+    btn.textContent = dark ? '\\u2600' : '\\u263E';
+    var title = dark ? (i.themeToLight || 'Switch to light mode') : (i.themeToDark || 'Switch to dark mode');
+    btn.title = title; btn.setAttribute('aria-label', title);
+  });
+}
 
 // ── Sign-in modal language helpers ──
 // The modal can be shown standalone (e.g. a custom portal page) where the

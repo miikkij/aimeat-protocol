@@ -16,6 +16,8 @@
  *   toggleTheme();                           // flip light <-> dark
  * @version-history
  *   v1.0.0 — 2026-06-02 — Initial dark/light theming (Phase 1 mechanism).
+ *   v1.1.0 — 2026-06-28 — Adopt external `aimeat-theme-change` events (the login pill now
+ *     owns the toggle) so SPA subscribers repaint; loop-guarded via selfDispatch.
  */
 
 const STORAGE_KEY = 'aimeat-theme';
@@ -27,6 +29,8 @@ const META_THEME_COLOR = { light: '#FAFAF8', dark: '#14151A' };
 
 const listeners = new Set();
 let mediaQuery = null;
+// Set true while WE dispatch EVENT_NAME so the external listener (below) ignores our own echo.
+let selfDispatch = false;
 
 /** Read the stored explicit choice, or null if the user has not chosen. */
 function storedChoice() {
@@ -76,7 +80,9 @@ export function setTheme(theme, persist = true) {
   syncMetaThemeColor(next);
   const detail = { theme: next };
   for (const fn of listeners) fn(next);
+  selfDispatch = true;
   window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail }));
+  selfDispatch = false;
   return next;
 }
 
@@ -98,6 +104,20 @@ export function onThemeChange(fn) {
  */
 export function initThemeSystem() {
   syncMetaThemeColor(getTheme());
+
+  // The login pill (served by libs.ts) owns the light/dark toggle now. It applies the theme
+  // itself (data-theme + localStorage) and fires this same event. Adopt those external changes
+  // so SPA subscribers (charts, tabs) repaint too. `selfDispatch` skips our own echo to avoid
+  // a loop; we DON'T call setTheme here (the pill already set data-theme + persisted) — just
+  // sync meta + notify in-module listeners.
+  window.addEventListener(EVENT_NAME, (e) => {
+    if (selfDispatch) return;
+    const detail = /** @type {CustomEvent} */ (e).detail;
+    const next = detail && detail.theme;
+    if (!VALID.has(next)) return;
+    syncMetaThemeColor(next);
+    for (const fn of listeners) fn(next);
+  });
 
   if (window.matchMedia) {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

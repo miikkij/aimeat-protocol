@@ -230,7 +230,12 @@ function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
       const resp = await updateProfile(fields);
       if (resp && resp.data) {
         if (session && typeof fields.display_name === 'string') {
-          session.displayName = fields.display_name;
+          // Persist + re-render the golden login pill live (so it shows the new name now).
+          if (window.AIMEAT?.auth?.updateSessionMeta) {
+            window.AIMEAT.auth.updateSessionMeta({ displayName: fields.display_name });
+          } else {
+            session.displayName = fields.display_name;
+          }
         }
         onSaved?.();
       } else {

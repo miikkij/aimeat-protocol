@@ -140,8 +140,15 @@ export async function establishOwnerSession(
 }
 
 export type RefreshResult =
-  | { ok: true; token: string; expiresIn: number; rotated: boolean }
+  | { ok: true; token: string; expiresIn: number; rotated: boolean; displayName: string }
   | { ok: false; status: number; code: string; message: string };
+
+/** Current display name for an owner (empty string if none) — so refreshed sessions
+ *  pick up profile edits without a full re-login (drives the login pill label). */
+async function freshOwnerDisplayName(storage: Storage, owner: string): Promise<string> {
+  const ghii = await storage.getGHIIByOwner(owner);
+  return ghii?.displayName ?? '';
+}
 
 /**
  * Validate the refresh cookie, rotate it (one-time use with a grace window), detect
@@ -195,16 +202,18 @@ export async function refreshOwnerSession(
     // request already rotated and set the new cookie, so DON'T rotate again — just issue a
     // fresh access token bound to the session.
     const roles = await freshOwnerRoles(storage, session.owner);
+    const displayName = await freshOwnerDisplayName(storage, session.owner);
     const token = await issueJWT(
       { sub: session.gaii, owner: session.owner, node: config.nodeId, roles },
       config.accessTtlSeconds,
       session.sessionId,
     );
-    return { ok: true, token, expiresIn: config.accessTtlSeconds, rotated: false };
+    return { ok: true, token, expiresIn: config.accessTtlSeconds, rotated: false, displayName };
   }
 
   // Normal path: presented token == current. Rotate one-time-use and slide the idle window.
   const roles = await freshOwnerRoles(storage, session.owner);
+  const displayName = await freshOwnerDisplayName(storage, session.owner);
   const newRawToken = randomBytes(32).toString('hex');
   const newIdle = new Date(absolute ? Math.min(now + config.refreshIdleDays * DAY_MS, absolute) : now + config.refreshIdleDays * DAY_MS).toISOString();
   await storage.rotateSessionRefresh(session.sessionId, {
@@ -222,5 +231,5 @@ export async function refreshOwnerSession(
     config.accessTtlSeconds,
     session.sessionId,
   );
-  return { ok: true, token, expiresIn: config.accessTtlSeconds, rotated: true };
+  return { ok: true, token, expiresIn: config.accessTtlSeconds, rotated: true, displayName };
 }

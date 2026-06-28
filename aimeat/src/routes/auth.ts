@@ -413,6 +413,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         expires_in: result.expiresIn,
         expires_at: new Date(Date.now() + result.expiresIn * 1000).toISOString(),
         ttl_seconds: result.expiresIn,
+        display_name: result.displayName,
       }));
       return;
     }
