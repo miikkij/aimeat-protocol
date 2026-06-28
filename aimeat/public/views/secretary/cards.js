@@ -28,7 +28,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { SECRETARY_CAPABILITIES, BANDS } from '/js/services/secretary-policy.js';
 import { buildInterviewPrompt, groupFeedByDay } from '/js/services/secretary-helpers.js';
@@ -38,7 +37,7 @@ export function contextSwitcher(p) {
   return html`
     <div class="sec-ctx-bar">
       ${p.contexts.map((c) => html`
-        <button class="sec-ctx-chip ${c.id === p.activeId ? 'active' : ''}" key=${c.id} onClick=${() => p.switchContext(c.id)}>${escHtml(c.name)}</button>`)}
+        <button class="sec-ctx-chip ${c.id === p.activeId ? 'active' : ''}" key=${c.id} onClick=${() => p.switchContext(c.id)}>${(c.name)}</button>`)}
       <button class="sec-ctx-add" title=${t('secretary.addContext')} onClick=${p.openAdd}>＋</button>
     </div>`;
 }
@@ -75,21 +74,21 @@ export function chatCard(p) {
   const canAttach = typeof p.onAttach === 'function' && p.canAttach !== false;
   return html`
     <section class="sec-card sec-chat">
-      <h2 class="sec-h2">${t('secretary.chatTitle')} · ${escHtml(p.activeName)}</h2>
+      <h2 class="sec-h2">${t('secretary.chatTitle')} · ${(p.activeName)}</h2>
       <div class="sec-chat-log">
         ${p.chat.length === 0
           ? html`<div class="sec-hint">${t('secretary.chatEmpty')}</div>`
-          : p.chat.map((m, i) => html`<div class="sec-msg sec-msg-${m.role}" key=${i}>${escHtml(m.content)}</div>`)}
+          : p.chat.map((m, i) => html`<div class="sec-msg sec-msg-${m.role}" key=${i}>${(m.content)}</div>`)}
         ${p.chatSending ? html`<div class="sec-msg sec-msg-assistant sec-msg-pending">…</div>` : null}
       </div>
       ${p.routeSuggestion ? html`
         <div class="sec-route-hint">
-          <span>${t('secretary.routeSuggest')} <strong>${escHtml(p.routeSuggestion.name)}</strong></span>
+          <span>${t('secretary.routeSuggest')} <strong>${(p.routeSuggestion.name)}</strong></span>
           <button class="btn-ghost btn-sm" onClick=${() => p.switchContext(p.routeSuggestion.id)}>${t('secretary.routeSwitch')}</button>
         </div>` : null}
       ${canAttach && p.attaching ? html`<div class="sec-hint sec-attach-status">${t('secretary.attaching')}</div>` : null}
       ${canAttach && !p.attaching && p.attachResult ? html`
-        <div class="sec-route-hint"><span>${t('secretary.attachFiled')} <strong>${escHtml(p.attachResult.wsName)}</strong>${p.attachResult.name ? html` — ${escHtml(p.attachResult.name)}` : null}</span></div>` : null}
+        <div class="sec-route-hint"><span>${t('secretary.attachFiled')} <strong>${(p.attachResult.wsName)}</strong>${p.attachResult.name ? html` — ${(p.attachResult.name)}` : null}</span></div>` : null}
       <div class="sec-chat-input">
         <textarea rows="2" placeholder=${t('secretary.chatPlaceholder')} value=${p.chatInput}
           onInput=${(e) => p.setChatInput(e.target.value)}
@@ -129,10 +128,10 @@ export function findCard(p) {
             ? html`<div class="sec-hint">${t('secretary.findEmpty')}</div>`
             : p.findResults.map((e, i) => html`
               <div class="sec-find-row" key=${i}>
-                <span class="sec-find-type">${escHtml(e.type)}</span>
+                <span class="sec-find-type">${(e.type)}</span>
                 <div class="sec-find-main">
-                  <div class="sec-find-title">${e.url ? html`<a href=${e.url} target="_blank" rel="noreferrer">${escHtml(e.title)}</a>` : escHtml(e.title)}</div>
-                  ${e.description ? html`<div class="sec-find-desc">${escHtml(String(e.description).slice(0, 160))}</div>` : null}
+                  <div class="sec-find-title">${e.url ? html`<a href=${e.url} target="_blank" rel="noreferrer">${(e.title)}</a>` : (e.title)}</div>
+                  ${e.description ? html`<div class="sec-find-desc">${(String(e.description).slice(0, 160))}</div>` : null}
                 </div>
               </div>`)}
         </div>`}
@@ -148,14 +147,14 @@ export function noteCard(p) {
       <textarea class="sec-paste" rows="3" placeholder=${t('secretary.notePlaceholder')} value=${p.noteText} onInput=${(e) => p.setNoteText(e.target.value)}></textarea>
       ${p.route && p.route.confidence === 'high' ? html`
         <div class="sec-route-hint">
-          <span>${t('secretary.routeBelongs')} <strong>${escHtml(p.route.name)}</strong></span>
+          <span>${t('secretary.routeBelongs')} <strong>${(p.route.name)}</strong></span>
           <button class="btn-outline btn-sm" disabled=${p.noteSaving} onClick=${p.autoRouteNote}>${t('secretary.routeFileThere')}</button>
         </div>` : p.route && p.route.confidence === 'low' ? html`
         <div class="sec-route-hint"><span class="sec-hint">${t('secretary.routeUnsure')}</span></div>` : null}
       <div class="sec-note-bar">
         <label class="sec-hint">${t('secretary.noteInto')}</label>
         <select class="sec-band" value=${p.effectiveWsId} onChange=${(e) => p.setNoteWsId(e.target.value)}>
-          ${p.wsList.map((w) => html`<option value=${w.id} selected=${p.effectiveWsId === w.id}>${escHtml(w.name)}</option>`)}
+          ${p.wsList.map((w) => html`<option value=${w.id} selected=${p.effectiveWsId === w.id}>${(w.name)}</option>`)}
         </select>
         <button class="btn-primary" disabled=${!p.noteText.trim() || p.noteSaving} onClick=${p.saveNote}>${p.noteSaving ? t('secretary.noteSaving') : t('secretary.noteSave')}</button>
         ${p.wsList.length >= 2 ? html`<button class="btn-outline btn-sm" disabled=${!p.noteText.trim() || p.noteSaving} onClick=${p.askDecision} title=${t('secretary.askInInboxHint')}>${t('secretary.askInInbox')}</button>` : null}
@@ -173,9 +172,9 @@ export function decisionsCard(p) {
           const dec = p.pendingDecisions[pid];
           const answer = p.decisionAnswers[pid];
           return html`<li class="sec-hist-row" key=${pid}>
-            <span class="sec-hist-purpose">${escHtml((dec.body || dec.text || dec.question || '').slice(0, 60))}</span>
+            <span class="sec-hist-purpose">${((dec.body || dec.text || dec.question || '').slice(0, 60))}</span>
             ${answer
-              ? html`<button class="btn-primary btn-sm" onClick=${() => p.applyDecision(pid)}>${t('secretary.decisionApply')}: ${escHtml(answer)}</button>`
+              ? html`<button class="btn-primary btn-sm" onClick=${() => p.applyDecision(pid)}>${t('secretary.decisionApply')}: ${(answer)}</button>`
               : html`<span class="sec-hint">${t('secretary.decisionAwaiting')}</span>`}
             <button class="btn-ghost btn-sm" onClick=${() => p.dismissDecision(pid)}>${t('secretary.cancel')}</button>
           </li>`;
@@ -195,12 +194,12 @@ export function brainCard(p) {
         <button class="btn-ghost btn-sm" onClick=${p.openEdit}>${t('secretary.rerun')}</button>
       </div>
       <h2 class="sec-h2">${t('secretary.brain')}</h2>
-      <p class="sec-purpose">${escHtml(brain.purpose)}</p>
-      ${Array.isArray(brain.rules) && brain.rules.length > 0 && html`<ul class="sec-rules">${brain.rules.map((r) => html`<li key=${r.id}>${escHtml(r.description)}</li>`)}</ul>`}
+      <p class="sec-purpose">${(brain.purpose)}</p>
+      ${Array.isArray(brain.rules) && brain.rules.length > 0 && html`<ul class="sec-rules">${brain.rules.map((r) => html`<li key=${r.id}>${(r.description)}</li>`)}</ul>`}
       ${active.organismName && html`
         <h2 class="sec-h2">${t('secretary.selfOrganism')}</h2>
-        <p class="sec-orgname">🗂 ${escHtml(active.organismName)}</p>
-        ${Array.isArray(active.workspaces) && html`<ul class="sec-ws">${active.workspaces.map((w, i) => html`<li key=${i}><strong>${escHtml(w.name)}</strong>${w.purpose ? html` — ${escHtml(w.purpose)}` : null}</li>`)}</ul>`}`}
+        <p class="sec-orgname">🗂 ${(active.organismName)}</p>
+        ${Array.isArray(active.workspaces) && html`<ul class="sec-ws">${active.workspaces.map((w, i) => html`<li key=${i}><strong>${(w.name)}</strong>${w.purpose ? html` — ${(w.purpose)}` : null}</li>`)}</ul>`}`}
     </section>`;
 }
 
@@ -242,7 +241,7 @@ export function historyCard(p) {
       <ul class="sec-hist">
         ${p.brainHistory.map((snap, i) => html`
           <li class="sec-hist-row" key=${i}>
-            <span class="sec-hist-purpose">${escHtml((snap.purpose || '').slice(0, 80))}</span>
+            <span class="sec-hist-purpose">${((snap.purpose || '').slice(0, 80))}</span>
             <button class="btn-ghost btn-sm" disabled=${p.applying} onClick=${() => p.restore(snap)}>${t('secretary.restore')}</button>
           </li>`)}
       </ul>
@@ -267,13 +266,13 @@ function routineStepRow(p, r, s) {
           ${agents.length > 0 ? html`
             <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
               <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
-              ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${escHtml(a.name)}</option>`)}
+              ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
             </select>
             <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>` : null}
           ${workflows.length > 0 ? html`
             <select class="sec-band" value=${p.delegateWorkflow} onChange=${(e) => p.setDelegateWorkflow(e.target.value)}>
               <option value="" selected=${!p.delegateWorkflow}>${t('secretary.next.delegateWorkflowPick')}</option>
-              ${workflows.map((w) => html`<option value=${w.id} selected=${p.delegateWorkflow === w.id}>${escHtml((w.title && (w.title.en_US || w.title)) || w.id)}</option>`)}
+              ${workflows.map((w) => html`<option value=${w.id} selected=${p.delegateWorkflow === w.id}>${((w.title && (w.title.en_US || w.title)) || w.id)}</option>`)}
             </select>
             <button class="btn-outline btn-sm" disabled=${busy || !p.delegateWorkflow} onClick=${() => p.approveStep(r, s, { workflowId: p.delegateWorkflow, workflowName: (workflows.find((w) => w.id === p.delegateWorkflow) || {}).title?.en_US })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateWorkflowGo')}</button>` : null}`}
     </div>`;
@@ -284,8 +283,8 @@ function routineStepRow(p, r, s) {
           <span class="sec-step-cap">${t('secretary.cap.' + s.capability)}</span>
           <span class="sec-band-tag band-${s.band}">${t('secretary.band.' + s.band)}</span>
         </div>
-        <div class="sec-step-summary">${escHtml(s.summary)}</div>
-        ${s.result ? html`<div class="sec-hint">→ ${escHtml(s.result.summary)}</div>` : null}
+        <div class="sec-step-summary">${(s.summary)}</div>
+        ${s.result ? html`<div class="sec-hint">→ ${(s.result.summary)}</div>` : null}
         ${s.status === 'delegated' && s.result && (s.result.taskId || s.result.runId) ? html`
           <button class="btn-ghost btn-sm" disabled=${p.checkingStepId === s.id} onClick=${() => p.checkDelegateResult(r, s)}>${p.checkingStepId === s.id ? t('secretary.next.running') : t('secretary.next.checkResult')}</button>` : null}
       </div>
@@ -314,8 +313,8 @@ export function whatsNextCard(p) {
         <div class="sec-routine">
           <div class="sec-routine-head">
             <div>
-              <div class="sec-routine-title">${escHtml(r.title)}</div>
-              ${r.purpose ? html`<div class="sec-hint">${escHtml(r.purpose)}</div>` : null}
+              <div class="sec-routine-title">${(r.title)}</div>
+              ${r.purpose ? html`<div class="sec-hint">${(r.purpose)}</div>` : null}
             </div>
             ${r.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.status.done')}</span>` : null}
           </div>
@@ -346,11 +345,11 @@ export function feedCard(p) {
         ? html`<div class="sec-hint">${t('secretary.feed.empty')}</div>`
         : groupFeedByDay(p.feed).map((g) => html`
             <div class="sec-feed-day" key=${g.key}>
-              <div class="sec-feed-day-head">${escHtml(g.label)} <span class="sec-feed-day-count">${g.items.length}</span></div>
+              <div class="sec-feed-day-head">${(g.label)} <span class="sec-feed-day-count">${g.items.length}</span></div>
               <ul class="sec-feed-list">
                 ${g.items.map((it, i) => html`<li class="sec-feed-item" key=${it.id || i}>
-                  <div class="sec-feed-meta">${it.contextName ? escHtml(it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleTimeString() : ''}</div>
-                  <div class="sec-feed-text">${escHtml(it.text || '')}</div>
+                  <div class="sec-feed-meta">${it.contextName ? (it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleTimeString() : ''}</div>
+                  <div class="sec-feed-text">${(it.text || '')}</div>
                 </li>`)}
               </ul>
             </div>`)}
@@ -369,8 +368,8 @@ export function automationCard(p) {
       : html`
         <div class="sec-auto-row">
           <div>
-            <div><strong>${escHtml(s.displayName || t('secretary.auto.scheduleName'))}</strong>${s.enabled ? null : html` <span class="sec-hint">(${t('secretary.auto.paused')})</span>`}</div>
-            <div class="sec-hint">${t('secretary.auto.nextRun')}: ${s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '—'}${s.cron ? ' · ' + escHtml(s.cron) : ''}</div>
+            <div><strong>${(s.displayName || t('secretary.auto.scheduleName'))}</strong>${s.enabled ? null : html` <span class="sec-hint">(${t('secretary.auto.paused')})</span>`}</div>
+            <div class="sec-hint">${t('secretary.auto.nextRun')}: ${s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '—'}${s.cron ? ' · ' + (s.cron) : ''}</div>
             ${p.budgetInfo ? html`<div class="sec-hint">${t('secretary.auto.budgetLeft')}: ${p.budgetInfo.remaining} / ${p.budgetInfo.budget}</div>` : null}
           </div>
           <div class="sec-auto-actions">
@@ -401,8 +400,8 @@ export function goalsCard(p) {
         : html`<ul class="sec-goal-list">
             ${p.goals.map((g) => html`<li class="sec-goal-row ${g.status === 'done' ? 'done' : ''}" key=${g.id}>
               <div class="sec-goal-main">
-                <div class="sec-goal-title">${escHtml(g.title)}</div>
-                ${g.why ? html`<div class="sec-hint">${escHtml(g.why)}</div>` : null}
+                <div class="sec-goal-title">${(g.title)}</div>
+                ${g.why ? html`<div class="sec-hint">${(g.why)}</div>` : null}
               </div>
               <button class="btn-ghost btn-sm" onClick=${() => p.completeGoal(g)}>${g.status === 'done' ? t('secretary.learn.reopen') : t('secretary.learn.done')}</button>
               <button class="btn-ghost btn-sm" onClick=${() => p.deleteGoal(g)}>✕</button>
@@ -441,7 +440,7 @@ export function decisionLogCard(p) {
             <label class="sec-hint">${t('secretary.learn.goalRef')}</label>
             <select class="sec-band" value=${f.goalRef} onChange=${(e) => p.setDecForm({ ...f, goalRef: e.target.value })}>
               <option value="">—</option>
-              ${p.goals.filter((g) => g.status !== 'done').map((g) => html`<option value=${'secretary.goal.' + g.id} selected=${f.goalRef === 'secretary.goal.' + g.id}>${escHtml(g.title)}</option>`)}
+              ${p.goals.filter((g) => g.status !== 'done').map((g) => html`<option value=${'secretary.goal.' + g.id} selected=${f.goalRef === 'secretary.goal.' + g.id}>${(g.title)}</option>`)}
             </select>
             <label class="sec-hint">${t('secretary.learn.revisitIn')}</label>
             <input class="sec-input sec-input-sm" type="number" min="0" value=${f.revisitDays} onInput=${(e) => p.setDecForm({ ...f, revisitDays: e.target.value })} />
@@ -453,10 +452,10 @@ export function decisionLogCard(p) {
         : html`<ul class="sec-goal-list">
             ${p.decisions.map((d) => html`<li class="sec-goal-row" key=${d.id}>
               <div class="sec-goal-main">
-                <div class="sec-goal-title">${escHtml(d.decision)}${d.chosen ? html` <span class="sec-hint">→ ${escHtml(d.chosen)}</span>` : null}</div>
+                <div class="sec-goal-title">${(d.decision)}${d.chosen ? html` <span class="sec-hint">→ ${(d.chosen)}</span>` : null}</div>
                 ${d.status === 'reviewed' && d.verdict
-                  ? html`<div class="sec-hint">${escHtml(d.verdict)}</div>`
-                  : (d.expectedOutcome ? html`<div class="sec-hint">${t('secretary.learn.expected')}: ${escHtml(d.expectedOutcome)}</div>` : null)}
+                  ? html`<div class="sec-hint">${(d.verdict)}</div>`
+                  : (d.expectedOutcome ? html`<div class="sec-hint">${t('secretary.learn.expected')}: ${(d.expectedOutcome)}</div>` : null)}
               </div>
               ${scoreChip(d)}
               <button class="btn-ghost btn-sm" onClick=${() => p.deleteDecision(d)}>✕</button>
@@ -475,7 +474,7 @@ export function metaCard(p) {
     <section class="sec-card sec-meta-card">
       <dl class="sec-meta">
         <dt>${t('secretary.identity')}</dt>
-        <dd><code>${escHtml(p.secretary.gaii)}</code></dd>
+        <dd><code>${(p.secretary.gaii)}</code></dd>
         <dt title=${t('secretary.reliabilityHint')}>${t('secretary.reliability')}</dt>
         <dd>${relChip}</dd>
         <dt>${t('secretary.scopes')}</dt>
