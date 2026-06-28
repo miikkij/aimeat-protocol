@@ -52,7 +52,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction } from './secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, evaluateTriggers, settleFiredTrigger, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction, type TriggerLike } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -624,10 +624,32 @@ export class Scheduler {
       });
     }
 
+    // (3a2) Triggers (Slice 2): evaluate the owner's triggers — fire any that are due (time/recurring),
+    // whose bound target completed, or whose condition is met. FREE (no AI). Signals from memory.
+    const trigRecs = await this.storage.listMemory(owner, { prefix: 'secretary.trigger.' });
+    const triggers = trigRecs.map((r) => (r.value ?? {}) as TriggerLike).filter((tr) => tr && tr.id);
+    let firedTriggers: TriggerLike[] = [];
+    if (triggers.length) {
+      const completed: Record<string, boolean> = {};
+      for (const r of goalRecs) { const g = (r.value ?? {}) as Record<string, unknown>; if (g.id) completed[String(g.id)] = g.status === 'done'; }
+      for (const c of contexts) for (const rt of (c.routines || [])) if (rt.id) completed[rt.id] = rt.status === 'done';
+      const memoryCounts: Record<string, number> = {};
+      const lastActivityMs: Record<string, number> = {};
+      const prefixes = Array.from(new Set(triggers.filter((tr) => tr.kind === 'condition' && tr.condition?.prefix).map((tr) => tr.condition!.prefix as string)));
+      for (const pfx of prefixes) {
+        const recs = await this.storage.listMemory(owner, { prefix: pfx });
+        memoryCounts[pfx] = recs.length;
+        let newest = 0;
+        for (const r of recs) { const ts = Date.parse(r.updatedAt || ''); if (!Number.isNaN(ts) && ts > newest) newest = ts; }
+        if (newest) lastActivityMs[pfx] = newest;
+      }
+      firedTriggers = evaluateTriggers(triggers, { completed, memoryCounts, lastActivityMs }, nowMs).map((f) => f.trigger);
+    }
+
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0;
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0;
     if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
       return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
@@ -671,6 +693,19 @@ export class Scheduler {
       newActionItems = routineActions.items.map((it) => ({
         id: 'ai-' + randomUUID().slice(0, 8), labelKind: it.labelKind, summary: it.summary, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,
       }));
+
+      // Fire triggers (Slice 2): each fired trigger surfaces a feed entry + an action-item, then settles
+      // (recurring re-arms with a new nextFireAt; one-off/completion/condition → 'fired'). FREE — no AI.
+      for (const tr of firedTriggers) {
+        const label = String(tr.label || tr.action?.summary || 'Trigger').slice(0, 200);
+        await this.appendFeed(owner, { kind: 'trigger', contextId: tr.contextId || active.id, contextName: active.name || '', text: `⏰ ${label}` });
+        newActionItems.push({ id: 'ai-' + randomUUID().slice(0, 8), text: label, suggestedAction: { kind: 'advance', routineId: '' }, source: 'trigger:' + tr.id, createdAt: nowIso, status: 'open' as const });
+        const settled = settleFiredTrigger(tr, nowMs);
+        const key = `secretary.trigger.${tr.id}`;
+        const ex = trigRecs.find((r) => r.key === key);
+        await this.storage.setMemory({ key, ownerGaii: owner, value: settled, visibility: 'private', tags: ['secretary', 'trigger', String(settled.status || '')], ttlHours: null, version: ex ? ex.version + 1 : 1, createdAt: ex?.createdAt ?? nowIso, updatedAt: nowIso });
+        writes.push(key);
+      }
 
       // Action generation (P1-A): ask the model for a STRUCTURED action list tied to the open goals +
       // a bounded slice of the self-organism (the context's workspaces). 1 paid morsel.

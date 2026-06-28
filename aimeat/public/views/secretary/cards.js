@@ -29,6 +29,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Markdown } from '/components/Markdown.js';
 import { SECRETARY_CAPABILITIES, BANDS } from '/js/services/secretary-policy.js';
 import { buildInterviewPrompt, groupFeedByDay } from '/js/services/secretary-helpers.js';
 
@@ -387,7 +388,7 @@ export function feedCard(p) {
               <ul class="sec-feed-list">
                 ${g.items.map((it, i) => html`<li class="sec-feed-item" key=${it.id || i}>
                   <div class="sec-feed-meta">${it.contextName ? (it.contextName) + ' · ' : ''}${it.ts ? new Date(it.ts).toLocaleTimeString() : ''}</div>
-                  <div class="sec-feed-text">${(it.text || '')}</div>
+                  <div class="sec-feed-text"><${Markdown} text=${it.text || ''} /></div>
                 </li>`)}
               </ul>
             </div>`)}

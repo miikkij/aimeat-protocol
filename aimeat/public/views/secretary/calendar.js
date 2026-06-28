@@ -38,7 +38,7 @@ export function cronHour(cron) {
  * (projected at the schedule's cron hour) + each recurring routine's cadence projected from nextRunAt.
  * Pure given `now`. Each event: { at: Date, type: 'done'|'scheduled', kind, text }.
  */
-export function buildCalendarEvents({ feed, schedule, routines, start, end, now }) {
+export function buildCalendarEvents({ feed, schedule, routines, triggers, start, end, now }) {
   const events = [];
   for (const it of (feed || [])) {
     if (!it || !it.ts) continue;
@@ -61,6 +61,19 @@ export function buildCalendarEvents({ feed, schedule, routines, start, end, now 
     let d = new Date(r.nextRunAt);
     for (let i = 0; i < 370 && d < end; i++, d = addDays(d, step)) {
       if (d >= start && d >= now) events.push({ at: new Date(d), type: 'scheduled', kind: 'routine', text: r.title || t('secretary.cal.routineRun') });
+    }
+  }
+  for (const tr of (triggers || [])) {
+    if (!tr || tr.status !== 'armed' || !tr.nextFireAt) continue;
+    if (tr.kind === 'time') {
+      const d = new Date(tr.nextFireAt);
+      if (d >= start && d < end) events.push({ at: d, type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent') });
+    } else if (tr.kind === 'recurring') {
+      const stepMs = tr.cadence === 'monthly' ? 30 * DAY_MS : tr.cadence === 'weekly' ? 7 * DAY_MS : DAY_MS;
+      let d = new Date(tr.nextFireAt);
+      for (let i = 0; i < 370 && d < end; i++, d = new Date(d.getTime() + stepMs)) {
+        if (d >= start) events.push({ at: new Date(d), type: 'scheduled', kind: 'trigger', text: tr.label || t('secretary.cal.triggerEvent') });
+      }
     }
   }
   return events.sort((a, b) => a.at.getTime() - b.at.getTime());
@@ -111,8 +124,8 @@ export function calendarCard(p) {
   }, [mode, anchor]);
 
   const events = useMemo(
-    () => buildCalendarEvents({ feed: p.feed, schedule: p.schedule, routines: p.routines, start, end, now }),
-    [p.feed, p.schedule, p.routines, start, end],
+    () => buildCalendarEvents({ feed: p.feed, schedule: p.schedule, routines: p.routines, triggers: p.triggers, start, end, now }),
+    [p.feed, p.schedule, p.routines, p.triggers, start, end],
   );
   const eventsOn = useCallback((day) => events.filter((e) => sameDay(e.at, day)), [events]);
 

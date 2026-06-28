@@ -26,6 +26,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Markdown } from '/components/Markdown.js';
 
 /** Core (+ later dynamic) quick actions: a button row above the chat. `items` are descriptors
  *  `{ key, label, title?, primary?, disabled?, hidden?, onClick }` so B3 can extend with dynamic actions. */
@@ -90,7 +91,40 @@ export function standPanel(p) {
       </div>
       ${s.loading
         ? html`<div class="sec-hint">${thinking}</div>`
-        : html`<div class="sec-stand-body">${(s.text)}</div>`}
+        : html`<div class="sec-stand-body"><${Markdown} text=${s.text} /></div>`}
+    </section>`;
+}
+
+/** "What's next" — the Secretary's proposed next actions, each with Do it / Skip; doing one runs it. */
+export function whatsNextPanel(p) {
+  const n = p.answer;
+  if (!n) return null;
+  return html`
+    <section class="sec-card sec-stand sec-next-answer">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.next.title')}</h2>
+        ${!n.loading ? html`<button class="btn-ghost btn-sm" onClick=${p.onDismiss}>${t('secretary.dash.dismiss')}</button>` : null}
+      </div>
+      ${n.loading
+        ? html`<div class="sec-hint">${t('secretary.next.thinking')}</div>`
+        : (n.actions && n.actions.length
+          ? html`<ul class="sec-next-actions">
+              ${n.actions.map((a) => html`
+                <li class="sec-next-action sec-next-action--${a.status}" key=${a.id}>
+                  <div class="sec-next-action-main">
+                    <div class="sec-next-action-sum">${a.summary}</div>
+                    ${a.why ? html`<div class="sec-hint">${a.why}</div>` : null}
+                    ${a.result ? html`<div class="sec-hint">→ ${a.result}</div>` : null}
+                  </div>
+                  ${a.status === 'done' ? html`<span class="sec-step-status sec-done">${t('secretary.next.done')}</span>`
+                    : a.status === 'skipped' ? html`<span class="sec-hint">${t('secretary.next.skipped')}</span>`
+                    : html`<div class="sec-next-action-btns">
+                        <button class="btn-primary btn-sm" disabled=${a.status === 'doing'} onClick=${() => p.onDo(a)}>${a.status === 'doing' ? t('secretary.next.running') : t('secretary.next.doIt')}</button>
+                        <button class="btn-ghost btn-sm" onClick=${() => p.onSkip(a)}>${t('secretary.next.skipIt')}</button>
+                      </div>`}
+                </li>`)}
+            </ul>`
+          : html`<div class="sec-hint">${t('secretary.next.nothingNow')}</div>`)}
     </section>`;
 }
 
@@ -210,5 +244,78 @@ export function manageHeader(p) {
         <span class="sec-manage-meta">${p.crewSummary ? p.crewSummary + ' · ' : ''}${p.open ? '▾' : '▸'}</span>
       </button>
       ${!p.open ? html`<p class="sec-hint sec-manage-hint">${t('secretary.dash.manageHint')}</p>` : null}
+    </section>`;
+}
+
+/** Triggers (Slice 3): list the owner's triggers + an add-form for all four kinds; pause/resume/delete.
+ *  The tick fires them; this is just management. `goals`/`routines` feed the completion-target picker. */
+export function triggersCard(p) {
+  const f = p.form;
+  const kindLabel = (tr) => {
+    if (tr.kind === 'recurring') return `${t('secretary.trig.kind.recurring')} · ${t('secretary.trig.cad.' + (tr.cadence || 'weekly'))}`;
+    if (tr.kind === 'time') return `${t('secretary.trig.kind.time')} · ${tr.nextFireAt ? new Date(tr.nextFireAt).toLocaleDateString() : '—'}`;
+    if (tr.kind === 'completion') return t('secretary.trig.kind.completion');
+    if (tr.kind === 'condition') return `${t('secretary.trig.kind.condition')} · ${t('secretary.trig.ct.' + ((tr.condition && tr.condition.type) || 'memory_count'))}`;
+    return tr.kind;
+  };
+  return html`
+    <section class="sec-card sec-triggers">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.trig.title')}</h2>
+        ${!f ? html`<button class="btn-outline btn-sm" onClick=${p.openForm}>+ ${t('secretary.trig.add')}</button>` : null}
+      </div>
+      <p class="sec-hint">${t('secretary.trig.hint')}</p>
+      ${p.triggers.length === 0 && !f ? html`<div class="sec-hint">${t('secretary.trig.empty')}</div>` : null}
+      ${p.triggers.length ? html`<ul class="sec-trig-list">
+        ${p.triggers.map((tr) => html`
+          <li class="sec-trig-row ${tr.status}" key=${tr.id}>
+            <div class="sec-trig-main">
+              <div class="sec-trig-label">${tr.label}</div>
+              <div class="sec-hint">${kindLabel(tr)}${tr.status === 'proposed' ? ' · ' + t('secretary.trig.proposedBadge') : tr.status === 'paused' ? ' · ' + t('secretary.trig.paused') : tr.status === 'fired' ? ' · ' + t('secretary.trig.fired') : ''}</div>
+            </div>
+            <div class="sec-trig-btns">
+              ${tr.status === 'proposed'
+                ? html`<button class="btn-primary btn-sm" onClick=${() => p.armTrigger(tr)}>${t('secretary.trig.arm')}</button>
+                       <button class="btn-ghost btn-sm" onClick=${() => p.removeTrigger(tr)}>${t('secretary.trig.dismiss')}</button>`
+                : html`<button class="btn-ghost btn-sm" onClick=${() => p.togglePause(tr)}>${tr.status === 'paused' ? t('secretary.trig.resume') : t('secretary.trig.pause')}</button>
+                       <button class="btn-ghost btn-sm" title=${t('secretary.remove')} onClick=${() => p.removeTrigger(tr)}>✕</button>`}
+            </div>
+          </li>`)}
+      </ul>` : null}
+      ${f ? html`
+        <div class="sec-form sec-trig-form">
+          <input class="sec-input" placeholder=${t('secretary.trig.labelPlaceholder')} value=${f.label} onInput=${(e) => p.setField('label', e.target.value)} />
+          <select class="sec-input" value=${f.kind} onChange=${(e) => p.setField('kind', e.target.value)}>
+            <option value="recurring" selected=${f.kind === 'recurring'}>${t('secretary.trig.kind.recurring')}</option>
+            <option value="time" selected=${f.kind === 'time'}>${t('secretary.trig.kind.time')}</option>
+            <option value="completion" selected=${f.kind === 'completion'}>${t('secretary.trig.kind.completion')}</option>
+            <option value="condition" selected=${f.kind === 'condition'}>${t('secretary.trig.kind.condition')}</option>
+          </select>
+          ${f.kind === 'recurring' ? html`<select class="sec-input" value=${f.cadence} onChange=${(e) => p.setField('cadence', e.target.value)}>
+            <option value="daily" selected=${f.cadence === 'daily'}>${t('secretary.trig.cad.daily')}</option>
+            <option value="weekly" selected=${f.cadence === 'weekly'}>${t('secretary.trig.cad.weekly')}</option>
+            <option value="monthly" selected=${f.cadence === 'monthly'}>${t('secretary.trig.cad.monthly')}</option></select>` : null}
+          ${f.kind === 'time' ? html`<input class="sec-input" type="datetime-local" value=${f.when} onInput=${(e) => p.setField('when', e.target.value)} />` : null}
+          ${f.kind === 'completion' ? html`<select class="sec-input" value=${f.targetId} onChange=${(e) => p.setField('targetId', e.target.value)}>
+            <option value="" selected=${!f.targetId}>${t('secretary.trig.pickTarget')}</option>
+            ${(p.goals || []).filter((g) => g.status !== 'done').map((g) => html`<option value=${g.id} key=${g.id}>${t('secretary.trig.goalOpt')}: ${g.title}</option>`)}
+            ${(p.routines || []).filter((r) => r.status === 'active').map((r) => html`<option value=${r.id} key=${r.id}>${t('secretary.trig.routineOpt')}: ${r.title}</option>`)}
+          </select>` : null}
+          ${f.kind === 'condition' ? html`
+            <select class="sec-input" value=${f.condType} onChange=${(e) => p.setField('condType', e.target.value)}>
+              <option value="memory_count" selected=${f.condType === 'memory_count'}>${t('secretary.trig.ct.memory_count')}</option>
+              <option value="workspace_count" selected=${f.condType === 'workspace_count'}>${t('secretary.trig.ct.workspace_count')}</option>
+              <option value="no_activity" selected=${f.condType === 'no_activity'}>${t('secretary.trig.ct.no_activity')}</option>
+              <option value="memory_exists" selected=${f.condType === 'memory_exists'}>${t('secretary.trig.ct.memory_exists')}</option>
+            </select>
+            <input class="sec-input" placeholder=${t('secretary.trig.prefixPlaceholder')} value=${f.condPrefix} onInput=${(e) => p.setField('condPrefix', e.target.value)} />
+            ${f.condType === 'no_activity'
+              ? html`<input class="sec-input sec-input-sm" type="number" min="1" value=${f.condDays} onInput=${(e) => p.setField('condDays', e.target.value)} title=${t('secretary.trig.days')} />`
+              : (f.condType !== 'memory_exists' ? html`<input class="sec-input sec-input-sm" type="number" min="1" value=${f.condValue} onInput=${(e) => p.setField('condValue', e.target.value)} title=${t('secretary.trig.count')} />` : null)}` : null}
+          <div class="sec-actions">
+            <button class="btn-ghost btn-sm" onClick=${p.closeForm}>${t('secretary.cancel')}</button>
+            <button class="btn-primary btn-sm" disabled=${p.adding || !f.label.trim()} onClick=${p.createTrigger}>${p.adding ? t('secretary.saving') : t('secretary.trig.create')}</button>
+          </div>
+        </div>` : null}
     </section>`;
 }
