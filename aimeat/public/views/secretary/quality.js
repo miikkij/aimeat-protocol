@@ -30,6 +30,19 @@ import { extractJson } from '/js/services/secretary-helpers.js';
 export const MIN_CONTEXT = 200_000;
 const LONG = { timeoutMs: 1_800_000, retries: 0 };
 
+/**
+ * The quality contract handed to specialists in every delegated task, so they work like the Secretary:
+ * grounded, no fabrication, and ask the owner (aimeat_dm_ask) when facts are missing rather than guess.
+ * Specialists already have aimeat_dm_ask + workspace/memory read tools — this tells them to use them.
+ */
+export const SPECIALIST_CONTRACT = [
+  'WORK TO THIS QUALITY CONTRACT:',
+  '- Ground everything ONLY in the facts/context you are given or can read from the workspace. Never invent numbers, metrics, statistics, quotes, testimonials, names, dates, events, deals, or outcomes.',
+  '- If a needed fact is missing and only the owner can provide it, ASK them with a structured question (the aimeat_dm_ask tool) instead of guessing; for anything still unknown, use a [bracketed placeholder].',
+  '- Use a ≥200k-context model so you can hold the grounding context; set temperature by task (low ≈0.2 for fact-based, higher ≈0.7 for creative).',
+  '- Verify your output against the facts before delivering, and flag anything not supported.',
+].join('\n');
+
 /** Read the owner's configured models + their context windows → capability for the quality pipeline. */
 export async function getAiCapability() {
   const [settingsR, modelsR] = await Promise.all([
