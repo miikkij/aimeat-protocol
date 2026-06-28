@@ -75,10 +75,10 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, isAllowedQuickAction, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine } from '../src/services/secretary-tick.js';
 // G6: the FRONTEND copy of the shared rules (pure, dependency-free) — imported directly so the parity
 // test below proves it agrees with the TS server helpers above. (test/ is excluded from tsc; tsx runs it.)
-import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as feSanitizeQuickActions } from '../public/js/services/secretary-rules.js';
+import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as feSanitizeQuickActions, isAllowedQuickAction as feIsAllowedQuickAction } from '../public/js/services/secretary-rules.js';
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
@@ -1202,6 +1202,16 @@ await test('65. routeRoutineStep + sanitizeProposedQuickActions: frontend mirror
     // 3 valid kept (prompt, compose, long-label-trimmed prompt); the security invariant: no 'run' survives.
     assert(be.length === 3 && !be.some((a: any) => a.kind === 'run'), `security invariant: ${JSON.stringify(be)}`);
     assert(be[2].label.length === 40, `long label trimmed to 40: ${be[2].label.length}`);
+    // G8: isAllowedQuickAction agrees fe/be and gates a stored 'run' action (the tick scrubs config with it).
+    const stored: any[] = [
+        { id: '1', label: 'ok', kind: 'prompt', prompt: 'hi', source: 'brain', status: 'active' },
+        { id: '2', label: 'okc', kind: 'compose', target: 'note', source: 'secretary', status: 'active' },
+        { id: '3', label: 'evil', kind: 'run', action: 'spend', source: 'secretary', status: 'active' }, // disallowed
+        { id: '4', label: 'badt', kind: 'compose', target: 'wallet', source: 'brain', status: 'active' }, // disallowed
+    ];
+    for (const a of stored) assert(isAllowedQuickAction(a) === feIsAllowedQuickAction(a), `isAllowed mismatch ${a.label}`);
+    const kept = stored.filter(isAllowedQuickAction);
+    assert(kept.length === 2 && !kept.some((a) => a.kind === 'run'), `G8 scrub keeps only prompt/compose: ${JSON.stringify(kept.map((a) => a.label))}`);
 });
 
 console.log('\nCleanup');
