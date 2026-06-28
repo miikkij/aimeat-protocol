@@ -903,6 +903,9 @@
       "running": "Ajetaan…",
       "ran": "Katsaus tehty — katso feed.",
       "skipped": "Ohitettu",
+      "skipStopSpending": "kulutuksen pysäytys on päällä",
+      "skipBudget": "tämän päivän budjetti on käytetty",
+      "skipNoContext": "kontekstia ei ole vielä asetettu",
       "budgetLeft": "Budjettia jäljellä tänään",
       "error": "Katsauksen päivitys epäonnistui"
     },

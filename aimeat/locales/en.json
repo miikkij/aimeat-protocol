@@ -903,6 +903,9 @@
       "running": "Running…",
       "ran": "Check-in done — see the feed.",
       "skipped": "Skipped",
+      "skipStopSpending": "stop-spending is on",
+      "skipBudget": "today's budget is used up",
+      "skipNoContext": "no context is set up yet",
       "budgetLeft": "Budget left today",
       "error": "Couldn't update the check-in"
     },
