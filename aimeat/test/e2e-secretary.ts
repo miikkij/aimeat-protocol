@@ -1300,6 +1300,21 @@ await test('71. Secretary clarify posts inbox questions + stores a produce job; 
     assert(bad.status === 400, `bad: ${bad.status}`);
 });
 
+await test('72. Specialist run endpoint: provision + queue + run contract; 404 unknown; unauth rejected', async () => {
+    const mk = await json('/v1/specialists', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'researcher', role: 'specialist', brain: { purpose: 'Research topics and summarize.' } }) });
+    assert(mk.status === 200 || mk.status === 201, `provision: ${mk.status} ${JSON.stringify(mk.body).slice(0, 200)}`);
+    const tk = await json('/v1/agents/researcher/tasks', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ title: 'Summarize X', description: 'Summarize the topic X grounded in given facts.', status: 'queued' }) });
+    assert(tk.status === 200 || tk.status === 201, `queue: ${tk.status} ${JSON.stringify(tk.body).slice(0, 200)}`);
+    // No OpenRouter key in CI → ran:0 (task left queued), but the endpoint contract holds.
+    const run = await json('/v1/specialists/researcher/run', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ limit: 3 }) });
+    assert(run.status === 200, `run: ${run.status} ${JSON.stringify(run.body).slice(0, 200)}`);
+    assert(typeof run.body.data.ran === 'number' && Array.isArray(run.body.data.deliverableKeys), `shape: ${JSON.stringify(run.body.data)}`);
+    const nf = await json('/v1/specialists/nope-nope/run', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: '{}' });
+    assert(nf.status === 404, `unknown: ${nf.status}`);
+    const un = await json('/v1/specialists/researcher/run', { method: 'POST', body: '{}' });
+    assert(un.status === 401 || un.status === 403, `unauth: ${un.status}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

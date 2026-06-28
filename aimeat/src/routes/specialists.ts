@@ -34,6 +34,7 @@ import {
   SPECIALIST_ROLE_TAG, specialistGaii, validateSpecialistName, getSpecialist, listSpecialists,
   ensureSpecialist, specialistRole, readSpecialistPolicy, writeSpecialistPolicy, deleteSpecialistConfig,
 } from '../services/specialist.js';
+import { runSpecialistQueue } from '../services/specialist-runner.js';
 
 /** Normalize a brain rules array from the request into stored DirectiveRule[]. */
 function normalizeRules(raw: unknown): DirectiveRule[] {
@@ -172,6 +173,25 @@ export function specialistsRouter(config: AimeatConfig, storage: Storage): Route
     } catch (err) {
       logger.error('Failed to list specialists', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list specialists'));
+    }
+  });
+
+  // ── POST /v1/specialists/:name/run — run this specialist's queued tasks now (node-side, owner key) ──
+  router.post('/v1/specialists/:name/run', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
+    try {
+      const owner = req.auth!.owner as string;
+      const name = req.params.name as string;
+      const agent = await getSpecialist(storage, config, owner, name);
+      if (!agent) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Specialist "${name}" not found`));
+      const ownerGhii = `${owner}@${config.nodeId}`;
+      const limit = Math.min(20, Math.max(1, Number((req.body as { limit?: number } | undefined)?.limit) || 5));
+      const deliverableKeys = await runSpecialistQueue(storage, config, ownerGhii, agent, { limit });
+      res.json(success(config.nodeId, { ran: deliverableKeys.length, deliverableKeys }, [
+        { description: 'List specialists', method: 'GET', url: '/v1/specialists' },
+      ]));
+    } catch (err) {
+      logger.error('Failed to run specialist', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to run specialist'));
     }
   });
 
