@@ -3,8 +3,9 @@
  * @description Owner-facing REST API for Agent Workflows — declared, ordered agent pipelines with
  *   per-step input/output signals (the abstraction the bare scheduler lacks: it shows "did it
  *   fire", a workflow shows "did it produce"). Definitions are stored in the owner's own memory
- *   (`workflows.def.<id>`), so no new storage backend is needed; the deterministic engine + runs
- *   arrive in Phase 4. Save is rejected unless the graph is a DAG and every step's agent/offer is
+ *   (`workflows.def.<id>`), so no new storage backend is needed. The deterministic engine + runs have
+ *   shipped — runs start via `POST /:id/run` (manual/test) plus the def's scheduled/event triggers, and
+ *   are cancellable. Save is rejected unless the graph is a DAG and every step's agent/offer is
  *   workflow-compatible (publishes its signals + deliverable.location). Authorable by the owner or
  *   an agent holding `workflow:write`. See docs/plans/2026-06-13-agent-workflows-node-plan.md §8.
  * @structure
@@ -12,13 +13,18 @@
  *   - GET    /v1/workflows/:id                  one def
  *   - PUT    /v1/workflows/:id                  create/update (save-time validation)
  *   - DELETE /v1/workflows/:id                  remove def (?withRuns=true also drops its runs)
+ *   - POST   /v1/workflows/:id/run              start a run (manual/test: signals-only | full, sandbox|live)
+ *   - POST   /v1/workflows/:id/runs/:runId/cancel  abort an in-flight run
+ *   - GET    /v1/workflows/:id/health           run-health trend over the last N runs
  *   - GET    /v1/workflows/:id/blueprint        derived structural graph (nodes + edges + keys)
- *   - GET    /v1/workflows/:id/runs             list runs (empty until the engine ships)
+ *   - GET    /v1/workflows/:id/runs             list runs
  *   - GET    /v1/workflows/:id/runs/:runId      one run
  * @usage
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.0.1 — 2026-06-28 — Doc: the engine + runs have shipped (POST /:id/run + cancel + health); corrected
+ *     the stale "engine = Phase 4 / runs empty until the engine ships" wording + listed the run endpoints.
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + blueprint; runs read-only (engine = Phase 4).
  */
 import { Router } from 'express';
