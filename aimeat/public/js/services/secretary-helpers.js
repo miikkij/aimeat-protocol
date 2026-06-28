@@ -67,35 +67,56 @@ export const CONTRACT = `\`\`\`json
     "description": "one line describing it",
     "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why" } ]
   },
+  "goals": [ { "title": "a concrete goal I'm working toward in this context", "why": "why it matters" } ],
   "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ]
 }
 \`\`\``;
 
-/** Conversational interview the user runs in their own external AI chat. */
-export function buildInterviewPrompt(owner) {
-  return `I want to set up a context for my personal Secretary inside AIMEAT${owner ? ` (my username is "${owner}")` : ''}.
+/** When EVOLVING an existing context (re-run "reshape current"), the current setup fed back so the AI
+ *  modifies it instead of starting over — and keeps the existing workspaces stable. Empty for a new context. */
+function currentSetupText(current) {
+  if (!current) return '';
+  const rules = ((current.brain && current.brain.rules) || []).map((r) => `- ${r.description}`).join('\n');
+  const ws = (current.workspaces || []).map((w) => `- ${w.name}: ${w.purpose || ''}`).join('\n');
+  return `
 
-Act as that Secretary getting to know me for ONE area of my life or work. Interview me with a few focused questions about: what I'm trying to achieve in this area, the kinds of tasks I'd want help with, and how I like to communicate (tone, language, level of detail). Do NOT ask me about "organisms", "workspaces", folders or any technical structure — figure the right structure out yourself from what I tell you. Keep it conversational; ask, wait for my answers, then continue.
-
-When you have enough, design two things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
-
-${CONTRACT}
-
-Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block.`;
+This context ALREADY EXISTS — EVOLVE it, do not start over.
+Current purpose: ${(current.brain && current.brain.purpose) || ''}
+Current rules:
+${rules || '(none)'}
+Current workspaces:
+${ws || '(none)'}
+KEEP the existing workspaces (same names) and only ADD a new one if the change truly needs it — never drop or rename an existing workspace. Update the brain, goals and quick actions to reflect the requested change below.`;
 }
 
-/** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). */
-export function buildDesignPrompt(owner, needs) {
-  return `You are setting up one context of ${owner || 'a user'}'s personal Secretary inside AIMEAT. Based ONLY on the needs described below, design two things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
+/** Conversational interview the user runs in their own external AI chat. `current` (optional) = the
+ *  context being re-run, so the AI EVOLVES it (reshape) instead of starting fresh. */
+export function buildInterviewPrompt(owner, current) {
+  return `I want to ${current ? 'adjust an existing' : 'set up a'} context for my personal Secretary inside AIMEAT${owner ? ` (my username is "${owner}")` : ''}.
+
+Act as that Secretary ${current ? 'helping me evolve this area of my life or work' : 'getting to know me for ONE area of my life or work'}. Interview me with a few focused questions about: what I'm trying to achieve in this area, the kinds of tasks I'd want help with, and how I like to communicate (tone, language, level of detail). Do NOT ask me about "organisms", "workspaces", folders or any technical structure — figure the right structure out yourself from what I tell you. Keep it conversational; ask, wait for my answers, then continue.${currentSetupText(current)}
+
+When you have enough, design these things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
 
 ${CONTRACT}
+
+Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 goals (concrete things I'm working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block.`;
+}
+
+/** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). `current`
+ *  (optional) = the context being re-run, so the AI EVOLVES it (reshape) and keeps its workspaces. */
+export function buildDesignPrompt(owner, needs, current) {
+  return `You are setting up ${current ? 'and evolving ' : ''}one context of ${owner || 'a user'}'s personal Secretary inside AIMEAT. Based ONLY on the needs described below${current ? ' and the current setup' : ''}, design these things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
+
+${CONTRACT}
+${currentSetupText(current)}
 
 The user's needs:
 """
 ${needs}
 """
 
-Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block — no commentary.`;
+Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 goals (concrete things the user is working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block — no commentary.`;
 }
 
 /** Pull a JSON object out of an AI's text (may be fenced / surrounded by prose). */

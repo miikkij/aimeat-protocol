@@ -53,8 +53,8 @@ export function hirePanel(p) {
       <p class="sec-desc">${t('secretary.hireIntro')}</p>
       <div class="sec-opt">
         <div class="sec-opt-h">${t('secretary.optionA')}</div>
-        <div class="sec-prompt-box">${buildInterviewPrompt(p.owner)}</div>
-        <${CopyButton} text=${buildInterviewPrompt(p.owner)} className="btn-outline btn-sm" label=${t('secretary.copyPrompt')} copiedLabel=${'✓ ' + t('secretary.copied')} />
+        <div class="sec-prompt-box">${buildInterviewPrompt(p.owner, p.current)}</div>
+        <${CopyButton} text=${buildInterviewPrompt(p.owner, p.current)} className="btn-outline btn-sm" label=${t('secretary.copyPrompt')} copiedLabel=${'✓ ' + t('secretary.copied')} />
       </div>
       <div class="sec-opt">
         <div class="sec-opt-h">${t('secretary.optionB')}</div>
@@ -187,15 +187,35 @@ export function decisionsCard(p) {
 export function brainCard(p) {
   const brain = p.brain;
   const active = p.active;
+  const d = p.brainDraft; // C2: when set, the brain is in inline-edit mode
   return html`
     <section class="sec-card">
       <div class="sec-card-head">
         <div class="sec-status"><span class="sec-dot"></span> ${t('secretary.hiredStatus')}</div>
-        <button class="btn-ghost btn-sm" onClick=${p.openEdit}>${t('secretary.rerun')}</button>
+        ${!d ? html`<div class="sec-brain-actions">
+          <button class="btn-ghost btn-sm" onClick=${p.startBrainEdit}>${t('secretary.editBrain')}</button>
+          <button class="btn-ghost btn-sm" onClick=${p.openEdit}>${t('secretary.rerun')}</button>
+        </div>` : null}
       </div>
       <h2 class="sec-h2">${t('secretary.brain')}</h2>
-      <p class="sec-purpose">${(brain.purpose)}</p>
-      ${Array.isArray(brain.rules) && brain.rules.length > 0 && html`<ul class="sec-rules">${brain.rules.map((r) => html`<li key=${r.id}>${(r.description)}</li>`)}</ul>`}
+      ${d ? html`
+        <textarea class="sec-input" rows="3" value=${d.purpose} onInput=${(e) => p.setBrainDraft({ ...d, purpose: e.target.value })}></textarea>
+        <div class="sec-h3">${t('secretary.rules')}</div>
+        <ul class="sec-rule-edit">
+          ${d.rules.map((r, i) => html`
+            <li class="sec-rule-row" key=${i}>
+              <input class="sec-input" value=${r.description} onInput=${(e) => p.setBrainDraft({ ...d, rules: d.rules.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)) })} />
+              <button class="btn-ghost btn-sm" title=${t('secretary.remove')} onClick=${() => p.setBrainDraft({ ...d, rules: d.rules.filter((_, j) => j !== i) })}>✕</button>
+            </li>`)}
+        </ul>
+        <button class="btn-ghost btn-sm" onClick=${() => p.setBrainDraft({ ...d, rules: [...d.rules, { id: '', description: '' }] })}>+ ${t('secretary.addRule')}</button>
+        <div class="sec-actions">
+          <button class="btn-ghost btn-sm" onClick=${p.cancelBrainEdit}>${t('secretary.cancel')}</button>
+          <button class="btn-primary btn-sm" disabled=${p.savingBrain} onClick=${p.saveBrain}>${p.savingBrain ? t('secretary.saving') : t('secretary.save')}</button>
+        </div>`
+      : html`
+        <p class="sec-purpose">${(brain.purpose)}</p>
+        ${Array.isArray(brain.rules) && brain.rules.length > 0 && html`<ul class="sec-rules">${brain.rules.map((r) => html`<li key=${r.id}>${(r.description)}</li>`)}</ul>`}`}
       ${active.organismName && html`
         <h2 class="sec-h2">${t('secretary.selfOrganism')}</h2>
         <p class="sec-orgname">🗂 ${(active.organismName)}</p>
@@ -306,6 +326,24 @@ export function whatsNextCard(p) {
       <h2 class="sec-h2">${t('secretary.next.title')}</h2>
       <p class="sec-hint">${t('secretary.next.hint')}</p>
       ${!r ? html`
+        <p class="sec-hint">${t('secretary.next.explain')}</p>
+        ${p.actionItems && p.actionItems.length ? html`<div class="sec-next-followups">↑ ${t('secretary.next.followups', { n: p.actionItems.length })}</div>` : null}
+        ${p.activeRoutines && p.activeRoutines.length ? html`
+          <div class="sec-h3">${t('secretary.next.continueTitle')}</div>
+          <ul class="sec-routine-list">
+            ${p.activeRoutines.map((rt) => {
+              const ns = p.nextPendingStep(rt);
+              return html`
+                <li class="sec-routine-row" key=${rt.id}>
+                  <div class="sec-routine-main">
+                    <div class="sec-routine-title">${(rt.title)}</div>
+                    <div class="sec-hint">${ns ? `${t('secretary.next.nextStep')}: ${ns.summary}` : t('secretary.next.allSettled')}</div>
+                  </div>
+                  <button class="btn-outline btn-sm" onClick=${() => p.advance(rt)}>${t('secretary.next.advance')}</button>
+                </li>`;
+            })}
+          </ul>` : null}
+        <div class="sec-h3">${t('secretary.next.startNewTitle')}</div>
         <textarea class="sec-paste" rows="2" placeholder=${t('secretary.next.placeholder')} value=${p.goal} onInput=${(e) => p.setGoal(e.target.value)}></textarea>
         <div class="sec-actions">
           <button class="btn-primary" disabled=${!p.goal.trim() || p.proposing} onClick=${p.proposeRoutine}>${p.proposing ? t('secretary.next.proposing') : t('secretary.next.propose')}</button>
