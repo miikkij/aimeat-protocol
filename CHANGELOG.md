@@ -8,7 +8,11 @@ The Secretary view is redesigned around the owner's daily loop — a dashboard-f
 ("What's next"), recurring **Routines** the Secretary runs and supervises, dynamic quick actions, delegation to
 other agents *or* multi-specialist workflows, and a band-driven autonomous tick that advances routines and
 derives one-click follow-up **action-items**. An independent audit then closed ten gaps (recurrence, i18n of
-tick output, a real reconcile scan, execution consistency, cross-runtime parity, and more).
+tick output, a real reconcile scan, execution consistency, cross-runtime parity, and more). It then grew a
+proactive layer: **Triggers** the Secretary binds to what it tracks (time / recurring / completion / condition,
+auto-detected from notes), a real **Calendar** (month/week/day), a **"What's next" that actually does the work**
+— one click produces the deliverable (drafted content or a scout list), shows it inline, and links to where it
+landed — and a **customizable two-column dashboard** the owner can pin/reorder/hide and that persists.
 
 ### Added
 
@@ -42,6 +46,31 @@ tick output, a real reconcile scan, execution consistency, cross-runtime parity,
   dismiss.
 - **Day-grouped activity feed.** "What I've done" groups entries by day (Today / Yesterday / date) with per-day
   counts, instead of a flat chronological list.
+- **Light/dark theme toggle lives inside the login pill.** The light/dark switch moved out of the nav (next to
+  the EN/FI buttons) and into the golden login pill served by `aimeat-auth.js` (`mountLoginButton`), in both the
+  signed-in and signed-out states. Every app that embeds the pill now inherits the toggle for free — no per-app
+  theming code. It is self-contained (`<html data-theme>` + the `aimeat-theme` localStorage key) and dispatches an
+  `aimeat-theme-change` window event so `theme.js` keeps the SPA (charts, tabs) in sync.
+- **Triggers — proactive follow-ups the Secretary binds to what it tracks.** Per-context `secretary.trigger.{id}`
+  records of four kinds: **time** (one-off datetime), **recurring** (daily/weekly/monthly, re-arms after firing),
+  **completion** (a goal/routine reaches done) and **condition** (a memory-key prefix or workspace passes a
+  threshold — `memory_count`/`workspace_count`/`memory_exists`/`no_activity`). The autonomous tick is the engine:
+  it evaluates armed triggers each run (FREE — no AI), fires due ones into the feed + as an action-item, and
+  re-arms recurring ones. Owners create/pause/delete them; the Secretary also **auto-detects** a recurring or
+  deadline follow-up from a filed note (cheap keyword gate → one AI call) and proposes it to **Arm or Dismiss**.
+- **Calendar (month / week / day).** A real calendar on the dashboard plots past activity (feed), the autonomous
+  check-in cron, routine cadences, and time/recurring triggers — navigable by month, week, or day.
+- **"What's next" produces real deliverables.** Each proposed next action has **Do it / Skip**; "Do it" actually
+  does the work — file/create actions run an AI completion to produce the deliverable (the drafted list/framework,
+  not a placeholder), discover keeps its results as a saved list — then **shows the produced content inline**
+  (expand/collapse) and files it into the best-matching workspace. Every action logs to the "What I've done" feed
+  with an **Open** link, and the proposal prompt is told not to re-propose anything already in the workspace.
+  A bad deliverable can be **Discarded** (deletes the filed note and clears it from the list).
+- **Customizable two-column dashboard.** On wide screens the view uses the full width: a "Today" status band on
+  top, then a main column + a **sticky right rail** (Calendar, Autonomous check-in, Triggers by default); below
+  ~1100px it collapses to one column. Every card has a ⋮ **arrange** menu — move to the other column, reorder, or
+  hide — and the arrangement is **persisted per owner** (`secretary.layout`); a layout bar offers Reset and a chip
+  to restore each hidden section.
 
 ### Changed
 
@@ -59,6 +88,34 @@ tick output, a real reconcile scan, execution consistency, cross-runtime parity,
   security gate (`sanitizeProposedQuickActions`) live in a pure, dependency-free `secretary-rules.js` imported by
   the browser; a parity test imports **both** that module and the server's TS helpers and asserts identical
   output across an edge-case vector table, so the two copies can't drift silently.
+- **Login pill shows the owner's display name, kept current on every refresh.** The golden pill already preferred
+  the display name over the raw `owner@node-id`, but the owner session refresh never re-read it, so an edited name
+  stayed stale until a full re-login. `POST /v1/auth/refresh` now returns the current `display_name` and the client
+  `refresh()` adopts it — so the pill self-heals on every page load. A new `auth.updateSessionMeta()` + a
+  `session-updated` event also re-render the pill **live** the moment the profile is saved, with no reload.
+- **"Where things stand" is organized, persisted, timestamped, and linked.** The orientation is now structured
+  Markdown (short sections + bullets, not one prose blob), **stored per context and restored on load** (with its
+  timestamp + an inline Refresh) so it isn't regenerated on every visit, and workspace mentions render as
+  **links** straight to the workspace.
+- **The "What's next" list survives navigation.** It is persisted per context (stamped with `ctxId`) with each
+  action's do/skip state and restored on return, instead of being lost when leaving the view; Dismiss clears it.
+
+### Fixed
+
+- **Secretary "Do it" no longer fabricates.** The deliverable generation ran with no grounding data (just the
+  action title) and no anti-fabrication instruction, so a "draft a story/pitch" task invented users, metrics,
+  quotes, and a publisher deal out of thin air. It now feeds the **real workspace content as the only facts** and
+  forbids inventing numbers, statistics, quotes, names, dates, events, or outcomes — unknowns become
+  `[bracketed placeholders]` and thin context yields a clearly-labelled skeleton with a note on what's missing,
+  not fiction.
+- **Secretary "Open" links reach the right place in a new tab.** The result/feed/orientation links pointed at
+  `/v1/organisms/{id}` — not a SPA route, so they fell back to the homepage in the same tab (losing the page
+  state). They now deep-link to `/v1/profile?tab=organisms&org={id}&ws={wsId}` and open in a new tab; the
+  Organisms tab reads `?org=&ws=` on a cold mount so a fresh tab lands on the exact organism + workspace.
+- **No more literal `&amp;` in Secretary content.** Workspace names and AI output containing `&` (e.g.
+  "Calendar & Appointments") were double-escaped — `escHtml()` inside Preact/htm `${…}` interpolation (which
+  already escapes) produced the literal entity. Removed the redundant escaping; feed and orientation now render
+  through the safe `Markdown` component.
 
 ### Security
 

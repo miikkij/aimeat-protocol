@@ -920,6 +920,8 @@
       "openResult": "Open",
       "showResult": "Show result",
       "hideResult": "Hide result",
+      "discard": "Discard",
+      "discarded": "Discarded",
       "followups": "{n} follow-up(s) to handle above",
       "continueTitle": "Continue",
       "startNewTitle": "Start something new",

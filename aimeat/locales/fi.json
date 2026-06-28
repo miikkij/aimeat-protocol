@@ -920,6 +920,8 @@
       "openResult": "Avaa",
       "showResult": "Näytä tulos",
       "hideResult": "Piilota tulos",
+      "discard": "Hylkää",
+      "discarded": "Hylätty",
       "followups": "{n} käsiteltävää jatkotoimea yllä",
       "continueTitle": "Jatka",
       "startNewTitle": "Aloita jotain uutta",
