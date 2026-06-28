@@ -891,6 +891,8 @@
       "didDrafted": "Drafted & filed into {ws}",
       "didScoutedSaved": "Scouted {n} → saved to {ws}",
       "openResult": "Open",
+      "showResult": "Show result",
+      "hideResult": "Hide result",
       "followups": "{n} follow-up(s) to handle above",
       "continueTitle": "Continue",
       "startNewTitle": "Start something new",

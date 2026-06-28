@@ -542,7 +542,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     };
     try {
       const cap = action.capability;
-      let resultMsg = ''; let href = null;
+      let resultMsg = ''; let href = null; let preview = '';
       if (cap === 'discover') {
         // Scout AND KEEP the results: file the top hits as a list the owner can open.
         const d = await apiGet('/v1/discover?scope=public&per_page=10&q=' + encodeURIComponent(action.summary)).catch(() => null);
@@ -550,7 +550,8 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         const ws = pickWs();
         if (active.organismId && ws && entries.length) {
           const list = entries.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
-          await fileNote(ws, `Scouted: ${action.summary}`, `Found ${entries.length}:\n\n${list}`);
+          preview = `Found ${entries.length}:\n\n${list}`;
+          await fileNote(ws, `Scouted: ${action.summary}`, preview);
           resultMsg = t('secretary.next.didScoutedSaved', { n: entries.length, ws: ws.name }); href = spaceUrl(ws.id);
         } else {
           resultMsg = t('secretary.next.didDiscover', { n: entries.length });
@@ -570,6 +571,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
           const gen = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, systemPrompt: sys, app_id: 'secretary-next-do' }), timeoutMs: 1_800_000, retries: 0 });
           content = ((gen && gen.data && gen.data.content) || '').trim() || action.summary;
         } catch { /* fall back to filing the title if generation fails */ }
+        preview = content;
         if (active.organismId && ws) {
           await fileNote(ws, action.summary, content);
           resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = spaceUrl(ws.id);
@@ -578,7 +580,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
           resultMsg = t('secretary.next.didNoted');
         }
       }
-      patch('done', { result: resultMsg, href });
+      patch('done', { result: resultMsg, href, preview, expanded: true });
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
     } catch (e) {
       patch('open');
@@ -588,6 +590,11 @@ ${SECRETARY_AIMEAT_PRIMER}`;
 
   const skipProposedAction = useCallback((action) => {
     setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, status: 'skipped' } : a)) } : s);
+  }, []);
+
+  // Show/hide the produced deliverable inline under a done action (no navigation needed).
+  const togglePreview = useCallback((action) => {
+    setNextAns((s) => (s && s.actions) ? { ...s, actions: s.actions.map((a) => (a.id === action.id ? { ...a, expanded: !a.expanded } : a)) } : s);
   }, []);
 
   const switchContext = useCallback(async (id) => {
@@ -661,7 +668,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${quickActionsManager(qa)}
 
               ${/* Today / dashboard — where are we + is this current */ ''}
-              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } })}
+              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } })}
               ${standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}
