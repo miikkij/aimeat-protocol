@@ -124,6 +124,14 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   The specialist executor now honors a workflow run's `wf-key-prefix` scope — in a sandbox run it also
   writes the deliverable under the prefixed key, so the sandbox success-signal passes without touching
   production keys.
+- **Calendar entries are editable in place.** Clicking a calendar entry opens a type-specific dialog
+  right in the Secretary (no bouncing around the app): a trigger → edit label/cadence + pause/delete
+  (persists to its `secretary.trigger.{id}` memory record); a routine → cadence + pause (its
+  `secretary.config`); the daily check-in → run-now/pause (its schedule); a past activity → its content
+  inline. The dialog drives the SAME domain hooks the dedicated cards use (use-triggers gains an
+  `updateTrigger` edit), so a change persists to the right backing store and shows everywhere — they
+  aren't one uniform record type (trigger = memory · routine = config sub-object · tick = schedule ·
+  feed = an item in `secretary.feed`), so the dialog dispatches by source type.
 
 ### Changed
 
