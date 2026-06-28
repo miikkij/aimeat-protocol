@@ -24220,6 +24220,46 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/specialists/{name}/run:
+    post:
+      operationId: runSpecialist
+      summary: Run a specialist's queued tasks now (node-side, owner key)
+      description: >-
+        Execute up to `limit` of the specialist's QUEUED agent tasks immediately on the node, using the
+        owner's OpenRouter key and the specialist's brain + the quality contract (grounded, no
+        fabrication). Each produced deliverable is written to the specialist's memory and the task is
+        marked done. The Secretary tick also runs this on schedule (it directs its specialists);
+        spending-paused/error leaves a task queued to retry. Owner-only.
+      tags: [Specialists]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, maximum: 20, default: 5 }
+      responses:
+        '200':
+          description: Tasks run
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ran: { type: integer }
+                          deliverableKeys: { type: array, items: { type: string } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/specialists/{name}/policy:
     put:
       operationId: updateSpecialistPolicy

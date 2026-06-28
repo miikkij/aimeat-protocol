@@ -95,6 +95,13 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   `aimeat_dm_ask` when a fact is missing, use a ≥200k model, verify before delivering — plus a pointer to
   where the facts live (the organism + workspaces, read via the agent's memory/workspace tools). So
   delegated specialists work the same way, not as one-shot guessers.
+- **Specialists execute node-side (like the Secretary).** A specialist is a stripped-down Secretary — its
+  own brain (agent directives) + operating policy — and now RUNS on the node using the owner's OpenRouter
+  key, not an external runtime. A new executor (`services/specialist-runner.ts`) produces each QUEUED
+  task's deliverable grounded in the task (no fabrication, the quality contract baked into the system
+  prompt), writes it to the specialist's memory, and marks the task done. Driven by the Secretary tick
+  (it directs its specialists) and on-demand via `POST /v1/specialists/:name/run`. Spending-paused/error
+  leaves a task queued to retry. This is the foundation for chaining specialists into designed workflows.
 
 ### Changed
 

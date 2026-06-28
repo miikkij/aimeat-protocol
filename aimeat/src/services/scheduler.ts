@@ -48,6 +48,8 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
+import { listSpecialists } from './specialist.js';
+import { runAllSpecialists } from './specialist-runner.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
@@ -651,10 +653,15 @@ export class Scheduler {
     const clarifyRecs = await this.storage.listMemory(owner, { prefix: 'secretary.clarify.' });
     const askedClarify = clarifyRecs.map((r) => (r.value ?? {}) as Record<string, unknown>).filter((j) => j && j.status === 'asked');
 
+    // (3a3) Specialists the Secretary directs: any with QUEUED tasks have node-run work to do this tick.
+    const specialistAgents = await listSpecialists(this.storage, owner.split('@')[0]);
+    const hasSpecialistWork = specialistAgents.length > 0
+      && (await Promise.all(specialistAgents.map((s) => this.storage.listAgentTasks(s.gaii, { status: 'queued', perPage: 1 })))).some((r) => r.total > 0);
+
     // (3b) B5: band-driven routine advancement (FREE — no AI). Decide, from each active routine's next
     // step band, what the tick should auto-run (act-band file steps) vs surface as a follow-up action-item.
     const routineActions = deriveRoutineActions(active);
-    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0 || askedClarify.length > 0;
+    const hasRoutineWork = routineActions.items.length > 0 || routineActions.runSteps.length > 0 || rearmedRoutines.length > 0 || firedTriggers.length > 0 || askedClarify.length > 0 || hasSpecialistWork;
     if (!hasWorkToDo({ openGoals: openGoals.length, dueDecisions: dueDecisions.length, pendingIntake: hasRoutineWork ? 1 : 0 })) {
       return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes: [], skipped: true, skipReason: 'nothing to do (no open goals, decisions due, or routine steps)' };
     }
@@ -683,6 +690,17 @@ export class Scheduler {
       const clarifyWrites = await this.resumeClarifyJobs(owner, ownerName, askedClarify);
       writes.push(...clarifyWrites);
       paidMorsels += clarifyWrites.filter((w) => w.startsWith('organism.')).length;
+
+      // Direct the specialists: run each specialist's queued tasks node-side (owner key + quality contract).
+      if (hasSpecialistWork) {
+        const specialistWrites = await runAllSpecialists(this.storage, this.config, owner, ownerName);
+        if (specialistWrites.length) {
+          writes.push(...specialistWrites);
+          paidMorsels += specialistWrites.length;
+          await this.appendFeed(owner, { kind: 'act', contextId: active.id, contextName: active.name || '', text: `🧩 Specialists produced ${specialistWrites.length} deliverable(s)` });
+          writes.push('secretary.feed');
+        }
+      }
 
       // B5 routine pass (FREE — no AI): auto-run each act-band performable step + mark it done, and stamp
       // the derived follow-up action-items. draft/ask/delegate steps were already turned into action-items
