@@ -556,6 +556,33 @@
     "identity": "Identity",
     "scopes": "Permissions",
     "managePermissions": "Manage in Agents",
+    "layout": {
+      "arrange": "Arrange",
+      "toRight": "Move to right column",
+      "toLeft": "Move to left column",
+      "up": "Move up",
+      "down": "Move down",
+      "hide": "Hide",
+      "reset": "Reset layout",
+      "section": {
+        "whatsNext": "What's next",
+        "stand": "Where things stand",
+        "actionItems": "Action items",
+        "routines": "Routines",
+        "decisions": "Decisions to confirm",
+        "automation": "Autonomous check-in",
+        "triggers": "Triggers",
+        "calendar": "Calendar",
+        "feed": "What I've done",
+        "goals": "Goals",
+        "decisionLog": "Decision log",
+        "chat": "Chat",
+        "whatsNextCard": "Suggestions",
+        "find": "Find",
+        "createResource": "Create",
+        "note": "Note"
+      }
+    },
     "cal": {
       "title": "Calendar",
       "month": "Month",
