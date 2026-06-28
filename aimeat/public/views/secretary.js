@@ -55,7 +55,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import { t, getLocale } from '/js/i18n.js';
-import { api, apiGet, apiPost, apiPut } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace } from '/js/services/organisms.js';
@@ -176,6 +176,10 @@ export default function SecretaryView() {
     apiGet(`/v1/memory/${encodeURIComponent('secretary.stand.' + activeId)}`)
       .then((r) => { const v = r && r.data && r.data.value; if (!cancelled && v && v.text) setStand({ text: v.text, generatedAt: v.generatedAt }); })
       .catch(() => {});
+    // Restore the last "What's next" list (with its do/skip state) so leaving and coming back keeps it.
+    apiGet(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`)
+      .then((r) => { const v = r && r.data && r.data.value; if (!cancelled && v && Array.isArray(v.actions) && v.actions.length) setNextAns(v); })
+      .catch(() => {});
     apiGet(`/v1/memory/${encodeURIComponent('secretary.chat.' + activeId)}`)
       .then((r) => {
         if (cancelled) return;
@@ -185,6 +189,13 @@ export default function SecretaryView() {
       .catch(() => { if (!cancelled) setChat([]); });
     return () => { cancelled = true; };
   }, [activeId]);
+
+  // Persist the "What's next" list (and its do/skip state) so navigating away and back keeps it.
+  // Stamped with ctxId so a context switch never writes the old list under the new context's key.
+  useEffect(() => {
+    if (!activeId || !nextAns || !Array.isArray(nextAns.actions) || nextAns.ctxId !== activeId) return;
+    apiPost('/v1/memory', { key: `secretary.next.${activeId}`, value: nextAns, visibility: 'private' }).catch(() => {});
+  }, [nextAns, activeId]);
 
   // Intake (note composer + Ask cards + P2-E cross-context auto-routing) lives in its own hook.
   // Triggers (Slice 3/4) — declared before intake so a filed note can ask the Secretary to auto-propose a trigger.
@@ -453,8 +464,8 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       const openDecs = (learn.decisions || []).filter((d) => d.status !== 'reviewed').map((d) => '- ' + d.decision).join('\n');
       const recent = (auto.feed || []).slice(0, 6).map((f) => '- ' + String(f.text || '').replace(/\s+/g, ' ').slice(0, 160)).join('\n');
       const space = await loadSpaceSnapshot();
-      const orgHref = active.organismId ? `/v1/organisms/${encodeURIComponent(active.organismId)}` : '';
-      const wsLinks = orgHref ? (wsList || []).map((w) => `- "${w.name}" → ${orgHref}`).join('\n') : '';
+      const wsUrl = (wsId) => (active.organismId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(active.organismId)}${wsId ? `&ws=${encodeURIComponent(wsId)}` : ''}` : '');
+      const wsLinks = active.organismId ? (wsList || []).map((w) => `- "${w.name}" → ${wsUrl(w.id)}`).join('\n') : '';
       const sys = `You are ${owner || 'the user'}'s personal Secretary in the "${active.name}" context. Give a SHORT, ORGANIZED orientation of where things stand right now. Use Markdown with 2–4 short sections or bullet groups (e.g. In progress / Open items / Needs attention / Recent) — NOT one long paragraph. Ground it in what's ACTUALLY in the workspaces below; do NOT say the space is empty if a workspace has content. When you mention a workspace, write it as a Markdown link using the "Workspace links" below so the owner can jump to it. Do NOT propose actions or claim to have done anything. Reply in ${getLocale() === 'fi' ? 'Finnish' : 'English'}.`;
       const snapshot = `Context purpose: ${active.brain.purpose}\nWorkspace contents:\n${space || '(no workspaces)'}\nWorkspace links:\n${wsLinks || '(none)'}\nOpen goals:\n${openGoals || '(none)'}\nOpen decisions:\n${openDecs || '(none)'}\nRecent autonomous activity:\n${recent || '(none)'}`;
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt: snapshot, systemPrompt: sys, app_id: 'secretary-orient' }), timeoutMs: 1_800_000, retries: 0 });
@@ -495,7 +506,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         why: String((a && a.why) || '').trim(),
         status: 'open',
       })).filter((a) => a.summary);
-      setNextAns({ actions });
+      setNextAns({ actions, ctxId: active.id });
     } catch (e) {
       setNextAns(null);
       showToast(`${t('secretary.next.error')}: ${e.message}`, true);
@@ -523,7 +534,8 @@ ${SECRETARY_AIMEAT_PRIMER}`;
       for (const w of wsl) { let sc = 0; const hay = String(w.name).toLowerCase(); for (const wd of words) if (hay.includes(wd)) sc++; if (sc > best) { best = sc; ws = w; } }
       return ws;
     };
-    const orgHref = active.organismId ? `/v1/organisms/${encodeURIComponent(active.organismId)}` : null;
+    // Deep link that opens the organism + the exact workspace in Profile › Organisms (new tab).
+    const spaceUrl = (wsId) => (active.organismId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(active.organismId)}${wsId ? `&ws=${encodeURIComponent(wsId)}` : ''}` : null);
     const fileNote = async (ws, title, body) => {
       const id = 'note-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
       await apiPost('/v1/memory', { key: `organism.${active.organismId}.w.${ws.id}.notes.${id}`, value: { id, title: String(title).slice(0, 80), body, createdAt: new Date().toISOString(), via: 'secretary-next' }, visibility: 'private' });
@@ -539,7 +551,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         if (active.organismId && ws && entries.length) {
           const list = entries.slice(0, 10).map((e) => `- ${e.title || e.id}${e.type ? ` (${e.type})` : ''}${e.url ? ` — ${e.url}` : ''}`).join('\n');
           await fileNote(ws, `Scouted: ${action.summary}`, `Found ${entries.length}:\n\n${list}`);
-          resultMsg = t('secretary.next.didScoutedSaved', { n: entries.length, ws: ws.name }); href = orgHref;
+          resultMsg = t('secretary.next.didScoutedSaved', { n: entries.length, ws: ws.name }); href = spaceUrl(ws.id);
         } else {
           resultMsg = t('secretary.next.didDiscover', { n: entries.length });
         }
@@ -560,7 +572,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         } catch { /* fall back to filing the title if generation fails */ }
         if (active.organismId && ws) {
           await fileNote(ws, action.summary, content);
-          resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = orgHref;
+          resultMsg = t('secretary.next.didDrafted', { ws: ws.name }); href = spaceUrl(ws.id);
           await feedLog(`✍️ ${action.summary} — ${t('secretary.next.didDrafted', { ws: ws.name })}`, href);
         } else {
           resultMsg = t('secretary.next.didNoted');
@@ -649,7 +661,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${quickActionsManager(qa)}
 
               ${/* Today / dashboard — where are we + is this current */ ''}
-              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onDismiss: () => setNextAns(null) })}
+              ${whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } })}
               ${standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) })}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
               ${actionItemsCard(next)}

@@ -828,7 +828,7 @@ export class Scheduler {
         const text = routedFrom
           ? `Routed a note to ${ctx.name || ctx.id} → ${ws.name}: ${a.summary}`
           : `Filed a note → ${ws.name}: ${a.summary}`;
-        await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text, href: `/v1/organisms/${ctx.organismId}` });
+        await this.appendFeed(owner, { kind: 'act', contextId: ctx.id, contextName: ctx.name || '', text, href: `/v1/profile?tab=organisms&org=${ctx.organismId}&ws=${ws.id}` });
         return [key, 'secretary.feed'];
       }
     }

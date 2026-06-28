@@ -202,6 +202,16 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     return () => window.removeEventListener('aimeat-open-organism', onOpen);
   }, []);
 
+  // Deep link from another view (e.g. the Secretary's "Open" links open in a new tab):
+  // ?org=…&ws=… opens that organism (+ workspace) on a cold navigation. Runs once on mount.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const org = params.get('org');
+      if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
+    } catch (e) { /* noop */ }
+  }, []);
+
   // Cross-organism content search (debounced) — librarian FTS across all my own content.
   useEffect(() => {
     const query = gQuery.trim();
