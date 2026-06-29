@@ -820,11 +820,11 @@ export class Scheduler {
       writes.push('secretary.feed');
 
       // Autonomous authoring phase: actually FILL the workspaces (document-first). Band-gated on
-      // `author_content` (default 'draft' = leave drafts for review; 'act' = publish directly; 'off' =
-      // skip). Each filled workspace is a paid AI call, so it respects the same per-day budget — pass the
-      // remaining headroom and let authoring stop when it's exhausted. Off by default for caution, so a
-      // context that never opts in behaves exactly as before.
-      const authorBand = active.policy?.bands?.author_content ?? 'draft';
+      // `author_content`: 'act' = write + publish · 'draft' = leave drafts for review · 'off' = skip.
+      // Each filled workspace is a paid AI call, so it respects the same per-day budget — pass the
+      // remaining headroom and let authoring stop when it's exhausted. OFF by default (it spends + can
+      // publish): a context that never opts in behaves exactly as before; the owner enables draft/act.
+      const authorBand = active.policy?.bands?.author_content ?? 'off';
       if (authorBand !== 'off') {
         const budgetRemaining = budget === null ? null : Math.max(0, budget - spentToday - paidMorsels);
         if (budgetRemaining === null || budgetRemaining > 0) {

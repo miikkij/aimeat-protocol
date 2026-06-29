@@ -108,6 +108,7 @@ const ALL_SUITES = [
     'test/e2e-connect-serve-loopback.ts',
     'test/e2e-phase0.ts',
     'test/e2e-secretary.ts',
+    'test/e2e-secretary-authoring.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',

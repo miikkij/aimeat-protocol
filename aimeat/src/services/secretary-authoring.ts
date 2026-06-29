@@ -54,6 +54,8 @@ export interface AuthoringOptions {
   budgetRemaining: number | null;
   /** appId for the metered completion (e.g. `schedule:<jobId>:author`). */
   appId: string;
+  /** Test seam: override the per-workspace AI completion. Defaults to completeForOwner(owner). */
+  complete?: (args: { prompt: string; systemPrompt: string; appId: string }) => Promise<{ content: string }>;
 }
 
 export interface AuthoringResult {
@@ -122,6 +124,7 @@ export async function authorWorkspaceContent(
 ): Promise<AuthoringResult> {
   const result: AuthoringResult = { writes: [], summaries: [], morsels: 0 };
   if (opts.band === 'off' || !active.organismId || !wsList.length) return result;
+  const runComplete = opts.complete ?? ((a: { prompt: string; systemPrompt: string; appId: string }) => completeForOwner(storage, config, owner, a));
 
   const orgId = active.organismId;
   const writerGaii = `secretary#${ownerName}@${config.nodeId}`;
@@ -190,7 +193,7 @@ export async function authorWorkspaceContent(
 
     let reply: string;
     try {
-      const completion = await completeForOwner(storage, config, owner, { prompt, systemPrompt, appId: opts.appId });
+      const completion = await runComplete({ prompt, systemPrompt, appId: opts.appId });
       result.morsels += 1;
       reply = completion.content;
     } catch {
