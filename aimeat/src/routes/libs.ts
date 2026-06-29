@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.25.0 - 2026-06-29 - aimeat-auth.js createSession() also coerces `ghii` to a string (or null) at the
+ *   session boundary — some writers persisted the server's whole ghii object ({ghii,username,display_name})
+ *   instead of the canonical string, which re-hydrated on every boot and broke ghii.split('@') (workspace
+ *   createdBy → "request access to your own workspace"). Same one-funnel fix as the owner coercion.
  * v1.24.0 - 2026-06-29 - aimeat-auth.js createSession() coerces `owner` to a string (or null) at the
  *   session boundary — a non-string owner (from an object login payload / stored value) crashed views
  *   that call owner.split (the identicon avatar). Defense-in-depth with the per-call minidenticon guard.
@@ -793,11 +797,19 @@ function createSession(data) {
   if (ownerVal != null && typeof ownerVal !== 'string') {
     ownerVal = (typeof ownerVal === 'object' && typeof ownerVal.name === 'string') ? ownerVal.name : String(ownerVal);
   }
+  // ghii MUST be a string (or null) for the same reason: downstream code calls ghii.split('@')
+  // (workspace createdBy, identity routing) and stores data keyed by it. Some writers persisted the
+  // server's WHOLE ghii object ({ ghii, username, display_name }) instead of the canonical string —
+  // that re-hydrates here on every boot. Extract the string at the one funnel every path goes through.
+  let ghiiVal = data.ghii;
+  if (ghiiVal != null && typeof ghiiVal !== 'string') {
+    ghiiVal = (typeof ghiiVal === 'object' && typeof ghiiVal.ghii === 'string') ? ghiiVal.ghii : String(ghiiVal);
+  }
   const session = {
-    ghii: data.ghii || null,
+    ghii: ghiiVal || null,
     owner: ownerVal,
     gaii: data.gaii || null,
-    identity: data.gaii || data.ghii || null,
+    identity: data.gaii || ghiiVal || null,
     jwt: data.jwt,
     roles: jwtPayload?.roles || data.roles || [],
     displayName: data.displayName || '',
