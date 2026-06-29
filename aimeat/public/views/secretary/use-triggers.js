@@ -7,6 +7,8 @@
  * @structure useTriggers({ active, showToast }) -> { triggers, armed, form, openForm, createTrigger, togglePause, removeTrigger, ... }
  * @usage const trig = useTriggers({ active, showToast }); triggersCard({ ...trig, goals, routines })
  * @version-history
+ *   v0.2.0 — 2026-06-28 — Bound actions: a trigger can BIND a workflow or a specialist to its fire
+ *     (action.{kind,workflowId|specialistName,prompt}); loads /v1/workflows + buildAction() composes it.
  *   v0.1.0 — 2026-06-28 — Slice 3: trigger CRUD hook (create all 4 kinds, pause/resume, delete).
  */
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
@@ -21,10 +23,20 @@ function genId() { return 'tr-' + Date.now().toString(36) + Math.random().toStri
 /** Cheap gate (Slice 4): only bother the model when text smells recurring or deadline-y (FI + EN). */
 const TRIG_HINTS = /(joka\s+(päivä|viikko|kuukausi|aamu|ilta|maanantai|tiistai|keskiviikko|torstai|perjantai)|viikoittain|päivittäin|kuukausittain|säännöllisesti|muistuta|deadline|määräaika|mennessä|ennen\s+\d|weekly|daily|monthly|every\s+(day|week|month|morning|monday|tuesday|wednesday|thursday|friday)|remind|by\s+\w+day|each\s+(day|week|month))/i;
 
-const EMPTY_FORM = { kind: 'recurring', label: '', cadence: 'weekly', when: '', targetId: '', condType: 'memory_count', condPrefix: '', condValue: 5, condDays: 7 };
+const EMPTY_FORM = { kind: 'recurring', label: '', cadence: 'weekly', when: '', targetId: '', condType: 'memory_count', condPrefix: '', condValue: 5, condDays: 7, actionKind: 'remind', actionWorkflowId: '', actionSpecialistName: '', actionPrompt: '' };
+
+/** Build the trigger's bound `action` from the form. 'remind' (default) → feed + action-item; 'workflow'
+ *  → start the chosen workflow; 'specialist' → queue + run a task (the prompt) for the chosen specialist. */
+function buildAction(form) {
+  const summary = form.label.trim();
+  if (form.actionKind === 'workflow' && form.actionWorkflowId) return { kind: 'workflow', summary, workflowId: form.actionWorkflowId };
+  if (form.actionKind === 'specialist' && form.actionSpecialistName) return { kind: 'specialist', summary, specialistName: form.actionSpecialistName, prompt: (form.actionPrompt || '').trim() || summary };
+  return { kind: 'remind', summary };
+}
 
 export function useTriggers({ active, showToast }) {
   const [triggers, setTriggers] = useState([]);
+  const [workflows, setWorkflows] = useState([]); // saved workflows a trigger can bind to (run-on-fire)
   const [form, setForm] = useState(null); // null = closed
   const [adding, setAdding] = useState(false);
 
@@ -35,6 +47,9 @@ export function useTriggers({ active, showToast }) {
     setTriggers(items.map((it) => it.value).filter((v) => v && v.id).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    apiGet('/v1/workflows').then((r) => setWorkflows((r && r.data && r.data.workflows) || [])).catch(() => {});
+  }, []);
   useEffect(() => {
     const h = () => load();
     window.addEventListener('aimeat-live-update', h);
@@ -55,7 +70,7 @@ export function useTriggers({ active, showToast }) {
     const tr = {
       id: genId(), kind: form.kind, label: form.label.trim().slice(0, 200),
       contextId: (active && active.id) || '', status: 'armed', createdBy: 'owner',
-      createdAt: new Date().toISOString(), action: { kind: 'remind', summary: form.label.trim() },
+      createdAt: new Date().toISOString(), action: buildAction(form),
     };
     if (form.kind === 'time') {
       if (!form.when) { showToast(t('secretary.trig.needWhen'), true); return; }
@@ -140,5 +155,5 @@ export function useTriggers({ active, showToast }) {
 
   const armed = useMemo(() => triggers.filter((tr) => tr.status === 'armed'), [triggers]);
   const proposed = useMemo(() => triggers.filter((tr) => tr.status === 'proposed'), [triggers]);
-  return { triggers, armed, proposed, form, openForm, closeForm, setField, createTrigger, adding, togglePause, updateTrigger, removeTrigger, armTrigger, proposeTriggerFromText };
+  return { triggers, workflows, armed, proposed, form, openForm, closeForm, setField, createTrigger, adding, togglePause, updateTrigger, removeTrigger, armTrigger, proposeTriggerFromText };
 }

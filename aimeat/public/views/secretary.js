@@ -11,6 +11,8 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.16.0 — 2026-06-28 — Bound triggers: pass specialists + workflows into triggersCard and the
+ *     calendar event dialog so a trigger's fire can be bound to a workflow/specialist run.
  *   v0.15.0 — 2026-06-28 — B5 (secretary-view-redesign): action-items. The autonomous tick now advances
  *     active routines band-driven (act-band file steps auto-run; draft/ask/delegate → action-items) and
  *     writes contexts[i].actionItems[]; the dashboard renders them (actionItemsCard) with a one-click
@@ -816,7 +818,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                   routines: routinesCard({ ...next, onDesignWorkflow: designWfFromStep }),
                   decisions: intake.pendingIds.length > 0 ? decisionsCard(intake) : null,
                   automation: automationCard({ ...auto, budgetInfo }),
-                  triggers: triggersCard({ ...trig, goals: learn.goals, routines: next.routines }),
+                  triggers: triggersCard({ ...trig, goals: learn.goals, routines: next.routines, specialists: spec.list }),
                   specialists: specialistsCard({ ...spec }),
                   calendar: calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines, triggers: trig.armed, onEventClick: setCalEvent }),
                   feed: feedCard(auto),
@@ -857,7 +859,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 ${metaCard({ secretary, reliability })}
               ` : null}
             ` : null}`}
-      ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
+      ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} workflows=${trig.workflows} specialists=${spec.list} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
       <${ToastContainer} />
     </div>`;
 }

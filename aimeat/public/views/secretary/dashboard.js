@@ -10,6 +10,8 @@
  * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
  * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.7.0 — 2026-06-28 — triggersCard: "When it fires" binding (remind / run a workflow / run a
+ *     specialist) + a bound-action badge in the trigger list; takes workflows + specialists props.
  *   v0.6.0 — 2026-06-28 — G3: dashStatus "Scan" button calls onReconcile (a real discover scan that
  *     stamps lastScanAt) with a scanning state, replacing the bare re-fetch; G2 cadence badge on routines.
  *   v0.5.0 — 2026-06-28 — G5: actionItemsCard renders the action-item label via t() from the item's
@@ -286,6 +288,15 @@ export function triggersCard(p) {
     if (tr.kind === 'condition') return `${t('secretary.trig.kind.condition')} · ${t('secretary.trig.ct.' + ((tr.condition && tr.condition.type) || 'memory_count'))}`;
     return tr.kind;
   };
+  // What it does when it fires (badge): a bound workflow / specialist, else a plain reminder.
+  const actLabel = (tr) => {
+    const a = tr.action || {};
+    if (a.kind === 'workflow' && a.workflowId) return `▶️ ${a.workflowId}`;
+    if (a.kind === 'specialist' && a.specialistName) return `🧩 ${a.specialistName}`;
+    return null;
+  };
+  const workflows = p.workflows || [];
+  const specialists = p.specialists || [];
   return html`
     <section class="sec-card sec-triggers">
       <div class="sec-card-head">
@@ -298,7 +309,7 @@ export function triggersCard(p) {
         ${p.triggers.map((tr) => html`
           <li class="sec-trig-row ${tr.status}" key=${tr.id}>
             <div class="sec-trig-main">
-              <div class="sec-trig-label">${tr.label}</div>
+              <div class="sec-trig-label">${tr.label}${actLabel(tr) ? html` <span class="sec-trig-bound">${actLabel(tr)}</span>` : null}</div>
               <div class="sec-hint">${kindLabel(tr)}${tr.status === 'proposed' ? ' · ' + t('secretary.trig.proposedBadge') : tr.status === 'paused' ? ' · ' + t('secretary.trig.paused') : tr.status === 'fired' ? ' · ' + t('secretary.trig.fired') : ''}</div>
             </div>
             <div class="sec-trig-btns">
@@ -340,6 +351,22 @@ export function triggersCard(p) {
             ${f.condType === 'no_activity'
               ? html`<input class="sec-input sec-input-sm" type="number" min="1" value=${f.condDays} onInput=${(e) => p.setField('condDays', e.target.value)} title=${t('secretary.trig.days')} />`
               : (f.condType !== 'memory_exists' ? html`<input class="sec-input sec-input-sm" type="number" min="1" value=${f.condValue} onInput=${(e) => p.setField('condValue', e.target.value)} title=${t('secretary.trig.count')} />` : null)}` : null}
+          <label class="sec-hint sec-trig-actlabel">${t('secretary.trig.act.label')}</label>
+          <select class="sec-input" value=${f.actionKind} onChange=${(e) => p.setField('actionKind', e.target.value)}>
+            <option value="remind" selected=${f.actionKind === 'remind'}>${t('secretary.trig.act.remind')}</option>
+            ${workflows.length ? html`<option value="workflow" selected=${f.actionKind === 'workflow'}>${t('secretary.trig.act.workflow')}</option>` : null}
+            ${specialists.length ? html`<option value="specialist" selected=${f.actionKind === 'specialist'}>${t('secretary.trig.act.specialist')}</option>` : null}
+          </select>
+          ${f.actionKind === 'workflow' ? html`<select class="sec-input" value=${f.actionWorkflowId} onChange=${(e) => p.setField('actionWorkflowId', e.target.value)}>
+            <option value="" selected=${!f.actionWorkflowId}>${t('secretary.trig.act.pickWorkflow')}</option>
+            ${workflows.map((w) => html`<option value=${w.id} key=${w.id} selected=${f.actionWorkflowId === w.id}>${w.name || w.id}</option>`)}
+          </select>` : null}
+          ${f.actionKind === 'specialist' ? html`
+            <select class="sec-input" value=${f.actionSpecialistName} onChange=${(e) => p.setField('actionSpecialistName', e.target.value)}>
+              <option value="" selected=${!f.actionSpecialistName}>${t('secretary.trig.act.pickSpecialist')}</option>
+              ${specialists.map((s) => html`<option value=${s.name} key=${s.name} selected=${f.actionSpecialistName === s.name}>${s.display_name || s.name}</option>`)}
+            </select>
+            <textarea class="sec-paste" rows="2" placeholder=${t('secretary.trig.act.promptPlaceholder')} value=${f.actionPrompt} onInput=${(e) => p.setField('actionPrompt', e.target.value)}></textarea>` : null}
           <div class="sec-actions">
             <button class="btn-ghost btn-sm" onClick=${p.closeForm}>${t('secretary.cancel')}</button>
             <button class="btn-primary btn-sm" disabled=${p.adding || !f.label.trim()} onClick=${p.createTrigger}>${p.adding ? t('secretary.saving') : t('secretary.trig.create')}</button>

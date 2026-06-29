@@ -667,7 +667,16 @@
       "error": "Triggeri epäonnistui",
       "kind": { "time": "Tiettynä päivänä", "recurring": "Toistuva", "completion": "Kun jokin valmistuu", "condition": "Kun ehto täyttyy" },
       "cad": { "none": "Ei toistoa", "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain" },
-      "ct": { "memory_count": "Kohteiden määrä saavuttaa", "workspace_count": "Työtilan kohteet saavuttavat", "no_activity": "Ei aktiviteettia N päivään", "memory_exists": "Jotain ilmestyy" }
+      "ct": { "memory_count": "Kohteiden määrä saavuttaa", "workspace_count": "Työtilan kohteet saavuttavat", "no_activity": "Ei aktiviteettia N päivään", "memory_exists": "Jotain ilmestyy" },
+      "act": {
+        "label": "Kun se laukeaa",
+        "remind": "Muistuta minua",
+        "workflow": "Aja workflow",
+        "specialist": "Aja specialisti",
+        "pickWorkflow": "Valitse workflow…",
+        "pickSpecialist": "Valitse specialisti…",
+        "promptPlaceholder": "Mitä specialistin pitäisi tehdä? (oletuksena otsikko)"
+      }
     },
     "editBrain": "Muokkaa aivoja",
     "rules": "Toimintasäännöt",

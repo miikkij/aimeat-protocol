@@ -1393,6 +1393,29 @@ await test('76. Live responder: answering a clarify question gets an immediate a
     assert(await waitForSecretaryReply(conversationId, 'Got your answers'), 'expected an acknowledgement reply from the Secretary');
 });
 
+await test('77. Bound trigger: workflow/specialist action persists on the record + a due one is selected to fire', async () => {
+    // A trigger can BIND an action to its fire: run a workflow, or queue+run a specialist task. The binding
+    // lives on action.{kind,workflowId|specialistName,prompt}; assert it round-trips intact (the tick reads it).
+    const wfTr = { id: 'tr-bw1', kind: 'recurring', cadence: 'daily', label: 'Nightly digest', status: 'armed', nextFireAt: new Date(Date.now() - 1000).toISOString(), action: { kind: 'workflow', summary: 'Nightly digest', workflowId: 'wf-evening-news-digest' } };
+    const specTr = { id: 'tr-bs1', kind: 'time', label: 'Prep brief', status: 'armed', when: new Date(Date.now() - 1000).toISOString(), nextFireAt: new Date(Date.now() - 1000).toISOString(), action: { kind: 'specialist', summary: 'Prep brief', specialistName: 'researcher', prompt: 'Draft tomorrow\'s prep brief from the workspace.' } };
+    for (const tr of [wfTr, specTr]) {
+      const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: `secretary.trigger.${tr.id}`, value: tr, visibility: 'private', tags: ['secretary', 'trigger', 'armed'] }) });
+      assert(w.status === 200 || w.status === 201, `write ${tr.id}: ${w.status}`);
+      const r = await json(`/v1/memory/${encodeURIComponent('secretary.trigger.' + tr.id)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+      assert(r.status === 200, `read ${tr.id}: ${r.status}`);
+      assert(r.body.data.value.action?.kind === tr.action.kind, `action.kind preserved: ${JSON.stringify(r.body.data.value.action)}`);
+    }
+    // Both are armed + due → evaluateTriggers selects them (the tick then runs the bound action).
+    const fired = evaluateTriggers([wfTr, specTr], {}, Date.now());
+    assert(fired.length === 2, `both due triggers fire: ${fired.length}`);
+    const wfFired = fired.find((f) => f.id === 'tr-bw1');
+    assert(wfFired?.trigger.action?.workflowId === 'wf-evening-news-digest', `workflow binding carried to fire: ${JSON.stringify(wfFired?.trigger.action)}`);
+    const specFired = fired.find((f) => f.id === 'tr-bs1');
+    assert(specFired?.trigger.action?.specialistName === 'researcher', `specialist binding carried to fire: ${JSON.stringify(specFired?.trigger.action)}`);
+    // A recurring fired trigger re-arms (stays armed) so its bound action runs again next cadence.
+    assert(settleFiredTrigger(wfTr, Date.now()).status === 'armed', 'recurring bound trigger re-arms');
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

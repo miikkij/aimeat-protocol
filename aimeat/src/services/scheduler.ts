@@ -5,6 +5,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.9.0 — 2026-06-28 — Secretary bound triggers: a fired trigger can carry out a BOUND action —
+ *     start an Agent Workflow run, or queue + run a specialist task (its prompt) node-side this tick —
+ *     instead of only posting a reminder (fireBoundTriggerAction). Gated by the existing spend guards.
  *   v2.8.0 — 2026-06-24 — Secretary P5 (S-C): scheduled extension jobs decrypt `type: secret` config
  *     before the sandbox VM, and an instance-scoped job loads the instance's (decrypted) config so a
  *     cron sync uses the same bring-your-own-key secret a live action would. See extension-secrets.ts.
@@ -39,7 +42,7 @@
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
 import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { getEncryptionKey } from './encryption.js';
@@ -51,7 +54,7 @@ import { completeForOwner } from './ai-completion.js';
 import { appendSecretaryFeed } from './secretary-feed.js';
 import { produceClarifyDeliverable, type ClarifyJob } from './secretary-clarify.js';
 import { listSpecialists } from './specialist.js';
-import { runAllSpecialists } from './specialist-runner.js';
+import { runAllSpecialists, runSpecialistQueue } from './specialist-runner.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
@@ -722,12 +725,19 @@ export class Scheduler {
         id: 'ai-' + randomUUID().slice(0, 8), labelKind: it.labelKind, summary: it.summary, suggestedAction: it.suggestedAction, source: it.source, createdAt: nowIso, status: 'open' as const,
       }));
 
-      // Fire triggers (Slice 2): each fired trigger surfaces a feed entry + an action-item, then settles
-      // (recurring re-arms with a new nextFireAt; one-off/completion/condition → 'fired'). FREE — no AI.
+      // Fire triggers (Slice 2 + bound actions): each fired trigger either just REMINDS (feed entry +
+      // action-item, the default) or carries out a BOUND action — start an Agent Workflow run, or queue +
+      // run a task for one of the owner's specialists. A bound action that ran does the work, so no
+      // follow-up action-item is added (the feed records what happened). Then the trigger settles
+      // (recurring re-arms with a new nextFireAt; one-off/completion/condition → 'fired'). Paid bound
+      // actions (workflow/specialist) are metered like any autonomous spend; the earlier stop-spending +
+      // daily-budget guards already gate this whole block.
       for (const tr of firedTriggers) {
         const label = String(tr.label || tr.action?.summary || 'Trigger').slice(0, 200);
-        await this.appendFeed(owner, { kind: 'trigger', contextId: tr.contextId || active.id, contextName: active.name || '', text: `⏰ ${label}` });
-        newActionItems.push({ id: 'ai-' + randomUUID().slice(0, 8), text: label, suggestedAction: { kind: 'advance', routineId: '' }, source: 'trigger:' + tr.id, createdAt: nowIso, status: 'open' as const });
+        const bound = await this.fireBoundTriggerAction(owner, ownerName, tr, label, specialistAgents, writes);
+        await this.appendFeed(owner, { kind: 'trigger', contextId: tr.contextId || active.id, contextName: active.name || '', text: bound ? `⏰ ${label} → ${bound.note}` : `⏰ ${label}` });
+        if (bound) paidMorsels += bound.morsels;
+        else newActionItems.push({ id: 'ai-' + randomUUID().slice(0, 8), text: label, suggestedAction: { kind: 'advance', routineId: '' }, source: 'trigger:' + tr.id, createdAt: nowIso, status: 'open' as const });
         const settled = settleFiredTrigger(tr, nowMs);
         const key = `secretary.trigger.${tr.id}`;
         const ex = trigRecs.find((r) => r.key === key);
@@ -1051,6 +1061,51 @@ export class Scheduler {
       }
     }
     return done;
+  }
+
+  /**
+   * Carry out a fired trigger's BOUND action (if any). Returns null for a plain reminder (the caller then
+   * posts a follow-up action-item); otherwise `{ note, morsels }` describing what ran (the caller folds the
+   * note into the feed entry and meters the morsels). Two bindings:
+   *   - workflow: start the named Agent Workflow run via the deterministic engine.
+   *   - specialist: queue a task (the trigger's `prompt`, defaulting to its label) for the named specialist
+   *     and run it node-side now (owner key + quality contract), so the deliverable lands this same tick.
+   * Best-effort: any failure (unknown workflow/specialist, engine down, spend-pause) degrades to a plain
+   * reminder so a misconfigured binding never breaks the tick.
+   */
+  private async fireBoundTriggerAction(
+    owner: string, ownerName: string, tr: TriggerLike, label: string,
+    specialists: Array<{ gaii: string; name: string }>, writes: string[],
+  ): Promise<{ note: string; morsels: number } | null> {
+    const act = tr.action || {};
+    try {
+      if (act.kind === 'workflow' && act.workflowId) {
+        const engine = getActiveWorkflowEngine();
+        if (!engine) return null;
+        const r = await engine.startRun(owner, ownerName, String(act.workflowId), { mode: 'full-live' });
+        if ('error' in r) { logger.info('[secretary tick] bound workflow refused to start', { id: tr.id, wf: act.workflowId, err: r.error.join('; ') }); return null; }
+        writes.push(`workflows.run.${act.workflowId}.${r.runId}`);
+        return { note: `▶️ ${act.workflowId}`, morsels: 1 };
+      }
+      if (act.kind === 'specialist' && act.specialistName) {
+        const spec = specialists.find((s) => s.name === act.specialistName);
+        if (!spec) return null;
+        const now = new Date().toISOString();
+        await this.storage.createAgentTask({
+          id: randomUUID(), agentGaii: spec.gaii, ownerGaii: owner,
+          title: label, description: String(act.prompt || label).slice(0, 4000),
+          scope: [], rules: [], verification: { userExpects: '', technicalChecks: [] }, todos: [],
+          status: 'queued', parentTaskId: `trigger:${tr.id}`, createdAt: now, updatedAt: now,
+        });
+        const specWrites = await runSpecialistQueue(this.storage, this.config, owner, spec as AgentRecord, { limit: 1 });
+        writes.push(...specWrites);
+        // 1 morsel for the specialist run even if it deferred (kept the queued task) — the run was attempted.
+        return { note: `🧩 ${spec.name}`, morsels: Math.max(1, specWrites.length) };
+      }
+    } catch (e) {
+      logger.info('[secretary tick] bound trigger action failed', { id: tr.id, kind: act.kind, err: (e as Error).message });
+    }
+    return null;
   }
 
   /**
