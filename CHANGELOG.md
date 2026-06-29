@@ -65,6 +65,13 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   from the calendar event dialog; a bound trigger shows a badge (`▶️ workflow` / `🧩 specialist`) in the list, and
   bound runs are metered like any autonomous spend (gated by the existing stop-spending + daily-budget guards). A
   misconfigured binding degrades to a plain reminder so it never breaks the tick.
+- **Reset Secretary (start over).** A guarded "Reset Secretary" control in *Manage & setup* (type `RESET` to confirm)
+  and a `POST /v1/secretary/reset` endpoint wipe the Secretary back to a clean slate: the brain/directives, all
+  `secretary.*` owner memory (config, contexts, goals, routines, triggers, feed, decisions, clarify jobs), the
+  self-organisms it created **and their workspaces/content** (only organisms the owner created), the owner's
+  specialists **and their deliverables**, and the autonomous tick schedule. The OpenRouter key and the Secretary's
+  agent identity are preserved; the view then lands on the fresh setup screen. Useful when an early auto-built brain
+  or broken workspaces have become clutter.
 - **Calendar (month / week / day).** A real calendar on the dashboard plots past activity (feed), the autonomous
   check-in cron, routine cadences, and time/recurring triggers — navigable by month, week, or day.
 - **"What's next" produces real deliverables.** Each proposed next action has **Do it / Skip**; "Do it" actually

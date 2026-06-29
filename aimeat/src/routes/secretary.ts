@@ -8,8 +8,12 @@
  *   exact same mechanism serves specialists/agents.
  * @structure secretaryRouter(config, storage, peers) -> Router
  *   - POST /v1/secretary/clarify — send the questions secretary#owner→owner + store the produce job
+ *   - POST /v1/secretary/reset   — wipe the owner's Secretary back to zero (start over)
  * @usage app.use(secretaryRouter(config, storage, peers));
  * @version-history
+ *   v0.2.0 — 2026-06-28 — Reset channel: POST /v1/secretary/reset wipes the Secretary to a clean state
+ *     (brain/directives + all secretary.* memory + optionally the self-organisms & their workspaces +
+ *     specialists & their deliverables + the tick schedule). Keeps the OpenRouter key + the agent identity.
  *   v0.1.0 — 2026-06-28 — Clarify channel: ask-don't-hallucinate via inbox questions + a tick-resumed job.
  */
 import { Router } from 'express';
@@ -21,6 +25,11 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import { InteractiveQuestionSchema } from '../models/message-schemas.js';
+import { secretaryGaii } from '../services/secretary.js';
+import { listSpecialists, deleteSpecialistConfig } from '../services/specialist.js';
+import { getActiveScheduler } from '../services/scheduler.js';
+import { emitChange } from '../services/event-bus.js';
+import { logger } from '../utils/logger.js';
 
 const ClarifySchema = z.object({
   contextId: z.string().min(1).max(200),
@@ -72,6 +81,99 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
     res.json(success(config.nodeId, { messageId, conversationId: result.message.conversationId, status: 'asked' }, [
       { description: 'Answer in your inbox', method: 'GET', url: '/v1/messages/inbox' },
     ]));
+  });
+
+  // ── POST /v1/secretary/reset ── wipe the owner's Secretary back to a clean slate so they can start over.
+  // The Secretary develops over time (brain, contexts, routines/triggers/feed, a self-organism with
+  // workspaces, specialists). When the early auto-built brain / broken workspaces are just clutter, this
+  // tears the whole thing down in one call. Owner-scoped + idempotent. PRESERVED: the OpenRouter key +
+  // settings, and the Secretary's agent IDENTITY (the `secretary#owner@node` record is re-used blank, so
+  // its GAII and any external references survive — only its brain/directives are cleared). The frontend
+  // then lands on the fresh setup screen. `organisms`/`specialists` default true (full reset); set either
+  // false to keep that layer.
+  const ResetSchema = z.object({
+    organisms: z.boolean().optional().default(true),
+    specialists: z.boolean().optional().default(true),
+  });
+
+  router.post('/v1/secretary/reset', requireAuth(), requireRole('owner'), async (req, res) => {
+    const parsed = ResetSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues[0]?.message || 'Invalid reset payload'));
+      return;
+    }
+    const opts = parsed.data;
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const removed = { memoryKeys: 0, organisms: [] as string[], specialists: [] as string[], schedules: 0, brain: false };
+
+    try {
+      // (1) Collect the Secretary's self-organism ids from the config BEFORE we wipe it.
+      const cfgRec = await storage.getMemory(ownerGhii, 'secretary.config');
+      const cfg = (cfgRec?.value ?? {}) as { contexts?: Array<{ organismId?: string | null }> };
+      const orgIds = Array.from(new Set((cfg.contexts || []).map((c) => c.organismId).filter((x): x is string => !!x)));
+
+      // (2) Specialists: mirror DELETE /v1/specialists/:name (directives + config + agent, which cascade-
+      //     deletes the specialist's own memory incl. its deliverables).
+      if (opts.specialists) {
+        const specs = await listSpecialists(storage, owner).catch(() => []);
+        for (const s of specs) {
+          await storage.deleteAgentDirectives(s.gaii).catch(() => {});
+          await deleteSpecialistConfig(storage, config, owner, s.name).catch(() => {});
+          await storage.deleteAgent(s.gaii).catch(() => {});
+          removed.specialists.push(s.name);
+        }
+      }
+
+      // (3) All owner-namespaced Secretary state: config, feed, goals, decisions, triggers, clarify jobs,
+      //     "what's next" — everything keyed `secretary.*`.
+      const secKeys = await storage.listMemory(ownerGhii, { prefix: 'secretary.' }).catch(() => []);
+      for (const m of secKeys) {
+        if (await storage.deleteMemory(ownerGhii, m.key).catch(() => false)) removed.memoryKeys++;
+      }
+
+      // (4) The Secretary's self-organisms + their workspaces/content. deleteOrganism cascades the
+      //     `organism.{id}.*` content (across owners), board, memberships, reputation, schemas. Guarded:
+      //     only organisms the owner CREATED (never a shared org the Secretary merely referenced). The
+      //     creator field may be stored bare ("alice"), as a GHII ("alice@node"), or even a GAII
+      //     ("agent#alice@node"), so compare the OWNER portion, not the raw string.
+      const ownerOf = (id: string): string => {
+        const s = String(id || '');
+        const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
+        return afterHash.includes('@') ? afterHash.slice(0, afterHash.indexOf('@')) : afterHash;
+      };
+      if (opts.organisms) {
+        for (const id of orgIds) {
+          const org = await storage.getOrganism(id).catch(() => null);
+          if (org && ownerOf(org.creatorGhii) === owner) {
+            await storage.deleteOrganism(id).catch(() => {});
+            removed.organisms.push(id);
+          }
+        }
+      }
+
+      // (5) The autonomous tick schedule(s). Stop the live cron first, then delete the record.
+      const scheduler = getActiveScheduler();
+      const jobs = await storage.listScheduledJobs({ type: 'secretary', ownerScope: ownerGhii }).catch(() => []);
+      for (const j of jobs) {
+        scheduler?.removeJob(j.id);
+        if (await storage.deleteScheduledJob(j.id).catch(() => false)) removed.schedules++;
+      }
+
+      // (6) Clear the Secretary's brain (agent directives). The agent record itself is kept (re-used blank)
+      //     so the SPA still resolves it and the OpenRouter backfill keeps it provisioned.
+      const gaii = secretaryGaii(owner, config);
+      removed.brain = await storage.deleteAgentDirectives(gaii).catch(() => false);
+
+      emitChange('agents');
+      logger.info('[secretary] reset', { owner, removed });
+      res.json(success(config.nodeId, { reset: true, removed }, [
+        { description: 'Set up the Secretary again', method: 'GET', url: '/v1/secretary' },
+      ]));
+    } catch (err) {
+      logger.error('[secretary] reset failed', { owner, error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to reset the Secretary'));
+    }
   });
 
   return router;

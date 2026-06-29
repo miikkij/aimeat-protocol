@@ -678,6 +678,17 @@
         "promptPlaceholder": "What should the specialist do? (defaults to the label)"
       }
     },
+    "reset": {
+      "title": "Reset Secretary",
+      "hint": "Start over from zero — wipes the brain, all goals/routines/triggers/feed/decisions, the workspaces it built, and your specialists. Your OpenRouter key is kept.",
+      "start": "Reset Secretary…",
+      "warn": "This permanently deletes your Secretary's brain, its data, the organism + workspaces it created, and all specialists. This cannot be undone.",
+      "confirmLabel": "Type RESET to confirm",
+      "confirm": "Wipe and start over",
+      "resetting": "Resetting…",
+      "done": "Secretary reset — starting fresh.",
+      "error": "Reset failed"
+    },
     "editBrain": "Edit brain",
     "rules": "Operating rules",
     "addRule": "Add rule",

@@ -678,6 +678,17 @@
         "promptPlaceholder": "Mitä specialistin pitäisi tehdä? (oletuksena otsikko)"
       }
     },
+    "reset": {
+      "title": "Nollaa sihteeri",
+      "hint": "Aloita alusta tyhjältä — pyyhkii aivot, kaikki tavoitteet/rutiinit/triggerit/feedin/päätökset, sen rakentamat workspacet ja specialistisi. OpenRouter-avain säilyy.",
+      "start": "Nollaa sihteeri…",
+      "warn": "Tämä poistaa pysyvästi sihteerin aivot, sen datan, sen luoman organismin + workspacet ja kaikki specialistit. Tätä ei voi perua.",
+      "confirmLabel": "Kirjoita RESET vahvistaaksesi",
+      "confirm": "Pyyhi ja aloita alusta",
+      "resetting": "Nollataan…",
+      "done": "Sihteeri nollattu — aloitetaan puhtaalta pöydältä.",
+      "error": "Nollaus epäonnistui"
+    },
     "editBrain": "Muokkaa aivoja",
     "rules": "Toimintasäännöt",
     "addRule": "Lisää sääntö",

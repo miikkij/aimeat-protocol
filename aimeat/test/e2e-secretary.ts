@@ -1416,6 +1416,32 @@ await test('77. Bound trigger: workflow/specialist action persists on the record
     assert(settleFiredTrigger(wfTr, Date.now()).status === 'armed', 'recurring bound trigger re-arms');
 });
 
+await test('78. Secretary reset: wipes secretary.* owner memory + specialists; unauth rejected', async () => {
+    // Seed some Secretary state under the owner.
+    const seed = async (key: string, value: unknown) => json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key, value, visibility: 'private' }) });
+    await seed('secretary.config', { activeContextId: 'r1', contexts: [{ id: 'r1', name: 'R', brain: { purpose: 'x', rules: [] }, organismId: null, workspaces: [], policy: { stopSpending: false, bands: {} } }] });
+    await seed('secretary.goal.g-reset', { id: 'g-reset', title: 'temp', status: 'open' });
+    await seed('secretary.trigger.tr-reset', { id: 'tr-reset', kind: 'recurring', cadence: 'weekly', label: 'temp', status: 'armed' });
+    // A specialist to confirm it gets torn down too.
+    await json('/v1/specialists', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'resetspec', role: 'specialist', brain: { purpose: 'temp' } }) });
+
+    const un = await json('/v1/secretary/reset', { method: 'POST', body: '{}' });
+    assert(un.status === 401 || un.status === 403, `unauth: ${un.status}`);
+
+    const r = await json('/v1/secretary/reset', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({}) });
+    assert(r.status === 200, `reset: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert(r.body.data.reset === true && r.body.data.removed.memoryKeys >= 3, `removed shape: ${JSON.stringify(r.body.data.removed)}`);
+    assert(r.body.data.removed.specialists.includes('resetspec'), `specialist wiped: ${JSON.stringify(r.body.data.removed.specialists)}`);
+
+    // secretary.* memory is gone; the specialist is gone.
+    const cfg = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(cfg.status === 404, `config gone: ${cfg.status}`);
+    const goal = await json('/v1/memory/secretary.goal.g-reset', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(goal.status === 404, `goal gone: ${goal.status}`);
+    const specs = await json('/v1/specialists', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!(specs.body.data.specialists || []).some((s: { name?: string }) => s.name === 'resetspec'), 'specialist removed from list');
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
