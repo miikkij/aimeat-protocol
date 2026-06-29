@@ -4,6 +4,9 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.24.0 - 2026-06-29 - aimeat-auth.js createSession() coerces `owner` to a string (or null) at the
+ *   session boundary — a non-string owner (from an object login payload / stored value) crashed views
+ *   that call owner.split (the identicon avatar). Defense-in-depth with the per-call minidenticon guard.
  * v1.23.0 - 2026-06-28 - aimeat-auth.js: (1) owner session refresh() adopts the display_name the
  *   server now returns from /v1/auth/refresh, so the apex login pill picks up profile edits without a
  *   re-login. (2) new auth.updateSessionMeta(patch) + a 'session-updated' event re-render the pill
@@ -783,9 +786,16 @@ function scheduleAutoRefresh(session) {
 function createSession(data) {
   // Extract roles from JWT payload so UI can check owner/operator status
   const jwtPayload = data.jwt ? parseJwt(data.jwt) : null;
+  // owner MUST be a string (or null). Login paths feed it differently (a JWT claim, an object's
+  // .name, a stored value), and downstream code calls owner.split (e.g. the identicon avatar), so a
+  // non-string owner would crash the whole view. Coerce it here, at the one place every path goes through.
+  let ownerVal = data.owner;
+  if (ownerVal != null && typeof ownerVal !== 'string') {
+    ownerVal = (typeof ownerVal === 'object' && typeof ownerVal.name === 'string') ? ownerVal.name : String(ownerVal);
+  }
   const session = {
     ghii: data.ghii || null,
-    owner: data.owner,
+    owner: ownerVal,
     gaii: data.gaii || null,
     identity: data.gaii || data.ghii || null,
     jwt: data.jwt,
