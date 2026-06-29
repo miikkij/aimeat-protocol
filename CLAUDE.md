@@ -83,6 +83,7 @@ All standards live in `docs/coding-guidelines/`:
 | [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E rules, multi-backend testing, writing tests |
 | [File Headers](docs/coding-guidelines/file-headers.md) | Header format, version history |
 | [Code Style](docs/coding-guidelines/code-style.md) | TS/JS conventions, route patterns, i18n |
+| [Prompt Writing](docs/coding-guidelines/prompt-writing.md) | Positive framing (say what TO do) + prompt framework; applies to every prompt string |
 | [Architecture](docs/coding-guidelines/architecture.md) | System design, storage layer, SSR-removal history |
 | [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII full reference, aggregation pattern, morsel economy |
 | [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
