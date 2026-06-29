@@ -51,6 +51,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:importmap
 
+      - name: No max_tokens caps on AI calls
+        working-directory: aimeat
+        run: pnpm check:no-max-tokens
+
       - name: Build
         working-directory: aimeat
         run: pnpm build
