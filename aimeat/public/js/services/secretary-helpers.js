@@ -8,6 +8,11 @@
  * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · sanitizeQuickActions · migrateConfig · buildDecisionRecord
  * @usage import { buildInterviewPrompt, extractJson, sanitizeQuickActions, migrateConfig } from '/js/services/secretary-helpers.js';
  * @version-history
+ *   v0.5.0 — 2026-06-30 — Close the milestone↔goal linking gap: CONTRACT milestones now carry "goalRefs"
+ *     (the AI links each gate to the goals it gates, by 1-based goal index) + linkMilestoneGoals() to
+ *     resolve those indices to seeded goal ids, keepKnownGoalRefs() to validate re-plan id refs, and
+ *     buildStrategyReplanPrompt() now lists existing goals so re-plans preserve/relink them. Removes the
+ *     manual "tick the linked goals" step the owner used to face after setup.
  *   v0.4.0 — 2026-06-28 — Setup interview reworked: deeper questions (current state, target, ordered
  *     milestones, who's involved), a mandatory reflect-back-and-confirm step before any JSON, and a
  *     closing "paste it back into AIMEAT" instruction. CONTRACT gains an OPTIONAL `direction` block
@@ -91,9 +96,10 @@ If you are NOT confident you can produce a VALID manifest + schemas, OMIT both f
     "risks": [ "something that could derail this, to watch for" ],
     "current": "where this area honestly stands right now (the current state)",
     "target": "the target state — what 'done well' looks like for this strategy cycle (no dates)",
-    "milestones": [ { "title": "an ordered gate on the way to the target", "enables": "what reaching it unlocks / why it matters", "criterion": "an external/judgement condition to consider it reached (optional)", "status": "not-started" } ]
+    "milestones": [ { "title": "an ordered gate on the way to the target", "enables": "what reaching it unlocks / why it matters", "criterion": "an external/judgement condition to consider it reached (optional)", "goalRefs": [1, 2], "status": "not-started" } ]
   }
-- Milestones are ORDERED and DATELESS; status is one of "not-started" | "in-progress" | "reached". A milestone is a checkpoint (a gate), NOT a task — the concrete tasks live in "goals". Base everything ONLY on what the user told you.`;
+- Milestones are ORDERED and DATELESS; status is one of "not-started" | "in-progress" | "reached". A milestone is a checkpoint (a gate), NOT a task — the concrete tasks live in "goals". Base everything ONLY on what the user told you.
+- "goalRefs" links each milestone to the goals it gates: list the 1-based positions of the goals (in the "goals" array above) whose completion moves this milestone toward "reached". Every goal should serve at least one milestone, and most milestones gate at least one goal — leave "goalRefs": [] only when a milestone genuinely maps to none. This linkage is what lets a milestone advance automatically as its goals get done, so fill it in — do not leave it empty by default.`;
 
 /** When EVOLVING an existing context (re-run "reshape current"), the current setup fed back so the AI
  *  modifies it instead of starting over — and keeps the existing workspaces stable. Empty for a new context. */
@@ -326,14 +332,54 @@ export function suggestMilestoneStatus(milestone, goalsById) {
   return milestone.status || 'not-started';
 }
 
+/** Resolve milestone goalRefs the setup/design AI produced as 1-based indices into the same JSON's
+ *  `goals` array (it cannot know the runtime goal ids, so it links by position) to the real goal ids
+ *  assigned at seed time. `idsInOrder` is the seeded goal ids in goals[] order (null for any goal that
+ *  was skipped or failed to persist). Refs that don't resolve to a real id are dropped; pass [] to strip
+ *  every index ref (e.g. when goals were not seeded, so no link can be made). Returns a new strategy;
+ *  non-strategy input passes through unchanged. Run this AFTER normalizeStrategy. */
+export function linkMilestoneGoals(strategy, idsInOrder) {
+  if (!strategy || typeof strategy !== 'object' || !Array.isArray(strategy.milestones)) return strategy;
+  const ids = Array.isArray(idsInOrder) ? idsInOrder : [];
+  return {
+    ...strategy,
+    milestones: strategy.milestones.map((m) => {
+      const refs = Array.isArray(m && m.goalRefs) ? m.goalRefs : [];
+      const mapped = refs
+        .map((r) => { const n = Number(r); return Number.isInteger(n) && n >= 1 && n <= ids.length ? ids[n - 1] : null; })
+        .filter(Boolean);
+      return { ...m, goalRefs: mapped };
+    }),
+  };
+}
+
+/** Keep only the milestone goalRefs that point at a goal that actually exists (matched by id) — used
+ *  after a re-plan, where the AI links milestones to EXISTING goal ids and could name one that's gone. */
+export function keepKnownGoalRefs(strategy, validIds) {
+  if (!strategy || typeof strategy !== 'object' || !Array.isArray(strategy.milestones)) return strategy;
+  const ok = new Set((validIds || []).filter(Boolean).map((x) => String(x)));
+  return {
+    ...strategy,
+    milestones: strategy.milestones.map((m) => ({
+      ...m,
+      goalRefs: (Array.isArray(m && m.goalRefs) ? m.goalRefs : []).filter((r) => ok.has(String(r))),
+    })),
+  };
+}
+
 /** Build a re-plan prompt: given the CURRENT strategy + what the owner just changed (e.g. a new target
  *  state), ask the AI to propose an UPDATED strategy that stays coherent — keep what still fits, adjust
  *  milestones/principles/risks toward the new target. Returns ONLY a `{ "strategy": {...} }` JSON object,
  *  so the same extractJson + normalizeStrategy path applies. Used by both the in-app (OpenRouter) re-plan
  *  and the copy-to-chat re-plan. `changeNote` is the human description of what changed. */
-export function buildStrategyReplanPrompt(owner, strategy, changeNote) {
+export function buildStrategyReplanPrompt(owner, strategy, changeNote, goals) {
   const cur = normalizeStrategy(strategy);
-  const ms = (cur.milestones || []).map((m, i) => `${i + 1}. [${m.status}] ${m.title}${m.enables ? ` — enables: ${m.enables}` : ''}`).join('\n') || '(none)';
+  const ms = (cur.milestones || []).map((m, i) => {
+    const links = (m.goalRefs || []).length ? ` — gates goals: ${m.goalRefs.join(', ')}` : '';
+    return `${i + 1}. [${m.status}] ${m.title}${m.enables ? ` — enables: ${m.enables}` : ''}${links}`;
+  }).join('\n') || '(none)';
+  const goalList = (Array.isArray(goals) ? goals : []).filter((g) => g && g.id && g.title)
+    .map((g) => `- [${g.id}] ${g.title}${g.status ? ` (${g.status})` : ''}`).join('\n') || '(none)';
   return `You are helping ${owner || 'a user'} re-plan the strategy for one area of their work inside AIMEAT. The user just changed something and the rest of the strategy should be adjusted to stay coherent — KEEP whatever still fits, and only change what the change implies. Do not invent facts or progress; preserve the status of milestones that are still valid.
 
 Current strategy:
@@ -345,6 +391,9 @@ Current strategy:
 - Target state: ${cur.target || '(none)'}
 - Milestones (in order):\n${ms}
 
+The user's existing goals in this area (link milestones to these by their [id] in "goalRefs"):
+${goalList}
+
 What changed:
 """
 ${String(changeNote || '').slice(0, 2000)}
@@ -352,9 +401,9 @@ ${String(changeNote || '').slice(0, 2000)}
 
 Output ONE JSON object inside a single code block and nothing else, with this shape:
 \`\`\`json
-{ "strategy": { "enabled": true, "vision": "", "mission": "", "principles": [], "risks": [], "current": "", "target": "", "milestones": [ { "title": "", "enables": "", "criterion": "", "status": "not-started|in-progress|reached" } ] } }
+{ "strategy": { "enabled": true, "vision": "", "mission": "", "principles": [], "risks": [], "current": "", "target": "", "milestones": [ { "title": "", "enables": "", "criterion": "", "goalRefs": [], "status": "not-started|in-progress|reached" } ] } }
 \`\`\`
-Keep milestones ORDERED and dateless; carry over the status of milestones that still apply. Output ONLY the JSON code block.`;
+Keep milestones ORDERED and dateless; carry over the status of milestones that still apply. Set each milestone's "goalRefs" to the [id]s (exact id strings from the goals list above) of the goals it gates — carry over the existing links shown next to each milestone, and [] only when a milestone gates none. Output ONLY the JSON code block.`;
 }
 
 /** Path to the decision-log Memory Contract spec (mirrors use-learning.js). */

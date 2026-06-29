@@ -11,6 +11,11 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.19.0 — 2026-06-30 — Strategy: setup now auto-links milestones to goals. seedGoals returns the
+ *     assigned goal ids in order; applyResult seeds goals before building the strategy and resolves each
+ *     milestone's index-based goalRefs to real ids (linkMilestoneGoals); reshape strips dangling index
+ *     refs; AI re-plan passes existing goals and validates returned id refs (keepKnownGoalRefs). Removes
+ *     the manual "tick the linked goals" step after setup.
  *   v0.18.0 — 2026-06-28 — Strategy: optional per-context steering frame (vision/mission/principles/risks
  *     + current → target + ordered milestone gates). strategyCard slot + handlers (edit fields, milestone
  *     CRUD/reorder/status, link goals, AI re-plan), enable from Manage & setup, carried in applyResult.
@@ -67,7 +72,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace, generateRaw, parseGenerated, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
-import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, normalizeStrategy, MILESTONE_STATUSES, buildStrategyReplanPrompt, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
+import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, normalizeStrategy, MILESTONE_STATUSES, buildStrategyReplanPrompt, linkMilestoneGoals, keepKnownGoalRefs, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
 import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard, strategyCard } from '/views/secretary/dashboard.js';
@@ -259,14 +264,19 @@ export default function SecretaryView() {
   const reliability = useMemo(() => computeReliability(learn.decisions), [learn.decisions]);
 
   /** C3: seed the hire-proposed goals as standalone goal records (so the learning loop isn't empty). */
+  // Seed the proposed goals and RETURN their assigned ids in input order (null for a skipped/failed one),
+  // so milestone goalRefs (the AI links them by 1-based goal index) can be resolved to real goal ids.
   const seedGoals = useCallback(async (goals, contextId, contextName) => {
     const arr = Array.isArray(goals) ? goals.slice(0, 4) : [];
+    const ids = [];
     for (const g of arr) {
       const title = String((g && g.title) || '').trim();
-      if (!title) continue;
+      if (!title) { ids.push(null); continue; }
       const gid = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      await apiPost('/v1/memory', { key: `secretary.goal.${gid}`, value: { id: gid, title: title.slice(0, 200), why: String((g && g.why) || '').trim().slice(0, 300), status: 'open', contextId, contextName, createdAt: new Date().toISOString() }, visibility: 'private', tags: ['secretary', 'goal', 'open', contextId] }).catch(() => {});
+      const ok = await apiPost('/v1/memory', { key: `secretary.goal.${gid}`, value: { id: gid, title: title.slice(0, 200), why: String((g && g.why) || '').trim().slice(0, 300), status: 'open', contextId, contextName, createdAt: new Date().toISOString() }, visibility: 'private', tags: ['secretary', 'goal', 'open', contextId] }).then(() => true).catch(() => false);
+      ids.push(ok ? gid : null);
     }
+    return ids;
   }, []);
 
   // Give a freshly-created workspace a PROPER manifest (AI-designed object types) so it's immediately
@@ -335,10 +345,15 @@ export default function SecretaryView() {
         }
         // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
-        const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions, strategy: normalizeStrategy(json.strategy) };
+        const ctxId = genCtxId();
+        // C3: seed the proposed goals FIRST (so the learning loop starts populated, not "no goals yet") and
+        // capture their ids, so each milestone's goalRefs (the AI links them by 1-based goal index) resolve
+        // to real goal ids — this is what lets a milestone auto-advance as its goals get done, instead of
+        // the owner ticking the linked goals by hand after setup.
+        const goalIds = await seedGoals(json.goals, ctxId, org.name);
+        const strategy = linkMilestoneGoals(normalizeStrategy(json.strategy), goalIds);
+        const ctx = { id: ctxId, name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions, strategy };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
-        // C3: seed the proposed goals so the learning loop starts populated (not "no goals yet").
-        await seedGoals(json.goals, ctx.id, ctx.name);
       } else {
         // Re-run on the active context (reshape): update its brain, snapshot the old one, KEEP its
         // organism. C1: ADD any newly-proposed workspaces (additive — never rename/remove existing;
@@ -362,7 +377,9 @@ export default function SecretaryView() {
           await Promise.all(created.map((c) => genAndApplyManifest(active.organismId, c.wsId, c.ws)));
         }
         // Strategy: if the reshape JSON proposes one, take it; otherwise keep what the context already had.
-        const strategy = json.strategy !== undefined ? normalizeStrategy(json.strategy) : (active.strategy || normalizeStrategy(null));
+        // Reshape doesn't re-seed goals, so a milestone's index-based goalRefs can't be resolved here —
+        // strip them (linkMilestoneGoals with no id list) rather than persist dangling references.
+        const strategy = json.strategy !== undefined ? linkMilestoneGoals(normalizeStrategy(json.strategy), []) : (active.strategy || normalizeStrategy(null));
         const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs], strategy };
         next = { ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) };
       }
@@ -810,10 +827,12 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     const note = (replan && replan.note || '').trim(); if (!note) return;
     setReplan((r) => ({ ...r, busy: true }));
     try {
-      const prompt = buildStrategyReplanPrompt(owner, active && active.strategy, note);
+      const prompt = buildStrategyReplanPrompt(owner, active && active.strategy, note, learn.goals);
       const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, app_id: 'secretary-strategy-replan' }), timeoutMs: 1_800_000, retries: 0 });
       const j = extractJson((r && r.data && r.data.content) || '');
-      setReplan({ draft: normalizeStrategy(j.strategy || j) });
+      // Re-plan links milestones to EXISTING goal ids — keep only refs that point at a real goal.
+      const draft = keepKnownGoalRefs(normalizeStrategy(j.strategy || j), (learn.goals || []).map((g) => g && g.id));
+      setReplan({ draft });
     } catch (e) { showToast(`${t('secretary.strat.replanErr')}: ${e.message}`, true); setReplan(null); }
   };
   const applyReplan = () => { if (replan && replan.draft) commitStrategy(replan.draft); setReplan(null); };
