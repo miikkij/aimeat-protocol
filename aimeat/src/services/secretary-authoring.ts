@@ -17,6 +17,14 @@
  * @structure authorWorkspaceContent(storage, config, owner, ownerName, active, wsList, opts) · pure helpers
  * @usage import { authorWorkspaceContent } from './secretary-authoring.js';
  * @version-history
+ *   v0.3.0 — 2026-06-30 — Retry transient provider failures (completeWithRetry), honouring the owner's
+ *     autoRetry/maxRetries. Stealth/alpha endpoints (owl-alpha) intermittently 400 and succeed on the next
+ *     attempt — a single try killed the authoring even though the model is fine; permanent failures (bad
+ *     key/malformed) are still not retried. Plus visible failures (log + ⚠️ feed line) from v0.2.x.
+ *   v0.2.0 — 2026-06-30 — Agentic, not one-shot: each record space's exact JSON Schema goes into the
+ *     prompt, and a rejected record's validation errors are fed BACK to the model for a bounded
+ *     correction round (read→write→see-error→correct) instead of being silently dropped. writeAndMaybePublish
+ *     now returns the schema errors so the loop can self-correct.
  *   v0.1.0 — 2026-06-30 — Initial: document-first autonomous authoring phase for the secretary tick
  *     (band-gated act→publish / draft→review, budget-metered, fills empty spaces toward the focus milestone).
  */
@@ -27,6 +35,7 @@ import { completeForOwner } from './ai-completion.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
 import { emitChange } from './event-bus.js';
+import { logger } from '../utils/logger.js';
 
 /** Minimal structural view of a secretary context (the scheduler's SecretaryContext satisfies it). */
 export interface AuthoringContext {
@@ -54,8 +63,43 @@ export interface AuthoringOptions {
   budgetRemaining: number | null;
   /** appId for the metered completion (e.g. `schedule:<jobId>:author`). */
   appId: string;
+  /** How many times to RETRY a transient provider failure (flaky stealth endpoints intermittently 400/429/
+   *  502 — owl-alpha works but errors occasionally). Honours the owner's autoRetry/maxRetries. 0 = no retry. */
+  maxRetries?: number;
   /** Test seam: override the per-workspace AI completion. Defaults to completeForOwner(owner). */
   complete?: (args: { prompt: string; systemPrompt: string; appId: string }) => Promise<{ content: string }>;
+}
+
+/** Error codes that are PERMANENT (don't retry) — a bad key / malformed request won't fix itself. */
+const PERMANENT_AI_CODES = new Set(['INVALID_API_KEY', 'INVALID_BODY', 'PROMPT_TOO_LONG', 'APP_NOT_ALLOWED', 'APP_ID_REQUIRED']);
+
+/**
+ * Run a completion, retrying on TRANSIENT provider failures up to `maxRetries` times with a short linear
+ * backoff. Stealth/alpha endpoints (e.g. owl-alpha) intermittently return a provider error and succeed on
+ * the next attempt — a single try kills the authoring even though the model is fine. Permanent failures
+ * (bad key, malformed request) are thrown immediately. The final failure is re-thrown for the caller to
+ * surface. A retried attempt that failed costs nothing (the provider 400s before billing).
+ */
+async function completeWithRetry(
+  run: (a: { prompt: string; systemPrompt: string; appId: string }) => Promise<{ content: string }>,
+  args: { prompt: string; systemPrompt: string; appId: string },
+  maxRetries: number,
+  label: string,
+): Promise<{ content: string }> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try { return await run(args); }
+    catch (e) {
+      lastErr = e;
+      const code = (e as { code?: string })?.code;
+      if (code && PERMANENT_AI_CODES.has(code)) throw e;     // permanent → don't waste retries
+      if (attempt < maxRetries) {
+        logger.warn('Secretary authoring: transient completion error, retrying', { label, attempt: attempt + 1, of: maxRetries, error: (e as Error)?.message });
+        await new Promise((r) => setTimeout(r, 750 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 export interface AuthoringResult {
@@ -174,7 +218,16 @@ export async function authorWorkspaceContent(
         + ((strat.principles || []).filter(Boolean).length ? `\n- Principles to respect: ${(strat.principles || []).filter(Boolean).join('; ')}` : '')
       : '';
     const docList = docTargets.map((o) => `- "${o.name}"${manifest && typeof (o as Record<string, unknown>).purpose === 'string' ? ` — ${(o as Record<string, unknown>).purpose as string}` : ''}`).join('\n') || '(none)';
+    // Give the model the EXACT JSON Schema for each record space (not just field names) so it conforms
+    // on the first shot — and so the correction round can point at concrete schema violations.
+    const recSchemas = new Map<string, Record<string, unknown>>();
+    for (const o of recTargets) {
+      const sc = await storage.findApplicableSchema(`${root}.${o.namespace}.__probe`);
+      if (sc?.schemaJson) recSchemas.set(o.name as string, sc.schemaJson as Record<string, unknown>);
+    }
     const recList = recTargets.map((o) => {
+      const sc = recSchemas.get(o.name as string);
+      if (sc) return `- "${o.name}" — each record MUST satisfy this JSON Schema: ${JSON.stringify(sc)}`;
       const fields = (o.fields || []).filter((f) => f && f.name).map((f) => `${f.name}${f.type ? `:${f.type}` : ''}`).join(', ');
       return `- "${o.name}"${fields ? ` — fields: ${fields}` : ''}`;
     }).join('\n') || '(none)';
@@ -193,20 +246,28 @@ export async function authorWorkspaceContent(
 
     let reply: string;
     try {
-      const completion = await runComplete({ prompt, systemPrompt, appId: opts.appId });
+      const completion = await completeWithRetry(runComplete, { prompt, systemPrompt, appId: opts.appId }, opts.maxRetries ?? 0, ws.name);
       result.morsels += 1;
       reply = completion.content;
-    } catch {
-      continue;   // a gated/failed completion for one workspace shouldn't sink the others
+    } catch (e) {
+      // Don't sink the other workspaces — but DON'T fail silently either (the whole point): log it and
+      // surface a feed line so the owner sees "couldn't fill X" instead of nothing happening.
+      logger.warn('Secretary authoring: completion failed', { ws: ws.name, error: (e as Error)?.message });
+      result.summaries.push(`⚠️ Couldn't author into ${ws.name}: ${(e as Error)?.message || 'the AI call failed'}`);
+      continue;
     }
     const parsed = extractJsonObject(reply);
-    if (!parsed) continue;
+    if (!parsed) {
+      logger.warn('Secretary authoring: reply did not parse as JSON', { ws: ws.name, head: reply.slice(0, 300) });
+      result.summaries.push(`⚠️ Couldn't author into ${ws.name}: the AI reply was not usable JSON`);
+      continue;
+    }
 
     let docCount = 0; let recCount = 0;
     const docByName = new Map(docTargets.map((o) => [o.name as string, o]));
     const recByName = new Map(recTargets.map((o) => [o.name as string, o]));
 
-    // Documents (priority).
+    // Documents (priority — free markdown, no schema to fight).
     const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
     for (const d of documents) {
       if (!d || typeof d !== 'object') continue;
@@ -216,23 +277,45 @@ export async function authorWorkspaceContent(
       const markdown = String(dd.markdown ?? '').trim();
       if (!ot || !ot.namespace || !title || !markdown) continue;
       const id = slugId(title, 'doc');
-      const value = { id, title: title.slice(0, 200), markdown };
-      const written = await writeAndMaybePublish(storage, config, root, ot.namespace, id, value, doPublish, writerGaii);
-      if (written.length) { result.writes.push(...written); docCount++; }
+      const res = await writeAndMaybePublish(storage, config, root, ot.namespace, id, { id, title: title.slice(0, 200), markdown }, doPublish, writerGaii);
+      if (res.writes.length) { result.writes.push(...res.writes); docCount++; }
     }
 
-    // Records (secondary).
-    const records = Array.isArray(parsed.records) ? parsed.records : [];
-    for (const r of records) {
-      if (!r || typeof r !== 'object') continue;
-      const rr = r as Record<string, unknown>;
-      const ot = recByName.get(String(rr.space ?? '').trim());
-      const rec = rr.record;
-      if (!ot || !ot.namespace || !rec || typeof rec !== 'object' || Array.isArray(rec)) continue;
-      const id = slugId(String((rec as Record<string, unknown>).title ?? (rec as Record<string, unknown>).name ?? ''), 'rec');
-      const value = { ...(rec as Record<string, unknown>), id };
-      const written = await writeAndMaybePublish(storage, config, root, ot.namespace, id, value, doPublish, writerGaii);
-      if (written.length) { result.writes.push(...written); recCount++; }
+    // Records (secondary) — AGENTIC: write each, and when the schema REJECTS one, feed the exact errors
+    // back to the model for a bounded correction round (read→write→see-error→correct), instead of
+    // silently dropping it. This is what makes the MCP agent path "just work"; one-shot drop is what made
+    // the old generator path tökkii. MAX_CORRECTION bounds the cost (each round is one metered call).
+    const MAX_CORRECTION = 1;
+    const toPending = (arr: unknown): Array<{ space: string; record: Record<string, unknown> }> =>
+      (Array.isArray(arr) ? arr : [])
+        .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object' && !Array.isArray(r))
+        .map((r) => {
+          const rec = r.record;
+          return { space: String(r.space ?? '').trim(), record: (rec && typeof rec === 'object' && !Array.isArray(rec)) ? rec as Record<string, unknown> : {} };
+        })
+        .filter((x) => x.space && Object.keys(x.record).length > 0);
+    let pending = toPending(parsed.records);
+    for (let round = 0; round <= MAX_CORRECTION && pending.length; round++) {
+      const rejected: Array<{ space: string; record: Record<string, unknown>; errors: unknown }> = [];
+      for (const item of pending) {
+        const ot = recByName.get(item.space);
+        if (!ot || !ot.namespace) continue;
+        const id = slugId(String(item.record.title ?? item.record.name ?? ''), 'rec');
+        const res = await writeAndMaybePublish(storage, config, root, ot.namespace, id, { ...item.record, id }, doPublish, writerGaii);
+        if (res.writes.length) { result.writes.push(...res.writes); recCount++; }
+        else rejected.push({ space: item.space, record: item.record, errors: res.errors });
+      }
+      // Done if nothing was rejected, no rounds left, or the budget is spent.
+      if (!rejected.length || round === MAX_CORRECTION) break;
+      if (opts.budgetRemaining !== null && result.morsels >= opts.budgetRemaining) break;
+      const fixPrompt = `Some records you produced for workspace "${ws.name}" were REJECTED by the schema. Fix ONLY these and return the corrected records.\n\n`
+        + rejected.map((x, i) => `${i + 1}. space "${x.space}" — rejected record: ${JSON.stringify(x.record)}\n   schema errors: ${JSON.stringify(x.errors)}`).join('\n\n')
+        + `\n\nFor each, follow that space's JSON Schema EXACTLY: add any required field, fix wrong types, and keep within the allowed fields. Return ONLY:\n{ "records": [ { "space": "<space name>", "record": { ... } } ] }`;
+      try {
+        const fix = await completeWithRetry(runComplete, { prompt: fixPrompt, systemPrompt, appId: opts.appId }, opts.maxRetries ?? 0, `${ws.name} (correction)`);
+        result.morsels += 1;
+        pending = toPending(extractJsonObject(fix.content)?.records);
+      } catch (e) { logger.warn('Secretary authoring: correction call failed', { ws: ws.name, error: (e as Error)?.message }); break; }
     }
 
     if (docCount || recCount) {
@@ -240,6 +323,10 @@ export async function authorWorkspaceContent(
       if (docCount) parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`);
       if (recCount) parts.push(`${recCount} record${recCount === 1 ? '' : 's'}`);
       result.summaries.push(`🖊️ Authored ${parts.join(' + ')} into ${ws.name}${doPublish ? ' (published)' : ' (drafts for review)'}`);
+    } else {
+      // Parsed fine but produced nothing usable (wrong space names / empty arrays) — surface it, don't vanish.
+      logger.warn('Secretary authoring: nothing authored', { ws: ws.name, head: reply.slice(0, 300) });
+      result.summaries.push(`⚠️ Tried to fill ${ws.name} but the AI returned nothing usable`);
     }
   }
 
@@ -249,27 +336,26 @@ export async function authorWorkspaceContent(
 
 /**
  * Write one item as a draft and (when `publish`) promote it via the draft→publish convention
- * (validate against the .latest schema, write .version.N + .latest, delete the draft) — identical
- * semantics to aimeat_workspace_write + _publish. Returns the keys written (empty on a schema reject,
- * so a single bad item is skipped, not fatal). Free-markdown document spaces carry no schema, so they
- * always validate; record spaces are validated against their locked schema.
+ * (validate against the schema, write .version.N + .latest, delete the draft) — identical semantics
+ * to aimeat_workspace_write + _publish. Returns `{ writes, errors }`: on a schema rejection nothing is
+ * written and `errors` carries the validation problems so the caller can feed them BACK to the model
+ * for a correction round (the read→write→see-error→correct loop, not a one-shot drop). Free-markdown
+ * document spaces carry no schema, so they always validate; record spaces validate against their schema.
  */
 async function writeAndMaybePublish(
   storage: Storage, config: AimeatConfig, root: string, namespace: string, instanceId: string,
   value: Record<string, unknown>, publish: boolean, writerGaii: string,
-): Promise<string[]> {
+): Promise<{ writes: string[]; errors: unknown | null }> {
   const base = `${root}.${namespace}.${instanceId}`;
   const draftKey = `${base}.draft`;
   const draftValid = await validateMemoryWrite(draftKey, value, storage);
-  if (!draftValid.valid) return [];
+  if (!draftValid.valid) return { writes: [], errors: draftValid.errors ?? 'schema rejected' };
   const now = new Date().toISOString();
   await storage.setMemory({ key: draftKey, ownerGaii: writerGaii, value, visibility: 'private', tags: ['secretary', 'authored'], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
-  if (!publish) return [draftKey];
+  if (!publish) return { writes: [draftKey], errors: null };
 
-  const latestValid = await validateMemoryWrite(`${base}.latest`, value, storage);
-  if (!latestValid.valid) return [draftKey];   // keep the draft; can't publish a schema-mismatched record
   await storage.setMemory({ key: `${base}.version.1`, ownerGaii: writerGaii, value, visibility: 'private', tags: ['secretary', 'authored'], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
   await storage.setMemory({ key: `${base}.latest`, ownerGaii: writerGaii, value, visibility: 'private', tags: ['secretary', 'authored'], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
   await storage.deleteMemory(writerGaii, draftKey);
-  return [`${base}.latest`, `${base}.version.1`];
+  return { writes: [`${base}.latest`, `${base}.version.1`], errors: null };
 }
