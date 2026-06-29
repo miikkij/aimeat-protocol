@@ -103,45 +103,38 @@ function currentSetupText(current) {
   const ws = (current.workspaces || []).map((w) => `- ${w.name}: ${w.purpose || ''}`).join('\n');
   return `
 
-This context ALREADY EXISTS — EVOLVE it, do not start over.
+This area already exists, so build on what is here and evolve it.
 Current purpose: ${(current.brain && current.brain.purpose) || ''}
 Current rules:
 ${rules || '(none)'}
 Current workspaces:
 ${ws || '(none)'}
-KEEP the existing workspaces (same names) and only ADD a new one if the change truly needs it — never drop or rename an existing workspace. Update the brain, goals and quick actions to reflect the requested change below.`;
+Keep the existing workspaces under their current names, add a new one only when the change genuinely calls for it, and update the brain, goals and direction to reflect what changes below.`;
 }
 
 /** Conversational interview the user runs in their own external AI chat. `current` (optional) = the
  *  context being re-run, so the AI EVOLVES it (reshape) instead of starting fresh. */
 export function buildInterviewPrompt(owner, current) {
-  return `I want to ${current ? 'adjust an existing' : 'set up a'} context for my personal Secretary inside AIMEAT${owner ? ` (my username is "${owner}")` : ''}.
+  return `I want to ${current ? 'evolve an existing' : 'set up a'} personal Secretary inside AIMEAT for ONE area of my work or life${owner ? ` (my username is "${owner}")` : ''}.
 
-Act as that Secretary ${current ? 'helping me evolve this area of my life or work' : 'getting to know me for ONE area of my life or work'}.
+You are that Secretary, and this is the start of us working together. Treat it as a real, flowing conversation between two people. Your aim: genuinely understand this area, be useful to me from the very first message, and by the end arrive at genuinely good "brains" for yourself, so you clearly know how to help me, my goals are sharp, and you have a space ready to fill with well-organized information as we go.
 
-HOW TO BE IN this conversation — read this first, it matters more than the output:
-You are a real collaborator and thinking partner, NOT a form-filler. The JSON at the end is the BY-PRODUCT of a genuinely useful conversation — it is not the goal, and you must not rush to it. ENGAGE with whatever I bring up: if I propose an approach, suggest a tool, or ask a question (for example "can we find out what AIMEAT can already do for this", or "I can run a prompt in Claude Code to help"), take it seriously, build on it, and actually help me think it through right now — do not ignore it or defer everything to "later". If I raise something you can help with, help. Be warm, peer-level, and direct; no corporate filler, no em-dashes.
+Lead with the conversation and let it lead everywhere. Talk the way a sharp, warm colleague talks: plain, simple, everyday language, in my own language. Stay curious and genuinely helpful: when I bring up an approach, a tool, or a question, take it seriously, build on it, and help me with it right there; and when you can move something forward in the moment (look something up, draft something, check whether something already exists), do it then. You have AIMEAT tools and knowledge available, so use them to help me and to ask sharper questions.
 
-You know AIMEAT, so you can answer my questions about it and suggest how it helps here:
+You know AIMEAT, so you can explain it and suggest how it helps here:
 ${SECRETARY_AIMEAT_PRIMER}
 
-Interview me properly — ask a few focused questions, ONE small batch at a time, and WAIT for my answers between batches. Do NOT ask me about "organisms", "workspaces", folders or any technical structure — figure the right structure out yourself from what I tell you.
+Follow me, and come to understand, in whatever order it surfaces: what this area is and where it honestly stands right now; what I need you for here and where you operate (your scope: what to keep an eye on, and what to leave to me); and, as it comes up, where I want to take this and how we get there. Keep your questions few and focused, one small batch at a time, and let my answers shape the next ones. Where you have a hunch, from what you know about me or what you can find, offer it as a suggestion I can shape ("maybe you're aiming at X, or is it something else?") and let me steer.
 
-Across the conversation, get to know (only push on what's relevant to my area):
-1. The area itself — what it is, what I'm trying to achieve, the kinds of tasks I'd want help with, and how I like to communicate (tone, language, level of detail).
-2. Whether I want this area STEERED with a strategy — i.e. tracking where we are → where we're going. Some areas want that, some are just ongoing upkeep. If I don't want it, skip the whole strategy structure.
-3. If I do: the strategy pieces — VISION (long-term aspiration), MISSION (what we do), PRINCIPLES (guardrails that should steer decisions), RISKS (what could derail), the CURRENT STATE (where it honestly stands now) and the TARGET STATE (what "done well" looks like this cycle), and the big MILESTONES between them in order (each a checkpoint/gate, not a task — what reaching it unlocks). Don't force every piece; capture what I actually have material for.
-4. WHO is involved in what (people, partners, projects).${currentSetupText(current)}
+Keep your words to me human and plain, and work out any underlying structure quietly on your own from what I tell you, holding it in the background.${currentSetupText(current)}
 
-BEFORE you produce any JSON: reflect your understanding back to me in plain language — the strategy (current → target, the milestones in order, vision/mission/principles/risks if we covered them) and who's involved — and ask me to CONFIRM or CORRECT it. Do NOT output JSON until I have confirmed. This is the most important step: I need to see you understood me before anything is built.
-
-ONLY after I confirm, design these and output them as ONE JSON object inside a single code block with EXACTLY this shape:
+Keep exploring with me (proposing, helping, sharpening) until we share a picture that feels right to me. I will tell you when it clicks. Once I do, capture everything we landed on as ONE JSON object inside a single code block in exactly this shape:
 
 ${CONTRACT}
 
-Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 goals (concrete things I'm working toward — distinct from strategy milestones, which are gates); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Include the "strategy" object only if I wanted this area steered that way, and only the sub-fields we actually covered.
+Fill it from our real conversation: the brain (who you are for me and how you help, written as clear operating rules), the space and what it will hold so information stays organized as it accumulates, my concrete goals, a couple of quick actions, and, when a clear sense of where I'm headed came up naturally, capture that direction too. Keep it to 3–7 brain rules, 2–6 workspaces drawn from my actual needs, 2–3 goals, and 2–3 quickActions, each kind being either "prompt" (a ready message to send me) or "compose" (focus an input, with "target" one of "plan"|"find"|"note"). Keep the JSON as one self-contained code block so the app can read it.
 
-After the JSON code block, add ONE short line in my language telling me exactly what to do next: go back to AIMEAT → the Secretary page → paste this JSON into the setup box → click "Set up my Secretary". (The JSON must still be a single self-contained code block so the app can read it.)`;
+After the JSON, add one short line in my language: go back to AIMEAT → the Secretary page → paste this into the setup box → "Set up my Secretary".`;
 }
 
 /** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). `current`
@@ -157,7 +150,7 @@ The user's needs:
 ${needs}
 """
 
-Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 goals (concrete things the user is working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Include the "strategy" object (vision/mission/principles/risks/current → target → ordered milestones — only the parts the needs support) when the needs describe a goal-driven area heading somewhere; OMIT it for areas that are just ongoing upkeep. Base everything ONLY on the needs — never invent progress. Output ONLY the JSON code block — no commentary.`;
+Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 goals (concrete things the user is working toward); 2–3 quickActions (role-specific shortcut buttons), each "kind" being either "prompt" (a ready message) or "compose" (focus an input, with "target" one of "plan"|"find"|"note"). Include the "strategy" object (vision/mission/principles/risks/current → target → ordered milestones, using the parts the needs support) when the needs describe a goal-driven area heading somewhere, and leave it out for areas that are ongoing upkeep. Ground everything in the needs as given. Output the single JSON code block on its own.`;
 }
 
 /** Pull a JSON object out of an AI's text (may be fenced / surrounded by prose). */
