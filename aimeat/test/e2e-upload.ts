@@ -292,6 +292,7 @@ await test('POST /v1/apps with valid base64 content -> success, size matches raw
         body: JSON.stringify({
             filename: 'valid-b64-test.html',
             name: 'Valid base64 test',
+            description: 'Inline base64 upload smoke test app.',
             content: content_b64,
         }),
     }));

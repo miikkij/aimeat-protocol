@@ -503,9 +503,12 @@ let tickToken = '';
 let tickSchedId = '';
 const tickCtx = { id: 't1', name: 'Tick', brain: { purpose: 'Test context', rules: [] }, organismId: null, organismName: 'Tick', workspaces: [], policy: { stopSpending: false, dailyMorselBudget: null, bands: {} }, brainHistory: [] };
 
-await test('25. Idle pre-check: no goals/decisions → tick skips WITHOUT a paid call', async () => {
+await test('25. AI-availability guard: owner with no AI key → tick skips gracefully WITHOUT a paid call', async () => {
+    // The daily check-in always briefs (the "nothing to do" idle early-out was removed), so the tick's
+    // core step is a PAID AI briefing. This fresh owner has no AI key configured, so no paid call can run
+    // — the pre-flight guard must skip gracefully (busy/limited), NOT error every run.
     tickToken = await registerOwner(tickOwner);
-    // stop-spending OFF, no budget, no goals, no decisions.
+    // stop-spending OFF, no budget, no goals, no decisions — only the missing AI key stops the paid call.
     await json('/v1/memory', {
         method: 'POST', headers: { Authorization: `Bearer ${tickToken}` },
         body: JSON.stringify({ key: 'secretary.config', value: { activeContextId: 't1', contexts: [tickCtx] }, visibility: 'private' }),
@@ -518,12 +521,12 @@ await test('25. Idle pre-check: no goals/decisions → tick skips WITHOUT a paid
     tickSchedId = created.body.data.schedule.id;
     const trig = await json(`/v1/schedules/${tickSchedId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${tickToken}` } });
     assert(trig.status === 200, `trigger status ${trig.status}: ${JSON.stringify(trig.body)}`);
-    assert(trig.body.data.outcome === 'busy' || trig.body.data.outcome === 'limited', `expected skip, got ${trig.body.data.outcome}`);
-    assert(/nothing to do/i.test(trig.body.data.reason || ''), `reason should be idle: ${trig.body.data.reason}`);
+    assert(trig.body.data.outcome === 'busy' || trig.body.data.outcome === 'limited', `expected skip, got ${trig.body.data.outcome} (reason: ${trig.body.data.reason})`);
+    assert(/ai key/i.test(trig.body.data.reason || ''), `reason should mention the missing AI key: ${trig.body.data.reason}`);
     // No feed written (the paid briefing never ran).
     const feed = await json('/v1/memory/secretary.feed', { headers: { Authorization: `Bearer ${tickToken}` } });
     const items = (feed.body && feed.body.data && feed.body.data.value && feed.body.data.value.items) || [];
-    assert(items.length === 0, `feed must stay empty on idle skip, got ${items.length}`);
+    assert(items.length === 0, `feed must stay empty on skip, got ${items.length}`);
 });
 
 await test('26. Soft budget guard: spend at/over dailyMorselBudget → tick skips with reason budget', async () => {

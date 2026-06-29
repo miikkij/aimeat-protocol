@@ -206,7 +206,7 @@ await test('POST /v1/apps — upload app with agent JWT', async () => {
     const content = Buffer.from('<html><body>Auth test app</body></html>').toString('base64');
     const data = await authApi('/v1/apps', agentJwt, {
         method: 'POST',
-        body: JSON.stringify({ filename: 'auth-test.html', content, mime_type: 'text/html' }),
+        body: JSON.stringify({ filename: 'auth-test.html', description: 'Auth-lib smoke test app.', content, mime_type: 'text/html' }),
     });
     assert(data.ok === true, `App upload failed: ${data.error?.message}`);
     assert(data.data.download_url.includes('auth-test.html'), 'download URL should contain filename');

@@ -28,6 +28,9 @@
  *   v2.5.0 — 2026-06-24 — Add the `secretary` kind: the Secretary's autonomous tick (Phase 4) — runs
  *     the active context's brain on the owner's key and appends a briefing to `secretary.feed`;
  *     stop-spending skips the paid call.
+ *   v2.5.1 — 2026-06-29 — Secretary tick: pre-flight AI-availability guard — when the owner has no usable
+ *     AI key, skip the tick gracefully (like stop-spending/budget) instead of erroring every run once the
+ *     "daily check-in always briefs" change removed the idle early-out.
  *   v1.0.0 — 2026-03-01 — Initial implementation with croner
  *   v2.0.0 — 2026-03-15 — Add @activate trigger, execution log, memory access tracking
  *   v2.1.0 — 2026-06-05 — executeJob/triggerNow return a JobOutcome so a manual
@@ -614,6 +617,15 @@ export class Scheduler {
       return { reads: ['secretary.config'], writes: [], skipped: true, skipReason: `daily morsel budget reached (${spentToday}/${budget})` };
     }
 
+    // (2.5) AI-availability guard: the autonomous tick's core output is a PAID AI briefing — the daily
+    // check-in always briefs (there is no "nothing to do" early-out). If the owner has no usable AI key,
+    // no paid call can run this tick, so skip gracefully — exactly like the stop-spending / budget guards
+    // above — instead of letting completeForOwner throw NO_API_KEY and marking EVERY tick "failed" (which
+    // also fires a "Schedule failed" notification each run). The tick resumes once a key is set in Settings.
+    if (!(await this.ownerHasUsableAiKey(owner))) {
+      return { reads: ['secretary.config', 'openrouter.apikey'], writes: [], skipped: true, skipReason: 'no AI key configured' };
+    }
+
     // (3) Cheap "anything to do?" pre-check (P1-B): no open goals + no due decisions → skip the paid call.
     const goalRecs = await this.storage.listMemory(owner, { prefix: 'secretary.goal.' });
     const openGoals = goalRecs
@@ -814,6 +826,22 @@ export class Scheduler {
     if (Object.keys(newPending).length) emitChange('agent-messages');
     if (stepCompletions.length || newActionItems.length || rearmedRoutines.length) emitChange('agent-tasks', owner);
     return { reads: ['secretary.config', 'secretary.goal.*', 'secretary.decision.*'], writes };
+  }
+
+  /**
+   * True when the owner has a usable AI key for autonomous completions. Mirrors the key resolution in
+   * completeForOwner(): the default 'openrouter' provider REQUIRES an encrypted key; other providers
+   * (e.g. a local model) may run keyless. Used as the Secretary tick's pre-flight guard so the tick
+   * skips rather than errors when no paid call is possible.
+   */
+  private async ownerHasUsableAiKey(owner: string): Promise<boolean> {
+    const [keyRec, prefsRec] = await Promise.all([
+      this.storage.getMemory(owner, 'openrouter.apikey'),
+      this.storage.getMemory(owner, 'openrouter.settings'),
+    ]);
+    const provider = ((prefsRec?.value as Record<string, unknown> | undefined)?.provider as string) || 'openrouter';
+    const hasKey = !!(keyRec?.value as { encrypted?: string } | undefined)?.encrypted;
+    return provider !== 'openrouter' || hasKey;
   }
 
   /** Read the active context's workspaces (id + name) from its self-organism registry. */
