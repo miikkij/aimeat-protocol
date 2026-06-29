@@ -1219,9 +1219,19 @@ export async function setImageVisibility(key, visibility) {
 //   ![alt](/v1/pub/<ownerGhii>/<key>)    — public, anyone loads it via a plain <img>
 const STORAGE_IMG_RE = /!\[([^\]]*)\]\(\/v1\/(?:storage|pub\/[^/)]+)\/([^\s)]+)\)/g;
 
-/** The current owner's GHII (`owner@node`) — used to build public /v1/pub image URLs. */
+/** The current owner's GHII (`owner@node`). ALWAYS returns a string so callers can safely `.split('@')`.
+ *  Prefers the synchronous `auth.storedGhii` accessor; falls back to a sync `getSession()` only when it
+ *  returns a session object with a string `ghii` (on some builds `getSession()` is async / returns a
+ *  Promise — never return that, or `.split` blows up at call sites). Empty string when unknown. */
 export function currentGhii() {
-  return window.AIMEAT?.auth?.getSession?.()?.ghii || '';
+  const auth = (typeof window !== 'undefined' && window.AIMEAT && window.AIMEAT.auth) || null;
+  if (!auth) return '';
+  if (typeof auth.storedGhii === 'string' && auth.storedGhii) return auth.storedGhii;
+  try {
+    const s = typeof auth.getSession === 'function' ? auth.getSession() : null;
+    if (s && typeof s === 'object' && typeof s.ghii === 'string') return s.ghii;
+  } catch { /* ignore */ }
+  return '';
 }
 
 /** Pull the storage object keys (+ alt text) embedded in a markdown document, in order (both forms). */
