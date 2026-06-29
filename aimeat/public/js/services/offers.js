@@ -95,7 +95,7 @@ export async function rankOffersByNeed(needText, items) {
   const prompt = `NEED: ${needText}\n\nCATALOGUE (${catalogue.length} offers):\n${JSON.stringify(catalogue)}`;
   const r = await api('/v1/ai/complete', {
     method: 'POST',
-    body: JSON.stringify({ prompt, systemPrompt, modelRole: 'execution', max_tokens: 900, app_id: 'offers-need-router' }),
+    body: JSON.stringify({ prompt, systemPrompt, modelRole: 'execution', app_id: 'offers-need-router' }),
     timeoutMs: 120_000, retries: 0,
   });
   if (!r?.ok) { const e = new Error(r?.error?.message || 'AI call failed'); e.code = r?.error?.code || 'UNKNOWN'; throw e; }

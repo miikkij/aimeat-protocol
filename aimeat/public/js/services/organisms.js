@@ -390,7 +390,6 @@ export async function generateRaw(description, currentManifest) {
       prompt: frameRequest(description, currentManifest),
       systemPrompt: await generatorSystemPrompt(),
       modelRole: 'execution',
-      max_tokens: 3000,
       app_id: 'organism-workspace',
     }),
     timeoutMs: 600_000,

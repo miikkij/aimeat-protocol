@@ -10,7 +10,6 @@ import type { AimeatConfig } from '../config.js';
  *     const r = await AIMEAT.ai.complete({
  *       prompt: 'Suggest 5 short genre tags for:\n' + summary,
  *       modelRole: 'execution',
- *       max_tokens: 60,
  *       app_id: 'my-app-name',  // for per-app spend tracking
  *     });
  *     output.value = r.content;
