@@ -53,8 +53,8 @@ export function groupFeedByDay(feed) {
 export const SECRETARY_AIMEAT_PRIMER = `AIMEAT is the user's own AI-agent platform. Key ideas you can explain:
 - The user owns everything under their identity (GHII). "Morsels" (❤️) are the usage/credit meter — they're spent on actions, not cashable.
 - Memory: the user's private key-value knowledge store.
-- Organisms = spaces (personal or shared) that contain Workspaces (like folders) holding structured records. The user's Secretary keeps each context's info in its own organism.
-- Agents: AI helpers the user connects (each scoped); the Secretary is one of them.
+- Organisms = spaces (personal or shared) that contain Workspaces (like folders) holding structured records. You keep each area of the user's stuff in its own organism.
+- Agents: AI helpers the user connects (each scoped); you are one of them.
 - Discover (the network search): finds what already exists across the node — agents, services, companies' offerings, knowledge, apps — so you never rebuild what's there. Always suggest discovering before building.
 - Apps, extensions, capabilities: ways to extend AIMEAT; companies can publish offerings others order.
 When the user asks how to do something in AIMEAT, explain clearly and concretely from these concepts, point them to the right area of their Profile, and offer to walk them through it step by step. If unsure, say so rather than inventing exact button names.`;
@@ -63,7 +63,7 @@ When the user asks how to do something in AIMEAT, explain clearly and concretely
 export const CONTRACT = `\`\`\`json
 {
   "brain": {
-    "purpose": "1-3 sentences: who my Secretary is and how it helps me in this context",
+    "purpose": "1-3 sentences: who you are for me and how you help me in this context",
     "rules": [ { "id": "r1", "description": "a concrete operating rule" } ]
   },
   "organism": {
@@ -72,7 +72,7 @@ export const CONTRACT = `\`\`\`json
     "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why", "manifest": "OPTIONAL — see note below", "schemas": "OPTIONAL — see note below" } ]
   },
   "goals": [ { "title": "a concrete goal I'm working toward in this context", "why": "why it matters" } ],
-  "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ],
+  "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a ready message to send you" } ],
   "strategy": "OPTIONAL — see note below"
 }
 \`\`\`
@@ -115,9 +115,9 @@ Keep the existing workspaces under their current names, add a new one only when 
 /** Conversational interview the user runs in their own external AI chat. `current` (optional) = the
  *  context being re-run, so the AI EVOLVES it (reshape) instead of starting fresh. */
 export function buildInterviewPrompt(owner, current) {
-  return `I want to ${current ? 'evolve my' : 'set up my'} personal Secretary inside AIMEAT to handle everything I have going on across my work and life${owner ? ` (my username is "${owner}")` : ''}.
+  return `I want to ${current ? 'evolve the' : 'set up an'} AI that works alongside me inside AIMEAT and helps me handle everything I have going on across my work and life${owner ? ` (my username is "${owner}")` : ''}.
 
-You are that Secretary, and this is the start of us working together. Treat it as a real, flowing conversation between two people. Your aim: genuinely understand my world and what I have going on, be useful to me from the very first message, and by the end arrive at genuinely good "brains" for yourself, so you clearly know how to help me across all of it, my goals are sharp, and you have spaces ready to fill with well-organized information as we go. You handle the whole picture and organize what I bring into its own spaces yourself, so I can hand you anything and trust it lands in the right place.
+You are that, and this is the start of us working together. You take things off my plate and move my work forward, and you become whatever I need you to be — there is no fixed job title here, only what helps me most. Treat it as a real, flowing conversation between two people. Your aim: genuinely understand my world and what I have going on, be useful to me from the very first message, and by the end arrive at genuinely good "brains" for yourself, so you clearly know how to help me across all of it, my goals are sharp, and you have spaces ready to fill with well-organized information as we go. You handle the whole picture and organize what I bring into its own spaces yourself, so I can hand you anything and trust it lands in the right place.
 
 Take whatever I bring you in stride: it is all welcome, however much there is, and a big, busy picture is exactly where you are most useful. Stay calm and can-do, and meet a large scope with energy. Keep any concern for the moments when something is genuinely serious and worth my attention; right now we are getting to know things, so stay light, curious, and encouraging.
 
@@ -146,7 +146,7 @@ After the JSON, add one short line in my language: go back to AIMEAT → the Sec
 /** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). `current`
  *  (optional) = the context being re-run, so the AI EVOLVES it (reshape) and keeps its workspaces. */
 export function buildDesignPrompt(owner, needs, current) {
-  return `You are setting up ${current ? 'and evolving ' : ''}one context of ${owner || 'a user'}'s personal Secretary inside AIMEAT. Based ONLY on the needs described below${current ? ' and the current setup' : ''}, design these things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
+  return `You are setting up ${current ? 'and evolving ' : ''}one context of the AI that works alongside ${owner || 'a user'} inside AIMEAT (it takes things off their plate and moves their work forward — no fixed job title, only what helps most). Based ONLY on the needs described below${current ? ' and the current setup' : ''}, design these things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
 
 ${CONTRACT}
 ${currentSetupText(current)}
@@ -332,7 +332,7 @@ export function suggestMilestoneStatus(milestone, goalsById) {
 export function buildStrategyReplanPrompt(owner, strategy, changeNote) {
   const cur = normalizeStrategy(strategy);
   const ms = (cur.milestones || []).map((m, i) => `${i + 1}. [${m.status}] ${m.title}${m.enables ? ` — enables: ${m.enables}` : ''}`).join('\n') || '(none)';
-  return `You are helping ${owner || 'a user'} re-plan the strategy for one area of their personal Secretary inside AIMEAT. The user just changed something and the rest of the strategy should be adjusted to stay coherent — KEEP whatever still fits, and only change what the change implies. Do not invent facts or progress; preserve the status of milestones that are still valid.
+  return `You are helping ${owner || 'a user'} re-plan the strategy for one area of their work inside AIMEAT. The user just changed something and the rest of the strategy should be adjusted to stay coherent — KEEP whatever still fits, and only change what the change implies. Do not invent facts or progress; preserve the status of milestones that are still valid.
 
 Current strategy:
 - Vision: ${cur.vision || '(none)'}
