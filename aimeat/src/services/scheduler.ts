@@ -5,6 +5,10 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.11.0 — 2026-06-30 — Secretary autonomous authoring: a band-gated phase (`author_content`) fills
+ *     the active context's EMPTY workspaces — document spaces first, then records — toward the focus
+ *     milestone (services/secretary-authoring.ts). act → write + publish · draft/ask → leave drafts ·
+ *     off (default) → skip. Metered per workspace, capped by the same per-day morsel budget.
  *   v2.10.0 — 2026-06-28 — Secretary Strategy: the tick reads the active context's optional `strategy`
  *     (current → target + principles/risks + ordered milestones) and steers the briefing toward the
  *     current focus milestone (first not-yet-reached), respecting the principles + flagging risks.
@@ -57,6 +61,7 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
+import { authorWorkspaceContent } from './secretary-authoring.js';
 import { appendSecretaryFeed } from './secretary-feed.js';
 import { produceClarifyDeliverable, type ClarifyJob } from './secretary-clarify.js';
 import { listSpecialists } from './specialist.js';
@@ -813,6 +818,27 @@ export class Scheduler {
       const feedText = deferred.length ? `${briefingText}\n\n${deferred.join('\n')}` : briefingText;
       await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: feedText });
       writes.push('secretary.feed');
+
+      // Autonomous authoring phase: actually FILL the workspaces (document-first). Band-gated on
+      // `author_content` (default 'draft' = leave drafts for review; 'act' = publish directly; 'off' =
+      // skip). Each filled workspace is a paid AI call, so it respects the same per-day budget — pass the
+      // remaining headroom and let authoring stop when it's exhausted. Off by default for caution, so a
+      // context that never opts in behaves exactly as before.
+      const authorBand = active.policy?.bands?.author_content ?? 'draft';
+      if (authorBand !== 'off') {
+        const budgetRemaining = budget === null ? null : Math.max(0, budget - spentToday - paidMorsels);
+        if (budgetRemaining === null || budgetRemaining > 0) {
+          const authored = await authorWorkspaceContent(this.storage, this.config, owner, ownerName, active, wsList, {
+            openGoals, band: authorBand, aggressive: true, useGeneralKnowledge: true, budgetRemaining, appId: `schedule:${job.id}:author`,
+          });
+          paidMorsels += authored.morsels;
+          writes.push(...authored.writes);
+          for (const line of authored.summaries) {
+            await this.appendFeed(owner, { kind: 'act', contextId: active.id, contextName: active.name || '', text: line, href: `/v1/profile?tab=organisms&org=${active.organismId}` });
+          }
+          if (authored.summaries.length) writes.push('secretary.feed');
+        }
+      }
     } finally {
       // Persist the spend ledger (+ any new pending decisions, routine step completions, and derived
       // action-items) even if generation threw mid-way, so the soft budget reflects what was actually
