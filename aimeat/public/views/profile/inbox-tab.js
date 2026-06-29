@@ -164,7 +164,7 @@ function groupConversations(conversations) {
 }
 
 function Avatar({ seed, size = 36 }) {
-  const svg = minidenticon(seed || 'user');
+  const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
   return html`<span class="inbox-avatar" style=${`width:${size}px;height:${size}px`}
     dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
 }

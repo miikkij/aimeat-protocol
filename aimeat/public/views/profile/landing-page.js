@@ -737,7 +737,7 @@ function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   const NODE_URL = getNodeUrl();
   const isNew = tier === 'new';
   const isExperienced = tier === 'experienced';
-  const avatarSvg = minidenticon(session.owner || 'user');
+  const avatarSvg = minidenticon(typeof session.owner === 'string' && session.owner ? session.owner : 'user');
 
   // Stats are NAVIGATION, not decoration \u2014 each one opens its own section.
   const stat = (icon, val, labelKey, tabId, green) => html`
@@ -1189,7 +1189,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
 
       <aside class="pf-sidebar">
         <div class="pf-side-identity">
-          <div class="pf-side-avatar" dangerouslySetInnerHTML=${{ __html: minidenticon(owner || 'user') }}></div>
+          <div class="pf-side-avatar" dangerouslySetInnerHTML=${{ __html: minidenticon(typeof owner === 'string' && owner ? owner : 'user') }}></div>
           <div class="pf-side-id-name">${session.displayName || owner}</div>
         </div>
 
