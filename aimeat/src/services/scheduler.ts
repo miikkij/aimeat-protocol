@@ -5,6 +5,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.10.0 — 2026-06-28 — Secretary Strategy: the tick reads the active context's optional `strategy`
+ *     (current → target + principles/risks + ordered milestones) and steers the briefing toward the
+ *     current focus milestone (first not-yet-reached), respecting the principles + flagging risks.
  *   v2.9.0 — 2026-06-28 — Secretary bound triggers: a fired trigger can carry out a BOUND action —
  *     start an Agent Workflow run, or queue + run a specialist task (its prompt) node-side this tick —
  *     instead of only posting a reminder (fireBoundTriggerAction). Gated by the existing spend guards.
@@ -97,6 +100,13 @@ interface SecretaryContext {
   routines?: RoutineLike[];
   actionItems?: ActionItem[];
   quickActions?: QuickAction[];
+  // Optional strategy steering frame (the view authors it; the tick reads it to steer the briefing using
+  // the principles/risks and the current focus milestone). Loosely typed — see normalizeStrategy (frontend).
+  strategy?: {
+    enabled?: boolean; vision?: string; mission?: string; principles?: string[]; risks?: string[];
+    current?: string; target?: string;
+    milestones?: Array<{ title?: string; enables?: string; criterion?: string; status?: string }>;
+  };
 }
 interface SecretaryConfig {
   contexts?: SecretaryContext[];
@@ -825,7 +835,22 @@ export class Scheduler {
       ? openGoals.map((g) => `- ${String(g.title || '')}${g.why ? ` (why: ${String(g.why)})` : ''}`).join('\n')
       : '(no open goals)';
     const wsNames = wsList.map((w) => w.name).join(', ') || '(none yet)';
-    const prompt = `Open goals in this context:\n${goalLines}\n\nThe owner's filing space "${active.organismName || active.name}" has these workspaces: ${wsNames}.\n\nDecide what to do for the owner right now. Return a JSON object EXACTLY like:\n{\n  "briefing": "2-4 sentence check-in: what to focus on and anything needing attention",\n  "actions": [\n    { "capability": "file_intake", "summary": "short label", "payload": { "workspace": "<an existing workspace name>", "note": "the text to file" } },\n    { "capability": "reminders", "summary": "a concrete reminder for the owner", "payload": {} }\n  ]\n}\nRules for actions: propose 0-3 CONCRETE actions that move the open goals forward. Only use these capabilities: "file_intake"/"curate_knowledge" (file a note into a workspace — set payload.workspace to an existing workspace name and payload.note to the text) and "reminders"/"briefing" (surface a note to the owner — payload may be empty). Do not invent other capabilities. If nothing concrete is warranted, return an empty actions array.`;
+    // Optional strategy steering: if this context has a strategy, give the model the current → target,
+    // the principles/risks to respect, and the CURRENT FOCUS milestone (first not-yet-reached) so the
+    // briefing steers toward it and flags when it looks reached. Free text; never invents progress.
+    let strategyBlock = '';
+    const strat = active.strategy;
+    if (strat && strat.enabled) {
+      const msl = Array.isArray(strat.milestones) ? strat.milestones : [];
+      const focus = msl.find((m) => m && m.status !== 'reached');
+      const principles = (strat.principles || []).filter(Boolean);
+      const risks = (strat.risks || []).filter(Boolean);
+      strategyBlock = `\n\nStrategy for this area:\n- Current state: ${strat.current || '(unstated)'}\n- Target state: ${strat.target || '(unstated)'}\n- Current focus milestone: ${focus ? `${focus.title}${focus.enables ? ` (enables: ${focus.enables})` : ''}` : '(all milestones reached — suggest what the next target could be)'}`
+        + (principles.length ? `\n- Principles to respect: ${principles.join('; ')}` : '')
+        + (risks.length ? `\n- Risks to watch: ${risks.join('; ')}` : '')
+        + `\nSteer the briefing toward this focus milestone, respect the principles, and flag a risk if it is materialising. If recent activity suggests the milestone is reached, say so and point at the next one.`;
+    }
+    const prompt = `Open goals in this context:\n${goalLines}\n\nThe owner's filing space "${active.organismName || active.name}" has these workspaces: ${wsNames}.${strategyBlock}\n\nDecide what to do for the owner right now. Return a JSON object EXACTLY like:\n{\n  "briefing": "2-4 sentence check-in: what to focus on and anything needing attention",\n  "actions": [\n    { "capability": "file_intake", "summary": "short label", "payload": { "workspace": "<an existing workspace name>", "note": "the text to file" } },\n    { "capability": "reminders", "summary": "a concrete reminder for the owner", "payload": {} }\n  ]\n}\nRules for actions: propose 0-3 CONCRETE actions that move the open goals forward. Only use these capabilities: "file_intake"/"curate_knowledge" (file a note into a workspace — set payload.workspace to an existing workspace name and payload.note to the text) and "reminders"/"briefing" (surface a note to the owner — payload may be empty). Do not invent other capabilities. If nothing concrete is warranted, return an empty actions array.`;
     return { systemPrompt, prompt };
   }
 

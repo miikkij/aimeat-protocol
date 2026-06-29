@@ -65,6 +65,16 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   from the calendar event dialog; a bound trigger shows a badge (`▶️ workflow` / `🧩 specialist`) in the list, and
   bound runs are metered like any autonomous spend (gated by the existing stop-spending + daily-budget guards). A
   misconfigured binding degrades to a plain reminder so it never breaks the tick.
+- **Secretary Strategy (optional steering frame per context).** A context can now carry a `strategy`: **vision ·
+  mission · principles · risks · current state → target state · ordered milestone gates**. Milestones are gates (not
+  tasks — tasks stay in goals): each has what it *enables*, an optional external *criterion*, a status
+  (not-started/in-progress/reached) with the first not-yet-reached shown as the current **focus**, can be reordered,
+  and can **link goals** (the goals that must be done for it). Shown as one card (only the filled parts), fully
+  editable in place; changing the **target state** auto-offers an **AI re-plan** that re-proposes a coherent strategy
+  to review and apply. Optional per context (enable from *Manage & setup*); the autonomous tick reads it to steer the
+  briefing toward the focus milestone, respect the principles, and flag risks. The setup interview was also reworked
+  to be a real collaborator (engages with what you raise, knows AIMEAT), to **reflect its understanding back and wait
+  for confirmation before emitting the JSON**, and to end by telling you to paste it back into AIMEAT.
 - **Reset Secretary (start over).** A guarded "Reset Secretary" control in *Manage & setup* (type `RESET` to confirm)
   and a `POST /v1/secretary/reset` endpoint wipe the Secretary back to a clean slate: the brain/directives, all
   `secretary.*` owner memory (config, contexts, goals, routines, triggers, feed, decisions, clarify jobs), the

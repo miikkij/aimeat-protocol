@@ -11,6 +11,7 @@
  *   - LayoutCard({ entry, node, prevKey, nextKey, onSwap, onMoveCol, onHide }) -> card + ⋮ arrange menu
  * @usage const lay = useLayout(); ... LayoutCard({ entry, node, prevKey, nextKey, ...lay })
  * @version-history
+ *   v0.2.0 — 2026-06-28 — Add the `strategy` card (first slot, main column) to DASH_DEFAULT.
  *   v0.1.0 — 2026-06-28 — Initial: pin-to-column + reorder + hide, persisted; mobile-safe.
  */
 import { h } from 'preact';
@@ -28,6 +29,7 @@ const fresh = () => DASH_DEFAULT.map((e) => ({ key: e.key, col: e.col, hidden: f
 // Default arrangement of the movable dashboard cards. New keys added here later are appended to a
 // user's saved layout automatically (see merge() below), so customised users still get new cards.
 export const DASH_DEFAULT = [
+  { key: 'strategy', col: 'main' },
   { key: 'whatsNext', col: 'main' },
   { key: 'stand', col: 'main' },
   { key: 'actionItems', col: 'main' },

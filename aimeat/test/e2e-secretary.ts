@@ -1442,6 +1442,32 @@ await test('78. Secretary reset: wipes secretary.* owner memory + specialists; u
     assert(!(specs.body.data.specialists || []).some((s: { name?: string }) => s.name === 'resetspec'), 'specialist removed from list');
 });
 
+await test('79. Strategy: a context carrying vision/mission/principles/risks/current→target/milestones round-trips', async () => {
+    // The optional strategy steering frame lives on the context as `strategy`. It is owner-private config
+    // (no server schema), so assert the full shape persists intact (the tick reads it to steer the briefing).
+    const cfg = { activeContextId: 'st1', contexts: [{
+      id: 'st1', name: 'Strat', brain: { purpose: 'p', rules: [] }, organismId: null, workspaces: [], policy: { stopSpending: false, bands: {} },
+      strategy: {
+        enabled: true, vision: 'The default agent OS', mission: 'Ship AIMEAT', principles: ['Reuse before building', 'Ship small'], risks: ['Runway'],
+        current: 'MVP shipped, no paying users', target: 'First 3 paying customers',
+        milestones: [
+          { id: 'm1', title: 'Lock the pitch', enables: 'demos can start', goalRefs: ['g-1'], criterion: 'Kalle approves', status: 'reached' },
+          { id: 'm2', title: 'Run 5 demos', enables: 'pipeline', goalRefs: [], criterion: '', status: 'in-progress' },
+          { id: 'm3', title: 'Close first deal', enables: 'proof', goalRefs: [], criterion: 'signed contract', status: 'not-started' },
+        ],
+      },
+    }] };
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key: 'secretary.config', value: cfg, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `write: ${w.status}`);
+    const r = await json('/v1/memory/secretary.config', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const s = r.body.data.value.contexts[0].strategy;
+    assert(r.status === 200 && s && s.enabled === true, `strategy present: ${JSON.stringify(s).slice(0, 160)}`);
+    assert(s.vision && s.mission && Array.isArray(s.principles) && s.principles.length === 2 && Array.isArray(s.risks), `frame: ${JSON.stringify(s).slice(0, 200)}`);
+    assert(s.current && s.target && Array.isArray(s.milestones) && s.milestones.length === 3, `shape: ${JSON.stringify(s).slice(0, 160)}`);
+    // Ordered milestone gates with statuses + goal links preserved (focus = first not-yet-reached = "Run 5 demos").
+    assert(s.milestones[0].status === 'reached' && s.milestones[0].goalRefs[0] === 'g-1' && s.milestones[1].status === 'in-progress', `milestones: ${JSON.stringify(s.milestones).slice(0, 200)}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
     await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
