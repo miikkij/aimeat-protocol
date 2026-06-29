@@ -21,6 +21,8 @@
  *   scoreContexts · routeIntake · learnCorrection · (G1) routeTickNote
  * @usage import { classifySecretaryActions, routeRoutineStep, sanitizeProposedQuickActions, hasWorkToDo } from './secretary-tick.js';
  * @version-history
+ *   v0.10.0 — 2026-06-28 — TriggerLike.action gains workflowId/specialistName/prompt so a trigger can
+ *     BIND a workflow/specialist run to its fire (the scheduler tick carries it out).
  *   v0.9.0 — 2026-06-28 — G4: deriveRoutineActions uses actionKind() (note|feed) as the single
  *     capability→kind map for tick-performability + renames runFileSteps→runSteps; the tick carries out
  *     briefing/reminders as FEED entries (not notes), aligning all three call sites.
@@ -442,7 +444,9 @@ export interface TriggerLike {
   nextFireAt?: string | null;  // computed next fire (time/recurring)
   target?: { type?: string; id?: string } | null;                                   // completion: item to watch
   condition?: { type?: string; prefix?: string; op?: string; value?: number; days?: number } | null; // condition
-  action?: { kind?: string; summary?: string; band?: string } | null;              // what to do when it fires
+  // What to do when it fires. kind 'remind' (default) → feed entry + action-item. 'workflow' → start the
+  // named Agent Workflow run. 'specialist' → queue + run a task for the named specialist (its `prompt`).
+  action?: { kind?: string; summary?: string; band?: string; workflowId?: string; specialistName?: string; prompt?: string } | null;
   lastFiredAt?: string | null;
   createdBy?: string;
 }

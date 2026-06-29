@@ -11,7 +11,7 @@
  *   - executeSpecialistTask(...) -> { ok, deliverableKey? }
  *   - runSpecialistQueue(storage, config, ownerGhii, ownerName, specialist, opts?) -> string[] (writes)
  *   - runAllSpecialists(storage, config, ownerGhii, ownerName) -> string[] (writes)
- * @usage import { runAllSpecialists } from './specialist-runner.js';
+ * @usage import { runAllSpecialists, runSpecialistQueue } from './specialist-runner.js';
  * @version-history
  *   v0.1.0 — 2026-06-28 — Phase 1: node-run specialist executor (owner-key, quality contract, grounded).
  */

@@ -58,6 +58,13 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
   it evaluates armed triggers each run (FREE — no AI), fires due ones into the feed + as an action-item, and
   re-arms recurring ones. Owners create/pause/delete them; the Secretary also **auto-detects** a recurring or
   deadline follow-up from a filed note (cheap keyword gate → one AI call) and proposes it to **Arm or Dismiss**.
+- **Triggers can bind an action to their fire (not just remind).** A trigger's "When it fires" can now be set to
+  **Run a workflow** (start a saved Agent Workflow run) or **Run a specialist** (queue + run a task — the trigger's
+  prompt — for one of the owner's specialists, node-side on the owner's key, this same tick), in addition to the
+  default **Remind me** (feed entry + action-item). The binding is editable from the Triggers card *and* in place
+  from the calendar event dialog; a bound trigger shows a badge (`▶️ workflow` / `🧩 specialist`) in the list, and
+  bound runs are metered like any autonomous spend (gated by the existing stop-spending + daily-budget guards). A
+  misconfigured binding degrades to a plain reminder so it never breaks the tick.
 - **Calendar (month / week / day).** A real calendar on the dashboard plots past activity (feed), the autonomous
   check-in cron, routine cadences, and time/recurring triggers — navigable by month, week, or day.
 - **"What's next" produces real deliverables.** Each proposed next action has **Do it / Skip**; "Do it" actually

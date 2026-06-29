@@ -10,6 +10,8 @@
  * @structure buildCalendarEvents · useCalendar · calendarCard (+ date helpers)
  * @usage const cal = useCalendar(); calendarCard({ ...cal, feed: auto.feed, schedule: auto.schedule, routines: next.routines })
  * @version-history
+ *   v0.2.0 — 2026-06-28 — CalendarEventDialog: the trigger editor can also set the bound action
+ *     (remind / run a workflow / run a specialist) in place; takes workflows + specialists props.
  *   v0.1.0 — 2026-06-28 — Decision B: month/week/day calendar of feed (past) + tick & routine cadence (future).
  */
 import { h } from 'preact';
@@ -231,9 +233,23 @@ export function CalendarEventDialog(p) {
   const ref = (ev && ev.ref) || {};
   const tr = ref.trigger || {};
   const ro = ref.routine || {};
+  const ta = tr.action || {};
   const [label, setLabel] = useState(tr.label || '');
   const [cadence, setCadence] = useState(tr.cadence || ro.cadence || 'weekly');
+  const [actKind, setActKind] = useState(ta.kind || 'remind');
+  const [actWf, setActWf] = useState(ta.workflowId || '');
+  const [actSpec, setActSpec] = useState(ta.specialistName || '');
+  const [actPrompt, setActPrompt] = useState(ta.prompt || '');
   const [busy, setBusy] = useState(false);
+  const workflows = p.workflows || [];
+  const specialists = p.specialists || [];
+  /** Compose the bound action from the dialog's local state (mirrors use-triggers buildAction). */
+  const buildAct = () => {
+    const summary = (label.trim() || tr.label || '');
+    if (actKind === 'workflow' && actWf) return { kind: 'workflow', summary, workflowId: actWf };
+    if (actKind === 'specialist' && actSpec) return { kind: 'specialist', summary, specialistName: actSpec, prompt: actPrompt.trim() || summary };
+    return { kind: 'remind', summary };
+  };
   if (!ev) return null;
   const run = async (fn) => { setBusy(true); try { await fn(); } finally { setBusy(false); p.onClose(); } };
 
@@ -249,8 +265,24 @@ export function CalendarEventDialog(p) {
         <select class="sec-input" value=${cadence} onChange=${(e) => setCadence(e.target.value)}>
           ${['daily', 'weekly', 'monthly'].map((c) => html`<option value=${c} selected=${cadence === c}>${t('secretary.trig.cad.' + c)}</option>`)}
         </select>` : html`<div class="sec-hint">${new Date(tr.nextFireAt || ev.at).toLocaleString()}</div>`}
+      <label class="sec-hint">${t('secretary.trig.act.label')}</label>
+      <select class="sec-input" value=${actKind} onChange=${(e) => setActKind(e.target.value)}>
+        <option value="remind" selected=${actKind === 'remind'}>${t('secretary.trig.act.remind')}</option>
+        ${workflows.length ? html`<option value="workflow" selected=${actKind === 'workflow'}>${t('secretary.trig.act.workflow')}</option>` : null}
+        ${specialists.length ? html`<option value="specialist" selected=${actKind === 'specialist'}>${t('secretary.trig.act.specialist')}</option>` : null}
+      </select>
+      ${actKind === 'workflow' ? html`<select class="sec-input" value=${actWf} onChange=${(e) => setActWf(e.target.value)}>
+        <option value="" selected=${!actWf}>${t('secretary.trig.act.pickWorkflow')}</option>
+        ${workflows.map((w) => html`<option value=${w.id} key=${w.id} selected=${actWf === w.id}>${w.name || w.id}</option>`)}
+      </select>` : null}
+      ${actKind === 'specialist' ? html`
+        <select class="sec-input" value=${actSpec} onChange=${(e) => setActSpec(e.target.value)}>
+          <option value="" selected=${!actSpec}>${t('secretary.trig.act.pickSpecialist')}</option>
+          ${specialists.map((s) => html`<option value=${s.name} key=${s.name} selected=${actSpec === s.name}>${s.display_name || s.name}</option>`)}
+        </select>
+        <textarea class="sec-paste" rows="2" placeholder=${t('secretary.trig.act.promptPlaceholder')} value=${actPrompt} onInput=${(e) => setActPrompt(e.target.value)}></textarea>` : null}
       <div class="sec-next-action-btns">
-        <button class="btn-primary btn-sm" disabled=${busy} onClick=${() => run(() => p.triggers.update(ref.id, { label: label.trim() || tr.label, cadence }))}>${t('secretary.cal.dlg.save')}</button>
+        <button class="btn-primary btn-sm" disabled=${busy} onClick=${() => run(() => p.triggers.update(ref.id, { label: label.trim() || tr.label, cadence, action: buildAct() }))}>${t('secretary.cal.dlg.save')}</button>
         <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => run(() => p.triggers.togglePause(tr))}>${tr.status === 'paused' ? t('secretary.trig.resume') : t('secretary.trig.pause')}</button>
         <button class="btn-ghost btn-sm sec-next-discard" disabled=${busy} onClick=${() => run(() => p.triggers.remove(tr))}>${t('secretary.cal.dlg.delete')}</button>
       </div>`;
