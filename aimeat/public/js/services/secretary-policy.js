@@ -31,6 +31,7 @@ export const SECRETARY_CAPABILITIES = [
   { id: 'file_intake',         defaultBand: 'act' },
   { id: 'briefing',            defaultBand: 'act' },
   { id: 'reminders',           defaultBand: 'act' },
+  { id: 'author_content',      defaultBand: 'draft', costs: true },
   { id: 'curate_knowledge',    defaultBand: 'draft' },
   { id: 'draft_replies',       defaultBand: 'draft' },
   { id: 'create_resource',     defaultBand: 'ask' },
