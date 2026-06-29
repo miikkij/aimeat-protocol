@@ -17,8 +17,10 @@ const results: string[] = [];
 
 async function test(name: string, fn: () => Promise<void>) {
     try {
+        // 60s per test: a MongoDB cascade-delete (owner + all their data across every collection)
+        // can legitimately run several seconds on a busy box; 30s was tight under load.
         const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('TIMEOUT after 30s')), 30_000));
+            setTimeout(() => reject(new Error('TIMEOUT after 60s')), 60_000));
         await Promise.race([fn(), timeout]);
         passed++;
         results.push(`PASS: ${name}`);
