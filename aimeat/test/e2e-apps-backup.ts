@@ -115,7 +115,7 @@ const html = (label: string) => `<!doctype html><html><body><h1>${label}</h1></b
 async function publish(filename: string, content: string, name: string, t = token) {
     const { status, body } = await json('/v1/apps', authed({
         method: 'POST',
-        body: JSON.stringify({ filename, content: Buffer.from(content).toString('base64'), name }),
+        body: JSON.stringify({ filename, content: Buffer.from(content).toString('base64'), name, description: `Backup/restore test app: ${name}.` }),
     }, t));
     assert(status === 201 || status === 200, `publish ${filename}: ${status} ${JSON.stringify(body.error)}`);
 }
@@ -127,7 +127,10 @@ async function getVersions(ownerName: string, filename: string, t = token) {
 }
 
 async function getVersionContent(ownerName: string, filename: string, version: number, t = token): Promise<string> {
-    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${encodeURIComponent(filename)}?version=${version}&mode=inline`, authed({}, t));
+    // Fetch the stored bytes byte-for-byte (any non-'inline' mode): these checks compare the restored
+    // version content against the exact source HTML. `mode=inline` would append the viral AIMEAT badge
+    // (injectAimeatBadge), so it must NOT be used here — that's a serving-time transform, not the data.
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${encodeURIComponent(filename)}?version=${version}&mode=raw`, authed({}, t));
     assert(res.status === 200, `fetch v${version} of ${filename}: ${res.status}`);
     return await res.text();
 }
