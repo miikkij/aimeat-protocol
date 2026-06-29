@@ -264,7 +264,7 @@ async function loadFeed() {
 const COMP_AI_ACTION = `// ai-action — run the user's own LLM on demand (aimeat-ai; load it + aimeat-auth).
 async function aiSuggest(promptText, outEl) {
   if (!(await AIMEAT.ai.isAvailable())) { outEl.value = 'Log in and add an OpenRouter key to enable AI.'; return; }
-  try { var r = await AIMEAT.ai.complete({ app_id: '{{app}}', prompt: promptText, max_tokens: 200 }); outEl.value = r.content; }
+  try { var r = await AIMEAT.ai.complete({ app_id: '{{app}}', prompt: promptText }); outEl.value = r.content; }
   catch (e) { outEl.value = 'AI error: ' + (e.message || e); }
 }
 // Render into an EDITABLE field so the user reviews before saving. Gate the button on isAvailable().`;
@@ -756,7 +756,7 @@ entry: index.html
       if (!idea) { alert('Type a title or an idea first.'); return; }
       this.disabled = true; this.textContent = '✨ Writing…';
       try {
-        var r = await AIMEAT.ai.complete({ prompt: 'Write a short, engaging blog post in markdown about: ' + idea, max_tokens: 500, app_id: '{{app}}' });
+        var r = await AIMEAT.ai.complete({ prompt: 'Write a short, engaging blog post in markdown about: ' + idea, app_id: '{{app}}' });
         document.getElementById('f-body').value = r.content;
       } catch (e) { alert('AI error: ' + (e.message || e)); }
       this.disabled = false; this.textContent = '✨ Write with AI';
