@@ -10,6 +10,8 @@
  * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
  * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.9.0 — 2026-06-28 — strategyCard: optional steering frame (vision/mission/principles/risks +
+ *     current→target + ordered milestone gates with status/focus/reorder/goal-linking + AI re-plan).
  *   v0.8.0 — 2026-06-28 — secretaryDangerCard: a guarded "Reset Secretary" control (type RESET to wipe
  *     the brain + all secretary.* + self-organisms/workspaces + specialists) for the Manage & setup area.
  *   v0.7.0 — 2026-06-28 — triggersCard: "When it fires" binding (remind / run a workflow / run a
@@ -422,6 +424,109 @@ export function workflowDesignPanel(p) {
           <div class="sec-next-action-btns">
             <button class="btn-primary btn-sm" disabled=${!(s.outcome || '').trim()} onClick=${p.onDesign}>${t('secretary.wf.design')}</button>
           </div>`}
+    </section>`;
+}
+
+/** Strategy — the optional steering frame: vision · mission · principles · risks · current → target ·
+ *  ordered milestones (gates, not tasks). Shows only the filled parts. The owner edits the text/list
+ *  fields in one Edit mode, manages milestones inline (status cycle, reorder, remove, add, link goals),
+ *  and can Re-plan (AI re-proposes a coherent strategy after a change). Rendered only when enabled. */
+export function strategyCard(p) {
+  const s = p.strategy || {};
+  const ms = s.milestones || [];
+  const goals = p.goals || [];
+  const focusIdx = ms.findIndex((m) => m.status !== 'reached'); // focus = first not-yet-reached gate
+  const statusLabel = (st) => t('secretary.strat.status.' + (st || 'not-started'));
+  const e = p.edit;        // text/list edit draft, or null
+  const rp = p.replan;     // { note } | { busy } | { draft } | null
+  const list = (arr) => (arr || []).filter(Boolean);
+  return html`
+    <section class="sec-card sec-strategy">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.strat.title')}</h2>
+        ${!e && !rp ? html`<div class="sec-trig-btns">
+          <button class="btn-ghost btn-sm" onClick=${p.onStartReplan}>${t('secretary.strat.replan')}</button>
+          <button class="btn-ghost btn-sm" onClick=${p.onStartEdit}>${t('secretary.strat.edit')}</button>
+        </div>` : null}
+      </div>
+
+      ${rp ? html`
+        ${rp.draft ? html`
+          <div class="sec-hint">${t('secretary.strat.replanReady')}</div>
+          <div class="sec-dir-state">
+            <div><span class="sec-dir-lbl">${t('secretary.strat.target')}</span> ${rp.draft.target || '—'}</div>
+            <div class="sec-hint">${(rp.draft.milestones || []).map((m) => m.title).join(' → ') || '—'}</div>
+          </div>
+          <div class="sec-actions">
+            <button class="btn-ghost btn-sm" onClick=${p.onCancelReplan}>${t('secretary.cancel')}</button>
+            <button class="btn-primary btn-sm" onClick=${p.onApplyReplan}>${t('secretary.strat.replanApply')}</button>
+          </div>`
+        : html`
+          <label class="sec-hint">${t('secretary.strat.replanPrompt')}</label>
+          <textarea class="sec-paste" rows="2" value=${rp.note || ''} onInput=${(ev) => p.onReplanNote(ev.target.value)}></textarea>
+          <div class="sec-actions">
+            <button class="btn-ghost btn-sm" disabled=${rp.busy} onClick=${p.onCancelReplan}>${t('secretary.cancel')}</button>
+            <button class="btn-primary btn-sm" disabled=${rp.busy || !(rp.note || '').trim()} onClick=${p.onRunReplan}>${rp.busy ? html`${t('secretary.strat.replanning')}<span class="sec-spin"></span>` : t('secretary.strat.replanRun')}</button>
+          </div>`}`
+      : e ? html`
+        <label class="sec-hint">${t('secretary.strat.vision')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.vision} onInput=${(ev) => p.onEditField('vision', ev.target.value)}></textarea>
+        <label class="sec-hint">${t('secretary.strat.mission')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.mission} onInput=${(ev) => p.onEditField('mission', ev.target.value)}></textarea>
+        <label class="sec-hint">${t('secretary.strat.current')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.current} onInput=${(ev) => p.onEditField('current', ev.target.value)}></textarea>
+        <label class="sec-hint">${t('secretary.strat.target')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.target} onInput=${(ev) => p.onEditField('target', ev.target.value)}></textarea>
+        <label class="sec-hint">${t('secretary.strat.principles')} ${t('secretary.strat.onePerLine')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.principles} onInput=${(ev) => p.onEditField('principles', ev.target.value)}></textarea>
+        <label class="sec-hint">${t('secretary.strat.risks')} ${t('secretary.strat.onePerLine')}</label>
+        <textarea class="sec-paste" rows="2" value=${e.risks} onInput=${(ev) => p.onEditField('risks', ev.target.value)}></textarea>
+        <div class="sec-actions">
+          <button class="btn-ghost btn-sm" onClick=${p.onCancelEdit}>${t('secretary.cancel')}</button>
+          <button class="btn-primary btn-sm" onClick=${p.onSaveEdit}>${t('secretary.save')}</button>
+        </div>`
+      : html`
+        ${s.vision ? html`<div class="sec-dir-line"><span class="sec-dir-lbl">${t('secretary.strat.vision')}</span> ${s.vision}</div>` : null}
+        ${s.mission ? html`<div class="sec-dir-line"><span class="sec-dir-lbl">${t('secretary.strat.mission')}</span> ${s.mission}</div>` : null}
+        <div class="sec-dir-state">
+          <div class="sec-dir-now"><span class="sec-dir-lbl">${t('secretary.strat.current')}</span> ${s.current ? html`<span>${s.current}</span>` : html`<span class="sec-hint">${t('secretary.strat.empty')}</span>`}</div>
+          <div class="sec-dir-arrow">↓</div>
+          <div class="sec-dir-goal"><span class="sec-dir-lbl">${t('secretary.strat.target')}</span> ${s.target ? html`<span>${s.target}</span>` : html`<span class="sec-hint">${t('secretary.strat.empty')}</span>`}</div>
+        </div>
+        ${list(s.principles).length ? html`<div class="sec-dir-line"><span class="sec-dir-lbl">${t('secretary.strat.principles')}</span><ul class="sec-dir-bul">${list(s.principles).map((x, i) => html`<li key=${i}>${x}</li>`)}</ul></div>` : null}
+        ${list(s.risks).length ? html`<div class="sec-dir-line"><span class="sec-dir-lbl">${t('secretary.strat.risks')}</span><ul class="sec-dir-bul">${list(s.risks).map((x, i) => html`<li key=${i}>${x}</li>`)}</ul></div>` : null}`}
+
+      ${!e && !rp ? html`
+        <div class="sec-h3">${t('secretary.strat.milestones')}</div>
+        ${ms.length === 0 ? html`<p class="sec-hint">${t('secretary.strat.noMilestones')}</p>` : html`
+          <ol class="sec-dir-ms">
+            ${ms.map((m, i) => html`
+              <li class=${`sec-dir-ms-row${i === focusIdx ? ' focus' : ''}${m.status === 'reached' ? ' reached' : ''}`} key=${m.id || (m.title + i)}>
+                <button class=${`sec-dir-pill sec-dir-${m.status}`} title=${t('secretary.strat.advance')} onClick=${() => p.onCycle(i)}>${statusLabel(m.status)}</button>
+                <div class="sec-dir-ms-main">
+                  <div class="sec-dir-ms-title">${m.title}${i === focusIdx ? html` <span class="sec-dir-focus">${t('secretary.strat.focus')}</span>` : null}</div>
+                  ${m.enables ? html`<div class="sec-hint">${t('secretary.strat.enables')}: ${m.enables}</div>` : null}
+                  ${m.criterion ? html`<div class="sec-hint">${t('secretary.strat.criterion')}: ${m.criterion}</div>` : null}
+                  ${goals.length ? html`<details class="sec-dir-goals"><summary class="sec-hint">${t('secretary.strat.linkGoals')} (${(m.goalRefs || []).length})</summary>
+                    ${goals.map((g) => html`<label class="sec-hint sec-dir-goal-opt" key=${g.id}>
+                      <input type="checkbox" checked=${(m.goalRefs || []).includes(g.id)} onChange=${() => p.onToggleGoal(i, g.id)} /> ${g.title}${g.status === 'done' ? ' ✓' : ''}
+                    </label>`)}
+                  </details>` : null}
+                </div>
+                <div class="sec-trig-btns">
+                  <button class="sec-linkbtn" disabled=${i === 0} title=${t('secretary.layout.up')} onClick=${() => p.onMove(i, -1)}>↑</button>
+                  <button class="sec-linkbtn" disabled=${i === ms.length - 1} title=${t('secretary.layout.down')} onClick=${() => p.onMove(i, 1)}>↓</button>
+                  <button class="sec-linkbtn sec-next-discard" title=${t('secretary.remove')} onClick=${() => p.onRemove(i)}>✕</button>
+                </div>
+              </li>`)}
+          </ol>`}
+        <div class="sec-note-bar">
+          <input class="sec-input sec-input-sm" placeholder=${t('secretary.strat.addPlaceholder')} value=${p.msInput || ''}
+            onInput=${(ev) => p.onMsInput(ev.target.value)}
+            onKeyDown=${(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); p.onAdd(); } }} />
+          <button class="btn-outline btn-sm" disabled=${!(p.msInput || '').trim()} onClick=${p.onAdd}>${t('secretary.strat.add')}</button>
+        </div>
+        <button class="sec-linkbtn sec-dir-off" onClick=${p.onDisable}>${t('secretary.strat.stop')}</button>` : null}
     </section>`;
 }
 

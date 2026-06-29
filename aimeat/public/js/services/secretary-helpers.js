@@ -8,6 +8,10 @@
  * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · sanitizeQuickActions · migrateConfig · buildDecisionRecord
  * @usage import { buildInterviewPrompt, extractJson, sanitizeQuickActions, migrateConfig } from '/js/services/secretary-helpers.js';
  * @version-history
+ *   v0.4.0 — 2026-06-28 — Setup interview reworked: deeper questions (current state, target, ordered
+ *     milestones, who's involved), a mandatory reflect-back-and-confirm step before any JSON, and a
+ *     closing "paste it back into AIMEAT" instruction. CONTRACT gains an OPTIONAL `direction` block
+ *     (where-we-are → where-we're-going + milestones) + normalizeDirection().
  *   v0.3.0 — 2026-06-27 — B3: CONTRACT gains quickActions (2–3 role-specific shortcuts) + sanitizeQuickActions
  *     — the frontend security mirror (brain/secretary may only seed prompt|compose, never a run verb).
  *   v0.2.0 — 2026-06-24 — P3-B: buildDecisionRecord — the single source of the decision-log contract
@@ -68,14 +72,28 @@ export const CONTRACT = `\`\`\`json
     "workspaces": [ { "name": "workspace name", "purpose": "what it holds and why", "manifest": "OPTIONAL — see note below", "schemas": "OPTIONAL — see note below" } ]
   },
   "goals": [ { "title": "a concrete goal I'm working toward in this context", "why": "why it matters" } ],
-  "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ]
+  "quickActions": [ { "label": "short button label (<= 4 words)", "kind": "prompt", "prompt": "a canned message to send to the Secretary" } ],
+  "strategy": "OPTIONAL — see note below"
 }
 \`\`\`
 
 Each workspace MAY include a ready-to-use schema so it is useful immediately (recommended when you can design it well):
 - "manifest": { "manifestVersion": "1.0", "name": "<the workspace name>", "kind": "<short-slug>", "status": "active", "objectTypes": [ { "name": "<type>", "namespace": "<ns>", "fields": [ { "name": "<field>", "type": "text|number|date|select|boolean|reference" } ] } ] }
 - "schemas": a JSON-Schema object per objectType, keyed by its namespace.
-If you are NOT confident you can produce a VALID manifest + schemas, OMIT both fields for that workspace — they will be designed automatically afterward. Never output an invalid or half-finished manifest.`;
+If you are NOT confident you can produce a VALID manifest + schemas, OMIT both fields for that workspace — they will be designed automatically afterward. Never output an invalid or half-finished manifest.
+
+"strategy" is the OPTIONAL steering frame for this area: where we are, where we're going, and how. Include it ONLY when the user wants this area steered that way (many goal-driven areas benefit; some areas are just ongoing upkeep — then OMIT the field entirely). EVERY sub-field is itself optional — include only the ones the user gave you real material for; never invent vision/mission/progress/names. When included:
+- "strategy": {
+    "enabled": true,
+    "vision": "the long-term aspirational picture — where this could ultimately go (optional)",
+    "mission": "what we do / our ongoing purpose in this area (optional)",
+    "principles": [ "a short guardrail that should steer decisions" ],
+    "risks": [ "something that could derail this, to watch for" ],
+    "current": "where this area honestly stands right now (the current state)",
+    "target": "the target state — what 'done well' looks like for this strategy cycle (no dates)",
+    "milestones": [ { "title": "an ordered gate on the way to the target", "enables": "what reaching it unlocks / why it matters", "criterion": "an external/judgement condition to consider it reached (optional)", "status": "not-started" } ]
+  }
+- Milestones are ORDERED and DATELESS; status is one of "not-started" | "in-progress" | "reached". A milestone is a checkpoint (a gate), NOT a task — the concrete tasks live in "goals". Base everything ONLY on what the user told you.`;
 
 /** When EVOLVING an existing context (re-run "reshape current"), the current setup fed back so the AI
  *  modifies it instead of starting over — and keeps the existing workspaces stable. Empty for a new context. */
@@ -99,13 +117,31 @@ KEEP the existing workspaces (same names) and only ADD a new one if the change t
 export function buildInterviewPrompt(owner, current) {
   return `I want to ${current ? 'adjust an existing' : 'set up a'} context for my personal Secretary inside AIMEAT${owner ? ` (my username is "${owner}")` : ''}.
 
-Act as that Secretary ${current ? 'helping me evolve this area of my life or work' : 'getting to know me for ONE area of my life or work'}. Interview me with a few focused questions about: what I'm trying to achieve in this area, the kinds of tasks I'd want help with, and how I like to communicate (tone, language, level of detail). Do NOT ask me about "organisms", "workspaces", folders or any technical structure — figure the right structure out yourself from what I tell you. Keep it conversational; ask, wait for my answers, then continue.${currentSetupText(current)}
+Act as that Secretary ${current ? 'helping me evolve this area of my life or work' : 'getting to know me for ONE area of my life or work'}.
 
-When you have enough, design these things and output them as ONE JSON object inside a single code block with EXACTLY this shape and nothing else:
+HOW TO BE IN this conversation — read this first, it matters more than the output:
+You are a real collaborator and thinking partner, NOT a form-filler. The JSON at the end is the BY-PRODUCT of a genuinely useful conversation — it is not the goal, and you must not rush to it. ENGAGE with whatever I bring up: if I propose an approach, suggest a tool, or ask a question (for example "can we find out what AIMEAT can already do for this", or "I can run a prompt in Claude Code to help"), take it seriously, build on it, and actually help me think it through right now — do not ignore it or defer everything to "later". If I raise something you can help with, help. Be warm, peer-level, and direct; no corporate filler, no em-dashes.
+
+You know AIMEAT, so you can answer my questions about it and suggest how it helps here:
+${SECRETARY_AIMEAT_PRIMER}
+
+Interview me properly — ask a few focused questions, ONE small batch at a time, and WAIT for my answers between batches. Do NOT ask me about "organisms", "workspaces", folders or any technical structure — figure the right structure out yourself from what I tell you.
+
+Across the conversation, get to know (only push on what's relevant to my area):
+1. The area itself — what it is, what I'm trying to achieve, the kinds of tasks I'd want help with, and how I like to communicate (tone, language, level of detail).
+2. Whether I want this area STEERED with a strategy — i.e. tracking where we are → where we're going. Some areas want that, some are just ongoing upkeep. If I don't want it, skip the whole strategy structure.
+3. If I do: the strategy pieces — VISION (long-term aspiration), MISSION (what we do), PRINCIPLES (guardrails that should steer decisions), RISKS (what could derail), the CURRENT STATE (where it honestly stands now) and the TARGET STATE (what "done well" looks like this cycle), and the big MILESTONES between them in order (each a checkpoint/gate, not a task — what reaching it unlocks). Don't force every piece; capture what I actually have material for.
+4. WHO is involved in what (people, partners, projects).${currentSetupText(current)}
+
+BEFORE you produce any JSON: reflect your understanding back to me in plain language — the strategy (current → target, the milestones in order, vision/mission/principles/risks if we covered them) and who's involved — and ask me to CONFIRM or CORRECT it. Do NOT output JSON until I have confirmed. This is the most important step: I need to see you understood me before anything is built.
+
+ONLY after I confirm, design these and output them as ONE JSON object inside a single code block with EXACTLY this shape:
 
 ${CONTRACT}
 
-Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 goals (concrete things I'm working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block.`;
+Constraints: 3–7 brain rules; 2–6 workspaces, each designed from my actual needs; 2–3 goals (concrete things I'm working toward — distinct from strategy milestones, which are gates); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message to send me) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Include the "strategy" object only if I wanted this area steered that way, and only the sub-fields we actually covered.
+
+After the JSON code block, add ONE short line in my language telling me exactly what to do next: go back to AIMEAT → the Secretary page → paste this JSON into the setup box → click "Set up my Secretary". (The JSON must still be a single self-contained code block so the app can read it.)`;
 }
 
 /** Single-shot design prompt for the in-app mode (runs on the owner's OpenRouter key). `current`
@@ -121,7 +157,7 @@ The user's needs:
 ${needs}
 """
 
-Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 goals (concrete things the user is working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Output ONLY the JSON code block — no commentary.`;
+Constraints: 3–7 brain rules; 2–6 workspaces (you choose names + purposes from the needs); 2–3 goals (concrete things the user is working toward); 2–3 quickActions (role-specific shortcut buttons) — each "kind" is either "prompt" (a canned message) or "compose" (focus an input; "target" is one of "plan"|"find"|"note"), never anything else. Include the "strategy" object (vision/mission/principles/risks/current → target → ordered milestones — only the parts the needs support) when the needs describe a goal-driven area heading somewhere; OMIT it for areas that are just ongoing upkeep. Base everything ONLY on the needs — never invent progress. Output ONLY the JSON code block — no commentary.`;
 }
 
 /** Pull a JSON object out of an AI's text (may be fenced / surrounded by prose). */
@@ -231,6 +267,93 @@ export function migrateConfig(cfg, directives) {
     return { config: { contexts: [ctx], activeContextId: ctx.id }, changed: true };
   }
   return { config: { contexts: [], activeContextId: null }, changed: false };
+}
+
+/** Valid milestone statuses for the optional "strategy" steering structure. */
+export const MILESTONE_STATUSES = ['not-started', 'in-progress', 'reached'];
+
+let _msSeq = 0;
+/** Stable-ish id for a milestone (needed so goals can reference it + for list keys). */
+function genMilestoneId() { return 'ms-' + Date.now().toString(36) + (_msSeq++).toString(36) + Math.random().toString(36).slice(2, 4); }
+
+/** Coerce a free-form list field (principles/risks) to an array of non-empty short strings. */
+function strList(v) {
+  const arr = Array.isArray(v) ? v : (typeof v === 'string' && v.trim() ? [v] : []);
+  return arr.map((x) => String((x && x.text) || x || '').trim().slice(0, 400)).filter(Boolean).slice(0, 20);
+}
+
+/** Normalize a context's optional `strategy` (from interview/design JSON or stored config) into the
+ *  canonical shape: `{ enabled, vision, mission, principles[], risks[], current, target, milestones[] }`
+ *  where each milestone is `{ id, title, enables, goalRefs[], criterion, status }`. A missing object, a
+ *  non-object, or `enabled:false` yields a disabled (hidden) strategy. Every sub-field is optional; the
+ *  card shows only the filled ones. Milestones keep their order (a gate; reach one before the next),
+ *  empty-title ones are dropped, ids are stamped if absent, and statuses are coerced to a valid value. */
+export function normalizeStrategy(s) {
+  const empty = { enabled: false, vision: '', mission: '', principles: [], risks: [], current: '', target: '', milestones: [] };
+  if (!s || typeof s !== 'object' || s.enabled === false) return empty;
+  const ms = Array.isArray(s.milestones) ? s.milestones : [];
+  return {
+    enabled: true,
+    vision: String(s.vision || '').slice(0, 4000),
+    mission: String(s.mission || '').slice(0, 4000),
+    principles: strList(s.principles),
+    risks: strList(s.risks),
+    current: String(s.current || '').slice(0, 4000),
+    target: String(s.target || '').slice(0, 4000),
+    milestones: ms.map((m) => ({
+      id: (m && typeof m.id === 'string' && m.id) ? m.id : genMilestoneId(),
+      title: String((m && m.title) || '').slice(0, 300),
+      enables: String((m && (m.enables || m.who)) || '').slice(0, 600),
+      goalRefs: Array.isArray(m && m.goalRefs) ? m.goalRefs.map((g) => String(g)).filter(Boolean).slice(0, 50) : [],
+      criterion: String((m && m.criterion) || '').slice(0, 600),
+      status: MILESTONE_STATUSES.includes(m && m.status) ? m.status : 'not-started',
+    })).filter((m) => m.title),
+  };
+}
+
+/** Suggested milestone status from its linked goals (Phase-2 helper): all linked goals done → "reached";
+ *  any linked goal exists and at least one is done/in-flight → "in-progress"; otherwise unchanged. Pure;
+ *  the owner confirms (some milestones also carry an external `criterion` that is a judgement call). */
+export function suggestMilestoneStatus(milestone, goalsById) {
+  const refs = (milestone && milestone.goalRefs) || [];
+  if (!refs.length) return milestone.status || 'not-started';
+  const linked = refs.map((id) => goalsById[id]).filter(Boolean);
+  if (!linked.length) return milestone.status || 'not-started';
+  const done = linked.filter((g) => g.status === 'done').length;
+  if (done === linked.length) return 'reached';
+  if (done > 0) return 'in-progress';
+  return milestone.status || 'not-started';
+}
+
+/** Build a re-plan prompt: given the CURRENT strategy + what the owner just changed (e.g. a new target
+ *  state), ask the AI to propose an UPDATED strategy that stays coherent — keep what still fits, adjust
+ *  milestones/principles/risks toward the new target. Returns ONLY a `{ "strategy": {...} }` JSON object,
+ *  so the same extractJson + normalizeStrategy path applies. Used by both the in-app (OpenRouter) re-plan
+ *  and the copy-to-chat re-plan. `changeNote` is the human description of what changed. */
+export function buildStrategyReplanPrompt(owner, strategy, changeNote) {
+  const cur = normalizeStrategy(strategy);
+  const ms = (cur.milestones || []).map((m, i) => `${i + 1}. [${m.status}] ${m.title}${m.enables ? ` — enables: ${m.enables}` : ''}`).join('\n') || '(none)';
+  return `You are helping ${owner || 'a user'} re-plan the strategy for one area of their personal Secretary inside AIMEAT. The user just changed something and the rest of the strategy should be adjusted to stay coherent — KEEP whatever still fits, and only change what the change implies. Do not invent facts or progress; preserve the status of milestones that are still valid.
+
+Current strategy:
+- Vision: ${cur.vision || '(none)'}
+- Mission: ${cur.mission || '(none)'}
+- Principles: ${cur.principles.join(' | ') || '(none)'}
+- Risks: ${cur.risks.join(' | ') || '(none)'}
+- Current state: ${cur.current || '(none)'}
+- Target state: ${cur.target || '(none)'}
+- Milestones (in order):\n${ms}
+
+What changed:
+"""
+${String(changeNote || '').slice(0, 2000)}
+"""
+
+Output ONE JSON object inside a single code block and nothing else, with this shape:
+\`\`\`json
+{ "strategy": { "enabled": true, "vision": "", "mission": "", "principles": [], "risks": [], "current": "", "target": "", "milestones": [ { "title": "", "enables": "", "criterion": "", "status": "not-started|in-progress|reached" } ] } }
+\`\`\`
+Keep milestones ORDERED and dateless; carry over the status of milestones that still apply. Output ONLY the JSON code block.`;
 }
 
 /** Path to the decision-log Memory Contract spec (mirrors use-learning.js). */

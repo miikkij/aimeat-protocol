@@ -11,6 +11,9 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.18.0 — 2026-06-28 — Strategy: optional per-context steering frame (vision/mission/principles/risks
+ *     + current → target + ordered milestone gates). strategyCard slot + handlers (edit fields, milestone
+ *     CRUD/reorder/status, link goals, AI re-plan), enable from Manage & setup, carried in applyResult.
  *   v0.17.0 — 2026-06-28 — "Reset Secretary": guarded full-wipe card in Manage & setup (doReset →
  *     POST /v1/secretary/reset → reload to the clean setup screen).
  *   v0.16.0 — 2026-06-28 — Bound triggers: pass specialists + workflows into triggersCard and the
@@ -64,10 +67,10 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace, generateRaw, parseGenerated, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
-import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
+import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, normalizeStrategy, MILESTONE_STATUSES, buildStrategyReplanPrompt, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard, strategyCard } from '/views/secretary/dashboard.js';
 import { fetchWorkflowOffers, designWorkflow, saveDesignedWorkflow, slugifyWorkflowId } from '/views/secretary/workflow-design.js';
 import { useSpecialists, specialistsCard } from '/views/secretary/use-specialists.js';
 import { useIntake } from '/views/secretary/use-intake.js';
@@ -119,6 +122,9 @@ export default function SecretaryView() {
   const [wfDesign, setWfDesign] = useState(null);        // "Design a workflow" flow: null | { outcome, designing, draft, trigger, error, saving, saved, errors }
   const [calEvent, setCalEvent] = useState(null);        // clicked calendar entry → inline type-specific editor dialog
   const [resetState, setResetState] = useState({ show: false, text: '', busy: false }); // "Reset Secretary" guard
+  const [stratEdit, setStratEdit] = useState(null);      // Strategy text/list edit draft | null
+  const [msInput, setMsInput] = useState('');            // Strategy "add milestone" input
+  const [replan, setReplan] = useState(null);            // Strategy re-plan flow: { note } | { busy } | { draft } | null
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -329,7 +335,7 @@ export default function SecretaryView() {
         }
         // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
-        const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions };
+        const ctx = { id: genCtxId(), name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions, strategy: normalizeStrategy(json.strategy) };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
         // C3: seed the proposed goals so the learning loop starts populated (not "no goals yet").
         await seedGoals(json.goals, ctx.id, ctx.name);
@@ -355,7 +361,9 @@ export default function SecretaryView() {
           }
           await Promise.all(created.map((c) => genAndApplyManifest(active.organismId, c.wsId, c.ws)));
         }
-        const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs] };
+        // Strategy: if the reshape JSON proposes one, take it; otherwise keep what the context already had.
+        const strategy = json.strategy !== undefined ? normalizeStrategy(json.strategy) : (active.strategy || normalizeStrategy(null));
+        const updated = { ...active, brain: newBrain, brainHistory: history, workspaces: [...(active.workspaces || []), ...addedWs], strategy };
         next = { ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) };
       }
       await persistConfig(next);
@@ -768,6 +776,48 @@ ${SECRETARY_AIMEAT_PRIMER}`;
   const toggleStop = () => updateActivePolicy({ stopSpending: !policy.stopSpending });
   const setBudget = (v) => updateActivePolicy({ dailyMorselBudget: v === '' ? null : Math.max(0, Math.floor(Number(v) || 0)) });
 
+  // Strategy (optional steering frame). Stored on the active context as `strategy = { enabled, vision,
+  // mission, principles[], risks[], current, target, milestones:[{id,title,enables,goalRefs[],criterion,status}] }`.
+  // Milestones are ordered gates (a checkpoint, not a task — tasks live in goals). Shows only filled parts.
+  const strategy = (active && active.strategy && active.strategy.enabled) ? normalizeStrategy(active.strategy) : null;
+  const goalsById = useMemo(() => { const m = {}; for (const g of (learn.goals || [])) if (g && g.id) m[g.id] = g; return m; }, [learn.goals]);
+  const commitStrategy = (next) => {
+    if (!active) return;
+    const updated = { ...active, strategy: normalizeStrategy(next) };
+    persistConfig({ ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) });
+  };
+  const curStrat = () => normalizeStrategy(active && active.strategy);
+  const startStratEdit = () => { const s = curStrat(); setStratEdit({ vision: s.vision, mission: s.mission, current: s.current, target: s.target, principles: s.principles.join('\n'), risks: s.risks.join('\n') }); };
+  const saveStratEdit = () => {
+    if (!stratEdit) return;
+    const s = curStrat();
+    const changedTarget = stratEdit.target.trim() !== (s.target || '').trim();
+    commitStrategy({ ...s, enabled: true, vision: stratEdit.vision, mission: stratEdit.mission, current: stratEdit.current, target: stratEdit.target, principles: stratEdit.principles.split('\n'), risks: stratEdit.risks.split('\n') });
+    setStratEdit(null);
+    // Changing the target state often means the rest of the plan should be re-proposed — offer it.
+    if (changedTarget && stratEdit.target.trim()) setReplan({ note: t('secretary.strat.targetChanged') });
+  };
+  const cycleMilestone = (i) => { const s = curStrat(); const ms = [...s.milestones]; if (!ms[i]) return; const ni = (MILESTONE_STATUSES.indexOf(ms[i].status) + 1) % MILESTONE_STATUSES.length; ms[i] = { ...ms[i], status: MILESTONE_STATUSES[ni] }; commitStrategy({ ...s, milestones: ms }); };
+  const addMilestone = () => { const title = msInput.trim(); if (!title) return; const s = curStrat(); commitStrategy({ ...s, milestones: [...s.milestones, { title, enables: '', goalRefs: [], criterion: '', status: 'not-started' }] }); setMsInput(''); };
+  const removeMilestone = (i) => { const s = curStrat(); commitStrategy({ ...s, milestones: s.milestones.filter((_, j) => j !== i) }); };
+  const moveMilestone = (i, delta) => { const s = curStrat(); const ms = [...s.milestones]; const j = i + delta; if (j < 0 || j >= ms.length) return; [ms[i], ms[j]] = [ms[j], ms[i]]; commitStrategy({ ...s, milestones: ms }); };
+  const toggleMilestoneGoal = (i, goalId) => { const s = curStrat(); const ms = [...s.milestones]; if (!ms[i]) return; const refs = new Set(ms[i].goalRefs || []); if (refs.has(goalId)) refs.delete(goalId); else refs.add(goalId); ms[i] = { ...ms[i], goalRefs: [...refs] }; commitStrategy({ ...s, milestones: ms }); };
+  const enableStrategy = () => commitStrategy({ ...curStrat(), enabled: true });
+  const disableStrategy = () => { commitStrategy({ ...curStrat(), enabled: false }); setStratEdit(null); };
+  // Re-plan: change something (e.g. the target), let the AI re-propose a coherent strategy you can apply/edit.
+  const startReplan = () => setReplan({ note: '' });
+  const runReplan = async () => {
+    const note = (replan && replan.note || '').trim(); if (!note) return;
+    setReplan((r) => ({ ...r, busy: true }));
+    try {
+      const prompt = buildStrategyReplanPrompt(owner, active && active.strategy, note);
+      const r = await api('/v1/ai/complete', { method: 'POST', body: JSON.stringify({ prompt, app_id: 'secretary-strategy-replan' }), timeoutMs: 1_800_000, retries: 0 });
+      const j = extractJson((r && r.data && r.data.content) || '');
+      setReplan({ draft: normalizeStrategy(j.strategy || j) });
+    } catch (e) { showToast(`${t('secretary.strat.replanErr')}: ${e.message}`, true); setReplan(null); }
+  };
+  const applyReplan = () => { if (replan && replan.draft) commitStrategy(replan.draft); setReplan(null); };
+
   const restore = useCallback(async (snap) => {
     if (!active) return;
     setApplying(true);
@@ -830,6 +880,13 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Customizable two-column dashboard (pin to column / reorder / hide per card; persisted). */ ''}
               ${(() => {
                 const nodes = {
+                  strategy: strategy ? strategyCard({
+                    strategy, goals: learn.goals, goalsById,
+                    edit: stratEdit, onStartEdit: startStratEdit, onEditField: (k, v) => setStratEdit((d) => ({ ...(d || {}), [k]: v })), onSaveEdit: saveStratEdit, onCancelEdit: () => setStratEdit(null),
+                    onCycle: cycleMilestone, msInput, onMsInput: setMsInput, onAdd: addMilestone, onRemove: removeMilestone, onMove: moveMilestone, onToggleGoal: toggleMilestoneGoal,
+                    replan, onStartReplan: startReplan, onReplanNote: (v) => setReplan((r) => ({ ...(r || {}), note: v })), onRunReplan: runReplan, onApplyReplan: applyReplan, onCancelReplan: () => setReplan(null),
+                    onDisable: disableStrategy,
+                  }) : null,
                   whatsNext: whatsNextPanel({ answer: nextAns, onDo: doProposedAction, onSkip: skipProposedAction, onTogglePreview: togglePreview, onDiscard: discardProposedAction, pasteDrafts, onPasteInput: setPasteDraft, onSavePrompt: savePromptResult, onDismiss: () => { setNextAns(null); if (activeId) apiDelete(`/v1/memory/${encodeURIComponent('secretary.next.' + activeId)}`).catch(() => {}); } }),
                   stand: standPanel({ stand, onRefresh: runStand, onDismiss: () => setStand(null) }),
                   actionItems: actionItemsCard(next),
@@ -870,6 +927,11 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${manageOpen ? html`
                 ${brainCard({ brain, active, openEdit, brainDraft, setBrainDraft, startBrainEdit, saveBrain, cancelBrainEdit, savingBrain })}
                 ${operatingCard({ policy, toggleStop, setBudget, setBand })}
+                ${!strategy ? html`<section class="sec-card">
+                  <h2 class="sec-h2">${t('secretary.strat.title')}</h2>
+                  <p class="sec-hint">${t('secretary.strat.enableHint')}</p>
+                  <button class="btn-outline btn-sm" onClick=${enableStrategy}>${t('secretary.strat.enable')}</button>
+                </section>` : null}
                 ${crewCard(crew)}
                 ${knowledgeCard(knowledge)}
                 ${accessCard(access)}
