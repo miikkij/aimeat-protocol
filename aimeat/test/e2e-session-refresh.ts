@@ -26,6 +26,12 @@ function assert(cond: boolean, msg: string) {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+/** Decode a JWT payload (no signature check — test inspection only). */
+function decodeJwt(token: string): any {
+    const payload = token.split('.')[1];
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+}
+
 /** All Set-Cookie header strings on a response (cross-runtime). */
 function setCookieHeaders(res: Response): string[] {
     const h: any = res.headers;
@@ -212,6 +218,45 @@ async function main() {
         const r = await call('/v1/auth/refresh', { jwt: l.token }); // no cookie, no csrf
         assert(r.status === 200 && r.data?.ok, `legacy bearer refresh should work, got ${r.status} ${r.data?.error?.message}`);
         assert(typeof r.data.data.token === 'string', 'legacy refresh should return a token');
+    });
+
+    console.log('\nPhase 7 — Agent legacy refresh must NOT escalate to owner/operator (security)');
+    // Regression for the intra-owner agent scope-collapse privilege escalation: the legacy
+    // Bearer refresh path used to merge the OWNER's owner/operator roles onto a refreshing
+    // AGENT token. A scoped agent would then clear requireRole('owner'/'operator') (those gates
+    // check role, not scope) and reach owner/operator-only endpoints after a single refresh.
+    // An agent session must stay roles=['agent'] across refresh, exactly as minted at device-auth.
+    await test('refreshed agent token keeps roles=[agent], never gains owner/operator', async () => {
+        const owner = await login(username, password); // this owner has the 'owner' role
+        const agentName = `secagent${Date.now()}`;
+
+        // Device-auth (RFC 8628): authorize → owner approves with a narrow scope → poll for token.
+        const da = await call('/v1/agents/device-authorize', { body: { agent_name: agentName, owner: username } });
+        assert(da.status === 200 && da.data?.ok, `device-authorize failed: ${da.status} ${da.data?.error?.message}`);
+        const approve = await call('/v1/agents/verify', {
+            body: { user_code: da.data.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: owner.token },
+        });
+        assert(approve.status === 200 && approve.data?.ok, `agent approve failed: ${approve.status} ${approve.data?.error?.message}`);
+        const poll = await call('/v1/agents/device-token', {
+            body: { device_code: da.data.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
+        });
+        // device-token returns a raw OAuth-style body (token at top level), not the success envelope.
+        assert(poll.status === 200 && typeof poll.data?.token === 'string', `device-token failed: ${poll.status} ${JSON.stringify(poll.data)}`);
+        const agentJwt: string = poll.data.token;
+
+        // Sanity: freshly minted token is a scoped agent with exactly ['agent'].
+        const minted = decodeJwt(agentJwt);
+        assert(JSON.stringify(minted.roles) === JSON.stringify(['agent']), `minted agent roles should be ['agent'], got ${JSON.stringify(minted.roles)}`);
+
+        // Legacy Bearer refresh (no cookie) — the path that carried the escalation.
+        const r = await call('/v1/auth/refresh', { jwt: agentJwt });
+        assert(r.status === 200 && r.data?.ok, `agent legacy refresh failed: ${r.status} ${r.data?.error?.message}`);
+        const refreshed = decodeJwt(r.data.data.token);
+        assert(!refreshed.roles.includes('owner'), `SECURITY: refreshed agent token must NOT contain 'owner', got ${JSON.stringify(refreshed.roles)}`);
+        assert(!refreshed.roles.includes('operator'), `SECURITY: refreshed agent token must NOT contain 'operator', got ${JSON.stringify(refreshed.roles)}`);
+        assert(JSON.stringify(refreshed.roles) === JSON.stringify(['agent']), `refreshed agent roles should stay ['agent'], got ${JSON.stringify(refreshed.roles)}`);
+        // Scope must also survive the refresh (no scope collapse either direction).
+        assert(Array.isArray(refreshed.scopes) && refreshed.scopes.includes('memory:read'), `refreshed agent should retain its scope, got ${JSON.stringify(refreshed.scopes)}`);
     });
 
     console.log('\n─────────────────────────────────────');

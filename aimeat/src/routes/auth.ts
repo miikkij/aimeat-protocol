@@ -11,6 +11,9 @@
  * @version-history
  *   v1.0.0 -- 2026-02-25 -- Initial authentication routes
  *   v1.1.0 -- 2026-05-28 -- Preserve agent identity and scopes during JWT refresh
+ *   v1.1.1 -- 2026-06-29 -- SECURITY: legacy Bearer refresh no longer merges the
+ *     owner's owner/operator roles onto an agent session (intra-owner scope collapse /
+ *     privilege escalation); agent sessions stay ['agent'] across refresh
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -440,9 +443,12 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Agent no longer active'));
         return;
       }
+      // SECURITY: an agent session stays exactly ['agent'] across refresh — the
+      // same role set it was minted with at device-auth (agents.ts). Merging the
+      // owner's owner/operator roles here would let a scoped agent clear
+      // requireRole('owner'/'operator') after one refresh (those gates check role,
+      // not scope) — an intra-owner privilege escalation / scope collapse.
       freshRoles = ['agent'];
-      if (ownerRecord.roles.includes('owner')) freshRoles.push('owner');
-      if (ownerRecord.roles.includes('operator')) freshRoles.push('operator');
       freshScopes = agent.defaultScopes;
     } else {
       freshRoles = ownerRecord.roles ?? ['owner'];
