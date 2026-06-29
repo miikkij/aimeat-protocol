@@ -470,7 +470,10 @@ export function wsRoot(orgId, wsId) { return `organism.${orgId}.w.${wsId}`; }
 export async function applyGeneratedWorkspace(orgId, wsId, generated) {
   const root = wsRoot(orgId, wsId);
   for (const [namespace, schema] of Object.entries(generated.schemas || {})) {
-    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+    // 'open' (not 'strict'): generated schemas enforce required fields + types but TOLERATE extra fields,
+    // so later autonomous/agent writes aren't silently rejected over a stray property. The generator
+    // pre-locks structure before any real content exists; strict betoni fights every later write.
+    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'open' });
   }
   const manifest = { ...generated.manifest, id: orgId, status: generated.manifest.status || 'active' };
   await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: manifest, visibility: 'private' });
@@ -492,7 +495,10 @@ export async function applyGeneratedWorkspace(orgId, wsId, generated) {
 export async function applyProjectTemplate(orgId, wsId, name, summary) {
   const root = wsRoot(orgId, wsId);
   for (const [namespace, schema] of Object.entries(PROJECT_SCHEMAS)) {
-    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+    // 'open' (not 'strict'): generated schemas enforce required fields + types but TOLERATE extra fields,
+    // so later autonomous/agent writes aren't silently rejected over a stray property. The generator
+    // pre-locks structure before any real content exists; strict betoni fights every later write.
+    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'open' });
   }
   await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: projectManifest(orgId, name, summary), visibility: 'private' });
   await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
@@ -1070,7 +1076,7 @@ export async function addSpace(orgId, wsId, manifest, name, mode) {
   if (mode === 'records') {
     await apiPut(`/v1/memory/${encodeURIComponent(`${wsRoot(orgId, wsId)}.${namespace}`)}/schema`, {
       schema: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } },
-      apply_to: 'prefix', schema_mode: 'strict',
+      apply_to: 'prefix', schema_mode: 'open',   // tolerate extra fields; enforce required/types only (see applyGeneratedWorkspace)
     });
   }
   return saveManifest(orgId, wsId, { ...manifest, objectTypes: [...(manifest.objectTypes || []), ot] });

@@ -72,6 +72,16 @@ const stubReply = JSON.stringify({
     ],
 });
 const okComplete = async () => ({ content: stubReply });
+/** Self-healing stub: first shot returns the bad record; on the correction prompt it returns a fixed one. */
+const selfHealComplete = async ({ prompt }: { prompt: string }) => {
+    if (/REJECTED by the schema/.test(prompt)) return { content: JSON.stringify({ records: [{ space: 'Tasks', record: { title: 'Recovered task', status: 'open' } }] }) };
+    return { content: stubReply };
+};
+/** Stubborn stub: the correction round returns ONLY the still-broken record (the model can't fix it). */
+const stubbornInvalidComplete = async ({ prompt }: { prompt: string }) => {
+    if (/REJECTED by the schema/.test(prompt)) return { content: JSON.stringify({ records: [{ space: 'Tasks', record: { bogus: true } }] }) };
+    return { content: stubReply };
+};
 
 /** Distinct keys present under a namespace with a given role suffix (e.g. '.latest', '.draft'). */
 async function keysWithSuffix(storage: Storage, ns: string, suffix: string): Promise<string[]> {
@@ -79,20 +89,29 @@ async function keysWithSuffix(storage: Storage, ns: string, suffix: string): Pro
     return items.filter((r) => r.key.endsWith(suffix)).map((r) => r.key);
 }
 
-await test('1. act band: document + valid record are PUBLISHED; invalid record is skipped; metered once', async () => {
+await test('1. agentic self-correction: a schema-rejected record is fixed on the feedback round and published', async () => {
     const storage = await seedWorkspace();
     const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
-        openGoals: [{ title: 'Lock the message' }], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: okComplete,
+        openGoals: [{ title: 'Lock the message' }], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: selfHealComplete,
     });
-    assert(res.morsels === 1, `one paid call for one workspace, got ${res.morsels}`);
+    assert(res.morsels === 2, `initial call + one correction round, got ${res.morsels}`);
     const docLatest = await keysWithSuffix(storage, DOC_NS, '.latest');
     const recLatest = await keysWithSuffix(storage, REC_NS, '.latest');
     assert(docLatest.length === 1, `document published to .latest, got ${docLatest.length}`);
-    assert(recLatest.length === 1, `exactly the VALID record published (invalid skipped), got ${recLatest.length}`);
-    // A published item leaves no draft behind.
-    assert((await keysWithSuffix(storage, DOC_NS, '.draft')).length === 0, 'no doc draft remains after publish');
-    assert(res.writes.includes(docLatest[0]) && res.writes.includes(recLatest[0]), 'writes report the published keys');
+    assert(recLatest.length === 2, `the valid record + the corrected (recovered) record both published, got ${recLatest.length}`);
+    assert((await keysWithSuffix(storage, REC_NS, '.draft')).length === 0, 'no record draft remains after publish');
+    assert(res.writes.includes(docLatest[0]), 'writes report the published document key');
     assert(res.summaries.length === 1 && /Authored/.test(res.summaries[0]) && /published/.test(res.summaries[0]), `summary mentions published authoring: ${res.summaries[0]}`);
+    storage.close();
+});
+
+await test('1b. bounded correction: a record the model never fixes is dropped after the round (no infinite loop)', async () => {
+    const storage = await seedWorkspace();
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: stubbornInvalidComplete,
+    });
+    assert(res.morsels === 2, `initial + exactly one bounded correction attempt, got ${res.morsels}`);
+    assert((await keysWithSuffix(storage, REC_NS, '.latest')).length === 1, 'only the originally-valid record published; the unfixable one dropped');
     storage.close();
 });
 
@@ -160,6 +179,34 @@ await test('6. budget cap halts the fan-out before the next workspace', async ()
         complete: async () => { calls++; return { content: stubReply }; },
     });
     assert(calls === 1 && res.morsels === 1, `budget of 1 morsel allows exactly one workspace, got ${calls} calls`);
+    storage.close();
+});
+
+await test('7. transient provider error (owl-alpha flakiness) is retried → content still published', async () => {
+    const storage = await seedWorkspace();
+    let calls = 0;
+    const flaky = async (_a: { prompt: string; systemPrompt: string; appId: string }) => {
+        calls++;
+        if (calls === 1) throw Object.assign(new Error('OpenRouter 400: Provider returned error'), { code: 'PROVIDER_ERROR' });
+        return { content: stubReply };
+    };
+    await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries: 2, appId: 'test:author', complete: flaky,
+    });
+    assert(calls >= 2, `the flaky completion was retried, calls=${calls}`);
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 1, 'document published after the retry');
+    storage.close();
+});
+
+await test('8. permanent error (bad API key) is NOT retried — fails fast, nothing published', async () => {
+    const storage = await seedWorkspace();
+    let calls = 0;
+    const badKey = async () => { calls++; throw Object.assign(new Error('API key rejected'), { code: 'INVALID_API_KEY' }); };
+    await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries: 3, appId: 'test:author', complete: badKey,
+    });
+    assert(calls === 1, `a permanent error must not be retried, calls=${calls}`);
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 0, 'nothing published on a permanent failure');
     storage.close();
 });
 

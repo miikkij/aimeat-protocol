@@ -828,8 +828,12 @@ export class Scheduler {
       if (authorBand !== 'off') {
         const budgetRemaining = budget === null ? null : Math.max(0, budget - spentToday - paidMorsels);
         if (budgetRemaining === null || budgetRemaining > 0) {
+          // Honour the owner's autoRetry/maxRetries so a flaky stealth model (owl-alpha intermittently 400s)
+          // is retried instead of killing the authoring on the first transient error. Off → no retry.
+          const aiPrefs = (await this.storage.getMemory(owner, 'openrouter.settings'))?.value as { autoRetry?: boolean; maxRetries?: number } | undefined;
+          const maxRetries = aiPrefs?.autoRetry === false ? 0 : (typeof aiPrefs?.maxRetries === 'number' ? aiPrefs.maxRetries : 3);
           const authored = await authorWorkspaceContent(this.storage, this.config, owner, ownerName, active, wsList, {
-            openGoals, band: authorBand, aggressive: true, useGeneralKnowledge: true, budgetRemaining, appId: `schedule:${job.id}:author`,
+            openGoals, band: authorBand, aggressive: true, useGeneralKnowledge: true, budgetRemaining, maxRetries, appId: `schedule:${job.id}:author`,
           });
           paidMorsels += authored.morsels;
           writes.push(...authored.writes);
