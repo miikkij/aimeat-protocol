@@ -132,11 +132,13 @@ Follow me, and come to understand, in whatever order it surfaces: what I have go
 
 Keep your words to me human and plain, and work out any underlying structure quietly on your own from what I tell you, holding it in the background.${currentSetupText(current)}
 
-Keep exploring with me (proposing, helping, sharpening) until we share a picture that feels right to me. I will tell you when it clicks. Once I do, capture everything we landed on as ONE JSON object inside a single code block in exactly this shape:
+As we talk, work toward one clear picture we both share, and say it back to me in plain words (your own, grounded in what we covered and what you looked up — a few sentences, not a labelled form): where things honestly stand now, where this is ultimately heading (the vision), and what success looks like for the near term (the target). Make that picture hang together as one coherent story, so each piece follows from the one before. Anything you then suggest doing is a step that plainly serves that target and connects to the rest, expressed as a real, concrete outcome a sharp colleague would immediately understand. Say everything plainly enough that I nod and recognize it as true; when a phrase would puzzle me, swap it for the plain thing you mean, and keep invented terms and strategy-speak out of it.
+
+Once that picture feels right to me — I will tell you when it clicks — capture everything we landed on as ONE JSON object inside a single code block in exactly this shape:
 
 ${CONTRACT}
 
-Fill it from our real conversation: the brain (who you are for me and how you help, written as clear operating rules), the space and what it will hold so information stays organized as it accumulates, my concrete goals, a couple of quick actions, and, when a clear sense of where I'm headed came up naturally, capture that direction too. Keep it to 3–7 brain rules, 2–6 workspaces drawn from my actual needs, 2–3 goals, and 2–3 quickActions, each kind being either "prompt" (a ready message to send me) or "compose" (focus an input, with "target" one of "plan"|"find"|"note"). Keep the JSON as one self-contained code block so the app can read it.
+Fill it from the picture we confirmed: the brain (who you are for me and how you help, written as clear operating rules), the space and what it will hold so information stays organized as it accumulates, the direction (the vision, where we are now, and the target we agreed), my goals (each one a concrete outcome that plainly serves that target and connects to the rest — never a list of disconnected tasks), and a couple of quick actions. Keep it to 3–7 brain rules, 2–6 workspaces drawn from my actual needs, 2–3 goals, and 2–3 quickActions, each kind being either "prompt" (a ready message to send me) or "compose" (focus an input, with "target" one of "plan"|"find"|"note"). Keep the JSON as one self-contained code block so the app can read it.
 
 After the JSON, add one short line in my language: go back to AIMEAT → the Secretary page → paste this into the setup box → "Set up my Secretary".`;
 }
