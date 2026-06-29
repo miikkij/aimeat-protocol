@@ -21,6 +21,7 @@
     "typecheck": "cd aimeat && pnpm typecheck",
     "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
     "check:importmap": "cd aimeat && pnpm check:importmap",
+    "check:no-max-tokens": "cd aimeat && pnpm check:no-max-tokens",
     "telemetry:stats": "cd aimeat && pnpm telemetry:stats",
     "telemetry:prune": "cd aimeat && pnpm telemetry:prune",
     "consent-audit:stats": "cd aimeat && pnpm consent-audit:stats",
