@@ -10,6 +10,8 @@
  * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
  * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.8.0 — 2026-06-28 — secretaryDangerCard: a guarded "Reset Secretary" control (type RESET to wipe
+ *     the brain + all secretary.* + self-organisms/workspaces + specialists) for the Manage & setup area.
  *   v0.7.0 — 2026-06-28 — triggersCard: "When it fires" binding (remind / run a workflow / run a
  *     specialist) + a bound-action badge in the trigger list; takes workflows + specialists props.
  *   v0.6.0 — 2026-06-28 — G3: dashStatus "Scan" button calls onReconcile (a real discover scan that
@@ -419,6 +421,26 @@ export function workflowDesignPanel(p) {
           <textarea class="sec-paste sec-wf-outcome" placeholder=${t('secretary.wf.placeholder')} value=${s.outcome || ''} onInput=${(e) => p.onOutcome(e.target.value)}></textarea>
           <div class="sec-next-action-btns">
             <button class="btn-primary btn-sm" disabled=${!(s.outcome || '').trim()} onClick=${p.onDesign}>${t('secretary.wf.design')}</button>
+          </div>`}
+    </section>`;
+}
+
+/** "Reset Secretary" — a guarded full wipe (start over). The owner types RESET to confirm; the view's
+ *  handler calls POST /v1/secretary/reset and reloads. Lives at the bottom of "Manage & setup". */
+export function secretaryDangerCard(p) {
+  return html`
+    <section class="sec-card sec-danger">
+      <h2 class="sec-h2">${t('secretary.reset.title')}</h2>
+      <p class="sec-hint">${t('secretary.reset.hint')}</p>
+      ${!p.show
+        ? html`<button class="btn-danger btn-sm" onClick=${p.onOpen}>${t('secretary.reset.start')}</button>`
+        : html`
+          <p class="sec-warn">⚠ ${t('secretary.reset.warn')}</p>
+          <label class="sec-hint">${t('secretary.reset.confirmLabel')}</label>
+          <input class="sec-input" value=${p.text} onInput=${(e) => p.onText(e.target.value)} placeholder="RESET" />
+          <div class="sec-actions">
+            <button class="btn-ghost btn-sm" disabled=${p.busy} onClick=${p.onCancel}>${t('secretary.cancel')}</button>
+            <button class="btn-danger-solid btn-sm" disabled=${p.busy || (p.text || '').trim().toUpperCase() !== 'RESET'} onClick=${p.onConfirm}>${p.busy ? t('secretary.reset.resetting') : t('secretary.reset.confirm')}</button>
           </div>`}
     </section>`;
 }

@@ -11,6 +11,8 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.17.0 — 2026-06-28 — "Reset Secretary": guarded full-wipe card in Manage & setup (doReset →
+ *     POST /v1/secretary/reset → reload to the clean setup screen).
  *   v0.16.0 — 2026-06-28 — Bound triggers: pass specialists + workflows into triggersCard and the
  *     calendar event dialog so a trigger's fire can be bound to a workflow/specialist run.
  *   v0.15.0 — 2026-06-28 — B5 (secretary-view-redesign): action-items. The autonomous tick now advances
@@ -65,7 +67,7 @@ import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard } from '/views/secretary/dashboard.js';
 import { fetchWorkflowOffers, designWorkflow, saveDesignedWorkflow, slugifyWorkflowId } from '/views/secretary/workflow-design.js';
 import { useSpecialists, specialistsCard } from '/views/secretary/use-specialists.js';
 import { useIntake } from '/views/secretary/use-intake.js';
@@ -116,6 +118,7 @@ export default function SecretaryView() {
   const [pasteDrafts, setPasteDrafts] = useState({});    // prompt-driven path: pasted-back result text, keyed by action id
   const [wfDesign, setWfDesign] = useState(null);        // "Design a workflow" flow: null | { outcome, designing, draft, trigger, error, saving, saved, errors }
   const [calEvent, setCalEvent] = useState(null);        // clicked calendar entry → inline type-specific editor dialog
+  const [resetState, setResetState] = useState({ show: false, text: '', busy: false }); // "Reset Secretary" guard
   const [brainDraft, setBrainDraft] = useState(null);    // C2: direct brain editor draft { purpose, rules[] } | null
   const [savingBrain, setSavingBrain] = useState(false);
 
@@ -173,6 +176,21 @@ export default function SecretaryView() {
   const activeId = active && active.id;
   // Cheap, AI-free routing suggestion: does what you're typing belong to another context? (§22)
   const routeSuggestion = useMemo(() => suggestContextId(chatInput, contexts, activeId), [chatInput, contexts, activeId]);
+
+  // "Reset Secretary" — full wipe (brain + all secretary.* + self-organisms/workspaces + specialists +
+  // tick schedule), keeping the OpenRouter key. Guarded by a typed RESET confirm; reloads to the clean
+  // setup screen afterward (state across many hooks is fully torn down server-side).
+  const doReset = useCallback(async () => {
+    setResetState((s) => ({ ...s, busy: true }));
+    try {
+      await apiPost('/v1/secretary/reset', {});
+      showToast(t('secretary.reset.done'));
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast(`${t('secretary.reset.error')}: ${e.message}`, true);
+      setResetState((s) => ({ ...s, busy: false }));
+    }
+  }, [showToast]);
 
   // Load the active context's conversation (chat is per-context).
   useEffect(() => {
@@ -857,6 +875,13 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 ${accessCard(access)}
                 ${(Array.isArray(active.brainHistory) && active.brainHistory.length > 0) ? historyCard({ brainHistory: active.brainHistory, applying, restore }) : null}
                 ${metaCard({ secretary, reliability })}
+                ${secretaryDangerCard({
+                  show: resetState.show, text: resetState.text, busy: resetState.busy,
+                  onOpen: () => setResetState({ show: true, text: '', busy: false }),
+                  onCancel: () => setResetState({ show: false, text: '', busy: false }),
+                  onText: (v) => setResetState((s) => ({ ...s, text: v })),
+                  onConfirm: doReset,
+                })}
               ` : null}
             ` : null}`}
       ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} workflows=${trig.workflows} specialists=${spec.list} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
