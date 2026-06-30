@@ -11,6 +11,8 @@
  *   v1.3.0 -- 2026-06-10 -- organism_list also fetches ?member={owner} and merges (was public-only:
  *     an agent's join answered ALREADY_MEMBER while the list omitted its own private organisms — the
  *     agent could not find its home). Mirrors the server-MCP tool; rows carry is_member.
+ *   v1.4.0 -- 2026-06-30 -- MCP drift fix: add `archived` enum (exclude/include/only) to
+ *     organism_search to match the server MCP surface; maps to the REST ?archived/?includeArchived flags.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -161,9 +163,15 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     organism_id: z.string().describe('Organism identifier'),
     q: z.string().describe('Search text (min 2 characters)'),
     ws: z.string().optional().describe('Optional: limit to a single workspace id'),
-  }, annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws }) => {
+    archived: z.enum(['exclude', 'include', 'only']).optional().describe('Archive scope: exclude (default), only (archive search), or include (both)'),
+  }, annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws, archived }) => {
     const params = new URLSearchParams({ q });
     if (ws) params.set('ws', ws);
+    // The REST route reads archive scope from two flags: ?archived=only (archive
+    // search) and ?includeArchived=true (both). Map the enum to those; 'exclude'
+    // (the default) sends neither.
+    if (archived === 'only') params.set('archived', 'only');
+    else if (archived === 'include') params.set('includeArchived', 'true');
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/search?${params.toString()}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
