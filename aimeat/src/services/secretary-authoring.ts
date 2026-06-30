@@ -17,6 +17,10 @@
  * @structure authorWorkspaceContent(storage, config, owner, ownerName, active, wsList, opts) · pure helpers
  * @usage import { authorWorkspaceContent } from './secretary-authoring.js';
  * @version-history
+ *   v0.5.0 — 2026-06-30 — Stop hallucinating: the fill is GROUNDED. Per workspace it queries Discovery
+ *     (scope=own) for the owner's real material and feeds it as cited sources; the prompt now forbids
+ *     inventing facts/data, makes DOCUMENTS the place for realistic grounded thinking (approaches/plans,
+ *     mermaid where it helps) and RECORDS real-data-only (leave empty rather than invent an entry).
  *   v0.4.0 — 2026-06-30 — Authoring prompt now tells the model it MAY use ```mermaid diagrams in documents
  *     (the doc viewer renders them) — but judiciously, only where a chart genuinely clarifies, never by default.
  *   v0.3.0 — 2026-06-30 — Retry transient provider failures (completeWithRetry), honouring the owner's
@@ -38,6 +42,7 @@ import { validateMemoryWrite } from './schema-validator.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { buildDiscoveryRegistry, runDiscovery, type DiscoveryContext } from './discovery/index.js';
 
 /** Minimal structural view of a secretary context (the scheduler's SecretaryContext satisfies it). */
 export interface AuthoringContext {
@@ -180,6 +185,11 @@ export async function authorWorkspaceContent(
   const gateOn = !!(cfgRec?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
   const doPublish = publishWanted && !gateOn;
 
+  // Discovery registry — the same cross-domain search the owner's "Discover" surface uses. We query it
+  // per workspace so the authoring is GROUNDED in real things (the owner's own organisms/workspaces/agents/
+  // knowledge), not invented from thin air. Best-effort: if it returns nothing, we just author less.
+  const discRegistry = buildDiscoveryRegistry(storage, config);
+
   const MAX_WS = 12;                                   // bound the per-tick fan-out
   const MAX_DOC_SPACES = opts.aggressive ? 8 : 2;      // empty doc spaces filled per workspace
   const MAX_REC_SPACES = opts.aggressive ? 8 : 1;      // empty record spaces filled per workspace
@@ -234,18 +244,36 @@ export async function authorWorkspaceContent(
       return `- "${o.name}"${fields ? ` — fields: ${fields}` : ''}`;
     }).join('\n') || '(none)';
 
-    const systemPrompt = `You are ${ownerName}'s personal Secretary, working autonomously (the owner is not present) in the "${active.name || 'personal'}" context. `
-      + `${active.brain?.purpose || ''} You are FILLING the owner's workspace with real, useful content toward their strategy. `
-      + `${opts.useGeneralKnowledge ? 'You MAY use your own general knowledge to write substantive, correct material' : 'Use ONLY what the owner has given you — organise and synthesise it, never invent facts'}, always grounded in the strategy and the workspace's purpose. `
+    // GROUNDING: query Discovery (scope=own) for the owner's REAL material relevant to this workspace, so
+    // the model writes from what actually exists rather than hallucinating. These are the cited sources.
+    let groundBlock = '';
+    try {
+      const q = [ws.name, readme.slice(0, 120), strat?.target || ''].filter(Boolean).join(' ').slice(0, 200);
+      const discCtx: DiscoveryContext = {
+        caller: { ownerName, sub: ownerName, gaii: owner, isOwnerSession: true, scopes: [] },
+        scope: 'own', filters: { q, limit: 12 }, nodeId: config.nodeId,
+      };
+      const entries = (await runDiscovery(discRegistry, discCtx)).slice(0, 12);
+      if (entries.length) {
+        groundBlock = `\n\nReal things that EXIST in ${ownerName}'s world, found via Discovery — these are your SOURCES. Ground your content in them and cite them by title; do not duplicate or reinvent what is already here:\n`
+          + entries.map((e) => `- [${e.type}] ${e.title}${e.description ? ' — ' + String(e.description).replace(/\s+/g, ' ').slice(0, 160) : ''}`).join('\n');
+      }
+    } catch { /* discovery is best-effort grounding */ }
+
+    const systemPrompt = `You are ${ownerName}'s personal Secretary, working autonomously (the owner is not present) in the "${active.name || 'personal'}" context. ${active.brain?.purpose || ''}\n\n`
+      + `GROUNDING RULES — follow them strictly:\n`
+      + `1. Base everything ONLY on the owner's real material: the strategy, this workspace's purpose, and the Discovery sources listed below. Do NOT invent facts, data, names, numbers, dates or events. When you state a fact, make clear where it comes from (the strategy, a Discovery source, the workspace intro).\n`
+      + `2. DOCUMENTS are where you THINK: realistic approaches, plans, analysis, how to tackle something (e.g. how to approach this area's marketing). Your own reasoning and proposals are WELCOME and the point here — but keep them realistic and grounded, and flag any assumption AS an assumption ("Oletus: …"). ${opts.useGeneralKnowledge ? 'You may bring general know-how to reason well.' : 'Stick to the owner\'s own material.'}\n`
+      + `3. RECORDS are real DATA only. NEVER invent record entries. Fill a records space only with concrete, real items grounded in the material above; if there is no real data for it, return NO records for that space.\n`
       + `Write in the owner's language. Return ONLY a JSON object — no prose around it.`;
-    const prompt = `Workspace: "${ws.name}"${readme ? `\nWorkspace intro:\n${readme.slice(0, 1200)}` : ''}\n${strategyBlock}\n\nOpen goals:\n${goalLines}\n\n`
-      + `DOCUMENT spaces to fill (free markdown about a topic — the important ones; write one substantial, well-structured document for EACH):\n${docList}\n\n`
-      + `RECORD spaces to fill (structured list/task entries; add ${RECS_PER_SPACE} concrete, realistic entr${RECS_PER_SPACE === 1 ? 'y' : 'ies'} for EACH, matching its fields):\n${recList}\n\n`
+    const prompt = `Workspace: "${ws.name}"${readme ? `\nWorkspace intro:\n${readme.slice(0, 1200)}` : ''}\n${strategyBlock}\n\nOpen goals:\n${goalLines}${groundBlock}\n\n`
+      + `DOCUMENT spaces to fill (the IMPORTANT part — write one substantial, realistic document for EACH; this is where your grounded thinking goes):\n${docList}\n\n`
+      + `RECORD spaces (structured data — fill ONLY with real, grounded entries; if you have no real data, leave the records array empty for that space — do NOT invent):\n${recList}\n\n`
       + `Return a JSON object EXACTLY like:\n`
-      + `{\n  "documents": [ { "space": "<exact document space name above>", "title": "a clear title", "markdown": "# Title\\n\\nReal, structured content in markdown…" } ],\n`
-      + `  "records": [ { "space": "<exact record space name above>", "record": { "<field>": "<value>", "...": "..." } } ]\n}\n`
-      + `Make every document genuinely useful and specific to this area — headings, substance, not a placeholder. Use the EXACT space names listed above. If a space truly has nothing to add, omit it. `
-      + 'A document MAY include a Mermaid diagram via a ```mermaid fenced code block (it renders as a real chart) — but use it JUDICIOUSLY, only where a flowchart, sequence, timeline or relationship genuinely clarifies the content. Do NOT add diagrams by default or decoratively; most documents need none.';
+      + `{\n  "documents": [ { "space": "<exact document space name>", "title": "a clear title", "markdown": "# Title\\n\\nGrounded, realistic content…" } ],\n`
+      + `  "records": [ { "space": "<exact record space name>", "record": { "<field>": "<value>" } } ]\n}\n`
+      + `Prefer filling DOCUMENTS richly and well; leave a records space empty rather than inventing entries. Use the EXACT space names above. `
+      + 'A document MAY include a ```mermaid fenced block (it renders as a real chart) — but JUDICIOUSLY, only where a flow, sequence, timeline or relationship genuinely clarifies; most documents need none.';
 
     let reply: string;
     try {
