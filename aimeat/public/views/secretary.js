@@ -11,6 +11,9 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.20.0 — 2026-06-30 — Content at handshake: a fresh hire now fills its workspaces with REAL content
+ *     immediately (POST /v1/secretary/author-now, long timeout) and drops any left empty; the workspace
+ *     generator runs with skipExamples so no fake "example-N" placeholder records are written.
  *   v0.19.0 — 2026-06-30 — Strategy: setup now auto-links milestones to goals. seedGoals returns the
  *     assigned goal ids in order; applyResult seeds goals before building the strategy and resolves each
  *     milestone's index-based goalRefs to real ids (linkMilestoneGoals); reshape strips dangling index
@@ -293,16 +296,18 @@ export default function SecretaryView() {
   const genAndApplyManifest = useCallback(async (orgId, wsId, ws) => {
     const name = String(ws.name || '').trim();
     try {
+      // skipExamples: the Secretary fills workspaces with REAL content at setup (author-now), so it never
+      // wants fake "example-N" placeholder records (they read as disinformation, not examples).
       // 1) Use a manifest the design JSON already carried (the prompt-driven path can include it inline).
       if (ws.manifest) {
         const provided = { manifest: ws.manifest, schemas: ws.schemas || {} };
         backfillEnvelope(provided.manifest, wsId, name);
-        if (!validateGenerated(provided).length) { await applyGeneratedWorkspace(orgId, wsId, provided); return; }
+        if (!validateGenerated(provided).length) { await applyGeneratedWorkspace(orgId, wsId, provided, { skipExamples: true }); return; }
       }
       // 2) Otherwise (or if the inline one was invalid) design it in-app with the workspace generator.
       const generated = parseGenerated(await generateRaw(`${name} — ${ws.purpose || ''}`.trim(), null));
       backfillEnvelope(generated && generated.manifest, wsId, name);
-      if (generated && !validateGenerated(generated).length) await applyGeneratedWorkspace(orgId, wsId, generated);
+      if (generated && !validateGenerated(generated).length) await applyGeneratedWorkspace(orgId, wsId, generated, { skipExamples: true });
     } catch { /* leave it manifest-less; the owner can set it up manually */ }
   }, []);
 
@@ -388,6 +393,22 @@ export default function SecretaryView() {
       window.dispatchEvent(new CustomEvent('aimeat-live-update')); // refresh goals/learning + cards
       showToast(t('secretary.hireDone'));
       setResult(''); setNeeds(''); setShowHire(false);
+      // Fill the brand-new workspaces with REAL content right at handshake (documents first), and drop any
+      // that stay empty ("empty workspace = useless"). A slow model can take a while — long timeout, no retry
+      // (the server already retries flaky models). Only on a fresh hire, so it never touches existing content.
+      if (isNew) {
+        showToast(t('secretary.fillingWorkspaces'));
+        try {
+          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({}), timeoutMs: 1_800_000, retries: 0 });
+          const d = (r && r.data) || {};
+          const filled = (d.authored || []).length;
+          const removed = (d.removedEmptyWorkspaces || []).length;
+          showToast(`${t('secretary.workspacesFilled')} (${filled})${removed ? ` — ${t('secretary.emptyRemoved')}: ${removed}` : ''}`);
+          window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+        } catch (e) {
+          showToast(`${t('secretary.fillError')}: ${e.message}`, true);
+        }
+      }
     } catch (e) {
       showToast(`${t('secretary.hireError')}: ${e.message}`, true);
     } finally {

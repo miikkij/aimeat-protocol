@@ -7,10 +7,15 @@
  *   resumes once the owner answers. The questions/answers reuse the DM interactive payload, so the
  *   exact same mechanism serves specialists/agents.
  * @structure secretaryRouter(config, storage, peers) -> Router
- *   - POST /v1/secretary/clarify — send the questions secretary#owner→owner + store the produce job
- *   - POST /v1/secretary/reset   — wipe the owner's Secretary back to zero (start over)
+ *   - POST /v1/secretary/clarify     — send the questions secretary#owner→owner + store the produce job
+ *   - POST /v1/secretary/reset       — wipe the owner's Secretary back to zero (start over)
+ *   - POST /v1/secretary/author-now  — fill the active context's workspaces with REAL content at setup
+ *     (reuses services/secretary-authoring) + remove any workspace left empty ("empty = useless")
  * @usage app.use(secretaryRouter(config, storage, peers));
  * @version-history
+ *   v0.3.0 — 2026-06-30 — author-now: fill workspaces with real content at handshake (documents first,
+ *     schema-valid records, agentic retry) instead of waiting for a tick, and drop any still-empty
+ *     workspace. Pairs with the Secretary setup skipping fake "example-N" placeholder records.
  *   v0.2.0 — 2026-06-28 — Reset channel: POST /v1/secretary/reset wipes the Secretary to a clean state
  *     (brain/directives + all secretary.* memory + optionally the self-organisms & their workspaces +
  *     specialists & their deliverables + the tick schedule). Keeps the OpenRouter key + the agent identity.
@@ -30,6 +35,8 @@ import { listSpecialists, deleteSpecialistConfig } from '../services/specialist.
 import { getActiveScheduler } from '../services/scheduler.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+import { authorWorkspaceContent, type AuthoringContext } from '../services/secretary-authoring.js';
+import { countWorkspaceInstances } from '../services/workspace-enrichment.js';
 
 const ClarifySchema = z.object({
   contextId: z.string().min(1).max(200),
@@ -173,6 +180,77 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
     } catch (err) {
       logger.error('[secretary] reset failed', { owner, error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to reset the Secretary'));
+    }
+  });
+
+  // ── POST /v1/secretary/author-now ── fill the active context's workspaces with REAL content at SETUP
+  //    ("heti kättelyssä"), reusing the tested authoring service (documents first, schema-valid records,
+  //    agentic retry on flaky models). Then REMOVE any workspace that's still empty — "empty workspace =
+  //    useless workspace". Runs as a one-time act-band pass; the persisted band is untouched. Synchronous:
+  //    the caller waits (a slow model can take a while), so call it with a long client timeout.
+  router.post('/v1/secretary/author-now', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    try {
+      const cfgRec = await storage.getMemory(ownerGhii, 'secretary.config');
+      const cfg = (cfgRec?.value ?? {}) as { contexts?: AuthoringContext[]; activeContextId?: string };
+      const contexts = Array.isArray(cfg.contexts) ? cfg.contexts : [];
+      const active = contexts.find((c) => c.id === cfg.activeContextId) || contexts[0];
+      if (!active || !active.organismId) {
+        res.status(400).json(error(config.nodeId, 'NO_CONTEXT', 'No active Secretary context with an organism to fill.'));
+        return;
+      }
+      const orgId = active.organismId;
+
+      // Open goals for this context steer what gets authored.
+      const goalRecs = await storage.listMemory(ownerGhii, { prefix: 'secretary.goal.' }).catch(() => []);
+      const openGoals = goalRecs
+        .map((r) => (r.value ?? {}) as Record<string, unknown>)
+        .filter((g) => g.status === 'open' && (!g.contextId || g.contextId === active.id));
+
+      // Honour the owner's autoRetry/maxRetries (flaky models retry instead of dying).
+      const aiPrefs = (await storage.getMemory(ownerGhii, 'openrouter.settings'))?.value as { autoRetry?: boolean; maxRetries?: number } | undefined;
+      const maxRetries = aiPrefs?.autoRetry === false ? 0 : (typeof aiPrefs?.maxRetries === 'number' ? aiPrefs.maxRetries : 3);
+
+      const regKey = `organism.${orgId}.meta.workspaces`;
+      const regRec = await storage.getMemory(ownerGhii, regKey);
+      const wsEntries = ((regRec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
+      const wsList = wsEntries.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
+
+      // Author real content (act → publish), reusing the agentic, doc-first, retrying service.
+      const authored = await authorWorkspaceContent(storage, config, ownerGhii, owner, active, wsList, {
+        openGoals, band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries, appId: 'setup:author',
+      });
+
+      // Change 3: drop any workspace that is STILL empty after authoring (nothing real to hold → not needed).
+      const removed: string[] = [];
+      const keep: Array<{ id?: string; name?: string }> = [];
+      for (const entry of wsEntries) {
+        const id = entry?.id;
+        if (!id) { keep.push(entry); continue; }
+        const root = `organism.${orgId}.w.${id}`;
+        const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
+        const manifest = (items.find((r) => r.key === `${root}.meta.manifest`)?.value ?? null) as Record<string, unknown> | null;
+        const { recs, docs } = countWorkspaceInstances(items, manifest, root);
+        if (recs + docs > 0) { keep.push(entry); continue; }
+        // Empty → remove: drop its meta so it no longer renders, and unregister it.
+        await storage.deleteMemory(ownerGhii, `${root}.meta.manifest`).catch(() => {});
+        await storage.deleteMemory(ownerGhii, `${root}.meta.readme`).catch(() => {});
+        removed.push(entry.name || id);
+      }
+      if (removed.length) {
+        const now = new Date().toISOString();
+        await storage.setMemory({ key: regKey, ownerGaii: ownerGhii, value: { workspaces: keep }, visibility: 'private', tags: regRec?.tags ?? [], ttlHours: null, version: (regRec?.version ?? 0) + 1, createdAt: regRec?.createdAt ?? now, updatedAt: now });
+      }
+
+      emitChange('organisms');
+      logger.info('[secretary] author-now', { owner, authored: authored.summaries.length, removedEmpty: removed.length, morsels: authored.morsels });
+      res.json(success(config.nodeId, { authored: authored.summaries, removedEmptyWorkspaces: removed, morsels: authored.morsels }, [
+        { description: 'Open the workspaces', method: 'GET', url: `/v1/profile?tab=organisms&org=${orgId}` },
+      ]));
+    } catch (err) {
+      logger.error('[secretary] author-now failed', { owner, error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to author workspace content'));
     }
   });
 

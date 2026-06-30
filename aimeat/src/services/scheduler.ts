@@ -5,6 +5,11 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.12.0 — 2026-06-30 — Learning loop closes: (A) selectLessons threads the highest-signal reviewed-
+ *     decision scores into the tick's briefing/action prompt (repeat what worked, avoid what didn't);
+ *     (B) proposeLearnedRule — when a cluster of reviewed decisions scored poorly, the tick asks for ONE
+ *     durable operating rule and posts it as a GATED inbox card (brain-rule) the owner approves; never
+ *     auto-applied. Source decisions flagged proposalUsed so a cluster doesn't re-propose.
  *   v2.11.0 — 2026-06-30 — Secretary autonomous authoring: a band-gated phase (`author_content`) fills
  *     the active context's EMPTY workspaces — document spaces first, then records — toward the focus
  *     milestone (services/secretary-authoring.ts). act → write + publish · draft/ask → leave drafts ·
@@ -70,7 +75,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { classifySecretaryActions, actionKind, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, evaluateTriggers, settleFiredTrigger, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction, type TriggerLike } from './secretary-tick.js';
+import { classifySecretaryActions, actionKind, ledgerSpentToday, budgetExceeded, bumpLedger, routeTickNote, deriveRoutineActions, actionItemKey, routineDueForRearm, rearmRoutine, isAllowedQuickAction, evaluateTriggers, settleFiredTrigger, selectLessons, poorDecisionCluster, type Lesson, type AutonomousLedger, type RoutedAction, type RoutableContext, type RoutingCorrections, type RoutineLike, type ActionItem, type QuickAction, type TriggerLike } from './secretary-tick.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -714,6 +719,11 @@ export class Scheduler {
         writes.push(...reviewed.map((r) => `secretary.decision.${r.id}`));
       }
 
+      // Learning loop (B): when a cluster of reviewed decisions scored poorly, propose ONE durable
+      // operating rule — GATED: posted as an inbox card the owner approves; never auto-applied to the brain.
+      const proposal = await this.proposeLearnedRule(owner, ownerName, active, cfg.pendingDecisions ?? {});
+      if (proposal) { newPending[proposal.id] = proposal.pending; paidMorsels += 1; writes.push('agent-message', ...proposal.writes); }
+
       const wsList = await this.loadContextWorkspaces(owner, active);
 
       // Resume any answered clarify jobs: produce the deliverable grounded in the owner's answers (+ facts).
@@ -774,7 +784,10 @@ export class Scheduler {
 
       // Action generation (P1-A): ask the model for a STRUCTURED action list tied to the open goals +
       // a bounded slice of the self-organism (the context's workspaces). 1 paid morsel.
-      const { systemPrompt, prompt } = this.buildTickPrompt(ownerName, active, openGoals, wsList);
+      // Learning loop (A): thread the highest-signal reviewed-decision lessons into the prompt so the next
+      // cycle repeats what scored well and avoids what scored poorly (the scores aren't a dead-end record).
+      const lessons = selectLessons(decRecs.map((r) => (r.value ?? {}) as Record<string, unknown>), active.id);
+      const { systemPrompt, prompt } = this.buildTickPrompt(ownerName, active, openGoals, wsList, lessons);
       const result = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: `schedule:${job.id}` });
       paidMorsels += 1;
 
@@ -886,6 +899,7 @@ export class Scheduler {
   private buildTickPrompt(
     ownerName: string, active: SecretaryContext,
     openGoals: Array<Record<string, unknown>>, wsList: Array<{ id: string; name: string }>,
+    lessons: Lesson[] = [],
   ): { systemPrompt: string; prompt: string } {
     const rules = (active.brain?.rules || []).map((r) => '- ' + (r.description || '')).join('\n');
     const systemPrompt = `You are ${ownerName}'s personal Secretary, working in the "${active.name || 'personal'}" context.\n${active.brain?.purpose || ''}\n\nOperating rules:\n${rules || '(none)'}\n\nYou are doing an autonomous check-in for the owner (they are not present). Reply in the owner's language. Return ONLY a JSON object — no prose around it.`;
@@ -908,7 +922,14 @@ export class Scheduler {
         + (risks.length ? `\n- Risks to watch: ${risks.join('; ')}` : '')
         + `\nSteer the briefing toward this focus milestone, respect the principles, and flag a risk if it is materialising. If recent activity suggests the milestone is reached, say so and point at the next one.`;
     }
-    const prompt = `Open goals in this context:\n${goalLines}\n\nThe owner's filing space "${active.organismName || active.name}" has these workspaces: ${wsNames}.${strategyBlock}\n\nDecide what to do for the owner right now. Return a JSON object EXACTLY like:\n{\n  "briefing": "2-4 sentence check-in: what to focus on and anything needing attention",\n  "actions": [\n    { "capability": "file_intake", "summary": "short label", "payload": { "workspace": "<an existing workspace name>", "note": "the text to file" } },\n    { "capability": "reminders", "summary": "a concrete reminder for the owner", "payload": {} }\n  ]\n}\nRules for actions: propose 0-3 CONCRETE actions that move the open goals forward. Only use these capabilities: "file_intake"/"curate_knowledge" (file a note into a workspace — set payload.workspace to an existing workspace name and payload.note to the text) and "reminders"/"briefing" (surface a note to the owner — payload may be empty). Do not invent other capabilities. If nothing concrete is warranted, return an empty actions array.`;
+    // Learning loop (A): the highest-signal lessons from past decisions the owner's reviews scored —
+    // repeat what worked, avoid what didn't. Free text; the model weighs them, nothing is auto-applied.
+    let lessonsBlock = '';
+    if (lessons.length) {
+      lessonsBlock = `\n\nLessons from your recently reviewed decisions (let these steer you — lean on what scored well, avoid repeating what scored poorly):\n`
+        + lessons.map((l) => `- [${l.score}/100] ${l.decision}${l.verdict ? ` — ${l.verdict}` : ''}`).join('\n');
+    }
+    const prompt = `Open goals in this context:\n${goalLines}\n\nThe owner's filing space "${active.organismName || active.name}" has these workspaces: ${wsNames}.${strategyBlock}${lessonsBlock}\n\nDecide what to do for the owner right now. Return a JSON object EXACTLY like:\n{\n  "briefing": "2-4 sentence check-in: what to focus on and anything needing attention",\n  "actions": [\n    { "capability": "file_intake", "summary": "short label", "payload": { "workspace": "<an existing workspace name>", "note": "the text to file" } },\n    { "capability": "reminders", "summary": "a concrete reminder for the owner", "payload": {} }\n  ]\n}\nRules for actions: propose 0-3 CONCRETE actions that move the open goals forward. Only use these capabilities: "file_intake"/"curate_knowledge" (file a note into a workspace — set payload.workspace to an existing workspace name and payload.note to the text) and "reminders"/"briefing" (surface a note to the owner — payload may be empty). Do not invent other capabilities. If nothing concrete is warranted, return an empty actions array.`;
     return { systemPrompt, prompt };
   }
 
@@ -993,6 +1014,64 @@ export class Scheduler {
     const rec = await this.storage.getMemory(owner, 'secretary.routing.corrections');
     const map = (rec?.value as { map?: Record<string, string> } | undefined)?.map;
     return (map && typeof map === 'object') ? map : {};
+  }
+
+  /**
+   * Learning loop (B): when a CLUSTER of reviewed decisions in this context scored poorly, ask the model
+   * for ONE durable operating rule that would avoid repeating them, and post it as a GATED inbox decision
+   * card (type 'brain-rule'). The owner approves it in the inbox (applyDecision appends it to the brain) —
+   * it is NEVER auto-applied. The source decisions are flagged `proposalUsed` so the same cluster doesn't
+   * re-propose every tick. Returns the pending card (+ the keys written) or null when there isn't enough
+   * signal / a brain-rule proposal is already pending / the model returns nothing. One paid morsel on propose.
+   */
+  private async proposeLearnedRule(
+    owner: string, ownerName: string, active: SecretaryContext, existingPending: Record<string, unknown>,
+  ): Promise<{ id: string; pending: Record<string, unknown>; writes: string[] } | null> {
+    // One brain-rule proposal at a time — don't stack cards.
+    if (Object.values(existingPending).some((p) => (p as { type?: string })?.type === 'brain-rule')) return null;
+
+    const recs = await this.storage.listMemory(owner, { prefix: 'secretary.decision.' });
+    const byId = new Map<string, typeof recs[number]>();
+    const values: Array<Record<string, unknown>> = [];
+    for (const r of recs) { const d = (r.value ?? {}) as Record<string, unknown>; if (d.id) byId.set(String(d.id), r); values.push(d); }
+    const cluster = poorDecisionCluster(values, active.id);
+    if (!cluster.length) return null;
+
+    const secretaryGaii = `secretary#${ownerName}@${this.config.nodeId}`;
+    const agent = await this.storage.getAgent(secretaryGaii);
+    if (!agent) return null;
+
+    const systemPrompt = `You distil ONE durable operating rule for ${ownerName}'s Secretary from past decisions that turned out poorly. Reply in the owner's language. Return ONLY a JSON object: {"rule": "one concrete, actionable sentence the Secretary should follow from now on"}.`;
+    const prompt = `These past decisions scored poorly on review:\n${cluster.map((d, i) => `${i + 1}. ${String(d.decision || '')} — chosen: ${String(d.chosen || '')} — verdict: ${String(d.verdict || '')} (${d.score}/100)`).join('\n')}\n\nPropose ONE operating rule that, followed from now on, would avoid repeating these. Make it concrete and general enough to reuse — not a restatement of a single case.`;
+    let rule: string;
+    try {
+      const out = await completeForOwner(this.storage, this.config, owner, { prompt, systemPrompt, appId: 'schedule:learn:rule' });
+      rule = String(extractJsonObject(out.content)?.rule ?? '').trim().slice(0, 400);
+    } catch { return null; }
+    if (!rule) return null;
+
+    // Flag the source decisions so the cluster doesn't re-propose every tick.
+    const now = new Date().toISOString();
+    const writes: string[] = [];
+    for (const d of cluster) {
+      const rec = byId.get(String(d.id));
+      if (!rec) continue;
+      await this.storage.setMemory({ key: rec.key, ownerGaii: owner, value: { ...d, proposalUsed: true }, visibility: 'private', tags: rec.tags ?? ['secretary', 'decision', 'reviewed', active.id], ttlHours: null, version: rec.version + 1, createdAt: rec.createdAt, updatedAt: now });
+      writes.push(rec.key);
+    }
+
+    const promptId = 'learn-' + randomUUID().slice(0, 8);
+    const question = `I noticed ${cluster.length} past decisions that went poorly. Add this rule to my brain so I avoid repeating them?\n\n"${rule}"`;
+    const pending = { type: 'brain-rule', rule, contextId: active.id, contextName: active.name || '', basisCount: cluster.length, question, createdAt: now };
+    const record: AgentMessageRecord = {
+      id: randomUUID(), agentGaii: secretaryGaii, threadId: randomUUID(), direction: 'outbound', senderGaii: owner,
+      content: `Proposed operating rule: ${rule}`, status: 'delivered',
+      metadata: { prompt: { promptId, question, options: ['Yes, add it', 'No'], allowOther: false } }, createdAt: now,
+    };
+    await this.storage.createMessage(record);
+    await this.appendFeed(owner, { kind: 'review', contextId: active.id, contextName: active.name || '', text: `💡 Proposed a learned rule from ${cluster.length} reviewed decisions — approve it in your inbox.` });
+    writes.push('secretary.feed');
+    return { id: promptId, pending, writes };
   }
 
   /**

@@ -467,7 +467,7 @@ ${jsonText}`;
 /** Key root for one workspace — an organism holds many workspaces under organism.{id}.w.{wsId}. */
 export function wsRoot(orgId, wsId) { return `organism.${orgId}.w.${wsId}`; }
 
-export async function applyGeneratedWorkspace(orgId, wsId, generated) {
+export async function applyGeneratedWorkspace(orgId, wsId, generated, opts = {}) {
   const root = wsRoot(orgId, wsId);
   for (const [namespace, schema] of Object.entries(generated.schemas || {})) {
     // 'open' (not 'strict'): generated schemas enforce required fields + types but TOLERATE extra fields,
@@ -479,14 +479,18 @@ export async function applyGeneratedWorkspace(orgId, wsId, generated) {
   await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: manifest, visibility: 'private' });
   await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${manifest.name || 'Workspace'}\n\n${manifest.summary || ''}`, visibility: 'private' });
   // Write any example instances as DRAFTS (clearly not-yet-published samples). Best-effort: a
-  // sample that doesn't validate is skipped, not fatal.
-  let n = 0;
-  for (const [namespace, items] of Object.entries(generated.examples || {})) {
-    if (!Array.isArray(items)) continue;
-    for (const item of items.slice(0, 5)) {
-      n++;
-      const id = String((item && item.id) || `example-${n}`).replace(/[^a-zA-Z0-9_-]/g, '-');
-      await apiPost('/v1/memory', { key: `${root}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
+  // sample that doesn't validate is skipped, not fatal. `skipExamples` suppresses these entirely —
+  // the Secretary setup path fills workspaces with REAL content instead (fake "example-N" records read
+  // as disinformation, not examples), so it never wants placeholders.
+  if (!opts.skipExamples) {
+    let n = 0;
+    for (const [namespace, items] of Object.entries(generated.examples || {})) {
+      if (!Array.isArray(items)) continue;
+      for (const item of items.slice(0, 5)) {
+        n++;
+        const id = String((item && item.id) || `example-${n}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+        await apiPost('/v1/memory', { key: `${root}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
+      }
     }
   }
 }
