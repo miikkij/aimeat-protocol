@@ -56,11 +56,25 @@ def main() -> None:
         )
 
         # Liaison-driven onboarding -- runs ONCE at crew kickoff.
+        # NOTE: several steps have NO aimeat_onboarding_* tool -- they pass when
+        # the agent writes the right memory/offers state. publish_commands (write
+        # agents.{name}.commands), declare_offerings + make_workflow_compatible
+        # (aimeat_offers_publish a workflow-compatible offer), and publish_config
+        # (write agents.config.{name}.*) are all of this kind. So the task tells
+        # the agent to keep going until no REQUIRED step is pending, not just to
+        # call onboarding tools.
         onboarding_task = Task(
             description=(
-                "Check AIMEAT onboarding status with aimeat_onboarding_status. "
-                "If any required step is pending, complete it via the appropriate "
-                "aimeat_onboarding_* tool. Report the final status."
+                "Drive AIMEAT Hello Integration to completion. Call "
+                "aimeat_onboarding_status, then resolve every pending step: use "
+                "the matching aimeat_onboarding_* tool where one exists; for steps "
+                "that have none, produce the state they check -- write your slash "
+                "command catalogue to agents.{name}.commands (publish_commands), "
+                "publish a workflow-compatible offer with aimeat_offers_publish "
+                "(declare_offerings + make_workflow_compatible), and write a "
+                "runtime descriptor under agents.config.{name}.* (publish_config). "
+                "Re-check status and repeat until no required step is pending. "
+                "Report the final status."
             ),
             expected_output="Final onboarding state (completed/in_progress) and list of passed steps.",
             agent=liaison,
