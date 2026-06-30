@@ -1028,10 +1028,14 @@ Every AIMEAT app MUST use this starter template:
     async function boot() {
       await loadScript('/v1/libs/aimeat-auth.js');
       await loadScript('/v1/libs/aimeat-data.js');
+      // onLogin fires ONLY on a fresh sign-in click, NOT on reload — so a returning
+      // user who is already signed in needs the session restored explicitly below.
       AIMEAT.auth.mountLoginButton('#header-auth', {
         onLogin: (session) => startApp(session),
         onLogout: () => location.reload(),
       });
+      const existing = await AIMEAT.auth.login();  // session from storage, or null
+      if (existing) startApp(existing);
     }
     function startApp(session) {
       // Your app logic here. Use:
@@ -1675,7 +1679,7 @@ Ask the user what their app should do. Then build a complete, self-contained HTM
 
 ## AIMEAT Platform
 - Load client libraries from {{node_url}}/v1/libs/ (aimeat-auth.js, aimeat-data.js, aimeat-storage.js, aimeat-social.js, aimeat-wallet.js, aimeat-work.js)
-- Auth: AIMEAT.auth.mountLoginButton("#login", { onLogin: fn, onLogout: fn })
+- Auth: AIMEAT.auth.mountLoginButton("#login", { onLogin: fn, onLogout: fn }) — onLogin fires ONLY on a fresh sign-in, NOT on reload; also call AIMEAT.auth.login().then(s => { if (s) fn(s); }) on load to restore an already-signed-in session
 - Data: AIMEAT.data.set(key, value), AIMEAT.data.get(key), AIMEAT.data.search(q)
 - Dark theme: --bg:#0f0a14; --text:#f0e6f6; --accent:#ff6b9d
 {{cortex_extensions}}
