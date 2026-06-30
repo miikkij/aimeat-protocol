@@ -744,6 +744,7 @@
     "hireDone": "Sihteerisi on pystytetty.",
     "fillingWorkspaces": "Täytetään työtilojasi oikealla sisällöllä…",
     "workspacesFilled": "Työtilat täytetty oikealla sisällöllä",
+    "workspacesFilledIssues": "näitä ei voitu vielä täyttää",
     "emptyRemoved": "tyhjiä poistettu",
     "fillError": "Työtilojen täyttö epäonnistui",
     "settingUpTitle": "Pystytetään sihteeriäsi…",

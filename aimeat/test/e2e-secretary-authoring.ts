@@ -8,6 +8,14 @@
  *   Invariant: act → write + publish (.latest) · draft → draft only (no .latest) · off → no-op; a
  *   record that fails its locked schema is skipped, never fatal; the publish gate forces drafts even on act.
  * @version-history
+ *   v1.2.0 — 2026-06-30 — Browser-found cases: a reply that does NOT parse as JSON still triggers
+ *     retry-on-empty and authors a document (13, the gap that left a live workspace blank); a document
+ *     whose space name is misspelled is still written when there is exactly one document space (14).
+ *   v1.1.0 — 2026-06-30 — Never-empty + document-first coverage: a placeholder-echo title ("a clear title")
+ *     is skipped not written (9); retry-on-empty re-prompts once and authors a real doc when the first reply
+ *     was unusable (10); without retryOnEmpty (the tick) an unusable reply is not retried but IS surfaced
+ *     (11); a doc-only reply publishes the document and leaves the records space empty — records are not
+ *     invented (12).
  *   v1.0.0 — 2026-06-30 — Initial: happy path (doc + record published) + failure modes (schema-skip,
  *     band=off no-op, band=draft draft-only, publish-gate forces drafts, budget cap stops the fan-out).
  */
@@ -207,6 +215,94 @@ await test('8. permanent error (bad API key) is NOT retried — fails fast, noth
     });
     assert(calls === 1, `a permanent error must not be retried, calls=${calls}`);
     assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 0, 'nothing published on a permanent failure');
+    storage.close();
+});
+
+await test('9. a placeholder-echo document title ("a clear title") is skipped, not written, and surfaced', async () => {
+    const storage = await seedWorkspace();
+    const placeholderReply = JSON.stringify({
+        documents: [{ space: 'Guides', title: 'a clear title', markdown: '# Title\n\nGrounded, realistic content…' }],
+        records: [],
+    });
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author',
+        complete: async () => ({ content: placeholderReply }),
+    });
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 0, 'a placeholder-titled document is not published');
+    assert(res.summaries.some((s) => /nothing usable/.test(s)), `the empty result is surfaced, not silent: ${res.summaries[0]}`);
+    storage.close();
+});
+
+await test('10. retry-on-empty re-prompts ONCE and authors a real document when the first reply was unusable', async () => {
+    const storage = await seedWorkspace();
+    let calls = 0;
+    const emptyThenReal = async ({ prompt }: { prompt: string }) => {
+        calls++;
+        if (/produced no usable document/.test(prompt)) {
+            return { content: JSON.stringify({ documents: [{ space: 'Guides', title: 'Messaging Guide', markdown: '# Messaging Guide\n\nReal content.' }], records: [] }) };
+        }
+        return { content: JSON.stringify({ documents: [{ space: 'Guides', title: 'a clear title', markdown: 'x' }], records: [] }) };
+    };
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, retryOnEmpty: true, appId: 'test:author', complete: emptyThenReal,
+    });
+    assert(calls === 2, `retry-on-empty issues exactly one extra call, calls=${calls}`);
+    assert(res.morsels === 2, `morsels counts the retry, got ${res.morsels}`);
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 1, 'the retried real document is published');
+    assert(res.summaries.some((s) => /Authored/.test(s)), `success summary after the retry: ${res.summaries[0]}`);
+    storage.close();
+});
+
+await test('11. WITHOUT retry-on-empty (the autonomous tick), an unusable reply is not retried but IS surfaced', async () => {
+    const storage = await seedWorkspace();
+    let calls = 0;
+    const alwaysEmpty = async () => { calls++; return { content: JSON.stringify({ documents: [{ space: 'Guides', title: 'a clear title', markdown: 'x' }], records: [] }) }; };
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: alwaysEmpty,
+    });
+    assert(calls === 1, `no retryOnEmpty → exactly one call (tick economics unchanged), calls=${calls}`);
+    assert(res.summaries.some((s) => /nothing usable/.test(s)), 'the empty workspace is surfaced, not silent');
+    storage.close();
+});
+
+await test('12. document-first: a doc-only reply publishes the document and leaves the records space empty (no invention)', async () => {
+    const storage = await seedWorkspace();
+    const docOnly = JSON.stringify({ documents: [{ space: 'Guides', title: 'Our approach', markdown: '# Our approach\n\nGrounded plan with an assumption flagged. Oletus: …' }], records: [] });
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: async () => ({ content: docOnly }),
+    });
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 1, 'the document is published');
+    assert((await keysWithSuffix(storage, REC_NS, '.latest')).length === 0, 'the records space is left empty — records are not invented');
+    assert(/document/.test(res.summaries[0] || '') && /Authored/.test(res.summaries[0] || ''), `summary reports the authored document: ${res.summaries[0]}`);
+    storage.close();
+});
+
+await test('13. a reply that does NOT parse as JSON still triggers retry-on-empty and authors a document', async () => {
+    const storage = await seedWorkspace();
+    let calls = 0;
+    const badJsonThenReal = async ({ prompt }: { prompt: string }) => {
+        calls++;
+        if (/was not valid JSON|produced no usable document/.test(prompt)) {
+            return { content: JSON.stringify({ documents: [{ space: 'Guides', title: 'Recovered plan', markdown: '# Recovered plan\n\nReal content.' }], records: [] }) };
+        }
+        return { content: 'Here you go:\n```\n{ this is not valid json, ' };  // unparseable on the first shot
+    };
+    const res = await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, retryOnEmpty: true, appId: 'test:author', complete: badJsonThenReal,
+    });
+    assert(calls === 2, `parse-fail then one retry = 2 calls, got ${calls}`);
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 1, 'the retried document is published even though the first reply did not parse');
+    assert(res.summaries.some((s) => /Authored/.test(s)), `success summary after the parse-fail retry: ${res.summaries[0]}`);
+    storage.close();
+});
+
+await test('14. a document for a MISSPELLED space name is still written when there is exactly one document space', async () => {
+    const storage = await seedWorkspace();
+    const misspelled = JSON.stringify({ documents: [{ space: 'Guidez', title: 'Messaging Guide', markdown: '# Messaging Guide\n\nReal content.' }], records: [] });
+    await authorWorkspaceContent(storage, config, OWNER, OWNER_NAME, ACTIVE, WSLIST, {
+        openGoals: [], band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, appId: 'test:author', complete: async () => ({ content: misspelled }),
+    });
+    assert((await keysWithSuffix(storage, DOC_NS, '.latest')).length === 1, 'the document lands in the single doc space despite the model mislabelling it');
     storage.close();
 });
 

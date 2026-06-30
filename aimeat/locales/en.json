@@ -744,6 +744,7 @@
     "hireDone": "Your Secretary is set up.",
     "fillingWorkspaces": "Filling your workspaces with real content…",
     "workspacesFilled": "Workspaces filled with real content",
+    "workspacesFilledIssues": "couldn't fill these yet",
     "emptyRemoved": "empty ones removed",
     "fillError": "Couldn't fill the workspaces",
     "settingUpTitle": "Setting up your Secretary…",
