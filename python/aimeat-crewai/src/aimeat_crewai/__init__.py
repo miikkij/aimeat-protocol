@@ -61,6 +61,11 @@ from .offers import (
     OfferValidationError,
 )
 from .offers_tool import offers_check, offers_publish, offers_tools
+from .onboarding import (
+    run_hello_integration,
+    OnboardingError,
+    ONBOARDING_CONFIRM_TOOLS,
+)
 from .messaging import (
     ServeClient,
     serve_client,
@@ -71,7 +76,7 @@ from .messaging import (
     AimeatMessagingError,
 )
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 
 __all__ = [
     "__version__",
@@ -104,6 +109,10 @@ __all__ = [
     "offers_check",
     "offers_publish",
     "offers_tools",
+    # Deterministic Hello Integration driver (0.12.0)
+    "run_hello_integration",
+    "OnboardingError",
+    "ONBOARDING_CONFIRM_TOOLS",
     # Interactive messages — federated AskUserQuestion (0.9.0)
     "ServeClient",
     "serve_client",

@@ -3232,6 +3232,14 @@ components:
           type: string
         description:
           type: string
+          description: Raw i18n key (agentOnboarding.stepDescriptions.{id}); see descriptionText for the resolved string.
+        descriptionText:
+          type: string
+          description: |
+            Localised, human-readable resolution of `description`. Present on the GET /onboarding
+            and aimeat_onboarding_status payloads (REST resolves via Accept-Language; MCP uses the
+            node default locale). Added so connector/agent consumers without the i18n bundle never
+            see a raw key.
         status:
           type: string
           enum: [pending, passed, failed, skipped]
@@ -3245,6 +3253,80 @@ components:
           enum: [automatic, api_call, owner_confirm]
         failureReason:
           type: string
+        howTo:
+          allOf:
+            - $ref: '#/components/schemas/OnboardingStepHowTo'
+          nullable: true
+          description: Machine-readable how-to-complete descriptor (null when the step id has no mapping).
+
+    OnboardingStepHowTo:
+      type: object
+      description: |
+        Authoritative machine-readable "how to complete this step" descriptor. A connector drives
+        each pending step from this (call `tool` with `args`) instead of fabricating a non-existent
+        `aimeat_onboarding_<stepId>` tool. The only onboarding-prefixed tools that exist are the five
+        aimeat_onboarding_* tools; every other step is completed by calling its mapped real tool.
+      properties:
+        actor:
+          type: string
+          enum: [agent, server]
+          description: Who performs the action -- the agent calls a tool, or the server validates passively.
+        automatic:
+          type: boolean
+          description: true when the server auto-ticks the step by reading real state (no dedicated confirm call).
+        gatesCompletion:
+          type: boolean
+          description: Mirrors `required` -- true when this step gates onboarding completion.
+        validationMethod:
+          type: string
+          enum: [automatic, api_call, owner_confirm]
+        tool:
+          type: string
+          nullable: true
+          description: Exact MCP tool to call, or null for passive/server steps.
+        toolAlias:
+          type: string
+          description: Optional local-connector convenience tool with the same effect (e.g. aimeat_offers_publish).
+        restEndpoint:
+          type: object
+          nullable: true
+          description: Underlying REST route for non-MCP clients; null for passive steps.
+          properties:
+            method:
+              type: string
+              enum: [GET, POST, PUT, PATCH]
+            path:
+              type: string
+        args:
+          type: object
+          additionalProperties: true
+          description: Copyable argument template. `{name}` is substituted server-side; `{test_task_id}` is filled from hints.test_task_id.
+        passiveNote:
+          type: string
+          description: For tool === null steps, the condition under which the server auto-passes the step.
+
+    OnboardingSummary:
+      type: object
+      description: Reachability summary. Completion gates only on required steps; optional steps never block.
+      properties:
+        required_total: { type: integer }
+        required_passed: { type: integer }
+        required_remaining: { type: integer }
+        optional_total: { type: integer }
+        optional_passed: { type: integer }
+        optional_remaining: { type: integer }
+        completable:
+          type: boolean
+          description: true once every required step has passed -- the agent can stop here.
+        next_required_step:
+          type: string
+          nullable: true
+          description: First not-yet-passed required step id, or null when none remain.
+        optional_pending:
+          type: array
+          items:
+            type: string
+          description: Ids of pending optional steps (never block completion).
 
     ScheduleConstraint:
       type: object
@@ -5334,6 +5416,166 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '502':
           description: Could not deliver the questions to the inbox
+
+  /v1/secretary/brief:
+    post:
+      operationId: secretaryBrief
+      summary: Propose grounded Work Briefs for the active context's structural gaps
+      description: >-
+        The light-vs-heavy seam. The cheap node-local Secretary no longer authors content one-shot (that
+        hallucinated). It detects STRUCTURAL gaps (empty/thin workspaces, stale content, off-target KPIs)
+        and assembles a grounded Work Brief — Current picture + real Discovery sources + exact record
+        schemas + the appdev MCP playbook — that a Builder (a connected big AI via the MCP tools) executes.
+        Deterministic (no paid AI call), idempotent (deduped against open briefs by gap), additive (never
+        touches content). Optional `ws` scopes to one workspace. Owner-only.
+      tags: [Secretary]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ws: { type: string, description: Optional workspace id to scope the brief to. }
+      responses:
+        '200':
+          description: Work briefs proposed (0 when no new gaps)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          proposed: { type: integer }
+                          workspaces: { type: integer }
+                          briefs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                objective: { type: string }
+                                ws: { type: string }
+                                wsName: { type: string }
+                                gaps: { type: integer }
+                                status: { type: string, example: proposed }
+        '400':
+          description: No active Secretary context with an organism to brief (NO_CONTEXT)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/secretary/briefs:
+    get:
+      operationId: secretaryBriefsList
+      summary: List the open Work Briefs (proposed/dispatched) for the brief tray
+      description: Owner-scoped private memory; includes the full brief markdown + MCP hints so the view renders without a second fetch. Owner-only.
+      tags: [Secretary]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Open Work Briefs, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          briefs:
+                            type: array
+                            items: { type: object }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/secretary/brief/{id}/dispatch:
+    post:
+      operationId: secretaryBriefDispatch
+      summary: Dispatch a Work Brief to a connected Builder (queue a task it runs via MCP)
+      description: >-
+        Queues the brief as an agent task a connected Builder picks up and runs via the appdev MCP tools
+        (lane b). The target must be one of THIS owner's connected agents and not the Secretary or a
+        node-local specialist. Marks the brief 'dispatched'. Owner-only.
+      tags: [Secretary]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetAgent]
+              properties:
+                targetAgent: { type: string, description: The Builder agent GAII (or name) to dispatch to. }
+      responses:
+        '200':
+          description: Brief dispatched; task queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          dispatched: { type: boolean }
+                          taskId: { type: string }
+                          to: { type: string }
+        '400':
+          description: Missing targetAgent, or the target is not a valid Builder (INVALID_TARGET)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Work brief not found
+
+  /v1/secretary/brief/{id}/done:
+    post:
+      operationId: secretaryBriefDone
+      summary: Resolve a Work Brief (handled or no longer relevant)
+      description: Marks the brief 'done' so it leaves the tray and the tick won't re-propose the same gap. Owner-only.
+      tags: [Secretary]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Brief resolved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          done: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Work brief not found
 
   # ── Device Authorization Flow (RFC 8628) ──────────────────
   /v1/agents/device-authorize:
@@ -25980,12 +26222,22 @@ paths:
                         properties:
                           onboarding:
                             $ref: '#/components/schemas/AgentOnboardingRecord'
+                          step_guide:
+                            type: object
+                            description: |
+                              Flow-scoped map of stepId -> OnboardingStepHowTo for the steps in this
+                              agent's onboarding flow. The authoritative how-to-complete contract a
+                              connector drives from (call howTo.tool with howTo.args per pending step).
+                            additionalProperties:
+                              $ref: '#/components/schemas/OnboardingStepHowTo'
+                          summary:
+                            $ref: '#/components/schemas/OnboardingSummary'
                           hints:
                             type: object
                             description: |
                               Next-step guidance for the agent. May include
-                              `next_step` (step id), `message` (human-readable),
-                              `test_task_id`, `test_task_active`.
+                              `next_step` (step id; now prefers the next required step),
+                              `message` (human-readable), `test_task_id`, `test_task_active`.
                             additionalProperties: true
                           post_onboarding_checklist:
                             type: object

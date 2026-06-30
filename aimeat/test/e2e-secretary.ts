@@ -82,6 +82,10 @@ import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as
 // P4-B: the read-only Enterprise directive merge layer — pure resolver, unit-tested with a fake seam
 // (the E2E server runs the open-core stub, so the live overlay is browser-verified on the dev server).
 import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates, isStalePersistedBrain } from '../src/services/secretary.js';
+// Work-tier seam (the light-vs-heavy redesign): the classifier + structural gap scan are PURE (no storage/
+// AI), unit-tested directly here. The storage-backed buildWorkBrief is exercised over HTTP / browser-verified.
+import { classifyWork, classifyIntent, needsHeavyEscalation, assessGaps, gapKey } from '../src/services/secretary-worktier.js';
+import { deriveObjective, deriveMcpHints, renderBriefMarkdown } from '../src/services/secretary-workbrief.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -519,6 +523,62 @@ await test('24c. Learning loop B: poorDecisionCluster needs a real cluster of po
     assert(poorDecisionCluster(poor(3, { proposalUsed: true }) as any, 'c1').length === 0, 'already-used decisions are excluded');
     const mixed = [...poor(3), { status: 'reviewed', score: 80, decision: 'good', contextId: 'c1' }];
     assert(poorDecisionCluster(mixed as any, 'c1').every(d => (d as any).score <= 50), 'only poor-scoring decisions are included');
+});
+
+await test('24d. work-tier classifier: light/specialist/heavy + intent + escalation', async () => {
+    assert(classifyWork('briefing') === 'light' && classifyWork('file_intake') === 'light', 'tick verbs are light');
+    assert(classifyWork('author_content') === 'heavy' && classifyWork('create_workspace') === 'heavy', 'structure/authoring is heavy');
+    assert(classifyWork('delegate') === 'specialist' && classifyWork('summarize') === 'specialist', 'produce-from-facts is specialist');
+    assert(classifyWork('totally_unknown') === 'light', 'unknown capability defaults to light');
+    assert(classifyIntent('please build a full marketing structure') === 'heavy', 'a build/structure verb → heavy');
+    assert(classifyIntent('remind me to call the dentist') === 'light', 'a reminder is light');
+    // The hallucination-killer: structural OR substantial OR no-source → heavy; only a grounded small task stays light.
+    assert(needsHeavyEscalation({ isStructural: true }) === true, 'structural → heavy');
+    assert(needsHeavyEscalation({ hasRealSource: false }) === true, 'no real source → heavy (never invent)');
+    assert(needsHeavyEscalation({ isStructural: false, isSubstantial: false, hasRealSource: true }) === false, 'grounded small task can stay light');
+});
+
+await test('24e. assessGaps: empty workspace, empty space, stale, off-target KPI (structural, pure)', async () => {
+    const now = Date.parse('2026-07-01T00:00:00Z');
+    const summaries = [
+        // all-empty workspace → exactly ONE empty-workspace gap, never per-space.
+        { ws: 'w1', name: 'Empty', readable: true, spaces: [{ name: 'Notes', namespace: 'meta.notes', mode: 'document', total: 0 }], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null },
+        // populated workspace with one empty space + stale + an off-target KPI.
+        { ws: 'w2', name: 'Active', readable: true,
+            spaces: [
+                { name: 'Docs', namespace: 'meta.docs', mode: 'document', total: 2 },
+                { name: 'Leads', namespace: 'meta.leads', mode: 'records', total: 0 },
+            ],
+            objectives: [{ statement: 'Grow', kpis: [{ name: 'Coverage', current: 40, target: { op: '>=', value: 80 } }] }],
+            totalRecords: 2, totalDocuments: 2, lastActivity: '2026-01-01T00:00:00Z' },
+        // unreadable → skipped entirely.
+        { ws: 'w3', name: 'Secret', readable: false, spaces: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null },
+    ];
+    const gaps = assessGaps(summaries as any, { now, freshnessDays: 30 });
+    const kinds = gaps.map(g => `${g.ws}:${g.kind}`);
+    assert(kinds.includes('w1:empty-workspace'), 'all-empty → empty-workspace');
+    assert(!kinds.includes('w1:empty-space'), 'all-empty does NOT also report per-space');
+    assert(kinds.includes('w2:empty-space'), 'a single empty space in a populated ws is reported');
+    assert(kinds.includes('w2:stale'), 'old lastActivity → stale');
+    assert(kinds.includes('w2:kpi-off-target'), '40 < 80 → off target');
+    assert(!gaps.some(g => g.ws === 'w3'), 'unreadable workspace is skipped');
+    assert(gapKey({ ws: 'w2', kind: 'empty-space', namespace: 'meta.leads' }) === 'w2:empty-space:meta.leads', 'gapKey distinguishes namespace');
+});
+
+await test('24f. work brief: objective derivation + MCP playbook + markdown render (pure)', async () => {
+    const gapsEmpty = [{ ws: 'w1', wsName: 'Marketing', kind: 'empty-workspace', detail: 'Workspace "Marketing" has no content yet.' }];
+    assert(/build out workspace "marketing"/i.test(deriveObjective(gapsEmpty as any, 'Marketing')), 'empty-workspace → build-out objective');
+    const gapsSpace = [{ ws: 'w1', wsName: 'CRM', kind: 'empty-space', detail: '', spaceName: 'Leads', namespace: 'meta.leads', spaceMode: 'records' }];
+    assert(/fill the empty space/i.test(deriveObjective(gapsSpace as any, 'CRM')), 'empty-space → fill objective');
+    const hints = deriveMcpHints(gapsEmpty as any, 'org1', 'w1');
+    assert(hints.some(h => h.includes('aimeat_organism_overview')) && hints.some(h => h.includes('aimeat_workspace_write')), 'playbook names the real MCP tools');
+    const md = renderBriefMarkdown({
+        objective: 'Build out workspace "Marketing".', ownerName: 'alice', contextName: 'Personal', organismId: 'org1', ws: 'w1', wsName: 'Marketing',
+        whyLines: ['Goal: launch campaign'], currentPicture: '# Marketing — structure overview', sources: [], recordSchemas: [], gaps: gapsEmpty as any, mcpHints: hints,
+    });
+    assert(md.includes('# Work brief') && md.includes('## Current picture') && md.includes('## Boundaries'), 'brief has the key sections');
+    assert(/rather than invent|do not invent|not fabricate/i.test(md), 'the never-invent boundary is present');
+    assert(md.includes('No existing material was found'), 'empty sources → ask-for-facts guidance, never invent');
 });
 
 // Fresh owner with a clean slate (no goals / decisions) for the deterministic tick-guard HTTP paths.
@@ -1495,16 +1555,71 @@ await test('79. Strategy: a context carrying vision/mission/principles/risks/cur
     assert(s.milestones[0].status === 'reached' && s.milestones[0].goalRefs[0] === 'g-1' && s.milestones[1].status === 'in-progress', `milestones: ${JSON.stringify(s.milestones).slice(0, 200)}`);
 });
 
-await test('80. Setup-authoring endpoint: refuses when there is no Secretary context to fill (failure mode)', async () => {
-    // A fresh owner with no secretary.config → /author-now has nothing to fill → 400 NO_CONTEXT (never 500).
+await test('80. Work-brief endpoint: refuses when there is no Secretary context to brief (failure mode)', async () => {
+    // A fresh owner with no secretary.config → /brief has nothing to brief → 400 NO_CONTEXT (never 500).
     const o = `secauthor${Date.now()}`;
     const tok = await registerOwner(o);
-    const r = await json('/v1/secretary/author-now', { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: '{}' });
+    const r = await json('/v1/secretary/brief', { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: '{}' });
     assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
     assert(r.body?.error?.code === 'NO_CONTEXT', `expected NO_CONTEXT, got ${r.body?.error?.code}`);
     // Unauthenticated is rejected too.
-    const u = await json('/v1/secretary/author-now', { method: 'POST', body: '{}' });
+    const u = await json('/v1/secretary/brief', { method: 'POST', body: '{}' });
     assert(u.status === 401 || u.status === 403, `unauth rejected, got ${u.status}`);
+});
+
+await test('80b. Work-brief endpoint: an empty workspace yields a grounded brief; GET /briefs lists it (happy path)', async () => {
+    // Isolated owner: a self-organism with one workspace that has a manifest but NO content → an
+    // empty-workspace gap → exactly one Work Brief, deterministic (no AI key needed). The cheap Secretary
+    // proposes the heavy work for a Builder; it never authors the content itself.
+    const o = `secbrief${Date.now()}`;
+    const tok = await registerOwner(o);
+    const auth = { Authorization: `Bearer ${tok}` };
+    // Self-organism.
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth, body: JSON.stringify({ name: 'Brief Space', description: 'brief test', visibility: 'private', join_policy: 'open' }) });
+    assert(org.status === 201, `org create: ${org.status} ${JSON.stringify(org.body).slice(0, 160)}`);
+    const orgId = org.body.data.organism.id;
+    // Registry + a workspace manifest (one memory-backed document space, empty).
+    await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: 'ws-a', name: 'Plan', createdAt: new Date().toISOString(), createdBy: o }] }, visibility: 'private' }) });
+    const manifest = { manifestVersion: '1.0', id: 'ws-a', name: 'Plan', kind: 'project', status: 'active', objectTypes: [{ name: 'Notes', schemaRef: 'schema:notes@1', namespace: 'meta.notes', backing: 'memory', writeRole: 'owner', mode: 'document' }] };
+    const manW = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: `organism.${orgId}.w.ws-a.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(manW.status === 200 || manW.status === 201, `manifest write: ${manW.status} ${JSON.stringify(manW.body).slice(0, 200)}`);
+    const manR = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.w.ws-a.meta.manifest`)}`, { headers: auth });
+    assert(manR.status === 200 && Array.isArray(manR.body?.data?.value?.objectTypes), `manifest readback: ${manR.status} ${JSON.stringify(manR.body?.data).slice(0, 200)}`);
+    // A secretary.config whose ACTIVE context points at this organism.
+    await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'secretary.config', value: { activeContextId: 'c1', contexts: [{ id: 'c1', name: 'Personal', organismId: orgId, organismName: 'Brief Space', policy: { bands: {} } }] }, visibility: 'private' }) });
+
+    const r = await json('/v1/secretary/brief', { method: 'POST', headers: auth, body: '{}' });
+    assert(r.status === 200, `brief: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert(r.body?.data?.proposed >= 1, `expected ≥1 brief proposed, got ${JSON.stringify(r.body?.data)}`);
+    assert(r.body.data.briefs[0].ws === 'ws-a', `brief targets ws-a: ${JSON.stringify(r.body.data.briefs[0])}`);
+
+    // Idempotent: a second call proposes nothing new (the gap is already covered by the open brief).
+    const r2 = await json('/v1/secretary/brief', { method: 'POST', headers: auth, body: '{}' });
+    assert(r2.body?.data?.proposed === 0, `second call should be idempotent, got ${r2.body?.data?.proposed}`);
+
+    // GET /briefs lists it with the full markdown + MCP hints for the tray.
+    const list = await json('/v1/secretary/briefs', { headers: auth });
+    assert(list.status === 200 && Array.isArray(list.body.data.briefs) && list.body.data.briefs.length === 1, `briefs list: ${JSON.stringify(list.body.data).slice(0, 200)}`);
+    const b = list.body.data.briefs[0];
+    assert(typeof b.brief === 'string' && b.brief.includes('Work brief') && b.brief.includes('Boundaries'), 'brief markdown is rendered');
+    assert(Array.isArray(b.mcpHints) && b.mcpHints.some((h: string) => h.includes('aimeat_workspace_write')), 'brief carries the MCP playbook');
+    assert(b.status === 'proposed', `brief status proposed: ${b.status}`);
+
+    // Dispatch failure modes (no real Builder is connected in E2E): unknown brief → 404, bogus target → 400.
+    const dNF = await json('/v1/secretary/brief/does-not-exist/dispatch', { method: 'POST', headers: auth, body: JSON.stringify({ targetAgent: `x#${o}@${NODE_ID}` }) });
+    assert(dNF.status === 404, `dispatch unknown brief → 404, got ${dNF.status}`);
+    const dBad = await json(`/v1/secretary/brief/${b.id}/dispatch`, { method: 'POST', headers: auth, body: JSON.stringify({ targetAgent: `ghost#${o}@${NODE_ID}` }) });
+    assert(dBad.status === 400 && dBad.body?.error?.code === 'INVALID_TARGET', `dispatch bogus target → 400 INVALID_TARGET, got ${dBad.status} ${dBad.body?.error?.code}`);
+
+    // Resolve it: 'done' removes it from the tray AND suppresses re-proposal of the same gap.
+    const done = await json(`/v1/secretary/brief/${b.id}/done`, { method: 'POST', headers: auth, body: '{}' });
+    assert(done.status === 200 && done.body?.data?.done === true, `done: ${done.status} ${JSON.stringify(done.body).slice(0, 120)}`);
+    const list2 = await json('/v1/secretary/briefs', { headers: auth });
+    assert((list2.body.data.briefs || []).length === 0, `done brief leaves the tray: ${JSON.stringify(list2.body.data.briefs).slice(0, 120)}`);
+    const r3 = await json('/v1/secretary/brief', { method: 'POST', headers: auth, body: '{}' });
+    assert(r3.body?.data?.proposed === 0, `a resolved gap is not re-proposed, got ${r3.body?.data?.proposed}`);
+
+    await json(`/v1/owners/${encodeURIComponent(o)}`, { method: 'DELETE', headers: auth });
 });
 
 console.log('\nCleanup');

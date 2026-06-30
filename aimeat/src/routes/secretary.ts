@@ -9,10 +9,15 @@
  * @structure secretaryRouter(config, storage, peers) -> Router
  *   - POST /v1/secretary/clarify     — send the questions secretary#owner→owner + store the produce job
  *   - POST /v1/secretary/reset       — wipe the owner's Secretary back to zero (start over)
- *   - POST /v1/secretary/author-now  — fill the active context's workspaces with REAL content at setup
- *     (reuses services/secretary-authoring) + remove any workspace left empty ("empty = useless")
+ *   - POST /v1/secretary/brief       — propose grounded Work Briefs for the active context's gaps (heavy
+ *     work is DISPATCHED to a Builder, not authored here); deterministic + idempotent, never touches content
+ *   - GET  /v1/secretary/briefs      — list the open Work Briefs (proposed/dispatched) for the brief tray
  * @usage app.use(secretaryRouter(config, storage, peers));
  * @version-history
+ *   v0.4.0 — 2026-07-01 — Light-vs-heavy seam: REPLACED author-now (cheap one-shot authoring that
+ *     hallucinated) with POST /v1/secretary/brief — the Secretary detects structural gaps and proposes a
+ *     grounded Work Brief a Builder executes via the appdev MCP tools, instead of inventing content. Adds
+ *     GET /v1/secretary/briefs for the brief tray. See services/secretary-workbrief + secretary-worktier.
  *   v0.3.0 — 2026-06-30 — author-now: fill workspaces with real content at handshake (documents first,
  *     schema-valid records, agentic retry) instead of waiting for a tick, and drop any still-empty
  *     workspace. Pairs with the Secretary setup skipping fake "example-N" placeholder records.
@@ -35,7 +40,8 @@ import { listSpecialists, deleteSpecialistConfig } from '../services/specialist.
 import { getActiveScheduler } from '../services/scheduler.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { authorWorkspaceContent, type AuthoringContext } from '../services/secretary-authoring.js';
+import { proposeWorkBriefs, updateBriefStatus, BRIEF_KEY_PREFIX, type WorkBrief, type BriefContext } from '../services/secretary-workbrief.js';
+import { randomUUID } from 'node:crypto';
 
 const ClarifySchema = z.object({
   contextId: z.string().min(1).max(200),
@@ -182,63 +188,127 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
     }
   });
 
-  // ── POST /v1/secretary/author-now ── fill the active context's workspaces with REAL content at SETUP
-  //    ("heti kättelyssä"), reusing the tested authoring service (documents first, schema-valid records,
-  //    agentic retry on flaky models). NEVER deletes a workspace — additive only. (An earlier version
-  //    removed "empty" workspaces after authoring; when the fill produced nothing it nuked ALL the user's
-  //    freshly-created workspaces, leaving an organism with zero spaces. Auto-deleting the owner's
-  //    workspaces is never acceptable, so authoring only ever ADDS content; empties simply stay.)
-  //    Runs as a one-time act-band pass; the persisted band is untouched. Synchronous: the caller waits
-  //    (a slow model can take a while), so call it with a long client timeout.
-  router.post('/v1/secretary/author-now', requireAuth(), requireRole('owner'), async (req, res) => {
+  // ── POST /v1/secretary/brief ── propose grounded Work Briefs for the active context's workspaces (the
+  //    heavy-work path). The cheap Secretary NO LONGER authors content one-shot (it hallucinated and went
+  //    "onto the Builders' turf"); instead it detects structural gaps (empty/thin workspaces, stale content,
+  //    off-target KPIs) and assembles a brief — Current picture + real Discovery sources + exact schemas +
+  //    MCP playbook — that a Builder (a connected big AI via the appdev MCP tools) executes. Deterministic
+  //    (no paid AI call), idempotent (deduped against open briefs by gap), additive (never touches content).
+  //    Optional `ws` scopes to one workspace. The view then offers "Open in Claude Desktop" / dispatch.
+  const BriefSchema = z.object({ ws: z.string().max(200).optional() });
+  router.post('/v1/secretary/brief', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
     const ownerGhii = `${owner}@${config.nodeId}`;
+    const parsed = BriefSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues[0]?.message || 'Invalid brief payload'));
+      return;
+    }
     try {
       const cfgRec = await storage.getMemory(ownerGhii, 'secretary.config');
-      const cfg = (cfgRec?.value ?? {}) as { contexts?: AuthoringContext[]; activeContextId?: string };
+      const cfg = (cfgRec?.value ?? {}) as { contexts?: BriefContext[]; activeContextId?: string };
       const contexts = Array.isArray(cfg.contexts) ? cfg.contexts : [];
       const active = contexts.find((c) => c.id === cfg.activeContextId) || contexts[0];
       if (!active || !active.organismId) {
-        res.status(400).json(error(config.nodeId, 'NO_CONTEXT', 'No active Secretary context with an organism to fill.'));
+        res.status(400).json(error(config.nodeId, 'NO_CONTEXT', 'No active Secretary context with an organism to brief.'));
         return;
       }
       const orgId = active.organismId;
 
-      // Open goals for this context steer what gets authored.
+      // Open goals for this context steer the brief's "why".
       const goalRecs = await storage.listMemory(ownerGhii, { prefix: 'secretary.goal.' }).catch(() => []);
       const openGoals = goalRecs
         .map((r) => (r.value ?? {}) as Record<string, unknown>)
         .filter((g) => g.status === 'open' && (!g.contextId || g.contextId === active.id));
 
-      // Honour the owner's autoRetry/maxRetries (flaky models retry instead of dying).
-      const aiPrefs = (await storage.getMemory(ownerGhii, 'openrouter.settings'))?.value as { autoRetry?: boolean; maxRetries?: number } | undefined;
-      const maxRetries = aiPrefs?.autoRetry === false ? 0 : (typeof aiPrefs?.maxRetries === 'number' ? aiPrefs.maxRetries : 3);
-
       const regKey = `organism.${orgId}.meta.workspaces`;
       const regRec = await storage.getMemory(ownerGhii, regKey);
       const wsEntries = ((regRec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
       let wsList = wsEntries.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
-      // Optional `ws`: fill just ONE workspace, so the setup UI can fill them one at a time and show
-      // live per-workspace progress instead of one long opaque call.
-      const onlyWs = typeof (req.body as { ws?: unknown })?.ws === 'string' ? (req.body as { ws: string }).ws : null;
+      const onlyWs = parsed.data.ws;
       if (onlyWs) wsList = wsList.filter((w) => w.id === onlyWs);
 
-      // Author real content (act → publish), reusing the agentic, doc-first, retrying service. ADDITIVE
-      // ONLY — a workspace that the fill couldn't populate stays exactly as it is; nothing is ever deleted.
-      const authored = await authorWorkspaceContent(storage, config, ownerGhii, owner, active, wsList, {
-        openGoals, band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries,
-        retryOnEmpty: true, appId: 'setup:author',
-      });
+      const { briefs } = await proposeWorkBriefs(storage, config, { ownerGhii, ownerName: owner, active, wsList, openGoals });
+      emitChange('agents');
+      logger.info('[secretary] brief', { owner, proposed: briefs.length, workspaces: wsList.length });
+      res.json(success(config.nodeId, {
+        briefs: briefs.map((b) => ({ id: b.id, objective: b.objective, ws: b.ws, wsName: b.wsName, gaps: b.gaps.length, status: b.status })),
+        proposed: briefs.length, workspaces: wsList.length,
+      }, [{ description: 'Open the Secretary', method: 'GET', url: '/v1/secretary' }]));
+    } catch (err) {
+      logger.error('[secretary] brief failed', { owner, error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to build work briefs'));
+    }
+  });
 
-      emitChange('organisms');
-      logger.info('[secretary] author-now', { owner, authored: authored.summaries.length, workspaces: wsList.length, morsels: authored.morsels });
-      res.json(success(config.nodeId, { authored: authored.summaries, workspaces: wsList.length, morsels: authored.morsels }, [
-        { description: 'Open the workspaces', method: 'GET', url: `/v1/profile?tab=organisms&org=${orgId}` },
+  // ── GET /v1/secretary/briefs ── list the open Work Briefs (proposed/dispatched) for the brief tray, newest
+  //    first. Owner-scoped private memory; the full brief markdown + MCP hints are included so the view can
+  //    render "Open in Claude Desktop" without a second fetch.
+  router.get('/v1/secretary/briefs', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const recs = await storage.listMemory(ownerGhii, { prefix: BRIEF_KEY_PREFIX }).catch(() => []);
+    const briefs = recs
+      .map((r) => r.value as unknown as WorkBrief)
+      .filter((b) => b && (b.status === 'proposed' || b.status === 'dispatched'))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+    res.json(success(config.nodeId, { briefs }));
+  });
+
+  // ── POST /v1/secretary/brief/:id/dispatch ── queue a Work Brief as a task a connected Builder picks up
+  //    and runs via the appdev MCP tools (lane b). The Builder is any of THIS owner's connected agents that
+  //    is NOT the Secretary (the watcher) or a node-local specialist. Marks the brief 'dispatched'.
+  const DispatchSchema = z.object({ targetAgent: z.string().min(1).max(300) });
+  router.post('/v1/secretary/brief/:id/dispatch', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const briefId = req.params.id as string;
+    const parsed = DispatchSchema.safeParse(req.body ?? {});
+    if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'targetAgent is required')); return; }
+    try {
+      const rec = await storage.getMemory(ownerGhii, `${BRIEF_KEY_PREFIX}${briefId}`);
+      if (!rec) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work brief not found')); return; }
+      const brief = rec.value as unknown as WorkBrief;
+      // Resolve + authorize the target Builder: it must be one of THIS owner's agents, and not the Secretary
+      // or a node-local specialist (those are not Builders — heavy work goes to a big external AI via MCP).
+      const agent = await storage.getAgent(parsed.data.targetAgent);
+      if (!agent || agent.owner !== owner) { res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'Unknown Builder for this owner')); return; }
+      const tags = agent.tags || [];
+      if (tags.includes('system:secretary') || tags.includes('system:specialist')) {
+        res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'Pick a connected Builder (a big AI), not the Secretary or a specialist'));
+        return;
+      }
+      const now = new Date().toISOString();
+      const taskId = randomUUID();
+      await storage.createAgentTask({
+        id: taskId, agentGaii: agent.gaii, ownerGaii: ownerGhii,
+        title: String(brief.objective || 'Work brief').slice(0, 200), description: String(brief.brief || '').slice(0, 20000),
+        scope: [], rules: [], verification: { userExpects: String(brief.objective || ''), technicalChecks: [] }, todos: [],
+        status: 'queued', parentTaskId: `brief:${briefId}`, createdAt: now, updatedAt: now,
+      });
+      await updateBriefStatus(storage, ownerGhii, briefId, { status: 'dispatched', dispatchedTo: agent.gaii, taskId });
+      emitChange('agent-tasks', ownerGhii);
+      emitChange('agents');
+      logger.info('[secretary] brief dispatched', { owner, briefId, to: agent.gaii, taskId });
+      res.json(success(config.nodeId, { dispatched: true, taskId, to: agent.gaii }, [
+        { description: 'Track the task', method: 'GET', url: `/v1/agents/${encodeURIComponent(agent.name)}/tasks` },
       ]));
     } catch (err) {
-      logger.error('[secretary] author-now failed', { owner, error: (err as Error).message });
-      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to author workspace content'));
+      logger.error('[secretary] brief dispatch failed', { owner, briefId, error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to dispatch the brief'));
     }
+  });
+
+  // ── POST /v1/secretary/brief/:id/done ── resolve a Work Brief (the owner handled it, or it's no longer
+  //    relevant). Marks it 'done' so it leaves the tray; the tick won't re-propose the same gap.
+  router.post('/v1/secretary/brief/:id/done', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const briefId = req.params.id as string;
+    const updated = await updateBriefStatus(storage, ownerGhii, briefId, { status: 'done' });
+    if (!updated) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work brief not found')); return; }
+    emitChange('agents');
+    res.json(success(config.nodeId, { done: true }));
   });
 
   return router;

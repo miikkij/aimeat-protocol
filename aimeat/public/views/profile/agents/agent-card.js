@@ -3,6 +3,8 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.18.0 -- 2026-06-30 -- Onboarding step labels use tOr() so a missing agentOnboarding.steps.*
+ *     key falls back to the server-provided step.title instead of rendering the raw key.
  *   v1.17.0 -- 2026-06-24 -- Secretary P5 (S-A): render a "Specialist · <role>" badge for agents tagged
  *     system:specialist, so the new specialist agent type is recognizable in the Agents tab.
  *   v1.16.0 -- 2026-06-21 -- Unseen-change badges are now has-unseen DOTS (no count) — the
@@ -59,7 +61,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { detectAgentState, getDefaultTab, getStateColor } from './state-detector.js';
@@ -437,7 +439,7 @@ function renderCollapsedStats(state, agent, onboarding) {
       return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} | ${t('profile.agents.detail.state.newSummary')}`;
     case 'onboarding': {
       const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${t('agentOnboarding.steps.' + nextStep.id) || nextStep.title || nextStep.id}` : ''}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}` : ''}`;
     }
     case 'problem':
       return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
@@ -483,7 +485,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
         <div class="pf-agd-zone2 pf-agd-zone2--onboarding">
           <div class="pf-agd-zone2-title">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
-            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${t('agentOnboarding.steps.' + nextStep.id) || nextStep.title || nextStep.id}</span>` : ''}
+            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}</span>` : ''}
           </div>
           <div class="pf-agd-progress-bar">
             <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
@@ -491,7 +493,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
           <div class="pf-agd-step-pills">
             ${steps.map(s => html`
               <span key=${s.id} class="pf-agd-step-pill pf-agd-step-pill--${s.status}">
-                ${s.status === 'passed' ? '✓' : '○'} ${t('agentOnboarding.steps.' + s.id) || s.title || s.id}
+                ${s.status === 'passed' ? '✓' : '○'} ${tOr('agentOnboarding.steps.' + s.id, s.title || s.id)}
               </span>
             `)}
           </div>

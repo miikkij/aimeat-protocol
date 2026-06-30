@@ -63,6 +63,15 @@ export function t(key, vars) {
   return str;
 }
 
+/** Translate a key, but fall back to `fallbackText` when the key is missing.
+ *  t() returns the raw key string on a miss (truthy), which defeats the common
+ *  `t(key) || serverProvidedTitle` pattern -- use this when a server-provided
+ *  label should win over a raw key. */
+export function tOr(key, fallbackText, vars) {
+  const val = t(key, vars);
+  return val === key ? (fallbackText ?? key) : val;
+}
+
 /** Get current locale. */
 export function getLocale() {
   return currentLocale;

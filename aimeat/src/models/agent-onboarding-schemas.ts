@@ -24,6 +24,10 @@
  *                            -- no runtime config, slash commands, telemetry, or
  *                            task queue -- so it gets the narrowest 4-step flow
  *                            (auth + platform + capabilities + directives).
+ *   v1.4.0 -- 2026-06-30 -- Add StepHowTo + STEP_HOWTO + getStepHowTo: the authoritative
+ *                            machine-readable stepId -> {tool, args} map a connector drives
+ *                            from (instead of fabricating aimeat_onboarding_<stepId>). Frozen
+ *                            and pinned by the contract-freeze test.
  */
 
 import { z } from 'zod';
@@ -101,6 +105,155 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'make_workflow_compatible', order: 15, title: 'Make an Offer Workflow-Compatible', description: STEP_DESCRIPTIONS.make_workflow_compatible, required: false, validationMethod: 'automatic' },
   { id: 'price_offer', order: 16, title: 'Price an Offer', description: STEP_DESCRIPTIONS.price_offer, required: false, validationMethod: 'automatic' },
 ];
+
+export type StepActor = 'agent' | 'server';
+
+/**
+ * Machine-readable "how to complete this step" descriptor. This is THE authoritative
+ * stepId -> {tool, args} contract a connector drives from, instead of fabricating a
+ * non-existent `aimeat_onboarding_<stepId>` tool. Surfaced per-step (as `howTo`) and as a
+ * top-level `step_guide` in both the REST GET /onboarding and MCP aimeat_onboarding_status
+ * payloads via services/onboarding-guide.ts.
+ */
+export interface StepHowTo {
+  /** Who performs the action: the agent calls a tool, or the server validates passively. */
+  actor: StepActor;
+  /** true when the server auto-ticks this step by reading real state (checkAutoSteps or /start),
+   *  with no dedicated confirm call. false for the four api_call confirm steps. */
+  automatic: boolean;
+  /** Mirrors StepDefinition.required: true when this step gates onboarding completion. */
+  gatesCompletion: boolean;
+  validationMethod: 'automatic' | 'api_call' | 'owner_confirm';
+  /** Exact MCP tool the agent calls to complete this step, or null for passive/server steps.
+   *  There is NO aimeat_onboarding_<stepId> tool beyond the five named here -- for every other
+   *  step the agent calls the real tool below, NEVER a fabricated onboarding-prefixed name. */
+  tool: string | null;
+  /** Local-connector convenience that maps to the same effect (e.g. the offers ladder can be
+   *  published with aimeat_offers_publish instead of a raw aimeat_memory_write). */
+  toolAlias?: string;
+  /** Underlying REST route for non-MCP clients; null for passive steps. */
+  restEndpoint: { method: 'GET' | 'POST' | 'PUT' | 'PATCH'; path: string } | null;
+  /** Copyable argument template. `{name}` is substituted with the agent's short name at emit time;
+   *  `{test_task_id}` is filled by the caller from the status payload's hints.test_task_id. */
+  args?: Record<string, unknown>;
+  /** For tool === null steps: the condition under which the server auto-passes the step. */
+  passiveNote?: string;
+}
+
+/**
+ * The frozen stepId -> howTo table. `gatesCompletion` and `validationMethod` MUST stay in
+ * lockstep with STEP_DEFINITIONS (asserted by the contract-freeze test in
+ * test/e2e-agent-onboarding.ts). Renaming any tool/step id is a contract break -- the same
+ * test pins the 16 step ids and the 5 aimeat_onboarding_* tool names.
+ */
+export const STEP_HOWTO: Readonly<Record<OnboardingStepId, StepHowTo>> = Object.freeze({
+  authenticate: {
+    actor: 'server', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: null, restEndpoint: null,
+    passiveNote: 'Auto-passed when the agent record exists; granted at POST /v1/agents/{name}/onboarding/start.',
+  },
+  identify_platform: {
+    actor: 'agent', automatic: false, gatesCompletion: true, validationMethod: 'api_call',
+    tool: 'aimeat_onboarding_identify_platform',
+    restEndpoint: { method: 'POST', path: '/v1/agents/{name}/onboarding/step/identify_platform' },
+    args: { platform: 'claude', platform_version: '' },
+  },
+  install_skill: {
+    actor: 'agent', automatic: false, gatesCompletion: true, validationMethod: 'api_call',
+    tool: 'aimeat_onboarding_confirm_skill_installed',
+    restEndpoint: { method: 'POST', path: '/v1/agents/{name}/onboarding/step/install_skill' },
+    args: { platform: 'generic', version: 'local' },
+  },
+  report_capabilities: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_agent_capabilities_report',
+    restEndpoint: { method: 'PUT', path: '/v1/agents/me/capabilities' },
+    args: { technical: [{ name: 'web-research', type: 'skill' }], domain: ['news'] },
+  },
+  read_directives: {
+    actor: 'agent', automatic: false, gatesCompletion: true, validationMethod: 'api_call',
+    tool: 'aimeat_onboarding_confirm_directives_read',
+    restEndpoint: { method: 'POST', path: '/v1/agents/{name}/onboarding/step/read_directives' },
+    args: { confirmed: true },
+  },
+  send_test_message: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_message_send',
+    restEndpoint: { method: 'POST', path: '/v1/agents/me/messages' },
+    args: { content: 'Hello Integration test message from {name}.' },
+  },
+  configure_delivery: {
+    actor: 'server', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: null, restEndpoint: null,
+    passiveNote: 'Auto-passes when a webhook is registered OR the agent was seen within 10 minutes (polling). Keep your watchdog running, or PUT /v1/agents/me/webhook.',
+  },
+  report_telemetry: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_agent_telemetry_report',
+    restEndpoint: { method: 'POST', path: '/v1/agents/me/telemetry' },
+    args: { type: 'agent_report', data: { status: 'healthy' } },
+  },
+  accept_test_task: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_task_propose_todos',
+    restEndpoint: { method: 'PATCH', path: '/v1/agents/me/tasks/{test_task_id}' },
+    args: { task_id: '{test_task_id}', todos: [{ title: 'Complete the onboarding test task', verification: 'Task status becomes done' }] },
+  },
+  complete_test_task: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_task_complete',
+    restEndpoint: { method: 'POST', path: '/v1/agents/me/tasks/{test_task_id}/complete' },
+    args: { task_id: '{test_task_id}', message: 'Onboarding test task complete' },
+  },
+  publish_commands: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    args: { key: 'agents.{name}.commands', value: [{ name: '/status', description: 'Report current status', category: 'meta' }] },
+  },
+  publish_config: {
+    actor: 'agent', automatic: true, gatesCompletion: true, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    args: { key: 'agents.config.{name}.connector', value: { runtime: 'crewai', delivery: 'polling' } },
+  },
+  declare_services: {
+    actor: 'agent', automatic: false, gatesCompletion: false, validationMethod: 'api_call',
+    tool: 'aimeat_onboarding_declare_services',
+    restEndpoint: { method: 'POST', path: '/v1/agents/{name}/onboarding/step/declare_services' },
+    args: { services: [] },
+  },
+  declare_offerings: {
+    actor: 'agent', automatic: true, gatesCompletion: false, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write', toolAlias: 'aimeat_offers_publish',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    args: { key: 'agents.{name}.offers', value: { version: 1, offers: [{ id: 'example', title: 'Example offer', ask: 'Plain-language invite describing what this agent does.' }] } },
+  },
+  make_workflow_compatible: {
+    actor: 'agent', automatic: true, gatesCompletion: false, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write', toolAlias: 'aimeat_offers_publish',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    args: { key: 'agents.{name}.offers', value: { version: 1, offers: [{
+      id: 'example', title: 'Example offer', ask: 'Plain-language invite describing what this agent does.',
+      success_signal: { kind: 'deterministic', key: 'agents.{name}.out.example', op: 'exists' },
+      required_to_function: 'none',
+      deliverable: { format: 'document', location: { key: 'agents.{name}.out.example' } },
+    }] } },
+  },
+  price_offer: {
+    actor: 'agent', automatic: true, gatesCompletion: false, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write', toolAlias: 'aimeat_offers_publish',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    args: { key: 'agents.{name}.offers', value: { version: 1, offers: [{
+      id: 'example', title: 'Example offer', ask: 'Plain-language invite describing what this agent does.',
+      price: { morsels: 10, unit: 'per-call' }, visibility: 'public', callable: { action_id: 'example-action' },
+    }] } },
+  },
+});
+
+export function getStepHowTo(stepId: string): StepHowTo | undefined {
+  return (STEP_HOWTO as Record<string, StepHowTo>)[stepId];
+}
 
 /**
  * Steps included when a task-runner agent is onboarded. Task-runners have no

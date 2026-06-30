@@ -11,6 +11,11 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.25.0 — 2026-07-01 — Light-vs-heavy seam: setup no longer cheap-authors content (that hallucinated).
+ *     applyResult now CREATES the workspace structure and then proposes grounded Work Briefs (POST
+ *     /v1/secretary/brief) the user hands to a Builder (a connected big AI via the appdev MCP tools). Drops
+ *     the per-workspace author-now fill loop + the author_content band. The dashboard brief tray (cards)
+ *     renders the briefs with "Open in Claude Desktop" / "Send to a connected Builder".
  *   v0.24.0 — 2026-06-30 — Never-empty + honest fill result. normalizeInlineManifest now GUARANTEES every
  *     workspace has a document space (appends a "Muistiinpanot" doc space when the design gave only records
  *     spaces) so the setup fill always has a thinking-home, and is genuinely document-first for unspecified
@@ -94,11 +99,11 @@ import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
 import { createOrganism, createWorkspace, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
-import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
+import { defaultPolicy, mergePolicy, autonomyPreset } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, normalizeStrategy, MILESTONE_STATUSES, buildStrategyReplanPrompt, linkMilestoneGoals, keepKnownGoalRefs, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
 import { createResourceCard, knowledgeCard, accessCard, crewCard } from '/views/secretary/cards-reach.js';
-import { quickActionRow, dashStatus, standPanel, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard, strategyCard } from '/views/secretary/dashboard.js';
+import { quickActionRow, dashStatus, standPanel, briefTrayCard, whatsNextPanel, actionItemsCard, routinesCard, triggersCard, quickActionsManager, manageHeader, workflowDesignPanel, secretaryDangerCard, strategyCard } from '/views/secretary/dashboard.js';
 import { fetchWorkflowOffers, designWorkflow, saveDesignedWorkflow, slugifyWorkflowId } from '/views/secretary/workflow-design.js';
 import { useSpecialists, specialistsCard } from '/views/secretary/use-specialists.js';
 import { useIntake } from '/views/secretary/use-intake.js';
@@ -130,6 +135,9 @@ export default function SecretaryView() {
   const [secretary, setSecretary] = useState(undefined); // undefined=loading, null=not provisioned
   const [hasOpenRouterKey, setHasOpenRouterKey] = useState(false); // owner has an OpenRouter key configured
   const [config, setConfig] = useState(null);            // { contexts:[...], activeContextId }
+  const [briefs, setBriefs] = useState([]);              // open Work Briefs (heavy work to hand a Builder)
+  const [builders, setBuilders] = useState([]);          // connected big-AI agents (not Secretary / specialists)
+  const [dispatching, setDispatching] = useState('');    // briefId currently being dispatched
   const [result, setResult] = useState('');
   const [needs, setNeeds] = useState('');
   const [applying, setApplying] = useState(false);
@@ -184,16 +192,41 @@ export default function SecretaryView() {
     const sec = agents.find((a) => (a.tags || []).includes('system:secretary'))
       || agents.find((a) => a.name === 'secretary') || null;
     setSecretary(sec);
+    // Builders = connected big-AI agents the heavy work is dispatched to — anything that is NOT the
+    // Secretary (the watcher) and NOT a node-local specialist. These are visually distinct in the brief tray.
+    setBuilders(agents.filter((a) => a && a.name !== 'secretary'
+      && !(a.tags || []).includes('system:secretary') && !(a.tags || []).includes('system:specialist')));
     if (!sec) return;
-    const [dir, cfg] = await Promise.all([
+    const [dir, cfg, briefResp] = await Promise.all([
       apiGet('/v1/agents/secretary/directives').catch(() => null),
       apiGet('/v1/memory/secretary.config').catch(() => null),
+      apiGet('/v1/secretary/briefs').catch(() => null),
     ]);
+    setBriefs((briefResp && briefResp.data && briefResp.data.briefs) || []);
     const rawCfg = (cfg && cfg.data && cfg.data.value) || null;
     const { config: normalized, changed } = migrateConfig(rawCfg, dir && dir.data);
     if (changed) await apiPost('/v1/memory', { key: 'secretary.config', value: normalized, visibility: 'private' }).catch(() => {});
     setConfig(normalized);
   }, []);
+
+  // Dispatch a Work Brief to a connected Builder (lane b): queues a task the Builder picks up + runs via
+  // the appdev MCP tools. Marks the brief 'dispatched' so the tray reflects "waiting on the Builder".
+  const dispatchBrief = useCallback(async (briefId, agentGaii) => {
+    if (!briefId || !agentGaii) return;
+    setDispatching(briefId);
+    try {
+      const r = await apiPost(`/v1/secretary/brief/${encodeURIComponent(briefId)}/dispatch`, { targetAgent: agentGaii }).catch(() => null);
+      if (r && r.data) { showToast(t('secretary.brief.dispatched')); load(); }
+      else showToast(t('secretary.brief.dispatchFailed'), true);
+    } finally { setDispatching(''); }
+  }, [load, showToast]);
+
+  // Resolve a Work Brief (the owner handled it themselves, or it's no longer relevant). Marks it 'done'.
+  const resolveBrief = useCallback(async (briefId) => {
+    if (!briefId) return;
+    await apiPost(`/v1/secretary/brief/${encodeURIComponent(briefId)}/done`, {}).catch(() => null);
+    load();
+  }, [load]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -439,10 +472,9 @@ export default function SecretaryView() {
         // the owner ticking the linked goals by hand after setup.
         const goalIds = await seedGoals(json.goals, ctxId, org.name);
         const strategy = linkMilestoneGoals(normalizeStrategy(json.strategy), goalIds);
-        // Autonomy chosen in the setup step: set the ongoing "fill my workspaces" band accordingly (the
-        // one-time setup fill below always runs; this controls what the daily tick does on its own later).
+        // Autonomy chosen in the setup step controls only how active the DAILY tick is (it watches, briefs,
+        // and proposes Work Briefs — it never authors content itself, so there is no "fill" band any more).
         const policy = defaultPolicy();
-        policy.bands = { ...policy.bands, author_content: ['off', 'draft', 'act'].includes(mode) ? mode : 'off' };
         const ctx = { id: ctxId, name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy, brainHistory: [], quickActions, strategy };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
       } else {
@@ -477,26 +509,18 @@ export default function SecretaryView() {
       await persistConfig(next);
       await syncDirectives(newBrain);
       window.dispatchEvent(new CustomEvent('aimeat-live-update')); // refresh goals/learning + cards
-      // Fill the brand-new workspaces with REAL content right at handshake (documents first), ONE AT A TIME
-      // so the setup view shows live per-workspace progress (the slow part — a flaky/slow model). The panel
-      // stays as a progress view until done. Only on a fresh hire, so it never touches existing content.
+      // The Secretary NO LONGER authors content one-shot at handshake (the cheap model hallucinated and went
+      // "onto the Builders' turf"). Instead it now proposes grounded Work Briefs for the new (empty)
+      // workspaces — heavy work a Builder (a connected big AI via the appdev MCP tools) executes. Fast +
+      // deterministic (no slow model call); the dashboard's brief tray then offers "Open in Claude Desktop"
+      // / "Send to a connected Builder". Only on a fresh hire, so it never touches existing content.
       if (isNew && fillTargets.length) {
-        let filled = 0; const problems = [];
-        for (let i = 0; i < fillTargets.length; i++) {
-          setSetupStep({ phase: 'fill', done: i, total: fillTargets.length, name: fillTargets[i].name });
-          // retries:1 — one HTTP retry recovers a flaky owl-alpha 400 on this one-time, user-clicked fill.
-          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({ ws: fillTargets[i].id }), timeoutMs: 1_800_000, retries: 1 }).catch(() => null);
-          // Count a workspace as filled ONLY when something was actually authored (🖊️ line), not when the
-          // server returned a ⚠️ "couldn't fill / nothing usable" summary — so the result is honest.
-          const summaries = (r && r.data && Array.isArray(r.data.authored)) ? r.data.authored : [];
-          if (summaries.some((s) => typeof s === 'string' && s.indexOf('🖊️') === 0)) filled++;
-          else problems.push(fillTargets[i].name);
-          window.dispatchEvent(new CustomEvent('aimeat-live-update')); // each finished workspace shows up live
-        }
+        setSetupStep({ phase: 'fill', done: 0, total: fillTargets.length, name: fillTargets[0].name });
+        const r = await api('/v1/secretary/brief', { method: 'POST', body: '{}', timeoutMs: 120000, retries: 1 }).catch(() => null);
+        const proposed = (r && r.data && typeof r.data.proposed === 'number') ? r.data.proposed : 0;
         setSetupStep({ phase: 'done', done: fillTargets.length, total: fillTargets.length });
-        const head = `${t('secretary.workspacesFilled')} (${filled}/${fillTargets.length})`;
-        if (problems.length) showToast(`${head} — ${t('secretary.workspacesFilledIssues')}: ${problems.join(', ')}`, true);
-        else showToast(head);
+        window.dispatchEvent(new CustomEvent('aimeat-live-update')); // briefs show up in the tray live
+        showToast(proposed ? `${t('secretary.briefsReady')} (${proposed})` : t('secretary.hireDone'));
       } else {
         showToast(t('secretary.hireDone'));
       }
@@ -918,6 +942,9 @@ ${SECRETARY_AIMEAT_PRIMER}`;
     persistConfig({ ...config, contexts: contexts.map((c) => (c.id === active.id ? updated : c)) });
   };
   const setBand = (capId, band) => updateActivePolicy({ bands: { ...policy.bands, [capId]: band } });
+  // One autonomy toggle: 'suggest' (surface only) | 'assist' (handle the small stuff). Sets the band preset
+  // underneath, so the band machinery + parity tests are unchanged — the toggle is just the simple surface.
+  const setAutonomy = (level) => updateActivePolicy({ bands: autonomyPreset(level) });
   const toggleStop = () => updateActivePolicy({ stopSpending: !policy.stopSpending });
   const setBudget = (v) => updateActivePolicy({ dailyMorselBudget: v === '' ? null : Math.max(0, Math.floor(Number(v) || 0)) });
 
@@ -1024,6 +1051,9 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ${/* Today — full-width status band, always on top */ ''}
               ${dashStatus({ reliability, budgetInfo, schedule: auto.schedule, lastScan, stale, onReconcile: reconcile, scanning })}
 
+              ${/* Heavy work to hand off — the Work Brief tray (the light-vs-heavy seam made physical). */ ''}
+              ${briefTrayCard({ briefs, builders, dispatching, onDispatch: dispatchBrief, onResolve: resolveBrief })}
+
               ${/* Customizable two-column dashboard (pin to column / reorder / hide per card; persisted). */ ''}
               ${(() => {
                 const nodes = {
@@ -1073,7 +1103,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
                 crewSummary: crew.agents && crew.agents.length ? `${crew.agents.length} ${t('secretary.dash.crewAgents')}` : '' })}
               ${manageOpen ? html`
                 ${brainCard({ brain, active, openEdit, brainDraft, setBrainDraft, startBrainEdit, saveBrain, cancelBrainEdit, savingBrain })}
-                ${operatingCard({ policy, toggleStop, setBudget, setBand })}
+                ${operatingCard({ policy, toggleStop, setBudget, setBand, setAutonomy })}
                 ${!strategy ? html`<section class="sec-card">
                   <h2 class="sec-h2">${t('secretary.strat.title')}</h2>
                   <p class="sec-hint">${t('secretary.strat.enableHint')}</p>
