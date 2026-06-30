@@ -201,6 +201,7 @@ export function bootstrapRouter(
               },
               key_rules: [
                 'Always include the AIMEAT login bar via AIMEAT.auth.mountLoginButton()',
+                'mountLoginButton onLogin fires ONLY on a fresh sign-in, NOT on reload — also call AIMEAT.auth.login() on load (returns the session or null) to restore an already-signed-in user, else a returning user sees nothing',
                 'session.fetch() returns already-parsed JSON, do NOT call .json() on it',
                 'All API paths must be relative (start with /), never absolute URLs',
                 'Do NOT add manual token entry fields, the auth library handles everything',

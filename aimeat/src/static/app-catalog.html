@@ -7348,13 +7348,22 @@
 
     // Auth pattern
     prompt += '### Auth Pattern\n';
+    prompt += 'Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n';
     prompt += '```html\n';
     prompt += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
     prompt += '<script>\n';
+    prompt += 'function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n';
+    prompt += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
+    prompt += '\n';
+    prompt += '// Path 1 — fresh sign-in / sign-out via the login button:\n';
     prompt += 'AIMEAT.auth.mountLoginButton("#login", {\n';
-    prompt += '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n';
-    prompt += '  onLogout: function() { /* hide content */ }\n';
+    prompt += '  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n';
+    prompt += '  onLogout: hideApp\n';
     prompt += '});\n';
+    prompt += '\n';
+    prompt += '// Path 2 — already signed in when the page loads. Restore the stored session\n';
+    prompt += '// explicitly; login() returns the session (or null if not signed in).\n';
+    prompt += 'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n';
     prompt += '</' + 'script>\n';
     prompt += '```\n\n';
 
@@ -8032,13 +8041,15 @@
         'Media & misc: aimeat-audio.js, aimeat-speech.js, aimeat-header.js, aimeat-tunnel.js.\n' +
         'Real-time multiplayer: no lib — POST/GET ' + nodeUrl + '/v1/realtime/rooms then WebSocket /v1/realtime/ws?room=ID (ICE config at /v1/realtime/ice-servers).\n\n' +
         '### Auth Pattern\n' +
+        'Handle BOTH login paths: a fresh sign-in click (onLogin) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — NOT on reload when a session already exists.\n' +
         '```html\n' +
         '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n' +
         '<script>\n' +
-        'AIMEAT.auth.mountLoginButton("#login", {\n' +
-        '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n' +
-        '  onLogout: function() { /* hide content */ }\n' +
-        '});\n' +
+        'function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n' +
+        'function hideApp() { /* hide content, show a "Sign in" message */ }\n' +
+        'AIMEAT.auth.mountLoginButton("#login", { onLogin: showApp, onLogout: hideApp });\n' +
+        '// Already signed in on load? onLogin will NOT fire — restore the session yourself:\n' +
+        'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n' +
         '</' + 'script>\n' +
         '```\n\n' +
         '### Data Storage\n' +
