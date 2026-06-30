@@ -344,6 +344,27 @@ export async function proposeWorkBriefs(
   return out;
 }
 
+/**
+ * Auto-resolve dispatched briefs whose Builder task has finished: a brief with status 'dispatched' + a
+ * taskId whose agent task is 'done' is flipped to 'done' so it leaves the tray on its own (no manual Done
+ * needed). Best-effort + idempotent. Returns the number resolved. A 'failed' task is left dispatched so the
+ * owner can see it stalled and re-handle it.
+ */
+export async function resolveCompletedBriefs(storage: Storage, ownerGhii: string): Promise<number> {
+  const recs = await storage.listMemory(ownerGhii, { prefix: BRIEF_KEY_PREFIX }).catch(() => []);
+  let resolved = 0;
+  for (const rec of recs) {
+    const b = rec.value as unknown as WorkBrief | undefined;
+    if (!b || b.status !== 'dispatched' || !b.taskId) continue;
+    const task = await storage.getAgentTask(b.taskId).catch(() => null);
+    if (task && task.status === 'done') {
+      await updateBriefStatus(storage, ownerGhii, b.id, { status: 'done' }).catch(() => null);
+      resolved++;
+    }
+  }
+  return resolved;
+}
+
 /** Mark an existing brief dispatched/done (read-modify-write). Returns the updated brief, or null if gone. */
 export async function updateBriefStatus(
   storage: Storage, ownerGhii: string, briefId: string,

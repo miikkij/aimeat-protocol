@@ -40,7 +40,7 @@ import { listSpecialists, deleteSpecialistConfig } from '../services/specialist.
 import { getActiveScheduler } from '../services/scheduler.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { proposeWorkBriefs, updateBriefStatus, BRIEF_KEY_PREFIX, type WorkBrief, type BriefContext } from '../services/secretary-workbrief.js';
+import { proposeWorkBriefs, updateBriefStatus, resolveCompletedBriefs, BRIEF_KEY_PREFIX, type WorkBrief, type BriefContext } from '../services/secretary-workbrief.js';
 import { randomUUID } from 'node:crypto';
 
 const ClarifySchema = z.object({
@@ -247,6 +247,9 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
   router.get('/v1/secretary/briefs', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
     const ownerGhii = `${owner}@${config.nodeId}`;
+    // Self-heal: a dispatched brief whose Builder task has finished flips to 'done' here, so it leaves the
+    // tray on its own when the owner looks — no manual Done needed.
+    await resolveCompletedBriefs(storage, ownerGhii).catch(() => 0);
     const recs = await storage.listMemory(ownerGhii, { prefix: BRIEF_KEY_PREFIX }).catch(() => []);
     const briefs = recs
       .map((r) => r.value as unknown as WorkBrief)
