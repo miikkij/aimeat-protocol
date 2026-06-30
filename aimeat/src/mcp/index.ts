@@ -21,6 +21,9 @@
  *     requireScope gates. Honours config.mcpEnforceScopes (false = warn-only logging).
  *   v1.8.0 — 2026-05-30 — v2 S2: createMcpServer accepts a surface role; the gate hard-skips tools
  *     outside that surface (toolsForSurface). role='all' (v1) applies no surface filter.
+ *   v1.8.1 — 2026-06-30 — resourceEvents.setMaxListeners(256): per-session fan-out (2 listeners/session,
+ *     cleaned up on close) is intentional, not a leak — silences MaxListenersExceededWarning while
+ *     keeping headroom for 128 concurrent agents and still flagging a genuine cleanup leak.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -69,6 +72,14 @@ import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog
 // Allows REST routes and MCP tools to emit resource change events
 // that get forwarded to subscribed MCP sessions via SSE.
 export const resourceEvents = new EventEmitter();
+// Each concurrent MCP session adds 2 listeners here (resource:updated +
+// resource:listChanged) and removes them on session close (see core.ts onclose).
+// This is intentional per-session fan-out, not a leak, so the number of listeners
+// scales with concurrent agents — Node's default cap of 10 trips a spurious
+// MaxListenersExceededWarning once ~6 agents connect at once. 256 = headroom for
+// 128 concurrent agents (2 listeners each), while still flagging a genuine leak
+// (e.g. broken onclose cleanup) instead of disabling the detector entirely (0).
+resourceEvents.setMaxListeners(256);
 
 export interface ResourceChangeEvent {
     agentGaii: string;
