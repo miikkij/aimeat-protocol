@@ -5,6 +5,12 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.13.0 — 2026-07-01 — Light-vs-heavy seam: the tick no longer cheap-authors content (the one-shot
+ *     authoring in the now-removed secretary-authoring.ts hallucinated). It now detects STRUCTURAL gaps
+ *     (empty/thin workspaces, stale content, off-target KPIs) and proposes grounded Work Briefs a Builder
+ *     (a connected big AI via the appdev MCP tools) executes — proposeWorkBriefs in services/
+ *     secretary-workbrief.ts (deterministic, no paid call, deduped against open briefs). The cheap
+ *     Secretary watches + hands off; it never authors structure/data.
  *   v2.12.0 — 2026-06-30 — Learning loop closes: (A) selectLessons threads the highest-signal reviewed-
  *     decision scores into the tick's briefing/action prompt (repeat what worked, avoid what didn't);
  *     (B) proposeLearnedRule — when a cluster of reviewed decisions scored poorly, the tick asks for ONE
@@ -66,7 +72,7 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
-import { authorWorkspaceContent } from './secretary-authoring.js';
+import { proposeWorkBriefs as buildContextBriefs, type WorkBrief } from './secretary-workbrief.js';
 import { appendSecretaryFeed } from './secretary-feed.js';
 import { produceClarifyDeliverable, type ClarifyJob } from './secretary-clarify.js';
 import { listSpecialists } from './specialist.js';
@@ -832,29 +838,20 @@ export class Scheduler {
       await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: feedText });
       writes.push('secretary.feed');
 
-      // Autonomous authoring phase: actually FILL the workspaces (document-first). Band-gated on
-      // `author_content`: 'act' = write + publish · 'draft' = leave drafts for review · 'off' = skip.
-      // Each filled workspace is a paid AI call, so it respects the same per-day budget — pass the
-      // remaining headroom and let authoring stop when it's exhausted. OFF by default (it spends + can
-      // publish): a context that never opts in behaves exactly as before; the owner enables draft/act.
-      const authorBand = active.policy?.bands?.author_content ?? 'off';
-      if (authorBand !== 'off') {
-        const budgetRemaining = budget === null ? null : Math.max(0, budget - spentToday - paidMorsels);
-        if (budgetRemaining === null || budgetRemaining > 0) {
-          // Honour the owner's autoRetry/maxRetries so a flaky stealth model (owl-alpha intermittently 400s)
-          // is retried instead of killing the authoring on the first transient error. Off → no retry.
-          const aiPrefs = (await this.storage.getMemory(owner, 'openrouter.settings'))?.value as { autoRetry?: boolean; maxRetries?: number } | undefined;
-          const maxRetries = aiPrefs?.autoRetry === false ? 0 : (typeof aiPrefs?.maxRetries === 'number' ? aiPrefs.maxRetries : 3);
-          const authored = await authorWorkspaceContent(this.storage, this.config, owner, ownerName, active, wsList, {
-            openGoals, band: authorBand, aggressive: true, useGeneralKnowledge: true, budgetRemaining, maxRetries, appId: `schedule:${job.id}:author`,
-          });
-          paidMorsels += authored.morsels;
-          writes.push(...authored.writes);
-          for (const line of authored.summaries) {
-            await this.appendFeed(owner, { kind: 'act', contextId: active.id, contextName: active.name || '', text: line, href: `/v1/profile?tab=organisms&org=${active.organismId}` });
-          }
-          if (authored.summaries.length) writes.push('secretary.feed');
+      // Heavy work is DISPATCHED, not invented here. Instead of asking the cheap model to author content
+      // one-shot (which hallucinated and "went onto the Builders' turf"), the tick detects STRUCTURAL gaps
+      // (empty/thin workspaces, stale content, off-target KPIs) and proposes a grounded Work Brief a Builder
+      // — a connected big AI via the appdev MCP tools — executes (the owner pastes it into Claude Desktop,
+      // or dispatches it to a connected agent). Brief assembly is deterministic (no paid call), idempotent
+      // (deduped against open briefs by gap), and bounded per tick. The cheap Secretary never authors data.
+      const briefed = await this.proposeWorkBriefs(owner, ownerName, active, wsList, openGoals);
+      if (briefed.writes.length) {
+        writes.push(...briefed.writes);
+        for (const line of briefed.feedLines) {
+          await this.appendFeed(owner, { kind: 'briefing', contextId: active.id, contextName: active.name || '', text: line, href: '/v1/secretary' });
         }
+        writes.push('secretary.feed');
+        emitChange('agents', owner);
       }
     } finally {
       // Persist the spend ledger (+ any new pending decisions, routine step completions, and derived
@@ -893,6 +890,26 @@ export class Scheduler {
     const rec = await this.storage.getMemory(owner, `organism.${active.organismId}.meta.workspaces`);
     const list = ((rec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
     return list.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
+  }
+
+  /**
+   * Detect structural gaps in the active context's workspaces and propose Work Briefs for a Builder to
+   * execute — heavy work is DISPATCHED, never invented by the cheap Secretary. Deterministic + idempotent:
+   * a gap already covered by an OPEN brief (proposed/dispatched) is skipped, so repeated ticks converge
+   * instead of spamming. Bounded to MAX_NEW_BRIEFS new briefs per tick. No paid AI call (storage reads +
+   * best-effort Discovery only). Briefs are persisted as secretary.brief.{id}; the view's brief tray reads
+   * them and offers "Open in Claude Desktop" / "Send to a connected Builder".
+   */
+  private async proposeWorkBriefs(
+    owner: string, ownerName: string, active: SecretaryContext,
+    wsList: Array<{ id: string; name: string }>, openGoals: Array<Record<string, unknown>>,
+  ): Promise<{ writes: string[]; feedLines: string[]; briefs: WorkBrief[] }> {
+    const briefContext = { id: active.id, name: active.name, organismId: active.organismId, brain: active.brain, strategy: active.strategy };
+    const { writes, briefs } = await buildContextBriefs(this.storage, this.config, {
+      ownerGhii: owner, ownerName, active: briefContext, wsList, openGoals,
+    });
+    const feedLines = briefs.map((b) => `📋 Work brief ready — ${b.objective} Open it in the Secretary to hand to a Builder.`);
+    return { writes, feedLines, briefs };
   }
 
   /** Build the tick's system + user prompt asking for a STRUCTURED action list (P1-A). */

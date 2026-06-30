@@ -15,6 +15,10 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-06-30 -- aimeat_onboarding_status enriches steps with descriptionText (resolved
+ *     via DEFAULT_LOCALE) + howTo, and returns step_guide + summary (completable, next_required_step)
+ *     so a connector drives each pending step deterministically. Also replicates the REST
+ *     optional->skipped-on-completion pass so the two surfaces match. next_step prefers next required.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,7 +27,9 @@ import type { AimeatConfig } from '../config.js';
 import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { checkAutoSteps, validateStep } from '../services/onboarding-validator.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
+import { createT, DEFAULT_LOCALE } from '../i18n.js';
 import type { AgentOnboardingRecord, Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -69,6 +75,15 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
         const allRequiredPassed = updatedSteps.filter(step => step.required).every(step => step.status === 'passed');
 
         if (allRequiredPassed) {
+            // Mark untouched optional steps as 'skipped' at completion -- mirrors the REST GET
+            // handler so the MCP and REST surfaces stay byte-identical (the agent chose not to
+            // do them; that's a final state, not pending).
+            for (const s of updatedSteps) {
+                if (!s.required && s.status === 'pending') {
+                    s.status = 'skipped';
+                    s.validatedAt = new Date().toISOString();
+                }
+            }
             const readiness = await calculateReadiness(agentGaii, updatedSteps, storage, onboarding.readinessOverride);
             onboarding = (await storage.updateOnboarding(agentGaii, {
                 steps: updatedSteps,
@@ -104,9 +119,21 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
         }
     }
 
-    if (pendingSteps.length > 0) hints.next_step = pendingSteps[0].id;
+    // Reachability summary + machine-readable guidance. next_step prefers the next required step
+    // (not pendingSteps[0]) so a connector isn't steered into an optional step that never unblocks
+    // completion. Drive each pending step via its howTo.tool/args; stop at summary.completable.
+    const agentName = getAgentName(agentGaii);
+    const summary = buildOnboardingSummary(onboarding.steps);
+    if (pendingSteps.length > 0) hints.next_step = summary.next_required_step ?? pendingSteps[0].id;
 
-    return { onboarding, hints };
+    const resolveText = createT(DEFAULT_LOCALE);
+    const onboardingOut = {
+        ...onboarding,
+        steps: enrichSteps(onboarding.steps, resolveText, agentName),
+    };
+    const step_guide = buildStepGuide(onboarding.steps, agentName);
+
+    return { onboarding: onboardingOut, step_guide, summary, hints };
 }
 
 async function confirmOnboardingStep(

@@ -30,7 +30,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
-import { SECRETARY_CAPABILITIES, BANDS } from '/js/services/secretary-policy.js';
+import { SECRETARY_CAPABILITIES, BANDS, autonomyLevelOf } from '/js/services/secretary-policy.js';
 import { buildInterviewPrompt, groupFeedByDay } from '/js/services/secretary-helpers.js';
 
 /** Context "hats" switcher chips + add. */
@@ -227,9 +227,22 @@ export function brainCard(p) {
 /** Operating model: stop-spending + daily budget + per-capability autonomy bands. */
 export function operatingCard(p) {
   const policy = p.policy;
+  const level = autonomyLevelOf(policy.bands);   // 'suggest' | 'assist' — the single toggle's state
   return html`
     <section class="sec-card">
       <h2 class="sec-h2">${t('secretary.howIWork')}</h2>
+
+      ${/* ONE autonomy toggle (collapses the per-capability band sprawl). Heavy work is always a Work
+          Brief a Builder executes — never something the cheap Secretary does on its own. */ ''}
+      <div class="sec-autonomy">
+        ${[['suggest', 'secretary.autonomy.suggest', 'secretary.autonomy.suggestHint'],
+           ['assist', 'secretary.autonomy.assist', 'secretary.autonomy.assistHint']].map(([val, label, hint]) => html`
+          <label class=${'sec-auto-opt' + (level === val ? ' sec-auto-opt--on' : '')} key=${val}>
+            <input type="radio" name="sec-autonomy" checked=${level === val} onChange=${() => p.setAutonomy(val)} />
+            <span><strong>${t(label)}</strong><br/><span class="sec-hint">${t(hint)}</span></span>
+          </label>`)}
+      </div>
+
       <label class="sec-stop ${policy.stopSpending ? 'on' : ''}">
         <input type="checkbox" checked=${policy.stopSpending} onChange=${p.toggleStop} />
         <span><strong>${t('secretary.stopSpending')}</strong><br/><span class="sec-hint">${t('secretary.stopSpendingHint')}</span></span>
@@ -239,18 +252,24 @@ export function operatingCard(p) {
         <input type="number" min="0" class="sec-budget-in" value=${policy.dailyMorselBudget == null ? '' : policy.dailyMorselBudget} placeholder=${t('secretary.noLimit')} onChange=${(e) => p.setBudget(e.target.value)} />
         <span class="sec-hint">${t('secretary.dailyBudgetHint')}</span>
       </div>
-      <p class="sec-hint sec-bands-note">${t('secretary.bandsNote')}</p>
-      <ul class="sec-caps">
-        ${SECRETARY_CAPABILITIES.map((c) => html`
-          <li class="sec-cap" key=${c.id}>
-            <span class="sec-cap-label">${t('secretary.cap.' + c.id)}${c.costs ? html`<span class="sec-cap-tag">${t('secretary.capCosts')}</span>` : null}</span>
-            ${c.enterprise
-              ? html`<span class="sec-cap-locked sec-cap-ent">${t('secretary.enterprise')}</span>`
-              : c.locked
-              ? html`<span class="sec-cap-locked">${t('secretary.band.' + policy.bands[c.id])} · ${t('secretary.locked')}</span>`
-              : html`<select class="sec-band" value=${policy.bands[c.id]} onChange=${(e) => p.setBand(c.id, e.target.value)}>${BANDS.map((b) => html`<option value=${b} selected=${policy.bands[c.id] === b}>${t('secretary.band.' + b)}</option>`)}</select>`}
-          </li>`)}
-      </ul>
+
+      ${/* Per-capability bands are still here for power users, tucked behind an Advanced disclosure so the
+          default surface is just the one toggle above. */ ''}
+      <details class="sec-adv">
+        <summary>${t('secretary.advancedBands')}</summary>
+        <p class="sec-hint sec-bands-note">${t('secretary.bandsNote')}</p>
+        <ul class="sec-caps">
+          ${SECRETARY_CAPABILITIES.map((c) => html`
+            <li class="sec-cap" key=${c.id}>
+              <span class="sec-cap-label">${t('secretary.cap.' + c.id)}${c.costs ? html`<span class="sec-cap-tag">${t('secretary.capCosts')}</span>` : null}</span>
+              ${c.enterprise
+                ? html`<span class="sec-cap-locked sec-cap-ent">${t('secretary.enterprise')}</span>`
+                : c.locked
+                ? html`<span class="sec-cap-locked">${t('secretary.band.' + policy.bands[c.id])} · ${t('secretary.locked')}</span>`
+                : html`<select class="sec-band" value=${policy.bands[c.id]} onChange=${(e) => p.setBand(c.id, e.target.value)}>${BANDS.map((b) => html`<option value=${b} selected=${policy.bands[c.id] === b}>${t('secretary.band.' + b)}</option>`)}</select>`}
+            </li>`)}
+        </ul>
+      </details>
     </section>`;
 }
 
@@ -278,13 +297,25 @@ function routineStepRow(p, r, s) {
   const isDelegate = s.capability === 'delegate';
   const agents = p.agents || [];
   const workflows = p.workflows || [];
+  // Unblur the delegation target by ROLE: node-local Specialists vs connected big-AI Builders. The Secretary
+  // (the watcher) is never a delegation target. Same handler/value (agent name) — the optgroups just label
+  // which kind of agent each is, so "pick a specialist" no longer lumps Builders + specialists together.
+  const isSpecialist = (a) => (a.tags || []).includes('system:specialist');
+  const isSecretary = (a) => (a.tags || []).includes('system:secretary') || a.name === 'secretary';
+  const specialistAgents = agents.filter((a) => isSpecialist(a));
+  const builderAgents = agents.filter((a) => !isSpecialist(a) && !isSecretary(a));
   // B4: delegate to one agent (agent task) · G7: OR run an Agent Workflow chaining specialists.
   const delegateControl = html`
     <div class="sec-delegate">
-      ${agents.length > 0 ? html`
+      ${(specialistAgents.length + builderAgents.length) > 0 ? html`
         <select class="sec-band" value=${p.delegateAgent} onChange=${(e) => p.setDelegateAgent(e.target.value)}>
           <option value="" selected=${!p.delegateAgent}>${t('secretary.next.delegatePick')}</option>
-          ${agents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
+          ${specialistAgents.length ? html`<optgroup label=${t('secretary.next.delegateSpecialists')}>
+            ${specialistAgents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
+          </optgroup>` : null}
+          ${builderAgents.length ? html`<optgroup label=${t('secretary.next.delegateBuilders')}>
+            ${builderAgents.map((a) => html`<option value=${a.name} selected=${p.delegateAgent === a.name}>${(a.name)}</option>`)}
+          </optgroup>` : null}
         </select>
         <button class="btn-primary btn-sm" disabled=${busy || !p.delegateAgent} onClick=${() => p.approveStep(r, s, { agentName: p.delegateAgent })}>${busy ? t('secretary.next.running') : t('secretary.next.delegateGo')}</button>` : null}
       ${workflows.length > 0 ? html`

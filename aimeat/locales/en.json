@@ -559,7 +559,7 @@
     "wf": {
       "title": "Design a workflow",
       "quick": "Design workflow",
-      "prompt": "Describe the outcome you want — I'll chain your specialists/agents into a workflow to reach it.",
+      "prompt": "Describe the outcome you want — I'll chain your specialists and Builders into a workflow (a multi-step pipeline) to reach it.",
       "placeholder": "e.g. Every evening, gather the day's news and publish an edition…",
       "design": "Design",
       "designing": "Designing the chain…",
@@ -742,6 +742,7 @@
     "apply": "Set up my Secretary",
     "applying": "Setting up…",
     "hireDone": "Your Secretary is set up.",
+    "briefsReady": "Work briefs ready to hand to a Builder",
     "fillingWorkspaces": "Filling your workspaces with real content…",
     "workspacesFilled": "Workspaces filled with real content",
     "workspacesFilledIssues": "couldn't fill these yet",
@@ -777,6 +778,13 @@
     "inappError": "Couldn't generate",
     "inappEmpty": "The AI returned nothing.",
     "howIWork": "How I work",
+    "autonomy": {
+      "suggest": "Suggest only",
+      "suggestHint": "I watch, keep things current, and surface what needs attention — but I ask before acting.",
+      "assist": "Handle the small stuff",
+      "assistHint": "I also file notes, post reminders and briefings on my own. Heavy work is always a Work Brief you hand to a Builder."
+    },
+    "advancedBands": "Advanced — per-capability control",
     "stopSpending": "Stop spending",
     "stopSpendingHint": "Pause everything that costs morsels or acts on its own. The Secretary can still think, draft, and message you.",
     "dailyBudget": "Daily morsel budget",
@@ -998,6 +1006,20 @@
     "reliability": "Reliability",
     "reliabilityBuilding": "building…",
     "reliabilityHint": "Average score of the Secretary's reviewed decisions — its own track record, not its marketplace trust.",
+    "brief": {
+      "title": "Hand to a Builder",
+      "subtitle": "Heavy work the Secretary prepared — a big AI builds it via MCP. You never invent content here.",
+      "heavyBadge": "Heavy",
+      "dispatchedBadge": "Dispatched",
+      "preview": "Preview the brief",
+      "openClaude": "Open in Claude Desktop",
+      "sendBuilder": "Send to a connected Builder…",
+      "waiting": "Waiting on the Builder…",
+      "noBuilder": "Connect a Builder to dispatch",
+      "done": "Done",
+      "dispatched": "Brief sent to the Builder.",
+      "dispatchFailed": "Couldn't dispatch the brief."
+    },
     "dash": {
       "todayTitle": "Today",
       "refresh": "Refresh",
@@ -1056,7 +1078,7 @@
       "startNewTitle": "Start something new",
       "nextStep": "Next step",
       "allSettled": "all steps settled",
-      "hint": "Tell me a goal — I'll propose a repeatable routine. Approve each step (band-gated) and I'll run it and track the results.",
+      "hint": "Tell me a goal — I'll propose a repeatable routine: light, recurring checks I run and track myself (for heavy building, I hand a Builder a Work Brief instead). Approve each step (band-gated).",
       "placeholder": "What do you want to make progress on?",
       "propose": "Propose a routine",
       "proposing": "Designing…",
@@ -1089,7 +1111,9 @@
       "delegateWorkflowPick": "Run a workflow…",
       "delegateWorkflowGo": "Run workflow",
       "delegateDesignWf": "Design new workflow",
-      "delegatePick": "Pick an agent…",
+      "delegatePick": "Pick who runs it…",
+      "delegateSpecialists": "Specialists (node-local)",
+      "delegateBuilders": "Builders (connected AI)",
       "delegateGo": "Delegate",
       "delegateNoAgent": "Pick an agent to delegate to first",
       "delegateNoAgents": "No other agents to delegate to — connect one in Manage → crew.",
@@ -8125,7 +8149,10 @@
       "complete_test_task": "Complete Test Task",
       "publish_commands": "Publish Slash Commands",
       "publish_config": "Publish Runtime Config",
-      "declare_services": "Declare Services"
+      "declare_services": "Declare Services",
+      "declare_offerings": "Declare Offerings",
+      "make_workflow_compatible": "Make an Offer Workflow-Compatible",
+      "price_offer": "Price an Offer"
     },
     "stepDescriptions": {
       "authenticate": "Agent is authenticated via device auth",

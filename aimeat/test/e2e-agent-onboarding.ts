@@ -7,6 +7,10 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.2.0 -- 2026-06-30 -- Add Hello Integration guidance assertions: GET enriches steps with
+ *                            descriptionText + howTo and returns step_guide + summary (3b); completion
+ *                            summary (completable/next_required_step) on test 26; contract-freeze unit
+ *                            guards (Phase 11) pinning the 16 step ids + the onboarding tool names.
  *   v1.1.0 -- 2026-05-24 -- Add full flow, readiness score, and auto-check tests (phases 7-9)
  *   v1.0.0 -- 2026-05-24 -- Initial creation
  */
@@ -57,6 +61,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ONBOARDING_STEP_IDS, STEP_HOWTO, getStepDefinition } from '../src/models/agent-onboarding-schemas.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -177,6 +182,47 @@ await test('3. POST start works with agent token (agents inherit owner roles)', 
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 200, `expected 200, got ${status}`);
+});
+
+await test('3b. GET enriches steps with descriptionText + howTo and returns step_guide + summary', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/onboarding`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const data = body.data;
+    const steps = data.onboarding.steps as Array<any>;
+
+    // Every step: descriptionText resolved (not the raw i18n key) + howTo with gatesCompletion === required.
+    for (const s of steps) {
+        assert(typeof s.descriptionText === 'string' && s.descriptionText.length > 0, `${s.id}: missing descriptionText`);
+        assert(s.descriptionText !== s.description, `${s.id}: descriptionText still equals the raw key '${s.description}'`);
+        assert(s.howTo && typeof s.howTo === 'object', `${s.id}: missing howTo`);
+        assert(s.howTo.gatesCompletion === s.required, `${s.id}: howTo.gatesCompletion ${s.howTo.gatesCompletion} !== required ${s.required}`);
+    }
+
+    // Spot checks of the stepId -> tool mapping.
+    const byId: Record<string, any> = Object.fromEntries(steps.map(s => [s.id, s]));
+    assert(byId.identify_platform.howTo.tool === 'aimeat_onboarding_identify_platform', 'identify_platform tool mismatch');
+    assert(byId.publish_commands.howTo.tool === 'aimeat_memory_write', 'publish_commands tool mismatch');
+    assert(byId.configure_delivery.howTo.tool === null && typeof byId.configure_delivery.howTo.passiveNote === 'string', 'configure_delivery should be passive with a passiveNote');
+    assert(byId.declare_offerings.howTo.toolAlias === 'aimeat_offers_publish', 'declare_offerings toolAlias mismatch');
+    // {name} is substituted server-side in args.
+    assert(JSON.stringify(byId.publish_commands.howTo.args).includes(`agents.${agentName}.commands`), 'publish_commands args {name} not substituted');
+
+    // step_guide keys === step ids.
+    const guideKeys = Object.keys(data.step_guide).sort();
+    const stepIds = steps.map(s => s.id).sort();
+    assert(JSON.stringify(guideKeys) === JSON.stringify(stepIds), `step_guide keys != step ids: ${JSON.stringify(guideKeys)}`);
+
+    // summary reachability: gates only on the 12 required steps.
+    assert(data.summary.required_total === 12, `required_total ${data.summary.required_total} != 12`);
+    assert(data.summary.optional_total === 4, `optional_total ${data.summary.optional_total} != 4`);
+    assert(data.summary.completable === false, 'should not be completable yet (required steps pending)');
+    assert(typeof data.summary.next_required_step === 'string', 'next_required_step should be a not-passed required id');
+    assert(data.hints.next_step === data.summary.next_required_step, 'hints.next_step should mirror summary.next_required_step');
+    const nextReq = byId[data.summary.next_required_step];
+    assert(nextReq && nextReq.required && nextReq.status !== 'passed', 'next_required_step must point at a not-passed required step');
 });
 
 // ─── Phase 3: Step confirmations ───
@@ -623,6 +669,13 @@ await test('26. GET onboarding shows completed status after all steps', async ()
     assert(checklist.config_published === true, `config_published should be true, got ${checklist.config_published}`);
     assert(checklist.shared_tags_in_use === null, `shared_tags_in_use null when owner has not assigned tags, got ${checklist.shared_tags_in_use}`);
     assert(checklist.knowledge_packages_published === false, `knowledge_packages_published false (none authored), got ${checklist.knowledge_packages_published}`);
+
+    // Reachability summary at completion: every required step passed.
+    const summary = body.data.summary;
+    assert(summary.completable === true, `summary.completable should be true once complete, got ${summary.completable}`);
+    assert(summary.required_remaining === 0, `required_remaining should be 0, got ${summary.required_remaining}`);
+    assert(summary.next_required_step === null, `next_required_step should be null when complete, got ${summary.next_required_step}`);
+    assert(Array.isArray(summary.optional_pending) && summary.optional_pending.length === 0, `optional_pending should be empty, got ${JSON.stringify(summary.optional_pending)}`);
 });
 
 // ─── Phase 8: Readiness score tests ───
@@ -1163,6 +1216,48 @@ await test('Self-tag rejects an invalid tag (failure mode)', async () => {
         assert(status === 400, `expected 400 for invalid tag '${bad}', got ${status}: ${JSON.stringify(body)}`);
         assert(body.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${body.error?.code}`);
     }
+});
+
+// ─── Phase 11: Contract freeze (unit, no server) ───
+// The connector (and the external crewaimeat runtime) maps onboarding by exact step id + the five
+// aimeat_onboarding_* tool names. These guards fail CI if a rename drifts the contract.
+console.log('\nPhase 11 -- Contract Freeze');
+
+await test('CF1. ONBOARDING_STEP_IDS is the frozen 16-id list in order', async () => {
+    const expected = [
+        'authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'read_directives',
+        'send_test_message', 'configure_delivery', 'report_telemetry', 'accept_test_task', 'complete_test_task',
+        'publish_commands', 'publish_config', 'declare_services', 'declare_offerings', 'make_workflow_compatible', 'price_offer',
+    ];
+    assert(ONBOARDING_STEP_IDS.length === 16, `expected 16 step ids, got ${ONBOARDING_STEP_IDS.length}`);
+    expected.forEach((id, i) => assert(ONBOARDING_STEP_IDS[i] === id, `step id drift at ${i}: expected ${id}, got ${ONBOARDING_STEP_IDS[i]}`));
+});
+
+await test('CF2. STEP_HOWTO gatesCompletion + validationMethod stay in lockstep with STEP_DEFINITIONS', async () => {
+    for (const id of ONBOARDING_STEP_IDS) {
+        const howTo = STEP_HOWTO[id];
+        const def = getStepDefinition(id);
+        assert(!!howTo, `STEP_HOWTO missing ${id}`);
+        assert(!!def, `STEP_DEFINITIONS missing ${id}`);
+        assert(howTo.gatesCompletion === def!.required, `${id}: gatesCompletion ${howTo.gatesCompletion} !== required ${def!.required}`);
+        assert(howTo.validationMethod === def!.validationMethod, `${id}: validationMethod ${howTo.validationMethod} !== ${def!.validationMethod}`);
+    }
+});
+
+await test('CF3. The four onboarding-prefixed confirm tools in the map are exactly the frozen set', async () => {
+    const onboardingTools = Object.values(STEP_HOWTO)
+        .map(h => h.tool)
+        .filter((t): t is string => !!t && t.startsWith('aimeat_onboarding_'));
+    // The fifth aimeat_onboarding_* tool (aimeat_onboarding_status) is read-only and not a step,
+    // so it does not appear in STEP_HOWTO. The four step-confirm tools below MUST stay named as-is.
+    const expected = [
+        'aimeat_onboarding_identify_platform',
+        'aimeat_onboarding_confirm_skill_installed',
+        'aimeat_onboarding_confirm_directives_read',
+        'aimeat_onboarding_declare_services',
+    ];
+    for (const t of onboardingTools) assert(expected.includes(t), `unexpected onboarding-prefixed tool in STEP_HOWTO: ${t}`);
+    for (const t of expected) assert(onboardingTools.includes(t), `expected onboarding tool missing from STEP_HOWTO: ${t}`);
 });
 
 // ─── Summary ───

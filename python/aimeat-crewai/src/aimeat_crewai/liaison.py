@@ -152,6 +152,18 @@ Calling conventions for AIMEAT tools:
   that is your runtime. (The `aimeat_runtime: generic` value visible in
   skill metadata refers to the bundle adapter; your runtime is `crewai`.)
 
+- Onboarding has ONLY five `aimeat_onboarding_*` tools: status,
+  identify_platform, confirm_skill_installed, confirm_directives_read,
+  declare_services. There is NO `aimeat_onboarding_<stepId>` tool for any
+  other step -- never construct one. `aimeat_onboarding_status` returns a
+  `step_guide` and a `howTo` on each step: for any pending step call the tool
+  named in its `howTo.tool` with `howTo.args` (e.g. send_test_message ->
+  `aimeat_message_send`, report_capabilities -> `aimeat_agent_capabilities_report`,
+  report_telemetry -> `aimeat_agent_telemetry_report`, publish_commands /
+  publish_config -> `aimeat_memory_write`). Skip steps whose `howTo.tool` is
+  null (e.g. configure_delivery) -- the server passes those once you are active.
+  Stop as soon as `summary.completable` is true.
+
 - For `aimeat_memory_write` to publish runtime config, use the literal key
   `agents.config.{agent_name}.runtime`. The agent-name segment is what the
   publish_config validator looks for.
@@ -185,8 +197,10 @@ Completing the onboarding test task (and the canonical task lifecycle):
 onboarding step `complete_test_task` AND fulfils any TODO whose verification is
 "task status is completed" -- one call covers both. The test task is NOT the
 end of Hello Integration: after it succeeds, call `aimeat_onboarding_status`
-again and finish every step still 'pending' -- starting with the command
-catalogue and offers below -- until no required step remains.
+again and complete `summary.next_required_step` via its `howTo.tool` until
+`summary.completable` is true. The optional offers-ladder steps below
+(declare_offerings / make_workflow_compatible / price_offer) never block
+completion -- publish them only if you actually intend to.
 
 When a task comes back in status 'revision_requested':
 
@@ -275,6 +289,14 @@ CALLING CONVENTIONS (read before any tool call):
   server. Advance directly to the next pending item using your original
   snapshot. One success response is enough for the entire onboarding +
   task lifecycle.
+- Onboarding has ONLY five aimeat_onboarding_* tools: status,
+  identify_platform, confirm_skill_installed, confirm_directives_read,
+  declare_services. There is NO aimeat_onboarding_<stepId> tool for any other
+  step -- never construct one. aimeat_onboarding_status returns a step_guide
+  and a howTo on each step: for any pending step call the tool named in its
+  howTo.tool with howTo.args (the per-step tools are listed in responsibility 1).
+  Skip steps whose howTo.tool is null (the server passes those once you are
+  active). Stop when summary.completable is true.
 
 YOUR RESPONSIBILITIES, in priority order:
 
@@ -311,8 +333,9 @@ YOUR RESPONSIBILITIES, in priority order:
      price_offer; left pending it is auto-marked 'skipped' at completion).
 
    The test task (step 2) is NOT the end of onboarding -- after it succeeds,
-   re-check aimeat_onboarding_status and finish every remaining 'pending'
-   required step (commands above) before considering Hello Integration done.
+   re-check aimeat_onboarding_status and complete summary.next_required_step
+   via its howTo.tool until summary.completable is true. The offers above are
+   optional and never block completion.
 
    If aimeat_onboarding_confirm_directives_read returns INVALID_STEP or
    STEP_NOT_IN_FLOW, that step is outside your flow. Advance to the next

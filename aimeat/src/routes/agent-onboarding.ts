@@ -17,6 +17,11 @@
  *                            to GET /onboarding response. Surfaces SKILL.md "After Onboarding"
  *                            items as a machine-readable signal that doesn't vanish when the
  *                            onboarding-status flips to "completed".
+ *   v1.3.0 -- 2026-06-30 -- GET /onboarding now enriches each step with descriptionText
+ *                            (resolved i18n) + howTo (machine-readable tool+args), and adds
+ *                            top-level step_guide + summary (required/optional counts,
+ *                            completable, next_required_step). hints.next_step now prefers the
+ *                            next required step. All additive + computed on a copy.
  */
 
 import { Router, type Request } from 'express';
@@ -31,6 +36,7 @@ import { emitResourceUpdated } from '../mcp/index.js';
 import { createDefaultSteps, ONBOARDING_STEP_IDS, STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { validateStep, checkAutoSteps } from '../services/onboarding-validator.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
@@ -175,8 +181,12 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       hints.message = `Propose todos on your test task (PATCH /v1/agents/${agentName}/tasks/${testTaskId}) to proceed with step 9.`;
       hints.test_task_id = testTaskId;
     }
+    // Reachability summary + machine-readable how-to guidance. Completion gates only on
+    // required steps, so next_step now prefers the next required step (not pendingSteps[0],
+    // which could be an optional offers-ladder step that never unblocks completion).
+    const summary = buildOnboardingSummary(onboarding.steps);
     if (pendingSteps.length > 0) {
-      hints.next_step = pendingSteps[0].id;
+      hints.next_step = summary.next_required_step ?? pendingSteps[0].id;
     }
 
     // Post-onboarding checklist -- surfaces the SKILL.md "After Onboarding" items as a
@@ -187,7 +197,17 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     // though it's not gated by an onboarding step.
     const post_onboarding_checklist = await buildPostOnboardingChecklist(agentGaii, agentName, storage);
 
-    res.json(success(config.nodeId, { onboarding, hints, post_onboarding_checklist }));
+    // Enrich steps with descriptionText (resolved i18n) + howTo, and attach a flow-scoped
+    // step_guide + summary so a connector can drive each pending step deterministically
+    // (call howTo.tool with howTo.args; stop at summary.completable). Additive, computed on
+    // a copy -- the persisted record is untouched.
+    const onboardingOut = {
+      ...onboarding,
+      steps: enrichSteps(onboarding.steps, (k) => t(req, k), agentName),
+    };
+    const step_guide = buildStepGuide(onboarding.steps, agentName);
+
+    res.json(success(config.nodeId, { onboarding: onboardingOut, step_guide, summary, hints, post_onboarding_checklist }));
   });
 
   /* -- POST /v1/agents/:name/onboarding/start -- */

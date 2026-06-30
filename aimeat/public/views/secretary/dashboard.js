@@ -7,9 +7,13 @@
  *   collapsible "Manage & setup" disclosure header that tucks the set-up-once config cards away.
  *   The view (views/secretary.js) owns all state/handlers and passes them in; the config cards
  *   themselves still live in ./cards.js / ./cards-reach.js. Redesign: docs/internal/2026-06-25-secretary-view-redesign.md.
- * @structure quickActionRow · dashStatus · standPanel · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
- * @usage import { quickActionRow, dashStatus, standPanel, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
+ * @structure quickActionRow · dashStatus · standPanel · briefTrayCard · actionItemsCard · routinesCard · quickActionsManager · manageHeader (one render function each)
+ * @usage import { quickActionRow, dashStatus, standPanel, briefTrayCard, actionItemsCard, routinesCard, quickActionsManager, manageHeader } from '/views/secretary/dashboard.js';
  * @version-history
+ *   v0.10.0 — 2026-07-01 — Light-vs-heavy seam: briefTrayCard — the Work Brief tray. The cheap Secretary
+ *     detects structural gaps and proposes grounded briefs; this renders each with "Open in Claude Desktop"
+ *     (CopyButton with an MCP preface + the brief) and "Send to a connected Builder" (lane b dispatch), so
+ *     heavy work goes to a big AI via MCP and never gets cheap-authored here.
  *   v0.9.0 — 2026-06-28 — strategyCard: optional steering frame (vision/mission/principles/risks +
  *     current→target + ordered milestone gates with status/focus/reorder/goal-linking + AI re-plan).
  *   v0.8.0 — 2026-06-28 — secretaryDangerCard: a guarded "Reset Secretary" control (type RESET to wipe
@@ -33,6 +37,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 /** Core (+ later dynamic) quick actions: a button row above the chat. `items` are descriptors
  *  `{ key, label, title?, primary?, disabled?, hidden?, onClick }` so B3 can extend with dynamic actions. */
@@ -103,6 +108,57 @@ export function standPanel(p) {
           ${s.generatedAt ? html`<div class="sec-hint sec-stand-when">${t('secretary.dash.standAt')} ${new Date(s.generatedAt).toLocaleString()} · <button class="sec-linkbtn" onClick=${p.onRefresh}>${t('secretary.dash.refreshStand')}</button></div>` : null}
           ${s.issues && s.issues.length ? html`<div class="sec-hint sec-warn">⚠ ${t('secretary.next.verifyFlag')}: ${s.issues.join('; ')}</div>` : null}
           <div class="sec-stand-body"><${Markdown} text=${s.text} /></div>`}
+    </section>`;
+}
+
+/** Compose the paste a Builder receives in Claude Desktop: a one-line MCP preface + the full brief. */
+function heavyWorkPrompt(b) {
+  return `You're connected to my AIMEAT node via the appdev MCP (the aimeat_* tools). Please carry out this work brief end-to-end using those tools — build/fill via aimeat_workspace_* / aimeat_organism_*, ground everything in real sources, and never invent facts.\n\n${b.brief || ''}`;
+}
+
+/** One Work Brief row: objective + ws + a markdown preview + the two heavy-work lanes (Open in Claude
+ *  Desktop / Send to a connected Builder) + Done. The seam made physical — the cheap Secretary proposed
+ *  this; a Builder (a big AI via MCP) executes it. */
+function briefRow(b, p) {
+  const builders = p.builders || [];
+  const dispatched = b.status === 'dispatched';
+  return html`
+    <div class="sec-brief" key=${b.id}>
+      <div class="sec-brief-top">
+        <span class="sec-brief-badge ${dispatched ? 'is-dispatched' : ''}">${dispatched ? t('secretary.brief.dispatchedBadge') : t('secretary.brief.heavyBadge')}</span>
+        <span class="sec-brief-obj">${b.objective}</span>
+        ${b.wsName ? html`<span class="sec-hint sec-brief-ws">${b.wsName}</span>` : null}
+      </div>
+      <details class="sec-brief-detail">
+        <summary>${t('secretary.brief.preview')}</summary>
+        <div class="sec-brief-md"><${Markdown} text=${b.brief || ''} /></div>
+      </details>
+      <div class="sec-brief-actions">
+        <${CopyButton} text=${heavyWorkPrompt(b)} className="btn-primary btn-sm" label=${t('secretary.brief.openClaude')} />
+        ${builders.length ? html`
+          <select class="sec-select" disabled=${dispatched || p.dispatching === b.id}
+            onChange=${(e) => { const v = e.target.value; e.target.value = ''; if (v) p.onDispatch(b.id, v); }}>
+            <option value="">${dispatched ? t('secretary.brief.waiting') : t('secretary.brief.sendBuilder')}</option>
+            ${builders.map((a) => html`<option value=${a.gaii} key=${a.gaii}>${a.name}</option>`)}
+          </select>` : html`<span class="sec-hint">${t('secretary.brief.noBuilder')}</span>`}
+        <button class="btn-ghost btn-sm" onClick=${() => p.onResolve(b.id)}>${t('secretary.brief.done')}</button>
+      </div>
+    </div>`;
+}
+
+/** The Work Brief tray: heavy work the Secretary detected and prepared for a Builder. Null when empty
+ *  (no gaps → nothing to hand off). The clear divide between "watch + propose" (cheap, here) and
+ *  "build + author" (a big AI via MCP). */
+export function briefTrayCard(p) {
+  const briefs = p.briefs || [];
+  if (!briefs.length) return null;
+  return html`
+    <section class="sec-card sec-brief-tray">
+      <div class="sec-card-head">
+        <h2 class="sec-h2">${t('secretary.brief.title')} <span class="sec-count">${briefs.length}</span></h2>
+        <span class="sec-hint">${t('secretary.brief.subtitle')}</span>
+      </div>
+      ${briefs.map((b) => briefRow(b, p))}
     </section>`;
 }
 

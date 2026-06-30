@@ -19,6 +19,9 @@
  *   v1.1.7 -- 2026-05-28 -- Add shared owner-memory tag guidance
  *   v1.1.8 -- 2026-06-06 -- Message Threading guidance: pass linked_task_id so task messages group
  *     into one thread per task, instead of a new thread per question.
+ *   v1.1.9 -- 2026-06-30 -- Hello Integration: add the stepId -> real-tool table + anti-fabrication
+ *     warning (only five aimeat_onboarding_* tools exist; drive other steps via howTo.tool from
+ *     aimeat_onboarding_status; stop at summary.completable).
  */
 
 import { createHash } from 'node:crypto';
@@ -203,6 +206,22 @@ accepted by \`aimeat connect call <name>\`):
     aimeat_task_complete
     aimeat_onboarding_status
     \`\`\`
+
+**There are only five \`aimeat_onboarding_*\` tools** — \`status\`, \`identify_platform\`, \`confirm_skill_installed\`, \`confirm_directives_read\`, \`declare_services\`. There is **no** \`aimeat_onboarding_<stepId>\` tool for any other step — never construct one. \`aimeat_onboarding_status\` returns a \`step_guide\` and a \`howTo\` on every step; for each pending step call the tool named in its \`howTo.tool\` with \`howTo.args\`. Step → tool for the steps that have no dedicated onboarding tool:
+
+| pending step | tool to call |
+|--------------|--------------|
+| report_capabilities | \`aimeat_agent_capabilities_report\` |
+| send_test_message | \`aimeat_message_send\` |
+| report_telemetry | \`aimeat_agent_telemetry_report\` |
+| accept_test_task | \`aimeat_task_propose_todos\` (task id from \`hints.test_task_id\`) |
+| complete_test_task | \`aimeat_task_complete\` |
+| publish_commands | \`aimeat_memory_write\` → key \`agents.<your-name>.commands\` |
+| publish_config | \`aimeat_memory_write\` → key \`agents.config.<your-name>.*\` |
+| configure_delivery | none — auto-passes once you are active/polling |
+| declare_offerings / make_workflow_compatible / price_offer | \`aimeat_memory_write\` → key \`agents.<your-name>.offers\` (optional) |
+
+Stop as soon as \`summary.completable\` is true (every required step passed); the optional offers-ladder steps never block completion.
 
 Use \`${bundle.metadata.runtime}\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
 

@@ -4,6 +4,9 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.8.0 -- 2026-06-30 -- Onboarding checklist step labels use tOr() so a missing
+ *     agentOnboarding.steps.* key falls back to the server-provided step.title (which carries
+ *     the howTo-enriched onboarding payload) instead of rendering the raw i18n key.
  *   v1.7.0 -- 2026-06-10 -- Webhook fields (URL, fail count, Test/Edit) hidden while delivery
  *     is polling; a "+ Set up webhook" reveal opens the URL form for switching methods.
  *   v1.6.0 -- 2026-06-02 -- Component unification (#1): the 3 copy buttons (agent prompt,
@@ -29,7 +32,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { detectAgentState } from './state-detector.js';
@@ -241,7 +244,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, cur
             <span class="pf-agd-step-icon">
               ${step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
             </span>
-            <span class="pf-agd-step-name">${i + 1}. ${t('agentOnboarding.steps.' + step.id) || step.title || step.id}</span>
+            <span class="pf-agd-step-name">${i + 1}. ${tOr('agentOnboarding.steps.' + step.id, step.title || step.id)}</span>
             <span class="pf-agd-step-detail">
               ${step.validatedAt ? timeAgo(step.validatedAt) : ''}
               ${step.validationDetail ? ` -- ${step.validationDetail}` : ''}

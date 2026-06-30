@@ -559,7 +559,7 @@
     "wf": {
       "title": "Suunnittele workflow",
       "quick": "Suunnittele workflow",
-      "prompt": "Kuvaa haluttu lopputulema — ketjutan specialistisi/agenttisi workflow:ksi sen saavuttamiseksi.",
+      "prompt": "Kuvaa haluttu lopputulema — ketjutan specialistisi ja Builderit workflow:ksi (monivaiheinen putki) sen saavuttamiseksi.",
       "placeholder": "esim. Joka ilta kokoa päivän uutiset ja julkaise painos…",
       "design": "Suunnittele",
       "designing": "Suunnittelen ketjua…",
@@ -742,6 +742,7 @@
     "apply": "Pystytä sihteerini",
     "applying": "Pystytetään…",
     "hireDone": "Sihteerisi on pystytetty.",
+    "briefsReady": "Työbriiffit valmiina annettavaksi Builderille",
     "fillingWorkspaces": "Täytetään työtilojasi oikealla sisällöllä…",
     "workspacesFilled": "Työtilat täytetty oikealla sisällöllä",
     "workspacesFilledIssues": "näitä ei voitu vielä täyttää",
@@ -777,6 +778,13 @@
     "inappError": "Luonti epäonnistui",
     "inappEmpty": "AI ei palauttanut mitään.",
     "howIWork": "Miten toimin",
+    "autonomy": {
+      "suggest": "Vain ehdota",
+      "suggestHint": "Seuraan, pidän asiat ajan tasalla ja nostan esiin mikä vaatii huomiota — mutta kysyn ennen kuin toimin.",
+      "assist": "Hoida pienet asiat",
+      "assistHint": "Kirjaan myös muistiinpanot, muistutukset ja briiffit itse. Raskas työ on aina Work Brief jonka annat Builderille."
+    },
+    "advancedBands": "Lisäasetukset — kyvykkyyskohtainen hallinta",
     "stopSpending": "Lopeta kulutus",
     "stopSpendingHint": "Keskeytä kaikki mikä kuluttaa morsseja tai toimii itsenäisesti. Sihteeri voi yhä ajatella, luonnostella ja viestiä sinulle.",
     "dailyBudget": "Päivittäinen morssi-budjetti",
@@ -998,6 +1006,20 @@
     "reliability": "Luotettavuus",
     "reliabilityBuilding": "kerätään…",
     "reliabilityHint": "Sihteerin arvioitujen päätösten keskiarvopistemäärä — sen oma näyttö, ei markkinapaikan luottamus.",
+    "brief": {
+      "title": "Anna Builderille",
+      "subtitle": "Raskas työ jonka Sihteeri valmisteli — iso äly rakentaa sen MCP:llä. Et keksi sisältöä täällä.",
+      "heavyBadge": "Raskas",
+      "dispatchedBadge": "Lähetetty",
+      "preview": "Esikatsele briiffi",
+      "openClaude": "Avaa Claude Desktopissa",
+      "sendBuilder": "Lähetä kytketylle Builderille…",
+      "waiting": "Odotetaan Builderia…",
+      "noBuilder": "Kytke Builder lähettääksesi",
+      "done": "Valmis",
+      "dispatched": "Briiffi lähetetty Builderille.",
+      "dispatchFailed": "Briiffin lähetys epäonnistui."
+    },
     "dash": {
       "todayTitle": "Tänään",
       "refresh": "Päivitä",
@@ -1056,7 +1078,7 @@
       "startNewTitle": "Aloita jotain uutta",
       "nextStep": "Seuraava vaihe",
       "allSettled": "kaikki vaiheet käsitelty",
-      "hint": "Kerro tavoite — ehdotan toistettavan rutiinin. Hyväksy jokainen vaihe (lupakaistan mukaan), niin ajan sen ja seuraan tuloksia.",
+      "hint": "Kerro tavoite — ehdotan toistettavan rutiinin: kevyitä, toistuvia tarkistuksia jotka ajan ja seuraan itse (raskaaseen rakentamiseen annan Builderille Work Briefin). Hyväksy jokainen vaihe (lupakaistan mukaan).",
       "placeholder": "Missä haluat edistyä?",
       "propose": "Ehdota rutiinia",
       "proposing": "Suunnitellaan…",
@@ -1089,7 +1111,9 @@
       "delegateWorkflowPick": "Aja työnkulku…",
       "delegateWorkflowGo": "Aja työnkulku",
       "delegateDesignWf": "Suunnittele uusi workflow",
-      "delegatePick": "Valitse agentti…",
+      "delegatePick": "Valitse kuka ajaa sen…",
+      "delegateSpecialists": "Specialistit (node-paikalliset)",
+      "delegateBuilders": "Builderit (kytketty AI)",
       "delegateGo": "Delegoi",
       "delegateNoAgent": "Valitse ensin agentti, jolle delegoidaan",
       "delegateNoAgents": "Ei muita agentteja delegoitavaksi — yhdistä sellainen kohdassa Hallinta → tiimi.",
@@ -8125,7 +8149,10 @@
       "complete_test_task": "Suorita testitehtävä",
       "publish_commands": "Julkaise slash-komennot",
       "publish_config": "Julkaise runtime-konfiguraatio",
-      "declare_services": "Ilmoita palvelut"
+      "declare_services": "Ilmoita palvelut",
+      "declare_offerings": "Ilmoita tarjoukset",
+      "make_workflow_compatible": "Tee tarjouksesta työnkulkuyhteensopiva",
+      "price_offer": "Hinnoittele tarjous"
     },
     "stepDescriptions": {
       "authenticate": "Agentti on tunnistautunut laitevarmennuksen kautta",
