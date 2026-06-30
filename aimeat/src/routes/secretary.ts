@@ -217,7 +217,11 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
       const regKey = `organism.${orgId}.meta.workspaces`;
       const regRec = await storage.getMemory(ownerGhii, regKey);
       const wsEntries = ((regRec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
-      const wsList = wsEntries.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
+      let wsList = wsEntries.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
+      // Optional `ws`: fill just ONE workspace, so the setup UI can fill them one at a time and show
+      // live per-workspace progress instead of one long opaque call.
+      const onlyWs = typeof (req.body as { ws?: unknown })?.ws === 'string' ? (req.body as { ws: string }).ws : null;
+      if (onlyWs) wsList = wsList.filter((w) => w.id === onlyWs);
 
       // Author real content (act → publish), reusing the agentic, doc-first, retrying service. ADDITIVE
       // ONLY — a workspace that the fill couldn't populate stays exactly as it is; nothing is ever deleted.
