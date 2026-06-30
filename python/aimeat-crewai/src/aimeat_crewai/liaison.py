@@ -34,6 +34,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
+from .offers_tool import offers_tools
 from .paths import aimeat_home
 
 try:
@@ -180,11 +181,12 @@ Completing the onboarding test task (and the canonical task lifecycle):
    as the work completes.
 4. Call `aimeat_task_complete` ONCE with the task id.
 
-`aimeat_task_complete` is the final action. It satisfies the onboarding
-step `complete_test_task` AND fulfils any TODO whose verification is
-"task status is completed" -- one call covers both. When
-`aimeat_task_complete` returns success, the test task is finished;
-advance to the next pending onboarding step using your original snapshot.
+`aimeat_task_complete` is the final action OF THE TEST TASK. It satisfies the
+onboarding step `complete_test_task` AND fulfils any TODO whose verification is
+"task status is completed" -- one call covers both. The test task is NOT the
+end of Hello Integration: after it succeeds, call `aimeat_onboarding_status`
+again and finish every step still 'pending' -- starting with the command
+catalogue and offers below -- until no required step remains.
 
 When a task comes back in status 'revision_requested':
 
@@ -195,6 +197,19 @@ task event of type 'revision_requested'. Read the owner's message,
 then call `aimeat_task_propose_todos` again with the revised plan. The
 server preserves your prior proposal as 'outdated' history and flips
 the task back to 'queued' for the owner to review again.
+
+Publishing your command catalogue (onboarding step `publish_commands`):
+
+Register the owner-facing slash commands this crew actually understands by
+writing memory key `agents.{agent_name}.commands` with `aimeat_memory_write`
+(visibility="owner"). The value MUST be a non-empty flat array of
+`{{ "name", "description", "category" }}` objects, each name starting with "/".
+List the real commands the owner can send you in AIMEAT Messages -- not the
+aimeat_* MCP tool names, and never an empty array to silence the check. This
+step is REQUIRED for an interactive crew: onboarding stays incomplete until it
+passes. (If your crew genuinely has no command surface -- a pure task-runner --
+the step is outside your reduced flow and returns STEP_NOT_IN_FLOW; treat that
+as a no-op and move on.)
 
 Publishing offers (make the crew legible, chainable, optionally sellable):
 
@@ -208,8 +223,13 @@ guided template; GET /v1/agents/me/handbook/offerings for the how-to):
 - workflow-compatible: + success_signal (output OK) + required_to_function
   (input needed, or "none" for a source) + deliverable.location (a STABLE key).
 - priced: + price + visibility:"public" + callable (sell to other owners).
-Use the aimeat_offers_check tool to validate offline before publishing (and
-aimeat_offers_publish to publish). Your onboarding declare_offerings /
+You hold two local tools for this: call `aimeat_offers_check` to validate a
+draft offers document offline (it reports which levels each offer reaches and
+what is missing), then `aimeat_offers_publish` (pass the document + your agent
+name) to write it to `agents.{agent_name}.offers`. Publish at least one offer
+at the workflow-compatible level so this crew can be chained as a workflow step;
+add price + public visibility + callable ONLY if you actually intend to sell it
+(most crews skip pricing). Your onboarding declare_offerings /
 make_workflow_compatible / price_offer steps auto-tick once your published
 offers satisfy each level.
 
@@ -273,6 +293,26 @@ YOUR RESPONSIBILITIES, in priority order:
      visibility="owner" -- this satisfies publish_config
    - aimeat_onboarding_confirm_directives_read AFTER first calling
      aimeat_handbook_get (empty input is fine)
+   - aimeat_memory_write key="agents.{agent_name}.commands" with a non-empty
+     flat array of {{"name":"/<cmd>", "description":"<what it does>",
+     "category":"<group>"}} -- the owner-facing slash commands this crew can
+     answer in AIMEAT Messages, NOT the aimeat_* tool names. This satisfies the
+     REQUIRED publish_commands step; an empty array does not count. (A pure
+     task-runner with no command surface gets STEP_NOT_IN_FLOW here -- treat as
+     a no-op.)
+   - PUBLISH OFFERS so this crew is findable + chainable: call
+     aimeat_offers_check to validate a draft offers document, then
+     aimeat_offers_publish (document + this agent name) to write
+     agents.{agent_name}.offers. At minimum publish one offer at the
+     workflow-compatible level (id + title + ask + success_signal +
+     required_to_function + deliverable.location) -- this satisfies
+     declare_offerings and make_workflow_compatible. Add price + public
+     visibility + callable only if you intend to sell it (most crews skip
+     price_offer; left pending it is auto-marked 'skipped' at completion).
+
+   The test task (step 2) is NOT the end of onboarding -- after it succeeds,
+   re-check aimeat_onboarding_status and finish every remaining 'pending'
+   required step (commands above) before considering Hello Integration done.
 
    If aimeat_onboarding_confirm_directives_read returns INVALID_STEP or
    STEP_NOT_IN_FLOW, that step is outside your flow. Advance to the next
@@ -410,6 +450,7 @@ def create_liaison_agent(
     goal: str = DEFAULT_GOAL,
     backstory: str | None = None,
     tool_filter: Iterable[str] | None = None,
+    include_offers_tools: bool = True,
     verbose: bool = False,
     allow_delegation: bool = False,
     **agent_kwargs: Any,
@@ -435,7 +476,16 @@ def create_liaison_agent(
             restrict the liaison to e.g. memory + knowledge only and forbid
             it from touching the wallet. Tool names are exact (e.g.
             "aimeat_memory_write"). If None (default), the liaison sees the
-            full surface the AIMEAT node exposes.
+            full surface the AIMEAT node exposes. The local offers tools
+            (see `include_offers_tools`) are NOT subject to this filter --
+            they are appended after filtering.
+        include_offers_tools: When True (default), append the two local
+            CrewAI offers tools (`aimeat_offers_check` / `aimeat_offers_publish`)
+            to the toolset so the liaison can self-validate and publish its
+            `agents.{name}.offers` document during Hello Integration (the
+            declare_offerings / make_workflow_compatible / price_offer steps).
+            These run offline + over REST; they are not MCP tools, so a
+            `tool_filter` never strips them. Set False to omit them.
         verbose: Pass through to crewai.Agent for verbose logging.
         allow_delegation: Pass through to crewai.Agent. Default False because
             the liaison's role is narrow.
@@ -512,6 +562,16 @@ def create_liaison_agent(
         # omitted optionals don't leak through as JSON null and trip AIMEAT's
         # zod .optional() validation. See _strip_none_kwargs docstring.
         tools = [_strip_none_kwargs(t) for t in tools]
+
+        # Append the local offers tools (offline validate + REST publish). They
+        # are NOT part of the MCP surface, so the tool_filter above never reaches
+        # them -- without this, the backstory's references to aimeat_offers_check
+        # / aimeat_offers_publish point at tools the agent doesn't actually hold,
+        # and the make_workflow_compatible / price_offer onboarding steps have no
+        # way to complete. crewai is guaranteed importable here (we build an
+        # Agent below), so offers_tools() will not raise.
+        if include_offers_tools:
+            tools.extend(offers_tools())
 
         agent_args: dict[str, Any] = {
             "role": role,
