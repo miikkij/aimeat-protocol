@@ -226,7 +226,8 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
       // Author real content (act → publish), reusing the agentic, doc-first, retrying service. ADDITIVE
       // ONLY — a workspace that the fill couldn't populate stays exactly as it is; nothing is ever deleted.
       const authored = await authorWorkspaceContent(storage, config, ownerGhii, owner, active, wsList, {
-        openGoals, band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries, appId: 'setup:author',
+        openGoals, band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries,
+        retryOnEmpty: true, appId: 'setup:author',
       });
 
       emitChange('organisms');

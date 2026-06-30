@@ -11,6 +11,12 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.24.0 — 2026-06-30 — Never-empty + honest fill result. normalizeInlineManifest now GUARANTEES every
+ *     workspace has a document space (appends a "Muistiinpanot" doc space when the design gave only records
+ *     spaces) so the setup fill always has a thinking-home, and is genuinely document-first for unspecified
+ *     spaces. The per-workspace fill loop counts a workspace as filled ONLY on a real 🖊️ authored line (not
+ *     a ⚠️ summary), retries the HTTP call once (flaky owl-alpha), and the toast names workspaces it
+ *     couldn't fill instead of a bare count.
  *   v0.23.0 — 2026-06-30 — Autonomy chosen up front: "Set up my Secretary" first asks HOW autonomous it
  *     should be (Prepare/Draft · Run/Act · Only-when-I-ask/Off), each explained in plain words incl. the
  *     AI-credit cost, BEFORE anything runs — so nobody stumbles into Act bands later. The choice sets the
@@ -337,7 +343,13 @@ export default function SecretaryView() {
       o.cardinality = o.cardinality === 'one' ? 'one' : 'many';
       o.versioned = o.versioned !== false;
       o.schemaRef = o.schemaRef || ('schema:' + wsSlug(o.name) + '@1');
-      if (o.mode !== 'document') o.mode = ((Array.isArray(o.fields) && o.fields.length) || schemas[ns]) ? 'records' : 'document';
+      // Document-first: keep an explicit mode as the design gave it; for an UNSPECIFIED space default to a
+      // DOCUMENT (flexible information — the common case) unless the design clearly describes a record list
+      // (real fields, or a schema already supplied for it). A records space is for same-shaped, list-like
+      // data (actions/tasks/bugs/a pipeline/a tracker) only.
+      if (o.mode !== 'document' && o.mode !== 'records') {
+        o.mode = ((Array.isArray(o.fields) && o.fields.length) || schemas[ns]) ? 'records' : 'document';
+      }
       if (o.mode !== 'document' && o.backing === 'memory' && !schemas[ns]) {
         const props = {}; (o.fields || []).forEach((f) => { if (f && f.name) props[f.name] = { type: WS_TYPE_MAP[f.type] || 'string' }; });
         if (!props.id) props.id = { type: 'string' };
@@ -345,6 +357,15 @@ export default function SecretaryView() {
       }
       return o;
     });
+    // Never-empty guarantee: every workspace needs at least one DOCUMENT space — a free-markdown "thinking
+    // home" the setup fill can always author grounded content into, even when the design gave only records
+    // spaces (records are real-data-only and legitimately start empty). Append a default document space when
+    // the design provided none. Additive + idempotent: only when no document space exists.
+    if (!manifest.objectTypes.some((o) => o.mode === 'document')) {
+      let dns = 'shared.muistiinpanot';
+      if (manifest.objectTypes.some((o) => o.namespace === dns)) dns = 'shared.muistiinpanot-' + wsSlug(name);
+      manifest.objectTypes.push({ name: 'Muistiinpanot', namespace: dns, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, schemaRef: 'schema:doc@1', mode: 'document' });
+    }
   };
   // A plain document space (free markdown) — the deterministic fallback so a workspace with no usable
   // manifest still gets a valid structure at setup, without any AI call.
@@ -460,15 +481,22 @@ export default function SecretaryView() {
       // so the setup view shows live per-workspace progress (the slow part — a flaky/slow model). The panel
       // stays as a progress view until done. Only on a fresh hire, so it never touches existing content.
       if (isNew && fillTargets.length) {
-        let filled = 0;
+        let filled = 0; const problems = [];
         for (let i = 0; i < fillTargets.length; i++) {
           setSetupStep({ phase: 'fill', done: i, total: fillTargets.length, name: fillTargets[i].name });
-          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({ ws: fillTargets[i].id }), timeoutMs: 1_800_000, retries: 0 }).catch(() => null);
-          if (r && r.data && (r.data.authored || []).length) filled++;
+          // retries:1 — one HTTP retry recovers a flaky owl-alpha 400 on this one-time, user-clicked fill.
+          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({ ws: fillTargets[i].id }), timeoutMs: 1_800_000, retries: 1 }).catch(() => null);
+          // Count a workspace as filled ONLY when something was actually authored (🖊️ line), not when the
+          // server returned a ⚠️ "couldn't fill / nothing usable" summary — so the result is honest.
+          const summaries = (r && r.data && Array.isArray(r.data.authored)) ? r.data.authored : [];
+          if (summaries.some((s) => typeof s === 'string' && s.indexOf('🖊️') === 0)) filled++;
+          else problems.push(fillTargets[i].name);
           window.dispatchEvent(new CustomEvent('aimeat-live-update')); // each finished workspace shows up live
         }
         setSetupStep({ phase: 'done', done: fillTargets.length, total: fillTargets.length });
-        showToast(`${t('secretary.workspacesFilled')} (${filled}/${fillTargets.length})`);
+        const head = `${t('secretary.workspacesFilled')} (${filled}/${fillTargets.length})`;
+        if (problems.length) showToast(`${head} — ${t('secretary.workspacesFilledIssues')}: ${problems.join(', ')}`, true);
+        else showToast(head);
       } else {
         showToast(t('secretary.hireDone'));
       }

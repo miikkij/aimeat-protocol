@@ -17,6 +17,16 @@
  * @structure authorWorkspaceContent(storage, config, owner, ownerName, active, wsList, opts) · pure helpers
  * @usage import { authorWorkspaceContent } from './secretary-authoring.js';
  * @version-history
+ *   v0.6.0 — 2026-06-30 — Never-empty + document-first + agentic. The fill prompt now (1) stays scoped to ONE
+ *     workspace (no cross-workspace bleed), (2) reframes DOCUMENTS as where the secretary THINKS — grounded
+ *     reasoning/plans are wanted; "don't invent" forbids fabricating FACTS, not thinking — so a workspace
+ *     gets a real document instead of staying blank, (3) drops the copy-able "a clear title" skeleton example
+ *     and guards placeholder-echo titles/markdown on write, and (4) adds an opt-in `retryOnEmpty` (set by the
+ *     user-initiated setup fill, off for the tick) that re-prompts ONCE when a workspace produced no usable
+ *     document — covering a reply that didn't parse, mislabelled the space, or was a placeholder (a parse
+ *     failure now flows into the retry instead of skipping it). writeDocs also accepts the document when
+ *     there is exactly ONE document space and the model misspelled its name. Pairs with the frontend
+ *     guaranteeing every workspace has a document space. Browser-verified end-to-end on owl-alpha/free.
  *   v0.5.0 — 2026-06-30 — Stop hallucinating: the fill is GROUNDED. Per workspace it queries Discovery
  *     (scope=own) for the owner's real material and feeds it as cited sources; the prompt now forbids
  *     inventing facts/data, makes DOCUMENTS the place for realistic grounded thinking (approaches/plans,
@@ -73,6 +83,10 @@ export interface AuthoringOptions {
   /** How many times to RETRY a transient provider failure (flaky stealth endpoints intermittently 400/429/
    *  502 — owl-alpha works but errors occasionally). Honours the owner's autoRetry/maxRetries. 0 = no retry. */
   maxRetries?: number;
+  /** Re-prompt ONCE, more firmly, when a workspace parsed fine but produced no usable document — so the
+   *  document "thinking home" never ends up blank. Set for the user-initiated setup fill; the autonomous
+   *  tick leaves it off so tick economics are unchanged. Budget-gated like any other call. */
+  retryOnEmpty?: boolean;
   /** Test seam: override the per-workspace AI completion. Defaults to completeForOwner(owner). */
   complete?: (args: { prompt: string; systemPrompt: string; appId: string }) => Promise<{ content: string }>;
 }
@@ -156,6 +170,13 @@ function extractJsonObject(text: string): Record<string, unknown> | null {
 function slugId(title: string, prefix: string): string {
   const base = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   return `${base || prefix}-${randomUUID().slice(0, 6)}`;
+}
+
+/** Reject a title/markdown that just echoes the prompt skeleton ("a clear title", a bare "<…>" placeholder,
+ *  "title"/"otsikko"/"untitled") instead of real authored content — a weak model copies the example verbatim. */
+function isPlaceholderEcho(s: string): boolean {
+  const t = String(s || '').trim();
+  return !t || /^<[^>]*>$/.test(t) || /^(a clear title|title|otsikko|untitled)$/i.test(t);
 }
 
 /**
@@ -262,17 +283,17 @@ export async function authorWorkspaceContent(
 
     const systemPrompt = `You are ${ownerName}'s personal Secretary, working autonomously (the owner is not present) in the "${active.name || 'personal'}" context. ${active.brain?.purpose || ''}\n\n`
       + `GROUNDING RULES — follow them strictly:\n`
-      + `1. Base everything ONLY on the owner's real material: the strategy, this workspace's purpose, and the Discovery sources listed below. Do NOT invent facts, data, names, numbers, dates or events. When you state a fact, make clear where it comes from (the strategy, a Discovery source, the workspace intro).\n`
-      + `2. DOCUMENTS are where you THINK: realistic approaches, plans, analysis, how to tackle something (e.g. how to approach this area's marketing). Your own reasoning and proposals are WELCOME and the point here — but keep them realistic and grounded, and flag any assumption AS an assumption ("Oletus: …"). ${opts.useGeneralKnowledge ? 'You may bring general know-how to reason well.' : 'Stick to the owner\'s own material.'}\n`
-      + `3. RECORDS are real DATA only. NEVER invent record entries. Fill a records space only with concrete, real items grounded in the material above; if there is no real data for it, return NO records for that space.\n`
+      + `1. Stay INSIDE this one workspace's purpose. Write only what belongs to THIS workspace; if some material clearly belongs to a different area, leave it out here — never pull other workspaces' topics into this one.\n`
+      + `2. DOCUMENTS are where you THINK, and thinking is the whole point: write the realistic approach, plan or analysis for THIS area (e.g. how to approach this area's marketing) — your own reasoning and proposals are WELCOME. "Do not invent" means do NOT fabricate FACTS, data, names, numbers, dates or events; it does NOT mean stay silent. Reason from the strategy, this workspace's purpose and the Discovery sources, and flag anything you are assuming AS an assumption ("Oletus: …"). ${opts.useGeneralKnowledge ? 'You may bring general know-how to reason well.' : 'Stick to the owner\'s own material.'}\n`
+      + `3. RECORDS are real DATA only. NEVER invent record entries. Fill a records space only with concrete, real items grounded in the material above; if there is no real data for it, return NO records for that space — that is fine, the document carries the thinking.\n`
       + `Write in the owner's language. Return ONLY a JSON object — no prose around it.`;
     const prompt = `Workspace: "${ws.name}"${readme ? `\nWorkspace intro:\n${readme.slice(0, 1200)}` : ''}\n${strategyBlock}\n\nOpen goals:\n${goalLines}${groundBlock}\n\n`
-      + `DOCUMENT spaces to fill (the IMPORTANT part — write one substantial, realistic document for EACH; this is where your grounded thinking goes):\n${docList}\n\n`
+      + `Write a substantial, grounded thinking document for EACH document space below — this is the IMPORTANT part: real analysis/plan/approach specific to THIS workspace's area, useful and concrete, never a placeholder. DOCUMENT spaces:\n${docList}\n\n`
       + `RECORD spaces (structured data — fill ONLY with real, grounded entries; if you have no real data, leave the records array empty for that space — do NOT invent):\n${recList}\n\n`
-      + `Return a JSON object EXACTLY like:\n`
-      + `{\n  "documents": [ { "space": "<exact document space name>", "title": "a clear title", "markdown": "# Title\\n\\nGrounded, realistic content…" } ],\n`
-      + `  "records": [ { "space": "<exact record space name>", "record": { "<field>": "<value>" } } ]\n}\n`
-      + `Prefer filling DOCUMENTS richly and well; leave a records space empty rather than inventing entries. Use the EXACT space names above. `
+      + `Return a JSON object in EXACTLY this shape, replacing every <…> with real content (do NOT copy the angle-bracket text itself):\n`
+      + `{\n  "documents": [ { "space": "<one of the exact document space names above>", "title": "<a specific, descriptive title for this document>", "markdown": "<the document body, in markdown>" } ],\n`
+      + `  "records": [ { "space": "<one of the exact record space names above>", "record": { "<field>": "<value>" } } ]\n}\n`
+      + `Fill DOCUMENTS richly and well; leave a records space empty rather than inventing entries. Use the EXACT space names above. `
       + 'A document MAY include a ```mermaid fenced block (it renders as a real chart) — but JUDICIOUSLY, only where a flow, sequence, timeline or relationship genuinely clarifies; most documents need none.';
 
     let reply: string;
@@ -287,30 +308,36 @@ export async function authorWorkspaceContent(
       result.summaries.push(`⚠️ Couldn't author into ${ws.name}: ${(e as Error)?.message || 'the AI call failed'}`);
       continue;
     }
+    // Parse the reply (tolerant of fences/prose). A parse failure is NOT fatal here: it flows into the
+    // retry-on-empty below (docCount stays 0) so the document thinking-home still gets a shot, instead of
+    // the workspace silently vanishing — a flaky model returning not-quite-JSON is the most common failure.
     const parsed = extractJsonObject(reply);
-    if (!parsed) {
-      logger.warn('Secretary authoring: reply did not parse as JSON', { ws: ws.name, head: reply.slice(0, 300) });
-      result.summaries.push(`⚠️ Couldn't author into ${ws.name}: the AI reply was not usable JSON`);
-      continue;
-    }
+    if (!parsed) logger.warn('Secretary authoring: reply did not parse as JSON', { ws: ws.name, head: reply.slice(0, 300) });
 
-    let docCount = 0; let recCount = 0;
+    let recCount = 0;
     const docByName = new Map(docTargets.map((o) => [o.name as string, o]));
     const recByName = new Map(recTargets.map((o) => [o.name as string, o]));
 
-    // Documents (priority — free markdown, no schema to fight).
-    const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
-    for (const d of documents) {
-      if (!d || typeof d !== 'object') continue;
-      const dd = d as Record<string, unknown>;
-      const ot = docByName.get(String(dd.space ?? '').trim());
-      const title = String(dd.title ?? '').trim();
-      const markdown = String(dd.markdown ?? '').trim();
-      if (!ot || !ot.namespace || !title || !markdown) continue;
-      const id = slugId(title, 'doc');
-      const res = await writeAndMaybePublish(storage, config, root, ot.namespace, id, { id, title: title.slice(0, 200), markdown }, doPublish, writerGaii);
-      if (res.writes.length) { result.writes.push(...res.writes); docCount++; }
-    }
+    // Documents (priority — free markdown, no schema to fight). Skip any whose title/markdown just echoes
+    // the prompt skeleton (e.g. "a clear title", a bare "<…>"). When there is exactly ONE document space,
+    // accept the model's document even if it mislabelled the space name (flaky models misspell it).
+    const writeDocs = async (documents: unknown): Promise<number> => {
+      let n = 0;
+      for (const d of (Array.isArray(documents) ? documents : [])) {
+        if (!d || typeof d !== 'object') continue;
+        const dd = d as Record<string, unknown>;
+        let ot = docByName.get(String(dd.space ?? '').trim());
+        if (!ot && docTargets.length === 1) ot = docTargets[0];
+        const title = String(dd.title ?? '').trim();
+        const markdown = String(dd.markdown ?? '').trim();
+        if (!ot || !ot.namespace || !title || !markdown || isPlaceholderEcho(title) || /^<[^>]*>$/.test(markdown)) continue;
+        const id = slugId(title, 'doc');
+        const res = await writeAndMaybePublish(storage, config, root, ot.namespace, id, { id, title: title.slice(0, 200), markdown }, doPublish, writerGaii);
+        if (res.writes.length) { result.writes.push(...res.writes); n++; }
+      }
+      return n;
+    };
+    let docCount = parsed ? await writeDocs(parsed.documents) : 0;
 
     // Records (secondary) — AGENTIC: write each, and when the schema REJECTS one, feed the exact errors
     // back to the model for a bounded correction round (read→write→see-error→correct), instead of
@@ -325,7 +352,7 @@ export async function authorWorkspaceContent(
           return { space: String(r.space ?? '').trim(), record: (rec && typeof rec === 'object' && !Array.isArray(rec)) ? rec as Record<string, unknown> : {} };
         })
         .filter((x) => x.space && Object.keys(x.record).length > 0);
-    let pending = toPending(parsed.records);
+    let pending = parsed ? toPending(parsed.records) : [];
     for (let round = 0; round <= MAX_CORRECTION && pending.length; round++) {
       const rejected: Array<{ space: string; record: Record<string, unknown>; errors: unknown }> = [];
       for (const item of pending) {
@@ -347,6 +374,21 @@ export async function authorWorkspaceContent(
         result.morsels += 1;
         pending = toPending(extractJsonObject(fix.content)?.records);
       } catch (e) { logger.warn('Secretary authoring: correction call failed', { ws: ws.name, error: (e as Error)?.message }); break; }
+    }
+
+    // Retry-on-empty (agentic, setup only): the document space is the guaranteed thinking-home — if the model
+    // produced no usable document (whether the reply didn't parse, mislabelled the space, or was a
+    // placeholder), re-prompt ONCE, more firmly, before giving up, instead of leaving the workspace blank.
+    // Records legitimately empty is fine and does not trigger this. Budget-gated.
+    if (opts.retryOnEmpty && docCount === 0 && docTargets.length
+        && (opts.budgetRemaining === null || result.morsels < opts.budgetRemaining)) {
+      const retryPrompt = prompt
+        + `\n\nIMPORTANT: your previous answer ${parsed ? 'produced no usable document' : 'was not valid JSON'}. Return ONLY one valid JSON object — no prose before or after it, and every string properly escaped — in the EXACT shape shown above, containing at least one substantial document for a document space named above: a specific title (never "a clear title" or any "<…>" placeholder) and a multi-paragraph markdown body of real analysis/plan for "${ws.name}".`;
+      try {
+        const retry = await completeWithRetry(runComplete, { prompt: retryPrompt, systemPrompt, appId: opts.appId }, opts.maxRetries ?? 0, `${ws.name} (retry-on-empty)`);
+        result.morsels += 1;
+        docCount += await writeDocs(extractJsonObject(retry.content)?.documents);
+      } catch (e) { logger.warn('Secretary authoring: retry-on-empty failed', { ws: ws.name, error: (e as Error)?.message }); }
     }
 
     if (docCount || recCount) {

@@ -8,6 +8,10 @@
  * @structure CONTRACT · buildInterviewPrompt · buildDesignPrompt · extractJson · snapshotOf · genCtxId · sanitizeQuickActions · migrateConfig · buildDecisionRecord
  * @usage import { buildInterviewPrompt, extractJson, sanitizeQuickActions, migrateConfig } from '/js/services/secretary-helpers.js';
  * @version-history
+ *   v0.7.0 — 2026-06-30 — Sharpen the CONTRACT to state the rule plainly: DOCUMENTS ARE THE DEFAULT (most
+ *     workspaces are flexible information → mostly/all document spaces); a RECORDS space is only for
+ *     same-shaped, list-like data (actions/tasks/bugs/pipeline/tracker) and legitimately starts empty —
+ *     so the user's AI stops over-producing rigid record spaces that the don't-invent fill leaves blank.
  *   v0.6.0 — 2026-06-30 — CONTRACT steers the design toward DOCUMENT spaces (free-form markdown, the
  *     default) and treats RECORDS spaces as the exception (only genuine lists/task-sets) — workspaces
  *     were coming out mostly as rigid record spaces.
@@ -85,10 +89,10 @@ export const CONTRACT = `\`\`\`json
 }
 \`\`\`
 
-A workspace's "manifest.objectTypes" are its SPACES, and each space is one of two kinds. PREFER DOCUMENT spaces:
-- A DOCUMENT space — free-form markdown pages about a topic (guides, write-ups, notes, plans, analysis, anything). Declare it as { "name": "<type>", "namespace": "<ns>", "mode": "document" } with NO fields and NO schema. This is the DEFAULT choice: it holds any kind of information and can be shaped freely, so most spaces should be document spaces.
-- A RECORDS space — a schema-locked list where every entry shares the SAME fixed fields. Use this ONLY when the content is genuinely a list or task-like set (a pipeline, a task list, a tracker). Declare it as { "name": "<type>", "namespace": "<ns>", "mode": "records", "fields": [ { "name": "<field>", "type": "text|number|date|select|boolean|reference" } ] } AND provide a matching JSON Schema under "schemas" keyed by its namespace.
-Lean toward document spaces; reach for a records space only when fixed, repeating fields clearly fit. Full manifest shape: { "manifestVersion": "1.0", "name": "<the workspace name>", "kind": "<short-slug>", "status": "active", "objectTypes": [ …the spaces above ] }.
+A workspace's "manifest.objectTypes" are its SPACES, and each space is one of two kinds. DOCUMENTS ARE THE DEFAULT — most workspaces are flexible information and should be all (or mostly) document spaces:
+- A DOCUMENT space — free-form markdown pages about a topic (guides, write-ups, notes, plans, analysis, anything). Declare it as { "name": "<type>", "namespace": "<ns>", "mode": "document" } with NO fields and NO schema. This is the DEFAULT: it holds any kind of information and can be shaped and edited freely. When in doubt, use a document space.
+- A RECORDS space — a schema-locked list where every entry shares the SAME fixed fields. Use this ONLY for genuinely list-like, repeating data: actions, tasks, bugs, a sales pipeline, a tracker — the SAME shape over and over, that you add rows to over time. Declare it as { "name": "<type>", "namespace": "<ns>", "mode": "records", "fields": [ { "name": "<field>", "type": "text|number|date|select|boolean|reference" } ] } AND provide a matching JSON Schema under "schemas" keyed by its namespace. A records space legitimately starts empty and fills as real items occur — so do not use one for content you want written up now.
+Default to document spaces; reach for a records space only when same-shaped, list-like rows clearly fit. A workspace may be entirely document spaces. Full manifest shape: { "manifestVersion": "1.0", "name": "<the workspace name>", "kind": "<short-slug>", "status": "active", "objectTypes": [ …the spaces above ] }.
 If you are NOT confident you can produce a VALID manifest + schemas, OMIT both fields for that workspace — they will be designed automatically afterward. Never output an invalid or half-finished manifest.
 
 "strategy" is the OPTIONAL steering frame for this area: where we are, where we're going, and how. Include it ONLY when the user wants this area steered that way (many goal-driven areas benefit; some areas are just ongoing upkeep — then OMIT the field entirely). EVERY sub-field is itself optional — include only the ones the user gave you real material for; never invent vision/mission/progress/names. When included:
