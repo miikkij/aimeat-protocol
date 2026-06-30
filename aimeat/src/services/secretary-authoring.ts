@@ -17,6 +17,8 @@
  * @structure authorWorkspaceContent(storage, config, owner, ownerName, active, wsList, opts) · pure helpers
  * @usage import { authorWorkspaceContent } from './secretary-authoring.js';
  * @version-history
+ *   v0.4.0 — 2026-06-30 — Authoring prompt now tells the model it MAY use ```mermaid diagrams in documents
+ *     (the doc viewer renders them) — but judiciously, only where a chart genuinely clarifies, never by default.
  *   v0.3.0 — 2026-06-30 — Retry transient provider failures (completeWithRetry), honouring the owner's
  *     autoRetry/maxRetries. Stealth/alpha endpoints (owl-alpha) intermittently 400 and succeed on the next
  *     attempt — a single try killed the authoring even though the model is fine; permanent failures (bad
@@ -242,7 +244,8 @@ export async function authorWorkspaceContent(
       + `Return a JSON object EXACTLY like:\n`
       + `{\n  "documents": [ { "space": "<exact document space name above>", "title": "a clear title", "markdown": "# Title\\n\\nReal, structured content in markdown…" } ],\n`
       + `  "records": [ { "space": "<exact record space name above>", "record": { "<field>": "<value>", "...": "..." } } ]\n}\n`
-      + `Make every document genuinely useful and specific to this area — headings, substance, not a placeholder. Use the EXACT space names listed above. If a space truly has nothing to add, omit it.`;
+      + `Make every document genuinely useful and specific to this area — headings, substance, not a placeholder. Use the EXACT space names listed above. If a space truly has nothing to add, omit it. `
+      + 'A document MAY include a Mermaid diagram via a ```mermaid fenced code block (it renders as a real chart) — but use it JUDICIOUSLY, only where a flowchart, sequence, timeline or relationship genuinely clarifies the content. Do NOT add diagrams by default or decoratively; most documents need none.';
 
     let reply: string;
     try {
