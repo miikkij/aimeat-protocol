@@ -11,6 +11,10 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.22.0 — 2026-06-30 — Live setup progress: the fill runs ONE workspace at a time (author-now?ws=)
+ *     and a top-level overlay (survives the hire→dashboard switch) shows "Filling workspace N/total ·
+ *     <name>" + a progress bar through the whole slow fill, instead of a couple of fleeting toasts.
+ *     Browser-verified: overlay cycled 1/2 → 2/2 with the bar advancing.
  *   v0.21.0 — 2026-06-30 — Deterministic workspace structure (NO AI): genAndApplyManifest normalizes any
  *     design-provided inline manifest into a valid one (fixes namespace form + backfills schemaRef/backing/
  *     writeRole/mode, rekeys schemas, derives a records schema when missing) and falls back to a plain
@@ -119,6 +123,7 @@ export default function SecretaryView() {
   const [result, setResult] = useState('');
   const [needs, setNeeds] = useState('');
   const [applying, setApplying] = useState(false);
+  const [setupStep, setSetupStep] = useState(null);      // live setup progress: { phase, done, total, name }
   const [generating, setGenerating] = useState(false);
   const [showHire, setShowHire] = useState(false);
   const [hireMode, setHireMode] = useState('new');       // 'new' (add context) | 'edit' (re-run active)
@@ -373,6 +378,8 @@ export default function SecretaryView() {
       }
       const newBrain = { purpose: b.purpose, rules };
       const isNew = hireMode === 'new' || !active;
+      setSetupStep({ phase: 'structure' });   // live progress: building the space + workspaces
+      let fillTargets = [];                    // [{ id, name }] of new workspaces to fill one at a time
 
       let next;
       if (isNew) {
@@ -394,6 +401,7 @@ export default function SecretaryView() {
           }
           // Design + apply each workspace's manifest in parallel so they come out usable, not empty shells.
           await Promise.all(created.map((c) => genAndApplyManifest(orgId, c.wsId, c.ws)));
+          fillTargets = created.map((c) => ({ id: c.wsId, name: String((c.ws && c.ws.name) || '').trim() || c.wsId }));
         }
         // B3: seed the brain-proposed quick actions — active on hire (run verbs are dropped by the sanitizer).
         const quickActions = sanitizeQuickActions(json.quickActions, 'brain', 'active');
@@ -438,28 +446,27 @@ export default function SecretaryView() {
       await persistConfig(next);
       await syncDirectives(newBrain);
       window.dispatchEvent(new CustomEvent('aimeat-live-update')); // refresh goals/learning + cards
-      showToast(t('secretary.hireDone'));
-      setResult(''); setNeeds(''); setShowHire(false);
-      // Fill the brand-new workspaces with REAL content right at handshake (documents first), and drop any
-      // that stay empty ("empty workspace = useless"). A slow model can take a while — long timeout, no retry
-      // (the server already retries flaky models). Only on a fresh hire, so it never touches existing content.
-      if (isNew) {
-        showToast(t('secretary.fillingWorkspaces'));
-        try {
-          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({}), timeoutMs: 1_800_000, retries: 0 });
-          const d = (r && r.data) || {};
-          const filled = (d.authored || []).length;
-          const removed = (d.removedEmptyWorkspaces || []).length;
-          showToast(`${t('secretary.workspacesFilled')} (${filled})${removed ? ` — ${t('secretary.emptyRemoved')}: ${removed}` : ''}`);
-          window.dispatchEvent(new CustomEvent('aimeat-live-update'));
-        } catch (e) {
-          showToast(`${t('secretary.fillError')}: ${e.message}`, true);
+      // Fill the brand-new workspaces with REAL content right at handshake (documents first), ONE AT A TIME
+      // so the setup view shows live per-workspace progress (the slow part — a flaky/slow model). The panel
+      // stays as a progress view until done. Only on a fresh hire, so it never touches existing content.
+      if (isNew && fillTargets.length) {
+        let filled = 0;
+        for (let i = 0; i < fillTargets.length; i++) {
+          setSetupStep({ phase: 'fill', done: i, total: fillTargets.length, name: fillTargets[i].name });
+          const r = await api('/v1/secretary/author-now', { method: 'POST', body: JSON.stringify({ ws: fillTargets[i].id }), timeoutMs: 1_800_000, retries: 0 }).catch(() => null);
+          if (r && r.data && (r.data.authored || []).length) filled++;
+          window.dispatchEvent(new CustomEvent('aimeat-live-update')); // each finished workspace shows up live
         }
+        setSetupStep({ phase: 'done', done: fillTargets.length, total: fillTargets.length });
+        showToast(`${t('secretary.workspacesFilled')} (${filled}/${fillTargets.length})`);
+      } else {
+        showToast(t('secretary.hireDone'));
       }
+      setResult(''); setNeeds(''); setShowHire(false);
     } catch (e) {
       showToast(`${t('secretary.hireError')}: ${e.message}`, true);
     } finally {
-      setApplying(false);
+      setApplying(false); setSetupStep(null);
     }
   }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, seedGoals, genAndApplyManifest, showToast]);
 
@@ -945,7 +952,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         ? html`<div class="sec-empty">${hasOpenRouterKey ? t('secretary.provisioning') : t('secretary.notReady')}</div>`
         : html`
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
-            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, current: hireMode === 'edit' ? active : null, needs, setNeeds, result, setResult, applying, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
+            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, current: hireMode === 'edit' ? active : null, needs, setNeeds, result, setResult, applying, setupStep, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
             ${hired && !showHire && active ? html`
               ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
               ${quickActionRow({ items: [
@@ -1034,6 +1041,20 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ` : null}
             ` : null}`}
       ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} workflows=${trig.workflows} specialists=${spec.list} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
+      ${applying && setupStep ? (() => {
+        // Top-level setup-progress overlay — stays visible across the hire→dashboard switch (persistConfig
+        // makes the Secretary "exist" before the slow fill, so a panel-local progress view would unmount).
+        const s = setupStep, pct = s.total ? Math.round(((s.done || 0) / s.total) * 100) : null;
+        const msg = s.phase === 'fill'
+          ? `${t('secretary.stepFilling')} ${(s.done || 0) + 1}/${s.total}${s.name ? ' · ' + s.name : ''}`
+          : (s.phase === 'done' ? t('secretary.stepDone') : t('secretary.stepStructure'));
+        return html`<div class="sec-setup-overlay"><div class="sec-setup-box">
+          <h3 class="sec-h2">${t('secretary.settingUpTitle')}</h3>
+          <div class="sec-setup-row"><span class="sec-spin"></span><span>${msg}</span></div>
+          ${pct != null ? html`<div class="sec-progress-bar"><div class="sec-progress-fill" style=${`width:${pct}%`}></div></div>` : null}
+          <p class="sec-desc">${t('secretary.settingUpHint')}</p>
+        </div></div>`;
+      })() : null}
       <${ToastContainer} />
     </div>`;
 }
