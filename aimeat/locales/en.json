@@ -751,6 +751,17 @@
     "stepStructure": "Creating your space and workspaces…",
     "stepFilling": "Filling workspace",
     "stepDone": "Done — finishing up…",
+    "mode": {
+      "title": "How should your Secretary work?",
+      "intro": "Either way, it fills your workspaces with real content right now. This choice is about what it does ON ITS OWN afterwards. You can change it any time.",
+      "draftTitle": "Prepare things for me (recommended)",
+      "draftDesc": "It keeps your workspaces up to date on its own and drafts what's next — but leaves it for you to approve. Nothing is published without your OK. Uses your AI credits.",
+      "actTitle": "Run things for me",
+      "actDesc": "Fully autonomous: it fills, updates and publishes on its own, every day, without asking. Uses your AI credits.",
+      "offTitle": "Only when I ask",
+      "offDesc": "It fills your workspaces now, then waits. It won't spend or act on its own until you turn it on.",
+      "changeLater": "You can change this any time under the Secretary's “How I work”."
+    },
     "hireError": "Couldn't set up the Secretary",
     "hireBadShape": "The pasted result is missing required fields (brain.purpose, organism.name, workspaces).",
     "hiredStatus": "Secretary is set up",
