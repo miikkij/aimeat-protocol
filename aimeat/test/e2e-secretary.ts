@@ -75,7 +75,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 // P1: pure tick helpers — routing/guard math is unit-tested directly (no AI key needed; the E2E owner
 // has no OpenRouter key so the live AI path can't be asserted here — it's browser-verified instead).
-import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, isAllowedQuickAction, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine, triggerNextFireMs, rearmTriggerAt, conditionMet, evaluateTriggers, settleFiredTrigger } from '../src/services/secretary-tick.js';
+import { classifySecretaryActions, actionKind, hasWorkToDo, ledgerSpentToday, budgetExceeded, routeIntake, learnCorrection, routeTickNote, routeRoutineStep, sanitizeProposedQuickActions, isAllowedQuickAction, deriveRoutineActions, actionItemKey, cadenceMs, routineDueForRearm, rearmRoutine, triggerNextFireMs, rearmTriggerAt, conditionMet, evaluateTriggers, settleFiredTrigger, selectLessons, poorDecisionCluster } from '../src/services/secretary-tick.js';
 // G6: the FRONTEND copy of the shared rules (pure, dependency-free) — imported directly so the parity
 // test below proves it agrees with the TS server helpers above. (test/ is excluded from tsc; tsx runs it.)
 import { routeRoutineStep as feRouteRoutineStep, sanitizeProposedQuickActions as feSanitizeQuickActions, isAllowedQuickAction as feIsAllowedQuickAction } from '../public/js/services/secretary-rules.js';
@@ -495,6 +495,30 @@ await test('24. hasWorkToDo + budget helpers (pure guard math)', async () => {
     assert(ledgerSpentToday({ c1: { date: '2020-01-01', morsels: 9 } }, 'c1', today) === 0, 'stale day resets');
     assert(budgetExceeded(2, 2) === true && budgetExceeded(1, 2) === false, 'budget compare');
     assert(budgetExceeded(0, null) === false, 'null budget = no limit');
+});
+
+await test('24b. Learning loop A: selectLessons picks the highest-signal reviewed decisions for the context', async () => {
+    const recs = [
+        { status: 'reviewed', score: 95, decision: 'A', verdict: 'great', contextId: 'c1', reviewedAt: '2026-06-01' },
+        { status: 'reviewed', score: 55, decision: 'B', verdict: 'meh', contextId: 'c1', reviewedAt: '2026-06-03' },
+        { status: 'reviewed', score: 10, decision: 'C', verdict: 'bad', contextId: 'c1', reviewedAt: '2026-06-02' },
+        { status: 'open', score: 0, decision: 'D', contextId: 'c1' },              // not reviewed → excluded
+        { status: 'reviewed', score: 90, decision: 'E', verdict: 'good', contextId: 'c2' }, // other context → excluded
+    ];
+    const out = selectLessons(recs as any, 'c1', 2);
+    assert(out.length === 2, `limit honoured, got ${out.length}`);
+    // 95 (|45|) and 10 (|40|) are higher-signal than 55 (|5|) → those two, strongest first.
+    assert(out[0].decision === 'A' && out[1].decision === 'C', `highest-signal first: ${out.map(o => o.decision).join(',')}`);
+    assert(selectLessons(recs as any, 'c2', 6).every(l => l.decision === 'E'), 'context filter excludes other contexts');
+});
+
+await test('24c. Learning loop B: poorDecisionCluster needs a real cluster of poor, not-yet-used decisions', async () => {
+    const poor = (n: number, extra: any = {}) => Array.from({ length: n }, (_, i) => ({ status: 'reviewed', score: 30, decision: `p${i}`, contextId: 'c1', ...extra }));
+    assert(poorDecisionCluster(poor(2) as any, 'c1').length === 0, 'a 2-decision cluster is below the min → no proposal');
+    assert(poorDecisionCluster(poor(3) as any, 'c1').length === 3, 'a 3-decision cluster triggers');
+    assert(poorDecisionCluster(poor(3, { proposalUsed: true }) as any, 'c1').length === 0, 'already-used decisions are excluded');
+    const mixed = [...poor(3), { status: 'reviewed', score: 80, decision: 'good', contextId: 'c1' }];
+    assert(poorDecisionCluster(mixed as any, 'c1').every(d => (d as any).score <= 50), 'only poor-scoring decisions are included');
 });
 
 // Fresh owner with a clean slate (no goals / decisions) for the deterministic tick-guard HTTP paths.
@@ -1469,6 +1493,18 @@ await test('79. Strategy: a context carrying vision/mission/principles/risks/cur
     assert(s.current && s.target && Array.isArray(s.milestones) && s.milestones.length === 3, `shape: ${JSON.stringify(s).slice(0, 160)}`);
     // Ordered milestone gates with statuses + goal links preserved (focus = first not-yet-reached = "Run 5 demos").
     assert(s.milestones[0].status === 'reached' && s.milestones[0].goalRefs[0] === 'g-1' && s.milestones[1].status === 'in-progress', `milestones: ${JSON.stringify(s.milestones).slice(0, 200)}`);
+});
+
+await test('80. Setup-authoring endpoint: refuses when there is no Secretary context to fill (failure mode)', async () => {
+    // A fresh owner with no secretary.config → /author-now has nothing to fill → 400 NO_CONTEXT (never 500).
+    const o = `secauthor${Date.now()}`;
+    const tok = await registerOwner(o);
+    const r = await json('/v1/secretary/author-now', { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: '{}' });
+    assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    assert(r.body?.error?.code === 'NO_CONTEXT', `expected NO_CONTEXT, got ${r.body?.error?.code}`);
+    // Unauthenticated is rejected too.
+    const u = await json('/v1/secretary/author-now', { method: 'POST', body: '{}' });
+    assert(u.status === 401 || u.status === 403, `unauth rejected, got ${u.status}`);
 });
 
 console.log('\nCleanup');

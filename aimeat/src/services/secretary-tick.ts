@@ -23,6 +23,9 @@
  * @version-history
  *   v0.10.0 — 2026-06-28 — TriggerLike.action gains workflowId/specialistName/prompt so a trigger can
  *     BIND a workflow/specialist run to its fire (the scheduler tick carries it out).
+ *   v0.10.0 — 2026-06-30 — Learning loop helpers: selectLessons (A — highest-signal reviewed-decision
+ *     lessons for the tick prompt) + poorDecisionCluster / POOR_SCORE_THRESHOLD (B — the cluster a gated
+ *     learned-rule proposal is based on). Both pure + unit-tested in e2e-secretary.
  *   v0.9.0 — 2026-06-28 — G4: deriveRoutineActions uses actionKind() (note|feed) as the single
  *     capability→kind map for tick-performability + renames runFileSteps→runSteps; the tick carries out
  *     briefing/reminders as FEED entries (not notes), aligning all three call sites.
@@ -149,6 +152,44 @@ export interface RoutineLike { id?: string; title?: string; status?: string; ste
 export interface ActionItem { id: string; labelKind?: string; summary?: string; text?: string; suggestedAction: { kind: string; routineId?: string; stepId?: string }; source: string; createdAt: string; status: 'open' | 'done'; }
 /** An action-item the tick wants to surface, before the tick stamps id/createdAt/status. */
 export interface ActionItemDraft { labelKind: 'approve' | 'ready' | 'check-delegate'; summary: string; suggestedAction: { kind: 'advance' | 'check-delegate'; routineId: string; stepId?: string }; source: string; }
+
+// ── Learning loop (Phase 5+): feed reviewed-decision scores back into behaviour ──
+
+/** A reviewed-decision lesson the tick threads into its next prompt (close the loop, not just record it). */
+export interface Lesson { score: number; decision: string; verdict: string; }
+
+/**
+ * Select the most relevant LESSONS from the owner's reviewed decisions for one context — the
+ * highest-signal ones (a clearly-good or clearly-poor score) first, newest as the tiebreak. The tick
+ * injects these into its briefing/action prompt so the next cycle repeats what scored well and avoids
+ * what scored poorly, instead of the scores being a dead-end record. Pure (no storage/AI) — unit-tested.
+ * `records` are the raw `secretary.decision.*` values; only `status:'reviewed'` with a numeric score count.
+ */
+export function selectLessons(records: Array<Record<string, unknown>>, contextId: string, limit = 6): Lesson[] {
+  return records
+    .filter((d) => d && d.status === 'reviewed' && typeof d.score === 'number' && (!d.contextId || d.contextId === contextId))
+    .map((d) => ({ score: Math.max(0, Math.min(100, Number(d.score))), decision: String(d.decision || ''), verdict: String(d.verdict || ''), reviewedAt: String(d.reviewedAt || '') }))
+    .filter((l) => l.decision)
+    // Signal = distance from a neutral 50 (a 95 or a 10 teaches more than a 55); newest breaks ties.
+    .sort((a, b) => (Math.abs(b.score - 50) - Math.abs(a.score - 50)) || b.reviewedAt.localeCompare(a.reviewedAt))
+    .slice(0, Math.max(0, limit))
+    .map(({ score, decision, verdict }) => ({ score, decision, verdict }));
+}
+
+/** Decisions whose review scored at/below this are "poor" — the basis for a learned-rule proposal (B). */
+export const POOR_SCORE_THRESHOLD = 50;
+
+/**
+ * B (learned-rule proposal): the cluster of reviewed decisions a proposal should be based on — those in
+ * this context that scored POORLY (≤ threshold) and haven't already fed a proposal (`proposalUsed`).
+ * Returns [] unless there's a real cluster (≥ `min`), so a one-off bad decision doesn't trigger a rule.
+ * Pure (no storage/AI) — the tick adds the AI call + the gated inbox card around it. Unit-tested.
+ */
+export function poorDecisionCluster(records: Array<Record<string, unknown>>, contextId: string, min = 3, max = 8): Array<Record<string, unknown>> {
+  const poor = records.filter((d) => d && d.status === 'reviewed' && typeof d.score === 'number'
+    && (d.score as number) <= POOR_SCORE_THRESHOLD && (!d.contextId || d.contextId === contextId) && !d.proposalUsed);
+  return poor.length >= min ? poor.slice(0, max) : [];
+}
 
 // ── G2: recurring routines ── the tick re-arms a completed routine on its cadence so it runs again.
 /** Supported routine cadences → their interval in ms (null = run-once / no recurrence). */

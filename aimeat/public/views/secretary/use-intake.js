@@ -20,7 +20,7 @@
  *   v0.1.0 — 2026-06-24 — P2: extract intake from views/secretary.js + add cross-context auto-routing (P2-E).
  */
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
-import { api, apiGet, apiPost } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { listMessages } from '/js/services/agent-messages.js';
 import { routeIntake, learnCorrection } from '/js/services/secretary-routing.js';
@@ -275,12 +275,29 @@ export function useIntake({ active, contexts, config, persistConfig, owner, show
     if (!dec || !choice) return;
     try {
       let toastTarget = choice;
+      let contextsOverride = null;   // brain-rule approval also writes the updated context brain
       if (dec.type === 'tick-note') {
         if (/^yes/i.test(String(choice))) {
           const fr = await apiGet('/v1/memory/secretary.feed').catch(() => null);
           const items = (fr && fr.data && fr.data.value && Array.isArray(fr.data.value.items)) ? fr.data.value.items : [];
           const entry = { id: 'f-' + Date.now().toString(36), ts: new Date().toISOString(), kind: 'act', contextId: dec.contextId || '', contextName: dec.contextName || '', text: dec.text || '' };
           await apiPost('/v1/memory', { key: 'secretary.feed', value: { items: [entry, ...items].slice(0, 50) }, visibility: 'private' });
+        }
+      } else if (dec.type === 'brain-rule') {
+        // Learning loop (B): the owner approved a proposed operating rule → append it to that context's
+        // brain and sync the directives so the autonomous tick uses it from now on (gated — only on "yes").
+        if (/^yes/i.test(String(choice)) && dec.rule) {
+          const ctxId = dec.contextId || (active && active.id);
+          contextsOverride = ((config && config.contexts) || []).map((c) => c.id === ctxId
+            ? { ...c, brain: { ...(c.brain || {}), rules: [...(((c.brain && c.brain.rules)) || []), { id: 'r-learned-' + Date.now().toString(36), description: String(dec.rule) }] } }
+            : c);
+          const upd = contextsOverride.find((c) => c.id === ctxId);
+          if (upd && active && ctxId === active.id) {
+            await apiPut('/v1/agents/secretary/directives', { purpose: (upd.brain && upd.brain.purpose) || '', rules: (upd.brain && upd.brain.rules) || [] }).catch(() => {});
+          }
+          toastTarget = t('secretary.ruleAdded');
+        } else {
+          toastTarget = t('secretary.ruleDeclined');
         }
       } else {
         const wr = await apiGet(`/v1/organisms/${encodeURIComponent(dec.organismId)}/workspaces`).catch(() => null);
@@ -308,7 +325,7 @@ export function useIntake({ active, contexts, config, persistConfig, owner, show
       const base = config || {};
       const next = { ...(base.pendingDecisions || {}) };
       delete next[promptId];
-      await persistConfig({ ...base, pendingDecisions: next });
+      await persistConfig({ ...base, ...(contextsOverride ? { contexts: contextsOverride } : {}), pendingDecisions: next });
       showToast(`${t('secretary.noteSaved')} ${toastTarget}`.trim());
       // Nudge the learning-loop card (and others) to re-read the newly written decision.
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
