@@ -11,6 +11,12 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.21.0 — 2026-06-30 — Deterministic workspace structure (NO AI): genAndApplyManifest normalizes any
+ *     design-provided inline manifest into a valid one (fixes namespace form + backfills schemaRef/backing/
+ *     writeRole/mode, rekeys schemas, derives a records schema when missing) and falls back to a plain
+ *     document space — instead of a flaky per-workspace AI generator call that left some workspaces as
+ *     "set up when opened". Every workspace now gets its structure reliably, every time. Verified on the
+ *     dev server: a 6-workspace design (with non-conforming komento.* namespaces) all came out structured.
  *   v0.20.0 — 2026-06-30 — Content at handshake: a fresh hire now fills its workspaces with REAL content
  *     immediately (POST /v1/secretary/author-now, long timeout) and drops any left empty; the workspace
  *     generator runs with skipExamples so no fake "example-N" placeholder records are written.
@@ -73,7 +79,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useToast } from '/components/Toast.js';
-import { createOrganism, createWorkspace, generateRaw, parseGenerated, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
+import { createOrganism, createWorkspace, validateGenerated, applyGeneratedWorkspace } from '/js/services/organisms.js';
 import { defaultPolicy, mergePolicy } from '/js/services/secretary-policy.js';
 import { buildDesignPrompt, extractJson, snapshotOf, genCtxId, migrateConfig, suggestContextId, computeBudgetInfo, computeReliability, sanitizeQuickActions, normalizeStrategy, MILESTONE_STATUSES, buildStrategyReplanPrompt, linkMilestoneGoals, keepKnownGoalRefs, SECRETARY_AIMEAT_PRIMER } from '/js/services/secretary-helpers.js';
 import { contextSwitcher, hirePanel, chatCard, findCard, noteCard, decisionsCard, brainCard, operatingCard, historyCard, metaCard, whatsNextCard, feedCard, automationCard, goalsCard, decisionLogCard } from '/views/secretary/cards.js';
@@ -282,9 +288,14 @@ export default function SecretaryView() {
     return ids;
   }, []);
 
-  // Give a freshly-created workspace a PROPER manifest (AI-designed object types) so it's immediately
-  // usable, not an empty "set up workspace" shell. Reuses the proven organism workspace generator.
-  // Best-effort: a manifest-less workspace still exists and can be set up manually.
+  // ── Deterministic workspace structure (NO AI) ──
+  // The design JSON's inline manifests routinely fail the workspace validator (wrong namespace form, or
+  // missing schemaRef/backing/writeRole), which used to push EACH workspace into a flaky per-workspace AI
+  // generator call — owl-alpha failing some of those left workspaces as "set up when opened". Instead we
+  // NORMALIZE any inline manifest into a valid one ourselves, and fall back to a plain document space.
+  // Zero AI calls → every workspace gets its structure reliably, every time.
+  const WS_TYPE_MAP = { text: 'string', number: 'number', date: 'string', select: 'string', boolean: 'boolean', reference: 'string' };
+  const wsSlug = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'tila';
   const backfillEnvelope = (mf, wsId, name) => {
     if (!mf) return;
     mf.manifestVersion = mf.manifestVersion || '1.0';
@@ -293,21 +304,57 @@ export default function SecretaryView() {
     mf.kind = mf.kind || 'project';
     mf.status = ['active', 'paused', 'done', 'archived'].includes(mf.status) ? mf.status : 'active';
   };
+  // Make ANY inline manifest valid: backfill the envelope + each objectType's required fields, normalize
+  // the namespace to the required shared.* form (rekeying its schema), and derive a schema for a records
+  // type that lacks one. Mutates `manifest`; may add keys to `schemas`.
+  const normalizeInlineManifest = (manifest, schemas, wsId, name) => {
+    backfillEnvelope(manifest, wsId, name);
+    const ots = Array.isArray(manifest.objectTypes) ? manifest.objectTypes : [];
+    manifest.objectTypes = ots.filter(Boolean).map((ot, i) => {
+      const o = { ...ot };
+      o.name = String(o.name || ('tila' + (i + 1))).trim() || ('tila' + (i + 1));
+      let ns = String(o.namespace || ('shared.' + wsSlug(o.name)));
+      if (!/^(meta|shared|member)\./.test(ns)) {
+        const tail = ns.includes('.') ? ns.slice(ns.indexOf('.') + 1) : ns;
+        const newNs = 'shared.' + (wsSlug(tail) || wsSlug(o.name));
+        if (schemas[o.namespace] && !schemas[newNs]) { schemas[newNs] = schemas[o.namespace]; delete schemas[o.namespace]; }
+        ns = newNs;
+      }
+      o.namespace = ns;
+      o.backing = o.backing === 'tasks' ? 'tasks' : 'memory';
+      o.writeRole = ['owner', 'admin', 'member'].includes(o.writeRole) ? o.writeRole : 'member';
+      o.cardinality = o.cardinality === 'one' ? 'one' : 'many';
+      o.versioned = o.versioned !== false;
+      o.schemaRef = o.schemaRef || ('schema:' + wsSlug(o.name) + '@1');
+      if (o.mode !== 'document') o.mode = ((Array.isArray(o.fields) && o.fields.length) || schemas[ns]) ? 'records' : 'document';
+      if (o.mode !== 'document' && o.backing === 'memory' && !schemas[ns]) {
+        const props = {}; (o.fields || []).forEach((f) => { if (f && f.name) props[f.name] = { type: WS_TYPE_MAP[f.type] || 'string' }; });
+        if (!props.id) props.id = { type: 'string' };
+        schemas[ns] = { type: 'object', properties: props, required: ['id'] };
+      }
+      return o;
+    });
+  };
+  // A plain document space (free markdown) — the deterministic fallback so a workspace with no usable
+  // manifest still gets a valid structure at setup, without any AI call.
+  const docSpaceManifest = (wsId, name) => ({
+    manifest: { manifestVersion: '1.0', id: wsId, name, kind: 'notes', status: 'active',
+      objectTypes: [{ name: 'Dokumentit', namespace: 'shared.dokumentit', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, schemaRef: 'schema:doc@1', mode: 'document' }] },
+    schemas: {},
+  });
   const genAndApplyManifest = useCallback(async (orgId, wsId, ws) => {
-    const name = String(ws.name || '').trim();
+    const name = String(ws.name || '').trim() || 'Työtila';
     try {
-      // skipExamples: the Secretary fills workspaces with REAL content at setup (author-now), so it never
-      // wants fake "example-N" placeholder records (they read as disinformation, not examples).
-      // 1) Use a manifest the design JSON already carried (the prompt-driven path can include it inline).
-      if (ws.manifest) {
-        const provided = { manifest: ws.manifest, schemas: ws.schemas || {} };
-        backfillEnvelope(provided.manifest, wsId, name);
+      // skipExamples: the Secretary fills workspaces with REAL content at setup (author-now), never fakes.
+      if (ws.manifest && typeof ws.manifest === 'object') {
+        const schemas = { ...(ws.schemas || {}) };
+        const manifest = JSON.parse(JSON.stringify(ws.manifest));
+        normalizeInlineManifest(manifest, schemas, wsId, name);
+        const provided = { manifest, schemas };
         if (!validateGenerated(provided).length) { await applyGeneratedWorkspace(orgId, wsId, provided, { skipExamples: true }); return; }
       }
-      // 2) Otherwise (or if the inline one was invalid) design it in-app with the workspace generator.
-      const generated = parseGenerated(await generateRaw(`${name} — ${ws.purpose || ''}`.trim(), null));
-      backfillEnvelope(generated && generated.manifest, wsId, name);
-      if (generated && !validateGenerated(generated).length) await applyGeneratedWorkspace(orgId, wsId, generated, { skipExamples: true });
+      // No usable inline manifest → a plain document space, applied deterministically (no AI).
+      await applyGeneratedWorkspace(orgId, wsId, docSpaceManifest(wsId, name), { skipExamples: true });
     } catch { /* leave it manifest-less; the owner can set it up manually */ }
   }, []);
 
