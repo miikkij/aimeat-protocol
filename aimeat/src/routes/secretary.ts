@@ -36,7 +36,6 @@ import { getActiveScheduler } from '../services/scheduler.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { authorWorkspaceContent, type AuthoringContext } from '../services/secretary-authoring.js';
-import { countWorkspaceInstances } from '../services/workspace-enrichment.js';
 
 const ClarifySchema = z.object({
   contextId: z.string().min(1).max(200),
@@ -185,9 +184,12 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
 
   // ── POST /v1/secretary/author-now ── fill the active context's workspaces with REAL content at SETUP
   //    ("heti kättelyssä"), reusing the tested authoring service (documents first, schema-valid records,
-  //    agentic retry on flaky models). Then REMOVE any workspace that's still empty — "empty workspace =
-  //    useless workspace". Runs as a one-time act-band pass; the persisted band is untouched. Synchronous:
-  //    the caller waits (a slow model can take a while), so call it with a long client timeout.
+  //    agentic retry on flaky models). NEVER deletes a workspace — additive only. (An earlier version
+  //    removed "empty" workspaces after authoring; when the fill produced nothing it nuked ALL the user's
+  //    freshly-created workspaces, leaving an organism with zero spaces. Auto-deleting the owner's
+  //    workspaces is never acceptable, so authoring only ever ADDS content; empties simply stay.)
+  //    Runs as a one-time act-band pass; the persisted band is untouched. Synchronous: the caller waits
+  //    (a slow model can take a while), so call it with a long client timeout.
   router.post('/v1/secretary/author-now', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
     const ownerGhii = `${owner}@${config.nodeId}`;
@@ -217,35 +219,15 @@ export function secretaryRouter(config: AimeatConfig, storage: Storage, peers: M
       const wsEntries = ((regRec?.value as { workspaces?: Array<{ id?: string; name?: string }> } | undefined)?.workspaces) ?? [];
       const wsList = wsEntries.filter((w) => w && w.id).map((w) => ({ id: w.id as string, name: w.name || (w.id as string) }));
 
-      // Author real content (act → publish), reusing the agentic, doc-first, retrying service.
+      // Author real content (act → publish), reusing the agentic, doc-first, retrying service. ADDITIVE
+      // ONLY — a workspace that the fill couldn't populate stays exactly as it is; nothing is ever deleted.
       const authored = await authorWorkspaceContent(storage, config, ownerGhii, owner, active, wsList, {
         openGoals, band: 'act', aggressive: true, useGeneralKnowledge: true, budgetRemaining: null, maxRetries, appId: 'setup:author',
       });
 
-      // Change 3: drop any workspace that is STILL empty after authoring (nothing real to hold → not needed).
-      const removed: string[] = [];
-      const keep: Array<{ id?: string; name?: string }> = [];
-      for (const entry of wsEntries) {
-        const id = entry?.id;
-        if (!id) { keep.push(entry); continue; }
-        const root = `organism.${orgId}.w.${id}`;
-        const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
-        const manifest = (items.find((r) => r.key === `${root}.meta.manifest`)?.value ?? null) as Record<string, unknown> | null;
-        const { recs, docs } = countWorkspaceInstances(items, manifest, root);
-        if (recs + docs > 0) { keep.push(entry); continue; }
-        // Empty → remove: drop its meta so it no longer renders, and unregister it.
-        await storage.deleteMemory(ownerGhii, `${root}.meta.manifest`).catch(() => {});
-        await storage.deleteMemory(ownerGhii, `${root}.meta.readme`).catch(() => {});
-        removed.push(entry.name || id);
-      }
-      if (removed.length) {
-        const now = new Date().toISOString();
-        await storage.setMemory({ key: regKey, ownerGaii: ownerGhii, value: { workspaces: keep }, visibility: 'private', tags: regRec?.tags ?? [], ttlHours: null, version: (regRec?.version ?? 0) + 1, createdAt: regRec?.createdAt ?? now, updatedAt: now });
-      }
-
       emitChange('organisms');
-      logger.info('[secretary] author-now', { owner, authored: authored.summaries.length, removedEmpty: removed.length, morsels: authored.morsels });
-      res.json(success(config.nodeId, { authored: authored.summaries, removedEmptyWorkspaces: removed, morsels: authored.morsels }, [
+      logger.info('[secretary] author-now', { owner, authored: authored.summaries.length, workspaces: wsList.length, morsels: authored.morsels });
+      res.json(success(config.nodeId, { authored: authored.summaries, workspaces: wsList.length, morsels: authored.morsels }, [
         { description: 'Open the workspaces', method: 'GET', url: `/v1/profile?tab=organisms&org=${orgId}` },
       ]));
     } catch (err) {
