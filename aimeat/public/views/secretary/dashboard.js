@@ -111,9 +111,17 @@ export function standPanel(p) {
     </section>`;
 }
 
-/** Compose the paste a Builder receives in Claude Desktop: a one-line MCP preface + the full brief. */
+/** Compose the paste a Builder receives in Claude Desktop: a connect-first preface + the full brief.
+ *  The preface tells the assistant to connect via the appdev MCP if it isn't already, so pasting into a
+ *  Claude Desktop that has NOT been wired to the node still leads somewhere instead of silently failing. */
 function heavyWorkPrompt(b) {
-  return `You're connected to my AIMEAT node via the appdev MCP (the aimeat_* tools). Please carry out this work brief end-to-end using those tools — build/fill via aimeat_workspace_* / aimeat_organism_*, ground everything in real sources, and never invent facts.\n\n${b.brief || ''}`;
+  return `I'd like you to carry out a work brief on my AIMEAT node using the appdev MCP tools (the aimeat_* tools).
+
+FIRST — make sure you can reach my node: if you are not already connected to my AIMEAT node via the appdev MCP, connect now. In the AIMEAT app open Profile → Agents → "Connect a New Agent" for the exact device-authorization steps (or read the node's /llms.txt). You need the aimeat_* tools available before you can do any of the work below.
+
+THEN — carry out the brief end-to-end with those tools: build/fill via aimeat_workspace_* / aimeat_organism_*, ground everything in the real sources listed, and never invent facts. If a records space has no real data, leave it empty rather than make something up.
+
+${b.brief || ''}`;
 }
 
 /** One Work Brief row: objective + ws + a markdown preview + the two heavy-work lanes (Open in Claude
@@ -133,6 +141,7 @@ function briefRow(b, p) {
         <summary>${t('secretary.brief.preview')}</summary>
         <div class="sec-brief-md"><${Markdown} text=${b.brief || ''} /></div>
       </details>
+      ${dispatched ? html`<div class="sec-hint sec-brief-wait">${t('secretary.brief.dispatchedNote')}</div>` : null}
       <div class="sec-brief-actions">
         <${CopyButton} text=${heavyWorkPrompt(b)} className="btn-primary btn-sm" label=${t('secretary.brief.openClaude')} />
         ${builders.length ? html`
@@ -155,9 +164,10 @@ export function briefTrayCard(p) {
   return html`
     <section class="sec-card sec-brief-tray">
       <div class="sec-card-head">
-        <h2 class="sec-h2">${t('secretary.brief.title')} <span class="sec-count">${briefs.length}</span></h2>
+        <h2 class="sec-h2">${t('secretary.brief.startHere')} ${t('secretary.brief.title')} <span class="sec-count">${briefs.length}</span></h2>
         <span class="sec-hint">${t('secretary.brief.subtitle')}</span>
       </div>
+      <p class="sec-brief-banner">${t('secretary.brief.mcpNote')} <a class="sec-linkbtn" href="/v1/profile">${t('secretary.brief.connectLink')}</a></p>
       ${briefs.map((b) => briefRow(b, p))}
     </section>`;
 }

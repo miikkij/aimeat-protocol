@@ -72,7 +72,8 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
-import { proposeWorkBriefs as buildContextBriefs, type WorkBrief } from './secretary-workbrief.js';
+import { proposeWorkBriefs as buildContextBriefs, resolveCompletedBriefs, type WorkBrief } from './secretary-workbrief.js';
+import { notify } from './notify.js';
 import { appendSecretaryFeed } from './secretary-feed.js';
 import { produceClarifyDeliverable, type ClarifyJob } from './secretary-clarify.js';
 import { listSpecialists } from './specialist.js';
@@ -844,6 +845,8 @@ export class Scheduler {
       // — a connected big AI via the appdev MCP tools — executes (the owner pastes it into Claude Desktop,
       // or dispatches it to a connected agent). Brief assembly is deterministic (no paid call), idempotent
       // (deduped against open briefs by gap), and bounded per tick. The cheap Secretary never authors data.
+      // Self-heal first: a dispatched brief whose Builder task finished flips to 'done' so it leaves the tray.
+      await resolveCompletedBriefs(this.storage, owner).catch(() => 0);
       const briefed = await this.proposeWorkBriefs(owner, ownerName, active, wsList, openGoals);
       if (briefed.writes.length) {
         writes.push(...briefed.writes);
@@ -852,6 +855,16 @@ export class Scheduler {
         }
         writes.push('secretary.feed');
         emitChange('agents', owner);
+        // Notify the owner (the header bell) when NEW heavy work is ready to hand off — so a brief the tick
+        // proposes overnight is actively surfaced, not just discovered on the next visit. Best-effort.
+        if (briefed.briefs.length) {
+          await notify(this.storage, owner, {
+            type: 'secretary_work_brief',
+            title: briefed.briefs.length === 1 ? '1 work brief ready' : `${briefed.briefs.length} work briefs ready`,
+            body: 'Heavy work the Secretary prepared — hand it to a Builder.',
+            link: '/v1/secretary',
+          });
+        }
       }
     } finally {
       // Persist the spend ledger (+ any new pending decisions, routine step completions, and derived
