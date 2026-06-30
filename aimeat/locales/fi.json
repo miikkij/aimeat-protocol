@@ -751,6 +751,17 @@
     "stepStructure": "Luodaan tila ja työtilat…",
     "stepFilling": "Täytetään työtila",
     "stepDone": "Valmis — viimeistellään…",
+    "mode": {
+      "title": "Miten sihteerisi toimii?",
+      "intro": "Kummassakin tapauksessa se täyttää työtilasi oikealla sisällöllä heti nyt. Tämä valinta koskee sitä mitä se tekee OMIN PÄIN sen jälkeen. Voit muuttaa tätä milloin vain.",
+      "draftTitle": "Valmistele puolestani (suositus)",
+      "draftDesc": "Pitää työtilat ajan tasalla itse ja luonnostelee seuraavat askeleet — mutta jättää ne sinun hyväksyttäväksesi. Mitään ei julkaista ilman lupaasi. Käyttää AI-krediittejäsi.",
+      "actTitle": "Hoida puolestani",
+      "actDesc": "Täysin autonominen: täyttää, päivittää ja julkaisee itse, joka päivä, kysymättä. Käyttää AI-krediittejäsi.",
+      "offTitle": "Vain kun pyydän",
+      "offDesc": "Täyttää työtilat nyt, sitten odottaa. Ei kuluta eikä toimi omin päin ennen kuin laitat sen päälle.",
+      "changeLater": "Voit muuttaa tätä milloin vain sihteerin ”How I work” -kohdasta."
+    },
     "hireError": "Sihteerin pystytys epäonnistui",
     "hireBadShape": "Liitetystä tuloksesta puuttuu pakollisia kenttiä (brain.purpose, organism.name, workspaces).",
     "hiredStatus": "Sihteeri on pystytetty",

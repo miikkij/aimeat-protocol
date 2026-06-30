@@ -11,6 +11,10 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.23.0 — 2026-06-30 — Autonomy chosen up front: "Set up my Secretary" first asks HOW autonomous it
+ *     should be (Prepare/Draft · Run/Act · Only-when-I-ask/Off), each explained in plain words incl. the
+ *     AI-credit cost, BEFORE anything runs — so nobody stumbles into Act bands later. The choice sets the
+ *     new context's author_content band and, for Draft/Act, turns the daily check-in on. Browser-verified.
  *   v0.22.0 — 2026-06-30 — Live setup progress: the fill runs ONE workspace at a time (author-now?ws=)
  *     and a top-level overlay (survives the hire→dashboard switch) shows "Filling workspace N/total ·
  *     <name>" + a progress bar through the whole slow fill, instead of a couple of fleeting toasts.
@@ -124,6 +128,8 @@ export default function SecretaryView() {
   const [needs, setNeeds] = useState('');
   const [applying, setApplying] = useState(false);
   const [setupStep, setSetupStep] = useState(null);      // live setup progress: { phase, done, total, name }
+  const [chooseMode, setChooseMode] = useState(false);   // showing the "how should it work?" autonomy step
+  const [setupMode, setSetupMode] = useState('draft');   // chosen autonomy: 'off' | 'draft' | 'act'
   const [generating, setGenerating] = useState(false);
   const [showHire, setShowHire] = useState(false);
   const [hireMode, setHireMode] = useState('new');       // 'new' (add context) | 'edit' (re-run active)
@@ -363,7 +369,7 @@ export default function SecretaryView() {
     } catch { /* leave it manifest-less; the owner can set it up manually */ }
   }, []);
 
-  const applyResult = useCallback(async () => {
+  const applyResult = useCallback(async (mode = 'off') => {
     setApplying(true);
     try {
       const json = extractJson(result);
@@ -412,7 +418,11 @@ export default function SecretaryView() {
         // the owner ticking the linked goals by hand after setup.
         const goalIds = await seedGoals(json.goals, ctxId, org.name);
         const strategy = linkMilestoneGoals(normalizeStrategy(json.strategy), goalIds);
-        const ctx = { id: ctxId, name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy: defaultPolicy(), brainHistory: [], quickActions, strategy };
+        // Autonomy chosen in the setup step: set the ongoing "fill my workspaces" band accordingly (the
+        // one-time setup fill below always runs; this controls what the daily tick does on its own later).
+        const policy = defaultPolicy();
+        policy.bands = { ...policy.bands, author_content: ['off', 'draft', 'act'].includes(mode) ? mode : 'off' };
+        const ctx = { id: ctxId, name: org.name, brain: newBrain, organismId: orgId || null, organismName: org.name, workspaces: wsSummary, policy, brainHistory: [], quickActions, strategy };
         next = { contexts: [...contexts, ctx], activeContextId: ctx.id };
       } else {
         // Re-run on the active context (reshape): update its brain, snapshot the old one, KEEP its
@@ -462,6 +472,11 @@ export default function SecretaryView() {
       } else {
         showToast(t('secretary.hireDone'));
       }
+      // If the owner chose an autonomous mode, turn the daily check-in ON for them — so it actually keeps
+      // working on its own (the band alone does nothing without a schedule). 'off' stays fully manual.
+      if (isNew && mode !== 'off') {
+        await apiPost('/v1/schedules', { kind: 'secretary', cron: '0 8 * * *', display_name: t('secretary.auto.scheduleName') }).catch(() => {});
+      }
       setResult(''); setNeeds(''); setShowHire(false);
     } catch (e) {
       showToast(`${t('secretary.hireError')}: ${e.message}`, true);
@@ -469,6 +484,16 @@ export default function SecretaryView() {
       setApplying(false); setSetupStep(null);
     }
   }, [result, hireMode, active, contexts, config, persistConfig, syncDirectives, seedGoals, genAndApplyManifest, showToast]);
+
+  // "Set up my Secretary" no longer runs immediately — it first asks (one step, up front) HOW autonomous
+  // the owner wants it, explained in plain words, so nobody stumbles into Act bands later. The chosen mode
+  // is passed to applyResult. Only for a brand-new hire; re-running an existing context keeps its policy.
+  const startSetup = useCallback(() => {
+    if (!result.trim()) return;
+    try { extractJson(result); } catch { showToast(t('secretary.hireBadShape'), true); return; }
+    if (hireMode === 'new' || !active) { setSetupMode('draft'); setChooseMode(true); } else { applyResult('off'); }
+  }, [result, hireMode, active, applyResult, showToast]);
+  const confirmSetup = useCallback(() => { setChooseMode(false); applyResult(setupMode); }, [applyResult, setupMode]);
 
   // C2 — direct brain editor: edit the active context's purpose + rules in place (no AI re-run).
   const startBrainEdit = useCallback(() => {
@@ -952,7 +977,7 @@ ${SECRETARY_AIMEAT_PRIMER}`;
         ? html`<div class="sec-empty">${hasOpenRouterKey ? t('secretary.provisioning') : t('secretary.notReady')}</div>`
         : html`
             ${hired ? contextSwitcher({ contexts, activeId, switchContext, openAdd }) : null}
-            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, current: hireMode === 'edit' ? active : null, needs, setNeeds, result, setResult, applying, setupStep, generating, generateInApp, applyResult, onCancel: cancelHire }) : null}
+            ${showHirePanel ? hirePanel({ firstEver, hireMode, owner, current: hireMode === 'edit' ? active : null, needs, setNeeds, result, setResult, applying, setupStep, generating, generateInApp, applyResult: startSetup, onCancel: cancelHire }) : null}
             ${hired && !showHire && active ? html`
               ${/* Quick-action row (core verbs; dynamic actions arrive in B3) */ ''}
               ${quickActionRow({ items: [
@@ -1041,6 +1066,23 @@ ${SECRETARY_AIMEAT_PRIMER}`;
               ` : null}
             ` : null}`}
       ${calEvent ? html`<${CalendarEventDialog} event=${calEvent} onClose=${() => setCalEvent(null)} triggers=${{ update: trig.updateTrigger, togglePause: trig.togglePause, remove: trig.removeTrigger }} workflows=${trig.workflows} specialists=${spec.list} routines=${{ setCadence: next.setRoutineCadence, setStatus: next.setRoutineStatus }} tick=${{ toggle: auto.toggleTick, run: auto.runTick }} feed=${{ remove: auto.deleteFeedItem }} />` : null}
+      ${chooseMode ? html`
+        <div class="sec-setup-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setChooseMode(false); }}>
+          <div class="sec-setup-box sec-mode-box">
+            <h3 class="sec-h2">${t('secretary.mode.title')}</h3>
+            <p class="sec-desc">${t('secretary.mode.intro')}</p>
+            ${[['draft', t('secretary.mode.draftTitle'), t('secretary.mode.draftDesc')], ['act', t('secretary.mode.actTitle'), t('secretary.mode.actDesc')], ['off', t('secretary.mode.offTitle'), t('secretary.mode.offDesc')]].map(([val, title, desc]) => html`
+              <label class=${'sec-mode-opt' + (setupMode === val ? ' sec-mode-opt--on' : '')}>
+                <input type="radio" name="setupmode" checked=${setupMode === val} onChange=${() => setSetupMode(val)} />
+                <span><span class="sec-mode-opt-t">${title}</span><span class="sec-desc">${desc}</span></span>
+              </label>`)}
+            <p class="sec-hint">${t('secretary.mode.changeLater')}</p>
+            <div class="sec-actions">
+              <button class="btn-ghost btn-sm" onClick=${() => setChooseMode(false)}>${t('secretary.cancel')}</button>
+              <button class="btn-primary" onClick=${confirmSetup}>${t('secretary.apply')}</button>
+            </div>
+          </div>
+        </div>` : null}
       ${applying && setupStep ? (() => {
         // Top-level setup-progress overlay — stays visible across the hire→dashboard switch (persistConfig
         // makes the Secretary "exist" before the slow fill, so a panel-local progress view would unmount).
