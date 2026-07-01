@@ -419,6 +419,11 @@ export interface AimeatConfig {
   // Service Generator
   generatorEnabled: boolean;
 
+  // Secretary + specialist agents (per-user embedded AI assistant). OFF by default: the feature is
+  // hidden from the UI, its routes are not mounted, and its scheduler tick is skipped. A secretary is
+  // better built as a standalone agent/app than embedded in the node — opt in with AIMEAT_SECRETARY_ENABLED=true.
+  secretaryEnabled: boolean;
+
   // Foundry (prompt-driven service builder)
   foundryEnabled: boolean;
 
@@ -832,6 +837,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Service Generator
     generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
+
+    // Secretary + specialist agents — OFF by default (opt-in via AIMEAT_SECRETARY_ENABLED=true).
+    secretaryEnabled: process.env.AIMEAT_SECRETARY_ENABLED === 'true',
 
     // Foundry (prompt-driven service builder)
     foundryEnabled: process.env.AIMEAT_FOUNDRY_ENABLED

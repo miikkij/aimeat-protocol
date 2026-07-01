@@ -18443,6 +18443,10 @@ paths:
         (`try`, `howItWorks`, `business`, `devView`, `help`). Defaults to all links
         visible in their declared order. No authentication required (Tier 0) — the
         header renders for anonymous visitors too.
+
+        Also returns a `features` map of node-level feature flags the SPA shell uses to
+        gate optional surfaces (currently `{ secretary }` — whether the per-user Secretary
+        and specialist agents are enabled on this node; off by default).
       tags: [Site]
       responses:
         '200':
@@ -18455,7 +18459,17 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/HeaderNavConfig'
+                        allOf:
+                          - $ref: '#/components/schemas/HeaderNavConfig'
+                          - type: object
+                            properties:
+                              features:
+                                type: object
+                                description: Node feature flags the SPA shell uses to gate optional surfaces.
+                                properties:
+                                  secretary:
+                                    type: boolean
+                                    description: Whether the Secretary + specialist agents are enabled on this node.
     put:
       operationId: setSiteHeaderNav
       summary: Update header navigation config

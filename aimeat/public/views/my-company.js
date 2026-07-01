@@ -22,6 +22,8 @@
  *     (revenue / orders / cost-per-task / commission income + per-agent table) from GET /v1/orgs/:slug/governance.
  *   v0.7.0 — 2026-06-24 — Secretary Phase 6 (slice 1): Company model admin subtab — prompt-driven builder
  *     (describe → generate in-app / copy-prompt → review → apply) for departments/roles/people/reporting (GET/PUT /v1/orgs/:slug/model).
+ *   v0.8.0 — 2026-07-01 — Company Secretary subtab hidden unless the node enables the Secretary feature
+ *     (AIMEAT_SECRETARY_ENABLED, read from /v1/site/header-nav `features.secretary`). Governance + model unaffected.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -760,6 +762,7 @@ export default function MyCompanyView() {
   const [newName, setNewName] = useState('');
   const [newBusinessId, setNewBusinessId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [featSecretary, setFeatSecretary] = useState(false);  // node opt-in: show the company Secretary subtab
 
   async function loadOrgs() {
     setState('loading');
@@ -771,6 +774,15 @@ export default function MyCompanyView() {
     }
   }
   useEffect(() => { loadOrgs(); }, []);
+  // Company Secretary is opt-in per node (AIMEAT_SECRETARY_ENABLED); hide its admin subtab when off.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/v1/site/header-nav')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && d?.ok) setFeatSecretary(!!(d.data?.features && d.data.features.secretary)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   async function loadOrders(org) {
     try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/orders`); setOrdersReceived(r.data?.orders ?? []); }
@@ -872,7 +884,7 @@ export default function MyCompanyView() {
             </div>
 
             <div class="mc-subtabs">
-              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'portfolio', 'secretary', 'governance', 'model', 'settings'] : []), 'members'].map(id => html`
+              ${['catalog', ...(selected.role === 'admin' ? ['orders', 'customers', 'portfolio', ...(featSecretary ? ['secretary'] : []), 'governance', 'model', 'settings'] : []), 'members'].map(id => html`
                 <button class="mc-subtab ${subTab === id ? 'active' : ''}" key=${id} onClick=${() => setSubTab(id)}>${t('myCompany.tab' + id.charAt(0).toUpperCase() + id.slice(1))}</button>`)}
               <span class="mc-role-chip">${t('myCompany.role' + (selected.role || 'member').charAt(0).toUpperCase() + (selected.role || 'member').slice(1))}</span>
             </div>

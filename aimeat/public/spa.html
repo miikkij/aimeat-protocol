@@ -544,6 +544,9 @@
       const [morsels, setMorsels] = useState(null);
       const [menuOpen, setMenuOpen] = useState(false);
       const [secretaryAvailable, setSecretaryAvailable] = useState(false);
+      // Node feature flags from /v1/site/header-nav (e.g. { secretary }). Empty until the fetch resolves,
+      // so optional surfaces stay hidden until we positively learn they're enabled (no flash).
+      const [features, setFeatures] = useState({});
       // Header nav config: { order, hidden }. Defaults to all visible in declared order
       // until the public /v1/site/header-nav fetch resolves (no flash of empty nav).
       const [navConfig, setNavConfig] = useState({ order: PUBLIC_NAV_LINKS.map(l => l.id), hidden: [] });
@@ -574,6 +577,7 @@
             const order = Array.isArray(d.data.order) ? d.data.order : PUBLIC_NAV_LINKS.map(l => l.id);
             const hidden = Array.isArray(d.data.hidden) ? d.data.hidden : [];
             setNavConfig({ order, hidden });
+            setFeatures(d.data.features || {});
           })
           .catch(e => console.warn('Header nav fetch failed:', e.message));
         return () => { cancelled = true; };
@@ -644,7 +648,7 @@
                   class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
               `)}
               ${session && html`
-                ${secretaryAvailable && html`
+                ${secretaryAvailable && features.secretary && html`
                   <a href="/v1/secretary" class="sec-nav-link ${currentPath === '/v1/secretary' ? 'active' : ''}"
                     title=${t('nav.secretary')} onClick=${(e) => { handleNav(e, '/v1/secretary'); setMenuOpen(false); }}>
                     <span class="sec-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true">

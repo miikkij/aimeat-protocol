@@ -9,6 +9,8 @@
  *            custom template is set, so polling clients stop logging spurious 404s.
  *   v1.2.0 — 2026-06-19 — Add GET (public) + PUT (operator) /v1/site/header-nav for
  *            operator-configurable header navigation links (visibility + order).
+ *   v1.3.0 — 2026-07-01 — GET /v1/site/header-nav also returns a `features` map of node feature flags
+ *            (currently { secretary }) so the SPA shell can hide optional surfaces when disabled.
  */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -184,10 +186,16 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
 
     // GET /v1/site/header-nav — Header navigation config (public; the SPA header reads this)
     // Public on purpose: the header renders for anonymous visitors too. Returns a normalized
-    // { order, hidden } over the known public link ids (defaults = all visible, default order).
+    // { order, hidden } over the known public link ids (defaults = all visible, default order),
+    // plus a `features` map of node-level feature flags the SPA shell needs to gate optional
+    // surfaces (e.g. the Secretary nav link + the company Secretary subtab). Node capabilities are
+    // already public via the federation descriptor, so exposing these booleans here is consistent.
     router.get('/v1/site/header-nav', async (_req, res) => {
         const data = await site.getHeaderNav();
-        res.json(success(config.nodeId, data, [
+        res.json(success(config.nodeId, {
+            ...data,
+            features: { secretary: config.secretaryEnabled },
+        }, [
             { description: 'Update header navigation (operator)', method: 'PUT', url: '/v1/site/header-nav' },
         ]));
     });
