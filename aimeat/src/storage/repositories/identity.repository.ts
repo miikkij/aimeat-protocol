@@ -7,6 +7,8 @@ export interface IdentityRepository {
   updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
   getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;
   getGHIIByGoogleSub(googleSub: string): Promise<GHIIRecord | null>;
+  /** Look up a GHII by an external OIDC identity (provider id + stable subject). */
+  getGHIIByExternalId(provider: string, sub: string): Promise<GHIIRecord | null>;
   listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]>;
   deleteGHII(ghii: string): Promise<boolean>;
   createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord>;

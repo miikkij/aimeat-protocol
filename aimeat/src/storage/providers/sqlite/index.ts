@@ -1683,8 +1683,8 @@ export class SqliteStorage implements Storage {
          totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
          emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
          loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
-         googleSub, trustScore, morselBalance, allowedOrigins)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         googleSub, externalIdentities, trustScore, morselBalance, allowedOrigins)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ghii, record.username, record.nodeId, record.displayName,
         record.bio ?? null, record.avatar ?? null, record.locale ?? null,
@@ -1703,6 +1703,7 @@ export class SqliteStorage implements Storage {
         record.verificationIssuer ?? null, record.verificationCredentialHash ?? null,
         record.ftnVerified ? 1 : 0,
         record.googleSub ?? null,
+        record.externalIdentities ? JSON.stringify(record.externalIdentities) : null,
         record.trustScore ?? null, record.morselBalance ?? null,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       );
@@ -1733,6 +1734,18 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeGHII(row) : null;
   }
 
+  async getGHIIByExternalId(provider: string, sub: string): Promise<GHIIRecord | null> {
+    // Google keeps its indexed mirror column for a fast path; all providers also live in the
+    // generic externalIdentities JSON map, matched with json_extract (JSON1, built into better-sqlite3).
+    if (provider === 'google') {
+      const byMirror = this.db.prepare('SELECT * FROM ghiis WHERE googleSub = ?').get(sub) as Record<string, unknown> | undefined;
+      if (byMirror) return this.deserializeGHII(byMirror);
+    }
+    const row = this.db.prepare("SELECT * FROM ghiis WHERE json_extract(externalIdentities, '$.' || ?) = ?")
+      .get(provider, sub) as Record<string, unknown> | undefined;
+    return row ? this.deserializeGHII(row) : null;
+  }
+
   async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
     const existing = await this.getGHII(ghii);
     if (!existing) return null;
@@ -1745,7 +1758,7 @@ export class SqliteStorage implements Storage {
        emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
        notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
        verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
-       googleSub = ?, trustScore = ?, morselBalance = ?, allowedOrigins = ?
+       googleSub = ?, externalIdentities = ?, trustScore = ?, morselBalance = ?, allowedOrigins = ?
        WHERE ghii = ?`
     ).run(
       updated.username, updated.nodeId, updated.displayName,
@@ -1765,6 +1778,7 @@ export class SqliteStorage implements Storage {
       updated.verificationIssuer ?? null, updated.verificationCredentialHash ?? null,
       updated.ftnVerified ? 1 : 0,
       updated.googleSub ?? null,
+      updated.externalIdentities ? JSON.stringify(updated.externalIdentities) : null,
       updated.trustScore ?? null, updated.morselBalance ?? null,
       updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       ghii,
@@ -1829,6 +1843,7 @@ export class SqliteStorage implements Storage {
     if (row.verificationCredentialHash) record.verificationCredentialHash = row.verificationCredentialHash as string;
     if (row.ftnVerified) record.ftnVerified = (row.ftnVerified as number) === 1;
     if (row.googleSub) record.googleSub = row.googleSub as string;
+    if (row.externalIdentities) record.externalIdentities = JSON.parse(row.externalIdentities as string);
     if (row.trustScore !== null && row.trustScore !== undefined) record.trustScore = row.trustScore as number;
     if (row.morselBalance !== null && row.morselBalance !== undefined) record.morselBalance = row.morselBalance as number;
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);

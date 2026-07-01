@@ -4,6 +4,20 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.28.0 - 2026-07-02 - aimeat-auth.js owner-session refresh() now reconciles `owner` + `ghii` from the
+ *   refreshed (authoritative) JWT when it is for a different owner than the persisted session — fixes a
+ *   stale identity after an OAuth sign-in as a different user without a clean logout (boot restored the
+ *   old session, refreshed the token/displayName, but left owner/ghii showing the previous account).
+ * v1.27.0 - 2026-07-02 - First-time social-signup modal now lets the user pick their DISPLAY NAME too
+ *   (editable, pre-filled from the provider claim), not just the permanent username; finalize POST
+ *   sends { username, displayName } and the backend falls back to the provider name when blank. New
+ *   modal i18n keys: signupDisplayNameLabel, signupDisplayNameHint.
+ * v1.26.0 - 2026-07-01 - aimeat-auth.js sign-in modal renders one social-login button per enabled OIDC
+ *   provider (Google + Casdoor + Microsoft Entra ID), baked from config via AUTH_PROVIDERS/PROVIDER_ICONS
+ *   instead of the single GOOGLE_LOGIN_ENABLED flag; a delegated handler navigates to
+ *   /v1/ghii/login/<id>. The one-time username-choice modal + finalize are now provider-aware (reads
+ *   `provider` from /v1/ghii/login/pending, POSTs /v1/ghii/login/<provider>/finalize). New modal i18n
+ *   keys: casdoorSignIn, entraSignIn.
  * v1.25.0 - 2026-06-29 - aimeat-auth.js createSession() also coerces `ghii` to a string (or null) at the
  *   session boundary — some writers persisted the server's whole ghii object ({ghii,username,display_name})
  *   instead of the canonical string, which re-hydrated on every boot and broke ghii.split('@') (workspace
@@ -93,6 +107,7 @@ import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 import { aimeatAiLib } from './lib-ai.js';
 import { aimeatAgentsLib } from './lib-agents.js';
 import { aimeatHeaderLib } from './lib-header.js';
+import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -382,8 +397,15 @@ function appDeclaredScopes() {
 
 const NODE_ID = '${config.nodeId}';
 
-// Social login availability (baked in server-side from node config).
-const GOOGLE_LOGIN_ENABLED = ${config.googleOAuthEnabled ? 'true' : 'false'};
+// Social login providers enabled on this node (baked in server-side from node config): each is
+// { id, label, i18nKey } — the sign-in modal renders one button per entry.
+const AUTH_PROVIDERS = ${JSON.stringify(listEnabledProviderMeta(config))};
+// Per-provider button glyphs (inline SVG — no external fetch).
+const PROVIDER_ICONS = {
+  google: '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>',
+  entra: '<svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>',
+  casdoor: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2" fill="#4757F6"/><circle cx="14" cy="11" r="1.6" fill="#fff"/><rect x="13.2" y="11.5" width="1.6" height="4" fill="#fff"/></svg>',
+};
 
 // ── Ed25519 via Web Crypto ──
 
@@ -886,6 +908,16 @@ function createSession(data) {
         }
         session.jwt = data.data.token;
         session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        // The refreshed token is AUTHORITATIVE for identity. If it is for a different owner than the
+        // persisted session (e.g. an OAuth sign-in as a different user without a clean logout, so boot
+        // restored the previous session then refreshed against the new cookie), adopt the owner + GHII
+        // from the token — otherwise the profile/pill would show a stale identity. (ghii = owner@node.)
+        var freshClaims = parseJwt(session.jwt) || {};
+        if (freshClaims.owner && freshClaims.owner !== session.owner) {
+          session.owner = freshClaims.owner;
+          if (freshClaims.node) session.ghii = freshClaims.owner + '@' + freshClaims.node;
+          session.identity = session.gaii || session.ghii || null;
+        }
         // The owner may have edited their profile since login — adopt the fresh display
         // name the server returns so the login pill stays current without a re-login.
         if (typeof data.data.display_name === 'string') session.displayName = data.data.display_name;
@@ -1556,14 +1588,16 @@ function showLoginModal(opts, renderBtn) {
     + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
     + '</div>'
     + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
-    // Social login (Google) — only shown when the node has Google sign-in configured
-    + (GOOGLE_LOGIN_ENABLED ? (
+    // Social login — one button per enabled OIDC provider (Google / Casdoor / Entra), baked from config
+    + (AUTH_PROVIDERS.length ? (
         '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px">'
         + '<span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i.orLabel || 'OR') + '<span style="flex:1;height:1px;background:#E5E7EB"></span>'
         + '</div>'
-        + '<button id="aimeat-google-btn" type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">'
-        + '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>'
-        + escHtml(i.googleSignIn || 'Continue with Google') + '</button>'
+        + AUTH_PROVIDERS.map(function (p) {
+            return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;margin-bottom:8px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">'
+              + (PROVIDER_ICONS[p.id] || '')
+              + escHtml((i[p.i18nKey]) || p.label) + '</button>';
+          }).join('')
       ) : '')
     + '<div style="margin-top:14px;display:flex;gap:16px">'
     + '<a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
@@ -1631,15 +1665,15 @@ function showLoginModal(opts, renderBtn) {
 
   document.getElementById('aimeat-cancel-btn').addEventListener('click', () => modal.remove());
 
-  // Google sign-in — full-page navigation to the OIDC start endpoint. The node sets a
+  // Social sign-in — full-page navigation to the provider's OIDC start endpoint. The node sets a
   // refresh cookie on callback and redirects back; the SPA then boots logged-in.
-  var googleBtn = document.getElementById('aimeat-google-btn');
-  if (googleBtn) {
-    googleBtn.addEventListener('click', function() {
+  modal.querySelectorAll('.aimeat-oauth-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = btn.getAttribute('data-provider');
       var back = encodeURIComponent(location.pathname + location.search + location.hash);
-      location.href = NODE_URL + '/v1/ghii/login/google?redirect=' + back;
+      location.href = NODE_URL + '/v1/ghii/login/' + id + '?redirect=' + back;
     });
-  }
+  });
 
   // Helper to toggle between views
   function showView(view) {
@@ -1880,13 +1914,16 @@ function showGoogleSignupModal(pending, i) {
     + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
     + '<div style="padding:28px 32px 24px">'
     + '<h2 style="margin:0 0 8px;font-size:21px;font-weight:800;color:#1A1A2E">' + escHtml(i.signupTitle || 'Choose your username') + '</h2>'
-    + '<p style="margin:0 0 6px;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(i.signupIntro || "You're signing in with Google for the first time. Pick the username for your AIMEAT account.") + '</p>'
+    + '<p style="margin:0 0 6px;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(i.signupIntro || "You're signing in for the first time. Pick the username for your AIMEAT account.") + '</p>'
     + emailNote
     + '<label class="aimeat-label" for="aimeat-su-name">' + escHtml(i.signupUsernameLabel || 'Username') + '</label>'
     + '<input id="aimeat-su-name" class="aimeat-inp" autocomplete="off" autocapitalize="none" spellcheck="false" value="' + escHtml(pending.suggested || '') + '">'
     + '<p id="aimeat-su-status" style="margin:6px 0 0;font-size:13px;min-height:18px"></p>'
-    + '<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupSuggestedHint || 'We suggested one from your Google account — change it to anything you like.') + '</p>'
+    + '<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupSuggestedHint || 'We suggested one from your account — change it to anything you like.') + '</p>'
     + '<div style="margin:16px 0 0;padding:12px 14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;font-size:13px;color:#9A3412;line-height:1.5">' + escHtml(i.signupPermanentWarning || 'This username is permanent. It identifies you across AIMEAT and cannot be changed later — the only way to change it is to delete your account and create a new one.') + '</div>'
+    + '<label class="aimeat-label" for="aimeat-su-display" style="margin-top:16px">' + escHtml(i.signupDisplayNameLabel || 'Display name') + '</label>'
+    + '<input id="aimeat-su-display" class="aimeat-inp" autocomplete="off" maxlength="80" value="' + escHtml(pending.displayName || '') + '">'
+    + '<p style="margin:6px 0 0;font-size:12px;color:#9CA3AF;line-height:1.45">' + escHtml(i.signupDisplayNameHint || 'Shown to others — not permanent, you can change it anytime later.') + '</p>'
     + '<div style="display:flex;gap:10px;margin-top:20px">'
     + '<button id="aimeat-su-create" class="aimeat-go">' + escHtml(i.signupCreateBtn || 'Create my account') + '</button>'
     + '<button id="aimeat-su-cancel" class="aimeat-cancel">' + escHtml(i.signupCancelBtn || 'Cancel') + '</button>'
@@ -1942,14 +1979,16 @@ function showGoogleSignupModal(pending, i) {
   createBtn.addEventListener('click', async function () {
     var name = (input.value || '').trim().toLowerCase();
     if (!USERNAME_RE.test(name)) { evaluate(); return; }
+    var displayEl = document.getElementById('aimeat-su-display');
+    var displayName = displayEl ? (displayEl.value || '').trim() : '';
     createBtn.disabled = true;
     createBtn.textContent = i.signupCreating || 'Creating account...';
     errEl.style.display = 'none';
     try {
-      var res = await api('/v1/ghii/login/google/finalize', {
+      var res = await api('/v1/ghii/login/' + (pending.provider || 'google') + '/finalize', {
         method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ username: name }),
+        body: JSON.stringify({ username: name, displayName: displayName }),
       });
       cleanSignupParam();
       var redirect = (res && res.data && res.data.redirect) || pending.redirect || '/';

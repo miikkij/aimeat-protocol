@@ -1,28 +1,33 @@
 /**
  * @file oauth-login.ts
- * @description Social login (sign-in) via external OIDC providers — currently Google.
- *   A generic, config-gated sign-in path for HUMAN owners that reuses the same OIDC
- *   relying-party client as FTN verification. On a successful Google login the user is
- *   mapped to a GHII: a returning Google user (matched by provider subject) or a verified
- *   email match link straight to their existing account + session. A BRAND-NEW user is NOT
- *   auto-created — instead they go through a one-time username-choice step: the callback
- *   stashes the verified Google identity in a short-lived signed cookie and bounces back to
- *   the SPA, which prompts the user to confirm or change the suggested username (warning
- *   that it is permanent) before POSTing to finalize, which creates the owner+GHII and
- *   establishes the session. This avoids silently minting a username from the email
- *   local-part (which leaks the address) and gives the user their one chance to pick it.
- * @structure oauthLoginRouter(config, storage, googleClient): GET /v1/ghii/login/google
- *   (authorize → redirect to Google) + GET /v1/ghii/login/google/callback (exchange → map
- *   returning/linked OR stash pending + redirect) + GET /v1/ghii/login/pending (read the
- *   pending cookie) + POST /v1/ghii/login/google/finalize (create with chosen username +
- *   session) + GET /v1/ghii/username-available (live validation). Helpers:
- *   deriveUniqueUsername(), normalizeUsername(), createOwnerForGoogle(), pending-token
- *   sign/verify + cookie read/set/clear.
- * @usage app.use(oauthLoginRouter(config, storage, googleOidcClient)) from routes-loader.
+ * @description Social login (sign-in) via external OIDC providers — Google, Casdoor, and Microsoft
+ *   Entra ID. A single generic, config-gated sign-in path for HUMAN owners that reuses the shared
+ *   OIDC relying-party client (src/services/oidc-client.ts) via the provider registry
+ *   (src/services/oidc-providers.ts). For every configured provider the SAME three routes are
+ *   registered — authorize → callback → finalize — differing only by the provider's URL segment,
+ *   nonce type, claim mapping, and optional tenant gate. On a successful login the user is mapped to
+ *   a GHII: a returning user (matched by the provider's stable subject) or a verified-email match
+ *   links straight to their existing account + session. A BRAND-NEW user is NOT auto-created —
+ *   instead they go through a one-time username-choice step: the callback stashes the verified
+ *   identity in a short-lived signed cookie and bounces back to the SPA, which prompts the user to
+ *   confirm or change the suggested username (permanent) before POSTing to finalize, which creates
+ *   the owner+GHII and establishes the session.
+ * @structure oauthLoginRouter(config, storage, providers[]) registers, per provider `<id>`:
+ *   GET /v1/ghii/login/<id> (authorize) + GET /v1/ghii/login/<id>/callback (exchange → map
+ *   returning/linked OR stash pending + redirect) + POST /v1/ghii/login/<id>/finalize (create with
+ *   chosen username + session); plus shared-once: GET /v1/ghii/login/pending (read the pending
+ *   cookie), GET /v1/ghii/username-available (live validation), GET /v1/auth/providers (discovery).
+ *   Account linking is generic via storage.getGHIIByExternalId + GHIIRecord.externalIdentities
+ *   (google also mirrors GHIIRecord.googleSub for the fast/indexed path).
+ * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial implementation: Google sign-in (link-by-verified-email or create).
  *   v1.1.0 — 2026-06-25 — Brand-new users choose their username once (pending-signup cookie +
  *     /login/pending + /login/google/finalize + /username-available); no more silent email-derived name.
+ *   v2.0.0 — 2026-07-01 — Generalised to a multi-provider registry (Google + Casdoor + Entra ID):
+ *     provider-parameterised routes, generic externalIdentities linking, per-provider claim mapping +
+ *     Entra tenant gating, and a GET /v1/auth/providers discovery endpoint. Google routes/behaviour
+ *     are unchanged (its id is 'google', so it emits the exact same paths + error codes).
  */
 
 import { Router } from 'express';
@@ -32,7 +37,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { GHIIRecord } from '../storage/interface.js';
-import type { OidcClient } from '../services/oidc-client.js';
+import type { OidcProvider, ProviderId } from '../services/oidc-providers.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateKeyPair } from '../auth/keypair.js';
@@ -42,18 +47,19 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
-/** Name of the short-lived, signed cookie that carries a not-yet-finalized Google signup. */
+/** Name of the short-lived, signed cookie that carries a not-yet-finalized OIDC signup. */
 const PENDING_COOKIE = 'aimeat_pending_signup';
-/** Cookie path — covers both /v1/ghii/login/pending and /v1/ghii/login/google/finalize. */
+/** Cookie path — covers both /v1/ghii/login/pending and /v1/ghii/login/<id>/finalize. */
 const PENDING_COOKIE_PATH = '/v1/ghii';
 /** Pending-signup token lifetime — long enough to pick a name, short enough to limit exposure. */
 const PENDING_TTL_SECONDS = 30 * 60;
 /** Discriminator claim so a pending-signup token can never be replayed as an auth token. */
-const PENDING_PURPOSE = 'google_signup';
+const PENDING_PURPOSE = 'oauth_signup';
 
-/** The verified Google identity we carry between the callback and finalize (signed, never trusted raw). */
+/** The verified external identity we carry between the callback and finalize (signed, never trusted raw). */
 interface PendingSignup {
-  googleSub: string;
+  provider: string;
+  providerSub: string;
   email: string | null;
   emailVerified: boolean;
   displayName: string;
@@ -78,12 +84,13 @@ function normalizeUsername(raw: unknown, nodeId: string): { username: string; re
   return { username };
 }
 
-/** Sign the verified Google identity into a short-lived EdDSA token (node key). */
+/** Sign the verified external identity into a short-lived EdDSA token (node key). */
 async function signPendingToken(data: PendingSignup): Promise<string> {
   const { privateKey } = getNodeCryptoKeys();
   return new SignJWT({
     purpose: PENDING_PURPOSE,
-    googleSub: data.googleSub,
+    provider: data.provider,
+    providerSub: data.providerSub,
     email: data.email,
     emailVerified: data.emailVerified,
     displayName: data.displayName,
@@ -101,9 +108,10 @@ async function verifyPendingToken(token: string): Promise<PendingSignup | null> 
   try {
     const { publicKey } = getNodeCryptoKeys();
     const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
-    if (payload.purpose !== PENDING_PURPOSE || typeof payload.googleSub !== 'string') return null;
+    if (payload.purpose !== PENDING_PURPOSE || typeof payload.providerSub !== 'string' || typeof payload.provider !== 'string') return null;
     return {
-      googleSub: payload.googleSub,
+      provider: payload.provider,
+      providerSub: payload.providerSub,
       email: typeof payload.email === 'string' ? payload.email : null,
       emailVerified: payload.emailVerified === true,
       displayName: typeof payload.displayName === 'string' ? payload.displayName : 'AIMEAT User',
@@ -134,7 +142,7 @@ function readPendingCookie(req: Request): string | null {
   return null;
 }
 
-/** Set the httpOnly, host-only pending-signup cookie (Lax so it survives the Google→callback redirect). */
+/** Set the httpOnly, host-only pending-signup cookie (Lax so it survives the IdP→callback redirect). */
 function setPendingCookie(req: Request, res: Response, token: string): void {
   res.cookie(PENDING_COOKIE, token, {
     httpOnly: true,
@@ -153,6 +161,17 @@ function clearPendingCookie(req: Request, res: Response): void {
     sameSite: 'lax',
     path: PENDING_COOKIE_PATH,
   });
+}
+
+/**
+ * The partial GHII update that links a provider identity onto a record: writes the generic
+ * externalIdentities map entry and, for google, keeps the indexed googleSub mirror in sync.
+ */
+function externalIdUpdate(existing: GHIIRecord | null, providerId: ProviderId, sub: string): Partial<GHIIRecord> {
+  const externalIdentities = { ...(existing?.externalIdentities ?? {}), [providerId]: sub };
+  const update: Partial<GHIIRecord> = { externalIdentities };
+  if (providerId === 'google') update.googleSub = sub;
+  return update;
 }
 
 /**
@@ -181,16 +200,16 @@ async function deriveUniqueUsername(storage: Storage, email: string | undefined,
 }
 
 /**
- * Create a fresh owner + GHII linked to a Google account, with the welcome bonus.
- * Shared by the finalize route (the only path that mints a brand-new Google account).
+ * Create a fresh owner + GHII linked to an external OIDC identity, with the welcome bonus.
+ * Shared by the finalize routes (the only path that mints a brand-new social account).
  * Caller must have already validated the username is free + valid.
  */
-async function createOwnerForGoogle(
+async function createOwnerForProvider(
   storage: Storage,
   config: AimeatConfig,
-  opts: { username: string; displayName: string; sub: string; email: string | null; emailVerified: boolean },
+  opts: { providerId: ProviderId; username: string; displayName: string; sub: string; email: string | null; emailVerified: boolean },
 ): Promise<GHIIRecord> {
-  const { username, displayName, sub, email, emailVerified } = opts;
+  const { providerId, username, displayName, sub, email, emailVerified } = opts;
   const now = new Date().toISOString();
   const keyPair = await generateKeyPair();
 
@@ -215,8 +234,10 @@ async function createOwnerForGoogle(
     nodeId: config.nodeId,
     ghii,
     displayName,
-    googleSub: sub,
-    // Google asserts the email; record it as a verified email (level 1).
+    externalIdentities: { [providerId]: sub },
+    // Keep the indexed googleSub mirror for the google provider (fast returning-user lookup).
+    googleSub: providerId === 'google' ? sub : undefined,
+    // The IdP asserts the email; record it as a verified email (level 1) when trusted.
     emailHash: emailVerified && email ? emailHashOf(email) : undefined,
     emailVerifiedAt: emailVerified && email ? now : undefined,
     notificationEmail: emailVerified && email ? email.toLowerCase().trim() : undefined,
@@ -246,11 +267,11 @@ async function createOwnerForGoogle(
 export function oauthLoginRouter(
   config: AimeatConfig,
   storage: Storage,
-  googleClient: OidcClient | null,
+  providers: OidcProvider[],
 ): Router {
   const router = Router();
 
-  const googleAvailable = () => config.googleOAuthEnabled && !!googleClient?.initialized;
+  const providerAvailable = (p: OidcProvider) => p.enabled && !!p.client?.initialized;
 
   // Sanitize a post-login redirect target: only same-site absolute paths are allowed.
   function safeRedirectPath(raw: unknown): string {
@@ -258,146 +279,231 @@ export function oauthLoginRouter(
     return '/';
   }
 
-  // GET /v1/ghii/login/google — Begin Google sign-in (redirect to Google's consent screen)
-  router.get('/v1/ghii/login/google', async (req, res) => {
-    try {
-      if (!googleAvailable()) {
-        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Google sign-in is not available on this node'));
-        return;
-      }
+  // Shared: establish an owner session (httpOnly refresh cookie + access token) for a resolved GHII.
+  async function establishForGhii(req: Request, res: Response, ghiiRecord: GHIIRecord): Promise<void> {
+    const now = new Date().toISOString();
+    const ownerName = ghiiRecord.ownerName;
+    const ownerRecord = await storage.getOwner(ownerName);
+    const roles: string[] = [];
+    if (ownerRecord?.roles.includes('owner')) roles.push('owner');
+    if (ownerRecord?.roles.includes('operator')) roles.push('operator');
+    if (roles.length === 0) roles.push('owner');
 
-      const authRequest = googleClient!.createAuthRequest();
-      const nonceTtl = config.nonceTtlSeconds * 1000;
-      await storage.createVerificationNonce({
-        id: randomUUID(),
-        owner: '',                       // login flow — no authenticated owner yet
-        type: 'google_login',
-        state: authRequest.state,
-        nonce: authRequest.nonce,
-        redirectUri: safeRedirectPath(req.query.redirect),  // where to send the user after login
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + nonceTtl).toISOString(),
-      });
+    await storage.updateGHII(ghiiRecord.ghii, {
+      lastLoginAt: now,
+      loginCount: (ghiiRecord.loginCount ?? 0) + 1,
+    });
 
-      res.redirect(authRequest.authorizationUrl);
-    } catch (err) {
-      logger.error('Google sign-in authorize failed', { error: String(err) });
-      res.redirect(`${config.baseUrl}/?auth_error=GOOGLE_START_FAILED`);
-    }
-  });
+    await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
+    emitChange('ghii');
+  }
 
-  // GET /v1/ghii/login/google/callback — Google redirects back here with code + state
-  router.get('/v1/ghii/login/google/callback', async (req, res) => {
-    const fail = (code: string) => res.redirect(`${config.baseUrl}/?auth_error=${encodeURIComponent(code)}`);
-    try {
-      if (!googleAvailable()) {
-        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Google sign-in is not available on this node'));
-        return;
-      }
+  // Register the authorize/callback/finalize trio for one provider.
+  function registerProvider(p: OidcProvider): void {
+    const PREFIX = p.id.toUpperCase();
 
-      const code = req.query.code as string | undefined;
-      const state = req.query.state as string | undefined;
-      if (!code || !state) { fail('GOOGLE_MISSING_CODE'); return; }
-
-      const nonceRecord = await storage.getVerificationNonce(state);
-      if (!nonceRecord || nonceRecord.type !== 'google_login') { fail('GOOGLE_INVALID_STATE'); return; }
-      if (new Date(nonceRecord.expiresAt) < new Date()) {
-        await storage.deleteVerificationNonce(state);
-        fail('GOOGLE_STATE_EXPIRED');
-        return;
-      }
-
-      const tokenResult = await googleClient!.exchangeCode(code, state, nonceRecord.nonce);
-      const postLoginPath = safeRedirectPath(nonceRecord.redirectUri);
-      await storage.deleteVerificationNonce(state);
-
-      if (!tokenResult.valid || !tokenResult.claims) { fail('GOOGLE_EXCHANGE_FAILED'); return; }
-
-      const claims = tokenResult.claims;
-      const sub = typeof claims.sub === 'string' ? claims.sub : undefined;
-      const email = typeof claims.email === 'string' ? claims.email : undefined;
-      const emailVerified = claims.email_verified === true || claims.email_verified === 'true';
-      const displayName = (typeof claims.name === 'string' && claims.name)
-        || (typeof claims.given_name === 'string' && claims.given_name)
-        || email?.split('@')[0]
-        || 'AIMEAT User';
-      if (!sub) { fail('GOOGLE_NO_SUBJECT'); return; }
-
-      const now = new Date().toISOString();
-
-      // ── Map the Google identity to a GHII ──
-      // 1) Returning Google user — matched by stable provider subject.
-      let ghiiRecord = await storage.getGHIIByGoogleSub(sub);
-
-      // 2) Link to an existing account ONLY when Google's email is verified AND it matches
-      //    a GHII whose email was already locally verified. Requiring the local side to be
-      //    verified too prevents takeover of an account that merely *claimed* (never proved)
-      //    this email at registration.
-      if (!ghiiRecord && emailVerified && email) {
-        const byEmail = await storage.getGHIIByEmailHash(emailHashOf(email));
-        if (byEmail && byEmail.emailVerifiedAt) {
-          ghiiRecord = await storage.updateGHII(byEmail.ghii, { googleSub: sub });
+    // GET /v1/ghii/login/<id> — Begin sign-in (redirect to the IdP's consent screen)
+    router.get(`/v1/ghii/login/${p.id}`, async (req, res) => {
+      try {
+        if (!providerAvailable(p)) {
+          res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', `${p.label} is not available on this node`));
+          return;
         }
-      }
 
-      // 3) No match — a brand-new user. Do NOT silently create an account with an
-      //    email-derived username (that leaks the address and locks in a name the user
-      //    never chose). Instead stash the verified Google identity in a short-lived signed
-      //    cookie and bounce back to the SPA, which prompts for a one-time username choice;
-      //    POST /v1/ghii/login/google/finalize then creates the account + session.
-      if (!ghiiRecord) {
-        const suggested = await deriveUniqueUsername(storage, email, String(displayName));
-        const token = await signPendingToken({
-          googleSub: sub,
-          email: email ?? null,
-          emailVerified,
-          displayName: String(displayName),
-          suggested,
-          redirect: postLoginPath,
+        const authRequest = p.client!.createAuthRequest();
+        const nonceTtl = config.nonceTtlSeconds * 1000;
+        await storage.createVerificationNonce({
+          id: randomUUID(),
+          owner: '',                       // login flow — no authenticated owner yet
+          type: p.nonceType as 'google_login' | 'casdoor_login' | 'entra_login',
+          state: authRequest.state,
+          nonce: authRequest.nonce,
+          redirectUri: safeRedirectPath(req.query.redirect),  // where to send the user after login
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + nonceTtl).toISOString(),
         });
-        setPendingCookie(req, res, token);
-        // Return them to where they started, flagged so the auth lib opens the choose-username step.
-        const sep = postLoginPath.includes('?') ? '&' : '?';
-        res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
-        return;
+
+        res.redirect(authRequest.authorizationUrl);
+      } catch (err) {
+        logger.error(`${p.id} sign-in authorize failed`, { error: String(err) });
+        res.redirect(`${config.baseUrl}/?auth_error=${PREFIX}_START_FAILED`);
       }
+    });
 
-      // ── Establish an owner session (httpOnly refresh cookie + access token) ──
-      const ownerName = ghiiRecord!.ownerName;
-      const ownerRecord = await storage.getOwner(ownerName);
-      const roles: string[] = [];
-      if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-      if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-      if (roles.length === 0) roles.push('owner');
+    // GET /v1/ghii/login/<id>/callback — IdP redirects back here with code + state
+    router.get(`/v1/ghii/login/${p.id}/callback`, async (req, res) => {
+      const fail = (code: string) => res.redirect(`${config.baseUrl}/?auth_error=${encodeURIComponent(code)}`);
+      try {
+        if (!providerAvailable(p)) {
+          res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', `${p.label} is not available on this node`));
+          return;
+        }
 
-      await storage.updateGHII(ghiiRecord!.ghii, {
-        lastLoginAt: now,
-        loginCount: (ghiiRecord!.loginCount ?? 0) + 1,
+        const code = req.query.code as string | undefined;
+        const state = req.query.state as string | undefined;
+        if (!code || !state) { fail(`${PREFIX}_MISSING_CODE`); return; }
+
+        const nonceRecord = await storage.getVerificationNonce(state);
+        if (!nonceRecord || nonceRecord.type !== p.nonceType) { fail(`${PREFIX}_INVALID_STATE`); return; }
+        if (new Date(nonceRecord.expiresAt) < new Date()) {
+          await storage.deleteVerificationNonce(state);
+          fail(`${PREFIX}_STATE_EXPIRED`);
+          return;
+        }
+
+        const tokenResult = await p.client!.exchangeCode(code, state, nonceRecord.nonce);
+        const postLoginPath = safeRedirectPath(nonceRecord.redirectUri);
+        await storage.deleteVerificationNonce(state);
+
+        if (!tokenResult.valid || !tokenResult.claims) { fail(`${PREFIX}_EXCHANGE_FAILED`); return; }
+
+        // Optional pre-mapping gate (e.g. Entra single-tenant enforcement via the `tid` claim).
+        if (p.validateClaims) {
+          const verr = p.validateClaims(tokenResult.claims);
+          if (verr) { fail(verr); return; }
+        }
+
+        const mapped = p.mapClaims(tokenResult.claims);
+        if (!mapped) { fail(`${PREFIX}_NO_SUBJECT`); return; }
+        const { sub, email, emailVerified, displayName } = mapped;
+
+        // ── Map the external identity to a GHII ──
+        // 1) Returning user — matched by this provider's stable subject.
+        let ghiiRecord = await storage.getGHIIByExternalId(p.id, sub);
+
+        // 2) Link to an existing account ONLY when the IdP's email is verified AND it matches a GHII
+        //    whose email was already locally verified. Requiring the local side to be verified too
+        //    prevents takeover of an account that merely *claimed* (never proved) this email.
+        if (!ghiiRecord && emailVerified && email) {
+          const byEmail = await storage.getGHIIByEmailHash(emailHashOf(email));
+          if (byEmail && byEmail.emailVerifiedAt) {
+            ghiiRecord = await storage.updateGHII(byEmail.ghii, externalIdUpdate(byEmail, p.id, sub));
+          }
+        }
+
+        // 3) No match — a brand-new user. Do NOT silently create an account with an email-derived
+        //    username. Stash the verified identity in a short-lived signed cookie and bounce back to
+        //    the SPA for a one-time username choice; POST .../finalize then creates account + session.
+        if (!ghiiRecord) {
+          const suggested = await deriveUniqueUsername(storage, email ?? undefined, displayName);
+          const token = await signPendingToken({
+            provider: p.id,
+            providerSub: sub,
+            email: email ?? null,
+            emailVerified,
+            displayName,
+            suggested,
+            redirect: postLoginPath,
+          });
+          setPendingCookie(req, res, token);
+          const sep = postLoginPath.includes('?') ? '&' : '?';
+          res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+          return;
+        }
+
+        await establishForGhii(req, res, ghiiRecord);
+        // Redirect back to the SPA — it boots logged-in from the refresh cookie.
+        res.redirect(`${config.baseUrl}${postLoginPath}`);
+      } catch (err) {
+        logger.error(`${p.id} sign-in callback failed`, { error: String(err) });
+        fail(`${PREFIX}_CALLBACK_FAILED`);
+      }
+    });
+
+    // POST /v1/ghii/login/<id>/finalize — Complete a brand-new signup with the chosen username.
+    // Reads the signed pending cookie (must be for THIS provider), validates the name, creates the
+    // owner + GHII, and establishes the session. Idempotent on double-submit.
+    router.post(`/v1/ghii/login/${p.id}/finalize`,
+      rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs }),
+      async (req, res) => {
+        try {
+          const raw = readPendingCookie(req);
+          const pending = raw ? await verifyPendingToken(raw) : null;
+          if (!pending || pending.provider !== p.id) {
+            res.status(400).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending sign-up — start sign-in again'));
+            return;
+          }
+
+          let ghiiRecord = await storage.getGHIIByExternalId(p.id, pending.providerSub);
+
+          if (!ghiiRecord) {
+            // Username: the user's choice, falling back to the suggested name if they left it blank.
+            const chosenRaw = (req.body && typeof req.body.username === 'string' && req.body.username.trim())
+              ? req.body.username
+              : pending.suggested;
+            const { username, remoteNode } = normalizeUsername(chosenRaw, config.nodeId);
+            if (remoteNode) {
+              res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Cannot register here with a remote identity (node ${remoteNode})`));
+              return;
+            }
+            const nameError = validateOwnerName(username);
+            if (nameError) {
+              res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
+              return;
+            }
+            if (await storage.getOwner(username)) {
+              res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
+              return;
+            }
+
+            // Display name: the user's choice from the signup modal, falling back to the
+            // provider-supplied name when left blank. Unlike the username, it is editable later.
+            const chosenDisplayName = (req.body && typeof req.body.displayName === 'string' && req.body.displayName.trim())
+              ? req.body.displayName.trim()
+              : pending.displayName;
+
+            ghiiRecord = await createOwnerForProvider(storage, config, {
+              providerId: p.id,
+              username,
+              displayName: chosenDisplayName,
+              sub: pending.providerSub,
+              email: pending.email,
+              emailVerified: pending.emailVerified,
+            });
+          }
+
+          await establishForGhii(req, res, ghiiRecord);
+          clearPendingCookie(req, res);
+
+          res.json(success(config.nodeId, {
+            ghii: ghiiRecord.ghii,
+            owner: ghiiRecord.ownerName,
+            displayName: ghiiRecord.displayName,
+            redirect: safeRedirectPath(pending.redirect),
+          }));
+        } catch (err) {
+          logger.error(`${p.id} sign-in finalize failed`, { error: String(err) });
+          res.status(500).json(error(config.nodeId, 'FINALIZE_FAILED', 'Could not complete sign-up'));
+        }
       });
+  }
 
-      await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
+  for (const p of providers) registerProvider(p);
 
-      emitChange('ghii');
-      // Redirect back to the SPA — it boots logged-in from the refresh cookie.
-      res.redirect(`${config.baseUrl}${postLoginPath}`);
-    } catch (err) {
-      logger.error('Google sign-in callback failed', { error: String(err) });
-      fail('GOOGLE_CALLBACK_FAILED');
-    }
+  // GET /v1/auth/providers — Discovery: which social-login providers this node offers. Lets any SPA
+  // render the right sign-in buttons instead of hard-coding provider availability.
+  router.get('/v1/auth/providers', (_req, res) => {
+    const enabled = providers.filter(p => p.enabled).map(p => ({
+      id: p.id,
+      label: p.label,
+      loginUrl: `/v1/ghii/login/${p.id}`,
+    }));
+    res.json(success(config.nodeId, { providers: enabled }));
   });
 
-  // GET /v1/ghii/login/pending — Read the pending Google signup (suggested username + which
-  // Google email it is for) so the SPA can render the one-time username-choice step. Reads the
-  // signed httpOnly cookie set by the callback; returns NO_PENDING_SIGNUP when absent/expired.
+  // GET /v1/ghii/login/pending — Read the pending signup (suggested username, which email, and which
+  // provider) so the SPA can render the one-time username-choice step + finalize to the right route.
+  // Reads the signed httpOnly cookie set by the callback; 404s when absent/expired.
   router.get('/v1/ghii/login/pending', async (req, res) => {
     const raw = readPendingCookie(req);
     const pending = raw ? await verifyPendingToken(raw) : null;
     if (!pending) {
-      res.status(404).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending Google sign-up'));
+      res.status(404).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending sign-up'));
       return;
     }
-    // The googleSub stays server-side; the client only needs what it must show + the redirect.
+    // The provider subject stays server-side; the client only needs what it must show + the redirect.
     res.json(success(config.nodeId, {
+      provider: pending.provider,
       suggested: pending.suggested,
       email: pending.email,
       displayName: pending.displayName,
@@ -422,82 +528,6 @@ export function oauthLoginRouter(
       }
       const taken = !!(await storage.getOwner(username));
       res.json(success(config.nodeId, { name: username, valid: true, available: !taken, reason: taken ? 'Username is already taken' : null }));
-    });
-
-  // POST /v1/ghii/login/google/finalize — Complete a brand-new Google sign-up with the username
-  // the user chose (or confirmed). Reads the signed pending cookie, validates the name, creates the
-  // owner + GHII, and establishes the owner session. Idempotent: if the Google identity already
-  // resolved to a GHII (double-submit / a parallel finalize), just establish that session.
-  router.post('/v1/ghii/login/google/finalize',
-    rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs }),
-    async (req, res) => {
-      try {
-        const raw = readPendingCookie(req);
-        const pending = raw ? await verifyPendingToken(raw) : null;
-        if (!pending) {
-          res.status(400).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending Google sign-up — start sign-in again'));
-          return;
-        }
-
-        let ghiiRecord = await storage.getGHIIByGoogleSub(pending.googleSub);
-
-        if (!ghiiRecord) {
-          // Username: the user's choice, falling back to the suggested name if they left it blank.
-          const chosenRaw = (req.body && typeof req.body.username === 'string' && req.body.username.trim())
-            ? req.body.username
-            : pending.suggested;
-          const { username, remoteNode } = normalizeUsername(chosenRaw, config.nodeId);
-          if (remoteNode) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Cannot register here with a remote identity (node ${remoteNode})`));
-            return;
-          }
-          const nameError = validateOwnerName(username);
-          if (nameError) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
-            return;
-          }
-          if (await storage.getOwner(username)) {
-            res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
-            return;
-          }
-
-          ghiiRecord = await createOwnerForGoogle(storage, config, {
-            username,
-            displayName: pending.displayName,
-            sub: pending.googleSub,
-            email: pending.email,
-            emailVerified: pending.emailVerified,
-          });
-        }
-
-        // ── Establish an owner session (httpOnly refresh cookie + access token) ──
-        const now = new Date().toISOString();
-        const ownerName = ghiiRecord.ownerName;
-        const ownerRecord = await storage.getOwner(ownerName);
-        const roles: string[] = [];
-        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-        if (roles.length === 0) roles.push('owner');
-
-        await storage.updateGHII(ghiiRecord.ghii, {
-          lastLoginAt: now,
-          loginCount: (ghiiRecord.loginCount ?? 0) + 1,
-        });
-
-        await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
-        clearPendingCookie(req, res);
-        emitChange('ghii');
-
-        res.json(success(config.nodeId, {
-          ghii: ghiiRecord.ghii,
-          owner: ownerName,
-          displayName: ghiiRecord.displayName,
-          redirect: safeRedirectPath(pending.redirect),
-        }));
-      } catch (err) {
-        logger.error('Google sign-in finalize failed', { error: String(err) });
-        res.status(500).json(error(config.nodeId, 'FINALIZE_FAILED', 'Could not complete sign-up'));
-      }
     });
 
   return router;
