@@ -26,6 +26,8 @@
     "telemetry:prune": "cd aimeat && pnpm telemetry:prune",
     "consent-audit:stats": "cd aimeat && pnpm consent-audit:stats",
     "consent-audit:prune": "cd aimeat && pnpm consent-audit:prune",
+    "versions:stats": "cd aimeat && pnpm versions:stats",
+    "versions:archive": "cd aimeat && pnpm versions:archive",
     "screenshot:worker": "cd aimeat && pnpm screenshot:worker",
     "lint": "cd aimeat && pnpm lint",
     "test": "cd aimeat && pnpm test",
