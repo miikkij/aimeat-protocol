@@ -406,7 +406,11 @@ export class Scheduler {
       } else if (job.type === 'eco-capability') {
         run = await this.executeEcoCapabilityJob(job);
       } else if (job.type === 'secretary') {
-        run = await this.executeSecretaryJob(job);
+        // Secretary is opt-in (AIMEAT_SECRETARY_ENABLED). When disabled, skip the tick rather than
+        // running it — existing per-owner secretary jobs simply lie dormant.
+        run = this.config.secretaryEnabled
+          ? await this.executeSecretaryJob(job)
+          : { reads: [], writes: [], skipped: true, skipReason: 'secretary disabled' };
       }
     } catch (err) {
       result = 'error';

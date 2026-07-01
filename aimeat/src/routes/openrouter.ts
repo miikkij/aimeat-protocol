@@ -183,7 +183,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       try {
         const keyRec = await storage.getMemory(gaii, 'openrouter.apikey');
         const hasKey = !!((keyRec?.value as { encrypted?: string } | undefined)?.encrypted);
-        if (hasKey) await ensureSecretary(storage, config, req.auth!.owner as string);
+        // Only auto-provision the Secretary when the feature is enabled (AIMEAT_SECRETARY_ENABLED).
+        if (hasKey && config.secretaryEnabled) await ensureSecretary(storage, config, req.auth!.owner as string);
       } catch (err) {
         logger.warn('[secretary] auto-provision on settings save failed', { error: String(err) });
       }
@@ -209,7 +210,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // got an agent (the Secretary page then wrongly said "configure OpenRouter"). This GET runs on
       // every SPA load (the header Secretary-button check), so it backfills them transparently.
       // Best-effort + idempotent — never block reading settings.
-      if ((apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted) {
+      if (config.secretaryEnabled && (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted) {
         try { await ensureSecretary(storage, config, req.auth!.owner as string); }
         catch (err) { logger.warn('[secretary] provision-on-settings-read failed', { error: String(err) }); }
       }

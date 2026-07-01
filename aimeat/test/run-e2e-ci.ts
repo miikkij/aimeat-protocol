@@ -8,6 +8,9 @@
  * @version-history
  *   v1.0.0 -- 2026-05-28 -- Add redacted MongoDB cleanup error details.
  *   v1.0.1 -- 2026-06-14 -- Disable e2e-email suite (no SMTP credentials to send mail).
+ *   v1.1.0 -- 2026-07-01 -- Pin AIMEAT_SECRETARY_ENABLED=true on the shared server (feature is off by
+ *            default in prod) so the secretary/specialist/organism-template suites keep exercising it;
+ *            add e2e-secretary-disabled.ts (self-spawns a flag-off server) for the hidden-by-default path.
  */
 
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
@@ -108,6 +111,9 @@ const ALL_SUITES = [
     'test/e2e-connect-serve-loopback.ts',
     'test/e2e-phase0.ts',
     'test/e2e-secretary.ts',
+    // Self-spawns its own server with the Secretary feature OFF (the shared server pins it ON),
+    // verifying the hidden-by-default path: routes 404 + header-nav features.secretary=false.
+    'test/e2e-secretary-disabled.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',
@@ -269,6 +275,11 @@ async function startServer(): Promise<ChildProcess> {
         // own flag-ON server, so it is unaffected.
         AIMEAT_APP_ORIGIN_ENABLED: 'false',
         AIMEAT_APP_HOST: '',
+        // Secretary + specialist agents are opt-in and OFF by default in prod. Pin them ON for the shared
+        // server so the secretary/specialist/organism-template suites keep exercising the feature. The
+        // .env.test.* files are gitignored, so CI relies on this default. e2e-secretary-disabled.ts
+        // self-spawns its own flag-OFF server to cover the hidden path.
+        AIMEAT_SECRETARY_ENABLED: process.env.AIMEAT_SECRETARY_ENABLED ?? 'true',
         // Open-core test suite runs in Community edition (no proprietary ee/ module): force the
         // enterprise stub even when an ee/ directory exists in the local working tree, so the
         // ENTERPRISE_REQUIRED behavior is deterministic in both CI and local. The ee/ module has

@@ -11,6 +11,9 @@
  * @structure SECRETARY_ICON · SecretaryView (default) — state, effects, handlers, layout (cards in ./secretary/cards.js + ./secretary/cards-reach.js + dashboard chrome in ./secretary/dashboard.js)
  * @usage routed at /v1/secretary by spa.html (+ portal.ts spaRoutes).
  * @version-history
+ *   v0.26.0 — 2026-07-01 — Opt-in feature: the Secretary is now gated on AIMEAT_SECRETARY_ENABLED (off by
+ *     default). The header nav link is hidden and this view redirects to /v1/profile when the node has it
+ *     disabled (flag read from /v1/site/header-nav `features.secretary`).
  *   v0.25.0 — 2026-07-01 — Light-vs-heavy seam: setup no longer cheap-authors content (that hallucinated).
  *     applyResult now CREATES the workspace structure and then proposes grounded Work Briefs (POST
  *     /v1/secretary/brief) the user hands to a Builder (a connected big AI via the appdev MCP tools). Drops
@@ -131,6 +134,16 @@ export const SECRETARY_ICON = html`
 
 export default function SecretaryView() {
   useViewCSS('/css/views/secretary.css');
+  // Secretary is opt-in per node (AIMEAT_SECRETARY_ENABLED). If it's disabled but this view is reached
+  // via a direct URL/bookmark (no nav link is rendered when off), bounce back to the profile.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/v1/site/header-nav')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && d?.ok && d.data?.features && d.data.features.secretary === false) window.location.replace('/v1/profile'); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const { showToast, ToastContainer } = useToast();
   const [secretary, setSecretary] = useState(undefined); // undefined=loading, null=not provisioned
   const [hasOpenRouterKey, setHasOpenRouterKey] = useState(false); // owner has an OpenRouter key configured

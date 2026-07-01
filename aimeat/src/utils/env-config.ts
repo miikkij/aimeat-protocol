@@ -1155,6 +1155,17 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
       ],
     },
     {
+      title: 'Secretary',
+      entries: [
+        {
+          envVar: 'AIMEAT_SECRETARY_ENABLED',
+          description: 'Enable the per-user Secretary + specialist agents (nav link, routes, scheduler tick). Off by default.',
+          value: String(config.secretaryEnabled),
+          defaultVal: 'false',
+        },
+      ],
+    },
+    {
       title: 'App Origin Isolation (H-2)',
       entries: [
         {

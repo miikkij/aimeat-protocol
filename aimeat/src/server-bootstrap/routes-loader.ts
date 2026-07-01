@@ -301,12 +301,12 @@ export async function mountRoutes(
   app.use(schedulesRouter(config, storage, scheduler));
   app.use(workflowsRouter(config, storage, scheduler, workflowEngine));
   app.use(agentDirectivesRouter(config, storage, webhookDispatcher, enterprise));
-  app.use(specialistsRouter(config, storage));
+  if (config.secretaryEnabled) app.use(specialistsRouter(config, storage));  // Secretary+specialists: opt-in (AIMEAT_SECRETARY_ENABLED)
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
   app.use(messagesRouter(config, storage, peers));
-  app.use(secretaryRouter(config, storage, peers));          // Secretary clarify channel (ask-don't-hallucinate)
+  if (config.secretaryEnabled) app.use(secretaryRouter(config, storage, peers));  // Secretary clarify channel — opt-in (AIMEAT_SECRETARY_ENABLED)
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));

@@ -260,7 +260,9 @@ export async function instantiateTemplate(
 
   if (tpl) {
     // 2a) Provision the specialists (idempotent; skip names that collide with a non-specialist agent).
-    for (const s of (tpl.specialists ?? [])) {
+    //     Gated on the Secretary feature (AIMEAT_SECRETARY_ENABLED) — when off, a template imports
+    //     its organism + workspaces but provisions no specialist agents.
+    for (const s of (config.secretaryEnabled ? (tpl.specialists ?? []) : [])) {
       try {
         // Provision CONSERVATIVELY — a template never grants requested extras silently. The owner consents
         // to them afterward (POST /v1/specialists { approved_scopes }); we only REPORT what was requested.
