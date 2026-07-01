@@ -4,10 +4,13 @@
  *   invoking a GEAI capability (source.type:'ecosystem') OVER THE TUNNEL via the new server→client
  *   invoke/invoke_result frame, incl. offline→502; (2) the workflow step kinds trigger-geai (invoke a
  *   GEAI capability) and export-out (push owner data to a GEAI), completing on the reply; (3) the
- *   data-area allowlist enforced on a GEAI's organism-workspace deposit; (4) read-through references.
+ *   data-area allowlist enforced on a GEAI's organism-workspace deposit; (4) read-through references;
+ *   (5) the data-area READ allowlist (model A / strict) — an organism read needs a matching 'read'
+ *   grant, a write-only GEAI is denied, and a GEAI's own flat namespace stays free.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-capabilities
  * @version-history
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem capability & data-access, chunk 3).
+ *   v1.1.0 — 2026-07-02 — Phase 6: data-area READ allowlist (ecoMayReadKey, model A / strict).
  */
 import { TunnelClient } from './helpers/tunnel-harness.js';
 
@@ -241,6 +244,40 @@ async function run() {
     const r2 = await json('/v1/ecosystem/read-through', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'refs.doc1' }) });
     assert(r2.status === 200 && r2.body.data?.read_through_unavailable === true, `offline should return cached marker: ${JSON.stringify(r2.body.data)}`);
     assert(r2.body.data?.cached?.title === 'Q3', 'cached metadata is returned when offline');
+  });
+
+  // ── Phase 6: data-area READ allowlist (model A / strict) ──
+  console.log('\nPhase 6 — Data-area READ allowlist on an organism key');
+  await test('A GEAI WITH a read grant may read back its organism deposit', async () => {
+    const g = await connectGeai('readapp', ['memory:read', 'memory:write'], [{ area: 'organisms', pattern: `organism.${orgId}.**`, rights: ['read', 'write'] }]);
+    const auth2 = { Authorization: `Bearer ${g.token}` };
+    const key = `organism.${orgId}.w.${WS}.mine`;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth2, body: JSON.stringify({ key, value: { ok: 1 }, visibility: 'owner' }) });
+    assert(w.status === 200 || w.status === 201, `deposit ${w.status}: ${JSON.stringify(w.body)}`);
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth2 });
+    assert(r.status === 200, `read should succeed, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data?.value?.ok === 1, `expected value back, got ${JSON.stringify(r.body.data)}`);
+  });
+
+  await test('A write-only GEAI is denied the read (DATA_AREA_DENIED)', async () => {
+    const g = await connectGeai('writeonlyreadapp', ['memory:read', 'memory:write'], [{ area: 'organisms', pattern: `organism.${orgId}.**`, rights: ['write'] }]);
+    const auth2 = { Authorization: `Bearer ${g.token}` };
+    const key = `organism.${orgId}.w.${WS}.mine2`;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth2, body: JSON.stringify({ key, value: { ok: 2 }, visibility: 'owner' }) });
+    assert(w.status === 200 || w.status === 201, `deposit should still succeed (has write), got ${w.status}: ${JSON.stringify(w.body)}`);
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth2 });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.error?.code === 'DATA_AREA_DENIED', `expected DATA_AREA_DENIED, got ${r.body.error?.code}`);
+  });
+
+  await test('A GEAI reads its OWN flat (eco:) namespace without any data-area grant', async () => {
+    const g = await connectGeai('flatreadapp', ['memory:read', 'memory:write']); // no dataAreas
+    const auth2 = { Authorization: `Bearer ${g.token}` };
+    const key = 'workspace.notes';
+    const w = await json('/v1/memory', { method: 'POST', headers: auth2, body: JSON.stringify({ key, value: { n: 1 }, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `flat deposit ${w.status}: ${JSON.stringify(w.body)}`);
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth2 });
+    assert(r.status === 200 && r.body.data?.value?.n === 1, `flat read should succeed, got ${r.status}: ${JSON.stringify(r.body)}`);
   });
 
   console.log('\n' + '─'.repeat(48));

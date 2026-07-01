@@ -74,8 +74,9 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
-import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose, isSameOwner, isGEAI } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
+import { ecoMayReadKey } from '../services/ecosystem-access.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
@@ -1134,6 +1135,12 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         canReadWorkspace = decision.allowed;
       }
     }
+    // Ecosystem (GEAI) data-area allowlist (model A / strict): a GEAI rides its owner's membership, so
+    // require a matching owner-granted 'read' area for this workspace's organism — same allowlist the
+    // write path enforces. Flat/own-namespace access is unaffected (the key here is always organism.*).
+    if (canReadWorkspace && manRec && isGEAI(req.auth!.sub) && !(await ecoMayReadKey(storage, req.auth!.sub, manRec.key))) {
+      canReadWorkspace = false;
+    }
     const readable: MemoryRecord[] = canReadWorkspace ? items : [];
     const byKey = new Map(readable.map(r => [r.key, r]));
 
@@ -1655,15 +1662,23 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     return null;
   };
 
-  /** Can this accessor read the workspace's content (i.e. its manifest)? */
+  /** Can this accessor read the workspace's content (i.e. its manifest)? For a GEAI (callerGaii is the
+   *  eco: sub, unchanged by resolveIdentity) a matching 'read' data-area grant is also required — model
+   *  A / strict, so a GEAI riding its owner's membership honours the owner-selected read scope. */
   const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> => {
     const mkey = `organism.${id}.w.${ws}.meta.manifest`;
     const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
     const man = items.find(r => r.key === mkey);
     if (!man) return false;
-    if (man.ownerGaii === callerGaii || isSameOwner(man.ownerGaii, callerGaii)) return true;
-    const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
-    return d.allowed;
+    let allowed: boolean;
+    if (man.ownerGaii === callerGaii || isSameOwner(man.ownerGaii, callerGaii)) {
+      allowed = true;
+    } else {
+      const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
+      allowed = d.allowed;
+    }
+    if (allowed && isGEAI(callerGaii)) allowed = await ecoMayReadKey(storage, callerGaii, mkey);
+    return allowed;
   };
 
   /** Create a consent grant if an equivalent active one doesn't already exist (idempotent). */

@@ -17,11 +17,14 @@
  * @version-history
  *   v1.0.0 -- 2026-06-21 -- Extract the workspace read gate (was inline in the route + organism-comments)
  *     so the connector record-push subscription enforces byte-identical access.
+ *   v1.1.0 -- 2026-07-02 -- Gate 3: ecosystem (GEAI) reads require a matching 'read' data-area grant
+ *     (model A / strict), so a GEAI riding its owner's membership honours the owner-selected read scope.
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { isSameOwner, isGEAI } from '../utils/gaii.js';
+import { ecoMayReadKey } from './ecosystem-access.js';
 
 /**
  * Decide whether the caller may READ the content of one workspace.
@@ -57,10 +60,21 @@ export async function canReadWorkspace(
   const scan = await storage.listAllMemory({ prefix: manKey, limit: 5 });
   const manRec = scan.items.find(r => r.key === manKey);
   if (!manRec) return false;
-  if (manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) return true;
-  const decision = await authorizeRead(storage, config, {
-    ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
-    visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
-  });
-  return decision.allowed;
+  let allowed: boolean;
+  if (manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {
+    allowed = true;
+  } else {
+    const decision = await authorizeRead(storage, config, {
+      ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
+      visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
+    });
+    allowed = decision.allowed;
+  }
+
+  // Gate 3 (ecosystem/GEAI only, model A / strict): a GEAI rides its owner's organism membership, so
+  // membership + the manifest gate alone would let it read any workspace its owner belongs to. Require
+  // a matching owner-granted 'read' data-area — the same allowlist the write path enforces — so the
+  // owner-selected read scope actually bites (and the tunnel record-push honours it identically).
+  if (allowed && callerSub && isGEAI(callerSub)) allowed = await ecoMayReadKey(storage, callerSub, manKey);
+  return allowed;
 }
