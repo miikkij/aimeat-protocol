@@ -16253,6 +16253,12 @@ paths:
         draft is schema-validated. If the organism's `meta.config` enables a publish gate
         (`gates.publish.enabled`), this instead creates a pending approval (202) for human review;
         on approval the publish runs. Default (no config) publishes immediately.
+
+        Change-guard: re-publishing a draft byte-identical to the live `.latest` is a no-op — the draft
+        is consumed and the response includes `skipped: true` with no new `.version.N`. `versioned` flag:
+        if the objectType is declared `versioned: false` in the manifest (e.g. a transient request
+        queue), publish writes only `.latest` and never appends a `.version.N`. Default is `versioned:
+        true` (full revision history).
       tags: [Organisms]
       security:
         - BearerAuth: []

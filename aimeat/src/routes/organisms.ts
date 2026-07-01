@@ -61,6 +61,10 @@
  *   v1.18.0 -- 2026-06-23 -- GET /workspace/activity now derives events via the shared
  *     deriveWorkspaceEvents helper (was an inline copy), so direct writes (`.latest`/bare with no
  *     `.version.N`) surface as publish events instead of going unnoticed in the feed/heatmap.
+ *   v1.19.0 -- 2026-07-01 -- publishDraft change-guard + versioned flag: an unchanged re-publish
+ *     returns { skipped:true } (consumes the draft, no new .version.N, no decision/structure churn)
+ *     instead of appending a byte-identical version; publish honours the objectType's `versioned`
+ *     flag (default true) so a `versioned:false` space keeps only .latest. Mirrors mcp/workspaces.ts.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -1550,7 +1554,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   // Schema-validated (the draft must be a valid object). Returns the new version number.
   const publishDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
-  ): Promise<{ ok: true; version: number } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
+  ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
     const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
@@ -1568,16 +1572,30 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         if (/^\d+$/.test(suffix)) maxN = Math.max(maxN, parseInt(suffix, 10));
       }
     }
-    const n = maxN + 1;
     const now = new Date().toISOString();
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
+    const existingLatest = items.find(r => r.key === `${base}.latest`);
 
-    await storage.setMemory({
+    // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
+    // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
+    // .latest or firing the Tracked-Response side effect.
+    if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draft.value)) {
+      await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
+      return { ok: true, version: maxN, skipped: true };
+    }
+    // Honour the manifest's `versioned` flag (default true): a `versioned:false` space (e.g. a request
+    // queue) keeps only .latest — no immutable per-publish history.
+    const mkey = `${wsRoot}.meta.manifest`;
+    const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
+    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const versioned = pubOt?.versioned !== false;
+    const n = maxN + 1;
+
+    if (versioned) await storage.setMemory({
       key: `${base}.version.${n}`, ownerGaii: publisher, value: draft.value,
       visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
-    const existingLatest = items.find(r => r.key === `${base}.latest`);
     await storage.setMemory({
       key: `${base}.latest`, ownerGaii: publisher, value: draft.value,
       visibility: vis, tags, ttlHours: null,
@@ -2674,6 +2692,15 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       } else {
         res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: result.violations }));
       }
+      return;
+    }
+    if (result.skipped) {
+      // No-op re-publish (draft identical to the live .latest) — no new version, no decision-log or
+      // structure-snapshot churn. The stale draft was still consumed.
+      res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, skipped: true }, [
+        { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
+      ]));
+      emitChange('organisms');
       return;
     }
     await writeDecision(id, publisher, `published ${namespace}.${instance} v${result.version}`, [`${namespace}.${instance}`]);

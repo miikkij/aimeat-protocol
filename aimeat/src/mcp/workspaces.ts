@@ -52,6 +52,10 @@
  *   v1.10.0 -- 2026-06-13 -- _organism_overview / _workspace_overview: read-only OKF-style structure
  *     maps (Markdown) so an agent grasps an organism / workspace in one call and navigates straight to
  *     the id it needs. Reuse services/structure-overview.ts; viewer = owner GHII (matches _read).
+ *   v1.11.0 -- 2026-07-01 -- _publish change-guard + versioned flag: an unchanged re-publish (contract
+ *     agents re-publish the same draft every poll cycle) now returns { skipped:true } instead of
+ *     appending a byte-identical .version.N; and publish honours the objectType's `versioned` flag
+ *     (default true) so a `versioned:false` space keeps only .latest (no per-publish history).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -72,7 +76,7 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 
-type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string };
+type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -380,14 +384,26 @@ export function registerWorkspaceTools(
             if (!valid.valid) return fail('Draft does not match the schema: ' + JSON.stringify(valid.errors));
             let maxN = 0;
             for (const r of items) { if (r.key.startsWith(`${base}.version.`)) { const s = r.key.slice(`${base}.version.`.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); } }
-            const n = maxN + 1;
             const now = new Date().toISOString();
             const tags = draft.tags ?? [];
+            const existingLatest = items.find(r => r.key === `${base}.latest`);
+            // Change-guard: an unchanged re-publish (a contract agent re-publishes the same draft on every
+            // poll/status cycle) must NOT append a byte-identical .version.N. Consume the draft and return
+            // without touching .latest or firing the Tracked-Response/structure side effects.
+            if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draft.value)) {
+                await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
+                emitChange('organisms');
+                return ok({ published: base, version: maxN, skipped: true });
+            }
+            // Honour the manifest's `versioned` flag (default true): a transient space (e.g. a request queue)
+            // declared `versioned:false` keeps only .latest — no immutable per-publish history.
+            const publishOt = (await readManifest(organism_id, ws))?.objectTypes?.find(o => o.namespace === namespace);
+            const versioned = publishOt?.versioned !== false;
+            const n = maxN + 1;
             // The published version is attributed to the PUBLISHER (writerGaii). The .latest pointer
             // preserves any existing record's owner so it doesn't fork into a duplicate (memory is keyed
             // by (ownerGaii, key)); the per-publish author lives in the immutable .version.N records.
-            await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
-            const existingLatest = items.find(r => r.key === `${base}.latest`);
+            if (versioned) await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: existingLatest?.ownerGaii ?? writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');
