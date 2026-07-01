@@ -14,6 +14,10 @@
  *   v1.2.0 -- 2026-06-24 -- PATCH /tags is same-owner gated (was owner-role only); agents
  *     may now self-tag (parity with capabilities self-report + server-MCP tags_set). Tag pattern
  *     allows ':' so faceted prefix:value tags validate and compose with aimeat_discover.
+ *   v1.3.0 -- 2026-07-02 -- PATCH /mode is same-owner gated (was owner-role only), mirroring /tags:
+ *     a device-authed crew (the new connector drops `connect add --mode task-runner`) can self-set
+ *     task-runner mode at startup via aimeat_agent_mode_set(self). The handler already enforced
+ *     same-owner (own-owner check), so only the route-level requireRole('owner') was dropped.
  */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -967,11 +971,14 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('agents');
   });
 
-  // PATCH /v1/agents/:name/mode — owner sets agent operational mode
-  // (autonomous | interactive | task-runner | coordinator | workstation). Affects
-  // Hello Integration step set: task-runner gets a reduced 7-step flow, workstation
-  // the narrowest 4-step flow.
-  router.patch('/v1/agents/:name/mode', requireAuth(), requireRole('owner'), async (req, res) => {
+  // PATCH /v1/agents/:name/mode — set agent operational mode
+  // (autonomous | interactive | task-runner | coordinator | workstation). Same-owner gated
+  // (not owner-role since v1.3.0, mirrors /tags): the owner may set any of their agents' mode,
+  // and an agent may set its own / a same-owner sibling's — so a device-authed crew (the new
+  // connector drops `connect add --mode`) self-sets task-runner at startup via aimeat_agent_mode_set.
+  // Cross-owner is rejected by the ownership check below. Affects Hello Integration step set:
+  // task-runner gets a reduced 7-step flow, workstation the narrowest 4-step flow.
+  router.patch('/v1/agents/:name/mode', requireAuth(), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
     const agent = await storage.getAgent(gaii);
