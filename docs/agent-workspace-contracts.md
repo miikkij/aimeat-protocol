@@ -103,7 +103,7 @@ aimeat_workspace_read({ organism_id, ws })            → manifest.objectTypes (
 aimeat_workspace_update({
   organism_id, ws,
   add_spaces: [
-    { name: "research-request", namespace: "shared.research-requests", mode: "records", contract: "research", description: "Research briefs awaiting work" },
+    { name: "research-request", namespace: "shared.research-requests", mode: "records", versioned: false, contract: "research", description: "Research briefs awaiting work" },
     { name: "research-result",  namespace: "shared.research-results",  mode: "records", contract: "research", description: "Findings + sources the agent returns" }
   ],
   schemas: {
@@ -130,6 +130,15 @@ POST /v1/organisms/:id/workspace-access/grant   { ws, grantee: "<agent-owner | a
 > needs to add. To rename/remove a space or change the publish gate, send a full replacement `manifest`.
 > Each objectType resolves to: `name`, `namespace`, `mode` (`records`|`document`), `schemaRef`,
 > `writeRole` (`member`), `cardinality` (`many`), `backing` (`memory`), `versioned` (`true`).
+
+> **Declare `versioned: false` for request/queue spaces.** A record whose lifecycle is a status machine
+> (a request an agent re-publishes as it moves `requested → in-progress → done`) does NOT want an
+> immutable per-publish revision history — publish keeps only its `.latest`. Leaving the default
+> `versioned: true` on such a queue makes every status advance (and every unchanged re-publish) append a
+> `.version.N`, which is the wrong tool for transient coordination state and bloats the store. Publish
+> also change-guards: re-publishing a draft byte-identical to the live `.latest` is a no-op (returns
+> `skipped: true`) and never creates a version. Keep `versioned: true` (the default) for genuine
+> documents/records where revision history and per-record time-travel are the point.
 
 ## 5. The processing loop (what the agent runs)
 
