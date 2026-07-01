@@ -26,6 +26,8 @@
  *     validator errors back to the LLM via gen-fix. (b) Honors the "Testauslaajuus" test scope:
  *     scope 'none' skips the test phase so a test failure can no longer break the pipeline before
  *     later components get their spec/code/register steps (which left their spec boxes empty).
+ *   v1.4.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
+ *     fallback with OpenRouter's free-models router 'openrouter/free'.
  */
 
 import { type Storage } from '../storage/interface.js';
@@ -151,7 +153,7 @@ export async function runAutopilot(
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
   const provider = (prefs.provider as string) || 'openrouter';
   const baseUrl = (prefs.baseUrl as string) || (provider === 'lmstudio' ? 'http://localhost:1234/v1' : 'https://openrouter.ai/api/v1');
-  const model = (prefs.model as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
+  const model = (prefs.model as string) || (prefs.executionModel as string) || 'openrouter/free';
   const temperature = (prefs.temperature as number) ?? undefined;
   // Validation auto-retry count — honor the user's OpenRouter setting (clamped 1-10, default 3),
   // the SAME value the browser UI uses (orSettings.maxRetries, generator-detail.js:461). The old
