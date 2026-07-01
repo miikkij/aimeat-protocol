@@ -12,6 +12,8 @@
  * @usage const { apiKey, model, baseUrl } = await resolveOwnerModel(storage, config, gaii);
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial: extracted shared key/model resolution + completion wrapper.
+ *   v1.1.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
+ *     fallback with OpenRouter's free-models router 'openrouter/free'.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -53,7 +55,7 @@ export async function resolveOwnerModel(
   } else if (provider === 'openrouter') {
     throw new NotebookAiError('NO_OPENROUTER_KEY', 'No OpenRouter API key configured. Add one in the OpenRouter settings to use AI sorting.', 400);
   }
-  const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
+  const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'openrouter/free';
   return { apiKey, model, baseUrl };
 }
 

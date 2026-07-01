@@ -12,6 +12,9 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.6.0 — 2026-07-01 — Vendor-neutral default: the completion route, the connection-test ping, and
+ *     the default settings object now fall back to OpenRouter's free-models router 'openrouter/free'
+ *     instead of a hardcoded anthropic/openai model (no specific vendor hardcoded).
  *   v1.5.0 — 2026-06-25 — GET /v1/openrouter/settings now BACKFILLS the Secretary: it ensureSecretary()s
  *     when a key is configured (best-effort, idempotent). PUT-only provisioning left owners who set up
  *     OpenRouter before the Secretary feature without an agent (the page wrongly said "configure OpenRouter");
@@ -150,7 +153,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       const existing = await storage.getMemory(gaii, 'openrouter.settings');
       const base = existing
         ? (existing.value as object)
-        : { model: 'anthropic/claude-sonnet-4', autoRetry: true, maxRetries: 3 };
+        // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
+        : { model: 'openrouter/free', autoRetry: true, maxRetries: 3 };
 
       const prefs: Record<string, unknown> = {
         ...base,
@@ -316,7 +320,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       try {
-        const model = (prefs.reasoningModel as string) || (prefs.executionModel as string) || (prefs.model as string) || 'openai/gpt-4o-mini';
+        const model = (prefs.reasoningModel as string) || (prefs.executionModel as string) || (prefs.model as string) || 'openrouter/free';
         await complete(decryptedKey, model, 'Reply with exactly: OK', undefined, baseUrl);
         res.json(success(config.nodeId, { ok: true, model }));
       } catch (e) {
@@ -394,7 +398,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         } else if (modelRole === 'execution' && prefs.executionModel) {
           selectedModel = prefs.executionModel as string;
         } else {
-          selectedModel = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
+          selectedModel = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'openrouter/free';
         }
         const model = selectedModel;
 

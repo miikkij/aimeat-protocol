@@ -22,6 +22,8 @@
  *   v1.1.9 -- 2026-06-30 -- Hello Integration: add the stepId -> real-tool table + anti-fabrication
  *     warning (only five aimeat_onboarding_* tools exist; drive other steps via howTo.tool from
  *     aimeat_onboarding_status; stop at summary.completable).
+ *   v1.1.10 -- 2026-07-01 -- Telemetry-protocol example uses the vendor-neutral 'openrouter/free'
+ *     instead of naming a specific vendor model.
  */
 
 import { createHash } from 'node:crypto';
@@ -451,7 +453,7 @@ POST /v1/agents/${ctx.agentName}/telemetry
   "type": "llm_call",
   "tokens_in": 1523,
   "tokens_out": 847,
-  "model": "anthropic/claude-sonnet-4-20250514",
+  "model": "openrouter/free",
   "duration_ms": 3200,
   "session_id": "your-session-id",
   "task_id": "optional-task-id"

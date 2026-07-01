@@ -23,6 +23,8 @@
  *   v1.2.0 — 2026-06-24 — When a request carries images, prefer the owner's
  *     configured `visionModel` (e.g. qwen-2.5-VL) over the (possibly text-only)
  *     default, so image intake works without an explicit model override.
+ *   v1.3.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
+ *     fallback with OpenRouter's free-models router 'openrouter/free' (no specific vendor hardcoded).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -227,7 +229,8 @@ export async function completeForOwner(
     selectedModel = (prefs.model as string)
       || (prefs.executionModel as string)
       || (prefs.reasoningModel as string)
-      || 'anthropic/claude-sonnet-4';
+      // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
+      || 'openrouter/free';
   }
 
   const options = {
