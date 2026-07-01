@@ -644,7 +644,10 @@ export interface GHIIRecord {
   verificationCredentialHash?: string;
   ftnVerified?: boolean;
   // Social login — stable provider subject for Google sign-in account linking
-  googleSub?: string;               // Google OIDC `sub` (stable per-user id)
+  googleSub?: string;               // Google OIDC `sub` (stable per-user id) — kept as a fast/back-compat mirror of externalIdentities.google
+  // Social login — generic external-identity map: { providerId: stableSubject }, e.g.
+  // { google: "1234...", casdoor: "abcd...", entra: "..." }. Lets one account link several IdPs.
+  externalIdentities?: Record<string, string>;
   // Economy (documented in GHII plan, now implemented)
   trustScore?: number;              // Aggregate trust score (0-100)
   morselBalance?: number;           // Morsel wallet balance
@@ -1036,7 +1039,7 @@ export interface TrustedIssuerRecord {
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  type: 'eudiw' | 'ftn' | 'google_login';
+  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login';
   state: string;
   nonce: string;
   redirectUri: string;

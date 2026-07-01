@@ -75,6 +75,7 @@ import { personalRouter } from '../routes/personal.js';
 import { pushRouter } from '../routes/push.js';
 import { verificationRouter } from '../routes/verification.js';
 import { oauthLoginRouter } from '../routes/oauth-login.js';
+import { buildOidcProviders } from '../services/oidc-providers.js';
 import { knowledgeRouter } from '../routes/knowledge.js';
 import { siteRouter } from '../routes/site.js';
 import { realtimeRouter } from '../routes/realtime.js';
@@ -454,20 +455,9 @@ export async function mountRoutes(
 
   app.use(verificationRouter(config, storage, eudiwService, vcIssuerService, mydataReceiptService, oidcClient));
 
-  // Google OAuth/OIDC sign-in client (social login) — generic, config-gated
-  let googleOidcClient: OidcClient | null = null;
-  if (config.googleOAuthEnabled && config.googleOAuthClientId && config.googleOAuthClientSecret) {
-    googleOidcClient = createOidcClient({
-      issuerUrl: 'https://accounts.google.com',
-      clientId: config.googleOAuthClientId,
-      clientSecret: config.googleOAuthClientSecret,
-      redirectUri: config.googleOAuthRedirectUri || `${config.baseUrl}/v1/ghii/login/google/callback`,
-      scopes: ['openid', 'email', 'profile'],
-    });
-    googleOidcClient.initialize().catch(err =>
-      logger.warn('Google OIDC discovery failed, Google sign-in will return 503', { error: String(err) }));
-  }
-  app.use(oauthLoginRouter(config, storage, googleOidcClient));
+  // Social login OIDC providers (Google + Casdoor + Entra ID) — generic, per-provider config-gated.
+  // buildOidcProviders creates + lazily discovers each configured client (503 until ready).
+  app.use(oauthLoginRouter(config, storage, buildOidcProviders(config)));
 
   // DID Document + VC signing key — Phase 3.3
   // Node key is loaded async; once available, enable VC signing and serve DID Document

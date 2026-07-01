@@ -298,6 +298,7 @@ export function initializeSchema(db: Database.Database): void {
       verificationCredentialHash TEXT,
       ftnVerified                INTEGER DEFAULT 0,
       googleSub                  TEXT,
+      externalIdentities         TEXT,
       trustScore                 REAL,
       morselBalance              REAL,
       allowedOrigins             TEXT
@@ -1705,6 +1706,12 @@ export function initializeSchema(db: Database.Database): void {
   // "no such column: googleSub" before the ALTER below could run.
   safeAddColumn('ghiis', 'googleSub', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ghii_googleSub ON ghiis(googleSub)');
+
+  // Social login — generic external-identity map (JSON: { providerId: subject }) for Casdoor,
+  // Entra, and any future OIDC provider. No index: the ghiis table holds only human owners
+  // (small), and lookups use json_extract; google still uses the indexed googleSub mirror.
+  // Added AFTER the ALTERs above for the same upgrade-safety reason as googleSub.
+  safeAddColumn('ghiis', 'externalIdentities', 'TEXT');
 
   // Organism archive — partial index over the ACTIVE working set only. Keeps the live owner/prefix
   // scans (the AI-material reads) physically small as archived rows accumulate. Created AFTER the

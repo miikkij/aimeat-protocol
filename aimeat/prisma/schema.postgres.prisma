@@ -356,6 +356,7 @@ model Ghii {
   verificationCredentialHash String?
   ftnVerified                Boolean  @default(false)
   googleSub                  String?
+  externalIdentities         Json?
   trustScore                 Int?
   morselBalance              Int?
   allowedOrigins             String[]

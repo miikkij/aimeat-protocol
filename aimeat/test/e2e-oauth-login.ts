@@ -1,15 +1,18 @@
 /**
  * @file e2e-oauth-login.ts
- * @description E2E guard tests for Google social login against a running node. In the standard
- *   test config Google sign-in is NOT configured, so both endpoints must report the feature as
- *   disabled (503) rather than 404 — proving the routes are mounted and correctly gated. The
- *   full mapping/session happy-path is covered by test/unit/oauth-login.test.ts (fake IdP).
+ * @description E2E guard tests for multi-provider social login (Google + Casdoor + Entra) against a
+ *   running node. In the standard test config no provider is configured, so every provider's
+ *   authorize + callback must report the feature as disabled (503) rather than 404 — proving the
+ *   routes are mounted and correctly gated. GET /v1/auth/providers must return 200 (an array, empty
+ *   here). The full mapping/session happy-path is covered by test/unit/oauth-login.test.ts (fake IdP).
  * @usage cd aimeat && E2E_BASE=http://localhost:40250 npx tsx test/e2e-oauth-login.ts
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial guard suite.
  *   v1.1.0 — 2026-06-25 — Guard the first-time-username-choice endpoints: /login/pending 404s
  *     without the signed cookie, finalize 400s without a pending, and /username-available works
  *     (valid/available, taken, invalid) — these are usable even without Google configured.
+ *   v2.0.0 — 2026-07-01 — Guard Casdoor + Entra (503 when unconfigured) and the new
+ *     GET /v1/auth/providers discovery endpoint (200, array).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40250';
@@ -45,6 +48,27 @@ await test('GET /v1/ghii/login/google returns 503 when Google sign-in is not con
 await test('GET /v1/ghii/login/google/callback returns 503 when Google sign-in is not configured', async () => {
   const res = await fetch(`${BASE}/v1/ghii/login/google/callback?code=x&state=y`, { redirect: 'manual' });
   assert(res.status === 503, `expected 503, got ${res.status}`);
+});
+
+for (const provider of ['casdoor', 'entra']) {
+  await test(`GET /v1/ghii/login/${provider} returns 503 when ${provider} sign-in is not configured`, async () => {
+    const res = await fetch(`${BASE}/v1/ghii/login/${provider}`, { redirect: 'manual' });
+    assert(res.status === 503, `expected 503, got ${res.status}`);
+    const data = await res.json() as { error?: { code?: string } };
+    assert(data.error?.code === 'FEATURE_DISABLED', `expected FEATURE_DISABLED, got ${data.error?.code}`);
+  });
+
+  await test(`GET /v1/ghii/login/${provider}/callback returns 503 when ${provider} sign-in is not configured`, async () => {
+    const res = await fetch(`${BASE}/v1/ghii/login/${provider}/callback?code=x&state=y`, { redirect: 'manual' });
+    assert(res.status === 503, `expected 503, got ${res.status}`);
+  });
+}
+
+await test('GET /v1/auth/providers returns 200 with a providers array', async () => {
+  const res = await fetch(`${BASE}/v1/auth/providers`, { redirect: 'manual' });
+  assert(res.status === 200, `expected 200, got ${res.status}`);
+  const data = await res.json() as { data?: { providers?: unknown[] } };
+  assert(Array.isArray(data.data?.providers), `expected providers array, got ${JSON.stringify(data.data)}`);
 });
 
 await test('GET /v1/ghii/login/pending returns 404 NO_PENDING_SIGNUP without the signed cookie', async () => {

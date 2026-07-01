@@ -1839,6 +1839,7 @@ export class PrismaStorage implements Storage {
             verificationCredentialHash: row.verificationCredentialHash ?? undefined,
             ftnVerified: row.ftnVerified ?? undefined,
             googleSub: row.googleSub ?? undefined,
+            externalIdentities: (row.externalIdentities as Record<string, string> | null) ?? undefined,
             trustScore: row.trustScore ?? undefined,
             morselBalance: row.morselBalance ?? undefined,
             allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined,
@@ -1882,6 +1883,7 @@ export class PrismaStorage implements Storage {
                     verificationCredentialHash: record.verificationCredentialHash,
                     ftnVerified: record.ftnVerified ?? false,
                     googleSub: record.googleSub,
+                    externalIdentities: record.externalIdentities ?? undefined,
                     trustScore: record.trustScore,
                     morselBalance: record.morselBalance,
                     allowedOrigins: record.allowedOrigins ?? [],
@@ -1918,6 +1920,31 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const row = await this.prisma.ghii.findFirst({ where: { googleSub } });
         return row ? this.toGHIIRecord(row) : null;
+    }
+
+    async getGHIIByExternalId(provider: string, sub: string): Promise<GHIIRecord | null> {
+        this.ensureReady();
+        // Google keeps its indexed mirror column for a fast path; all providers also live in the
+        // generic externalIdentities JSON map.
+        if (provider === 'google') {
+            const byMirror = await this.prisma.ghii.findFirst({ where: { googleSub: sub } });
+            if (byMirror) return this.toGHIIRecord(byMirror);
+        }
+        // JSON filtering differs by connector: PostgreSQL supports Prisma's `path`/`equals`, but the
+        // MongoDB connector rejects `path` ("Unknown argument"). On Mongo we query the nested field
+        // with native dot-notation via findRaw, then load the typed row by its (unique) ghii.
+        if (this.schemaFileName() === 'schema.postgres.prisma') {
+            const row = await this.prisma.ghii.findFirst({
+                where: { externalIdentities: { path: [provider], equals: sub } },
+            });
+            return row ? this.toGHIIRecord(row) : null;
+        }
+        const raw = await this.prisma.ghii.findRaw({
+            filter: { [`externalIdentities.${provider}`]: sub },
+            options: { limit: 1 },
+        }) as Array<{ ghii?: string }>;
+        const ghiiVal = Array.isArray(raw) && raw.length > 0 ? raw[0].ghii : undefined;
+        return ghiiVal ? this.getGHII(ghiiVal) : null;
     }
 
     async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {

@@ -14214,9 +14214,13 @@ paths:
                       data:
                         type: object
                         properties:
+                          provider:
+                            type: string
+                            enum: [google, casdoor, entra]
+                            description: Which OIDC provider this pending sign-up is for (drives which finalize route the SPA calls)
                           suggested:
                             type: string
-                            description: Suggested username (derived from the Google account, free at suggestion time)
+                            description: Suggested username (derived from the provider account, free at suggestion time)
                           email:
                             type: string
                             nullable: true
@@ -14301,6 +14305,9 @@ paths:
                 username:
                   type: string
                   description: The username the user chose or confirmed; blank uses the suggested name
+                displayName:
+                  type: string
+                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
       responses:
         '200':
           description: Account created (or resolved) and session established
@@ -14338,6 +14345,254 @@ paths:
                         properties:
                           code:
                             example: NAME_TAKEN
+
+  /v1/auth/providers:
+    get:
+      operationId: authProviders
+      summary: List the social-login (OIDC) providers this node offers
+      description: |
+        Discovery endpoint: returns the enabled social-login providers (Google, Casdoor, Microsoft
+        Entra ID) so any SPA can render the correct sign-in buttons and start URLs instead of
+        hard-coding provider availability. No authentication required.
+      tags: [GHII-Web]
+      responses:
+        '200':
+          description: Enabled providers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          providers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  enum: [google, casdoor, entra]
+                                label:
+                                  type: string
+                                loginUrl:
+                                  type: string
+                                  description: Same-node path to begin this provider's sign-in flow
+
+  /v1/ghii/login/casdoor:
+    get:
+      operationId: ghiiLoginCasdoorStart
+      summary: Begin Casdoor sign-in (social login)
+      description: |
+        Starts the Casdoor OIDC sign-in flow and redirects the browser to Casdoor's consent screen.
+        Available only when the node has Casdoor sign-in configured (`AIMEAT_CASDOOR_OAUTH_ENABLED=true`
+        + endpoint + client credentials); otherwise returns 503. Browser-navigation endpoint.
+      tags: [GHII-Web]
+      parameters:
+        - name: redirect
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Same-site absolute path to return to after login (must start with `/`). Defaults to `/`.
+      responses:
+        '302':
+          description: Redirect to the Casdoor authorization endpoint
+        '503':
+          description: Casdoor sign-in is not available on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: FEATURE_DISABLED
+
+  /v1/ghii/login/casdoor/callback:
+    get:
+      operationId: ghiiLoginCasdoorCallback
+      summary: Casdoor sign-in OIDC redirect callback
+      description: |
+        Casdoor redirects the browser here with `code` and `state`. The node exchanges the code and
+        maps the Casdoor identity to a GHII (returning user by subject, or verified-email link, else a
+        one-time username choice via `?aimeat_signup=1` + `/v1/ghii/login/casdoor/finalize`). On any
+        failure it redirects to `/?auth_error=<CODE>`.
+      tags: [GHII-Web]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect back to the SPA on success (refresh cookie set), or to `/?auth_error=<CODE>` on failure.
+        '503':
+          description: Casdoor sign-in is not available on this node
+
+  /v1/ghii/login/casdoor/finalize:
+    post:
+      operationId: ghiiLoginCasdoorFinalize
+      summary: Complete a first-time Casdoor sign-up with the chosen username
+      description: |
+        Finalizes a brand-new Casdoor sign-up: reads the signed pending-signup cookie (must be for the
+        casdoor provider), validates the chosen username, creates the owner + GHII linked to the Casdoor
+        account, and establishes an owner session. Idempotent on double-submit. Rate-limited.
+      tags: [GHII-Web]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                displayName:
+                  type: string
+                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
+      responses:
+        '200':
+          description: Account created (or resolved) and session established
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii: { type: string }
+                          owner: { type: string }
+                          displayName: { type: string }
+                          redirect: { type: string }
+        '400':
+          description: No pending sign-up, or invalid username
+        '409':
+          description: Username already taken
+
+  /v1/ghii/login/entra:
+    get:
+      operationId: ghiiLoginEntraStart
+      summary: Begin Microsoft Entra ID sign-in (social login)
+      description: |
+        Starts the Microsoft Entra ID OIDC sign-in flow and redirects the browser to Microsoft's
+        consent screen. Available only when the node has Entra sign-in configured
+        (`AIMEAT_ENTRA_OAUTH_ENABLED=true` + client credentials); otherwise returns 503. When the node
+        pins a tenant GUID (`AIMEAT_ENTRA_OAUTH_TENANT`), only that tenant's members may complete
+        sign-in (the `tid` claim is enforced). Browser-navigation endpoint.
+      tags: [GHII-Web]
+      parameters:
+        - name: redirect
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Same-site absolute path to return to after login (must start with `/`). Defaults to `/`.
+      responses:
+        '302':
+          description: Redirect to the Entra authorization endpoint
+        '503':
+          description: Entra sign-in is not available on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: FEATURE_DISABLED
+
+  /v1/ghii/login/entra/callback:
+    get:
+      operationId: ghiiLoginEntraCallback
+      summary: Microsoft Entra ID sign-in OIDC redirect callback
+      description: |
+        Entra redirects the browser here with `code` and `state`. The node exchanges the code,
+        optionally enforces the configured tenant (`tid`), and maps the identity to a GHII (returning
+        user by subject, or verified-email link for a pinned tenant, else a one-time username choice via
+        `?aimeat_signup=1` + `/v1/ghii/login/entra/finalize`). A token from a different tenant is
+        rejected with `/?auth_error=ENTRA_WRONG_TENANT`. On other failures it redirects to
+        `/?auth_error=<CODE>`.
+      tags: [GHII-Web]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect back to the SPA on success (refresh cookie set), or to `/?auth_error=<CODE>` on failure.
+        '503':
+          description: Entra sign-in is not available on this node
+
+  /v1/ghii/login/entra/finalize:
+    post:
+      operationId: ghiiLoginEntraFinalize
+      summary: Complete a first-time Microsoft Entra ID sign-up with the chosen username
+      description: |
+        Finalizes a brand-new Entra sign-up: reads the signed pending-signup cookie (must be for the
+        entra provider), validates the chosen username, creates the owner + GHII linked to the Entra
+        account, and establishes an owner session. Idempotent on double-submit. Rate-limited.
+      tags: [GHII-Web]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                displayName:
+                  type: string
+                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
+      responses:
+        '200':
+          description: Account created (or resolved) and session established
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii: { type: string }
+                          owner: { type: string }
+                          displayName: { type: string }
+                          redirect: { type: string }
+        '400':
+          description: No pending sign-up, or invalid username
+        '409':
+          description: Username already taken
 
   # ============================================================
   # Phase 1.4: Directories

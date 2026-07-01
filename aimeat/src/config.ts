@@ -331,6 +331,20 @@ export interface AimeatConfig {
   googleOAuthClientSecret: string;
   googleOAuthRedirectUri: string;  // empty = derive from baseUrl
 
+  // Social login — Casdoor OAuth/OIDC sign-in (open-source IdP, config-gated)
+  casdoorOAuthEnabled: boolean;
+  casdoorOAuthEndpoint: string;      // Casdoor server URL, e.g. https://casdoor.example.com
+  casdoorOAuthClientId: string;
+  casdoorOAuthClientSecret: string;
+  casdoorOAuthRedirectUri: string;   // empty = derive from baseUrl
+
+  // Social login — Microsoft Entra ID OAuth/OIDC sign-in (enterprise IdP, config-gated)
+  entraOAuthEnabled: boolean;
+  entraOAuthTenant: string;          // tenant GUID (single-tenant gating) | common | organizations | consumers
+  entraOAuthClientId: string;
+  entraOAuthClientSecret: string;
+  entraOAuthRedirectUri: string;     // empty = derive from baseUrl
+
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;
   maxGenesisPeers: number;
@@ -763,6 +777,16 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     googleOAuthClientId: process.env.AIMEAT_GOOGLE_OAUTH_CLIENT_ID ?? '',
     googleOAuthClientSecret: process.env.AIMEAT_GOOGLE_OAUTH_CLIENT_SECRET ?? '',
     googleOAuthRedirectUri: process.env.AIMEAT_GOOGLE_OAUTH_REDIRECT_URI ?? '',
+    casdoorOAuthEnabled: process.env.AIMEAT_CASDOOR_OAUTH_ENABLED === 'true',
+    casdoorOAuthEndpoint: process.env.AIMEAT_CASDOOR_OAUTH_ENDPOINT ?? '',
+    casdoorOAuthClientId: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_ID ?? '',
+    casdoorOAuthClientSecret: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET ?? '',
+    casdoorOAuthRedirectUri: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
+    entraOAuthEnabled: process.env.AIMEAT_ENTRA_OAUTH_ENABLED === 'true',
+    entraOAuthTenant: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
+    entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
+    entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
+    entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),
