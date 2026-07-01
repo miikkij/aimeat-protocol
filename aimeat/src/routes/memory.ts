@@ -43,7 +43,7 @@ import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
-import { ecoMayWriteKey } from '../services/ecosystem-access.js';
+import { ecoMayReadKey, ecoMayWriteKey } from '../services/ecosystem-access.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
 import { isKeyArchived } from '../services/archive.js';
 
@@ -1347,6 +1347,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         return;
       }
       gaii = agentParam;
+    }
+
+    // Ecosystem (GEAI) data-area allowlist (model A / strict): an organism read needs an owner-granted
+    // `read` area — mirroring the write gate. Flat (own eco: namespace) keys pass through freely.
+    if (req.auth!.roles.includes('ecosystem') && !(await ecoMayReadKey(storage, req.auth!.sub, key))) {
+      res.status(403).json(error(config.nodeId, 'DATA_AREA_DENIED', `Read of "${key}" is not permitted by this app's data-area allowlist`));
+      return;
     }
 
     // Owner sessions read across their owner-scope (GHII + agents + ecosystem apps), GHII-first —
