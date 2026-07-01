@@ -18,6 +18,9 @@
  *     a device-authed crew (the new connector drops `connect add --mode task-runner`) can self-set
  *     task-runner mode at startup via aimeat_agent_mode_set(self). The handler already enforced
  *     same-owner (own-owner check), so only the route-level requireRole('owner') was dropped.
+ *   v1.3.1 -- 2026-07-02 -- PATCH /mode now RE-DERIVES the Hello Integration step list for the new
+ *     mode's flow (preserving passed steps), so an agent that self-sets task-runner after a default
+ *     'interactive' registration no longer shows a stale full flow (was 7/16, now the reduced 7/7).
  */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -1002,6 +1005,39 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     if (!updated) {
       res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
       return;
+    }
+
+    // Ensure the Hello Integration step list matches the (possibly new) mode's flow — e.g. a
+    // task-runner's reduced 7-step set. This self-heals the case where an agent registered as
+    // 'interactive' (the device-auth default; the connector dropped `--mode`) later self-sets
+    // 'task-runner' at startup and would otherwise keep showing the full flow (7/16 instead of 7/7).
+    // Progress on steps that carry over (same id) is preserved. It fires whenever the stored step SET
+    // differs from the mode's flow — so it also repairs agents ALREADY in the target mode with a stale
+    // set — and is a no-op otherwise. Best-effort: a sync failure must never fail the mode change.
+    try {
+      const onboarding = await storage.getOnboarding(gaii);
+      if (onboarding) {
+        const target = createDefaultSteps(newMode);
+        const currentIds = new Set(onboarding.steps.map(s => s.id));
+        const flowChanged = target.length !== onboarding.steps.length || target.some(s => !currentIds.has(s.id));
+        if (flowChanged) {
+          const prevById = new Map(onboarding.steps.map(s => [s.id, s] as const));
+          const steps = target.map(fresh => {
+            const prev = prevById.get(fresh.id);
+            return prev
+              ? { ...fresh, status: prev.status, validatedAt: prev.validatedAt, details: prev.details, failureReason: prev.failureReason }
+              : fresh;
+          });
+          const allRequiredPassed = steps.filter(s => s.required).every(s => s.status === 'passed');
+          await storage.updateOnboarding(gaii, {
+            steps,
+            status: allRequiredPassed ? 'completed' : 'in_progress',
+            ...(allRequiredPassed && !onboarding.completedAt ? { completedAt: new Date().toISOString() } : {}),
+          });
+        }
+      }
+    } catch (err) {
+      console.error(`[agents] mode change: could not re-derive onboarding steps for ${gaii}:`, err);
     }
 
     res.json(success(config.nodeId, {
