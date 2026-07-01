@@ -4,6 +4,13 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-07-02
+
+Adds configurable **Casdoor** and **Microsoft Entra ID** social sign-in alongside Google, built on a single
+generic OIDC provider registry — a node can now offer open-source (Casdoor), enterprise (Entra, with optional
+single-tenant gating), and consumer (Google) login side by side, and adding another OIDC provider is a few
+lines of config. First-time social sign-up also lets the user pick their display name (not just the username).
+
 The Secretary view is redesigned around the owner's daily loop — a dashboard-first page with a forward-driver
 ("What's next"), recurring **Routines** the Secretary runs and supervises, dynamic quick actions, delegation to
 other agents *or* multi-specialist workflows, and a band-driven autonomous tick that advances routines and
@@ -16,6 +23,23 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
 
 ### Added
 
+- **Configurable Casdoor + Microsoft Entra ID social login (generic OIDC provider registry).** A new
+  `src/services/oidc-providers.ts` registry drives per-provider sign-in through one provider-parameterised
+  router (`GET /v1/ghii/login/<id>` + `/callback` + `POST /finalize`), reusing the existing generic
+  `OidcClient`. Config-gated per provider via flat env vars (`AIMEAT_CASDOOR_OAUTH_*`, `AIMEAT_ENTRA_OAUTH_*`);
+  Google's routes/behaviour are unchanged. Entra supports **single-tenant gating** — set the tenant to a
+  Directory GUID to admit only that org's members (validates the `tid` claim), or `common`/`organizations`/
+  `consumers` for broader audiences. Account linking is generic via a new `GHIIRecord.externalIdentities`
+  map + `storage.getGHIIByExternalId()` (google keeps its indexed `googleSub` mirror). The sign-in modal
+  renders one button per enabled provider.
+- **Choose your display name on first social sign-up.** The one-time username-choice step now also lets a
+  first-time OIDC user set their display name (editable later), instead of silently inheriting the IdP's
+  name; finalize accepts `{ username, displayName }` and falls back to the provider name when blank.
+- **`GET /v1/auth/providers` discovery endpoint.** Lists the node's enabled social-login providers so any
+  SPA can render the right sign-in buttons without hard-coding availability.
+- **Agent operational mode is self-settable (same-owner).** `PATCH /v1/agents/:name/mode` (and the
+  `aimeat_agent_mode_set` MCP tool) relaxed from owner-role to same-owner gating (parity with `/tags`), so a
+  device-authed crew can self-set `task-runner` mode at startup; cross-owner is still rejected.
 - **Secretary dashboard-first information architecture.** The old flat ~15-card stack is re-laid around the
   daily loop: a **quick-action row** (core verbs — "Where do things stand?" read-only orientation, Plan/Find/Note
   focus, Review-decisions when due — plus dynamic actions), a **"Today" status strip** (reliability · budget ·
@@ -159,6 +183,14 @@ landed — and a **customizable two-column dashboard** the owner can pin/reorder
 
 ### Fixed
 
+- **MongoDB external-identity lookup for social login.** `getGHIIByExternalId` used a Prisma `path` JSON
+  filter that PostgreSQL supports but MongoDB rejects (`Unknown argument 'path'`), so a returning Casdoor/
+  Entra login threw `CASDOOR_CALLBACK_FAILED` on the Mongo backend. Mongo now queries the nested field with
+  native dot-notation via `findRaw`; Postgres keeps the `path` filter; SQLite uses `json_extract`.
+- **Stale identity after switching accounts via OAuth.** Signing in as a different user without a clean
+  logout left the login pill / profile showing the previous account's GHII: boot restored the old session and
+  `refresh()` adopted the new token + display name but never reconciled `owner`/`ghii`. `refresh()` now adopts
+  `owner` + `ghii` from the authoritative refreshed JWT when it is for a different owner.
 - **Secretary-created workspaces now come out usable, not empty shells.** When the Secretary set up an
   organism after the interview it created the workspaces by NAME only — no manifest — so each one opened
   to the bare "Set up workspace / Generate a custom workspace with AI" prompt. `applyResult` now
