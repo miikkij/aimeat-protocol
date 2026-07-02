@@ -18,6 +18,10 @@
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  then  AIMEAT.md.render(md, '#out')
  *   or    await AIMEAT.md.renderRich(md, '#out')
  * @version-history
+ *   v1.2.0 — 2026-07-02 — ```aimeat-memory fenced blocks render as LIVE data embeds in renderRich
+ *     (and in its safe-subset fallback): the named memory key is fetched at render time and shown as
+ *     a table/props/list/value, fresh on every open. Access is the server's memory read (workspace
+ *     rules + entry visibility); denials render a placeholder. `owner:` reads a public key.
  *   v1.1.0 — 2026-07-02 — renderRich (markdown-it + DOMPurify + hljs + mermaid, lazy CDN, safe-subset
  *     fallback) + renderToString; mermaid uses suppressErrorRendering so parse errors never inject
  *     mermaid's error bomb into the page (extracted from the AIMEAT Pages app).
@@ -167,7 +171,13 @@ function parseBlocks(src) {
         code.push(lines[i]); i++;
       }
       i++; // consume closing fence (or EOF)
-      blocks.push(el('pre', { 'class': 'md-pre' }, el('code', { 'class': 'md-code' }, code.join('\\n'))));
+      if (fence.lang === 'aimeat-memory') {
+        // live-data embed marker — renderRich's post-pass resolves it; plain render() leaves
+        // the spec visible as a code-style block (safe degrade).
+        blocks.push(el('pre', { 'class': 'md-pre md-mem-src' }, el('code', { 'class': 'md-code' }, code.join('\\n'))));
+      } else {
+        blocks.push(el('pre', { 'class': 'md-pre' }, el('code', { 'class': 'md-code' }, code.join('\\n'))));
+      }
       continue;
     }
 
@@ -258,7 +268,16 @@ var RICH_CSS = '.md-body li.task-list-item{list-style:none;margin-left:-1.2rem;}
   '[data-theme="dark"] .md-body .hljs-title,[data-theme="dark"] .md-body .hljs-name,[data-theme="dark"] .md-body .hljs-section{color:#61afef;}' +
   '[data-theme="dark"] .md-body .hljs-built_in,[data-theme="dark"] .md-body .hljs-type{color:#e5c07b;}' +
   '[data-theme="dark"] .md-body .hljs-symbol,[data-theme="dark"] .md-body .hljs-bullet,[data-theme="dark"] .md-body .hljs-meta,[data-theme="dark"] .md-body .hljs-selector-id,[data-theme="dark"] .md-body .hljs-variable,[data-theme="dark"] .md-body .hljs-template-variable{color:#56b6c2;}' +
-  '[data-theme="dark"] .md-body .hljs-deletion{color:#e06c75;}';
+  '[data-theme="dark"] .md-body .hljs-deletion{color:#e06c75;}' +
+  '.md-body .md-mem{border:1px solid var(--color-base-300,#3a3a3a);border-radius:8px;padding:.5em .8em .7em;margin:1em 0;background:var(--color-base-200,#1c1c1c);}' +
+  '.md-body .md-mem-head{display:flex;align-items:center;gap:.6em;font-size:.78rem;opacity:.75;margin-bottom:.35em;}' +
+  '.md-body .md-mem-title{font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere;flex:1;}' +
+  '.md-body .md-mem-refresh{border:none;background:transparent;color:inherit;cursor:pointer;border-radius:4px;padding:0 .3em;font-size:.9rem;}' +
+  '.md-body .md-mem table{margin:.3em 0 0;}' +
+  '.md-body .md-mem-note{opacity:.75;font-size:.88rem;padding:.2em 0;}' +
+  '.md-body .md-mem-err{color:#e06c75;opacity:1;}' +
+  '.md-body .md-mem-more{opacity:.7;font-size:.78rem;margin-top:.3em;}' +
+  '.md-body .md-mem-value{white-space:pre-wrap;overflow-wrap:anywhere;}';
 function injectRichCss() {
   if (document.getElementById('aimeat-md-rich-styles')) return;
   var s = document.createElement('style');
@@ -329,6 +348,105 @@ function renderMermaids(container) {
     });
   }).catch(function () { /* renderer unavailable — raw source stays */ });
 }
+// ── live memory embeds (aimeat-memory fence) ──
+function parseEmbedSpec(text) {
+  var spec = {};
+  String(text || '').split('\\n').forEach(function (line) {
+    var m = line.match(/^\\s*([a-zA-Z_-]+)\\s*[:=]\\s*(.+?)\\s*$/);
+    if (!m) return;
+    var k = m[1].toLowerCase();
+    if (k === 'fields') spec.fields = m[2].split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    else spec[k] = m[2];
+  });
+  return spec;
+}
+function memCellText(v) {
+  if (v == null) return '\\u2014';
+  var s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+  return s.length > 160 ? s.slice(0, 160) + '\\u2026' : s;
+}
+function isPlainObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+function buildMemBody(spec, value) {
+  var view = (spec.view || 'auto').toLowerCase();
+  if (view === 'auto') {
+    if (Array.isArray(value)) view = value.length && value.every(isPlainObj) ? 'table' : 'list';
+    else if (isPlainObj(value)) view = 'props';
+    else view = 'value';
+  }
+  if (view === 'json') return el('pre', { 'class': 'md-pre' }, el('code', { 'class': 'md-code' }, JSON.stringify(value, null, 2)));
+  if (view === 'table') {
+    var rows = (Array.isArray(value) ? value : []).filter(isPlainObj);
+    var cols = (spec.fields && spec.fields.length) ? spec.fields : [];
+    if (!cols.length) {
+      rows.forEach(function (r) { Object.keys(r).forEach(function (k) { if (cols.indexOf(k) < 0 && cols.length < 10) cols.push(k); }); });
+    }
+    var table = el('table', null, [
+      el('thead', null, el('tr', null, cols.map(function (c) { return el('th', null, c); }))),
+      el('tbody', null, rows.slice(0, 200).map(function (r) {
+        return el('tr', null, cols.map(function (c) { return el('td', null, memCellText(r[c])); }));
+      }))
+    ]);
+    var out = [table];
+    if (rows.length > 200) out.push(el('div', { 'class': 'md-mem-more' }, '\\u2026 ' + (rows.length - 200) + ' more rows'));
+    return el('div', null, out);
+  }
+  if (view === 'props') {
+    var obj = isPlainObj(value) ? value : {};
+    return el('table', null, el('tbody', null, Object.keys(obj).map(function (k) {
+      return el('tr', null, [el('th', null, k), el('td', null, memCellText(obj[k]))]);
+    })));
+  }
+  if (view === 'list') {
+    var arr = Array.isArray(value) ? value : [value];
+    return el('ul', null, arr.slice(0, 200).map(function (v) { return el('li', null, memCellText(v)); }));
+  }
+  return el('div', { 'class': 'md-mem-value' }, memCellText(value));
+}
+function renderOneEmbed(preEl) {
+  var spec = parseEmbedSpec(preEl.textContent || '');
+  var box = el('div', { 'class': 'md-mem' });
+  var title = el('span', { 'class': 'md-mem-title' }, spec.title || spec.key || 'aimeat-memory');
+  var refresh = el('button', { type: 'button', 'class': 'md-mem-refresh', title: 'Refresh' }, '\\u21BB');
+  box.appendChild(el('div', { 'class': 'md-mem-head' }, [title, refresh]));
+  var body = el('div', { 'class': 'md-mem-note' }, 'Loading\\u2026');
+  box.appendChild(body);
+  function setBody(node) { box.replaceChild(node, body); body = node; }
+  function note(msg, err) { setBody(el('div', { 'class': 'md-mem-note' + (err ? ' md-mem-err' : '') }, msg)); }
+  async function load() {
+    if (!spec.key) { note('The block declares no key', true); return; }
+    try {
+      var envl;
+      if (spec.owner) {
+        var r = await fetch(NODE_URL + '/v1/memory/' + encodeURIComponent(spec.owner) + '/' + encodeURIComponent(spec.key));
+        envl = await r.json();
+      } else {
+        var auth = window.AIMEAT && window.AIMEAT.auth;
+        var s = auth && auth.getSession && auth.getSession();
+        if (!s || !s.jwt) { note('Sign in to view this data', true); return; }
+        envl = await s.fetch('/v1/memory/' + encodeURIComponent(spec.key));
+        if (envl && typeof envl.json === 'function') envl = await envl.json();
+      }
+      if (!envl || envl.ok === false) {
+        var code = (envl && envl.error && envl.error.code) || '';
+        if (code === 'NOT_FOUND') note('Key not found', true);
+        else if (code === 'AUTH_REQUIRED') note('Sign in to view this data', true);
+        else if (/SCOPE|FORBIDDEN|CONSENT|ACCESS|DENIED/.test(code)) note('\\uD83D\\uDD12 No permission to read this key', true);
+        else note('Could not load (' + ((envl && envl.error && envl.error.message) || code || '?') + ')', true);
+        return;
+      }
+      var value = envl.data ? envl.data.value : undefined;
+      if (value == null) { note('(empty)'); return; }
+      setBody(buildMemBody(spec, value));
+    } catch (e) { note('Could not load (' + ((e && e.message) || '?') + ')', true); }
+  }
+  refresh.addEventListener('click', function () { note('Loading\\u2026'); load(); });
+  preEl.replaceWith(box);
+  load();
+}
+function renderMemoryEmbeds(container) {
+  container.querySelectorAll('pre.md-mem-src').forEach(function (p) { renderOneEmbed(p); });
+}
+
 var _mdit = null;
 function getMdIt() {
   if (_mdit) return _mdit;
@@ -349,8 +467,12 @@ function getMdIt() {
   var defFence = m.renderer.rules.fence || function (t, i, o, e, s) { return s.renderToken(t, i, o); };
   m.renderer.rules.fence = function (tokens, idx, options, env, self) {
     var t = tokens[idx];
-    if (String(t.info || '').trim().toLowerCase() === 'mermaid') {
+    var info = String(t.info || '').trim().toLowerCase();
+    if (info === 'mermaid') {
       return '<pre class="md-mermaid">' + m.utils.escapeHtml(t.content) + '</pre>\\n';
+    }
+    if (info === 'aimeat-memory') {
+      return '<pre class="md-mem-src">' + m.utils.escapeHtml(t.content) + '</pre>\\n';
     }
     return defFence(tokens, idx, options, env, self);
   };
@@ -377,6 +499,8 @@ async function renderRich(text, target) {
   } catch (e) {
     div = render(text);
   }
+  injectRichCss();
+  renderMemoryEmbeds(div); // resolves in both paths — the safe-subset fallback also marks the fence
   if (target) {
     var t = typeof target === 'string' ? document.querySelector(target) : target;
     if (t) { t.innerHTML = ''; t.appendChild(div); }

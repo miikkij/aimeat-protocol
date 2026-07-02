@@ -82,7 +82,6 @@
   "inbox.attachmentOpenRaw": "Avaa raakana",
   "inbox.attachmentDownload": "Lataa",
   "inbox.attachmentLoadError": "Liitettä ei voitu ladata.",
-  "inbox.close": "Sulje",
   "inbox.directThread": "Suora",
   "inbox.subjectPlaceholder": "Aihe (valinnainen — aloittaa uuden ketjun)",
   "admin.messages.title": "Suorat viestit",
@@ -666,9 +665,24 @@
       "needPrefix": "Anna seurattava memory-prefiksi",
       "created": "Triggeri luotu",
       "error": "Triggeri epäonnistui",
-      "kind": { "time": "Tiettynä päivänä", "recurring": "Toistuva", "completion": "Kun jokin valmistuu", "condition": "Kun ehto täyttyy" },
-      "cad": { "none": "Ei toistoa", "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain" },
-      "ct": { "memory_count": "Kohteiden määrä saavuttaa", "workspace_count": "Työtilan kohteet saavuttavat", "no_activity": "Ei aktiviteettia N päivään", "memory_exists": "Jotain ilmestyy" },
+      "kind": {
+        "time": "Tiettynä päivänä",
+        "recurring": "Toistuva",
+        "completion": "Kun jokin valmistuu",
+        "condition": "Kun ehto täyttyy"
+      },
+      "cad": {
+        "none": "Ei toistoa",
+        "daily": "Päivittäin",
+        "weekly": "Viikoittain",
+        "monthly": "Kuukausittain"
+      },
+      "ct": {
+        "memory_count": "Kohteiden määrä saavuttaa",
+        "workspace_count": "Työtilan kohteet saavuttavat",
+        "no_activity": "Ei aktiviteettia N päivään",
+        "memory_exists": "Jotain ilmestyy"
+      },
       "act": {
         "label": "Kun se laukeaa",
         "remind": "Muistuta minua",
@@ -710,7 +724,11 @@
       "replanApply": "Ota käyttöön",
       "replanErr": "Uudelleensuunnittelu epäonnistui",
       "targetChanged": "Tavoitetila muuttui — säädä välietapit ja muu suunnitelma siihen sopivaksi.",
-      "status": { "not-started": "Aloittamatta", "in-progress": "Käynnissä", "reached": "Saavutettu" }
+      "status": {
+        "not-started": "Aloittamatta",
+        "in-progress": "Käynnissä",
+        "reached": "Saavutettu"
+      }
     },
     "reset": {
       "title": "Nollaa sihteeri",
@@ -791,7 +809,12 @@
     "dailyBudgetHint": "Yläraja sille mitä itsenäiset toimet saavat kuluttaa päivässä.",
     "noLimit": "Ei rajaa",
     "bandsNote": "Nämä määräävät mitä sihteeri saa tehdä itsenäisesti. Kukin astuu voimaan kun kyseinen kyvykkyys valmistuu.",
-    "band": { "act": "Tee", "draft": "Luonnostele", "ask": "Kysy", "off": "Pois" },
+    "band": {
+      "act": "Tee",
+      "draft": "Luonnostele",
+      "ask": "Kysy",
+      "off": "Pois"
+    },
     "locked": "aina päällä",
     "enterprise": "Enterprise",
     "capCosts": "kuluttaa / ulospäin",
@@ -1095,7 +1118,6 @@
       "running": "Ajetaan…",
       "queued": "jonossa",
       "startNew": "Aloita uusi rutiini",
-      "discard": "Hylkää",
       "decisionChosen": "Hyväksyttiin tämä rutiinin vaihe",
       "routinesTitle": "Rutiinit",
       "last": "Viimeisin",
@@ -1124,7 +1146,11 @@
       "checkResult": "Tarkista tulos",
       "repeats": "Toistuu",
       "nextRun": "Seuraava ajo",
-      "cadence": { "none": "Kerran (ei toistoa)", "daily": "Päivittäin", "weekly": "Viikoittain" },
+      "cadence": {
+        "none": "Kerran (ei toistoa)",
+        "daily": "Päivittäin",
+        "weekly": "Viikoittain"
+      },
       "status": {
         "done": "valmis",
         "skipped": "ohitettu",
@@ -1153,12 +1179,18 @@
       "suggestEmpty": "Ei uusia ehdotuksia",
       "error": "Pikatoiminnot epäonnistui",
       "composeTarget": "avaa",
-      "kind": { "prompt": "viesti", "compose": "avaa" }
+      "kind": {
+        "prompt": "viesti",
+        "compose": "avaa"
+      }
     },
     "items": {
       "title": "Toimenpiteet",
       "dismiss": "Hylkää",
-      "handle": { "advance": "Avaa", "check-delegate": "Tarkista tulos" },
+      "handle": {
+        "advance": "Avaa",
+        "check-delegate": "Tarkista tulos"
+      },
       "text": {
         "approve": "Hyväksy: {summary}",
         "ready": "Valmis ajettavaksi: {summary}",
@@ -1717,11 +1749,43 @@
       "autoSection": "⏱ Pyörii automaattisesti",
       "manualSection": "Pyynnöstä",
       "ungrouped": "Muu",
-      "axis": { "need": "Tarpeen mukaan", "agent": "Agentin mukaan", "auto": "Automaation mukaan", "tag": "Tagin mukaan", "capability": "Kyvyn mukaan" },
-      "sort": { "standing": "Arvokkaimmat", "cost": "Halvimmat", "speed": "Nopeimmat", "name": "A–Ö" },
-      "facet": { "cost": "Hinta", "latency": "Nopeus", "verification": "Luotettavuus", "dataHandling": "Tietosuoja", "format": "Tuotos" },
-      "format": { "document": "dokumentti", "record": "tietue", "board-post": "tauluviesti", "file": "tiedosto", "app": "sovellus", "image": "kuva", "json": "data (JSON)" },
-      "need": { "create": "Luo", "analyze": "Analysoi & päätä", "communicate": "Viesti & käännä", "build": "Rakenna & automatisoi", "inspect": "Tarkasta & raportoi", "other": "Muu" },
+      "axis": {
+        "need": "Tarpeen mukaan",
+        "agent": "Agentin mukaan",
+        "auto": "Automaation mukaan",
+        "tag": "Tagin mukaan",
+        "capability": "Kyvyn mukaan"
+      },
+      "sort": {
+        "standing": "Arvokkaimmat",
+        "cost": "Halvimmat",
+        "speed": "Nopeimmat",
+        "name": "A–Ö"
+      },
+      "facet": {
+        "cost": "Hinta",
+        "latency": "Nopeus",
+        "verification": "Luotettavuus",
+        "dataHandling": "Tietosuoja",
+        "format": "Tuotos"
+      },
+      "format": {
+        "document": "dokumentti",
+        "record": "tietue",
+        "board-post": "tauluviesti",
+        "file": "tiedosto",
+        "app": "sovellus",
+        "image": "kuva",
+        "json": "data (JSON)"
+      },
+      "need": {
+        "create": "Luo",
+        "analyze": "Analysoi & päätä",
+        "communicate": "Viesti & käännä",
+        "build": "Rakenna & automatisoi",
+        "inspect": "Tarkasta & raportoi",
+        "other": "Muu"
+      },
       "aiSearch": "Hae tarpeella",
       "aiThinking": "Sovitetaan tarvettasi…",
       "aiResultsTitle": "Parhaat osumat tarpeeseesi",
@@ -1733,12 +1797,41 @@
       "buildForNeed": "Rakenna agentti tähän →",
       "buildRequested": "Pyydettiin {agent} rakentamaan agentti tähän.",
       "noBuilder": "Agenttirakentajaa ei ole. Yhdistä crew-forge ensin.",
-      "visibility": { "private": "Yksityinen (vain minä)", "unlisted": "Listaamaton (linkillä)", "public": "Julkinen (listattu)" },
-      "status": { "done": "valmis", "failed": "epäonnistui", "active": "käynnissä", "paused": "tauolla", "stalled": "jumissa", "queued": "jonossa", "revision_requested": "muutospyyntö", "draft": "luonnos" },
-      "verification": { "deterministic": "deterministinen", "gated": "varmennettu", "ungated": "varmentamaton" },
-      "dataHandling": { "local-only": "vain paikallinen", "llm-provider": "LLM:n kautta", "third-party": "kolmas osapuoli" },
-      "cost": { "free": "ilmainen", "cheap": "halpa", "expensive": "$$$" },
-      "latency": { "seconds": "sekunteja", "minutes": "minuutteja", "long-running": "pitkäkestoinen" },
+      "visibility": {
+        "private": "Yksityinen (vain minä)",
+        "unlisted": "Listaamaton (linkillä)",
+        "public": "Julkinen (listattu)"
+      },
+      "status": {
+        "done": "valmis",
+        "failed": "epäonnistui",
+        "active": "käynnissä",
+        "paused": "tauolla",
+        "stalled": "jumissa",
+        "queued": "jonossa",
+        "revision_requested": "muutospyyntö",
+        "draft": "luonnos"
+      },
+      "verification": {
+        "deterministic": "deterministinen",
+        "gated": "varmennettu",
+        "ungated": "varmentamaton"
+      },
+      "dataHandling": {
+        "local-only": "vain paikallinen",
+        "llm-provider": "LLM:n kautta",
+        "third-party": "kolmas osapuoli"
+      },
+      "cost": {
+        "free": "ilmainen",
+        "cheap": "halpa",
+        "expensive": "$$$"
+      },
+      "latency": {
+        "seconds": "sekunteja",
+        "minutes": "minuutteja",
+        "long-running": "pitkäkestoinen"
+      },
       "consequence": {
         "creates-agent": "luo agentin",
         "creates-schedule": "luo ajastuksen",
@@ -8762,5 +8855,14 @@
     "ctaDemo": "Varaa demo →",
     "ctaPricing": "Katso hinnat →",
     "writtenToday": "kirjoitettu tänään klo"
-  }
+  },
+  "markdown.embed.loading": "Ladataan…",
+  "markdown.embed.notFound": "Avainta ei löytynyt",
+  "markdown.embed.signIn": "Kirjaudu nähdäksesi tämän datan",
+  "markdown.embed.noAccess": "Ei oikeutta lukea tätä avainta",
+  "markdown.embed.error": "Lataus epäonnistui",
+  "markdown.embed.empty": "(tyhjä)",
+  "markdown.embed.refresh": "Päivitä",
+  "markdown.embed.moreRows": "riviä lisää",
+  "markdown.embed.missingKey": "Lohkosta puuttuu key-rivi"
 }

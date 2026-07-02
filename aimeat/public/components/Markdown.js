@@ -28,9 +28,13 @@
  *   v1.3.0 -- 2026-06-16 -- Horizontal rules (---, ***, ___) render as <hr>; LIST ITEMS may span
  *     multiple lines (wrapped continuation lines join the current item) so ordered-list numbering no
  *     longer restarts at 1 on every wrapped line.
+ *   v1.4.0 -- 2026-07-02 -- ```aimeat-memory fenced blocks render as LIVE data embeds (MemoryEmbed):
+ *     the named memory key is fetched at render time and shown as a table/props/list/value, so a
+ *     document referencing agent-produced data is fresh on every open.
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
+import { MemoryEmbed } from './MemoryEmbed.js';
 
 // Only these schemes may appear in a rendered link. Everything else (javascript:,
 // data:, vbscript:, file:, etc.) is dropped — the anchor renders without href.
@@ -217,6 +221,11 @@ function parseBlocks(src, onWikiLink) {
       if (lang === 'mermaid') {
         // ```mermaid → render the diagram (Mermaid lazy-loads its 3MB renderer only when used).
         blocks.push(h(Mermaid, { chart: codeLines.join('\n') }));
+      } else if (lang === 'aimeat-memory') {
+        // ```aimeat-memory → live data embed: the named memory key is fetched at render time and
+        // shown as a table/props/list/value, so the document is fresh on every open. Access is the
+        // server's memory read (workspace rules + entry visibility) — denials render a placeholder.
+        blocks.push(h(MemoryEmbed, { spec: codeLines.join('\n') }));
       } else {
         blocks.push(h('pre', { class: 'md-pre' }, h('code', { class: 'md-code' }, codeLines.join('\n'))));
       }

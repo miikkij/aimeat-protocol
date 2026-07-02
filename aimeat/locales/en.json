@@ -82,7 +82,6 @@
   "inbox.attachmentOpenRaw": "Open raw",
   "inbox.attachmentDownload": "Download",
   "inbox.attachmentLoadError": "Could not load this attachment.",
-  "inbox.close": "Close",
   "inbox.directThread": "Direct",
   "inbox.subjectPlaceholder": "Subject (optional — starts a new thread)",
   "admin.messages.title": "Direct messages",
@@ -666,9 +665,24 @@
       "needPrefix": "Enter a memory prefix to watch",
       "created": "Trigger created",
       "error": "Trigger failed",
-      "kind": { "time": "On a date", "recurring": "Recurring", "completion": "When something completes", "condition": "When a condition is met" },
-      "cad": { "none": "Don't repeat", "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly" },
-      "ct": { "memory_count": "Item count reaches", "workspace_count": "Workspace items reach", "no_activity": "No activity for N days", "memory_exists": "Something appears" },
+      "kind": {
+        "time": "On a date",
+        "recurring": "Recurring",
+        "completion": "When something completes",
+        "condition": "When a condition is met"
+      },
+      "cad": {
+        "none": "Don't repeat",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      },
+      "ct": {
+        "memory_count": "Item count reaches",
+        "workspace_count": "Workspace items reach",
+        "no_activity": "No activity for N days",
+        "memory_exists": "Something appears"
+      },
       "act": {
         "label": "When it fires",
         "remind": "Remind me",
@@ -710,7 +724,11 @@
       "replanApply": "Apply",
       "replanErr": "Re-plan failed",
       "targetChanged": "The target state changed — adjust the milestones and the rest of the plan to fit.",
-      "status": { "not-started": "Not started", "in-progress": "In progress", "reached": "Reached" }
+      "status": {
+        "not-started": "Not started",
+        "in-progress": "In progress",
+        "reached": "Reached"
+      }
     },
     "reset": {
       "title": "Reset Secretary",
@@ -791,7 +809,12 @@
     "dailyBudgetHint": "Cap on what autonomous actions may spend per day.",
     "noLimit": "No limit",
     "bandsNote": "These set what the Secretary may do on its own. Each takes effect as that capability ships.",
-    "band": { "act": "Act", "draft": "Draft", "ask": "Ask", "off": "Off" },
+    "band": {
+      "act": "Act",
+      "draft": "Draft",
+      "ask": "Ask",
+      "off": "Off"
+    },
     "locked": "always on",
     "enterprise": "Enterprise",
     "capCosts": "costs / outbound",
@@ -1095,7 +1118,6 @@
       "running": "Running…",
       "queued": "queued",
       "startNew": "Start a new routine",
-      "discard": "Discard",
       "decisionChosen": "Approved this routine step",
       "routinesTitle": "Routines",
       "last": "Last",
@@ -1124,7 +1146,11 @@
       "checkResult": "Check result",
       "repeats": "Repeats",
       "nextRun": "Next run",
-      "cadence": { "none": "Once (no repeat)", "daily": "Daily", "weekly": "Weekly" },
+      "cadence": {
+        "none": "Once (no repeat)",
+        "daily": "Daily",
+        "weekly": "Weekly"
+      },
       "status": {
         "done": "done",
         "skipped": "skipped",
@@ -1153,12 +1179,18 @@
       "suggestEmpty": "No new shortcuts to suggest",
       "error": "Shortcuts failed",
       "composeTarget": "focuses",
-      "kind": { "prompt": "message", "compose": "open" }
+      "kind": {
+        "prompt": "message",
+        "compose": "open"
+      }
     },
     "items": {
       "title": "Action items",
       "dismiss": "Dismiss",
-      "handle": { "advance": "Open", "check-delegate": "Check result" },
+      "handle": {
+        "advance": "Open",
+        "check-delegate": "Check result"
+      },
       "text": {
         "approve": "Approve: {summary}",
         "ready": "Ready to run: {summary}",
@@ -1717,11 +1749,43 @@
       "autoSection": "⏱ Runs automatically",
       "manualSection": "On demand",
       "ungrouped": "Other",
-      "axis": { "need": "By need", "agent": "By agent", "auto": "By automation", "tag": "By tag", "capability": "By capability" },
-      "sort": { "standing": "Most valuable", "cost": "Cheapest", "speed": "Fastest", "name": "A–Z" },
-      "facet": { "cost": "Price", "latency": "Speed", "verification": "Trust", "dataHandling": "Privacy", "format": "Output" },
-      "format": { "document": "document", "record": "record", "board-post": "board post", "file": "file", "app": "app", "image": "image", "json": "data (JSON)" },
-      "need": { "create": "Create", "analyze": "Analyze & decide", "communicate": "Communicate & translate", "build": "Build & automate", "inspect": "Inspect & report", "other": "Other" },
+      "axis": {
+        "need": "By need",
+        "agent": "By agent",
+        "auto": "By automation",
+        "tag": "By tag",
+        "capability": "By capability"
+      },
+      "sort": {
+        "standing": "Most valuable",
+        "cost": "Cheapest",
+        "speed": "Fastest",
+        "name": "A–Z"
+      },
+      "facet": {
+        "cost": "Price",
+        "latency": "Speed",
+        "verification": "Trust",
+        "dataHandling": "Privacy",
+        "format": "Output"
+      },
+      "format": {
+        "document": "document",
+        "record": "record",
+        "board-post": "board post",
+        "file": "file",
+        "app": "app",
+        "image": "image",
+        "json": "data (JSON)"
+      },
+      "need": {
+        "create": "Create",
+        "analyze": "Analyze & decide",
+        "communicate": "Communicate & translate",
+        "build": "Build & automate",
+        "inspect": "Inspect & report",
+        "other": "Other"
+      },
       "aiSearch": "Find by need",
       "aiThinking": "Matching your need…",
       "aiResultsTitle": "Best matches for your need",
@@ -1733,12 +1797,41 @@
       "buildForNeed": "Build an agent for this →",
       "buildRequested": "Asked {agent} to build an agent for this.",
       "noBuilder": "No agent-builder available. Connect crew-forge first.",
-      "visibility": { "private": "Private (only me)", "unlisted": "Unlisted (by link)", "public": "Public (listed)" },
-      "status": { "done": "done", "failed": "failed", "active": "in progress", "paused": "paused", "stalled": "stalled", "queued": "queued", "revision_requested": "revision requested", "draft": "draft" },
-      "verification": { "deterministic": "deterministic", "gated": "verified", "ungated": "unverified" },
-      "dataHandling": { "local-only": "local-only", "llm-provider": "via LLM", "third-party": "third-party" },
-      "cost": { "free": "free", "cheap": "cheap", "expensive": "$$$" },
-      "latency": { "seconds": "seconds", "minutes": "minutes", "long-running": "long-running" },
+      "visibility": {
+        "private": "Private (only me)",
+        "unlisted": "Unlisted (by link)",
+        "public": "Public (listed)"
+      },
+      "status": {
+        "done": "done",
+        "failed": "failed",
+        "active": "in progress",
+        "paused": "paused",
+        "stalled": "stalled",
+        "queued": "queued",
+        "revision_requested": "revision requested",
+        "draft": "draft"
+      },
+      "verification": {
+        "deterministic": "deterministic",
+        "gated": "verified",
+        "ungated": "unverified"
+      },
+      "dataHandling": {
+        "local-only": "local-only",
+        "llm-provider": "via LLM",
+        "third-party": "third-party"
+      },
+      "cost": {
+        "free": "free",
+        "cheap": "cheap",
+        "expensive": "$$$"
+      },
+      "latency": {
+        "seconds": "seconds",
+        "minutes": "minutes",
+        "long-running": "long-running"
+      },
       "consequence": {
         "creates-agent": "creates an agent",
         "creates-schedule": "creates a schedule",
@@ -8762,5 +8855,14 @@
     "ctaDemo": "Book a demo →",
     "ctaPricing": "See pricing →",
     "writtenToday": "written today at"
-  }
+  },
+  "markdown.embed.loading": "Loading…",
+  "markdown.embed.notFound": "Key not found",
+  "markdown.embed.signIn": "Sign in to view this data",
+  "markdown.embed.noAccess": "No permission to read this key",
+  "markdown.embed.error": "Could not load",
+  "markdown.embed.empty": "(empty)",
+  "markdown.embed.refresh": "Refresh",
+  "markdown.embed.moreRows": "more rows",
+  "markdown.embed.missingKey": "The block declares no key"
 }

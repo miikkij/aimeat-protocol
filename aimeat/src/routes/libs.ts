@@ -318,7 +318,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
         {
           name: 'aimeat-markdown',
           url: '/v1/libs/aimeat-markdown.js',
-          description: 'Markdown rendering: AIMEAT.md.render(text, target) — safe dependency-free GFM subset (returns an ELEMENT; use the target param or renderToString(), never innerHTML = render(...)). AIMEAT.md.renderRich(text, target) upgrades to full GFM (task lists, footnotes, code highlighting, Mermaid diagrams) with sanitization, falling back to the safe subset if CDNs are unreachable.',
+          description: 'Markdown rendering: AIMEAT.md.render(text, target) — safe dependency-free GFM subset (returns an ELEMENT; use the target param or renderToString(), never innerHTML = render(...)). AIMEAT.md.renderRich(text, target) upgrades to full GFM (task lists, footnotes, code highlighting, Mermaid diagrams) with sanitization, falling back to the safe subset if CDNs are unreachable. A ```aimeat-memory fenced block (key/view/fields lines) renders as a LIVE table/props/list of that memory key, fetched fresh on every render.',
           size_estimate: '~12KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>`,
         },
