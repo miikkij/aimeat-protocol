@@ -4,6 +4,53 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+Push notifications now land where they came from. Clicking a push used to open a route that never
+existed (`/v1/portal/human/dashboard` — dangling since the initial commit); now every notification
+carries a deep link, the service worker routes the click into an already-open SPA window (tab switch
+in place) or cold-opens the right view, and the whole bell inbox mirrors to web push — a DM push opens
+that conversation, an organism event opens the Organisms tab. Apps, agents, and extensions gained a
+first-class way to notify their owner: an app's notification deep-links back to the app itself.
+
+### Fixed
+
+- **Push-notification clicks opened a dead route.** The test push, the PWA manifest `start_url`, and the
+  shadowed PWA worker all pointed at `/v1/portal/human/dashboard`, which was never registered as a route
+  (404). Fixed targets: test push → `/v1/profile?tab=notifications`, admin test → `/v1/admin?tab=push`,
+  personal-node mailbox alert → `/v1/profile?tab=nodes` (it carried no URL at all), manifest `start_url` →
+  `/v1/portal`.
+- **Notification click never deep-linked an open window.** The served `sw.js` only `focus()`ed a matching
+  window (and its URL match could never hit a `?tab=` target), so deep links either did nothing or piled up
+  new tabs. The worker now installs with `skipWaiting`/`clients.claim`, focuses a same-path window and posts
+  an `aimeat-notification-click` message the SPA translates into an in-place tab switch (shared
+  `openNotificationLink()` in `NotificationBell.js` — one translation for bell clicks and push clicks);
+  otherwise it opens the URL cold and the SPA's `?tab=` / `#hash` deep-linking lands the view.
+- **Stale saved tab beat `?tab=` deep links.** The landing page prefers its sessionStorage-saved tab over the
+  URL param, so a reused browser tab could hijack a deep link (and a plain-string value in that key even
+  disabled the `?tab=` fallback). A boot-priming block in `spa.html` now writes the deep-link target in the
+  landing page's `{tabId, slot}` contract before the view mounts; `#inbox/<conversationId>` also primes the
+  inbox thread key so a cold open lands in the exact conversation.
+- **Notification icons were 404s.** Payloads referenced `/icons/icon-192.png`, which did not exist anywhere
+  (the repo had SVGs only, which Android notifications don't reliably render). Real PNGs added (`icon-192`,
+  `icon-512`, monochrome `badge-96`) and wired into the manifest and both workers.
+- **Notifications tab: browser-level permission denial now says so** (en+fi), instead of the generic
+  "subscribe failed" that was indistinguishable from a VAPID misconfiguration.
+
+### Added
+
+- **Bell → web-push bridge.** Every in-app bell notification (`services/notify.ts`) is mirrored to the
+  owner's web-push subscription (best-effort, tag-deduped per type), with the bell's hash-form link
+  translated to a cold-openable URL — so DMs, organism events, workflow failures, and extension events reach
+  a subscribed owner as real browser pushes that open the right view, even with AIMEAT closed.
+- **Apps and agents can notify their own owner: `POST /v1/notifications`** (new `notifications:send` scope,
+  app-grantable). Self-targeted only — the recipient is always the caller's owner. An app notification
+  defaults its link to the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens
+  the app, and gets the app's name prefixed to the title (provenance — an app cannot impersonate the node).
+  Browser helper: `await session.notify(title, { body, link, type })` in `aimeat-auth.js`; documented in the
+  app-developer AI guide; OpenAPI + en/fi locales in sync; new `e2e-notifications` suite.
+- **Extension `ctx.notify()` is visible now.** It used to write only a private memory list nobody rendered;
+  all three runtimes (REST, MCP, scheduler) now also drop a bell notification + push, deep-linked to the
+  Extensions tab.
+
 ## [1.36.0] - 2026-07-02
 
 Adds configurable **Casdoor** and **Microsoft Entra ID** social sign-in alongside Google, built on a single
