@@ -7,9 +7,20 @@
  *   Link hrefs + image srcs are scheme-sanitized. The .md-body CSS is injected once and uses
  *   daisyUI base vars with dark fallbacks, so it looks right in the standard app shells.
  * @structure aimeatMarkdownLib(config) -> string (IIFE attaching global.AIMEAT.md)
- *   - AIMEAT.md.render(text, target?) -> HTMLElement (div.md-body); replaces target if given
+ *   - AIMEAT.md.render(text, target?) -> HTMLElement (div.md-body); replaces target if given.
+ *     NOTE: returns an ELEMENT, not a string — never assign it to innerHTML (that renders
+ *     "[object HTMLDivElement]"). Use the target param or appendChild, or renderToString().
+ *   - AIMEAT.md.renderToString(text) -> string (serialized safe-subset render, for innerHTML users)
+ *   - AIMEAT.md.renderRich(text, target?) -> Promise<HTMLElement> — full GFM pipeline (markdown-it +
+ *     task lists + footnotes + DOMPurify + highlight.js lazy-loaded from jsDelivr; mermaid fences
+ *     via the node's vendored /lib/mermaid with suppressErrorRendering). Falls back to render()
+ *     when any CDN dependency fails, so it never renders less than the safe subset.
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  then  AIMEAT.md.render(md, '#out')
+ *   or    await AIMEAT.md.renderRich(md, '#out')
  * @version-history
+ *   v1.1.0 — 2026-07-02 — renderRich (markdown-it + DOMPurify + hljs + mermaid, lazy CDN, safe-subset
+ *     fallback) + renderToString; mermaid uses suppressErrorRendering so parse errors never inject
+ *     mermaid's error bomb into the page (extracted from the AIMEAT Pages app).
  *   v1.0.0 — 2026-06-26 — initial: vanilla port of components/Markdown.js GFM subset (no wiki-links /
  *     mermaid) for standalone apps; exposes AIMEAT.md.render.
  */
@@ -214,6 +225,164 @@ function render(text, target) {
   }
   return div;
 }
+// String form of the safe-subset renderer, for callers that must assign to innerHTML.
+function renderToString(text) { return render(text).outerHTML; }
+
+// ── rich pipeline (markdown-it + DOMPurify + hljs + mermaid), lazy-loaded on first use ──
+var NODE_URL = (function () {
+  var meta = document.querySelector('meta[name="aimeat-node"]');
+  if (meta) return meta.getAttribute('content').replace(/\\/$/, '');
+  if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+  return '${config.baseUrl}';
+})();
+var RICH_CSS = '.md-body li.task-list-item{list-style:none;margin-left:-1.2rem;}' +
+  '.md-body li.task-list-item input[type=checkbox]{margin-right:.45rem;vertical-align:-1px;}' +
+  '.md-body .footnotes{font-size:.85rem;opacity:.75;}' +
+  '.md-body pre.md-mermaid{position:relative;}' +
+  '.md-body pre.md-mermaid::after{content:"mermaid";position:absolute;top:.35rem;right:.55rem;font-size:.62rem;opacity:.6;}' +
+  '.md-body pre.md-mermaid.md-mermaid-err::after{content:"mermaid — syntax error, showing source";color:#e06c75;opacity:1;}' +
+  '.md-body .md-mermaid-svg{margin:.8rem 0;overflow-x:auto;text-align:center;}' +
+  '.md-body .md-mermaid-svg svg{max-width:100%;height:auto;}' +
+  '.md-body .hljs-comment,.md-body .hljs-quote{color:#7d8799;font-style:italic;}' +
+  '.md-body .hljs-keyword,.md-body .hljs-selector-tag,.md-body .hljs-doctag{color:#a626a4;}' +
+  '.md-body .hljs-string,.md-body .hljs-regexp,.md-body .hljs-addition{color:#50a14f;}' +
+  '.md-body .hljs-number,.md-body .hljs-literal,.md-body .hljs-attr{color:#986801;}' +
+  '.md-body .hljs-title,.md-body .hljs-name,.md-body .hljs-section{color:#4078f2;}' +
+  '.md-body .hljs-built_in,.md-body .hljs-type{color:#c18401;}' +
+  '.md-body .hljs-symbol,.md-body .hljs-bullet,.md-body .hljs-meta,.md-body .hljs-selector-id,.md-body .hljs-variable,.md-body .hljs-template-variable{color:#0184bb;}' +
+  '.md-body .hljs-deletion{color:#ca1243;}.md-body .hljs-emphasis{font-style:italic;}.md-body .hljs-strong{font-weight:700;}' +
+  '[data-theme="dark"] .md-body .hljs-comment,[data-theme="dark"] .md-body .hljs-quote{color:#7f848e;}' +
+  '[data-theme="dark"] .md-body .hljs-keyword,[data-theme="dark"] .md-body .hljs-selector-tag,[data-theme="dark"] .md-body .hljs-doctag{color:#c678dd;}' +
+  '[data-theme="dark"] .md-body .hljs-string,[data-theme="dark"] .md-body .hljs-regexp,[data-theme="dark"] .md-body .hljs-addition{color:#98c379;}' +
+  '[data-theme="dark"] .md-body .hljs-number,[data-theme="dark"] .md-body .hljs-literal,[data-theme="dark"] .md-body .hljs-attr{color:#d19a66;}' +
+  '[data-theme="dark"] .md-body .hljs-title,[data-theme="dark"] .md-body .hljs-name,[data-theme="dark"] .md-body .hljs-section{color:#61afef;}' +
+  '[data-theme="dark"] .md-body .hljs-built_in,[data-theme="dark"] .md-body .hljs-type{color:#e5c07b;}' +
+  '[data-theme="dark"] .md-body .hljs-symbol,[data-theme="dark"] .md-body .hljs-bullet,[data-theme="dark"] .md-body .hljs-meta,[data-theme="dark"] .md-body .hljs-selector-id,[data-theme="dark"] .md-body .hljs-variable,[data-theme="dark"] .md-body .hljs-template-variable{color:#56b6c2;}' +
+  '[data-theme="dark"] .md-body .hljs-deletion{color:#e06c75;}';
+function injectRichCss() {
+  if (document.getElementById('aimeat-md-rich-styles')) return;
+  var s = document.createElement('style');
+  s.id = 'aimeat-md-rich-styles';
+  s.textContent = RICH_CSS;
+  (document.head || document.documentElement).appendChild(s);
+}
+var _scriptP = {};
+function loadScript(src) {
+  if (_scriptP[src]) return _scriptP[src];
+  _scriptP[src] = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function () { resolve(); };
+    s.onerror = function () { delete _scriptP[src]; reject(new Error('failed to load ' + src)); };
+    document.head.appendChild(s);
+  });
+  return _scriptP[src];
+}
+var _richP = null;
+function ensureRich() {
+  if (window.markdownit && window.DOMPurify) return Promise.resolve();
+  if (_richP) return _richP;
+  _richP = loadScript('https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js').then(function () {
+    return Promise.all([
+      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2/dist/markdown-it-task-lists.min.js').catch(function () {}),
+      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-footnote@4/dist/markdown-it-footnote.min.js').catch(function () {}),
+      loadScript('https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js'),
+      loadScript('https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js').catch(function () {})
+    ]);
+  }).catch(function (e) { _richP = null; throw e; });
+  return _richP;
+}
+var _mermaidP = null, _mmSeq = 0;
+function loadMermaid() {
+  if (window.mermaid) return Promise.resolve(window.mermaid);
+  if (_mermaidP) return _mermaidP;
+  _mermaidP = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = NODE_URL + '/lib/mermaid/mermaid.min.js'; // vendored on the node, ~3MB — lazy
+    s.onload = function () {
+      try {
+        window.mermaid.initialize({
+          startOnLoad: false, securityLevel: 'strict', flowchart: { htmlLabels: false },
+          suppressErrorRendering: true, // parse errors must NOT inject mermaid's error bomb into <body>
+          theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'neutral'
+        });
+        resolve(window.mermaid);
+      } catch (e) { reject(e); }
+    };
+    s.onerror = function () { _mermaidP = null; reject(new Error('mermaid load failed')); };
+    document.head.appendChild(s);
+  });
+  return _mermaidP;
+}
+function renderMermaids(container) {
+  var nodes = container.querySelectorAll('pre.md-mermaid');
+  if (!nodes.length) return;
+  loadMermaid().then(function (mm) {
+    nodes.forEach(function (preEl) {
+      mm.render('aimd-' + (_mmSeq++), preEl.textContent || '').then(function (r) {
+        if (!preEl.isConnected) return;
+        var d = document.createElement('div');
+        d.className = 'md-mermaid-svg';
+        d.innerHTML = r.svg; // mermaid output, securityLevel:'strict'
+        preEl.replaceWith(d);
+      }).catch(function () { preEl.classList.add('md-mermaid-err'); /* keep raw source visible */ });
+    });
+  }).catch(function () { /* renderer unavailable — raw source stays */ });
+}
+var _mdit = null;
+function getMdIt() {
+  if (_mdit) return _mdit;
+  if (!window.markdownit) return null;
+  var m = window.markdownit({
+    html: false, linkify: true,
+    highlight: function (code, lang) {
+      if (window.hljs && code.length < 30000) {
+        try {
+          if (lang && window.hljs.getLanguage(lang)) return window.hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+        } catch (e) {}
+      }
+      return ''; // markdown-it escapes the code itself
+    }
+  });
+  try { if (window.markdownitTaskLists) m.use(window.markdownitTaskLists); } catch (e) {}
+  try { if (window.markdownitFootnote) m.use(window.markdownitFootnote); } catch (e) {}
+  var defFence = m.renderer.rules.fence || function (t, i, o, e, s) { return s.renderToken(t, i, o); };
+  m.renderer.rules.fence = function (tokens, idx, options, env, self) {
+    var t = tokens[idx];
+    if (String(t.info || '').trim().toLowerCase() === 'mermaid') {
+      return '<pre class="md-mermaid">' + m.utils.escapeHtml(t.content) + '</pre>\\n';
+    }
+    return defFence(tokens, idx, options, env, self);
+  };
+  _mdit = m;
+  return m;
+}
+// Full pipeline render. Resolves to the div.md-body element (also mounted into target when given).
+// Any failure to load the CDN deps falls back to the dependency-free safe-subset render().
+async function renderRich(text, target) {
+  text = typeof text === 'string' ? text : '';
+  var div;
+  try {
+    await ensureRich();
+    injectRichCss();
+    var m = getMdIt();
+    if (!m || !window.DOMPurify) throw new Error('rich pipeline unavailable');
+    div = el('div', { 'class': 'md-body' });
+    div.innerHTML = window.DOMPurify.sanitize(m.render(text));
+    div.querySelectorAll('a[href]').forEach(function (a) {
+      a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener noreferrer nofollow');
+    });
+    div.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.disabled = true; });
+    renderMermaids(div);
+  } catch (e) {
+    div = render(text);
+  }
+  if (target) {
+    var t = typeof target === 'string' ? document.querySelector(target) : target;
+    if (t) { t.innerHTML = ''; t.appendChild(div); }
+  }
+  return div;
+}
 
 var CSS = '.md-body{line-height:1.6;color:var(--color-base-content,#e6e6e6);word-wrap:break-word;}' +
   '.md-body>:first-child{margin-top:0;}.md-body>:last-child{margin-bottom:0;}' +
@@ -246,7 +415,7 @@ function injectCss() {
 injectCss();
 
 global.AIMEAT = global.AIMEAT || {};
-global.AIMEAT.md = { render: render, sanitizeHref: sanitizeHref, sanitizeImgSrc: sanitizeImgSrc };
+global.AIMEAT.md = { render: render, renderToString: renderToString, renderRich: renderRich, sanitizeHref: sanitizeHref, sanitizeImgSrc: sanitizeImgSrc };
 })(window);
 `;
 }
