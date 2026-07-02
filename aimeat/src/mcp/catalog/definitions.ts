@@ -11,6 +11,9 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-07-02 -- aimeat_workspace_write / aimeat_memory_write / aimeat_organism_update
+ *     descriptions teach the aimeat-memory LIVE data fence (embed a memory key in document markdown;
+ *     current value renders fresh on every open) alongside the existing mermaid guidance.
  *   v1.0.0 -- 2026-05-28 -- Add initial shared catalog for connector CLI fallback
  *   v1.1.0 -- 2026-05-28 -- Add app, extension, and cortex lifecycle tools to CLI fallback catalog
  *   v1.2.0 -- 2026-05-28 -- Add core memory, work, wallet, board, storage, and admin CLI fallback tools
@@ -455,7 +458,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_write',
-        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list.',
+        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1128,7 +1131,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_write',
-        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Drafts are NOT live until published (aimeat_workspace_publish). Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>). Member-only.",
+        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>). Member-only.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1206,14 +1209,14 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_update',
-        description: 'Update an ORGANISM in place (creator/admin only): its name, description (the short tagline), interests, join policy, visibility, and/or its free-form README — a markdown body (mermaid allowed) shown at the top of the organism home that explains what the organism is about and is kept up to date. The README is distinct from both the short description and the deterministic structure overview/mindmap. Pass only the fields you want to change.',
+        description: 'Update an ORGANISM in place (creator/admin only): its name, description (the short tagline), interests, join policy, visibility, and/or its free-form README — a markdown body (mermaid diagrams + aimeat-memory live-data blocks allowed) shown at the top of the organism home that explains what the organism is about and is kept up to date. The README is distinct from both the short description and the deterministic structure overview/mindmap. Pass only the fields you want to change.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             name: { type: 'string', required: false, description: 'New organism name.' },
             description: { type: 'string', required: false, description: 'Short tagline shown under the name.' },
-            readme: { type: 'string', required: false, description: 'Free-form markdown README (mermaid allowed) describing the organism; shown at the top of the organism home. Replaces the current one.' },
+            readme: { type: 'string', required: false, description: 'Free-form markdown README (mermaid + aimeat-memory live-data blocks allowed) describing the organism; shown at the top of the organism home. Replaces the current one.' },
             interests: { type: 'array', required: false, description: 'Interest tags.' },
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
