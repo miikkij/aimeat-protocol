@@ -759,9 +759,10 @@ const me = await iam('check', { command: 'post' });
 if (me.allowed) showComposer();
 if (me.needsConfirmation) askTheHumanFirst();   // irreversible tier
 
-// Owner-only user management (the extension verifies ownership server-side — a
-// non-owner gets an error, so gate the panel with try/catch, not a level guess):
-const state = await iam('admin', { op: 'getState' });   // roles, levels, commands, assignments
+// Owner-only user management. getState answers for ANY caller but reports isOwner —
+// gate the panel on state.isOwner (server truth, not a level guess); the mutating
+// ops (assign/revoke/set*) are enforced owner-only server-side regardless:
+const state = await iam('admin', { op: 'getState' });   // roles, levels, commands, assignments, isOwner
 await iam('admin', { op: 'assign', ghii: 'friend@node-id', role: 'editor' });
 await iam('admin', { op: 'revoke', ghii: 'friend@node-id' });
 
