@@ -1,0 +1,159 @@
+<!-- AIMEAT App Manifest
+name: Club Board
+version: 1.0.0
+description: A members board with its own BBS-level IAM (aimeat-iam)
+entry: index.html
+-->
+<!-- Template 2 proof app — the "App-IAM Template" from /llms.txt, published verbatim.
+     Demonstrates an app with its OWN permission system: a per-app copy of the aimeat-iam
+     extension (EXT below) holds BBS ordinal levels (lower = more power; admin 0 / editor 10 /
+     viewer 20), user→role assignments, and a command manifest. The app CONSULTS the extension
+     (check {command}) before showing/executing anything; the decision runs SERVER-SIDE in the
+     extension sandbox and its state lives in ext:{EXT} memory, sovereign to the extension.
+     The IAM roster doubles as the content index: everyone who can post is assigned, so the
+     board reads exactly those users' public post keys. One model, two user kinds — a human
+     GHII and an agent GAII get checked identically. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Club Board</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1"><span class="text-lg font-bold">🏛️ Club Board</span>
+      <span id="me-badge" class="ml-3 badge badge-outline"></span></div>
+    <div class="flex-none"><span id="header-auth"></span></div>
+  </nav>
+  <div id="app" class="flex-1 p-4 max-w-2xl mx-auto w-full"><p>Loading…</p></div>
+  <script>
+    // The app's OWN iam extension instance (install the aimeat-iam package copy under this name).
+    const EXT = 'club-board-iam';
+    const POSTS_KEY = 'club-board.posts';
+
+    function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+    const $app = () => document.getElementById('app');
+
+    // Every IAM question goes to the extension — the decision is server-side and sovereign.
+    async function iam(action, body) {
+      const r = await AIMEAT.auth.getSession().fetch('/v1/ext/' + EXT + '/' + action, { method: 'POST', body: JSON.stringify(body || {}) });
+      if (r.ok === false) throw new Error((r.error && (r.error.message || r.error.code)) || action + ' failed');
+      return r.data !== undefined ? r.data : r;
+    }
+
+    async function boot() {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-data.js');
+      AIMEAT.auth.mountLoginButton('#header-auth', { onLogin: start, onLogout: () => location.reload() });
+      let started = false;
+      const startOnce = () => { if (!started) { started = true; start(); } };
+      AIMEAT.auth.on('login', startOnce);
+      const session = await AIMEAT.auth.login();
+      if (session) startOnce(); else if (!started) $app().innerHTML = '<p>Sign in to enter the club.</p>';
+    }
+
+    async function start() {
+      let me;
+      try { me = await iam('check', { command: 'read-board' }); }
+      catch (e) {
+        $app().innerHTML = '<div class="alert alert-warning">IAM extension "' + EXT + '" is not installed on this node yet — install the aimeat-iam package copy first (see the App-IAM template in /llms.txt).</div>';
+        return;
+      }
+      document.getElementById('me-badge').textContent = (me.role || 'unassigned') + (me.level != null ? ' · level ' + me.level : '');
+      if (!me.allowed) { $app().innerHTML = '<p>No access — ask the owner to assign you a role.</p>'; return; }
+
+      const canPost = (await iam('check', { command: 'post' })).allowed;
+      const clearCmd = await iam('check', { command: 'clear-my-posts' });
+
+      // Roster = the IAM assignments (public extension memory) — the content index.
+      const assignments = (await AIMEAT.data.getPublic('ext:' + EXT, 'iam.assignments')) || {};
+      const posts = [];
+      for (const ghii of Object.keys(assignments)) {
+        const theirs = (await AIMEAT.data.getPublic(ghii, POSTS_KEY).catch(() => null)) || [];
+        for (const p of theirs) posts.push({ ...p, author: ghii.split('@')[0], role: assignments[ghii] });
+      }
+      posts.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
+      const el = $app(); el.innerHTML = '<h2 class="text-lg font-bold mb-2">Board</h2>';
+      for (const p of posts) {
+        const card = document.createElement('div');
+        card.className = 'card bg-base-200 mb-2 p-3';
+        card.textContent = p.text;
+        const meta = document.createElement('div');
+        meta.className = 'text-xs opacity-60 mt-1';
+        meta.textContent = p.author + ' (' + p.role + ') · ' + new Date(p.at).toLocaleString();
+        card.appendChild(meta);
+        el.appendChild(card);
+      }
+      if (!posts.length) el.innerHTML += '<p class="opacity-60">Nothing posted yet.</p>';
+
+      if (canPost) {
+        const form = document.createElement('form'); form.className = 'mt-4 flex gap-2';
+        form.innerHTML = '<input class="input input-bordered flex-1" placeholder="Say something…" required />' +
+                         '<button class="btn btn-primary">Post</button>';
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const text = form.querySelector('input').value.trim(); if (!text) return;
+          const mine = (await AIMEAT.data.get(POSTS_KEY)) || [];
+          mine.unshift({ text, at: new Date().toISOString() });
+          await AIMEAT.data.set(POSTS_KEY, mine, { visibility: 'public', tags: ['club-board'] });
+          start();
+        };
+        el.appendChild(form);
+      } else {
+        el.innerHTML += '<p class="text-sm opacity-60 mt-3">Your level can read but not post.</p>';
+      }
+
+      // The irreversible tier drives the confirmation — the manifest decides, not the UI author.
+      if (clearCmd.allowed) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-error btn-sm mt-4';
+        btn.textContent = 'Clear my posts';
+        btn.onclick = async () => {
+          if (clearCmd.needsConfirmation && !confirm('This is irreversible — delete ALL your posts?')) return;
+          await AIMEAT.data.set(POSTS_KEY, [], { visibility: 'public' });
+          start();
+        };
+        el.appendChild(btn);
+      }
+
+      // Users panel — server-truth gate: only the extension's claimed owner can getState.
+      try {
+        const state = await iam('admin', { op: 'getState' });
+        const panel = document.createElement('div');
+        panel.className = 'mt-6 border-t pt-4';
+        panel.innerHTML = '<h3 class="font-bold mb-2">Users (owner)</h3>';
+        for (const [ghii, role] of Object.entries(state.assignments || {})) {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 mb-1 text-sm';
+          row.innerHTML = '<span class="flex-1">' + ghii + '</span><span class="badge">' + role +
+            ' · lvl ' + (state.levels?.[role] ?? '?') + '</span>';
+          const rm = document.createElement('button');
+          rm.className = 'btn btn-ghost btn-xs'; rm.textContent = 'Revoke';
+          rm.onclick = async () => { await iam('admin', { op: 'revoke', ghii }); start(); };
+          row.appendChild(rm);
+          panel.appendChild(row);
+        }
+        const form = document.createElement('form'); form.className = 'flex gap-2 mt-2';
+        const roles = Object.keys(state.roles || {});
+        form.innerHTML = '<input class="input input-bordered input-sm flex-1" placeholder="user@node-id" required />' +
+          '<select class="select select-bordered select-sm">' + roles.map(r => '<option>' + r + '</option>').join('') + '</select>' +
+          '<button class="btn btn-outline btn-sm">Assign</button>';
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          await iam('admin', { op: 'assign', ghii: form.querySelector('input').value.trim(), role: form.querySelector('select').value });
+          start();
+        };
+        panel.appendChild(form);
+        el.appendChild(panel);
+      } catch { /* not the owner — no panel */ }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
