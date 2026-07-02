@@ -27,6 +27,7 @@ import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { notify } from '../services/notify.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -311,6 +312,11 @@ export function registerExtensionsTools(
                         version: (existing?.version || 0) + 1,
                         createdAt: existing?.createdAt || new Date().toISOString(),
                         updatedAt: new Date().toISOString(),
+                    });
+                    // Also surface it where the owner actually looks: the header bell + web push,
+                    // deep-linked to the Extensions tab.
+                    void notify(storage, `${parsed.owner}@${config.nodeId}`, {
+                        type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
                     });
                     return true;
                 },

@@ -14,6 +14,7 @@
  *   v1.0.0 -- 2026-04-20 -- Initial mailbox notification service with web push
  *   v1.1.0 -- 2026-05-01 -- Add email channel, notification templates, quiet hours
  *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (mailbox_notif_sent, mailbox_notif_failed, mailbox_notif_blocked)
+ *   v1.3.0 -- 2026-07-02 -- Mailbox web push carries a click URL (/v1/profile?tab=nodes)
  */
 
 import { createRequire } from 'node:module';
@@ -219,6 +220,8 @@ export class MailboxNotificationService {
           body: tpl.body,
           icon: '/icons/icon-192.png',
           tag: 'mailbox-alert',
+          // The personal-node mailbox surface lives in the profile Nodes tab.
+          url: '/v1/profile?tab=nodes',
           data: payload,
         }),
         { TTL: 3600 },

@@ -54,6 +54,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  'notifications:send': 'Send you notifications (bell + browser push) that open this app',
 };
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s

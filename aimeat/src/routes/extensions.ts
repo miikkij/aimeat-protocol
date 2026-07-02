@@ -25,6 +25,7 @@ import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRec
 import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { notify } from '../services/notify.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import type { Scheduler } from '../services/scheduler.js';
@@ -1301,6 +1302,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
           const trimmed = list.slice(-100);
           await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          // Also surface it where the owner actually looks: the header bell + web push,
+          // deep-linked to the Extensions tab.
+          void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
+            type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
+          });
           return true;
         },
         email: async (to: string, subject: string, body: string) => {
@@ -1552,6 +1558,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
           const trimmed = list.slice(-100);
           await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          // Also surface it where the owner actually looks: the header bell + web push,
+          // deep-linked to the Extensions tab.
+          void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
+            type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
+          });
           return true;
         },
         email: async (to: string, subject: string, body: string) => {

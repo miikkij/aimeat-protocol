@@ -317,12 +317,31 @@
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { initThemeSystem } from '/js/theme.js';
-    import { NotificationBell } from '/components/NotificationBell.js';
+    import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
     // generateStars no longer needed for light theme
 
     const html = htm.bind(h);
+
+    // ── Notification cold-open deep link ──
+    // A push-notification click can open '/v1/profile?tab=messages#inbox/<conversationId>' (or
+    // the bell's '#<tab>[/<rest>]' hash form) in a fresh window. Prime the landing page's
+    // sessionStorage contract ({tabId, slot} JSON — landing-page.js openView init) BEFORE the
+    // view mounts, plus the inbox thread key that inbox-tab.js consumes on mount. Overwriting the
+    // saved tab matters: landing-page prefers sessionStorage over ?tab=, so a stale value from
+    // earlier browsing would otherwise beat the deep link in a reused browser tab.
+    (() => {
+      if (location.pathname !== '/v1/profile') return;
+      const m = /^#([a-z]+)(?:\/(.+))?$/i.exec(location.hash || '');
+      const rawTab = new URLSearchParams(location.search).get('tab') || (m ? m[1] : '');
+      if (!rawTab) return;
+      const tabId = rawTab.toLowerCase() === 'inbox' ? 'messages' : rawTab;
+      try {
+        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
+        if (tabId === 'messages' && m && m[2]) sessionStorage.setItem('aimeat.inbox.open', m[2]);
+      } catch { /* private mode — ?tab= still lands the tab */ }
+    })();
 
     // ── Error Boundary ──
     class ErrorBoundary extends Component {
@@ -435,6 +454,19 @@
           setView(null);
         }
       }, []);
+
+      // Push-notification clicks on an already-open window: the service worker (sw.js) focuses
+      // this window and posts the notification's target URL — deep-link it in place (tab switch,
+      // inbox thread) instead of a full reload.
+      useEffect(() => {
+        if (!('serviceWorker' in navigator)) return undefined;
+        const onSwMessage = (e) => {
+          if (!e.data || e.data.type !== 'aimeat-notification-click' || !e.data.url) return;
+          openNotificationLink(e.data.url, navigate);
+        };
+        navigator.serviceWorker.addEventListener('message', onSwMessage);
+        return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
+      }, [navigate]);
 
       // Initial load + popstate
       useEffect(() => {

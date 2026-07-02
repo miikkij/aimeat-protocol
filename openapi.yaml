@@ -16477,6 +16477,38 @@ paths:
       responses:
         '200': { description: Notifications + unread count }
         '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: createNotification
+      summary: Notify the caller's own owner (bell + browser push)
+      description: |
+        Create a notification for the CALLER's OWN owner — self-targeted only; there is no way to
+        notify an arbitrary owner. The notification lands in the header bell and, when the owner
+        has a web-push subscription, is mirrored as a browser push whose click opens `link`.
+
+        Owner sessions may always call this. Agent sessions need the `notifications:send` scope.
+        App-grant sessions (role `app`) need `notifications:send` in their grant; an app
+        notification gets the app's name prefixed to the title (provenance) and `link` defaults to
+        the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens the app.
+        Delivery is best-effort (`created: true` confirms acceptance, not push delivery).
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 200, description: Short title shown in the bell and push }
+                body: { type: string, maxLength: 1000, description: Optional longer context }
+                link: { type: string, maxLength: 500, description: "Same-node path the notification deep-links to (must start with '/'), e.g. '/v1/profile?tab=messages'" }
+                type: { type: string, pattern: "^[a-zA-Z0-9_:.-]{1,64}$", description: "Machine type; defaults to 'app' / 'agent' / 'custom' by caller role" }
+      responses:
+        '201': { description: "Notification accepted ({ created: true, link })" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Missing notifications:send scope }
 
   /v1/notifications/read:
     post:

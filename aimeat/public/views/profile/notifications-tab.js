@@ -3,6 +3,8 @@
  * @description Profile tab for push notification and email notification preferences.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; use ToggleSwitch and GlassCard from shared.js
+ *   v1.1.0 — 2026-07-02 — Distinguish a browser-level permission denial from generic subscribe
+ *     failures so the user knows to unblock notifications in browser settings.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -81,6 +83,11 @@ export default function NotificationsTab({ session, showToast }) {
         setSubStatus(null);
         return;
       }
+      if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        showToast(t('profile.notifications.permissionDenied'), true);
+        setSubStatus(null);
+        return;
+      }
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
@@ -114,7 +121,8 @@ export default function NotificationsTab({ session, showToast }) {
       showToast(t('profile.notifications.subscribeSuccess'));
     } catch (err) {
       console.error('Push subscribe failed:', err);
-      showToast(t('profile.notifications.subscribeFailed'), true);
+      const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+      showToast(t(denied ? 'profile.notifications.permissionDenied' : 'profile.notifications.subscribeFailed'), true);
     }
     setSubStatus(null);
   }

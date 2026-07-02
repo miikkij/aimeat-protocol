@@ -362,6 +362,24 @@ sidebar, or for an admin dashboard.
 Clears the 60s availability + 1h models cache. Call after the user toggles
 their key/budget in another tab.
 
+### `await session.notify(title, { body?, link?, type? }) → envelope`
+
+Notify the signed-in owner: a record in their header bell plus — when they have
+browser push enabled (profile → Notifications) — a real push notification, even
+with your app closed. Self-targeted only: it always goes to the owner behind the
+current session, never to anyone else.
+
+Requires the `notifications:send` scope in your grant
+(`<meta name="aimeat-scopes" content="... notifications:send">`). Clicking the
+notification opens `link`; when you omit it, it defaults to **your app's own
+open URL**, so "Report ready" brings the user straight back to your app. `link`
+must be a same-node path (starts with `/`). The node prefixes your app's name to
+the title so notifications are always attributable.
+
+```js
+await session.notify('Report ready', { body: 'Q2 numbers are in.' });
+```
+
 ---
 
 ## Cortex and extensions
