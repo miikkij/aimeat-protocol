@@ -623,6 +623,12 @@ export async function saveWorkspaceReadme(orgId, wsId, readme) {
   return apiPut(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`, { ws: wsId, readme });
 }
 
+/** Replace the workspace's pinned-apps list (FULL replace; [] clears). Each entry references a
+ *  published app ({ owner, filename, label? }). Creator/admin only (enforced server-side). */
+export async function saveWorkspaceApps(orgId, wsId, apps) {
+  return apiPut(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`, { ws: wsId, apps });
+}
+
 /** Overwrite a workspace's manifest (e.g. edited name/summary/policy from Settings). */
 export async function saveManifest(orgId, wsId, manifest) {
   return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.manifest`, value: manifest, visibility: 'private' });

@@ -19,13 +19,16 @@
  *     skipped the space — published content became invisible) and infers mode:'document' from a
  *     kind:'document' objectType (old clients used `kind`; the open envelope swallowed it and the
  *     space fell into records mode). isMemoryBackedSpace() is THE predicate every read path shares.
+ *   v1.4.0 — 2026-07-02 — Workspace app bindings: optional `apps` (FULL replace, [] clears) pins
+ *     published apps ({owner, filename}) to the workspace. Stored as its OWN meta record
+ *     (`…meta.apps`, like the readme) so a manifest full-replace can never clobber the bindings.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { validateMemoryWrite } from './schema-validator.js';
 
 export class WorkspaceMetaError extends Error {
-  constructor(public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST', message: string) {
+  constructor(public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS', message: string) {
     super(message);
     this.name = 'WorkspaceMetaError';
   }
@@ -78,6 +81,10 @@ export interface UpdateWorkspaceOpts {
   addObjectTypes?: Array<Record<string, unknown>>;
   /** Map of namespace → JSON Schema, locked (strict) for that space's records. */
   schemas?: Record<string, Record<string, unknown>>;
+  /** App bindings pinned to this workspace (FULL replace; [] clears). Each entry references a
+   *  published app by { owner, filename } (+ optional label). Binding is presentation/launch-context
+   *  only — access to workspace DATA stays enforced per call by the workspace gates. */
+  apps?: Array<Record<string, unknown>>;
 }
 
 export async function updateWorkspaceMeta(
@@ -91,7 +98,8 @@ export async function updateWorkspaceMeta(
   const manifest = (opts.manifest && typeof opts.manifest === 'object' && !Array.isArray(opts.manifest)) ? opts.manifest : undefined;
   const addObjectTypes = (Array.isArray(opts.addObjectTypes) && opts.addObjectTypes.length) ? opts.addObjectTypes : undefined;
   const schemas = (opts.schemas && typeof opts.schemas === 'object') ? opts.schemas : undefined;
-  if (!name && readme === undefined && !manifest && !addObjectTypes && !schemas) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest, add_spaces and/or schemas.');
+  const apps = Array.isArray(opts.apps) ? opts.apps : undefined;
+  if (!name && readme === undefined && !manifest && !addObjectTypes && !schemas && apps === undefined) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest, add_spaces, schemas and/or apps.');
 
   const root = `organism.${orgId}.w.${ws}`;
   // The workspace's registry entry lives in its creator's registry record — find it across members.
@@ -110,6 +118,7 @@ export async function updateWorkspaceMeta(
   const meta = (await storage.listAllMemory({ prefix: `${root}.meta.`, limit: 200 })).items;
   const manRec = meta.find(r => r.key === `${root}.meta.manifest`) ?? null;
   const readmeRec = meta.find(r => r.key === `${root}.meta.readme`) ?? null;
+  const appsRec = meta.find(r => r.key === `${root}.meta.apps`) ?? null;
   const creatorGhii = regRec.ownerGaii;
 
   const now = new Date().toISOString();
@@ -189,6 +198,22 @@ export async function updateWorkspaceMeta(
 
   // 3. Readme.
   if (readme !== undefined) { await write(`${root}.meta.readme`, readmeRec?.ownerGaii ?? creatorGhii, readme, readmeRec); updated.push('readme'); }
+
+  // 4. App bindings (full replace; [] clears). Own meta record so a manifest replace never clobbers
+  // the pinned-apps list; ownership stays with the creator like the manifest/readme records.
+  if (apps !== undefined) {
+    if (apps.length > 50) throw new WorkspaceMetaError('INVALID_APPS', 'Too many app bindings (max 50).');
+    const cleaned = apps.map(a => {
+      const owner = typeof a?.owner === 'string' ? a.owner.trim() : '';
+      const filename = typeof a?.filename === 'string' ? a.filename.trim() : '';
+      if (!owner || !filename) throw new WorkspaceMetaError('INVALID_APPS', 'Each apps entry needs an owner and a filename (a published app reference).');
+      const cleanedEntry: Record<string, unknown> = { owner, filename };
+      if (typeof a.label === 'string' && a.label.trim()) cleanedEntry.label = a.label.trim();
+      return cleanedEntry;
+    });
+    await write(`${root}.meta.apps`, appsRec?.ownerGaii ?? creatorGhii, { apps: cleaned }, appsRec);
+    updated.push('apps');
+  }
 
   return { updated, creator: entry.createdBy ?? '', name, ...(addObjectTypes ? { added, skipped } : {}) };
 }

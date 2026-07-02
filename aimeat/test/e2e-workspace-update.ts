@@ -10,6 +10,9 @@
  *   v1.2.0 — 2026-06-23 — Measurability convention: a manifest carrying top-level objectives[] (with a
  *     from:records KPI) + an objectType servesObjective validates and persists (2f); a KPI with an
  *     out-of-enum `kind` is rejected (2g).
+ *   v1.3.0 — 2026-07-02 — Workspace app bindings: `apps` full-replace persists + surfaces on GET
+ *     /workspace and the workspaces-list enrichment (2h), replace/clear (2i), invalid entry rejected
+ *     (2j), a manifest full-replace does NOT clobber the bindings (2k), plain member denied (4b).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-update
 
@@ -168,6 +171,45 @@ await test('2e. failure: add_spaces entry without a namespace is rejected', asyn
     assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
+await test('2h. creator pins apps — persisted, on GET /workspace + list enrichment', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({
+        apps: [{ owner: creator, filename: 'demo-app.html', label: 'Demo' }, { owner: 'someone', filename: 'other.html' }],
+    }) });
+    assert(r.status === 200 && r.body.data.updated.includes('apps'), `pin ${r.status}: ${JSON.stringify(r.body)}`);
+    const w = (await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(creatorTok) })).body.data;
+    assert(Array.isArray(w.apps) && w.apps.length === 2, `GET apps: ${JSON.stringify(w.apps)}`);
+    assert(w.apps[0].owner === creator && w.apps[0].filename === 'demo-app.html' && w.apps[0].label === 'Demo', `entry shape: ${JSON.stringify(w.apps[0])}`);
+    const list = (await json(`/v1/organisms/${orgId}/workspaces?include=enrichment`, { headers: auth(creatorTok) })).body.data.workspaces;
+    const entry = list.find((x: any) => x.id === WS);
+    assert(entry?.enrichment && Array.isArray(entry.enrichment.apps) && entry.enrichment.apps.length === 2, `enrichment apps: ${JSON.stringify(entry?.enrichment?.apps)}`);
+});
+
+await test('2i. apps is a FULL replace — shrink to one, then [] clears', async () => {
+    const r1 = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ apps: [{ owner: creator, filename: 'demo-app.html' }] }) });
+    assert(r1.status === 200, `shrink ${r1.status}`);
+    let w = (await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(creatorTok) })).body.data;
+    assert(w.apps.length === 1 && !w.apps[0].label, `after shrink: ${JSON.stringify(w.apps)}`);
+    const r2 = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ apps: [] }) });
+    assert(r2.status === 200 && r2.body.data.updated.includes('apps'), `clear ${r2.status}: ${JSON.stringify(r2.body.data)}`);
+    w = (await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(creatorTok) })).body.data;
+    assert(Array.isArray(w.apps) && w.apps.length === 0, `after clear: ${JSON.stringify(w.apps)}`);
+});
+
+await test('2j. failure: an apps entry without a filename is rejected (400)', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ apps: [{ owner: creator }] }) });
+    assert(r.status === 400, `expected 400 (INVALID_APPS), got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('2k. manifest full-replace does NOT clobber the pinned apps (own meta record)', async () => {
+    await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ apps: [{ owner: creator, filename: 'demo-app.html' }] }) });
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ manifest: { ...man, summary: 'replaced wholesale' } }) });
+    assert(r.status === 200, `manifest replace ${r.status}: ${JSON.stringify(r.body)}`);
+    const w = (await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(creatorTok) })).body.data;
+    assert(w.manifest.summary === 'replaced wholesale', 'manifest actually replaced');
+    assert(Array.isArray(w.apps) && w.apps.length === 1 && w.apps[0].filename === 'demo-app.html', `apps survived the manifest replace: ${JSON.stringify(w.apps)}`);
+});
+
 await test('3. empty update (no name/readme) is rejected', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({}) });
     assert(r.status === 400, `expected 400, got ${r.status}`);
@@ -179,6 +221,13 @@ await test('4. a plain member (not the creator) is denied', async () => {
     await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(memberTok), body: JSON.stringify({}) });
     const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(memberTok), body: JSON.stringify({ name: 'Hijack' }) });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('4b. a plain member cannot pin apps either', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(memberTok), body: JSON.stringify({ apps: [{ owner: memberName, filename: 'sneak.html' }] }) });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+    const w = (await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(creatorTok) })).body.data;
+    assert(w.apps.length === 1 && w.apps[0].filename === 'demo-app.html', `bindings untouched: ${JSON.stringify(w.apps)}`);
 });
 
 await test('Cleanup', async () => {

@@ -15559,6 +15559,18 @@ paths:
                           readme:
                             nullable: true
                             description: Markdown readme at organism.{id}.meta.readme
+                          apps:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner: { type: string, description: Publishing owner of the app }
+                                filename: { type: string, description: "App filename under /v1/apps/{owner}/{filename}" }
+                                label: { type: string, description: Optional display label override }
+                            description: >
+                              Apps pinned to this workspace (the `…meta.apps` binding record; empty when
+                              none). Pinning is presentation/launch-context only — workspace data access
+                              stays gated per call.
                           objects:
                             type: object
                             additionalProperties:
@@ -15629,12 +15641,14 @@ paths:
           $ref: '#/components/responses/NotFound'
     put:
       operationId: updateOrganismWorkspace
-      summary: Update a workspace's name and/or readme in place
+      summary: Update a workspace's definition in place (name/readme/structure/schemas/apps)
       description: |
-        Update a workspace's editable metadata **in place** — its `name` and/or `readme` — without
-        changing its id, objectTypes, schemas, sections or content (so nothing that references it gets
-        orphaned). The name is kept in sync across both places it lives: the manifest
-        (`meta.manifest.name`) and the organism's workspace registry (`meta.workspaces[].name`).
+        Update a workspace **in place** — its `name`, `readme`, its whole structure (a full
+        replacement `manifest`, or safe additive `add_spaces`), record `schemas`, and/or the `apps`
+        pinned to it — without changing its id (so nothing that references it gets orphaned). The
+        name is kept in sync across both places it lives: the manifest (`meta.manifest.name`) and
+        the organism's workspace registry (`meta.workspaces[].name`). App bindings live in their own
+        `…meta.apps` record, so a manifest replace never clobbers them.
         Creator-only (or an org admin). Mirrors the `aimeat_workspace_update` MCP tool.
       tags: [Organisms]
       security:
@@ -15658,6 +15672,34 @@ paths:
               properties:
                 name: { type: string, description: New workspace name (synced to manifest + registry) }
                 readme: { type: string, description: New markdown readme/intro (replaces the current one) }
+                manifest:
+                  type: object
+                  description: >
+                    FULL replacement manifest (objectTypes + policy/gate + settings). For genuine
+                    restructuring; to only add spaces prefer `add_spaces`.
+                add_spaces:
+                  type: array
+                  items: { type: object }
+                  description: >
+                    ADDITIVE objectTypes to UNION into the manifest (skip-if-exists, defaults filled).
+                    Alias `add_object_types` is also accepted.
+                schemas:
+                  type: object
+                  additionalProperties: { type: object }
+                  description: Map of namespace → JSON Schema, locked (strict) for that space's records.
+                apps:
+                  type: array
+                  items:
+                    type: object
+                    required: [owner, filename]
+                    properties:
+                      owner: { type: string }
+                      filename: { type: string }
+                      label: { type: string }
+                  description: >
+                    FULL replacement list of apps pinned to this workspace (`[]` clears; max 50).
+                    Each entry references a published app (/v1/apps/{owner}/{filename}). Pinning is
+                    presentation/launch-context only — workspace data access stays gated per call.
       responses:
         '200':
           description: Updated. Returns the list of meta records changed.
@@ -15671,7 +15713,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme" }
+                          updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme / schemas / apps" }
                           creator: { type: string }
                           name: { type: string }
         '400':
@@ -16015,7 +16057,7 @@ paths:
             `enrichment` folds the per-workspace getWorkspace+activity+participants fan-out into this one
             response: each readable workspace gains `enrichment: { hasManifest, recs, docs,
             lastEvent:{type,instance,action,at}|null, participants:[{owner,node,isLocalNode,isCreator,isSelf,agentsCount}],
-            pendingReviews }`. Workspaces with `access:none` carry no enrichment.
+            pendingReviews, apps:[{owner,filename,label?}] }`. Workspaces with `access:none` carry no enrichment.
       responses:
         '200':
           description: Workspaces with the caller's per-workspace access status (+ enrichment when requested)

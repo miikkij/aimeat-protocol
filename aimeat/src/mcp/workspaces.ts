@@ -56,6 +56,9 @@
  *     agents re-publish the same draft every poll cycle) now returns { skipped:true } instead of
  *     appending a byte-identical .version.N; and publish honours the objectType's `versioned` flag
  *     (default true) so a `versioned:false` space keeps only .latest (no per-publish history).
+ *   v1.12.0 -- 2026-07-02 -- Workspace app bindings: _update accepts `apps` (FULL replace, [] clears —
+ *     pins published apps {owner, filename} to the workspace via updateWorkspaceMeta) and _read
+ *     returns the pinned `apps` list alongside the manifest.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -286,7 +289,9 @@ export function registerWorkspaceTools(
                 objects[ot.name] = cur;
                 if (drf.length) drafts[ot.name] = drf;
             }
-            return ok({ organism_id, ws, manifest, objects, drafts });
+            // Apps pinned to this workspace (meta.apps binding record) — launch-context only.
+            const apps = ((items.find(r => r.key === `${root}.meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
+            return ok({ organism_id, ws, manifest, apps, objects, drafts });
         });
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
@@ -442,19 +447,22 @@ export function registerWorkspaceTools(
             add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
             manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
             schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
+            apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),
         },
         annotationsFor('aimeat_workspace_update'),
-        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }): Promise<TextResult> => {
+        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
             try {
                 const addParsed = parseObj(add_spaces);
+                const appsParsed = parseObj(apps);
                 const result = await updateWorkspaceMeta(storage, config, {
                     orgId: organism_id, ws, callerOwner: ownerName,
                     isAdmin: role === 'admin' || role === 'creator', name, readme,
                     addObjectTypes: Array.isArray(addParsed) ? addParsed as Array<Record<string, unknown>> : undefined,
                     manifest: parseObj(manifest) as Record<string, unknown> | undefined,
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
+                    apps: Array.isArray(appsParsed) ? appsParsed as Array<Record<string, unknown>> : undefined,
                 });
                 emitChange('organisms');
                 void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
