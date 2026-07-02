@@ -82,9 +82,12 @@ describe('v2 MCP surfaces', () => {
         // brought current 2026-06-23: reconciled drift (+aimeat_discover, +aimeat_organism_update,
         // +aimeat_organism_overview, +aimeat_workspace_overview, +aimeat_dm_ask) — surfaces now fully
         // cover the connector and the catalog has no uncovered tools).
-        expect(MCP_SURFACES.appdev.length).toBe(48);
-        expect(MCP_SURFACES.agent.length).toBe(80);
-        expect(MCP_SURFACES.service.length).toBe(75);
+        // 2026-07-02: +aimeat_iam_define on appdev; the guard was ALREADY behind on every row
+        // (pre-existing drift — validateSurfaces() above is the real invariant and stayed green),
+        // so reconciled every row to the counted actuals.
+        expect(MCP_SURFACES.appdev.length).toBe(50);
+        expect(MCP_SURFACES.agent.length).toBe(82);
+        expect(MCP_SURFACES.service.length).toBe(77);
         expect(MCP_SURFACES.admin.length).toBe(15);
     });
 });

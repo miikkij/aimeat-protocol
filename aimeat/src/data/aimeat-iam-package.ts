@@ -7,8 +7,10 @@
  *
  *   Components (lean):
  *     - extension `iam` — server-side enforcement + sovereign state (ext:{name} memory).
- *         actions: check {permission} → {allowed, role}  (any authed caller)
- *                  admin {op,…}       → owner-only multiplexed (claim/getState/setConfig/setRoles/assign/revoke)
+ *         actions: check {permission | command} → {allowed, role, level, tier?, needsConfirmation?}
+ *                    (any authed caller — command mode resolves an app command's capability + mutation tier)
+ *                  admin {op,…} → owner-only multiplexed
+ *                    (claim/getState/setConfig/setRoles/setLevels/setCommands/assign/revoke)
  *     - app `iam-dashboard` — the owner's UI: role→permission matrix editor, user assignments,
  *         configurable default role, a "tell your AI" usage snippet, and a live permission tester.
  *
@@ -19,22 +21,43 @@
  *   v1.0.0 — 2026-06-26 — initial: extension (enforcement) + dashboard app.
  *   v1.1.0 — 2026-06-26 — dashboard v2: plain fetch+JWT (fix load), structured role editor,
  *     assignments list, "use in your app / tell your AI" snippet, help text, default-role select.
+ *   v1.2.0 — 2026-07-02 — IAM P5: align to the shared level/capability model. BBS ordinal LEVELS per
+ *     role (iam.levels, lower = more power, seeded admin:0/editor:10/viewer:20) + a COMMAND MANIFEST
+ *     (iam.commands: {id, description, capability, tier}) so agents call app commands gated by the level
+ *     model, with a mutation tier (read|write|irreversible → needsConfirmation). check gains a
+ *     { command } mode; admin gains setLevels + setCommands. Backward-compatible: check { permission }
+ *     and iam.roles/assignments/config are unchanged; new keys default empty.
  */
 import type { ExamplePackageDef } from './example-packages.js';
 
 // ── Extension `iam` — server-side enforcement (V8 sandbox: export default async (ctx, input)) ──
 
 const SCRIPT_CHECK = `export default async function (ctx, input) {
-  const permission = input && input.permission;
-  if (!permission) return { allowed: false, error: 'permission required' };
   const config = (await ctx.memory.get('iam.config')) || {};
   const roles = (await ctx.memory.get('iam.roles')) || {};
+  const levels = (await ctx.memory.get('iam.levels')) || {};
+  const commands = (await ctx.memory.get('iam.commands')) || [];
   const assignments = (await ctx.memory.get('iam.assignments')) || {};
   const caller = ctx.caller && ctx.caller.gaii;
   const role = (caller && assignments[caller]) || config.defaultRole || null;
   const perms = (role && roles[role]) || [];
-  const allowed = perms.indexOf('*') !== -1 || perms.indexOf(permission) !== -1;
-  return { allowed: allowed, role: role, permission: permission };
+  const level = (role && Object.prototype.hasOwnProperty.call(levels, role)) ? levels[role] : null;
+  const has = function (cap) { return perms.indexOf('*') !== -1 || perms.indexOf(cap) !== -1; };
+  // Command mode: check { command } — resolve the command's required capability + mutation tier so the
+  // caller (a human GHII or an agent GAII, identically) knows whether it may run + when to confirm.
+  if (input && input.command) {
+    let cmd = null;
+    for (let i = 0; i < commands.length; i++) { if (commands[i] && commands[i].id === input.command) { cmd = commands[i]; break; } }
+    if (!cmd) return { allowed: false, error: 'unknown command', command: input.command, role: role, level: level };
+    return {
+      allowed: has(cmd.capability), role: role, level: level, command: cmd.id, capability: cmd.capability,
+      tier: cmd.tier || 'write', needsConfirmation: cmd.tier === 'irreversible',
+    };
+  }
+  // Permission mode (legacy — unchanged shape): check { permission }.
+  const permission = input && input.permission;
+  if (!permission) return { allowed: false, error: 'permission or command required' };
+  return { allowed: has(permission), role: role, permission: permission, level: level };
 }`;
 
 const SCRIPT_ADMIN = `export default async function (ctx, input) {
@@ -47,6 +70,12 @@ const SCRIPT_ADMIN = `export default async function (ctx, input) {
     roles = { admin: ['*'], editor: ['read', 'create', 'edit'], viewer: ['read'] };
     await ctx.memory.set('iam.roles', roles);
   }
+  let levels = await ctx.memory.get('iam.levels');
+  if (!levels) {
+    levels = { admin: 0, editor: 10, viewer: 20 };  // BBS ordinal, lower = more power
+    await ctx.memory.set('iam.levels', levels);
+  }
+  let commands = (await ctx.memory.get('iam.commands')) || [];
   if (op === 'claim') {
     if (!config.ownerGhii) {
       config.ownerGhii = caller;
@@ -57,7 +86,7 @@ const SCRIPT_ADMIN = `export default async function (ctx, input) {
   }
   const isOwner = !config.ownerGhii || config.ownerGhii === caller;
   if (op === 'getState') {
-    return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: isOwner, config: config, roles: roles, assignments: assignments };
+    return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: isOwner, config: config, roles: roles, levels: levels, commands: commands, assignments: assignments };
   }
   if (!isOwner) return { ok: false, error: 'forbidden: owner only' };
   if (op === 'setConfig') {
@@ -68,6 +97,14 @@ const SCRIPT_ADMIN = `export default async function (ctx, input) {
   if (op === 'setRoles') {
     if (input.roles && typeof input.roles === 'object') { roles = input.roles; await ctx.memory.set('iam.roles', roles); }
     return { ok: true, roles: roles };
+  }
+  if (op === 'setLevels') {
+    if (input.levels && typeof input.levels === 'object') { levels = input.levels; await ctx.memory.set('iam.levels', levels); }
+    return { ok: true, levels: levels };
+  }
+  if (op === 'setCommands') {
+    if (Array.isArray(input.commands)) { commands = input.commands; await ctx.memory.set('iam.commands', commands); }
+    return { ok: true, commands: commands };
   }
   if (op === 'assign') {
     if (input.ghii && input.role) { assignments[input.ghii] = input.role; await ctx.memory.set('iam.assignments', assignments); }
@@ -84,8 +121,8 @@ const EXTENSION_IAM = JSON.stringify({
   manifest: [
     'metadata:',
     '  name: iam',
-    '  version: 1.0.0',
-    '  description: In-app role & permission management with server-side enforcement.',
+    '  version: 1.1.0',
+    '  description: In-app role & permission management with server-side enforcement (BBS levels + command manifest).',
     '  author: operator',
     'required_apis:',
     '  - memory',
@@ -93,9 +130,9 @@ const EXTENSION_IAM = JSON.stringify({
     '  - id: check',
     '    method: POST',
     '    path: /check',
-    '    description: Check whether the calling user has a permission. Any authenticated user.',
-    '    input_schema: { type: object, properties: { permission: { type: string } }, required: [permission] }',
-    '    output_schema: { type: object, properties: { allowed: { type: boolean }, role: { type: string } } }',
+    '    description: Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user.',
+    '    input_schema: { type: object, properties: { permission: { type: string }, command: { type: string } } }',
+    '    output_schema: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean } } }',
     '    script: check.js',
     '  - id: admin',
     '    method: POST',
