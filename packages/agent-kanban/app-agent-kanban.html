@@ -1,0 +1,185 @@
+<!-- AIMEAT App Manifest
+name: Agent Kanban
+version: 1.0.0
+description: A task board humans fill and agents work — same workspace records, two faces
+entry: index.html
+-->
+<!-- Template 3 proof app — the "Agent-Faced App Template" from /llms.txt, published verbatim.
+     ONE app, TWO faces over the SAME workspace records:
+       - the HUMAN face is this UI (create tasks, watch progress, collect deliverables),
+       - the AGENT face is the existing MCP workspace tools (aimeat_workspace_read/_write/_publish)
+         driven by the contract prompt this app generates — no agent-specific backend exists.
+     A task is one record in a records space (contract: 'kanban'): { id, title, brief,
+     status: todo|claimed|doing|done, assignee (the agent's GAII), deliverable, notes }.
+     Agents claim by writing themselves into `assignee`, progress via `status`+`notes`, and
+     finish with `status: done` + a `deliverable` pointer. Access on BOTH faces is the
+     workspace's own access (membership/roles/publish-gate) — the app adds no gate. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Kanban</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+  <style>#board { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; align-items: start; }</style>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1"><span class="text-lg font-bold">📋 Agent Kanban</span>
+      <span id="ws-name" class="ml-3 text-sm opacity-70"></span></div>
+    <div class="flex-none gap-2">
+      <button id="agent-prompt" class="btn btn-outline btn-sm" style="display:none">🤖 Copy agent prompt</button>
+      <span id="header-auth"></span>
+    </div>
+  </nav>
+  <div id="app" class="flex-1 p-4 max-w-5xl mx-auto w-full"><p>Loading…</p></div>
+  <script>
+    const STATUSES = ['todo', 'claimed', 'doing', 'done'];
+    const CONTRACT = 'kanban';
+    let CTX = null;      // { orgId, wsId } once pinned
+    let SPACE = null;    // { name, namespace }
+
+    function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+    const $app = () => document.getElementById('app');
+
+    function launchContext() {
+      const m = /[#&]aimeat-ws=([^/&]+)\/([^&]+)/.exec(location.hash || '');
+      return m ? { orgId: decodeURIComponent(m[1]), wsId: decodeURIComponent(m[2]) } : null;
+    }
+
+    async function boot() {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-organism.js');
+      AIMEAT.auth.mountLoginButton('#header-auth', { onLogin: start, onLogout: () => location.reload() });
+      let started = false;
+      const startOnce = () => { if (!started) { started = true; start(); } };
+      AIMEAT.auth.on('login', startOnce);
+      const session = await AIMEAT.auth.login();
+      if (session) startOnce(); else if (!started) $app().innerHTML = '<p>Sign in to open the board.</p>';
+    }
+
+    async function start() {
+      const ctx = launchContext();
+      if (ctx) return openBoard(ctx.orgId, ctx.wsId);
+      // Bare launch: pick from accessible workspaces (pinned-here first — see the Workspace App Template).
+      const orgs = await AIMEAT.organism.list();
+      $app().innerHTML = '<h2 class="text-lg font-bold mb-2">Pick a workspace</h2>';
+      for (const org of orgs) {
+        const wss = await AIMEAT.organism.workspaces(org.id).catch(() => []);
+        for (const w of wss) {
+          if (w.access === 'none') continue;
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-outline btn-block justify-start mb-2';
+          btn.textContent = org.name + ' / ' + (w.name || w.id);
+          btn.onclick = () => { location.hash = '#aimeat-ws=' + encodeURIComponent(org.id) + '/' + encodeURIComponent(w.id); openBoard(org.id, w.id); };
+          $app().appendChild(btn);
+        }
+      }
+    }
+
+    async function openBoard(orgId, wsId) {
+      CTX = { orgId, wsId };
+      const ws = await AIMEAT.organism.read(orgId, wsId);
+      document.getElementById('ws-name').textContent = ws.manifest?.name || wsId;
+      // The kanban space is the objectType carrying contract:'kanban' (fallback: first records space).
+      const ot = (ws.manifest?.objectTypes || []).find(o => o.contract === CONTRACT)
+        || (ws.manifest?.objectTypes || []).find(o => (o.mode || 'records') !== 'document');
+      if (!ot) { $app().innerHTML = '<p>This workspace has no kanban space — add one (see the template in /llms.txt).</p>'; return; }
+      SPACE = { name: ot.name, namespace: ot.namespace };
+      const space = ws.spaces.find(s => s.name === ot.name);
+      const tasks = (space?.items || []).map(i => i.value).filter(v => v && v.id);
+
+      const el = $app(); el.innerHTML = '';
+      const board = document.createElement('div'); board.id = 'board';
+      for (const st of STATUSES) {
+        const col = document.createElement('div');
+        col.innerHTML = '<div class="font-bold text-sm uppercase opacity-60 mb-2">' + st +
+          ' <span class="badge badge-sm">' + tasks.filter(t => (t.status || 'todo') === st).length + '</span></div>';
+        for (const t of tasks.filter(t => (t.status || 'todo') === st)) col.appendChild(taskCard(t));
+        board.appendChild(col);
+      }
+      el.appendChild(board);
+
+      // New task — the human face. status:'todo' puts it up for grabs; any agent watching the
+      // workspace (or told via the agent prompt) can claim it.
+      const form = document.createElement('form'); form.className = 'mt-4 flex gap-2';
+      form.innerHTML = '<input name="title" class="input input-bordered flex-1" placeholder="Task title…" required />' +
+        '<input name="brief" class="input input-bordered flex-1" placeholder="What does done look like?" />' +
+        '<button class="btn btn-primary">Add task</button>';
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const id = 'task-' + Date.now();
+        await AIMEAT.organism.writeDraft(CTX.orgId, CTX.wsId, SPACE.namespace, id, {
+          id, title: form.title.value.trim(), brief: form.brief.value.trim(),
+          status: 'todo', assignee: '', deliverable: '', notes: '',
+        });
+        await AIMEAT.organism.publish(CTX.orgId, CTX.wsId, SPACE.namespace, id);
+        openBoard(CTX.orgId, CTX.wsId);
+      };
+      el.appendChild(form);
+
+      const promptBtn = document.getElementById('agent-prompt');
+      promptBtn.style.display = '';
+      promptBtn.onclick = async () => {
+        await navigator.clipboard.writeText(agentPrompt());
+        promptBtn.textContent = '✓ Copied';
+        setTimeout(() => { promptBtn.textContent = '🤖 Copy agent prompt'; }, 1500);
+      };
+
+      // Agents work while humans watch — keep the board fresh without any agent-specific backend.
+      clearTimeout(openBoard._t);
+      openBoard._t = setTimeout(() => { if (CTX) openBoard(CTX.orgId, CTX.wsId); }, 20000);
+    }
+
+    function taskCard(t) {
+      const card = document.createElement('div');
+      card.className = 'card bg-base-200 mb-2 p-3 text-sm';
+      let inner = '<div class="font-semibold">' + esc(t.title || t.id) + '</div>';
+      if (t.brief) inner += '<div class="opacity-70 mt-1">' + esc(t.brief) + '</div>';
+      if (t.assignee) inner += '<div class="mt-1">🤖 ' + esc(t.assignee) + '</div>';
+      if (t.notes) inner += '<div class="opacity-60 mt-1">' + esc(t.notes) + '</div>';
+      if (t.deliverable) inner += '<div class="mt-1"><a class="link link-primary" href="' + esc(t.deliverable) + '" target="_blank" rel="noopener">deliverable</a></div>';
+      card.innerHTML = inner;
+      // The human can override any task's status — same records, same write path as the agents.
+      const sel = document.createElement('select');
+      sel.className = 'select select-bordered select-xs mt-2';
+      for (const st of STATUSES) { const o = document.createElement('option'); o.textContent = st; o.selected = (t.status || 'todo') === st; sel.appendChild(o); }
+      sel.onchange = async () => {
+        await AIMEAT.organism.writeDraft(CTX.orgId, CTX.wsId, SPACE.namespace, t.id, { ...t, status: sel.value });
+        await AIMEAT.organism.publish(CTX.orgId, CTX.wsId, SPACE.namespace, t.id);
+        openBoard(CTX.orgId, CTX.wsId);
+      };
+      card.appendChild(sel);
+      return card;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+    // The AGENT face is a prompt, not code: paste this into any MCP-connected agent and it works
+    // the board with the standard workspace tools. This is AIMEAT's prompt-driven pattern.
+    function agentPrompt() {
+      return [
+        'You work a kanban board that lives in an AIMEAT workspace. Use your AIMEAT MCP tools.',
+        '',
+        'Board: organism_id "' + CTX.orgId + '", ws "' + CTX.wsId + '", space "' + SPACE.name + '".',
+        'A task record is { id, title, brief, status: todo|claimed|doing|done, assignee, deliverable, notes }.',
+        '',
+        'Work loop:',
+        '1. Read the board: aimeat_workspace_read { organism_id, ws }. Look at objects["' + SPACE.name + '"].',
+        '2. Pick ONE task with status "todo" that matches your skills.',
+        '3. CLAIM it: aimeat_workspace_write { organism_id, ws, type: "' + SPACE.name + '", value: <the task with status: "claimed", assignee: "<your GAII>"> }, then aimeat_workspace_publish for the same id.',
+        '   Re-read after publishing — if assignee is not you, someone else won; pick another task.',
+        '4. Do the work. Record progress by re-writing the task with status "doing" and a short note in `notes`, publishing each update.',
+        '5. Finish: set status "done" and put WHERE THE RESULT LIVES into `deliverable` — a URL, a workspace document id, or a memory key. Publish.',
+        '6. Repeat from 1 while "todo" tasks remain that match your skills. Leave the rest alone.',
+        '',
+        'Rules: one task at a time; keep every existing field when you re-write a record; if a publish is gated, leave the draft for human review and say so.',
+      ].join('\n');
+    }
+
+    boot();
+  </script>
+</body>
+</html>

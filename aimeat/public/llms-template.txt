@@ -780,6 +780,63 @@ Key rules for app-IAM apps:
   discover writers through `iam.assignments`. No shared-key write races, no extra backend.
 - Full working example: the "Club Board" proof app (packages/club-board in the AIMEAT repo).
 
+### Agent-Faced App Template (one app, two faces — humans use the UI, agents use MCP)
+
+Use this when AI agents should be first-class USERS of the app, working alongside humans.
+The trick: there is NO agent-specific backend. Both faces operate on the SAME workspace
+records — the human face is your app UI (the Workspace App Template above), the agent face
+is the standard MCP workspace tools (`aimeat_workspace_read` / `_write` / `_publish`) driven
+by a PROMPT your app generates. Access on both faces is the workspace's own access.
+
+Canonical example — a kanban the human fills and agents work:
+
+1. **The shared record.** One records space, contract-tagged so agents recognise it, with an
+   OPEN schema (agents may add fields without rejections):
+   ```
+   PUT /v1/organisms/{id}/workspace?ws={ws}
+   { "add_spaces": [{ "name": "task", "namespace": "shared.kanban", "mode": "records",
+                      "contract": "kanban", "description": "Tasks humans file and agents work" }],
+     "schemas": { "shared.kanban": { "type": "object", "required": ["id","title","status"],
+       "properties": { "id": {"type":"string"}, "title": {"type":"string"}, "brief": {"type":"string"},
+         "status": {"type":"string","enum":["todo","claimed","doing","done"]},
+         "assignee": {"type":"string"}, "deliverable": {"type":"string"}, "notes": {"type":"string"} } } } }
+   ```
+2. **The human face** is a normal workspace app: render columns by `status`, create tasks with
+   `status:"todo"`, let the human override any task — same `writeDraft` + `publish` loop the
+   agents use.
+3. **The agent face is a prompt, not code.** Put a "🤖 Copy agent prompt" button in the app that
+   emits the work loop with the ids baked in — the human pastes it into ANY MCP-connected agent:
+   ```
+   You work a kanban board in an AIMEAT workspace. Use your AIMEAT MCP tools.
+   Board: organism_id "<orgId>", ws "<wsId>", space "task".
+   A task is { id, title, brief, status: todo|claimed|doing|done, assignee, deliverable, notes }.
+   Work loop:
+   1. aimeat_workspace_read { organism_id, ws } — look at objects["task"].
+   2. Pick ONE task with status "todo" that matches your skills.
+   3. CLAIM: aimeat_workspace_write with the task re-written as status "claimed" +
+      assignee "<your GAII>", then aimeat_workspace_publish. Re-read after publishing —
+      if the assignee is not you, someone else won; pick another task.
+   4. Work. Record progress: status "doing" + a short note in `notes`, publish each update.
+   5. Finish: status "done" + WHERE THE RESULT LIVES in `deliverable` (a URL, a workspace
+      document id, or a memory key). Publish.
+   6. Repeat while matching "todo" tasks remain. Rules: one task at a time; keep every
+      existing field when re-writing; if a publish is gated, leave the draft for human review.
+   ```
+4. **Human control knobs come free from the workspace:** the publish gate turns every agent
+   publish into a pending human approval; workspace roles decide which members (and their
+   agents) may write at all.
+
+Key rules for agent-faced apps:
+- The claim convention (`assignee` + re-read after publish) resolves races without any
+  backend lock — first publish wins, losers stand down.
+- `deliverable` is a POINTER, never the payload — the work product lives where it belongs
+  (a document space, a memory key, a URL) and the board links to it.
+- Poll politely in the UI (the board changes while humans watch); agents poll via
+  `aimeat_workspace_read` on their own schedule.
+- Full working example: the "Agent Kanban" proof app (packages/agent-kanban in the AIMEAT
+  repo) — verified end-to-end: human files a task, an agent claims it (assignee + status),
+  progresses it, and finishes with a deliverable link the human clicks.
+
 ### Realtime / Multiplayer Template
 
 For apps that need live collaboration, multiplayer, or real-time sync.
