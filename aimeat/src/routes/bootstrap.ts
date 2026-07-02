@@ -9,6 +9,8 @@
  *   v1.0.1 -- 2026-05-28 -- Document same-owner shared tag memory pattern
  *   v1.1.0 -- 2026-05-30 -- Advertise v2 purpose-scoped MCP surfaces (/v2/mcp/<role>) in mcp_connection;
  *     drop stale "18 tools" wording
+ *   v1.2.0 -- 2026-07-02 -- sdk_libraries: add aimeat-markdown (render-into-element + renderRich),
+ *     aimeat-organism (normalized workspace read + draft/publish) and aimeat-editor (CM6 markdown editor)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -192,6 +194,9 @@ export function bootstrapRouter(
                 `${base}/v1/libs/aimeat-social.js - boards: create, post, react`,
                 `${base}/v1/libs/aimeat-wallet.js - morsel balance, transactions`,
                 `${base}/v1/libs/aimeat-work.js - actions, work requests`,
+                `${base}/v1/libs/aimeat-markdown.js - markdown rendering: AIMEAT.md.render(text, target) renders INTO an element (returns an Element - use the target param or renderToString, never innerHTML = render(...)); renderRich adds task lists, footnotes, code highlighting, Mermaid`,
+                `${base}/v1/libs/aimeat-organism.js - organisms & workspaces: normalized read (published + drafts merged per item), writeDraft, publish, README, search`,
+                `${base}/v1/libs/aimeat-editor.js - markdown editor: CodeMirror 6 + toolbar + live-preview split (pairs with aimeat-markdown)`,
                 `${base}/lib/realtime.js - WebSocket P2P rooms, WebRTC, Yjs CRDT`,
               ],
               starter_templates: {
