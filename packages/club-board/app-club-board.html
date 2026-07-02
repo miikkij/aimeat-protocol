@@ -1,6 +1,6 @@
 <!-- AIMEAT App Manifest
 name: Club Board
-version: 1.0.0
+version: 1.0.1
 description: A members board with its own BBS-level IAM (aimeat-iam)
 entry: index.html
 -->
@@ -121,9 +121,11 @@ entry: index.html
         el.appendChild(btn);
       }
 
-      // Users panel — server-truth gate: only the extension's claimed owner can getState.
+      // Users panel — server-truth gate: getState answers for anyone but reports isOwner;
+      // only the extension's claimed owner gets the panel (mutating ops are owner-only anyway).
       try {
         const state = await iam('admin', { op: 'getState' });
+        if (!state || !state.isOwner) throw new Error('not the owner');
         const panel = document.createElement('div');
         panel.className = 'mt-6 border-t pt-4';
         panel.innerHTML = '<h3 class="font-bold mb-2">Users (owner)</h3>';
