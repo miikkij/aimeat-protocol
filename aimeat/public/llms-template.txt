@@ -566,6 +566,155 @@ Key rules:
 - Do NOT add manual token entry fields. The auth library handles everything.
 - Do NOT modify the AIMEAT header nav bar.
 
+### Workspace App Template (app pinned to organism workspaces)
+
+A workspace app is a normal published app that WORKS ON a workspace's content. A workspace
+creator/admin pins it to the workspace (workspace Overview → Apps → Manage, or the
+`aimeat_workspace_update` MCP tool's `apps` param) and every member launches it from the
+workspace's Apps cards. Three things make it a workspace app:
+
+1. **Access = workspace access.** There is no app-side permission system: every read/write the
+   app makes runs as the signed-in user through `/v1/organisms/...` and is gated by the
+   workspace's own rules (membership, creator/admin, granted roles). If the user can read the
+   workspace they can use the app — never build your own gate.
+2. **Launch context rides the URL fragment.** The workspace launch card opens the app with
+   `#aimeat-ws={organismId}/{workspaceId}`. The fragment survives the app-origin redirect, so
+   parse `location.hash` on boot and pin the app to that workspace.
+3. **Launched bare → offer the pinned workspaces.** Without a fragment, list the workspaces the
+   user can access and prefer the ones this app is pinned to: `AIMEAT.organism.workspaces(orgId)`
+   returns `enrichment.apps` = the pinned `{owner, filename}` list.
+
+Use `aimeat-organism.js` for all content work — it does the objects/drafts merge, the `value.id`
+convention and `_meta` stripping for you (see the SDK table above).
+
+```html
+<!-- AIMEAT App Manifest
+name: workspace-notes
+version: 1.0.0
+description: Notes on a shared workspace — pin it to any workspace with a records space
+entry: index.html
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workspace Notes</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1"><span class="text-lg font-bold">Workspace Notes</span>
+      <span id="ws-name" class="ml-3 text-sm opacity-70"></span></div>
+    <div class="flex-none"><span id="header-auth"></span></div>
+  </nav>
+  <div id="app" class="flex-1 p-4 max-w-2xl mx-auto w-full"><p>Loading…</p></div>
+  <script>
+    function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+    const $app = () => document.getElementById('app');
+
+    // #aimeat-ws={organismId}/{workspaceId} — set by the workspace launch card.
+    function launchContext() {
+      const m = /[#&]aimeat-ws=([^/&]+)\/([^&]+)/.exec(location.hash || '');
+      return m ? { orgId: decodeURIComponent(m[1]), wsId: decodeURIComponent(m[2]) } : null;
+    }
+
+    // Which published app am I? Match my <title> against the public catalog — works on any
+    // origin (apex or app subdomain), no hardcoding.
+    async function discoverSelf() {
+      try {
+        const r = await fetch('/v1/apps'); const d = await r.json();
+        const me = (d?.data?.apps || []).find(a => a?.manifest?.name === document.title);
+        return me ? { owner: me.owner, filename: me.filename } : null;
+      } catch { return null; }
+    }
+
+    async function boot() {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-organism.js');
+      AIMEAT.auth.mountLoginButton('#header-auth', { onLogin: start, onLogout: () => location.reload() });
+      // On the isolated APP ORIGIN the silent-SSO / consent-popup flows complete asynchronously and
+      // fire the 'login' EVENT (not the button's onLogin callback) — subscribe to both.
+      let started = false;
+      const startOnce = () => { if (!started) { started = true; start(); } };
+      AIMEAT.auth.on('login', startOnce);
+      const session = await AIMEAT.auth.login();
+      if (session) startOnce(); else if (!started) $app().innerHTML = '<p>Sign in to open a workspace.</p>';
+    }
+
+    async function start() {
+      const ctx = launchContext();
+      if (ctx) return openWorkspace(ctx.orgId, ctx.wsId);
+      // Launched bare: list accessible workspaces, pinned-here first.
+      const self = await discoverSelf();
+      const orgs = await AIMEAT.organism.list();
+      const rows = [];
+      for (const org of orgs) {
+        const wss = await AIMEAT.organism.workspaces(org.id).catch(() => []);
+        for (const w of wss) {
+          if (w.access === 'none') continue;
+          const pinned = !!self && (w.enrichment?.apps || []).some(a => a.owner === self.owner && a.filename === self.filename);
+          rows.push({ org, w, pinned });
+        }
+      }
+      rows.sort((a, b) => Number(b.pinned) - Number(a.pinned));
+      $app().innerHTML = '<h2 class="text-lg font-bold mb-2">Pick a workspace</h2>';
+      for (const r of rows) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline btn-block justify-start mb-2';
+        btn.textContent = (r.pinned ? '📌 ' : '') + r.org.name + ' / ' + (r.w.name || r.w.id);
+        btn.onclick = () => { location.hash = '#aimeat-ws=' + encodeURIComponent(r.org.id) + '/' + encodeURIComponent(r.w.id); openWorkspace(r.org.id, r.w.id); };
+        $app().appendChild(btn);
+      }
+      if (!rows.length) $app().innerHTML += '<p>No accessible workspaces.</p>';
+    }
+
+    async function openWorkspace(orgId, wsId) {
+      const ws = await AIMEAT.organism.read(orgId, wsId);
+      document.getElementById('ws-name').textContent = ws.manifest?.name || wsId;
+      // First records-mode space is the notes home (documents work the same way).
+      const space = ws.spaces.find(s => (s.kind || 'records') !== 'document') || ws.spaces[0];
+      if (!space) { $app().innerHTML = '<p>This workspace has no spaces yet.</p>'; return; }
+      const el = $app(); el.innerHTML = '<h2 class="text-lg font-bold mb-2">' + space.name + '</h2>';
+      for (const item of space.items.sort((a, b) => b.updatedAt - a.updatedAt)) {
+        const card = document.createElement('div');
+        card.className = 'card bg-base-200 mb-2 p-3';
+        card.textContent = item.title + (item.status !== 'published' ? ' (' + item.status + ')' : '');
+        el.appendChild(card);
+      }
+      // Add form: draft + publish under the space's namespace. The server gates the write by
+      // workspace access; a gated workspace turns publish into a pending approval — show why.
+      const form = document.createElement('form'); form.className = 'mt-4 flex gap-2';
+      form.innerHTML = '<input class="input input-bordered flex-1" placeholder="New note…" required />' +
+                       '<button class="btn btn-primary">Add</button>';
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const text = form.querySelector('input').value.trim(); if (!text) return;
+        const id = 'note-' + Date.now();
+        try {
+          await AIMEAT.organism.writeDraft(orgId, wsId, space.namespace, id, { id, title: text });
+          await AIMEAT.organism.publish(orgId, wsId, space.namespace, id);
+          openWorkspace(orgId, wsId);
+        } catch (err) { alert(err.message); }
+      };
+      el.appendChild(form);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
+```
+
+Key rules for workspace apps:
+- NEVER build an app-side permission gate — the server enforces workspace access on every call.
+- Parse `#aimeat-ws=` on boot; keep the fragment when you navigate so reload stays pinned.
+- `writeDraft` + `publish` is the write loop; items with `hasRealId:false` are read-only.
+- A publish can return a pending approval when the workspace gates publishes — tell the user
+  instead of treating it as an error.
+
 ### Realtime / Multiplayer Template
 
 For apps that need live collaboration, multiplayer, or real-time sync.
