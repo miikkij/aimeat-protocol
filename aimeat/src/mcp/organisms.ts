@@ -9,6 +9,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.x -- 2026-07-02 -- readme param description mentions aimeat-memory live-data blocks (with mermaid).
  *   v1.0.0 — 2026-03-21 — Initial creation: 5 tools + 1 resource for organism management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -666,7 +667,7 @@ export function registerOrganismsTools(
             organism_id: z.string().describe('The organism ID'),
             name: z.string().optional().describe('New organism name'),
             description: z.string().optional().describe('Short tagline shown under the name'),
-            readme: z.string().optional().describe('Free-form markdown README (mermaid allowed); shown at the top of the organism home'),
+            readme: z.string().optional().describe('Free-form markdown README (mermaid + aimeat-memory live-data blocks allowed); shown at the top of the organism home'),
             interests: z.array(z.string()).optional().describe('Interest tags'),
             join_policy: z.string().optional().describe('open | approval_required | invite_only'),
             visibility: z.string().optional().describe('public | listed | private'),

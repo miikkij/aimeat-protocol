@@ -6,6 +6,9 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.6.0 — 2026-07-02 — Workspace generator prompt + agent connect prompt teach rich document
+ *     markdown: mermaid diagrams and aimeat-memory LIVE data blocks (embed a memory key; fresh on
+ *     every open) so AI-authored documentspaces/documents use live embeds instead of static tables.
  *   v1.5.0 — 2026-06-24 — uploadFile(orgId, file): generic blob upload (any document/image) to an
  *     organism's private storage, returning {key,url,mime} — used by the Secretary doc/image intake.
  *   v1.4.0 — 2026-06-23 — Optional color tags: getAllColors()/saveColors() read/write the per-item
@@ -276,7 +279,7 @@ const GENERATOR_PROMPT = `You are the AIMEAT Workspace Architect. Design a works
 
 A workspace is a set of object types. Each type is one of two modes:
 - "records" — structured items with consistent fields, validated by a schema. Use this for trackable things: milestones, tasks, risks, contacts, decisions.
-- "document" — free-form markdown that grows organically, with no schema. Use this whenever the user asks for documents, a wiki, notes, guides, design docs, or an open / free-form format.
+- "document" — free-form markdown that grows organically, with no schema. Use this whenever the user asks for documents, a wiki, notes, guides, design docs, or an open / free-form format. Documents render rich markdown: \`\`\`mermaid fenced blocks become diagrams, and \`\`\`aimeat-memory fenced blocks become LIVE data (the block names a memory key; the document shows that key's current value — array of objects renders as a table — fresh on every open, so agent-maintained data belongs in a memory key + embed, not in pasted static tables). Mention these in a document space's "description" when the space is meant for dashboards or agent-fed reports.
 
 Respond with this shape:
 {
@@ -902,6 +905,10 @@ export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'hum
     `- Write/refresh a draft: aimeat_memory_write key="organism.${orgId}.w.${wsId}.{namespace}.{id}.draft" value={...}`,
     `- Attach a file/screenshot: aimeat_storage_upload key="organism.${orgId}.w.${wsId}.img.{name}"`,
     `    then embed it in a document's markdown as  ![alt](/v1/storage/<returned key>)`,
+    `- Live data in documents: a \`\`\`aimeat-memory fenced block (body: key: <memory key>, optional view: table|props|list,`,
+    `    fields: a,b and title: ...) renders that key's CURRENT value on every open — write changing data with`,
+    `    aimeat_memory_write as an array of objects (consistent field names) and embed the key instead of a static table;`,
+    `    re-writing the SAME key updates every document that embeds it. \`\`\`mermaid blocks render as diagrams.`,
     `- Publish a draft:     POST ${nodeUrl}/v1/organisms/${orgId}/publish   body { "ws":"${wsId}", "namespace":"...", "id":"..." }`,
     `    (snapshots .version.N + .latest, consumes the draft; may require operator approval if the publish gate is on)`,
   ].join('\n');
