@@ -715,6 +715,71 @@ Key rules for workspace apps:
 - A publish can return a pending approval when the workspace gates publishes — tell the user
   instead of treating it as an error.
 
+### App-IAM Template (an app with its OWN users and BBS levels via aimeat-iam)
+
+Use this when the app needs its own permission system — its own user roster and levels,
+independent of workspaces. The app gets a per-app copy of the **aimeat-iam extension**: a
+server-side decision oracle whose state (roles, levels, assignments, command manifest) lives in
+the extension's own `ext:{name}` memory, sovereign and tamper-proof from the browser. The app
+never decides permissions itself — it ASKS the extension, and shows/hides UI from the answer.
+One model, two user kinds: a human GHII and an agent GAII are checked identically.
+
+**The model (BBS ordinal levels — LOWER number = MORE power):**
+- Roles carry capability lists and sit on levels: seeded `admin: 0 ['*']`,
+  `editor: 10 ['read','create','edit']`, `viewer: 20 ['read']` — all replaceable.
+- A **command manifest** maps app commands → required capability + mutation tier
+  (`read | write | irreversible`). The `irreversible` tier makes `needsConfirmation: true`,
+  so the UI knows to confirm — the manifest decides, not the UI author.
+- Unassigned users get `config.defaultRole` (seeded `viewer`).
+
+**Setup (once, by the app owner or their AI):**
+1. Install a copy of the aimeat-iam extension under your app's own name (convention:
+   `{your-app}-iam`) — via the aimeat-iam package, or `aimeat_extension_install` over MCP.
+2. `POST /v1/ext/{ext}/admin` with `{ "op": "claim" }` (records you as owner + seeds defaults),
+   then `{ "op": "setCommands", "commands": [...] }` and `{ "op": "assign", "ghii": "you@node",
+   "role": "admin" }` — claiming does NOT auto-assign a role.
+3. AI route: the `aimeat_iam_define` MCP tool validates a level schema + command manifest,
+   computes the level→command matrix, and returns ready-to-apply admin payloads
+   (`setRoles` / `setLevels` / `setCommands`).
+
+**The runtime contract (all calls need a signed-in session; `resp.data` is the answer):**
+
+```javascript
+const EXT = 'my-app-iam';   // your app's own extension instance
+const iam = async (action, body) => {
+  const r = await AIMEAT.auth.getSession().fetch('/v1/ext/' + EXT + '/' + action,
+    { method: 'POST', body: JSON.stringify(body || {}) });
+  if (r.ok === false) throw new Error(r.error?.message || action + ' failed');
+  return r.data;
+};
+
+// Gate EVERYTHING on check { command } — the decision is server-side:
+const me = await iam('check', { command: 'post' });
+// → { allowed, role, level, command, capability, tier, needsConfirmation }
+if (me.allowed) showComposer();
+if (me.needsConfirmation) askTheHumanFirst();   // irreversible tier
+
+// Owner-only user management (the extension verifies ownership server-side — a
+// non-owner gets an error, so gate the panel with try/catch, not a level guess):
+const state = await iam('admin', { op: 'getState' });   // roles, levels, commands, assignments
+await iam('admin', { op: 'assign', ghii: 'friend@node-id', role: 'editor' });
+await iam('admin', { op: 'revoke', ghii: 'friend@node-id' });
+
+// The roster doubles as a content index — assignments are PUBLIC extension memory:
+const assignments = await AIMEAT.data.getPublic('ext:' + EXT, 'iam.assignments') || {};
+// { "user@node": "role", ... } — everyone who can write is here, so read exactly
+// their public keys to aggregate shared content (each user writes their OWN key).
+```
+
+Key rules for app-IAM apps:
+- The extension is the ONLY permission truth; the app renders its answers. Never mirror the
+  rules into app JS — they would drift and can be bypassed anyway.
+- `check {permission}` (legacy role/permission mode) still works; prefer `check {command}` —
+  agents and humans then share one verb vocabulary with tiers.
+- Content pattern: each user writes their own public key (e.g. `my-app.posts`); readers
+  discover writers through `iam.assignments`. No shared-key write races, no extra backend.
+- Full working example: the "Club Board" proof app (packages/club-board in the AIMEAT repo).
+
 ### Realtime / Multiplayer Template
 
 For apps that need live collaboration, multiplayer, or real-time sync.
