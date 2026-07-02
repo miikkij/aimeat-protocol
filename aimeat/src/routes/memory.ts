@@ -14,6 +14,9 @@
  *   v1.6.0 -- 2026-06-22 -- Scalable Memory tab: GET /v1/memory?include=meta (omit values, report
  *     per-entry bytes), GET /v1/memory/search?prefix= (scope to a namespace), and new bulk routes
  *     GET /v1/memory/export, POST /v1/memory/import (skip/overwrite/rename), POST /v1/memory/bulk-delete.
+ *   v1.7.0 -- 2026-07-02 -- GET /v1/memory/:key honors ?owner_scope=true for non-owner same-owner
+ *     principals (app grants, agents), mirroring the list route's opt-in — so a document's live
+ *     aimeat-memory embed (app session) can read a key an MCP agent wrote under its GAII.
  */
 
 import { Router } from 'express';
@@ -1358,8 +1361,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     // Owner sessions read across their owner-scope (GHII + agents + ecosystem apps), GHII-first —
     // the same broadening list/search use, so the profile Memory tab can lazy-load any listed key's
-    // value (many are written under an agent's GAII, not the owner's GHII).
-    let record = (isOwnerSession && !agentParam)
+    // value (many are written under an agent's GAII, not the owner's GHII). ?owner_scope=true lets
+    // other same-owner principals (app grants, agents) opt into the same set — mirroring the list
+    // route's opt-in (same-owner-access invariant), e.g. a document's live aimeat-memory embed
+    // reading a key an MCP agent wrote.
+    const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true') && !agentParam;
+    let record = ownerScopeRead
       ? await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key)
       : await storage.getMemory(gaii, key);
     // On-read TTL check: if TTL has expired, treat as not found and delete

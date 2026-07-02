@@ -15,6 +15,9 @@
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script><script src="/v1/libs/aimeat-editor.js"></script>
  *   then  const { adapter } = AIMEAT.editor.split(host, { value: md, onChange: t => dirty = true });
  * @version-history
+ *   v1.1.0 — 2026-07-02 — toolbar gains a Live data button that inserts an aimeat-memory fence
+ *     skeleton (key placeholder selected for overtyping) — pairs with aimeat-markdown's live
+ *     memory embeds.
  *   v1.0.0 — 2026-07-02 — initial: CM6 adapter + toolbar + split preview, extracted from the
  *     AIMEAT Pages app (browser-verified there incl. the textarea fallback path).
  */
@@ -185,6 +188,7 @@ function toolbar(A) {
     sep(),
     b('</>', 'Code block', function () { A.wrap('\\n' + FENCE + '\\n', '\\n' + FENCE + '\\n', 'code'); }),
     b('\\uD83E\\uDDDC', 'Mermaid diagram', function () { A.wrap('\\n' + FENCE + 'mermaid\\n', '\\n' + FENCE + '\\n', 'graph TD\\n  A[Start] --> B[End]'); }),
+    b('\\uD83E\\uDDE9', 'Live data (aimeat-memory block)', function () { A.wrap('\\n' + FENCE + 'aimeat-memory\\nkey: ', '\\n' + FENCE + '\\n', 'livedata.my-table'); }),
     b('\\uD83D\\uDD17', 'Link', function () { A.wrap('[', '](https://)', 'link text'); }),
     b('\\u2015', 'Divider', function () { A.prefixLine('\\n---\\n'); })
   ].forEach(function (n) { bar.appendChild(n); });
