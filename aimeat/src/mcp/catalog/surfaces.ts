@@ -47,7 +47,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
-        'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete',
+        'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',
         'aimeat_cortex_install', 'aimeat_cortex_activate', 'aimeat_cortex_deactivate', 'aimeat_cortex_list', 'aimeat_cortex_delete',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',

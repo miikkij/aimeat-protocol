@@ -1400,6 +1400,17 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: { name: { type: 'string', required: true, description: 'Extension name.' } },
     },
     {
+        name: 'aimeat_iam_define',
+        description: 'Design an app\'s in-app permission model (for the aimeat-iam extension): validate a level schema (BBS ordinal levels, lower = more power, with app capability strings — a level 0 holding "*" is required) + a command manifest (commands → required capability + mutation tier read|write|irreversible), compute the level→command matrix (which levels may run which commands + which need human confirmation), and return ready-to-apply admin payloads (setRoles/setLevels/setCommands). PURE DESIGN + VALIDATION — it does not change any live state; apply the returned payloads with aimeat_extension_invoke against the app\'s iam extension\'s "admin" action. One model for both user kinds (human GHII + agent GAII).',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            app_id: { type: 'string', description: 'App id / name for the schema label (optional).' },
+            levels: { type: 'array', required: true, description: 'Level schema: array of { level (int, 0 = most power), key, label, capabilities: string[] }.' },
+            commands: { type: 'array', required: true, description: 'Command manifest: array of { id, description, capability, tier: read|write|irreversible }.' },
+        },
+    },
+    {
         name: 'aimeat_cortex_list',
         description: 'List installed cortex extensions (browser-side UI/IIFE bundles) with name, version, status, visibility, namespace, tags, and author. Cortex code runs in the browser (not server-side like a regular extension), so it cannot be invoked here — manage its lifecycle with aimeat_cortex_activate / _deactivate / _delete. Install with aimeat_cortex_install.',
         caller: 'agent',

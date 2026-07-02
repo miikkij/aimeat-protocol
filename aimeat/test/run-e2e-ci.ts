@@ -47,6 +47,7 @@ const ALL_SUITES = [
     // 'test/e2e-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-extension-secrets.ts',
+    'test/e2e-iam-extension.ts',
     'test/e2e-specialists.ts',
     'test/e2e-organism-templates.ts',
     'test/e2e-b2b-sales-hub-template.ts',

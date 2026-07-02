@@ -192,6 +192,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // openWorldHint: extension actions run user-provided WASM with ctx.fetch -- effects unbounded
     aimeat_extension_invoke: { title: 'Invoke Extension Action', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_extension_delete: { title: 'Delete Extension', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_iam_define: { title: 'Design App IAM', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Cortex ──
     aimeat_cortex_list: { title: 'List Cortex Extensions', readOnlyHint: true },

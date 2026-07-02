@@ -33,6 +33,7 @@ import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { defineAppIam } from '../services/iam/define-app-iam.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -121,6 +122,27 @@ export function registerExtensionsTools(
                     })), null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_iam_define (P5 — validate + design an app's IAM level schema + command manifest) ──
+    mcp.tool(
+        'aimeat_iam_define',
+        descriptionFor('aimeat_iam_define'),
+        {
+            app_id: z.string().optional().describe('App id / name for the schema label'),
+            levels: z.array(z.object({
+                level: z.number(), key: z.string(), label: z.string(), capabilities: z.array(z.string()),
+            })).describe('Level schema: BBS ordinal levels (lower = more power; level 0 must hold "*") → app capabilities'),
+            commands: z.array(z.object({
+                id: z.string(), description: z.string(), capability: z.string(),
+                tier: z.enum(['read', 'write', 'irreversible']),
+            })).describe('Command manifest: commands → required capability + mutation tier'),
+        },
+        annotationsFor('aimeat_iam_define'),
+        async ({ app_id, levels, commands }) => {
+            const result = defineAppIam({ appId: app_id, levels, commands });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         },
     );
 
