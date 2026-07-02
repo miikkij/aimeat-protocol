@@ -32,6 +32,8 @@
  *     (ColorPicker + TAG_PALETTE → theme tokens) lets sections, documents and records be tagged with
  *     a color (left-rail accent). Section colors persist on the section object; per-item colors in a
  *     parallel meta.colors map (getAllColors/saveColors). Colors are optional and default to none.
+ *   v1.8.0 — 2026-07-02 — Apps strip on the Overview: the apps pinned to this workspace (meta.apps
+ *     binding) render as launch cards (WorkspaceApps), with a creator/admin pin/unpin picker.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -60,6 +62,7 @@ import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.j
 import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
 import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
 import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
+import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
 
 /* ───────────────── Organism workspace (manifest-driven) ─────────────────
  * Any organism can have a governed workspace. If it has no manifest yet, offer
@@ -1375,6 +1378,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                 <span class="pj-ov-event-time">${relTime(e.at)}</span>
               </button>`)}
           </div>` : null}
+        <${WorkspaceApps} orgId=${orgId} wsId=${wsId} apps=${ws.apps || []} canEdit=${wsCanEdit}
+          showToast=${showToast} onChanged=${load} />
         ${allTypes.map(renderOvSection)}
         ${allTypes.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
       </div>`;

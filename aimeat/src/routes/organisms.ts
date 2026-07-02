@@ -1147,6 +1147,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const manifestRec = byKey.get(`${nsRoot}meta.manifest`);
     const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
     const readme = byKey.get(`${nsRoot}meta.readme`)?.value ?? null;
+    // Apps pinned to this workspace (meta.apps binding record) — presentation/launch-context only.
+    const apps = ((byKey.get(`${nsRoot}meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
 
     // Build the generic objects map from whatever objectTypes the manifest declares.
     // Versioning convention: each instance is one key, optionally suffixed `.draft` (working
@@ -1214,7 +1216,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       /* best-effort: leave todos empty if the task store is unavailable */
     }
 
-    res.json(success(config.nodeId, { manifest, readme, objects, drafts, decisions, resources, todos }, [
+    res.json(success(config.nodeId, { manifest, readme, apps, objects, drafts, decisions, resources, todos }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
       { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },
       { description: 'Publish a draft', method: 'POST', url: `/v1/organisms/${id}/publish` },
@@ -1871,6 +1873,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
           : (buckets.get(w.id) ?? []);
         const manifestRec = bucket.find(r => r.key === `${root}.meta.manifest`);
         const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
+        const appsRec = bucket.find(r => r.key === `${root}.meta.apps`);
         // Per-record read-authorization for lastEvent (cross-owner only; same-owner short-circuits) —
         // identical to GET /workspace/activity.
         const readable: MemoryRecord[] = [];
@@ -1890,6 +1893,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
             lastEvent: latestWorkspaceEvent(readable, manifest, root),
             participants: aggregateParticipants(bucket, { root, members: organism.members ?? [], creator: w.created_by, viewerOwner: ownerName, nodeId: config.nodeId }),
             pendingReviews: reviewByWs[w.id] ?? 0,
+            apps: ((appsRec?.value as { apps?: unknown[] } | undefined)?.apps) ?? [],
           },
         });
       }
@@ -2271,6 +2275,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         name: req.body?.name, readme: req.body?.readme,
         addObjectTypes: Array.isArray(req.body?.add_object_types) ? req.body.add_object_types : (Array.isArray(req.body?.add_spaces) ? req.body.add_spaces : undefined),
         manifest: req.body?.manifest, schemas: req.body?.schemas,
+        apps: Array.isArray(req.body?.apps) ? req.body.apps : undefined,
       });
       emitChange('organisms');
       res.json(success(config.nodeId, result));
