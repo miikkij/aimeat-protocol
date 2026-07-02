@@ -98,11 +98,11 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body || '',
-    icon: payload.icon || '/icons/icon.svg',
-    badge: payload.badge || '/icons/icon.svg',
+    icon: payload.icon || '/icons/icon-192.png',
+    badge: payload.badge || '/icons/badge-96.png',
     tag: payload.tag || 'aimeat-notification',
     data: {
-      url: payload.url || '/v1/portal/human/dashboard',
+      url: payload.url || '/v1/profile',
       ...payload.data,
     },
     vibrate: [100, 50, 100],
@@ -114,22 +114,24 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// ── Notification click: open the URL ──
+// ── Notification click: focus a matching open window (and let the SPA deep-link in place via
+// the 'aimeat-notification-click' message — see spa.html), else open a new one ──
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/v1/portal/human/dashboard';
+  const targetUrl = event.notification.data?.url || '/v1/profile';
+  const target = new URL(targetUrl, self.location.origin);
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // Try to focus an existing tab
       for (const client of clients) {
-        if (client.url.includes(targetUrl) && 'focus' in client) {
-          return client.focus();
-        }
+        let clientUrl;
+        try { clientUrl = new URL(client.url); } catch { continue; }
+        if (clientUrl.origin !== target.origin || clientUrl.pathname !== target.pathname) continue;
+        client.postMessage({ type: 'aimeat-notification-click', url: target.pathname + target.search + target.hash });
+        return 'focus' in client ? client.focus() : undefined;
       }
-      // Open a new tab
-      return self.clients.openWindow(targetUrl);
+      return self.clients.openWindow(target.href);
     })
   );
 });

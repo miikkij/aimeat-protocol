@@ -127,6 +127,7 @@ import { appsBackupRouter } from '../routes/apps-backup.js';
 // Services needed during route mounting
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createPushService } from '../services/push.js';
+import { setNotifyPushService } from '../services/notify.js';
 import { createEudiwService } from '../services/eudiw.js';
 import { createSdJwtVerifier } from '../services/sd-jwt.js';
 import { createOidcClient, type OidcClient } from '../services/oidc-client.js';
@@ -431,6 +432,7 @@ export async function mountRoutes(
 
   // Push notification service — Phase 3.1
   const pushService = createPushService(config, storage);
+  setNotifyPushService(pushService);   // bell notifications (services/notify.ts) mirror to web push
   app.use(pushRouter(config, storage, pushService));
 
   // EUDIW / VC / MyData services — Phase 3.3

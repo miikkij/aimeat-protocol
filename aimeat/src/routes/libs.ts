@@ -856,6 +856,17 @@ function createSession(data) {
       return resp.json();
     },
 
+    // Notify the signed-in owner (header bell + browser push if subscribed). Apps need the
+    // 'notifications:send' scope in their grant; an app notification deep-links back to the
+    // app by default (pass opts.link for a different same-node target).
+    // Usage: await session.notify('Report ready', { body: 'Q2 numbers are in.' })
+    async notify(title, opts = {}) {
+      return session.fetch('/v1/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type }),
+      });
+    },
+
     // Get a fresh access token. Owner sessions use the httpOnly refresh cookie
     // (POST /v1/auth/refresh, rotation + reuse-detection server-side); agent sessions
     // still re-sign with their IndexedDB key. Concurrent owner refreshes share one
@@ -1250,6 +1261,12 @@ const auth = {
             const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt, ...(opts.headers || {}) };
             const resp = await fetch(url, { ...opts, headers });
             return resp.json();
+          },
+          async notify(title, opts = {}) {
+            return session.fetch('/v1/notifications', {
+              method: 'POST',
+              body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type }),
+            });
           },
         };
 
@@ -2070,7 +2087,7 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 // ── Expose globally ──
 if (!global.AIMEAT) global.AIMEAT = {};
 global.AIMEAT.auth = auth;
-global.AIMEAT.version = '2026-06-03-003';
+global.AIMEAT.version = '2026-07-02-001';
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 `;

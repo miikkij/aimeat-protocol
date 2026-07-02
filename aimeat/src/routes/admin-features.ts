@@ -519,7 +519,7 @@ export function adminFeaturesRouter(
             title: 'AIMEAT Test',
             body: 'Push notifications are working!',
             icon: '/icons/icon-192.png',
-            url: '/v1/portal',
+            url: '/v1/admin?tab=push',
             tag: 'test',
         });
         if (!ok) {

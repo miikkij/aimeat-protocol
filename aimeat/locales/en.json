@@ -3523,6 +3523,7 @@
       "testBtn": "Send Test",
       "subscribeSuccess": "Push notifications enabled!",
       "subscribeFailed": "Failed to enable push notifications. Please allow notifications in your browser.",
+      "permissionDenied": "Notifications are blocked for this site. Allow notifications in your browser's site settings, then try again.",
       "unsubscribeSuccess": "Push notifications disabled.",
       "unsubscribeFailed": "Failed to disable push notifications.",
       "testSent": "Test notification sent!",

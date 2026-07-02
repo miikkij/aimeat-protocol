@@ -4,11 +4,17 @@
  *   in-app notifications (GET /v1/notifications). Opening the dropdown marks them read. Refreshes on
  *   the SSE `aimeat-live-update` event and a 45s poll, so a workspace-access approval (or request)
  *   surfaces without the user having to guess. Self-contained: reads the JWT from window.AIMEAT.auth.
- * @structure NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
+ *   Exports openNotificationLink() — the ONE translation from a notification link/URL into SPA
+ *   navigation, shared by the bell dropdown and the service-worker push-click handler (spa.html).
+ * @structure
+ *   - openNotificationLink(link, onNavigate) — deep-link a bell/push notification target
+ *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
  *   v1.0.0 — 2026-06-08 — Initial: header bell + dropdown + mark-read for the notification inbox.
  *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.1.0 — 2026-07-02 — Extract openNotificationLink() so push-notification clicks reuse the
+ *     same deep-link translation as bell clicks (supports both '#hash' and '?tab=' forms).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -34,6 +40,43 @@ function relTime(iso) {
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';
     return d.toLocaleDateString();
   } catch { return ''; }
+}
+
+/**
+ * Deep-link a notification target into the SPA. Handles both notification link vocabularies:
+ * the bell's hash form ('/v1/profile#organisms', '/v1/profile#inbox/<conversationId>') and the
+ * push URL form ('/v1/profile?tab=messages#inbox/<id>'). Profile targets switch tabs in place:
+ * prime sessionStorage so a cold profile mount opens the tab, navigate, then dispatch
+ * aimeat-open-tab so an already-mounted profile reacts too. Anything else just navigates.
+ * @param {string} link
+ * @param {(path: string) => void} [onNavigate]
+ */
+export function openNotificationLink(link, onNavigate) {
+  if (!link) return;
+  let url;
+  try { url = new URL(link, window.location.origin); } catch { return; }
+  if (url.origin === window.location.origin && url.pathname === '/v1/profile') {
+    const hashMatch = /^#([a-z]+)(?:\/(.+))?$/i.exec(url.hash || '');
+    const rawTab = url.searchParams.get('tab') || (hashMatch ? hashMatch[1] : '');
+    if (rawTab) {
+      const tabId = rawTab.toLowerCase() === 'inbox' ? 'messages' : rawTab;
+      const rest = hashMatch ? (hashMatch[2] || '') : '';
+      try {
+        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
+        if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
+      } catch { /* noop */ }
+      if (onNavigate) onNavigate('/v1/profile');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
+      return;
+    }
+  }
+  // App pages ('/v1/apps/<owner>/<file>') and other non-SPA documents are served by the
+  // backend (and may 301 to the isolated app origin) — a hard navigation, not SPA routing.
+  if (/^\/v1\/apps\//.test(url.pathname) || /\.html$/i.test(url.pathname)) {
+    window.location.assign(url.pathname + url.search + url.hash);
+    return;
+  }
+  if (onNavigate) onNavigate(url.pathname + url.search + url.hash);
 }
 
 export function NotificationBell({ t, onNavigate }) {
@@ -72,24 +115,7 @@ export function NotificationBell({ t, onNavigate }) {
   };
   const clickNotif = (n) => {
     setOpen(false);
-    if (!n.link) return;
-    // Profile tab deep-links carry a #hash that the SPA router ignores (it matches on pathname
-    // only). Translate them into the profile's tab-open mechanism: prime sessionStorage so a cold
-    // mount opens the tab, navigate to the profile, then dispatch aimeat-open-tab so an
-    // already-mounted profile reacts too. `#inbox[/<conversationId|requests>]` opens that thread.
-    const m = /\/v1\/profile#([a-z]+)(?:\/(.+))?$/i.exec(n.link);
-    if (m) {
-      const tabId = m[1] === 'inbox' ? 'messages' : m[1];
-      const rest = m[2] || '';
-      try {
-        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
-        if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
-      } catch { /* noop */ }
-      if (onNavigate) onNavigate('/v1/profile');
-      setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
-      return;
-    }
-    if (onNavigate) onNavigate(n.link);
+    openNotificationLink(n.link, onNavigate);
   };
 
   return html`

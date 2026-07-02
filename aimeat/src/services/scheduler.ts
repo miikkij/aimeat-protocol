@@ -1739,6 +1739,12 @@ export class Scheduler {
           createdAt: existing?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
+        // Also surface it where the owner actually looks: the header bell + web push,
+        // deep-linked to the Extensions tab.
+        const installerGhii = ext.installedBy.includes('@') ? ext.installedBy : `${ext.installedBy}@${this.config.nodeId}`;
+        void notify(this.storage, installerGhii, {
+          type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
+        });
         return true;
       },
       email: async (to, subject, body) => {

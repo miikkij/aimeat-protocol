@@ -1,3 +1,18 @@
+/**
+ * @file push.ts
+ * @description Web-push subscription routes: subscribe/unsubscribe the caller's owner, send a
+ *   self-targeted test notification, and expose the public VAPID key for client subscription.
+ * @structure
+ *   - POST   /v1/push/subscribe  — register the caller's browser push subscription
+ *   - DELETE /v1/push/subscribe  — remove it
+ *   - POST   /v1/push/test       — send a test push to the caller (deep-links to the Notifications tab)
+ *   - GET    /v1/push/vapid-key  — public VAPID key (no auth)
+ * @usage app.use(pushRouter(config, storage, pushService));
+ * @version-history
+ *   v1.0.0 — 2026-04-15 — Initial push subscription routes.
+ *   v1.1.0 — 2026-07-02 — Test push deep-links to /v1/profile?tab=notifications (the old
+ *     /v1/portal/human/dashboard target never existed as a route).
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -53,7 +68,7 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
         title: 'AIMEAT Test',
         body: 'Push notifications are working!',
         icon: '/icons/icon-192.png',
-        url: '/v1/portal/human/dashboard',
+        url: '/v1/profile?tab=notifications',
         tag: 'test',
       });
       if (!ok) {

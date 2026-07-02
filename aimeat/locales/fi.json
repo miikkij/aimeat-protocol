@@ -3523,6 +3523,7 @@
       "testBtn": "Lähetä testi",
       "subscribeSuccess": "Push-ilmoitukset käytössä!",
       "subscribeFailed": "Push-ilmoitusten käyttöönotto epäonnistui. Salli ilmoitukset selaimessasi.",
+      "permissionDenied": "Ilmoitukset on estetty tälle sivustolle. Salli ilmoitukset selaimen sivustoasetuksista ja yritä uudelleen.",
       "unsubscribeSuccess": "Push-ilmoitukset poistettu käytöstä.",
       "unsubscribeFailed": "Push-ilmoitusten poisto epäonnistui.",
       "testSent": "Testi-ilmoitus lähetetty!",
