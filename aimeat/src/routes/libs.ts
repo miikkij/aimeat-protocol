@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.29.0 - 2026-07-02 - New libraries: aimeat-organism.js (normalized workspace read + draft/publish
+ *   client) and aimeat-editor.js (CodeMirror 6 markdown editor with toolbar + split live preview);
+ *   aimeat-markdown gains renderRich/renderToString. Catalogue now lists aimeat-markdown (route
+ *   existed but the /v1/libs listing omitted it) + the two new libraries.
  * v1.28.0 - 2026-07-02 - aimeat-auth.js owner-session refresh() now reconciles `owner` + `ghii` from the
  *   refreshed (authoritative) JWT when it is for a different owner than the persisted session — fixes a
  *   stale identity after an OAuth sign-in as a different user without a clean logout (boot restored the
@@ -107,6 +111,8 @@ import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 import { aimeatAiLib } from './lib-ai.js';
 import { aimeatAgentsLib } from './lib-agents.js';
 import { aimeatHeaderLib } from './lib-header.js';
+import { aimeatOrganismLib } from './lib-organism.js';
+import { aimeatEditorLib } from './lib-editor.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -192,6 +198,16 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-agents.js — commission & observe the owner's agents
   router.get('/v1/libs/aimeat-agents.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatAgentsLib(config));
+  });
+
+  // GET /v1/libs/aimeat-organism.js — organism/workspace content client (normalized read + draft/publish)
+  router.get('/v1/libs/aimeat-organism.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatOrganismLib(config));
+  });
+
+  // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)
+  router.get('/v1/libs/aimeat-editor.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatEditorLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -298,6 +314,28 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           size_estimate: '~7KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-agents.js"></script>`,
           requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-markdown',
+          url: '/v1/libs/aimeat-markdown.js',
+          description: 'Markdown rendering: AIMEAT.md.render(text, target) — safe dependency-free GFM subset (returns an ELEMENT; use the target param or renderToString(), never innerHTML = render(...)). AIMEAT.md.renderRich(text, target) upgrades to full GFM (task lists, footnotes, code highlighting, Mermaid diagrams) with sanitization, falling back to the safe subset if CDNs are unreachable.',
+          size_estimate: '~12KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>`,
+        },
+        {
+          name: 'aimeat-organism',
+          url: '/v1/libs/aimeat-organism.js',
+          description: 'Organisms & workspaces: list organisms/workspaces, normalized workspace read (published + drafts merged per instance, value.id convention, read-metadata handling), write drafts, publish, revert-to-draft, delete objects, README, search.',
+          size_estimate: '~9KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-organism.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-editor',
+          url: '/v1/libs/aimeat-editor.js',
+          description: 'Markdown editor: CodeMirror 6 (textarea fallback) with a uniform adapter, formatting toolbar, and an editor+live-preview split view rendered through aimeat-markdown.',
+          size_estimate: '~8KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>\n<script src="${config.baseUrl}/v1/libs/aimeat-editor.js"></script>`,
         },
       ],
     });

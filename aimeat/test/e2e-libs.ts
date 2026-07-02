@@ -623,6 +623,47 @@ await test('GET /v1/libs/aimeat-work.js — serves JavaScript', async () => {
     assert(text.includes('waitFor'), 'should include polling helper');
 });
 
+await test('GET /v1/libs/aimeat-markdown.js — serves render + renderRich + renderToString', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-markdown.js`);
+    assert(res.ok, `markdown lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('AIMEAT.md'), 'should expose AIMEAT.md');
+    assert(text.includes('renderRich'), 'should include the rich pipeline');
+    assert(text.includes('renderToString'), 'should include the string form');
+    assert(text.includes('suppressErrorRendering'), 'mermaid init must suppress error-bomb rendering');
+});
+
+await test('GET /v1/libs/aimeat-organism.js — serves normalized workspace client', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-organism.js`);
+    assert(res.ok, `organism lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('AIMEAT.organism'), 'should expose AIMEAT.organism');
+    assert(text.includes('normalizeWorkspace'), 'should include the objects+drafts normalizer');
+    assert(text.includes('writeDraft'), 'should include draft writes');
+    assert(text.includes('/publish'), 'should include the publish call');
+    assert(text.includes('stripMeta'), 'should strip _-prefixed read metadata before writes');
+});
+
+await test('GET /v1/libs/aimeat-editor.js — serves CM6 editor with fallback', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-editor.js`);
+    assert(res.ok, `editor lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('AIMEAT.editor'), 'should expose AIMEAT.editor');
+    assert(text.includes('codemirror@6.0.2'), 'CM6 must be exact-pinned (the @6 range resolves to CM5 on esm.sh)');
+    assert(text.includes('textarea'), 'should include the textarea fallback');
+    assert(text.includes('toolbar'), 'should include the toolbar builder');
+});
+
+await test('GET /v1/libs — catalogue lists markdown, organism and editor', async () => {
+    const res = await fetch(`${BASE}/v1/libs`);
+    assert(res.ok, `libs catalogue failed: ${res.status}`);
+    const data = await res.json() as any;
+    const names = (data.libraries ?? []).map((l: any) => l.name);
+    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor']) {
+        assert(names.includes(expected), `catalogue should list ${expected} (got: ${names.join(', ')})`);
+    }
+});
+
 // ─── Results ───
 console.log('\n─────────────────────────────────────');
 console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);

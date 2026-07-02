@@ -7,6 +7,9 @@
  * @structure Mermaid({ chart }) — chart is the Mermaid source string.
  * @usage import { Mermaid } from '/components/Mermaid.js';  html`<${Mermaid} chart=${src} />`
  * @version-history
+ *   v1.1.0 — 2026-07-02 — suppressErrorRendering: mermaid v11 otherwise injects its "Syntax error
+ *     in text" bomb SVG into <body> on parse failure even though render() rejects; the component's
+ *     own raw-source fallback already covers the error UX.
  *   v1.0.0 — 2026-06-08 — Initial: lazy-loaded vendored Mermaid renderer for organism/workspace charts.
  */
 import { h } from 'preact';
@@ -25,7 +28,7 @@ function loadMermaid() {
     s.src = '/lib/mermaid/mermaid.min.js' + (window.__B || '');
     s.onload = () => {
       try {
-        window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', flowchart: { htmlLabels: false } });
+        window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', flowchart: { htmlLabels: false }, suppressErrorRendering: true });
         resolve(window.mermaid);
       } catch (e) { reject(e); }
     };

@@ -44,6 +44,10 @@
     v2.5.2 — 2026-06-26 — Add a pencil (✏️) next to the app name — on the detail-view title and on the
       owner's own published + parked cards — that opens the inline name/description editor right where
       the name is shown (editAppDetails opens the detail view with the About editor pre-opened).
+    v2.6.0 — 2026-07-02 — Build-prompt library list: add aimeat-organism.js + aimeat-editor.js; reword
+      the aimeat-markdown line so generated apps use render(text, target)/renderToString (render
+      returns an Element — assigning it to innerHTML shows "[object HTMLDivElement]") and mention
+      renderRich (task lists, footnotes, highlighting, Mermaid).
 -->
 <html lang="en">
 <head>
@@ -7318,7 +7322,8 @@
     prompt += 'Core:\n';
     prompt += '- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n';
     prompt += '- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n';
-    prompt += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n\n';
+    prompt += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n';
+    prompt += '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n';
     prompt += 'AI (prompt-driven — see the AI section below):\n';
     prompt += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
     prompt += 'Social & economy:\n';
@@ -7330,7 +7335,8 @@
     prompt += 'Media & misc:\n';
     prompt += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
     prompt += '- aimeat-speech.js — text-to-speech / speech helpers\n';
-    prompt += '- aimeat-markdown.js — render safe markdown to HTML (`AIMEAT.md.render`)\n';
+    prompt += '- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting and Mermaid diagrams, sanitized.\n';
+    prompt += '- aimeat-editor.js — markdown editor: `AIMEAT.editor.mount(el, {value, onChange})`, `AIMEAT.editor.toolbar(adapter)`, `AIMEAT.editor.split(el, {value, onChange})` for editor + live preview (pairs with aimeat-markdown.js)\n';
     prompt += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
     prompt += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
 
