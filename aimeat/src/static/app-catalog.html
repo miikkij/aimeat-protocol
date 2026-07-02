@@ -7335,7 +7335,7 @@
     prompt += 'Media & misc:\n';
     prompt += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
     prompt += '- aimeat-speech.js — text-to-speech / speech helpers\n';
-    prompt += '- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting and Mermaid diagrams, sanitized.\n';
+    prompt += '- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid diagrams AND live data embeds: a ```aimeat-memory fence (lines `key: <memory key>`, optional `view: table|props|list|value|json`, `fields: a,b`, `title: …`) renders that memory key as a fresh table on every open — perfect for agent-produced data in documents.\n';
     prompt += '- aimeat-editor.js — markdown editor: `AIMEAT.editor.mount(el, {value, onChange})`, `AIMEAT.editor.toolbar(adapter)`, `AIMEAT.editor.split(el, {value, onChange})` for editor + live preview (pairs with aimeat-markdown.js)\n';
     prompt += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
     prompt += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';

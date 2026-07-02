@@ -631,6 +631,8 @@ await test('GET /v1/libs/aimeat-markdown.js — serves render + renderRich + ren
     assert(text.includes('renderRich'), 'should include the rich pipeline');
     assert(text.includes('renderToString'), 'should include the string form');
     assert(text.includes('suppressErrorRendering'), 'mermaid init must suppress error-bomb rendering');
+    assert(text.includes('md-mem-src'), 'should mark aimeat-memory fences for the live-embed post-pass');
+    assert(text.includes('renderMemoryEmbeds'), 'should include the live memory-embed renderer');
 });
 
 await test('GET /v1/libs/aimeat-organism.js — serves normalized workspace client', async () => {

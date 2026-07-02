@@ -8,6 +8,8 @@
  *   all colors/spacing via theme.css variables.
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: extracted the per-view duplicates into one global component sheet.
+ *   v1.1.0 — 2026-07-02 — Styles for the live memory embed (aimeat-memory fence → MemoryEmbed): .md-mem
+ *     container/header/refresh/table/notes.
  */
 
 .md-body {
@@ -65,3 +67,16 @@
 .md-body .md-img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.6em 0; }
 .md-body hr,
 .md-body .md-hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
+
+/* ── Live memory embed (```aimeat-memory fence → components/MemoryEmbed.js) ── */
+.md-body .md-mem { border: 1px solid var(--border); border-radius: 8px; padding: 0.5em 0.8em 0.7em; margin: 1em 0; background: var(--bg-dim); }
+.md-body .md-mem-head { display: flex; align-items: center; gap: 0.6em; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.35em; }
+.md-body .md-mem-title { font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace); overflow-wrap: anywhere; flex: 1; }
+.md-body .md-mem-upd { white-space: nowrap; }
+.md-body .md-mem-refresh { border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; padding: 0 0.3em; font-size: 0.9rem; line-height: 1.4; }
+.md-body .md-mem-refresh:hover { color: var(--text); background: var(--surface, var(--card)); }
+.md-body .md-mem table { margin: 0.3em 0 0; background: transparent; }
+.md-body .md-mem-note { color: var(--muted); font-size: 0.88rem; padding: 0.2em 0; }
+.md-body .md-mem-err { color: var(--warning, var(--muted)); }
+.md-body .md-mem-more { color: var(--muted); font-size: 0.78rem; margin-top: 0.3em; }
+.md-body .md-mem-value { font-size: 0.95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
