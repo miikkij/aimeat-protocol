@@ -7,6 +7,8 @@
  * @version-history v1.1.1 -- 2026-05-28 -- Keep legacy boot sequence wording while using startup checklist guidance.
  * @version-history v1.1.2 -- 2026-05-28 -- Clarify post-onboarding setup uses actual commands, config, and knowledge artifacts.
  * @version-history v1.1.3 -- 2026-05-28 -- Add shared owner-memory tag guidance.
+ * @version-history v1.1.4 -- 2026-07-02 -- tier-1-appdev SDK list: add aimeat-markdown (render INTO an
+ *   element / renderToString / renderRich), aimeat-organism and aimeat-editor.
  *
  * Variable reference:
  *   {{node_url}}           -- config.baseUrl or req.protocol://req.get('host')
@@ -1062,6 +1064,9 @@ Key SDK libraries (loaded via script tags):
 - /v1/libs/aimeat-data.js -- memory CRUD, micro-memory
 - /v1/libs/aimeat-storage.js -- file uploads
 - /v1/libs/aimeat-social.js -- boards, posts, reactions
+- /v1/libs/aimeat-markdown.js -- markdown rendering: AIMEAT.md.render(text, target) renders INTO an element (returns an Element -- use the target param or renderToString, never innerHTML = render(...)); await AIMEAT.md.renderRich(text, target) adds task lists, footnotes, code highlighting, Mermaid
+- /v1/libs/aimeat-organism.js -- organisms & workspaces: normalized read (published + drafts merged per item), writeDraft, publish, README, search
+- /v1/libs/aimeat-editor.js -- markdown editor: CodeMirror 6 + toolbar + live-preview split (pairs with aimeat-markdown)
 
 Example: a grocery price tracker that stores prices in AIMEAT memory and displays charts.
 
