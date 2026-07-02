@@ -423,7 +423,8 @@ function renderOneEmbed(preEl) {
         var auth = window.AIMEAT && window.AIMEAT.auth;
         var s = auth && auth.getSession && auth.getSession();
         if (!s || !s.jwt) { note('Sign in to view this data', true); return; }
-        envl = await s.fetch('/v1/memory/' + encodeURIComponent(spec.key));
+        // owner_scope: resolve keys across the owner's identities (agents included)
+        envl = await s.fetch('/v1/memory/' + encodeURIComponent(spec.key) + '?owner_scope=true');
         if (envl && typeof envl.json === 'function') envl = await envl.json();
       }
       if (!envl || envl.ok === false) {

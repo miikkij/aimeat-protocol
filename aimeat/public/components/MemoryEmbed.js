@@ -106,9 +106,11 @@ export function MemoryEmbed({ spec: rawSpec }) {
     if (!spec.key) { setState({ status: 'error', msg: tOr('markdown.embed.missingKey', 'The block declares no key') }); return; }
     setState({ status: 'loading' });
     try {
+      // owner_scope: read across the owner's identities (GHII + agents), so keys an MCP
+      // agent wrote resolve too — mirrors the Memory tab's owner-scope reads.
       const path = spec.owner
         ? '/v1/memory/' + encodeURIComponent(spec.owner) + '/' + encodeURIComponent(spec.key)
-        : '/v1/memory/' + encodeURIComponent(spec.key);
+        : '/v1/memory/' + encodeURIComponent(spec.key) + '?owner_scope=true';
       const resp = await apiGet(path);
       setState({ status: 'ok', value: resp?.data?.value, updatedAt: resp?.data?.updated_at || null });
     } catch (e) {
