@@ -56,6 +56,112 @@ class AimeatLiaisonError(RuntimeError):
     """Raised when the liaison cannot establish or use an AIMEAT MCP connection."""
 
 
+# Tool whose per-todo `title` some models omit -- see _install_propose_todos_repair.
+_PROPOSE_TODOS_TOOL = "aimeat_task_propose_todos"
+
+# Titles on the AIMEAT side are a short human-readable label; the full text lives
+# in the todo's `description`. When we synthesise a title from a description we
+# only keep the first meaningful line, trimmed to this many characters.
+_DERIVED_TITLE_MAXLEN = 80
+
+
+def _derive_todo_title(description: Any) -> str:
+    """
+    Synthesise a short TODO title from its description text.
+
+    Some models (observed with GLM 5.2) emit `aimeat_task_propose_todos` entries
+    that carry only a `description` and omit the REQUIRED `title`. Rather than
+    let that trip validation and send the model into a retry loop, we derive a
+    title from the description: first non-blank line, whitespace collapsed,
+    trimmed to a sensible length at a word boundary. The description is left
+    untouched. Returns "" when there is nothing to derive from -- an empty
+    string still satisfies the schema (`z.string()` accepts "") and is far
+    better than a validation failure the model will just repeat.
+    """
+    if not isinstance(description, str):
+        return ""
+    line = next((ln.strip() for ln in description.splitlines() if ln.strip()), "")
+    if len(line) <= _DERIVED_TITLE_MAXLEN:
+        return line
+    clipped = line[:_DERIVED_TITLE_MAXLEN].rstrip()
+    if " " in clipped:
+        clipped = clipped[: clipped.rfind(" ")].rstrip()
+    return clipped + "…"  # ellipsis
+
+
+def _repair_propose_todos_input(raw: Any) -> Any:
+    """
+    Fill a missing/blank `title` on each proposed TODO from its `description`.
+
+    The AIMEAT node requires `title` on every todo (`z.string()`); `description`
+    is optional. When a model produces `{"description": "..."}` with no title,
+    BOTH the client-side pydantic args_schema AND the server reject it, and
+    CrewAI re-prompts the same agent -- which repeats the same mistake until
+    max_iter (the runaway this repair exists to kill). We normalise the payload
+    BEFORE validation so a real, present title reaches both layers.
+
+    Only dict payloads shaped like the propose_todos args are touched, and only
+    todos with an absent/blank title; anything else is returned unchanged so
+    genuinely malformed calls still surface as validation errors instead of
+    being silently "fixed". Never mutates the caller's objects.
+    """
+    if not isinstance(raw, dict):
+        return raw
+    todos = raw.get("todos")
+    if not isinstance(todos, list):
+        return raw
+    repaired_todos: list[Any] = []
+    changed = False
+    for todo in todos:
+        if not isinstance(todo, dict):
+            repaired_todos.append(todo)
+            continue
+        title = todo.get("title")
+        if isinstance(title, str) and title.strip():
+            repaired_todos.append(todo)
+            continue
+        new_todo = dict(todo)
+        new_todo["title"] = _derive_todo_title(todo.get("description", ""))
+        repaired_todos.append(new_todo)
+        changed = True
+    if not changed:
+        return raw
+    patched = dict(raw)
+    patched["todos"] = repaired_todos
+    return patched
+
+
+def _install_propose_todos_repair(tool: Any) -> None:
+    """
+    Make `tool`'s args_schema repair propose_todos payloads before validating.
+
+    Both tool-execution paths in this CrewAI version validate incoming args via
+    `args_schema.model_validate(raw)` -- CrewStructuredTool._parse_args and
+    BaseTool._validate_kwargs -- and both share the SAME args_schema object
+    (to_structured_tool() copies it by reference). Subclassing that schema with
+    a `model_validate` that pre-repairs is therefore the single choke point that
+    covers every execution path, and it repairs BEFORE validation so the derived
+    title satisfies both the client pydantic model and the server's zod schema.
+    """
+    schema = getattr(tool, "args_schema", None)
+    if not isinstance(schema, type):
+        return
+
+    class _RepairingProposeTodosSchema(schema):  # type: ignore[valid-type,misc]
+        @classmethod
+        def model_validate(cls, obj: Any, *args: Any, **kwargs: Any) -> Any:
+            return super().model_validate(_repair_propose_todos_input(obj), *args, **kwargs)
+
+    # Keep the original name so validation-error messages and the generated tool
+    # description read identically to the unpatched schema.
+    _RepairingProposeTodosSchema.__name__ = getattr(schema, "__name__", "ProposeTodosArgs")
+    _RepairingProposeTodosSchema.__qualname__ = _RepairingProposeTodosSchema.__name__
+    try:
+        tool.args_schema = _RepairingProposeTodosSchema
+    except Exception:  # pragma: no cover -- defensive; never break tool wiring
+        pass
+
+
 def _strip_none_kwargs(tool: Any) -> Any:
     """
     Wrap a CrewAI tool so its `_run` filters out kwargs where the value is None
@@ -108,6 +214,12 @@ def _strip_none_kwargs(tool: Any) -> Any:
         tool.cache_function = lambda *_args, **_kwargs: False
     except Exception:  # pragma: no cover -- defensive; CrewAI may rename later
         pass
+
+    # Tool-specific argument normalisation. aimeat_task_propose_todos requires a
+    # `title` on every todo; some models omit it and loop on the rejection until
+    # max_iter. Repair the payload before validation so the call succeeds once.
+    if getattr(tool, "name", None) == _PROPOSE_TODOS_TOOL:
+        _install_propose_todos_repair(tool)
 
     return tool
 
@@ -476,6 +588,7 @@ def create_liaison_agent(
     include_offers_tools: bool = True,
     verbose: bool = False,
     allow_delegation: bool = False,
+    max_iter: int = 10,
     **agent_kwargs: Any,
 ) -> Iterator[Agent]:
     """
@@ -512,6 +625,20 @@ def create_liaison_agent(
         verbose: Pass through to crewai.Agent for verbose logging.
         allow_delegation: Pass through to crewai.Agent. Default False because
             the liaison's role is narrow.
+        max_iter: Hard ceiling on the agent's reasoning iterations, forwarded to
+            crewai.Agent. Defaults to 10 -- well below CrewAI's own default of
+            25 (widely regarded as too high, since every iteration re-sends the
+            accumulated context, so a runaway costs 5-10x). This is a bounded
+            backstop, not headroom: the per-tool argument repair (e.g.
+            propose_todos title backfill) is the primary loop preventer, so the
+            cap only needs to stop pathological loops cheaply. 10 comfortably
+            covers a deterministic-driver Hello Integration (where this agent's
+            LLM is barely used). If you run the liaison as a PURE model-driven
+            agent that walks a full onboarding + task lifecycle in one task
+            (~15-18 sequential tool calls), raise this accordingly. Note it only
+            caps agents built by THIS factory; a crew that attaches AIMEAT tools
+            to its own agents via `liaison_tools()` sets max_iter on those
+            agents itself.
         **agent_kwargs: Any extra kwargs forwarded to crewai.Agent.
 
     Yields:
@@ -603,6 +730,7 @@ def create_liaison_agent(
             "tools": tools,
             "verbose": verbose,
             "allow_delegation": allow_delegation,
+            "max_iter": max_iter,
         }
         if llm is not None:
             agent_args["llm"] = llm
