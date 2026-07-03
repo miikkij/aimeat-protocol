@@ -1180,6 +1180,18 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           value: config.appHost,
           defaultVal: '',
         },
+        {
+          envVar: 'AIMEAT_PORTFOLIO_ORIGIN_ENABLED',
+          description: 'Serve published portfolios standalone at <username>.portfolio.<domain>. Requires DNS + wildcard TLS.',
+          value: config.portfolioOriginEnabled ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_PORTFOLIO_HOST',
+          description: 'Portfolio origin host (e.g. portfolio.example.com) used when the portfolio origin is enabled.',
+          value: config.portfolioHost,
+          defaultVal: '',
+        },
       ],
     },
     {

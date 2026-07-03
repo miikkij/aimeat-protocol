@@ -180,6 +180,8 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_GENERATOR_ENABLED: 'true',
   AIMEAT_APP_HOST: '',
   AIMEAT_APP_ORIGIN_ENABLED: 'false',
+  AIMEAT_PORTFOLIO_HOST: '',
+  AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -463,6 +465,8 @@ function generateEnvContent(settings: Record<string, string>): string {
       vars: [
         { key: 'AIMEAT_APP_ORIGIN_ENABLED', comment: 'Serve user apps from *.apps.<domain> to isolate them from your session. Requires DNS + wildcard TLS (see docs/internal/app-origin-deployment.md)' },
         { key: 'AIMEAT_APP_HOST', comment: 'App origin host, e.g. apps.example.com (required when AIMEAT_APP_ORIGIN_ENABLED=true)' },
+        { key: 'AIMEAT_PORTFOLIO_ORIGIN_ENABLED', comment: 'Serve published portfolios standalone at <username>.portfolio.<domain>. Requires DNS + wildcard TLS' },
+        { key: 'AIMEAT_PORTFOLIO_HOST', comment: 'Portfolio origin host, e.g. portfolio.example.com (required when AIMEAT_PORTFOLIO_ORIGIN_ENABLED=true)' },
       ],
     },
   ];
@@ -1770,6 +1774,39 @@ async function askAllAdvancedSettings(
       );
       settings.AIMEAT_APP_HOST = appHost.trim();
       settings.AIMEAT_APP_ORIGIN_ENABLED = 'true';
+    }
+
+    // ── Portfolio Origin ──
+    // Same isolation model for standalone published portfolios:
+    // <username>.portfolio.<domain>. Requires DNS + wildcard TLS.
+    const portfolioOriginEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.portfolioOrigin'),
+        initialValue: false,
+      }),
+      t,
+    );
+    if (portfolioOriginEnabled) {
+      let portfolioHostDefault = '';
+      try {
+        portfolioHostDefault = `portfolio.${new URL(baseUrl).hostname}`;
+      } catch {
+        portfolioHostDefault = '';
+      }
+      const portfolioHost = checkCancel(
+        await p.text({
+          message: t('init.portfolioHost'),
+          placeholder: portfolioHostDefault || 'portfolio.example.com',
+          ...(portfolioHostDefault ? { defaultValue: portfolioHostDefault } : {}),
+          validate: val => {
+            const v = val ?? portfolioHostDefault;
+            if (!v?.trim()) return t('init.portfolioHostRequired');
+          },
+        }),
+        t,
+      );
+      settings.AIMEAT_PORTFOLIO_HOST = portfolioHost.trim();
+      settings.AIMEAT_PORTFOLIO_ORIGIN_ENABLED = 'true';
     }
   }
 

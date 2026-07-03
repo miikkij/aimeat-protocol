@@ -207,13 +207,18 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
 
     // H-2 seamless SSO: the silent bridge page must be FRAMABLE by app origins (a hidden iframe
     // inside an app), so override the global X-Frame-Options: SAMEORIGIN and pin frame-ancestors
-    // to the app host family only (*.appHost). Never framable by anything else.
+    // to the app host family (*.appHost) — plus the portfolio host family when the portfolio
+    // origin is enabled (standalone portfolios use the same silent bridge for members data).
+    // Never framable by anything else.
     const appSilentPath = join(pwaStaticDir, 'app-silent.html');
-    if (config.appHost && existsSync(appSilentPath)) {
+    if ((config.appHost || (config.portfolioOriginEnabled && config.portfolioHost)) && existsSync(appSilentPath)) {
       let scheme = 'https';
       try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
-      const h = config.appHost;
-      const ancestors = `${scheme}://*.${h} ${scheme}://*.${h}:*`;
+      const families = [
+        ...(config.appHost ? [config.appHost] : []),
+        ...(config.portfolioOriginEnabled && config.portfolioHost ? [config.portfolioHost] : []),
+      ];
+      const ancestors = families.map(h => `${scheme}://*.${h} ${scheme}://*.${h}:*`).join(' ');
       app.get('/app-silent.html', (_req, res) => {
         const html = readFileSync(appSilentPath, 'utf-8');
         res.removeHeader('X-Frame-Options');

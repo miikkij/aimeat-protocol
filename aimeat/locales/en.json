@@ -4960,7 +4960,10 @@
     "appOrigin": "Serve user apps from a separate app origin (*.apps.<domain>) to isolate them from your session? Requires DNS + a wildcard TLS cert (see docs/internal/app-origin-deployment.md). Defaults to off.",
     "appHost": "App origin host (e.g. apps.example.com)",
     "appHostHint": "Set up DNS (apps.<domain> + wildcard *.apps.<domain>) and a wildcard TLS cert first, see docs/internal/app-origin-deployment.md",
-    "appHostRequired": "App host is required when app origin isolation is enabled"
+    "appHostRequired": "App host is required when app origin isolation is enabled",
+    "portfolioOrigin": "Serve published portfolios standalone at <username>.portfolio.<domain>? Requires DNS + a wildcard TLS cert (same setup as the app origin). Defaults to off.",
+    "portfolioHost": "Portfolio origin host (e.g. portfolio.example.com)",
+    "portfolioHostRequired": "Portfolio host is required when the portfolio origin is enabled"
   },
   "join": {
     "title": "Join AIMEAT Federation",
@@ -7200,6 +7203,9 @@
       "unpublish": "Unpublish",
       "unpublished": "Portfolio unpublished",
       "unpublishConfirm": "Unpublish your portfolio? The public page stops working until you publish again.",
+      "viewStandalone": "Own address",
+      "standaloneTarget": "Also served standalone at:",
+      "showBadge": "Show the aimeat.io badge on the standalone page",
       "customTypePlaceholder": "Describe what kind of portfolio you want…",
       "customGatePlaceholder": "Describe the custom auth-gated sections…",
       "backToProfile": "Profile",
@@ -7214,7 +7220,8 @@
       "notFoundDesc": "This user hasn't published a portfolio yet.",
       "loginToSeeMore": "Log in to see more content",
       "backToPortal": "Home",
-      "fullscreen": "Fullscreen"
+      "fullscreen": "Fullscreen",
+      "standalone": "Own address"
     }
   },
   "cli": {

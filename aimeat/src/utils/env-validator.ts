@@ -295,6 +295,15 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'error', variable: 'AIMEAT_APP_HOST', message: 'App origin isolation is enabled (AIMEAT_APP_ORIGIN_ENABLED=true) but AIMEAT_APP_HOST is empty. Set the app origin host (e.g. apps.example.com); it requires DNS + a wildcard TLS cert.' });
   }
 
+  // ── Portfolio Origin ──
+  const portfolioOriginEnabled = env.AIMEAT_PORTFOLIO_ORIGIN_ENABLED;
+  if (portfolioOriginEnabled !== undefined && portfolioOriginEnabled !== 'true' && portfolioOriginEnabled !== 'false') {
+    results.push({ level: 'error', variable: 'AIMEAT_PORTFOLIO_ORIGIN_ENABLED', message: `Invalid value "${portfolioOriginEnabled}". Must be "true" or "false".` });
+  }
+  if (portfolioOriginEnabled === 'true' && !env.AIMEAT_PORTFOLIO_HOST?.trim()) {
+    results.push({ level: 'error', variable: 'AIMEAT_PORTFOLIO_HOST', message: 'The portfolio origin is enabled (AIMEAT_PORTFOLIO_ORIGIN_ENABLED=true) but AIMEAT_PORTFOLIO_HOST is empty. Set the portfolio origin host (e.g. portfolio.example.com); it requires DNS + a wildcard TLS cert.' });
+  }
+
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────
   const fileSource = loadFileSource();
   if (fileSource) {

@@ -128,6 +128,19 @@ export interface AimeatConfig {
    * `*.appHost` are provisioned, so enabling it without infra can't break app serving.
    */
   appOriginEnabled: boolean;
+  /**
+   * Dedicated origin family for standalone published portfolios: a portfolio
+   * resolves at `<username>.portfolio.<apex>` as a top-level document (same
+   * isolation argument as the app origin — host-only cookies mean no visitor
+   * session exists there). Host form, e.g. `portfolio.aimeat.io`; empty when unset.
+   */
+  portfolioHost: string;
+  /**
+   * Feature flag for the portfolio origin. OFF until DNS/TLS/nginx for
+   * `*.portfolioHost` are provisioned; when off, standalone URLs are not
+   * advertised and the serve route stays inert.
+   */
+  portfolioOriginEnabled: boolean;
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;
@@ -539,6 +552,12 @@ function deriveAppHost(baseUrl: string): string {
   return `apps.${host}`;
 }
 
+/** Same derivation for the standalone-portfolio origin (`portfolio.<apexHost>`). */
+function derivePortfolioHost(baseUrl: string): string {
+  const appHost = deriveAppHost(baseUrl);
+  return appHost ? appHost.replace(/^apps\./, 'portfolio.') : '';
+}
+
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};
 
@@ -608,6 +627,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // from the baseUrl. Left empty for host-less baseUrls (so nothing breaks in dev).
     appHost: (process.env.AIMEAT_APP_HOST ?? deriveAppHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     appOriginEnabled: process.env.AIMEAT_APP_ORIGIN_ENABLED === 'true',
+    // Portfolio origin: explicit AIMEAT_PORTFOLIO_HOST wins; otherwise derive
+    // `portfolio.<apexHost>` from the baseUrl (empty for host-less baseUrls).
+    portfolioHost: (process.env.AIMEAT_PORTFOLIO_HOST ?? derivePortfolioHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
+    portfolioOriginEnabled: process.env.AIMEAT_PORTFOLIO_ORIGIN_ENABLED === 'true',
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
