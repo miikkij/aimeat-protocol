@@ -188,6 +188,41 @@ await test('7. after publish: object present, draft gone', async () => {
     assert(!(data.drafts?.note || []).some((d: any) => d.id === 'n1'), 'draft consumed');
 });
 
+await test('7b. agent write/publish → .latest owned by the GHII; read-dedup + collapse of a forked key', async () => {
+    const base = `${root()}.shared.notes.dedup1`;
+    const latestKey = encodeURIComponent(`${base}.latest`);
+    const ownerH = { Authorization: `Bearer ${A.ownerToken}` };
+    const agentH = { Authorization: `Bearer ${A.agentToken}` };
+    const wr = (title: string) => A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'dedup1', value: { title, body: 'x' } }, 1070);
+    const pub = () => A.client.call('aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'dedup1' }, 1071);
+
+    // Agent authors + publishes twice → .latest at version 2.
+    await wr('DDP-v1'); await pub(); await wr('DDP-v2'); await pub();
+
+    // .latest is owned by the member's GHII, not the agent's GAII: the owner (GHII) reads it, the agent does not.
+    const asOwner = await json(`/v1/memory/${latestKey}`, { headers: ownerH });
+    const asAgent = await json(`/v1/memory/${latestKey}`, { headers: agentH });
+    assert(asOwner.status === 200 && asOwner.body.data.value.title === 'DDP-v2', `.latest readable by owner (GHII), got ${asOwner.status}`);
+    assert(asAgent.status === 404, `.latest must NOT be owned by the agent GAII, got ${asAgent.status}`);
+    assert(asOwner.body.data.version === 2, `.latest at version 2, got ${asOwner.body.data.version}`);
+
+    // Seed a STALE forked copy of .latest under the agent GAII (raw same-owner memory write → version 1).
+    const seed = await json('/v1/memory', { method: 'POST', headers: agentH, body: JSON.stringify({ key: `${base}.latest`, value: { id: 'dedup1', title: 'DDP-STALE', body: 'x' }, visibility: 'private' }) });
+    assert(seed.status === 201, `seed fork ${seed.status}: ${JSON.stringify(seed.body.error)}`);
+    assert((await json(`/v1/memory/${latestKey}`, { headers: agentH })).status === 200, 'agent-owned fork seeded');
+
+    // Read-dedup: the workspace read surfaces the FRESHEST (v2), never the stale lower-version fork.
+    const wsRead = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: ownerH });
+    const ddp = (wsRead.body.data.objects.note as any[]).find((n: any) => n.id === 'dedup1');
+    assert(ddp?.title === 'DDP-v2', `read-dedup must return the freshest DDP-v2, got ${ddp?.title}`);
+
+    // Re-publish → collapse removes the agent-owned fork; one owner (the GHII) remains.
+    await wr('DDP-v3'); await pub();
+    assert((await json(`/v1/memory/${latestKey}`, { headers: agentH })).status === 404, 'agent-owned fork collapsed after publish');
+    const after = await json(`/v1/memory/${latestKey}`, { headers: ownerH });
+    assert(after.status === 200 && after.body.data.value.title === 'DDP-v3', `GHII .latest advanced to DDP-v3, got ${after.body.data.value.title}`);
+});
+
 await test('8. workspace_write creates a markdown document draft (document space, auto id)', async () => {
     const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'page', value: { title: 'Status', markdown: '# Status\nAll good.' } }, 108);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);

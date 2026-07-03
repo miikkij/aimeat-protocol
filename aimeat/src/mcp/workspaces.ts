@@ -128,22 +128,39 @@ export function registerWorkspaceTools(
         return m && m.status === 'active' ? null : 'Not an active member of this organism';
     }
 
-    /** Find an existing record at an EXACT key regardless of which same-owner identity owns it. Memory
-     *  is keyed by (ownerGaii, key), so rewriting under a different identity would create a DUPLICATE;
-     *  the writer reuses the existing record's owner instead. */
-    const findByKey = async (key: string): Promise<MemoryRecord | null> => {
-        const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-        return items.find(r => r.key === key) ?? null;
+    /** Pick the freshest of two records for the same key: higher version wins, then newer updatedAt.
+     *  Guards every workspace read/write against a key that has forked into duplicate-owner copies. */
+    const fresher = (a: MemoryRecord | null | undefined, b: MemoryRecord): MemoryRecord => {
+        if (!a) return b;
+        if (b.version !== a.version) return b.version > a.version ? b : a;
+        return (b.updatedAt ?? '') >= (a.updatedAt ?? '') ? b : a;
     };
-    /** Write content. A NEW record is authored by `owner` (defaults to the calling agent — attribution);
-     *  a rewrite preserves the existing record's owner so it doesn't fork into a duplicate. Pass
-     *  `owner: ownerGhii` for workspace META that should stay owned by the creator. */
-    const writeRecord = async (key: string, value: unknown, prev: MemoryRecord | null, owner: string = writerGaii): Promise<void> => {
+    /** Find the FRESHEST existing record at an EXACT key, whichever identity owns it. Memory is keyed by
+     *  (ownerGaii, key); a key ever written under two identities (a GHII and an agent GAII) has duplicate
+     *  copies — carry the freshest forward and collapse the rest (see collapseTo). */
+    const findByKey = async (key: string): Promise<MemoryRecord | null> => {
+        const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
+        return items.filter(r => r.key === key).reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
+    };
+    /** Delete every copy of `key` NOT owned by `keepOwner` — collapses a forked key back to one owner. */
+    const collapseTo = async (key: string, keepOwner: string): Promise<void> => {
+        const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
+        await Promise.all(items
+            .filter(r => r.key === key && r.ownerGaii !== keepOwner)
+            .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(() => { /* best-effort collapse */ })));
+    };
+    /** Write workspace CONTENT under the member's GHII — ONE owner per key, so a record never forks into
+     *  per-agent duplicates that the read path then has to disambiguate. Author/attribution is preserved
+     *  on the immutable `.version.N` records (writerGaii) and the activity timeline, so collapsing the
+     *  current-state owner onto the GHII costs no attribution. `owner` is overridable only for META that
+     *  must stay under a specific identity. A legacy copy under a different identity is collapsed away. */
+    const writeRecord = async (key: string, value: unknown, prev: MemoryRecord | null, owner: string = ownerGhii): Promise<void> => {
         const now = new Date().toISOString();
         await storage.setMemory({
-            key, ownerGaii: prev?.ownerGaii ?? owner, value, visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: null,
+            key, ownerGaii: owner, value, visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: null,
             version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
         });
+        if (prev && prev.ownerGaii !== owner) await collapseTo(key, owner);
     };
 
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
@@ -274,18 +291,21 @@ export function registerWorkspaceTools(
             for (const ot of manifest.objectTypes ?? []) {
                 if (!ot.namespace || !isMemoryBackedSpace(ot)) continue;
                 const nsPrefix = `${root}.${ot.namespace}.`;
-                const inst = new Map<string, { latest?: unknown; draft?: unknown }>();
+                // Keep the FRESHEST record per (instance, role): a key that forked into duplicate-owner
+                // copies (a GHII + a legacy agent GAII) must never surface the stale one. fresher() wins on
+                // higher version, then newer updatedAt.
+                const inst = new Map<string, { latest?: MemoryRecord; draft?: MemoryRecord }>();
                 for (const r of mine) {
                     if (!r.key.startsWith(nsPrefix)) continue;
                     const parts = r.key.slice(nsPrefix.length).split('.');
                     const role = parts.slice(1).join('.');
                     const slot = inst.get(parts[0]) ?? {};
-                    if (role === '' || role === 'latest') slot.latest = r.value;
-                    else if (role === 'draft') slot.draft = r.value;
+                    if (role === '' || role === 'latest') slot.latest = fresher(slot.latest, r);
+                    else if (role === 'draft') slot.draft = fresher(slot.draft, r);
                     inst.set(parts[0], slot);
                 }
                 const cur: unknown[] = []; const drf: unknown[] = [];
-                for (const s of inst.values()) { if (s.latest !== undefined) cur.push(s.latest); if (s.draft !== undefined) drf.push(s.draft); }
+                for (const s of inst.values()) { if (s.latest) cur.push(s.latest.value); if (s.draft) drf.push(s.draft.value); }
                 objects[ot.name] = cur;
                 if (drf.length) drafts[ot.name] = drf;
             }
@@ -383,7 +403,8 @@ export function registerWorkspaceTools(
             const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
             // The draft may have been written by a sibling agent of the same owner (shell/REST path
             // stores under the agent's own GAII), so accept any same-owner draft, not just ownerGhii's.
-            const draft = items.find(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)));
+            const draft = items.filter(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)))
+                .reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
             if (!draft) return fail(`No draft at ${base}.draft`);
             const valid = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
             if (!valid.valid) return fail('Draft does not match the schema: ' + JSON.stringify(valid.errors));
@@ -391,7 +412,7 @@ export function registerWorkspaceTools(
             for (const r of items) { if (r.key.startsWith(`${base}.version.`)) { const s = r.key.slice(`${base}.version.`.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); } }
             const now = new Date().toISOString();
             const tags = draft.tags ?? [];
-            const existingLatest = items.find(r => r.key === `${base}.latest`);
+            const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
             // Change-guard: an unchanged re-publish (a contract agent re-publishes the same draft on every
             // poll/status cycle) must NOT append a byte-identical .version.N. Consume the draft and return
             // without touching .latest or firing the Tracked-Response/structure side effects.
@@ -405,16 +426,20 @@ export function registerWorkspaceTools(
             const publishOt = (await readManifest(organism_id, ws))?.objectTypes?.find(o => o.namespace === namespace);
             const versioned = publishOt?.versioned !== false;
             const n = maxN + 1;
-            // The published version is attributed to the PUBLISHER (writerGaii). The .latest pointer
-            // preserves any existing record's owner so it doesn't fork into a duplicate (memory is keyed
-            // by (ownerGaii, key)); the per-publish author lives in the immutable .version.N records.
+            // Attribution: the immutable .version.N snapshot is authored by the PUBLISHER (writerGaii).
+            // The .latest pointer (current state) is owned by a member's GHII — ONE owner per key, so it
+            // never forks into per-agent duplicates that a read then has to disambiguate. Preserve the
+            // record's existing owner (normalised to their GHII — never a raw agent GAII); a brand-new
+            // record is owned by the caller's GHII. collapseTo removes any copy left under another identity.
+            const latestOwner = existingLatest ? `${bareOwner(existingLatest.ownerGaii)}@${config.nodeId}` : ownerGhii;
             if (versioned) await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
-            await storage.setMemory({ key: `${base}.latest`, ownerGaii: existingLatest?.ownerGaii ?? writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+            await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+            await collapseTo(`${base}.latest`, latestOwner);
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');
             // Memory Contracts (reactive): publishing a watched record (e.g. a bug → status:done)
             // fires Tracked Response evaluation. Gated O(1) on the track-registry in the subscriber.
-            emitMemoryWritten(existingLatest?.ownerGaii ?? writerGaii, `${base}.latest`);
+            emitMemoryWritten(latestOwner, `${base}.latest`);
             void updateOrganismStructure(storage, config, organism_id, { event: 'content published', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
             return ok({ published: base, version: n });
         });
@@ -428,11 +453,13 @@ export function registerWorkspaceTools(
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
             if (items.find(r => r.key === `${base}.draft`)) return fail(`A draft already exists at ${base}.draft — edit it directly instead of reopening.`);
-            // The published current state is .latest, or the bare key as fallback (mirrors the read).
-            const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
+            // The published current state is the FRESHEST .latest (guarding a forked key), or the bare key.
+            const latest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresher(best, r), null)
+                ?? items.find(r => r.key === base) ?? null;
             if (!latest) return fail(`No published record at ${base}.latest to reopen.`);
             const now = new Date().toISOString();
-            await storage.setMemory({ key: `${base}.draft`, ownerGaii: writerGaii, value: latest.value, visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+            // Draft (current-state) owned by the member's GHII — one owner per key (see writeRecord).
+            await storage.setMemory({ key: `${base}.draft`, ownerGaii: ownerGhii, value: latest.value, visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
             emitChange('organisms');
             return ok({ reopened: base });
         });
