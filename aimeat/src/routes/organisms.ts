@@ -110,6 +110,26 @@ function roleSatisfies(approverRole: string, membershipRole: string): boolean {
   return false;
 }
 
+/** Freshest of two records for the same key: higher version wins, then newer updatedAt. Guards workspace
+ *  reads/writes against a key that has forked into duplicate-owner copies (a GHII + a legacy agent GAII). */
+function fresherRec(a: MemoryRecord | null | undefined, b: MemoryRecord): MemoryRecord {
+  if (!a) return b;
+  if (b.version !== a.version) return b.version > a.version ? b : a;
+  return (b.updatedAt ?? '') >= (a.updatedAt ?? '') ? b : a;
+}
+/** The member GHII behind any identity: `agent#owner@node` → `owner@node`; a bare GHII is returned as-is.
+ *  Workspace current-state records (.draft/.latest) are owned by this so a key never forks per-agent. */
+function ownerGhiiOf(identity: string): string {
+  return identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity;
+}
+/** Delete every copy of `key` NOT owned by `keepOwner` — collapses a forked key back to a single owner. */
+async function collapseKeyTo(storage: Storage, key: string, keepOwner: string): Promise<void> {
+  const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
+  await Promise.all(items
+    .filter(r => r.key === key && r.ownerGaii !== keepOwner)
+    .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(() => { /* best-effort collapse */ })));
+}
+
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -1217,9 +1237,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         const instanceId = parts[0];
         const role = parts.slice(1).join('.');
         const slot = instances.get(instanceId) ?? {};
-        if (role === '') slot.bare = r;
-        else if (role === 'draft') slot.draft = r;
-        else if (role === 'latest') slot.latest = r;
+        // Keep the FRESHEST per (instance, role): a key forked into duplicate-owner copies (a GHII + a
+        // legacy agent GAII) must surface the current value, never a stale lower-version duplicate.
+        if (role === '') slot.bare = fresherRec(slot.bare, r);
+        else if (role === 'draft') slot.draft = fresherRec(slot.draft, r);
+        else if (role === 'latest') slot.latest = fresherRec(slot.latest, r);
         // role startsWith 'version.' → history, skip
         instances.set(instanceId, slot);
       }
@@ -1613,8 +1635,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
+    const ownerGhii = ownerGhiiOf(publisher);
     const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
-    const draft = items.find(r => r.key === `${base}.draft`);
+    const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
     if (!draft) return { ok: false, code: 'NO_DRAFT' };
 
     const validation = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
@@ -1631,7 +1654,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const now = new Date().toISOString();
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
-    const existingLatest = items.find(r => r.key === `${base}.latest`);
+    const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
@@ -1652,15 +1675,22 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       key: `${base}.version.${n}`, ownerGaii: publisher, value: draft.value,
       visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
+    // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
+    // per-agent duplicates a read then has to disambiguate. Preserve the record's existing owner
+    // (normalised to their GHII — never a raw agent GAII); a brand-new record is owned by the publisher's
+    // GHII. The immutable .version.N above keeps the publisher's attribution. collapseKeyTo removes any
+    // copy of .latest left under another identity.
+    const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
     await storage.setMemory({
-      key: `${base}.latest`, ownerGaii: publisher, value: draft.value,
+      key: `${base}.latest`, ownerGaii: latestOwner, value: draft.value,
       visibility: vis, tags, ttlHours: null,
       version: (existingLatest?.version ?? 0) + 1,
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
     });
+    await collapseKeyTo(storage, `${base}.latest`, latestOwner);
     // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
     // (gated O(1) on the track-registry in the subscriber).
-    emitMemoryWritten(publisher, `${base}.latest`);
+    emitMemoryWritten(latestOwner, `${base}.latest`);
     // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.)
