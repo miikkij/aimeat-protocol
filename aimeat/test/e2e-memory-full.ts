@@ -13,6 +13,9 @@
  *     search?prefix scoping, export, import (skip/overwrite/rename), and bulk-delete by prefix.
  *   v1.5.0 — 2026-07-03 — 'members' visibility: write accepted, anonymous public-route read
  *     404s, authenticated other-owner read succeeds.
+ *   v1.6.0 — 2026-07-03 — POST /v1/memory/bundle (collection ZIP export): happy path returns a real
+ *     application/zip attachment containing the memory + file entries and a manifest; failure modes
+ *     cover empty items (400), only-not-owned items (404), and missing auth (401).
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -911,6 +914,51 @@ await test('cleanup second owner', async () => {
         headers: { Authorization: `Bearer ${owner2Token}` },
     });
     assert(status === 200, `delete owner2 status ${status}`);
+});
+
+// ═══════════════════════════════════════════════════════
+// Collection bundle — ZIP export of selected memory entries + storage files
+// ═══════════════════════════════════════════════════════
+console.log('\n13. POST /v1/memory/bundle — collection ZIP export');
+
+await test('Bundle setup: a memory entry + a storage file', async () => {
+    const m = await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'bundle.note', value: { hi: 'there' }, visibility: 'private' }) });
+    assert(m.status === 201, `mem ${m.status}: ${JSON.stringify(m.body)}`);
+    const f = await json('/v1/memory/files', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'bundle/report.txt', content: Buffer.from('hello bundle').toString('base64'), mime_type: 'text/plain', visibility: 'private' }) });
+    assert(f.status === 201, `file ${f.status}: ${JSON.stringify(f.body)}`);
+});
+
+await test('Bundle returns a real ZIP with both entries (application/zip attachment, PK magic)', async () => {
+    const res = await fetch(`${BASE}/v1/memory/bundle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth1() },
+        body: JSON.stringify({ items: [{ kind: 'memory', key: 'bundle.note' }, { kind: 'file', key: 'bundle/report.txt' }] }),
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') || '').includes('application/zip'), `content-type: ${res.headers.get('content-type')}`);
+    assert((res.headers.get('content-disposition') || '').includes('attachment'), 'attachment disposition');
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert(buf.length > 0, 'empty zip');
+    assert(buf[0] === 0x50 && buf[1] === 0x4B, `not a zip (magic ${buf[0]},${buf[1]})`); // 'PK'
+    // ZIP entry names are stored uncompressed in the archive, so they appear verbatim in the bytes.
+    assert(buf.includes(Buffer.from('memory/bundle.note.json')), 'memory entry present');
+    assert(buf.includes(Buffer.from('files/bundle/report.txt')), 'file entry present');
+    assert(buf.includes(Buffer.from('manifest.json')), 'manifest present');
+});
+
+await test('Bundle rejects empty items (400)', async () => {
+    const { status } = await json('/v1/memory/bundle', { method: 'POST', headers: auth1(), body: JSON.stringify({ items: [] }) });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('Bundle of only not-owned items returns 404', async () => {
+    const { status } = await json('/v1/memory/bundle', { method: 'POST', headers: auth1(), body: JSON.stringify({ items: [{ kind: 'memory', key: 'bundle.note', owner_gaii: 'stranger#nobody@' + NODE_ID }] }) });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('Bundle without auth returns 401', async () => {
+    const { status } = await json('/v1/memory/bundle', { method: 'POST', body: JSON.stringify({ items: [{ kind: 'memory', key: 'bundle.note' }] }) });
+    assert(status === 401, `expected 401, got ${status}`);
 });
 
 // ═══════════════════════════════════════════════════════

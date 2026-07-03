@@ -95,6 +95,27 @@ export async function importMemory(entries, mode, agentGaii) {
 }
 
 /**
+ * Download a ZIP bundle of selected memory entries + storage files (the "collection cart").
+ * @param {Array<{ kind: 'memory'|'file', key: string, owner_gaii?: string }>} items
+ * @returns {Promise<Blob>} the ZIP blob (throws on a non-2xx response).
+ */
+export async function bundleCollection(items) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (window.AIMEAT?.auth?.hasSession) {
+    const s = window.AIMEAT.auth.getSession();
+    if (s?.jwt) headers['Authorization'] = 'Bearer ' + s.jwt;
+  }
+  const base = typeof window !== 'undefined' ? window.location.origin : '';
+  const resp = await fetch(`${base}/v1/memory/bundle`, { method: 'POST', headers, body: JSON.stringify({ items }) });
+  if (!resp.ok) {
+    let msg = String(resp.status);
+    try { const j = await resp.json(); msg = j?.error?.message || msg; } catch { /* non-JSON */ }
+    throw new Error(msg);
+  }
+  return resp.blob();
+}
+
+/**
  * Bulk-delete memory entries by prefix and/or an explicit key list. Returns envelope ({ data: { deleted } }).
  * @param {{ prefix?: string, keys?: string[], agentGaii?: string }} [opts]
  */

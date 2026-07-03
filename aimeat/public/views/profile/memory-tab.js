@@ -3,6 +3,19 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v2.6.0 — 2026-07-03 — Collection cart: gather memory entries + files (per-row 🛒 toggles, bulk
+ *     "add to collection", localStorage-persisted per owner) into a tray that exports three ways —
+ *     a copyable/downloadable URL list, a ZIP bundle (POST /v1/memory/bundle), or attaching the items
+ *     as pointer Sources on an organism workspace (reusing saveWorkspaceSources).
+ *   v2.5.0 — 2026-07-03 — Files discoverability + preview: (1) a name/tag/type search box in the
+ *     Files sub-tab (client-side over the loaded list); (2) a universal in-browser preview modal
+ *     (image/pdf/video/audio/text) — blob-fetched so PRIVATE files preview too, with an "Open in
+ *     new tab" that uses the shareable /v1/pub URL for public files and a transient object URL for
+ *     private ones; the image thumbnail is click-to-preview. (3) Thumbnail/preview/download now
+ *     fetch via the owner_gaii-aware URL (fileBytesUrl: /v1/pub for public files, auth route for
+ *     own files, with a /v1/pub fallback) — the Files list aggregates AGENT-owned files but the
+ *     caller-scoped auth route 404s them, so agent-owned (e.g. app-generated) files now load.
+ *     Entries: a per-entry "Copy value" button (canonical <CopyButton>) in the expanded detail.
  *   v2.3.0 — 2026-07-03 — 'members' visibility (readable by any logged-in node user)
  *     selectable in all visibility pickers (popover, detail select, bulk bar,
  *     create form, edit modal).
@@ -67,7 +80,7 @@ import { listPeers } from '/js/services/federation.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { listGroups } from '/js/services/sharing-groups.js';
-import { listOrganisms } from '/js/services/organisms.js';
+import { listOrganisms, listWorkspaces, getWorkspaceSources, saveWorkspaceSources, currentGhii } from '/js/services/organisms.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
 import { Modal, useConfirm } from '/components/Modal.js';
@@ -99,6 +112,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [filterText, setFilterText] = useState('');
   const [memArchived, setMemArchived] = useState(false); // false = active working set, true = archived-only view
   const [orgNames, setOrgNames] = useState({});         // organism uuid → display name
+  // Collection "cart": gather memory entries + files across sub-tabs, then export (URL list / ZIP /
+  // send to a workspace's Sources). Persisted in localStorage per owner so it survives reloads.
+  const cartStoreKey = `aimeat.mem.cart.${session?.owner || 'anon'}`;
+  const [cart, setCart] = useState(() => {
+    try { const raw = localStorage.getItem(`aimeat.mem.cart.${session?.owner || 'anon'}`); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : []; } catch { return []; }
+  });
+  const [cartOrgs, setCartOrgs] = useState([]);         // organisms the user can send a collection into
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem('aimeat.mem.groups.collapsed') || '[]')); } catch { return new Set(); }
   });
@@ -138,11 +158,37 @@ export default function MemoryTab({ session, showToast, onStats }) {
   async function loadOrgNames() {
     try {
       const resp = await listOrganisms({ member: session.owner });
+      const orgs = resp?.data?.organisms || [];
       const map = {};
-      for (const o of (resp?.data?.organisms || [])) map[o.id] = o.name;
+      for (const o of orgs) map[o.id] = o.name;
       setOrgNames(map);
+      setCartOrgs(orgs.map(o => ({ id: o.id, name: o.name })));
     } catch { /* names are a nicety — ids still render */ }
   }
+
+  // ── Collection cart ───────────────────────────────────────────────────────
+  // Persist on every change so the cart survives reloads (and cross-tab within the same owner).
+  useEffect(() => {
+    try { localStorage.setItem(cartStoreKey, JSON.stringify(cart)); } catch { /* quota/private mode — cart is best-effort */ }
+  }, [cart, cartStoreKey]);
+
+  const cartIdOf = (it) => `${it.kind}:${it.ownerGaii || ''}:${it.key}`;
+  const inCart = (it) => cart.some(c => cartIdOf(c) === cartIdOf(it));
+  const toggleCartItem = (it) => setCart(prev => prev.some(c => cartIdOf(c) === cartIdOf(it))
+    ? prev.filter(c => cartIdOf(c) !== cartIdOf(it))
+    : [...prev, it]);
+  const addCartItems = (items) => setCart(prev => {
+    const have = new Set(prev.map(cartIdOf));
+    const fresh = items.filter(it => !have.has(cartIdOf(it)));
+    return fresh.length ? [...prev, ...fresh] : prev;
+  });
+  const removeCartItem = (id) => setCart(prev => prev.filter(c => cartIdOf(c) !== id));
+  const clearCart = () => setCart([]);
+
+  // Cart item builders: memory entries carry the owner GAII (list value, selected agent, or GHII)
+  // so the bundle/URL/source export can address each key in the right keyspace.
+  const memCartItem = (m) => ({ kind: 'memory', key: m.key, ownerGaii: m.owner_gaii || selectedAgent || currentGhii(), label: m.key });
+  const fileCartItem = (f) => ({ kind: 'file', key: f.key || f.name, ownerGaii: f.owner_gaii || currentGhii(), label: f.key || f.name, mime: f.mime_type });
 
   function toggleGroupCollapsed(id) {
     setCollapsedGroups(prev => {
@@ -282,6 +328,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   // The effective value for a row: from the full list, the lazy cache, or undefined (still loading).
   const valueOf = (m) => (fullLoaded ? m.value : valueCache[m.key]);
+
+  // Clipboard text for a single entry's value: pretty JSON for objects, the raw string otherwise.
+  // Empty string when the value isn't loaded yet (the Copy-value button is hidden in that case).
+  const valueCopyText = (m) => {
+    const v = valueOf(m);
+    if (v === undefined) return '';
+    return (typeof v === 'object' && v !== null) ? JSON.stringify(v, null, 2) : String(v ?? '');
+  };
 
   // Server-side content search (key + value + tags), optionally scoped to a namespace/group prefix.
   async function runServerSearch(query, prefix) {
@@ -451,16 +505,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     });
   }
 
-  async function handleDownloadFile(key) {
+  // Download works on the owner_gaii-aware URL (with a /v1/pub fallback) so agent-owned files —
+  // which the list aggregates but the caller-scoped auth route 404s — download too.
+  async function handleDownloadFile(f) {
+    const key = typeof f === 'string' ? f : (f.key || f.name);
+    const fileObj = typeof f === 'string' ? { key } : f;
     try {
-      const headers = /** @type {Record<string,string>} */ ({});
-      if (window.AIMEAT?.auth?.hasSession) {
-        const session = window.AIMEAT.auth.getSession();
-        if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
-      }
-      const resp = await fetch(`${NODE_URL}/v1/memory/files/${encodeURIComponent(key)}`, { headers });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const blob = await resp.blob();
+      const blob = await fetchFileBytes(fileObj, NODE_URL);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -708,6 +759,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
             onClick=${(e) => { e.stopPropagation(); setVisPopoverFor(visPopoverFor === m.key ? null : m.key); }} />
           ${keyHasRules(m.key) && html`<span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️</span>`}
           ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
+          <button class="mem-cart-btn ${inCart(memCartItem(m)) ? 'mem-cart-btn--on' : ''}"
+            title=${inCart(memCartItem(m)) ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}
+            onClick=${(e) => { e.stopPropagation(); toggleCartItem(memCartItem(m)); }}>🛒</button>
         </div>
         ${visPopoverFor === m.key && html`
           <div class="mem-vis-pop" onClick=${(e) => e.stopPropagation()}>
@@ -777,6 +831,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
             `}
             <div class="mem-actions">
               <button class="btn-sm" onClick=${() => { const v = valueOf(m); setEditModal({ key: m.key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null }); }}>${t('profile.memory.editBtn')}</button>
+              ${valueOf(m) !== undefined && html`<${CopyButton}
+                text=${valueCopyText(m)}
+                label=${'\u{1F4CB} ' + (t('profile.memory.copyValue') || 'Copy value')}
+                className="btn-outline btn-sm"
+                onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />`}
               ${fedConsents[m.key]
                 ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
                     onClick=${() => handleStopSharing(m.key)}>
@@ -869,6 +928,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
             ${groups.map(grp => html`<option key=${grp.id} value=${'group:' + grp.id}>${t('knowledge.visibility.group')}: ${grp.name}</option>`)}
           </select>
           <button class="btn-outline btn-sm" onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}</button>
+          <button class="btn-outline btn-sm" onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>🛒 ${t('profile.memory.cartAddSelected') || 'Add to collection'}</button>
           <button class="btn-danger btn-sm" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}</button>
           <button class="btn-ghost btn-sm" onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}</button>
         </div>
@@ -910,6 +970,22 @@ export default function MemoryTab({ session, showToast, onStats }) {
   };
 
   const [fileTagFilter, setFileTagFilter] = useState(new Set());
+  const [fileFilterText, setFileFilterText] = useState('');
+  const [previewFile, setPreviewFile] = useState(null);   // file being previewed in the lightbox modal
+
+  // Public, no-auth file URL (mirrors memory's /v1/memory/:gaii/:key public read):
+  // GET /v1/pub/:owner/:key serves the bytes when visibility==='public', so the copied link is
+  // embeddable anywhere (<img src>, a new tab, a chat). Keeps slashes in keys literal for the
+  // wildcard route; only encodes per-segment. Falls back to the legacy authenticated URL if the
+  // list response predates owner_gaii (server needs a restart). At component scope so the Files
+  // list AND the preview modal share one definition.
+  const fileUrl = (f) => {
+    const owner = f.owner_gaii;
+    const keyPath = String(f.key || f.name).split('/').map(encodeURIComponent).join('/');
+    return owner
+      ? `${NODE_URL}/v1/pub/${encodeURIComponent(owner)}/${keyPath}`
+      : `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`;
+  };
 
   const renderFilesList = () => {
     if (!files) return html`<${Spinner} text=${t('profile.files.loading')} />`;
@@ -920,10 +996,16 @@ export default function MemoryTab({ session, showToast, onStats }) {
       if (f.tags) for (const tag of f.tags) allTags.add(tag);
     }
 
-    // Filter files by selected tags
-    const filtered = fileTagFilter.size === 0 ? files : files.filter(f =>
-      f.tags && [...fileTagFilter].every(tag => f.tags.includes(tag))
-    );
+    // Filter by selected tags AND the live name/type search (filename, mime type, tags).
+    const ftText = fileFilterText.trim().toLowerCase();
+    const filtered = files.filter(f => {
+      if (fileTagFilter.size > 0 && !(f.tags && [...fileTagFilter].every(tag => f.tags.includes(tag)))) return false;
+      if (!ftText) return true;
+      if (String(f.key || f.name || '').toLowerCase().includes(ftText)) return true;
+      if (f.mime_type && f.mime_type.toLowerCase().includes(ftText)) return true;
+      if (f.tags && f.tags.some(tag => tag.toLowerCase().includes(ftText))) return true;
+      return false;
+    });
 
     const toggleTag = (tag) => {
       setFileTagFilter(prev => {
@@ -933,18 +1015,6 @@ export default function MemoryTab({ session, showToast, onStats }) {
       });
     };
 
-    // Public, no-auth file URL (mirrors memory's /v1/memory/:gaii/:key public read):
-    // GET /v1/pub/:owner/:key serves the bytes when visibility==='public', so the copied
-    // link is embeddable anywhere (<img src>, another site, a chat). Keeps slashes in keys
-    // literal for the wildcard route; only encodes per-segment. Falls back to the legacy
-    // authenticated URL if the list response predates owner_gaii (server needs a restart).
-    const fileUrl = (f) => {
-      const owner = f.owner_gaii;
-      const keyPath = String(f.key || f.name).split('/').map(encodeURIComponent).join('/');
-      return owner
-        ? `${NODE_URL}/v1/pub/${encodeURIComponent(owner)}/${keyPath}`
-        : `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`;
-    };
     const fileUrls = filtered.map(fileUrl).join('\n');
 
     return html`
@@ -958,20 +1028,26 @@ export default function MemoryTab({ session, showToast, onStats }) {
           onCopied=${() => showToast(t('profile.files.urlsCopied') || `${filtered.length} URLs copied`)} />`}
         <span class="text-meta-sm">${t('profile.files.sizeLimit')}</span>
       </div>
+      <div class="search-bar mem-file-search mb-half">
+        <input type="text" class="input-field" placeholder=${t('profile.files.searchPlaceholder') || 'Search files by name, tag, or type…'}
+          value=${fileFilterText} onInput=${e => setFileFilterText(e.target.value)} />
+        ${fileFilterText && html`<button class="btn-ghost btn-sm" onClick=${() => setFileFilterText('')}>✕</button>`}
+      </div>
       <${TagCloud} tags=${[...allTags]} selected=${fileTagFilter} onToggle=${toggleTag} onClear=${() => setFileTagFilter(new Set())} />
       ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} />`}
       ${filtered.length === 0
-        ? html`<div class="empty">${files.length > 0 ? (t('profile.files.noMatch') || 'No files match selected tags') : t('profile.files.empty')}</div>`
+        ? html`<div class="empty">${files.length === 0 ? t('profile.files.empty') : (t('profile.files.noMatchSearch') || t('profile.files.noMatch') || 'No files match')}</div>`
         : html`<div class="file-grid">
             ${filtered.map(f => {
               const fKey = f.key || f.name;
               const isImage = f.mime_type?.startsWith('image');
+              const cat = fileCategory(f.mime_type, fKey);
               const vis = f.visibility || 'private';
               return html`
                 <div class="file-card">
                   ${isImage
-                    ? html`<${AuthImage} class="file-thumb" src="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" alt=${escHtml(fKey)} />`
-                    : html`<div class="file-icon">${f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}'}</div>`
+                    ? html`<${AuthImage} class="file-thumb pf-clickable" src=${fileBytesUrl(f, NODE_URL)} alt=${fKey} title=${t('profile.files.preview') || 'Preview'} onClick=${() => setPreviewFile(f)} />`
+                    : html`<div class="file-icon pf-clickable" title=${t('profile.files.preview') || 'Preview'} onClick=${() => setPreviewFile(f)}>${categoryIcon(cat)}</div>`
                   }
                   <div class="file-info">
                     <div class="file-name">${escHtml(fKey)}</div>
@@ -993,13 +1069,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       `}
                   </div>
                   <div class="file-actions">
+                    <button class="btn-outline btn-sm ${inCart(fileCartItem(f)) ? 'mem-cart-btn--on' : ''}"
+                      title=${inCart(fileCartItem(f)) ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}
+                      onClick=${() => toggleCartItem(fileCartItem(f))}>🛒</button>
+                    <button class="btn-outline btn-sm" title=${t('profile.files.preview') || 'Preview'} onClick=${() => setPreviewFile(f)}>${'\u{1F441}️'} ${t('profile.files.preview') || 'Preview'}</button>
                     <${CopyButton}
                       text=${fileUrl(f)}
                       label=${`\u{1F517} ${t('profile.files.copyUrl') || 'Copy URL'}`}
                       title=${t('profile.files.copyUrl') || 'Copy URL'}
                       className="btn-outline btn-sm"
                       onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied to clipboard')} />
-                    <button class="btn-outline btn-sm" onClick=${() => handleDownloadFile(fKey)}>${t('profile.files.download')}</button>
+                    <button class="btn-outline btn-sm" onClick=${() => handleDownloadFile(f)}>${t('profile.files.download')}</button>
                     <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteFile(fKey)}>${t('profile.files.delete')}</button>
                   </div>
                 </div>`;
@@ -1326,6 +1406,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
         <button class="sub-tab ${memSubTab === 'files' ? 'active' : ''}" onClick=${() => setMemSubTab('files')}>${t('profile.memory.files')}</button>
       </div>
+      ${cart.length > 0 && html`<${CartTray} cart=${cart} nodeUrl=${NODE_URL} orgs=${cartOrgs} onRemove=${removeCartItem} onClear=${clearCart} showToast=${showToast} />`}
       ${memSubTab === 'entries' ? renderEntries() : renderFilesList()}
     `}
 
@@ -1338,6 +1419,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
       groups=${groups}
       onSave=${(v, vis, ver, gId) => handleSaveEdit(editModal.key, v, vis, ver, gId)}
       onCancel=${() => setEditModal(null)} />`}
+    ${previewFile && html`<${FilePreviewModal}
+      file=${previewFile}
+      nodeUrl=${NODE_URL}
+      onClose=${() => setPreviewFile(null)}
+      onDownload=${handleDownloadFile}
+      showToast=${showToast} />`}
     <${ConfirmUI} />
   `;
 }
@@ -1360,6 +1447,120 @@ function DiscoverPreview({ ownerGaii, memKey }) {
   const text = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value || '');
   const truncated = text.length > 2000 ? text.slice(0, 2000) + '\n...' : text;
   return html`<div class="mem-discover-preview"><pre>${truncated}</pre></div>`;
+}
+
+// Collection cart tray — lists gathered memory entries + files and exports them three ways:
+// a copyable/downloadable URL list, a ZIP bundle (POST /v1/memory/bundle), or attaching them as
+// pointer Sources on an organism workspace (reusing the Sources model — nothing is copied there).
+function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) {
+  const [open, setOpen] = useState(true);
+  const [zipping, setZipping] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendOrg, setSendOrg] = useState('');
+  const [sendWs, setSendWs] = useState('');
+  const [workspaces, setWorkspaces] = useState([]);
+  const [sending, setSending] = useState(false);
+
+  const idOf = (it) => `${it.kind}:${it.ownerGaii || ''}:${it.key}`;
+  const urlOf = (it) => it.kind === 'file'
+    ? `${nodeUrl}/v1/pub/${encodeURIComponent(it.ownerGaii)}/${encKeyPath(it.key)}`
+    : `${nodeUrl}/v1/memory/${encodeURIComponent(it.ownerGaii)}/${encodeURIComponent(it.key)}`;
+  const urlList = cart.map(urlOf).join('\n');
+
+  const downloadBlob = (blob, name) => {
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(u);
+  };
+  const downloadText = () => downloadBlob(new Blob([urlList], { type: 'text/plain' }), 'aimeat-collection-urls.txt');
+  const downloadZip = async () => {
+    setZipping(true);
+    try {
+      const blob = await memoryService.bundleCollection(cart.map(it => ({ kind: it.kind, key: it.key, owner_gaii: it.ownerGaii })));
+      downloadBlob(blob, 'aimeat-collection.zip');
+      showToast(t('profile.memory.cartZipDone') || 'Collection downloaded');
+    } catch (e) {
+      showToast((t('profile.memory.cartZipError') || 'Bundle failed') + (e.message ? ': ' + e.message : ''), true);
+    } finally { setZipping(false); }
+  };
+
+  const pickOrg = async (orgId) => {
+    setSendOrg(orgId); setSendWs(''); setWorkspaces([]);
+    if (!orgId) return;
+    try { setWorkspaces(await listWorkspaces(orgId)); } catch { setWorkspaces([]); }
+  };
+  // Cart item → workspace Source pointer (files are type 'storage'; see sources-panel.js).
+  const sourceOf = (it) => it.kind === 'file'
+    ? { type: 'storage', key: it.key, ownerGaii: it.ownerGaii, label: it.label || it.key, mime: it.mime, external: false }
+    : { type: 'memory', key: it.key, ownerGaii: it.ownerGaii, label: it.label || it.key, external: false };
+  const srcKeyOf = (s) => `${s.type}:${s.ownerGaii || ''}|${s.key || ''}`;
+  const sendToWorkspace = async () => {
+    if (!sendOrg || !sendWs) return;
+    setSending(true);
+    try {
+      const existing = await getWorkspaceSources(sendOrg, sendWs);
+      const have = new Set(existing.map(srcKeyOf));
+      const additions = [];
+      for (const it of cart) {
+        const src = sourceOf(it);
+        if (have.has(srcKeyOf(src))) continue;
+        have.add(srcKeyOf(src));
+        additions.push({ id: 's-' + Math.random().toString(36).slice(2, 9), addedAt: new Date().toISOString(), ...src });
+      }
+      if (additions.length === 0) { showToast(t('profile.memory.cartSourcesExist') || 'All items already attached to that workspace'); return; }
+      const r = await saveWorkspaceSources(sendOrg, sendWs, [...existing, ...additions]);
+      if (r?.ok === false) { showToast(r.error?.message || t('profile.error'), true); return; }
+      showToast((t('profile.memory.cartSourcesAdded') || 'Added {n} sources to the workspace').replace('{n}', String(additions.length)));
+      setSendOpen(false);
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
+    finally { setSending(false); }
+  };
+
+  return html`
+    <div class="mem-cart">
+      <div class="mem-cart-head" role="button" tabindex="0" onClick=${() => setOpen(o => !o)}>
+        <span class="mem-cart-title">🛒 ${t('profile.memory.cartTitle') || 'Collection'} <span class="mem-cart-count">${cart.length}</span></span>
+        <span class="mem-cart-head-actions">
+          <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
+          <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); onClear(); }}>${t('profile.memory.cartClear') || 'Clear'}</button>
+        </span>
+      </div>
+      ${open && html`
+        <div class="mem-cart-body">
+          <div class="mem-cart-list">
+            ${cart.map(it => html`
+              <div class="mem-cart-item" key=${idOf(it)}>
+                <span class="mem-cart-item-icon">${it.kind === 'file' ? '📎' : '🧠'}</span>
+                <span class="mem-cart-item-label" title=${it.key}>${it.label || it.key}</span>
+                <button class="pj-icon-btn" title=${t('profile.memory.cartRemove') || 'Remove from collection'} onClick=${() => onRemove(idOf(it))}>✕</button>
+              </div>`)}
+          </div>
+          <div class="mem-cart-actions">
+            <${CopyButton} text=${urlList} label=${'📋 ' + (t('profile.memory.cartCopyUrls') || 'Copy URL list')}
+              className="btn-outline btn-sm" onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')} />
+            <button class="btn-outline btn-sm" onClick=${downloadText}>⬇ ${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}</button>
+            <button class="btn-outline btn-sm" disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : '⬇ ' + (t('profile.memory.cartDownloadZip') || 'Download ZIP')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}</button>
+          </div>
+          ${sendOpen && html`
+            <div class="mem-cart-send">
+              ${(orgs || []).length === 0
+                ? html`<span class="text-meta-sm">${t('profile.memory.cartNoOrgs') || 'You are not in any organism workspaces yet.'}</span>`
+                : html`
+                  <select class="input-field mem-vis-select" value=${sendOrg} onChange=${e => pickOrg(e.target.value)}>
+                    <option value="">${t('profile.memory.cartPickOrg') || 'Choose organism…'}</option>
+                    ${(orgs || []).map(o => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
+                  </select>
+                  <select class="input-field mem-vis-select" value=${sendWs} disabled=${!sendOrg} onChange=${e => setSendWs(e.target.value)}>
+                    <option value="">${t('profile.memory.cartPickWs') || 'Choose workspace…'}</option>
+                    ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${w.name || w.id}</option>`)}
+                  </select>
+                  <button class="btn-primary btn-sm" disabled=${!sendWs || sending} onClick=${sendToWorkspace}>${sending ? '…' : (t('profile.memory.cartSendBtn') || 'Add as sources')}</button>`}
+            </div>`}
+        </div>`}
+    </div>`;
 }
 
 function MemoryForm({ onSave, onCancel, groups }) {
@@ -1408,6 +1609,156 @@ function fileIcon(type) {
   if (type?.startsWith('image')) return '\u{1F5BC}\uFE0F';
   if (type?.includes('pdf')) return '\u{1F4C4}';
   return '\u{1F4CE}';
+}
+
+// Extensions treated as text when the upload's mime is a generic octet-stream.
+const TEXT_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'xml', 'yml', 'yaml',
+  'js', 'mjs', 'ts', 'jsx', 'tsx', 'css', 'html', 'htm', 'py', 'sh', 'ini', 'conf', 'toml', 'sql']);
+const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif', 'svg']);
+const VIDEO_EXT = new Set(['mp4', 'webm', 'ogv', 'mov', 'mkv']);
+const AUDIO_EXT = new Set(['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac']);
+
+// Which preview element a file gets. Prefers the mime type; falls back to the key's
+// extension for generic octet-stream uploads. 'other' \u2192 no inline preview (download only).
+function fileCategory(mime, key) {
+  const m = (mime || '').toLowerCase();
+  if (m.startsWith('image/')) return 'image';
+  if (m === 'application/pdf') return 'pdf';
+  if (m.startsWith('video/')) return 'video';
+  if (m.startsWith('audio/')) return 'audio';
+  if (m.startsWith('text/') || m === 'application/json' || m === 'application/xml'
+    || m === 'application/javascript' || m.endsWith('+json') || m.endsWith('+xml')) return 'text';
+  const ext = (key || '').split('.').pop()?.toLowerCase() || '';
+  if (IMAGE_EXT.has(ext)) return 'image';
+  if (ext === 'pdf') return 'pdf';
+  if (VIDEO_EXT.has(ext)) return 'video';
+  if (AUDIO_EXT.has(ext)) return 'audio';
+  if (TEXT_EXT.has(ext)) return 'text';
+  return 'other';
+}
+
+function categoryIcon(cat) {
+  switch (cat) {
+    case 'image': return '\u{1F5BC}\uFE0F';
+    case 'pdf': return '\u{1F4C4}';
+    case 'video': return '\u{1F3AC}';
+    case 'audio': return '\u{1F3B5}';
+    case 'text': return '\u{1F4DD}';
+    default: return '\u{1F4CE}';
+  }
+}
+
+// Authenticated blob fetch \u2014 browser <img>/<video>/<a> can't attach the JWT, so private files
+// are fetched with the session token and shown from an object URL (the AuthImage pattern).
+async function fetchFileBlob(url) {
+  const headers = /** @type {Record<string,string>} */ ({});
+  if (window.AIMEAT?.auth?.hasSession) {
+    const s = window.AIMEAT.auth.getSession();
+    if (s?.jwt) headers['Authorization'] = 'Bearer ' + s.jwt;
+  }
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) throw new Error(String(resp.status));
+  return resp.blob();
+}
+
+// Per-segment encode — keeps slashes literal for the /v1/pub wildcard route (keys like images/x.png).
+const encKeyPath = (k) => String(k || '').split('/').map(encodeURIComponent).join('/');
+
+// Best single URL to fetch a file's bytes. The Files list AGGREGATES the owner's own GHII files AND
+// every agent's files, but the auth route GET /v1/memory/files/:key is scoped to the CALLER's
+// resolved gaii — so an agent-owned file 404s there. Public files therefore go through the
+// owner_gaii-aware /v1/pub route (serves any owner's public bytes); everything else uses the auth
+// route, which serves the caller's own GHII files (incl. private, no consent needed).
+function fileBytesUrl(f, nodeUrl) {
+  return (f.visibility === 'public' && f.owner_gaii)
+    ? `${nodeUrl}/v1/pub/${encodeURIComponent(f.owner_gaii)}/${encKeyPath(f.key || f.name)}`
+    : `${nodeUrl}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`;
+}
+
+// Fetch a file's bytes with a fallback: try the primary URL, then the owner_gaii /v1/pub route (with
+// the JWT for consented reads). Covers own GHII files, public agent-owned files, and consented ones.
+async function fetchFileBytes(f, nodeUrl) {
+  const primary = fileBytesUrl(f, nodeUrl);
+  try { return await fetchFileBlob(primary); }
+  catch (e) {
+    if (f.owner_gaii) {
+      const pub = `${nodeUrl}/v1/pub/${encodeURIComponent(f.owner_gaii)}/${encKeyPath(f.key || f.name)}`;
+      if (pub !== primary) return fetchFileBlob(pub);
+    }
+    throw e;
+  }
+}
+
+// In-browser file preview lightbox. Blob-fetches the bytes (so PRIVATE files preview too) and
+// renders the right element by category. "Open in new tab" uses the shareable /v1/pub URL for
+// public files and a transient object URL for private ones (bare tab navigation can't send the JWT).
+function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast }) {
+  const fKey = file.key || file.name;
+  const cat = fileCategory(file.mime_type, fKey);
+  const [objUrl, setObjUrl] = useState(null);
+  const [text, setText] = useState(null);
+  const [err, setErr] = useState(false);
+  const [loading, setLoading] = useState(cat !== 'other');
+  const urlRef = useRef(null);
+
+  useEffect(() => {
+    if (cat === 'other') { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true); setErr(false); setObjUrl(null); setText(null);
+    fetchFileBytes(file, nodeUrl)
+      .then(async (blob) => {
+        if (cancelled) return;
+        if (cat === 'text') {
+          const txt = await blob.text();
+          if (!cancelled) setText(txt.length > 200_000 ? txt.slice(0, 200_000) + '\n\u2026' : txt);
+        } else {
+          const u = URL.createObjectURL(blob);
+          if (cancelled) { URL.revokeObjectURL(u); return; }
+          urlRef.current = u;
+          setObjUrl(u);
+        }
+      })
+      .catch(() => { if (!cancelled) setErr(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+      if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; }
+    };
+  }, [file, nodeUrl, cat]);
+
+  // Public files \u2192 the shareable /v1/pub URL directly (bare tab nav, no JWT needed). Private / own
+  // files \u2192 a fresh, transient object URL (revoked after a minute so the new tab has time to load;
+  // the modal owns its own objUrl separately, so this one is independent).
+  const openInTab = async () => {
+    if (file.visibility === 'public' && file.owner_gaii) {
+      window.open(fileBytesUrl(file, nodeUrl), '_blank', 'noopener');
+      return;
+    }
+    try {
+      const blob = await fetchFileBytes(file, nodeUrl);
+      const u = URL.createObjectURL(blob);
+      window.open(u, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(u), 60_000);
+    } catch { showToast(t('profile.files.previewError') || 'Couldn\u2019t load this file', true); }
+  };
+
+  return html`
+    <${Modal} open=${true} onClose=${onClose} title=${fKey} className="pf-file-preview-modal">
+      <div class="pf-file-preview-body">
+        ${loading && html`<div class="pf-file-preview-status">${t('profile.files.previewLoading') || 'Loading preview\u2026'}</div>`}
+        ${err && html`<div class="pf-file-preview-status">${t('profile.files.previewError') || 'Couldn\u2019t load this file'}</div>`}
+        ${!loading && !err && cat === 'image' && objUrl && html`<img class="pf-file-preview-img" src=${objUrl} alt=${fKey} />`}
+        ${!loading && !err && cat === 'pdf' && objUrl && html`<iframe class="pf-file-preview-frame" src=${objUrl} title=${fKey}></iframe>`}
+        ${!loading && !err && cat === 'video' && objUrl && html`<video class="pf-file-preview-media" src=${objUrl} controls></video>`}
+        ${!loading && !err && cat === 'audio' && objUrl && html`<audio class="pf-file-preview-media" src=${objUrl} controls></audio>`}
+        ${!loading && !err && cat === 'text' && text !== null && html`<pre class="pf-file-preview-text">${text}</pre>`}
+        ${!loading && !err && cat === 'other' && html`<div class="pf-file-preview-status">${t('profile.files.noPreview') || 'No preview for this file type \u2014 download it instead'}</div>`}
+      </div>
+      <div class="pf-file-preview-actions">
+        <button class="btn-outline btn-sm" onClick=${openInTab}>${'\u2197'} ${t('profile.files.openInTab') || 'Open in new tab'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>
+      </div>
+    <//>`;
 }
 
 function FileUploadForm({ onUpload, onCancel }) {

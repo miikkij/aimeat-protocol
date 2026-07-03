@@ -17,9 +17,13 @@
  *   v1.7.0 -- 2026-07-02 -- GET /v1/memory/:key honors ?owner_scope=true for non-owner same-owner
  *     principals (app grants, agents), mirroring the list route's opt-in — so a document's live
  *     aimeat-memory embed (app session) can read a key an MCP agent wrote under its GAII.
+ *   v1.8.0 -- 2026-07-03 -- POST /v1/memory/bundle: ZIP export of selected memory values + storage
+ *     files (+ manifest.json) for the profile "collection cart". Owner-scoped (caller's GHII + owned
+ *     agents); non-owned/missing items are skipped and recorded in the manifest. Uses archiver.
  */
 
 import { Router } from 'express';
+import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
@@ -633,6 +637,92 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
     if (deleted > 0) { emitResourceListChanged(gaii); emitChange('memory'); }
     res.json(success(config.nodeId, { deleted }));
+  });
+
+  // POST /v1/memory/bundle — download a ZIP of selected memory values + storage files (+ a manifest).
+  // Backs the "collection cart" export: a pointer-free bundle of the caller's OWN data (GHII + owned
+  // agents). Each item must be owned by the caller or one of their agents; anything else is skipped
+  // and recorded in manifest.json. Body: { items: [{ kind:'memory'|'file', key, owner_gaii? }] }.
+  router.post('/v1/memory/bundle', requireAuth(), async (req, res) => {
+    const body = req.body ?? {};
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (items.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'items is required (non-empty array)'));
+      return;
+    }
+    if (items.length > 500) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A bundle may contain at most 500 items'));
+      return;
+    }
+
+    // Allowed owners = the caller's own identity + (owner sessions only) their agents' GAIIs.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const callerGaii = resolve(req);
+    const allowed = new Set<string>([callerGaii]);
+    if (isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      for (const a of agents) allowed.add(a.gaii);
+    }
+
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const chunks: Buffer[] = [];
+    archive.on('data', (c: Buffer) => chunks.push(c));
+    archive.on('error', (err: Error) => {
+      if (!res.headersSent) res.status(500).json(error(config.nodeId, 'ZIP_ERROR', `Failed to build bundle: ${err.message}`));
+    });
+    archive.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      const stamp = new Date().toISOString().slice(0, 10);
+      res.set({
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="aimeat-collection-${stamp}.zip"`,
+        'Content-Length': String(buffer.length),
+      });
+      res.send(buffer);
+    });
+
+    // Keep zip entry names inside the archive root (strip leading slashes and any '..' traversal).
+    const sanitize = (k: string) => String(k).replace(/\\/g, '/').replace(/\.\.+/g, '.').replace(/^\/+/, '');
+    const encKeyPath = (k: string) => k.split('/').map(encodeURIComponent).join('/');
+    const manifest: { generated_at: string; node_id: string; items: Array<Record<string, unknown>> } = {
+      generated_at: new Date().toISOString(), node_id: config.nodeId, items: [],
+    };
+    const seen = new Set<string>();
+
+    for (const raw of items) {
+      const kind = raw?.kind === 'file' ? 'file' : raw?.kind === 'memory' ? 'memory' : null;
+      const key = typeof raw?.key === 'string' && raw.key ? raw.key : null;
+      const owner = typeof raw?.owner_gaii === 'string' && raw.owner_gaii ? raw.owner_gaii : callerGaii;
+      if (!kind || !key) { manifest.items.push({ kind: raw?.kind ?? null, key: raw?.key ?? null, included: false, reason: 'invalid' }); continue; }
+      const dedup = `${kind}:${owner}:${key}`;
+      if (seen.has(dedup)) continue;
+      seen.add(dedup);
+      if (!allowed.has(owner)) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_owned' }); continue; }
+      try {
+        if (kind === 'file') {
+          const file = await storage.getStorageFile(owner, key);
+          if (!file) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
+          archive.append(file.data as Buffer, { name: `files/${sanitize(key)}` });
+          manifest.items.push({ kind, key, owner_gaii: owner, included: true, mime_type: file.mimeType, size: file.size, url: `${config.baseUrl}/v1/pub/${encodeURIComponent(owner)}/${encKeyPath(key)}` });
+        } else {
+          const record = await storage.getMemory(owner, key);
+          if (!record) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
+          const content = typeof record.value === 'string' ? record.value : JSON.stringify(record.value, null, 2);
+          archive.append(content, { name: `memory/${sanitize(key)}.json` });
+          manifest.items.push({ kind, key, owner_gaii: owner, included: true, visibility: record.visibility, url: `${config.baseUrl}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}` });
+        }
+      } catch {
+        manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'error' });
+      }
+    }
+
+    const included = manifest.items.filter(i => i.included).length;
+    if (included === 0) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No accessible items to bundle'));
+      return;
+    }
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+    archive.finalize();
   });
 
   // GET /v1/memory/discover — browse public memory entries across all users on this node

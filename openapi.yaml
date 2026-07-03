@@ -7343,6 +7343,57 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/memory/bundle:
+    post:
+      operationId: bundleMemory
+      summary: Download a ZIP of selected memory entries and files
+      description: >
+        Bundle selected memory values and storage files into a single downloadable ZIP (the profile
+        "collection cart"). The archive contains memory/<key>.json for each entry, files/<key> for each
+        file, and a manifest.json listing every item with its public URL. Owner-scoped: each item must
+        be owned by the caller or one of their agents; non-owned or missing items are skipped and noted
+        in the manifest. Responds 404 if nothing accessible was bundled.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  description: 1–500 items to include in the bundle.
+                  items:
+                    type: object
+                    required: [kind, key]
+                    properties:
+                      kind:
+                        type: string
+                        enum: [memory, file]
+                      key:
+                        type: string
+                      owner_gaii:
+                        type: string
+                        description: Owner of the item (defaults to the caller). Must be the caller's GHII or one of their agents.
+      responses:
+        '200':
+          description: A ZIP archive (application/zip) as an attachment.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: items missing/empty or over the 500-item cap
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No accessible items to bundle
+
   /v1/ai/complete:
     post:
       operationId: aiComplete
