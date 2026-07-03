@@ -111,6 +111,7 @@ import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 import { aimeatAiLib } from './lib-ai.js';
 import { aimeatAgentsLib } from './lib-agents.js';
 import { aimeatHeaderLib } from './lib-header.js';
+import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
 import { aimeatOrganismLib } from './lib-organism.js';
 import { aimeatEditorLib } from './lib-editor.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
@@ -138,6 +139,12 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // language + live login pill) for standalone pages such as custom portal templates.
   router.get('/v1/libs/aimeat-header.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatHeaderLib(config));
+  });
+
+  // GET /v1/libs/portfolio-standalone.js — bridge shim injected into portfolios
+  // served on the portfolio origin (<username>.portfolio.<apex>).
+  router.get('/v1/libs/portfolio-standalone.js', (_req, res) => {
+    sendJavascriptLibrary(res, portfolioStandaloneLib(config));
   });
 
   // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library

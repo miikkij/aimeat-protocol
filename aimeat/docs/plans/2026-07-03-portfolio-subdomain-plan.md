@@ -1,6 +1,19 @@
 # Implementation plan: `<username>.portfolio.<apex>` — portfolio origin
 
-**Status:** PLANNED (not built) · **Author:** Claude + Jouni · **Date:** 2026-07-03
+**Status:** BUILT 2026-07-03 (phases 0–6; infra pending prod deploy) · **Author:** Claude + Jouni · **Date:** 2026-07-03
+
+**Build notes:** silent SSO on the standalone page ships for the OWNER's own portfolio
+(auto-approve via the extended app-grant-silent, target `portfolio:<username>`); other
+visitors stay on the safe placeholder — the visible consent flow for portfolio targets is
+a follow-up (the apex viewer covers logged-in visitors meanwhile). Local-dev caveat:
+`*.localhost` is cross-site for cookies in Chrome, so the silent bridge can't be driven
+end-to-end locally — in prod `aimeat.io` ↔ `<u>.portfolio.aimeat.io` are same-site
+(eTLD+1), the exact topology apps-SSO already uses. Verify on prod after deploy.
+
+**Decisions locked 2026-07-03:** (1) attribution badge is OPTIONAL — per-portfolio
+`showBadge` flag in `portfolio.config`, default ON, toggle in the builder; (2) Phase 5
+(standalone members bridge) ships in the first release; (3) the apex viewer stays
+alongside the subdomain (no redirect).
 
 ## Goal
 

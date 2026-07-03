@@ -11,6 +11,9 @@
  *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
  *   v1.1.0 — 2026-06-20 — H-2: two-level app-origin parsing (`<sub>.apps.<apex>` /
  *     `apps.<apex>`) + `req.appOrigin` flag (x-app-origin header / hostname fallback).
+ *   v1.2.0 — 2026-07-03 — Portfolio origin: `req.portfolioOrigin` flag +
+ *     `<username>.portfolio.<apex>` parsing (x-portfolio-origin header / hostname
+ *     fallback), checked before the apex like the app host.
  */
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -26,6 +29,12 @@ declare global {
        * where user apps run (H-2). Apex requests have this falsy.
        */
       appOrigin?: boolean;
+      /**
+       * True when the request arrived on the dedicated portfolio origin
+       * (`portfolio.<apex>` or `<username>.portfolio.<apex>`) — the isolated,
+       * session-less host where published portfolios are served standalone.
+       */
+      portfolioOrigin?: boolean;
     }
   }
 }
@@ -46,21 +55,28 @@ export function subdomainMiddleware(config: AimeatConfig) {
     apexHost = new URL(config.baseUrl).hostname.toLowerCase();
   } catch { /* no hostname fallback without a valid baseUrl */ }
   const appHost = (config.appHost || '').toLowerCase();
+  const portfolioHost = (config.portfolioHost || '').toLowerCase();
 
   return (req: Request, _res: Response, next: NextFunction) => {
     req.subdomain = null;
     req.appOrigin = false;
+    req.portfolioOrigin = false;
 
-    // Header path (production behind nginx). x-app-origin marks the app host family.
+    // Header path (production behind nginx). x-app-origin marks the app host
+    // family, x-portfolio-origin the portfolio host family.
     const fromHeader = req.get('x-subdomain');
     const appHeader = req.get('x-app-origin');
-    if (appHeader || fromHeader) {
+    const portfolioHeader = req.get('x-portfolio-origin');
+    if (appHeader || portfolioHeader || fromHeader) {
       if (appHeader && appHeader.trim() !== '' && appHeader.trim() !== '0') req.appOrigin = true;
+      if (portfolioHeader && portfolioHeader.trim() !== '' && portfolioHeader.trim() !== '0') req.portfolioOrigin = true;
       if (fromHeader) req.subdomain = fromHeader.trim().toLowerCase();
       return next();
     }
 
-    // Hostname fallback (dev / no proxy). App host checked before apex.
+    // Hostname fallback (dev / no proxy). App + portfolio hosts checked before
+    // apex — they are themselves apex subdomains and would otherwise be misread
+    // as the single-label subdomains "apps" / "portfolio".
     const host = (req.hostname || '').toLowerCase();
     if (appHost) {
       if (host === appHost) {
@@ -71,6 +87,18 @@ export function subdomainMiddleware(config: AimeatConfig) {
         req.appOrigin = true;
         const label = host.slice(0, -(appHost.length + 1));
         if (label && !label.includes('.')) req.subdomain = label; // <sub>.apps.<apex>
+        return next();
+      }
+    }
+    if (portfolioHost) {
+      if (host === portfolioHost) {
+        req.portfolioOrigin = true; // bare portfolio.<apex> — redirects to the apex showcase
+        return next();
+      }
+      if (host.endsWith('.' + portfolioHost)) {
+        req.portfolioOrigin = true;
+        const label = host.slice(0, -(portfolioHost.length + 1));
+        if (label && !label.includes('.')) req.subdomain = label; // <username>.portfolio.<apex>
         return next();
       }
     }

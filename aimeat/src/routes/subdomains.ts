@@ -25,6 +25,11 @@
  *   v1.5.0 — 2026-06-24 — serveApp now appends the permanent "aimeat.io · publish your own app"
  *     attribution badge to HTML apps (injectAimeatBadge) so visitors landing on a shared app origin
  *     reach the project + see a publish CTA; Content-Length already reflects the transformed body.
+ *   v1.6.0 — 2026-07-03 — Portfolio origin: serve published portfolios standalone at
+ *     `<username>.portfolio.<apex>` (label = username, no mapping table; uniform 404).
+ *     Injects the standalone bridge (aimeat-auth + portfolio-standalone.js + memory:read
+ *     scopes meta); aimeat badge per-portfolio optional (showBadge, default on);
+ *     'portfolio' added to RESERVED_SUBDOMAINS.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -34,11 +39,13 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
+import { resolvePublishedPortfolio } from './portfolio.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
   'www', 'mail', 'api', 'admin', 'static', 'cdn',
   'portal', 'app', 'apps', 'docs', 'status', 'mcp',
+  'portfolio',
 ]);
 
 /** Valid subdomain label: lowercase alphanumeric + hyphens, 2–63 chars, no edge hyphens. */
@@ -197,6 +204,35 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   res.send(app.data);
 }
 
+/** Insert an HTML snippet into a document head (fallbacks: after <body>, else prepend). */
+function injectHeadSnippet(html: string, snippet: string): string {
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, snippet + '</head>');
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + snippet);
+  return snippet + html;
+}
+
+/**
+ * Write a standalone portfolio document on the portfolio origin. Injects the
+ * standalone bridge (aimeat-auth SDK + portfolio-standalone.js + a memory:read
+ * scopes meta) so the SAME portfolio HTML that runs inside the apex viewer's
+ * iframe gets working auth/members bridging here too. The optional aimeat badge
+ * follows the per-portfolio `showBadge` flag (default ON).
+ */
+function servePortfolio(res: Response, html: string, portfolioConfig: Record<string, unknown>, csp: string): void {
+  const bridge =
+    '<meta name="aimeat-scopes" content="memory:read">'
+    + '<script src="/v1/libs/aimeat-auth.js"></script>'
+    + '<script src="/v1/libs/portfolio-standalone.js"></script>';
+  let buf: Buffer = Buffer.from(injectHeadSnippet(html, bridge), 'utf-8');
+  if (portfolioConfig.showBadge !== false) buf = injectAimeatBadge(buf);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Security-Policy', csp);
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Length', buf.length.toString());
+  res.send(buf);
+}
+
 /**
  * Serves mapped subdomains at their root. Mounted BEFORE bootstrapRouter so a
  * subdomain request never reaches the apex GET / handler; requests without a
@@ -212,6 +248,26 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
+
+    // Portfolio origin: <username>.portfolio.<apex> — the label IS the username,
+    // no mapping table. Same CSP/trust level as the app origin (user HTML on an
+    // isolated, session-less host). Uniform 404 for every failure mode so the
+    // origin is not a username-enumeration oracle.
+    if (req.portfolioOrigin) {
+      if (!config.portfolioOriginEnabled) return next();
+      if (!sub) {
+        res.redirect(301, config.baseUrl + '/v1/members'); // bare portfolio.<apex> → member showcase
+        return;
+      }
+      const portfolioNotFound = () =>
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown portfolio'));
+      if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return portfolioNotFound();
+      const resolved = await resolvePublishedPortfolio(storage, sub);
+      if (!resolved.ok || !resolved.html) return portfolioNotFound();
+      servePortfolio(res, resolved.html, resolved.portfolioConfig, csp);
+      return;
+    }
+
     if (!sub) return next();
 
     if (sub === 'www') {

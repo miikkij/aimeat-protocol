@@ -387,4 +387,5 @@
 .portfolio-publish-target { font-size: .85rem; color: var(--text-dim); margin-bottom: .75rem; }
 .portfolio-publish-url { font-family: monospace; word-break: break-all; }
 .portfolio-paste-actions { display: flex; gap: .6rem; margin-top: .5rem; flex-wrap: wrap; }
+.portfolio-badge-toggle { margin: -0.25rem 0 0.75rem; }
 .portfolio-preview-frame { margin-top: .75rem; min-height: 420px; width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #fff; }

@@ -32,6 +32,8 @@ const ALL_SUITES = [
     // Self-spawns its own server with the app-origin flag ON (the shared server keeps it
     // OFF), so it owns its lifecycle rather than running against BASE_URL.
     'test/e2e-app-origin.ts',
+    // Self-spawns its own server with the portfolio-origin flag ON (same pattern).
+    'test/e2e-portfolio-origin.ts',
     'test/e2e-app-grants.ts',
     'test/e2e-app-silent.ts',
     'test/e2e-apps-backup.ts',
@@ -280,6 +282,10 @@ async function startServer(): Promise<ChildProcess> {
         // own flag-ON server, so it is unaffected.
         AIMEAT_APP_ORIGIN_ENABLED: 'false',
         AIMEAT_APP_HOST: '',
+        // Same pinning for the portfolio origin — e2e-portfolio-origin self-spawns
+        // its own flag-ON server.
+        AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
+        AIMEAT_PORTFOLIO_HOST: '',
         // Secretary + specialist agents are opt-in and OFF by default in prod. Pin them ON for the shared
         // server so the secretary/specialist/organism-template suites keep exercising the feature. The
         // .env.test.* files are gitignored, so CI relies on this default. e2e-secretary-disabled.ts

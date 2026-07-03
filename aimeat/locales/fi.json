@@ -4960,7 +4960,10 @@
     "appOrigin": "Tarjotaanko käyttäjien sovellukset erillisestä sovellusalkuperästä (*.apps.<domain>) niiden eristämiseksi istunnostasi? Vaatii DNS:n + jokerimerkki-TLS-varmenteen (katso docs/internal/app-origin-deployment.md). Oletuksena pois päältä.",
     "appHost": "Sovellusalkuperän isäntä (esim. apps.example.com)",
     "appHostHint": "Määritä ensin DNS (apps.<domain> + jokerimerkki *.apps.<domain>) ja jokerimerkki-TLS-varmenne, katso docs/internal/app-origin-deployment.md",
-    "appHostRequired": "Sovellusisäntä vaaditaan, kun sovellusalkuperän eristys on käytössä"
+    "appHostRequired": "Sovellusisäntä vaaditaan, kun sovellusalkuperän eristys on käytössä",
+    "portfolioOrigin": "Tarjotaanko julkaistut portfoliot omilla osoitteillaan <käyttäjänimi>.portfolio.<domain>? Vaatii DNS:n + jokerimerkki-TLS-varmenteen (sama pystytys kuin sovellusalkuperällä). Oletuksena pois päältä.",
+    "portfolioHost": "Portfolio-alkuperän isäntä (esim. portfolio.example.com)",
+    "portfolioHostRequired": "Portfolio-isäntä vaaditaan, kun portfolio-alkuperä on käytössä"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",
@@ -7200,6 +7203,9 @@
       "unpublish": "Poista julkaisusta",
       "unpublished": "Portfolio poistettu julkaisusta",
       "unpublishConfirm": "Poistetaanko portfolio julkaisusta? Julkinen sivu lakkaa toimimasta kunnes julkaiset uudelleen.",
+      "viewStandalone": "Oma osoite",
+      "standaloneTarget": "Tarjoillaan myös omassa osoitteessa:",
+      "showBadge": "Näytä aimeat.io-badge omalla sivulla",
       "customTypePlaceholder": "Kuvaile millaisen portfolion haluat…",
       "customGatePlaceholder": "Kuvaile kirjautumisen takana olevat omat osiot…",
       "backToProfile": "Profiili",
@@ -7214,7 +7220,8 @@
       "notFoundDesc": "Tämä käyttäjä ei ole julkaissut portfoliota.",
       "loginToSeeMore": "Kirjaudu sisään nähdäksesi lisää",
       "backToPortal": "Koti",
-      "fullscreen": "Koko näyttö"
+      "fullscreen": "Koko näyttö",
+      "standalone": "Oma osoite"
     }
   },
   "cli": {

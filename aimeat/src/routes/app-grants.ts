@@ -23,6 +23,11 @@
  *     grant token with no visible login (same-site iframe + postMessage). Others → consent_required.
  *   v1.2.0 — 2026-06-26 — Silent bridge reply includes the owner's display_name so the app login pill
  *     can show a human label instead of the raw GHII (non-sensitive; '' when unset).
+ *   v1.3.0 — 2026-07-03 — Silent bridge accepts the portfolio origin family
+ *     (`<username>.portfolio.<apex>` → grant target `portfolio:<username>`): the owner
+ *     visiting their OWN standalone portfolio auto-gets a scoped token (members data
+ *     works); other visitors get consent_required and stay logged out — the visible
+ *     authorize flow still resolves app targets only.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -34,6 +39,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
+import { resolvePublishedPortfolio } from './portfolio.js';
 
 /**
  * Scopes an app may request, each with a short description key for the consent UI. Drawn from the
@@ -262,22 +268,43 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const reply = (data: Record<string, unknown>) => res.json(success(config.nodeId, data));
 
     const appHost = (config.appHost || '').toLowerCase();
-    if (!appHost) return reply({ ok: false, error: 'app_origin_disabled' });
+    const portfolioHost = (config.portfolioOriginEnabled ? (config.portfolioHost || '') : '').toLowerCase();
+    if (!appHost && !portfolioHost) return reply({ ok: false, error: 'app_origin_disabled' });
 
     // The app's real origin (the apex bridge passes it from window.location.ancestorOrigins).
     let host: string;
     try { host = new URL(String(req.query.origin ?? '')).hostname.toLowerCase(); } catch { return reply({ ok: false, error: 'bad_origin' }); }
-    if (host === appHost || !host.endsWith('.' + appHost)) return reply({ ok: false, error: 'bad_origin' });
-    const sub = host.slice(0, -(appHost.length + 1));
-    if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' }); // single-label per-app subdomain only
 
-    // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
-    const site = await storage.getSubdomainSite(sub);
-    if (!site || !site.enabled || site.kind !== 'app') return reply({ ok: false, error: 'unknown_app' });
-    const slash = site.target.indexOf('/');
-    if (slash <= 0) return reply({ ok: false, error: 'unknown_app' });
-    const appOwner = site.target.slice(0, slash);
-    const appFile = site.target.slice(slash + 1);
+    // Origin → grant target. Two origin families are eligible:
+    //   • <sub>.apps.<apex>       → the mapped published app (subdomain_sites binding)
+    //   • <username>.portfolio.<apex> → that user's published portfolio (label IS the username)
+    // The single-label rule keeps a token bound to exactly one origin in both families.
+    let grantTarget: string;   // app grant identity ("owner/file.html" or "portfolio:<username>")
+    let grantName: string;     // human label for consent surfaces
+    let grantOwner: string;    // bare owner whose own visit auto-approves
+    if (appHost && host !== appHost && host.endsWith('.' + appHost)) {
+      const sub = host.slice(0, -(appHost.length + 1));
+      if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' }); // single-label per-app subdomain only
+
+      // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
+      const site = await storage.getSubdomainSite(sub);
+      if (!site || !site.enabled || site.kind !== 'app') return reply({ ok: false, error: 'unknown_app' });
+      const slash = site.target.indexOf('/');
+      if (slash <= 0) return reply({ ok: false, error: 'unknown_app' });
+      grantTarget = site.target;
+      grantName = site.target.slice(slash + 1);
+      grantOwner = site.target.slice(0, slash);
+    } else if (portfolioHost && host !== portfolioHost && host.endsWith('.' + portfolioHost)) {
+      const sub = host.slice(0, -(portfolioHost.length + 1));
+      if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' });
+      const resolved = await resolvePublishedPortfolio(storage, sub);
+      if (!resolved.ok || !resolved.html) return reply({ ok: false, error: 'unknown_app' });
+      grantTarget = `portfolio:${sub}`;
+      grantName = `${sub}'s portfolio`;
+      grantOwner = sub;
+    } else {
+      return reply({ ok: false, error: 'bad_origin' });
+    }
 
     // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation.
     const raw = readRefreshCookie(req);
@@ -288,7 +315,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       && !(session.absoluteExpiresAt && now >= Date.parse(session.absoluteExpiresAt));
     // Include the resolved app so the SDK can open the consent popup (which prompts apex login) even
     // when no one is logged in — the user logs in there, then approves, in one flow.
-    if (!sessionValid) return reply({ ok: false, error: 'login_required', app: site.target, app_name: appFile });
+    if (!sessionValid) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
     const owner = session!.owner;
 
     const requested = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
@@ -296,8 +323,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Policy: own app → auto-approve requested scopes; otherwise require a prior non-revoked grant
     // that already covers them (remembered approval). Anything else needs the visible consent.
-    const isOwnApp = owner === appOwner;
-    const existing = (await storage.listAppGrantsByOwner(owner)).find(g => !g.revoked && g.app === site.target);
+    const isOwnApp = owner === grantOwner;
+    const existing = (await storage.listAppGrantsByOwner(owner)).find(g => !g.revoked && g.app === grantTarget);
     let scopes: string[];
     if (isOwnApp) {
       scopes = requested.length ? requested : ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
@@ -306,7 +333,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     } else {
       // Surface what the app is + what it's asking for, so the SDK can launch the visible consent
       // popup (the authorize flow) without a second round-trip to discover the app identity.
-      return reply({ ok: false, error: 'consent_required', app: site.target, app_name: appFile, scope: requested.join(' ') });
+      // NOTE: the visible authorize flow resolves app targets only (owner/file) — a portfolio
+      // visitor lands here and stays logged out (safe placeholder); the apex viewer covers them.
+      return reply({ ok: false, error: 'consent_required', app: grantTarget, app_name: grantName, scope: requested.join(' ') });
     }
 
     // Mint: reuse this owner's existing grant for the app, else create one.
@@ -320,7 +349,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     } else {
       grantId = `appgrant-${randomBytes(16).toString('hex')}`;
       await storage.createAppGrant({
-        grantId, app: site.target, appName: appFile, appOrigin: `https://${host}`,
+        grantId, app: grantTarget, appName: grantName, appOrigin: `https://${host}`,
         owner, gaii: ownerGhii, scopes, refreshTokenHash: hashToken(rawRefresh),
         createdAt: ts, lastUsedAt: ts, revoked: false,
       });
@@ -331,7 +360,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const ghiiRec = await storage.getGHII(ownerGhii);
     // Include `app` (owner/filename) + `own` so the SDK can offer in-app grant management (the gear on
     // the login pill re-opens the consent screen for exactly this app).
-    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId, app: site.target, own: isOwnApp, display_name: ghiiRec?.displayName ?? '' });
+    reply({ ok: true, access_token: token, refresh_token: rawRefresh, expires_in: expiresIn, scope: scopes.join(' '), grant_id: grantId, app: grantTarget, own: isOwnApp, display_name: ghiiRec?.displayName ?? '' });
   });
 
   // ── POST /v1/app-grants/token ── the app (cross-origin, CORS *) exchanges code / refreshes.

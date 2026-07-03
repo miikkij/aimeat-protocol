@@ -3,6 +3,10 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.5.0 — 2026-07-03 — Portfolio origin surfaces: builder shows the standalone
+ *     URL (<username>.portfolio.<apex>) + an aimeat-badge toggle (showBadge, saved
+ *     to portfolio.config); viewer toolbar links to the standalone page. Both come
+ *     from the server (standalone_url on /v1/portfolio/config and data/:username).
  *   v1.4.0 — 2026-07-03 — Viewer bridge: the trusted parent posts login state
  *     ('aimeat-portfolio-auth') into the sandboxed portfolio and serves a narrow
  *     fetch RPC ('aimeat-portfolio-fetch' → '...-fetch-result') that reads the
@@ -374,6 +378,11 @@ function PortfolioBuilder({ session, navigate }) {
 
   // Existing portfolio state
   const [existingConfig, setExistingConfig] = useState(null);
+  // Standalone portfolio-origin URL (<username>.portfolio.<apex>) — null when
+  // the node has the portfolio origin disabled.
+  const [standaloneUrl, setStandaloneUrl] = useState(null);
+  // Whether the standalone page shows the aimeat attribution badge (default on).
+  const [showBadge, setShowBadge] = useState(true);
 
   // Load catalog + existing config
   useEffect(() => {
@@ -384,13 +393,25 @@ function PortfolioBuilder({ session, navigate }) {
     ]).then(([catRes, cfgRes]) => {
       if (catRes.ok !== false && catRes.data) setCatalog(catRes.data);
       else setErrMsg('Failed to load content catalog');
-      if (cfgRes.ok !== false && cfgRes.data?.config) setExistingConfig(cfgRes.data.config);
+      if (cfgRes.ok !== false && cfgRes.data?.config) {
+        setExistingConfig(cfgRes.data.config);
+        setShowBadge(cfgRes.data.config.showBadge !== false);
+      }
+      if (cfgRes.ok !== false && cfgRes.data?.standalone_url) setStandaloneUrl(cfgRes.data.standalone_url);
       setLoading(false);
     }).catch(() => {
       setErrMsg('Network error');
       setLoading(false);
     });
   }, [session]);
+
+  // Persist the badge toggle immediately (it only affects the standalone page).
+  const handleBadgeToggle = async (value) => {
+    setShowBadge(value);
+    const next = { ...(existingConfig || {}), enabled: existingConfig?.enabled || false, showBadge: value, tags: ['portfolio'] };
+    setExistingConfig(next);
+    await apiPut('/v1/portfolio/config', next);
+  };
 
   // Toggle helpers
   const toggleSet = (setter, value) => {
@@ -461,6 +482,7 @@ function PortfolioBuilder({ session, navigate }) {
       selectedBoards: [...selectedBoards],
       selectedCortex: [...selectedCortex],
       selectedMemories: [...selectedMemories],
+      showBadge,
       tags: ['portfolio'],
     });
   };
@@ -516,6 +538,7 @@ function PortfolioBuilder({ session, navigate }) {
           authGates: [...authGates],
           publishedAt: new Date().toISOString(),
           htmlSizeKb: sizeKb,
+          showBadge,
           tags: ['portfolio'],
         });
         setExistingConfig({ ...(existingConfig || {}), enabled: true });
@@ -590,6 +613,9 @@ function PortfolioBuilder({ session, navigate }) {
           <span class="portfolio-published-dot">●</span>
           <span>${t('portfolio.builder.enabled')}</span>
           <a href=${publicUrl} target="_blank" class="portfolio-published-link">${t('portfolio.builder.viewPublic')}</a>
+          ${standaloneUrl && html`
+            <a href=${standaloneUrl} target="_blank" rel="noopener" class="portfolio-published-link">${tr('portfolio.builder.viewStandalone', 'Own address')} ↗</a>
+          `}
           <button class="btn-ghost btn-sm" disabled=${uploading} onClick=${handleUnpublish}>
             ${tr('portfolio.builder.unpublish', 'Unpublish')}
           </button>
@@ -832,6 +858,17 @@ function PortfolioBuilder({ session, navigate }) {
             ${tr('portfolio.builder.publishTarget', 'Will be published at:')}
             <a href=${publicUrl} target="_blank" class="portfolio-publish-url">${publicUrl}</a>
           </div>
+          ${standaloneUrl && html`
+            <div class="portfolio-publish-target">
+              ${tr('portfolio.builder.standaloneTarget', 'Also served standalone at:')}
+              <a href=${standaloneUrl} target="_blank" rel="noopener" class="portfolio-publish-url">${standaloneUrl}</a>
+            </div>
+            <div class="portfolio-source-item portfolio-badge-toggle">
+              <input type="checkbox" id="pf-show-badge" checked=${showBadge}
+                onChange=${(e) => handleBadgeToggle(e.target.checked)} />
+              <label for="pf-show-badge">${tr('portfolio.builder.showBadge', 'Show the aimeat.io badge on the standalone page')}</label>
+            </div>
+          `}
 
           <div class="portfolio-upload-zone ${dragover ? 'dragover' : ''}"
             onClick=${() => fileInputRef.current?.click()}
@@ -1017,6 +1054,11 @@ function PortfolioViewer({ username, navigate }) {
             ← ${t('portfolio.viewer.backToPortal')}
           </button>
           <span class="portfolio-viewer-owner">${escHtml(data.display_name || username)}'s portfolio</span>
+          ${data.standalone_url && html`
+            <a class="btn-ghost btn-sm" href=${data.standalone_url} target="_blank" rel="noopener">
+              ${tr('portfolio.viewer.standalone', 'Own address')} ↗
+            </a>
+          `}
           <button class="btn-ghost btn-sm portfolio-viewer-fs"
             title=${tr('portfolio.viewer.fullscreen', 'Fullscreen')}
             onClick=${() => frameRef.current?.requestFullscreen?.()}>

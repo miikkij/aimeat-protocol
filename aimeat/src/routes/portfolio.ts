@@ -14,10 +14,60 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, GHIIRecord, AgentRecord } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+
+/** Result of resolving a username to their published portfolio. */
+export type PortfolioResolution =
+  | { ok: true; html: string | null; ghii: GHIIRecord; agents: AgentRecord[]; portfolioConfig: Record<string, unknown> }
+  | { ok: false; reason: 'user_not_found' | 'no_agent' | 'not_enabled' };
+
+/**
+ * Shared resolver: username → published portfolio HTML + owner identities.
+ * Used by both the apex JSON route (GET /v1/portfolio/data/:username, which maps
+ * reasons to granular 404 messages and tolerates html:null) and the
+ * portfolio-origin serve route (<username>.portfolio.<apex>, which returns a
+ * uniform 404 for every failure INCLUDING html:null).
+ */
+export async function resolvePublishedPortfolio(storage: Storage, username: string): Promise<PortfolioResolution> {
+  const ghii = await storage.getGHIIByOwner(username);
+  if (!ghii) return { ok: false, reason: 'user_not_found' };
+
+  const agents = await storage.getAgentsByOwner(username);
+  if (!agents.length) return { ok: false, reason: 'no_agent' };
+
+  const configMem = await storage.getMemory(agents[0].gaii, 'portfolio.config');
+  const portfolioConfig = (configMem?.value ?? null) as Record<string, unknown> | null;
+  if (!portfolioConfig || !portfolioConfig.enabled) return { ok: false, reason: 'not_enabled' };
+
+  const htmlFile = await storage.getStorageFile(agents[0].gaii, 'portfolio/index.html');
+  return { ok: true, html: htmlFile ? htmlFile.data.toString('utf-8') : null, ghii, agents, portfolioConfig };
+}
+
+/** Valid DNS label for a portfolio subdomain (same shape as SUBDOMAIN_RE; kept local
+ *  to avoid a portfolio ↔ subdomains import cycle). */
+const PORTFOLIO_LABEL_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
+
+/**
+ * Standalone portfolio-origin URL (`<username>.portfolio.<apex>`) for a username,
+ * or null when the portfolio origin is disabled or the username is not a usable
+ * DNS label (OWNER_RE allows up to 64 chars; DNS labels cap at 63 — such names
+ * simply keep the apex URL only).
+ */
+export function portfolioStandaloneUrl(config: AimeatConfig, username: string): string | null {
+  if (!config.portfolioOriginEnabled || !config.portfolioHost) return null;
+  const label = username.toLowerCase();
+  if (!PORTFOLIO_LABEL_RE.test(label)) return null;
+  let scheme = 'https', portSuffix = '';
+  try {
+    const b = new URL(config.baseUrl);
+    scheme = b.protocol.replace(':', '');
+    portSuffix = b.port ? `:${b.port}` : '';
+  } catch { /* keep https, no port */ }
+  return `${scheme}://${label}.${config.portfolioHost}${portSuffix}/`;
+}
 
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -166,7 +216,12 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
     const mem = await storage.getMemory(agents[0].gaii, 'portfolio.config');
-    res.json(success(config.nodeId, { config: mem?.value ?? null }));
+    res.json(success(config.nodeId, {
+      config: mem?.value ?? null,
+      // Where the portfolio is (or would be) served standalone — null when the
+      // portfolio origin is disabled or the username isn't a valid DNS label.
+      standalone_url: portfolioStandaloneUrl(config, ownerName),
+    }));
   });
 
   /**
@@ -250,22 +305,14 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    */
   router.get('/v1/portfolio/data/:username', optionalAuth(), async (req, res) => {
     const username = req.params.username as string;
-    const ghiiRecord = await storage.getGHIIByOwner(username);
-    if (!ghiiRecord) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `User "${username}" not found`));
-      return;
-    }
-
-    const agents = await storage.getAgentsByOwner(username);
-    if (!agents.length) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent found for this user'));
-      return;
-    }
-
-    // Get portfolio config
-    const configMem = await storage.getMemory(agents[0].gaii, 'portfolio.config');
-    if (!configMem?.value || !(configMem.value as Record<string, unknown>).enabled) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Portfolio not enabled for this user'));
+    const resolved = await resolvePublishedPortfolio(storage, username);
+    if (!resolved.ok) {
+      const messages: Record<string, string> = {
+        user_not_found: `User "${username}" not found`,
+        no_agent: 'No agent found for this user',
+        not_enabled: 'Portfolio not enabled for this user',
+      };
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', messages[resolved.reason]));
       return;
     }
 
@@ -275,26 +322,22 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const isAuthenticated = !!req.auth && req.auth.anonymous !== true;
     const isOwner = isAuthenticated && req.auth?.owner === username;
 
-    // Check if a generated portfolio HTML file exists in storage
-    let portfolioHtml: string | null = null;
-    const htmlFile = await storage.getStorageFile(agents[0].gaii, 'portfolio/index.html');
-    if (htmlFile) {
-      portfolioHtml = htmlFile.data.toString('utf-8');
-    }
-
     res.json(success(config.nodeId, {
       username,
-      display_name: ghiiRecord.displayName,
-      bio: ghiiRecord.bio,
-      avatar: ghiiRecord.avatar,
-      has_html: !!portfolioHtml,
-      portfolio_html: portfolioHtml,
+      display_name: resolved.ghii.displayName,
+      bio: resolved.ghii.bio,
+      avatar: resolved.ghii.avatar,
+      has_html: !!resolved.html,
+      portfolio_html: resolved.html,
       viewer_authenticated: isAuthenticated,
       viewer_is_owner: isOwner,
       // Identities whose memory records the viewer's fetch bridge may proxy on
       // behalf of the portfolio iframe (GHII + all agent GAIIs of this owner) —
       // the allowlist that keeps the bridge from reading anyone else's records.
-      owner_gaiis: [ghiiRecord.ghii, ...agents.map(a => a.gaii)],
+      owner_gaiis: [resolved.ghii.ghii, ...resolved.agents.map(a => a.gaii)],
+      // Standalone-origin URL (<username>.portfolio.<apex>) when the portfolio
+      // origin is enabled and the username is a usable DNS label; null otherwise.
+      standalone_url: portfolioStandaloneUrl(config, username),
     }));
   });
 
