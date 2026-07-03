@@ -3,6 +3,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v2.3.0 — 2026-07-03 — 'members' visibility (readable by any logged-in node user)
+ *     selectable in all visibility pickers (popover, detail select, bulk bar,
+ *     create form, edit modal).
  *   v2.2.0 — 2026-06-13 — Render image memory values inline: a value that IS an image (a /v1/pub URL
  *     string or a { url, mime:image/* } object) shows a thumbnail above its raw JSON, via the shared
  *     ImageDeliverable renderer.
@@ -490,7 +493,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   /* Visibility is edited via an explicit select inside the EXPANDED detail (and in the
      edit modal) — the old per-row click-to-cycle pill meant one stray click in the list
      could publish a memory. The list rows show a static badge only. */
-  const VIS_OPTIONS = ['private', 'owner', 'group', 'public'];
+  const VIS_OPTIONS = ['private', 'owner', 'group', 'members', 'public'];
 
   // Quick visibility change from the expanded detail. 'group' needs a group pick,
   // so it routes to the edit modal where the group select lives.
@@ -1374,6 +1377,7 @@ function MemoryForm({ onSave, onCancel, groups }) {
           <option value="private">${t('profile.memory.visPrivate')}</option>
           <option value="shared">${t('profile.memory.visShared')}</option>
           <option value="group">${t('knowledge.visibility.group')}</option>
+          <option value="members">${t('knowledge.visibility.members')}</option>
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
@@ -1544,7 +1548,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
           <select class="input-field mem-vis-select" value=${vis}
             onChange=${e => { setVis(e.target.value); if (e.target.value !== 'group') setGroupId(''); }}>
-            ${['private', 'owner', 'group', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+            ${['private', 'owner', 'group', 'members', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
           </select>
         </div>
         ${vis === 'group' && html`

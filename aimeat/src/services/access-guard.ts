@@ -58,6 +58,14 @@ export async function authorizeRead(
     return { allowed: true, reason: 'public_data' };
   }
 
+  // 'members' = any authenticated user of this node. The CALLER must verify the
+  // accessor is a real authenticated principal (not the anonymous-mode shared
+  // identity) BEFORE calling — this guard cannot tell anonymity from a GAII
+  // string. Like public, allowed member reads are not audited.
+  if (visibility === 'members') {
+    return { allowed: true, reason: 'members_data' };
+  }
+
   if (!config.consentEnabled) {
     return { allowed: false, reason: 'consent_disabled' };
   }

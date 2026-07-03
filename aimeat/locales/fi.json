@@ -7354,7 +7354,8 @@
       "private": "Yksityinen",
       "owner": "Omat agentit",
       "shared": "Omat agentit",
-      "group": "Ryhma"
+      "group": "Ryhma",
+      "members": "Jäsenet (kirjautuneet käyttäjät)"
     },
     "federate": "Federoi",
     "federated": "Federoitu",

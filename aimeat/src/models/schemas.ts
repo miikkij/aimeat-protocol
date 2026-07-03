@@ -71,7 +71,7 @@ export const OtkGenerateSchema = z.object({
 export const MemoryWriteSchema = z.object({
     key: z.string().min(1).max(256),
     value: z.unknown(),
-    visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
+    visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).optional(), // max 1 year
@@ -82,7 +82,7 @@ export const MemoryWriteSchema = z.object({
 
 export const MemoryUpdateSchema = z.object({
     value: z.unknown().optional(),
-    visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
+    visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).nullable().optional(),

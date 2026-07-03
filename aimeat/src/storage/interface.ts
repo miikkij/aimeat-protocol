@@ -181,7 +181,9 @@ export interface MemoryRecord {
   key: string;
   ownerGaii: string;    // the agent GAII that owns this memory
   value: unknown;
-  visibility: 'private' | 'owner' | 'group' | 'public';
+  // 'members' = readable by any authenticated user of this node (NOT the shared
+  // anonymous identity); sits between 'group' and 'public'.
+  visibility: 'private' | 'owner' | 'group' | 'members' | 'public';
   groupId?: string;
   tags: string[];
   ttlHours: number | null;

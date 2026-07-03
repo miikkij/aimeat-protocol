@@ -7354,7 +7354,8 @@
       "private": "Private",
       "owner": "My Agents",
       "shared": "My Agents",
-      "group": "Group"
+      "group": "Group",
+      "members": "Members (logged-in users)"
     },
     "federate": "Federate",
     "federated": "Federated",

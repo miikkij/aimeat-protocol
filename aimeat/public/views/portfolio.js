@@ -3,6 +3,13 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.4.0 — 2026-07-03 — Viewer bridge: the trusted parent posts login state
+ *     ('aimeat-portfolio-auth') into the sandboxed portfolio and serves a narrow
+ *     fetch RPC ('aimeat-portfolio-fetch' → '...-fetch-result') that reads the
+ *     portfolio owner's records with the VISITOR's session — enabling the new
+ *     'members' memory visibility (logged-in-only content, never in the HTML).
+ *     Requests are allowlisted to data.owner_gaiis; the visitor's JWT never
+ *     enters the iframe. Prompt documents the protocol + members entries.
  *   v1.3.2 — 2026-07-03 — Builder prompt fixes for the sandboxed viewer reality:
  *     memory fetch URLs now use the anonymous public route /v1/memory/:gaii/:key
  *     (old /v1/memory/:key always 401s without auth) and only for public-visibility
@@ -161,13 +168,15 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     }
   }
 
-  // Selected memory entries. Only PUBLIC records are live-fetchable by visitors:
-  // the portfolio runs anonymously in a sandboxed iframe, and the only route it can
-  // reach without auth is /v1/memory/:gaii/:key (public visibility). The old prompt
-  // pointed at /v1/memory/:key — an auth-required owner route that always 401s there.
+  // Selected memory entries — three delivery paths, decided by record visibility:
+  //   public  → plain anonymous fetch from /v1/memory/:gaii/:key
+  //   members → requested from the hosting viewer over the postMessage bridge
+  //             (the viewer fetches with the VISITOR's session; anonymous → no data)
+  //   other   → not deliverable to visitors at all; bake preview or placeholder
+  const publicMems = selectedMemories.filter(m => m.visibility === 'public');
+  const memberMems = selectedMemories.filter(m => m.visibility === 'members');
+  const gatedMems = selectedMemories.filter(m => m.visibility !== 'public' && m.visibility !== 'members');
   if (selectedMemories.length > 0) {
-    const publicMems = selectedMemories.filter(m => m.visibility === 'public');
-    const gatedMems = selectedMemories.filter(m => m.visibility !== 'public');
     prompt += `\n## Memory Entries\n`;
     if (publicMems.length > 0) {
       prompt += `These PUBLIC entries can be fetched live (anonymously, no auth) for dynamic portfolio content:\n`;
@@ -175,8 +184,14 @@ The user wants to create a personal portfolio website. Generate a single, self-c
         prompt += `- ${mem.key} → GET ${url}/v1/memory/${encodeURIComponent(mem.gaii || ghii)}/${encodeURIComponent(mem.key)}\n`;
       }
     }
+    if (memberMems.length > 0) {
+      prompt += `These MEMBERS-ONLY entries are readable by logged-in node members. Do NOT fetch them directly (an anonymous fetch returns 404). Request each from the hosting viewer over the postMessage bridge (see "Viewer Bridge" below) and render the value inside a [data-auth-required] section, keeping a [data-auth-placeholder] fallback:\n`;
+      for (const mem of memberMems) {
+        prompt += `- key: ${mem.key} · gaii: ${mem.gaii || ghii}\n`;
+      }
+    }
     if (gatedMems.length > 0) {
-      prompt += `These entries are NOT publicly readable — visitors' browsers cannot fetch them (any attempt returns 401/404). Represent each with its preview text baked into the HTML, or a placeholder the user can edit:\n`;
+      prompt += `These entries are NOT readable by visitors at all (any fetch attempt returns 401/404). Represent each with its preview text baked into the HTML, or a placeholder the user can edit:\n`;
       for (const mem of gatedMems) {
         prompt += `- ${mem.key} (visibility: ${mem.visibility})${mem.preview ? ` — preview: ${mem.preview}` : ''}\n`;
       }
@@ -237,16 +252,24 @@ ${resourceNotes}${sectionNotes}- For missing images: Use inline SVG placeholders
 - **IMPORTANT — CSP compatibility:** The portfolio HTML will be rendered inside a sandboxed iframe. All JavaScript MUST be inside a single \`<script>\` tag at the end of \`<body>\`. Do NOT use inline event handlers (onclick=, onload=, etc.) — use addEventListener instead. Do NOT use external script/CSS CDN links.
 `;
 
-  if (authGates.length > 0) {
+  if (authGates.length > 0 || memberMems.length > 0) {
     prompt += `
-## Auth-Gated Sections Implementation
+## Viewer Bridge (auth state + members-only data)
 The portfolio renders inside a sandboxed iframe with an opaque origin: it has NO access to the
 hosting page's session, cookies, or \`window.AIMEAT\` — login state cannot be read directly.
-Implement gated sections so they default to the logged-out placeholder and activate only on an
-explicit signal posted by the hosting AIMEAT viewer:
+The hosting AIMEAT viewer bridges over postMessage. Two message flows:
+
+1. Viewer → portfolio: \`{ type: 'aimeat-portfolio-auth', loggedIn: boolean }\` — posted on load
+   and whenever the visitor's login state changes.
+2. Portfolio → viewer: \`{ type: 'aimeat-portfolio-fetch', gaii: string, key: string, id: number }\`
+   (id = your own correlation number). The viewer answers with
+   \`{ type: 'aimeat-portfolio-fetch-result', id, ok: boolean, gaii, key, value }\` — \`value\` is the
+   memory record's value when \`ok\` is true, otherwise null (not logged in / no access).
+   The viewer only serves the gaii+key pairs listed in "Memory Entries" above.
+
+Implementation pattern — default to logged-out, activate on the viewer's signal:
 
 \`\`\`javascript
-// Default: logged out — placeholders visible, gated content hidden.
 function applyAuthState(isLoggedIn) {
   document.querySelectorAll('[data-auth-required]').forEach(el => {
     el.style.display = isLoggedIn ? '' : 'none';
@@ -256,18 +279,48 @@ function applyAuthState(isLoggedIn) {
   });
 }
 applyAuthState(false);
-// The AIMEAT viewer may post the visitor's login state into this frame.
+
+// Members-only data: ask the viewer, resolve by correlation id.
+let bridgeSeq = 0;
+const bridgePending = {};
+function fetchMemberData(gaii, key) {
+  return new Promise((resolve) => {
+    const id = ++bridgeSeq;
+    bridgePending[id] = resolve;
+    window.parent.postMessage({ type: 'aimeat-portfolio-fetch', gaii, key, id }, '*');
+  });
+}
+
 window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'aimeat-portfolio-auth') applyAuthState(!!e.data.loggedIn);
+  const d = e.data;
+  if (!d) return;
+  if (d.type === 'aimeat-portfolio-auth') {
+    applyAuthState(!!d.loggedIn);
+    // (Re-)request members-only data when the viewer reports a logged-in visitor.
+    if (d.loggedIn) loadMemberSections();
+  } else if (d.type === 'aimeat-portfolio-fetch-result' && bridgePending[d.id]) {
+    bridgePending[d.id](d.ok ? d.value : null);
+    delete bridgePending[d.id];
+  }
 });
+
+async function loadMemberSections() {
+  // Example: const contact = await fetchMemberData('<gaii>', '<key>');
+  // if (contact) { render it into the [data-auth-required] section }
+}
 \`\`\`
 
-Wrap auth-gated content in \`<div data-auth-required>\` and add a placeholder:
+Wrap gated content in \`<div data-auth-required>\` and add a placeholder:
 \`<div data-auth-placeholder>Log in to see more content</div>\`
 
-NOTE: This is a convenience feature, not a security boundary — gated content is still present in
-the HTML source. Keep truly private data OUT of the portfolio HTML entirely (and do not try to
-fetch it: non-public API data is unreachable from this sandbox, see the fetch rules above).
+Rules:
+- Show the placeholder until data actually arrives — no spinners waiting on the bridge
+  (an older viewer never answers, and the placeholder is the correct fallback).
+- Members-only values arrive ONLY via the bridge — never bake them into the HTML and never
+  fetch them directly.
+- Content that is merely wrapped in [data-auth-required] but baked into the HTML is a
+  convenience, not a security boundary — it is visible in the HTML source. Keep truly
+  private data out of the portfolio entirely.
 `;
   }
 
@@ -850,6 +903,75 @@ function PortfolioViewer({ username, navigate }) {
   const [errMsg, setErrMsg] = useState(null);
   const frameRef = useRef(null);
 
+  // ── Portfolio bridge ──
+  // The sandboxed portfolio (opaque origin) cannot see the visitor's session.
+  // This trusted parent brokers two things over postMessage:
+  //   1. 'aimeat-portfolio-auth' {loggedIn} — posted on frame load + auth change,
+  //      so HTML-baked [data-auth-required] sections can toggle (convenience).
+  //   2. 'aimeat-portfolio-fetch' {gaii, key, id} → 'aimeat-portfolio-fetch-result'
+  //      {id, ok, gaii, key, value} — the parent fetches the record with the
+  //      VISITOR's JWT (which never enters the iframe) via the public read route,
+  //      so 'members'-visibility records reach logged-in viewers only. Requests
+  //      are allowlisted to the portfolio owner's identities (data.owner_gaiis)
+  //      so portfolio JS cannot spend the visitor's token on anything else.
+  const postAuthState = (win) => {
+    // '*' targetOrigin: an opaque-origin frame is not addressable any other way;
+    // the payload is just a boolean.
+    win?.postMessage({ type: 'aimeat-portfolio-auth', loggedIn: !!getSession() }, '*');
+  };
+
+  useEffect(() => {
+    if (!data?.has_html) return undefined;
+    const ownerGaiis = Array.isArray(data.owner_gaiis) ? data.owner_gaiis : [];
+
+    const onAuthChange = () => postAuthState(frameRef.current?.contentWindow);
+
+    const onMessage = async (e) => {
+      const win = frameRef.current?.contentWindow;
+      if (!win || e.source !== win) return; // only our portfolio frame
+      const d = e.data;
+      if (!d || d.type !== 'aimeat-portfolio-fetch') return;
+      const reply = (ok, value) => win.postMessage({
+        type: 'aimeat-portfolio-fetch-result',
+        id: d.id ?? null, ok, gaii: d.gaii ?? null, key: d.key ?? null, value,
+      }, '*');
+      if (typeof d.gaii !== 'string' || typeof d.key !== 'string' || !ownerGaiis.includes(d.gaii)) {
+        reply(false, null);
+        return;
+      }
+      const s = getSession();
+      try {
+        const resp = await fetch(`/v1/memory/${encodeURIComponent(d.gaii)}/${encodeURIComponent(d.key)}`,
+          s ? { headers: { Authorization: 'Bearer ' + s.jwt } } : undefined);
+        const j = await resp.json().catch(() => null);
+        const ok = !!(resp.ok && j && j.ok !== false);
+        reply(ok, ok ? (j.data?.value ?? null) : null);
+      } catch (_) {
+        reply(false, null);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    window.addEventListener('aimeat-auth-change', onAuthChange);
+    // aimeat-auth-change fires from the login pill's onLogout BEFORE the async
+    // auth.logout() has cleared the session, so getSession() still reads the old
+    // state at that moment. The auth lib's own 'login'/'logout' events fire only
+    // AFTER the state change — subscribe to those too so the frame flips reliably.
+    const authApi = window.AIMEAT?.auth;
+    if (authApi?.on) {
+      authApi.on('login', onAuthChange);
+      authApi.on('logout', onAuthChange);
+    }
+    return () => {
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('aimeat-auth-change', onAuthChange);
+      if (authApi?.off) {
+        authApi.off('login', onAuthChange);
+        authApi.off('logout', onAuthChange);
+      }
+    };
+  }, [data]);
+
   useEffect(() => {
     fetch(`${NODE_URL}/v1/portfolio/data/${encodeURIComponent(username)}`)
       .then(r => r.json())
@@ -902,7 +1024,8 @@ function PortfolioViewer({ username, navigate }) {
           </button>
         </div>
         <iframe ref=${frameRef} class="portfolio-viewer-frame portfolio-viewer-frame-full"
-          srcdoc=${stampCspNonce(data.portfolio_html)} sandbox="allow-scripts"></iframe>
+          srcdoc=${stampCspNonce(data.portfolio_html)} sandbox="allow-scripts"
+          onLoad=${(e) => postAuthState(e.target.contentWindow)}></iframe>
       </div>
     `;
   }
