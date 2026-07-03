@@ -91,6 +91,7 @@ import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, ty
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
+import { canSeeMembers, redactOrganism, rosterCallerFromAuth, MEMBER_VISIBILITY_VALUES } from '../services/organism-privacy.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, deriveWorkspaceEvents, aggregateParticipants } from '../services/workspace-enrichment.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from '../services/archive.js';
@@ -112,7 +113,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   /* ── POST /v1/organisms — Create a new organism ── */
   router.post('/v1/organisms', requireAuth(), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
-    const { name, description, type, location, interests, join_policy, max_members, visibility } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility } = req.body ?? {};
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name is required (min 2 characters)'));
@@ -123,6 +124,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const orgType = validTypes.includes(type) ? type : 'community';
     const policy = ['open', 'approval_required', 'invite_only'].includes(join_policy) ? join_policy : 'open';
     const vis = ['public', 'listed', 'private'].includes(visibility) ? visibility : 'public';
+    // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
+    const memberVis = MEMBER_VISIBILITY_VALUES.includes(member_visibility) ? member_visibility : undefined;
 
     const id = uuidv4();
     const now = new Date().toISOString();
@@ -154,6 +157,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       joinPolicy: policy,
       maxMembers: max_members || 500,
       visibility: vis,
+      memberVisibility: memberVis,
       moderationConfig: {
         flagsEnabled: true,
         autoHideThreshold: 3,
@@ -233,6 +237,16 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       }));
     }
 
+    // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the
+    // members[]/agentGaiis fields. member_count is computed pre-redaction (a count is not an
+    // identity) so list cards keep working when the roster itself is hidden. The shared anonymous
+    // identity is treated as unauthenticated (rosterCallerFromAuth).
+    const listCaller = rosterCallerFromAuth(req.auth);
+    payload = await Promise.all((payload as Array<OrganismRecord & { workspace_count?: number }>).map(async (o) => {
+      const canSee = await canSeeMembers(storage, o, listCaller);
+      return { ...redactOrganism(o, canSee), member_count: o.members.length, members_hidden: !canSee };
+    }));
+
     res.json(success(config.nodeId, {
       organisms: payload,
       total: payload.length,
@@ -282,7 +296,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /* ── GET /v1/organisms/:id — Get organism detail ── */
-  router.get('/v1/organisms/:id', async (req, res) => {
+  router.get('/v1/organisms/:id', optionalAuth(), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {
@@ -307,10 +321,20 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const members = await storage.listMembers(id, { status: 'active' });
     const readme = await getOrganismReadme(storage, id);
 
+    // Roster privacy (memberVisibility): redact members[]/agentGaiis for callers below the tier.
+    // your_membership keeps "am I a member / what's my role" answerable for the SPA even when the
+    // roster arrays are hidden; member_count stays (a count is not an identity). The shared
+    // anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
+    const detailCaller = rosterCallerFromAuth(req.auth);
+    const canSeeRoster = await canSeeMembers(storage, organism, detailCaller);
+    const yourMembership = detailCaller.ownerName ? await storage.getMembership(id, detailCaller.ownerName) : null;
+
     res.json(success(config.nodeId, {
-      organism,
+      organism: redactOrganism(organism, canSeeRoster),
       member_count: members.length,
       readme,
+      members_hidden: !canSeeRoster,
+      your_membership: yourMembership ? { role: yourMembership.role, status: yourMembership.status } : null,
     }));
   });
 
@@ -331,7 +355,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const { name, description, type, location, interests, join_policy, max_members, visibility, readme } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility } = req.body ?? {};
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
     if (name !== undefined) updates.name = name;
@@ -339,6 +363,13 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (type !== undefined) updates.type = type;
     if (location !== undefined) updates.location = location;
     if (interests !== undefined) updates.interests = interests;
+    if (member_visibility !== undefined) {
+      if (!MEMBER_VISIBILITY_VALUES.includes(member_visibility)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `member_visibility must be one of: ${MEMBER_VISIBILITY_VALUES.join(', ')}`));
+        return;
+      }
+      updates.memberVisibility = member_visibility;
+    }
     if (join_policy !== undefined) updates.joinPolicy = join_policy;
     if (max_members !== undefined) updates.maxMembers = max_members;
     if (visibility !== undefined) updates.visibility = visibility;
@@ -518,6 +549,19 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       role: role as string,
       status: (status as string) || 'active',
     });
+
+    // Roster privacy (memberVisibility): below the tier the listing shrinks to the accountability
+    // rows — creator/admins + the caller's own row — while the TRUE total stays (count ≠ identity).
+    // The shared anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
+    const rosterCaller = rosterCallerFromAuth(req.auth);
+    const canSeeRoster = await canSeeMembers(storage, organism, rosterCaller);
+    if (!canSeeRoster) {
+      const visible = members.filter(m => m.role === 'creator' || m.role === 'admin'
+        || m.ghii === organism.creatorGhii || organism.admins.includes(m.ghii)
+        || (rosterCaller.ownerName && m.ghii === rosterCaller.ownerName));
+      res.json(success(config.nodeId, { members: visible, total: members.length, members_hidden: true }));
+      return;
+    }
 
     // A member's agents inherit access implicitly (same-owner: join answers ALREADY_MEMBER), so
     // "who can touch this organism" must be enumerable — an unlisted actor with access is an

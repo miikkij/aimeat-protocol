@@ -489,6 +489,7 @@ export function initializeSchema(db: Database.Database): void {
       joinPolicy       TEXT NOT NULL DEFAULT 'open',
       maxMembers       INTEGER NOT NULL DEFAULT 100,
       visibility       TEXT NOT NULL DEFAULT 'public',
+      memberVisibility TEXT,
       moderationConfig TEXT NOT NULL DEFAULT '{}',
       memoryNamespace  TEXT NOT NULL,
       semantic         TEXT,
@@ -1598,6 +1599,9 @@ export function initializeSchema(db: Database.Database): void {
   const safeAddColumn = (table: string, column: string, type: string) => {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); } catch { /* column already exists */ }
   };
+
+  // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).
+  safeAddColumn('organisms', 'memberVisibility', 'TEXT');
 
   // Owner session refresh tokens — add columns to existing sessions tables, then
   // index the lookup columns (must run AFTER the ALTERs so the columns exist).

@@ -7788,6 +7788,14 @@
     "fieldInterests": "Interests",
     "fieldType": "Type",
     "fieldVisibility": "Visibility",
+    "memberVisLabel": "Member list",
+    "memberVisHint": "Who can see who belongs here. Hides the member LIST only — content authorship (comments, records, activity) stays visible, and the creator/admins are always shown.",
+    "memberVis": {
+      "authenticated": "Signed-in users",
+      "members": "Members only",
+      "admins": "Admins only",
+      "public": "Public (anyone)"
+    },
     "formIdentity": "Identity",
     "formAccess": "Access",
     "addTag": "Add…",
