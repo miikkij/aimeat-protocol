@@ -14,12 +14,25 @@
  *     'success'|'error'|'busy' + reason) so callers can report skips/offline truthfully.
  *     Add getScheduleDetail (GET /:id → { schedule, runs } run-history log) +
  *     setScheduleCron (PATCH /:id { cron } — change cadence of an existing schedule).
+ *   v1.3.0 -- 2026-07-03 -- Add listScheduleOccurrences (GET /v1/schedules/occurrences?from&to):
+ *     projected cron fire-times for the Profile › Scheduler calendar.
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 
 /** Master aggregate: { managed, extensions, agentInternal }. */
 export async function listAllSchedules() {
   return apiGet('/v1/schedules');
+}
+
+/**
+ * Projected cron fire-times for the owner's enabled schedules within [from, to]
+ * (Date objects). Returns the envelope; `res.data` = { occurrences:[{ scheduleId,
+ * at }], from, to, truncated }. Join scheduleId back to listAllSchedules() records
+ * for kind/name. Powers the Profile › Scheduler calendar.
+ */
+export async function listScheduleOccurrences(from, to) {
+  const qs = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
+  return apiGet(`/v1/schedules/occurrences?${qs.toString()}`);
 }
 
 /** Per-agent view: { managed, agentInternal }. */

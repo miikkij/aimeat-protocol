@@ -23388,6 +23388,60 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/schedules/occurrences:
+    get:
+      operationId: listScheduleOccurrences
+      summary: Project schedule fire-times into a time window (calendar)
+      description: >
+        Expands each of the owner's enabled, cron-bearing schedules (managed +
+        owner-installed extension crons) into concrete fire-times within
+        [from, to], using the same cron engine the scheduler runs on. Powers the
+        Profile › Scheduler day/week/month calendar. The window is clamped to ~2
+        months and per-schedule/total occurrence caps apply; when caps hit,
+        `truncated` is true. The `@activate` sentinel and paused schedules are
+        omitted. Join `scheduleId` back to the schedules from GET /v1/schedules
+        for kind/name/colour.
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+          description: Window start (ISO 8601). Defaults to now.
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+          description: Window end (ISO 8601). Defaults to now + 7 days. Clamped to from + ~62 days.
+      responses:
+        '200':
+          description: Projected occurrences within the window
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          occurrences:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                scheduleId: { type: string }
+                                at: { type: string, format: date-time }
+                          from: { type: string, format: date-time }
+                          to: { type: string, format: date-time }
+                          truncated: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /v1/schedules/{id}:
     parameters:
       - name: id

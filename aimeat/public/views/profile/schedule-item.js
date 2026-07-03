@@ -12,6 +12,8 @@
  *   v1.1.0 -- 2026-06-05 -- "Run now" reads the trigger outcome and reports it:
  *     a warning toast when no task was created (a previous run is still active,
  *     or a run limit was reached) instead of a misleading "started" success.
+ *   v1.2.0 -- 2026-07-03 -- Card root gets id="sch-card-{id}" so the Scheduler calendar
+ *     can scroll to + flash this card when its event is clicked (jumpToSchedule).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -123,7 +125,7 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
   const d = describeDispatch(s);
 
   return html`
-    <div class="sch-card">
+    <div class="sch-card" id=${'sch-card-' + s.id}>
       <div class="sch-card-head">
         <div class="sch-card-title">
           <span class="sch-badge ${KIND_BADGE[s.type] || KIND_BADGE.core}">${t(KIND_LABEL[s.type] || KIND_LABEL.core)}</span>

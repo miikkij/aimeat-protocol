@@ -14,6 +14,7 @@
  * @structure
  *   - GET    /v1/schedules                  master aggregate (managed + ext + agent-internal)
  *   - POST   /v1/schedules                  create (profile-level or agent-targeted)
+ *   - GET    /v1/schedules/occurrences      project enabled crons into a [from,to] window (calendar)
  *   - GET    /v1/schedules/:id              detail + recent execution log
  *   - PATCH  /v1/schedules/:id              edit cron/enabled/constraints/input/...
  *   - DELETE /v1/schedules/:id              cancel (owner can delete agent-created)
@@ -29,6 +30,10 @@
  *     capability; validates the app is connected and the capability is declared.
  *   v1.2.0 — 2026-06-24 — Add the `secretary` kind (Secretary Phase 4 autonomous tick); no extra body
  *     fields — the executor reads the owner's secretary.config at fire time.
+ *   v1.3.0 — 2026-07-03 — Add GET /v1/schedules/occurrences: projects each enabled, cron-bearing schedule
+ *     (managed + owner-installed extension crons) into a [from,to] window via croner, so the Profile ›
+ *     Scheduler calendar can show day/week/month cadence. Window clamped to ~2 months; per-schedule and
+ *     total occurrence caps guard against sub-minute crons; returns { occurrences:[{scheduleId,at}], truncated }.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -61,6 +66,14 @@ function isValidCron(cron: string, timezone?: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Parse a query timestamp: absent → fallback, invalid → null (caller 400s). */
+function parseWhen(q: unknown, fallback: Date): Date | null {
+  if (q == null || q === '') return fallback;
+  const s = Array.isArray(q) ? q[0] : q;
+  const d = new Date(String(s));
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** Normalise a constraints array from the request body (drop unknown types). */
@@ -303,6 +316,81 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     catch (err) {
       logger.error('Failed to create schedule', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create schedule'));
+    }
+  });
+
+  // ── GET /v1/schedules/occurrences — project cron fire-times into a window ──
+  // Powers the Profile › Scheduler calendar. Uses croner (the same library the
+  // real Scheduler runs on) so projected times match what will actually fire —
+  // timezone-accurate, no cron parser duplicated in the browser. Only enabled,
+  // cron-bearing jobs the owner can see (managed + owner-installed extension
+  // crons) are projected; the '@activate' sentinel has no recurring pattern and
+  // is skipped. Must be registered BEFORE '/v1/schedules/:id' (static-before-param).
+  router.get('/v1/schedules/occurrences', requireAuth(), async (req, res) => {
+    try {
+      const owner = ownerGhii(req);
+      const ownerName = req.auth!.owner as string;
+      const now = new Date();
+      const from = parseWhen(req.query.from, now);
+      const rawTo = parseWhen(req.query.to, new Date(now.getTime() + 7 * 86400000));
+      if (!from || !rawTo || rawTo.getTime() <= from.getTime()) {
+        res.status(400).json(error(config.nodeId, 'INVALID_RANGE', 'from/to must be valid timestamps with to > from'));
+        return;
+      }
+      // Clamp the window so a huge range can't force unbounded enumeration
+      // (~2 months covers the widest calendar view, the 42-day month grid).
+      const MAX_WINDOW_MS = 62 * 86400000;
+      const end = new Date(Math.min(rawTo.getTime(), from.getTime() + MAX_WINDOW_MS));
+
+      // Cron-bearing jobs the owner can see: managed (ownerScope) + owner-installed
+      // extension crons — mirrors the master GET /v1/schedules aggregation.
+      const managed = await storage.listScheduledJobs({ ownerScope: owner });
+      const managedIds = new Set(managed.map(j => j.id));
+      const jobs: ScheduledJobRecord[] = [...managed];
+      const allExtJobs = await storage.listScheduledJobs({ type: 'extension' });
+      for (const job of allExtJobs) {
+        if (managedIds.has(job.id)) continue;
+        if (job.ownerScope === owner) { jobs.push(job); continue; }
+        if (!job.extensionName) continue;
+        const ext = await storage.getExtension(job.extensionName);
+        if (ext?.installedBy === ownerName) jobs.push(job);
+      }
+
+      const PER_SCHEDULE = 366; // a year of daily runs; caps sub-daily crons
+      const TOTAL_CAP = 2000;
+      const occurrences: { scheduleId: string; at: string }[] = [];
+      let truncated = false;
+      for (const job of jobs) {
+        if (occurrences.length >= TOTAL_CAP) { truncated = true; break; }
+        if (job.enabled === false) continue;
+        if (!job.cron || job.cron === '@activate') continue;
+        let runs: Date[] = [];
+        try {
+          const opts: { timezone?: string; paused: boolean } = { paused: true };
+          if (job.timezone) opts.timezone = job.timezone;
+          const c = new Cron(job.cron, opts);
+          runs = c.nextRuns(PER_SCHEDULE, from);
+          c.stop();
+        } catch { continue; }
+        let hitEnd = false;
+        for (const r of runs) {
+          if (r.getTime() > end.getTime()) { hitEnd = true; break; }
+          occurrences.push({ scheduleId: job.id, at: r.toISOString() });
+          if (occurrences.length >= TOTAL_CAP) { truncated = true; break; }
+        }
+        // Enumeration capped before reaching the window end → some runs are hidden.
+        if (!hitEnd && runs.length >= PER_SCHEDULE) truncated = true;
+      }
+
+      res.json(success(config.nodeId, {
+        occurrences,
+        from: from.toISOString(),
+        to: end.toISOString(),
+        truncated,
+      }));
+    } catch (err) {
+      logger.error('Failed to compute schedule occurrences', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to compute occurrences'));
     }
   });
 
