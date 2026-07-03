@@ -3109,7 +3109,9 @@
       "importEmpty": "No entries found in file",
       "deleteGroup": "Delete group",
       "deleteGroupConfirm": "Delete all {n} entries under \"{g}\"? This cannot be undone.",
-      "deleteGroupUnsupported": "This group cannot be bulk-deleted"
+      "deleteGroupUnsupported": "This group cannot be bulk-deleted",
+      "copyValue": "Copy value",
+      "valueCopied": "Value copied"
     },
     "files": {
       "title": "Stored Files",
@@ -3145,7 +3147,14 @@
       "copyUrl": "Copy URL",
       "urlCopied": "URL copied to clipboard",
       "clearFilter": "Clear",
-      "noMatch": "No files match selected tags"
+      "noMatch": "No files match selected tags",
+      "noMatchSearch": "No files match your search",
+      "searchPlaceholder": "Search files by name, tag, or type…",
+      "preview": "Preview",
+      "openInTab": "Open in new tab",
+      "previewLoading": "Loading preview…",
+      "previewError": "Couldn’t load this file",
+      "noPreview": "No preview for this file type — download it instead"
     },
     "work": {
       "title": "Work History",
@@ -7698,6 +7707,10 @@
     "retired": "{agent} retired from this workspace",
     "retiredTag": "retired",
     "retiredUntilHint": "Retired — this agent served here until this date. Its past work stays visible.",
+    "retiredFromHere": "retired from here",
+    "retiredFromHereHint": "This agent is retired from this workspace — its loop skips it. Bring it back to let it work here again.",
+    "bringBack": "Bring back",
+    "broughtBack": "{agent} is working here again",
     "reAdopt": "Re-adopt",
     "bareContract": "contract",
     "spaceTasksBacked": "This space points at the task system: its items are tasks, not workspace records. Manage them in the Tasks views.",

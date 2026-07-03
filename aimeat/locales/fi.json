@@ -3109,7 +3109,9 @@
       "importEmpty": "Tiedostosta ei löytynyt merkintöjä",
       "deleteGroup": "Poista ryhmä",
       "deleteGroupConfirm": "Poistetaanko kaikki {n} merkintää ryhmästä \"{g}\"? Ei voi perua.",
-      "deleteGroupUnsupported": "Tätä ryhmää ei voi poistaa joukkona"
+      "deleteGroupUnsupported": "Tätä ryhmää ei voi poistaa joukkona",
+      "copyValue": "Kopioi arvo",
+      "valueCopied": "Arvo kopioitu"
     },
     "files": {
       "title": "Tallennetut tiedostot",
@@ -3145,7 +3147,14 @@
       "copyUrl": "Kopioi URL",
       "urlCopied": "URL kopioitu leikepöydälle",
       "clearFilter": "Tyhjennä",
-      "noMatch": "Ei tiedostoja valituilla tageilla"
+      "noMatch": "Ei tiedostoja valituilla tageilla",
+      "noMatchSearch": "Ei hakua vastaavia tiedostoja",
+      "searchPlaceholder": "Hae tiedostoja nimellä, tagilla tai tyypillä…",
+      "preview": "Esikatsele",
+      "openInTab": "Avaa uuteen välilehteen",
+      "previewLoading": "Ladataan esikatselua…",
+      "previewError": "Tiedostoa ei voitu ladata",
+      "noPreview": "Tälle tiedostotyypille ei ole esikatselua — lataa se sen sijaan"
     },
     "work": {
       "title": "Työhistoria",
@@ -7698,6 +7707,10 @@
     "retired": "{agent} poistettu tästä työtilasta",
     "retiredTag": "poistettu",
     "retiredUntilHint": "Poistettu käytöstä — tämä agentti palveli täällä tähän päivämäärään asti. Sen aiempi työ säilyy näkyvissä.",
+    "retiredFromHere": "poistettu tästä työtilasta",
+    "retiredFromHereHint": "Tämä agentti on poistettu tästä työtilasta — sen silmukka ohittaa sen. Tuo se takaisin, niin se työskentelee täällä taas.",
+    "bringBack": "Tuo takaisin",
+    "broughtBack": "{agent} työskentelee taas täällä",
     "reAdopt": "Ota uudelleen käyttöön",
     "bareContract": "sopimus",
     "spaceTasksBacked": "Tämä tila osoittaa tehtäväjärjestelmään: sen sisältö on tehtäviä, ei työtilan tietueita. Hallitse niitä Tehtävät-näkymissä.",
