@@ -5,6 +5,9 @@
  *   portfolio-data endpoint consumed by the SPA viewer.
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  * @version-history
+ *   v1.2.0 — 2026-07-03 — data/:username returns owner_gaiis (bridge allowlist for the
+ *     viewer's fetch proxy); viewer_authenticated no longer counts the anonymous-mode
+ *     shared identity as authenticated.
  *   v1.1.0 — 2026-07-03 — Catalog memories entries carry the owning gaii so the builder
  *     can compose anonymous public-read URLs (/v1/memory/:gaii/:key) into the prompt.
  *   v1.0.0 — 2026-03-06 — Initial portfolio API.
@@ -266,8 +269,11 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const isAuthenticated = !!req.auth;
-    const isOwner = req.auth?.owner === username;
+    // Anonymous-mode note: optionalAuth injects a truthy shared identity
+    // (anonymous: true) — a bare !!req.auth would report every visitor as
+    // authenticated. The viewer uses this flag for the portfolio auth bridge.
+    const isAuthenticated = !!req.auth && req.auth.anonymous !== true;
+    const isOwner = isAuthenticated && req.auth?.owner === username;
 
     // Check if a generated portfolio HTML file exists in storage
     let portfolioHtml: string | null = null;
@@ -285,6 +291,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       portfolio_html: portfolioHtml,
       viewer_authenticated: isAuthenticated,
       viewer_is_owner: isOwner,
+      // Identities whose memory records the viewer's fetch bridge may proxy on
+      // behalf of the portfolio iframe (GHII + all agent GAIIs of this owner) —
+      // the allowlist that keeps the bridge from reading anyone else's records.
+      owner_gaiis: [ghiiRecord.ghii, ...agents.map(a => a.gaii)],
     }));
   });
 

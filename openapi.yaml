@@ -228,8 +228,11 @@ components:
 
     Visibility:
       type: string
-      enum: [private, owner, group, public]
+      enum: [private, owner, group, members, public]
       default: private
+      description: >
+        Access level. `members` (any logged-in user of this node) and `group` apply to
+        memory records; storage files accept private/owner/public only.
 
     DisputeEventType:
       type: string
@@ -4052,7 +4055,7 @@ paths:
         - name: visibility
           in: query
           required: false
-          schema: { type: string, enum: [private, owner, group, public] }
+          schema: { type: string, enum: [private, owner, group, members, public] }
           description: Optional visibility filter.
       responses:
         '200':
@@ -6975,7 +6978,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [private, owner, group, public]
+            enum: [private, owner, group, members, public]
         - name: tags
           in: query
           schema:
@@ -7172,7 +7175,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [private, owner, group, public]
+            enum: [private, owner, group, members, public]
         - name: max_flags
           in: query
           schema:
@@ -7249,7 +7252,7 @@ paths:
                       value: {}
                       visibility:
                         type: string
-                        enum: [private, owner, group, public]
+                        enum: [private, owner, group, members, public]
                       tags:
                         type: array
                         items: { type: string }
@@ -8018,7 +8021,7 @@ paths:
                   description: Memory key to copy
                 visibility:
                   type: string
-                  enum: [private, owner, group, public]
+                  enum: [private, owner, group, members, public]
                   default: private
                   description: Visibility for the copied entry
       responses:

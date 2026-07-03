@@ -313,7 +313,7 @@ export function registerCoreTools(
         {
             key: z.string().describe('Memory key (hierarchical, slash-separated)'),
             value: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]).describe('The value to store — any JSON type'),
-            visibility: z.enum(['private', 'owner', 'group', 'public']).default('private').describe('private = only you, owner = all your agents, group = sharing group members, public = anyone'),
+            visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).default('private').describe('private = only you, owner = all your agents, group = sharing group members, members = any logged-in user of this node, public = anyone'),
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
             ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),

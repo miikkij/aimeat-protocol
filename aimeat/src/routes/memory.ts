@@ -56,6 +56,7 @@ function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' 
     case 'private': return 'private';
     case 'owner': return 'dmz';
     case 'group': return 'dmz';
+    case 'members': return 'dmz'; // node-local: never replicated to federation
     case 'public': return 'federation';
     default: return 'private';
   }
@@ -204,7 +205,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key,
       ownerGaii: gaii,
       value,
-      visibility: vis as 'private' | 'owner' | 'group' | 'public',
+      visibility: vis as 'private' | 'owner' | 'group' | 'members' | 'public',
       tags: Array.isArray(tags) ? tags : [],
       ttlHours: ttl_hours ?? null,
       version: existing ? existing.version + 1 : 1,
@@ -569,7 +570,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
           key: targetKey,
           ownerGaii: gaii,
           value: entry.value,
-          visibility: (['private', 'owner', 'group', 'public'].includes(entry.visibility) ? entry.visibility : 'private') as MemoryRecord['visibility'],
+          visibility: (['private', 'owner', 'group', 'members', 'public'].includes(entry.visibility) ? entry.visibility : 'private') as MemoryRecord['visibility'],
           tags: Array.isArray(entry.tags) ? entry.tags : [],
           ttlHours: typeof entry.ttl_hours === 'number' ? entry.ttl_hours : null,
           version: prior ? prior.version + 1 : 1,
@@ -1743,6 +1744,49 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
           visibility: record.visibility,
         },
       }));
+      return;
+    }
+
+    // Members data — readable by any authenticated user of this node. The check
+    // MUST exclude the anonymous-mode shared identity: global optionalAuth injects
+    // a truthy req.auth (anonymous: true) for unauthenticated visitors, so a bare
+    // req.auth truthiness gate would leak members records to everyone.
+    if (record.visibility === 'members') {
+      const isAuthenticatedMember = !!req.auth && req.auth.anonymous !== true;
+      if (isAuthenticatedMember) {
+        stats?.increment('memory_reads');
+
+        // Shared guard: audits the members read when the consent layer is enabled.
+        await authorizeRead(storage, config, {
+          ownerGaii: record.ownerGaii,
+          accessorGaii: req.auth!.sub,
+          resourceKey: key,
+          visibility: 'members',
+          action: 'read',
+        });
+
+        res.json(success(config.nodeId, {
+          key: record.key,
+          value: record.value,
+          visibility: record.visibility,
+          zone: visibilityToZone(record.visibility),
+          tags: record.tags,
+          version: record.version,
+          owner_gaii: record.ownerGaii,
+          created_at: record.createdAt,
+          updated_at: record.updatedAt,
+          _ddc: {
+            flagCount: record.flagCount ?? 0,
+            version: record.version,
+            freshness: record.updatedAt,
+            visibility: record.visibility,
+          },
+        }));
+        return;
+      }
+      // Anonymous (incl. the shared anonymous identity): behave like other
+      // non-public records — 404, don't reveal existence.
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
       return;
     }
 

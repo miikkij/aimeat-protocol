@@ -38,7 +38,7 @@ export function registerMemoryExtendedTools(
         descriptionFor('aimeat_memory_search'),
         {
             query: z.string(),
-            visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
+            visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
         },
         annotationsFor('aimeat_memory_search'),
         async ({ query, visibility }) => {

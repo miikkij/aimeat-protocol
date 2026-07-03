@@ -464,7 +464,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
             value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Who can read it. Default: private.' },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Who can read it (members = any logged-in user of this node). Default: private.' },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.' },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
@@ -480,7 +480,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         concisePath: 'items',
         input: {
             prefix: { type: 'string', description: 'Key prefix filter, e.g. "project/".' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Optional visibility filter.' },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.' },
             tags: { type: 'array', description: 'Optional tag filters.' },
             owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory.' },
             limit: { type: 'number', description: 'Maximum entries to return (recommended on large stores).' },
@@ -493,7 +493,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             query: { type: 'string', required: true, description: 'Search query.' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Optional visibility filter.' },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.' },
         },
     },
     {

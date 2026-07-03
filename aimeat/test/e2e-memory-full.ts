@@ -11,6 +11,8 @@
  *   v1.3.0 — 2026-05-31 — Add owner-session POST agent-targeting coverage (owner can create a key under their agent's GAII via `agent`; foreign-agent target rejected)
  *   v1.4.0 — 2026-06-22 — Cover the scalable Memory tab: include=meta (value omitted + bytes),
  *     search?prefix scoping, export, import (skip/overwrite/rename), and bulk-delete by prefix.
+ *   v1.5.0 — 2026-07-03 — 'members' visibility: write accepted, anonymous public-route read
+ *     404s, authenticated other-owner read succeeds.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -828,6 +830,87 @@ await test('bulk-delete by prefix removes all matching keys', async () => {
 await test('bulk-delete requires prefix or keys', async () => {
     const { status } = await json('/v1/memory/bulk-delete', { method: 'POST', headers: auth1(), body: JSON.stringify({}) });
     assert(status === 400, `expected 400, got ${status}`);
+});
+
+// ═══════════════════════════════════════════════════════
+// 'members' visibility — readable by any authenticated node user via the
+// public read route (/v1/memory/:gaii/:key); anonymous requests get 404.
+// Works both with anonymous mode OFF (req.auth undefined) and ON (the
+// injected shared identity carries anonymous:true and is excluded).
+// ═══════════════════════════════════════════════════════
+console.log('\n12. members visibility');
+
+const memberKey = 'test.members-contact';
+const owner2Name = `memowner2${Date.now()}`;
+let owner2Token = '';
+
+await test('POST accepts visibility "members"', async () => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST',
+        headers: auth1(),
+        body: JSON.stringify({ key: memberKey, value: { email: 'members@example.com' }, visibility: 'members' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.visibility === 'members', `visibility: ${body.data?.visibility}`);
+});
+
+await test('anonymous read of a members record → 404 (no existence leak)', async () => {
+    const { status } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(memberKey)}`);
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('register second owner + token (different account)', async () => {
+    if (ADMIN_PW) {
+        const { status, body } = await json('/v1/admin/setup/register', {
+            method: 'POST',
+            headers: { 'X-Admin-Password': ADMIN_PW },
+            body: JSON.stringify({ name: owner2Name }),
+        });
+        assert(status === 200, `owner2 register ${status}: ${JSON.stringify(body)}`);
+        const tok = await json('/v1/admin/setup/token', {
+            method: 'POST',
+            headers: { 'X-Admin-Password': ADMIN_PW },
+            body: JSON.stringify({ owner: owner2Name, private_key: body.private_key }),
+        });
+        assert(tok.body.ok === true, `owner2 token: ${JSON.stringify(tok.body.error)}`);
+        owner2Token = tok.body.token;
+    } else {
+        const { status, body } = await json('/v1/owners', {
+            method: 'POST',
+            body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
+        });
+        assert(status === 201, `owner2 register ${status}: ${JSON.stringify(body)}`);
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(body.data.private_key, owner2Name + NODE_ID + timestamp);
+        const tok = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ owner: owner2Name, timestamp, signature }),
+        });
+        assert(tok.body.ok === true, `owner2 token: ${JSON.stringify(tok.body.error)}`);
+        owner2Token = tok.body.data?.token;
+    }
+});
+
+await test('authenticated other-owner read of a members record → 200 with value', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(memberKey)}`, {
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.value?.email === 'members@example.com', `value round-trips: ${JSON.stringify(body.data?.value)}`);
+    assert(body.data?.visibility === 'members', `visibility: ${body.data?.visibility}`);
+});
+
+await test('members read stays 404 for anonymous after an authenticated read', async () => {
+    const { status } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(memberKey)}`);
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('cleanup second owner', async () => {
+    const { status } = await json(`/v1/owners/${encodeURIComponent(owner2Name)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(status === 200, `delete owner2 status ${status}`);
 });
 
 // ═══════════════════════════════════════════════════════
