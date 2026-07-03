@@ -197,7 +197,7 @@ export function tierLevel(tier) {
 function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en' });
+  const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', directory_listed: false });
   const [currentEmail, setCurrentEmail] = useState('');
 
   useEffect(() => {
@@ -213,6 +213,7 @@ function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
             bio: d.bio || '',
             avatar: d.avatar || '',
             locale: d.locale || 'en',
+            directory_listed: d.directory_listed === true,
           });
           setCurrentEmail(d.notification_email || '');
         }
@@ -299,6 +300,14 @@ function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
               <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onClose(); window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'email' } })); }}>
                 ${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}</a>
             </div>
+            <label class="pf-edit-check">
+              <input type="checkbox" checked=${fields.directory_listed}
+                onChange=${(e) => set('directory_listed', e.target.checked)} />
+              <span>
+                <span class="pf-edit-check-title">${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}</span>
+                <span class="pf-edit-hint">${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}</span>
+              </span>
+            </label>
           </div>
           <div class="pf-edit-footer">
             <a href="#" class="pf-edit-link pf-edit-footer-left" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>

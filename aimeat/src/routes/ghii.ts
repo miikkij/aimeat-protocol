@@ -1386,17 +1386,32 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     // GET /v1/ghii/list — Search/list human identities (Tier 0, no auth)
     // Note: renamed from /v1/ghii/directory to avoid confusion with /v1/catalogue/directory
     // Must be registered BEFORE the /:ghii param route
-    router.get('/v1/ghii/list', async (req, res) => {
+    // The member directory ("phone book"). Two privacy guarantees:
+    //  1. requireAuth() — you must be a SIGNED-IN user to browse it (the anonymous internet, incl.
+    //     the shared anonymous identity, is rejected 401). Was previously world-readable.
+    //  2. Opt-in — only members who explicitly listed themselves (PUT /v1/ghii { directory_listed:
+    //     true } → the profile.{username}.directory_listed memory key) appear. Default = unlisted.
+    router.get('/v1/ghii/list', requireAuth(), async (req, res) => {
         const q = typeof req.query.q === 'string' ? req.query.q : undefined;
         const level = typeof req.query.level === 'string' ? parseInt(req.query.level, 10) : undefined;
 
-        const results = await storage.listGHIIs({
+        const all = await storage.listGHIIs({
             q,
             level: level !== undefined && !isNaN(level) ? level : undefined,
         });
 
+        // Keep only members who opted in. Best-effort per-profile read of the opt-in key; a caller
+        // always sees THEIR OWN entry regardless (so they can confirm their listing took effect).
+        const callerOwner = req.auth!.owner;
+        const listed = [];
+        for (const r of all) {
+            if (r.ownerName === callerOwner) { listed.push(r); continue; }
+            const optIn = await storage.getMemory(r.ghii, `profile.${r.username}.directory_listed`);
+            if (optIn?.value === true) listed.push(r);
+        }
+
         res.json(success(config.nodeId, {
-            humans: results.map(r => ({
+            humans: listed.map(r => ({
                 ghii: r.ghii,
                 display_name: r.displayName,
                 bio: r.bio,
@@ -1405,7 +1420,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 verification_level: r.verificationLevel,
                 created_at: r.createdAt,
             })),
-            total: results.length,
+            total: listed.length,
         }));
     });
 
@@ -1491,6 +1506,8 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
+        // Directory opt-in state (the member "phone book") — owner-controlled memory key.
+        const dirKey = await storage.getMemory(ghiiRecord.ghii, `profile.${ghiiRecord.username}.directory_listed`);
         res.json(success(config.nodeId, {
             ghii: ghiiRecord.ghii,
             display_name: ghiiRecord.displayName,
@@ -1498,6 +1515,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             avatar: ghiiRecord.avatar,
             locale: ghiiRecord.locale,
             notification_email: ghiiRecord.notificationEmail ?? null,
+            directory_listed: dirKey?.value === true,
             verification_level: ghiiRecord.verificationLevel,
             email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
             // Whether a password has been set. Accounts created via OAuth (e.g. Google
@@ -1520,8 +1538,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
-        // Get agents owned by this human
-        const agents = await storage.getAgentsByOwner(record.ownerName);
+        // The AGENT ROSTER (each agent's GAII) is not public data — same principle as the organism
+        // roster. Only the profile's OWNER (a real signed-in principal) or an operator gets it; the
+        // shared anonymous identity and other users get the profile without the agent list.
+        const isOwner = !!req.auth && !req.auth.anonymous && req.auth.owner === record.ownerName;
+        const isOperator = !!req.auth && !req.auth.anonymous && req.auth.roles?.includes('operator');
+        const includeAgents = isOwner || isOperator;
+        const agents = includeAgents ? await storage.getAgentsByOwner(record.ownerName) : [];
 
         res.json(success(config.nodeId, {
             ghii: record.ghii,
@@ -1532,11 +1555,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verification_level: record.verificationLevel,
             semantic: record.semantic,
             created_at: record.createdAt,
-            agents: agents.map(a => ({
-                gaii: a.gaii,
-                display_name: a.displayName,
-                trust_score: a.trustScore,
-            })),
+            ...(includeAgents ? {
+                agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+            } : {}),
         }));
     });
 
@@ -1549,7 +1570,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
-        const { display_name, bio, avatar, locale, notification_email } = req.body ?? {};
+        const { display_name, bio, avatar, locale, notification_email, directory_listed } = req.body ?? {};
         const updates: Record<string, unknown> = {};
         if (typeof display_name === 'string') updates.displayName = display_name;
         if (typeof bio === 'string') updates.bio = bio;
@@ -1557,15 +1578,39 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         if (typeof locale === 'string') updates.locale = locale;
         if (typeof notification_email === 'string') updates.notificationEmail = notification_email;
 
-        if (Object.keys(updates).length === 0) {
+        // Directory opt-in (the member "phone book"). Stored as an owner-controlled memory key
+        // rather than a profile column: default OFF (unlisted), and only GET /v1/ghii/list entries
+        // whose key is true appear — and that list itself requires a signed-in caller. Toggling it
+        // is a valid standalone update (no other field required).
+        const togglingDirectory = typeof directory_listed === 'boolean';
+        if (!togglingDirectory && Object.keys(updates).length === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid fields to update'));
             return;
         }
 
-        const updated = await storage.updateGHII(ghiiRecord.ghii, updates);
-        if (!updated) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update profile'));
-            return;
+        let updated = ghiiRecord;
+        if (Object.keys(updates).length > 0) {
+            const u = await storage.updateGHII(ghiiRecord.ghii, updates);
+            if (!u) {
+                res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update profile'));
+                return;
+            }
+            updated = u;
+        }
+
+        if (togglingDirectory) {
+            const now = new Date().toISOString();
+            await storage.setMemory({
+                key: `profile.${ghiiRecord.username}.directory_listed`,
+                ownerGaii: ghiiRecord.ghii,
+                value: directory_listed,
+                visibility: 'public',
+                tags: ['profile', 'directory'],
+                ttlHours: null,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
         }
 
         res.json(success(config.nodeId, {
@@ -1575,6 +1620,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             avatar: updated.avatar,
             locale: updated.locale,
             verification_level: updated.verificationLevel,
+            ...(togglingDirectory ? { directory_listed } : {}),
             updated_at: updated.updatedAt,
         }));
         emitChange('ghii');

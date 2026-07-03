@@ -4536,6 +4536,8 @@
       "profileBtn": "Profile",
       "editLocaleHint": "Your preferred language. Used for the portal UI; agents can read it from your profile to answer in it.",
       "editEmailLink": "Change in the Email tab →",
+      "editDirectoryListed": "List me in the member directory",
+      "editDirectoryHint": "Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.",
       "pwMin": "At least 8 characters",
       "pwUpper": "An uppercase letter",
       "pwLower": "A lowercase letter",

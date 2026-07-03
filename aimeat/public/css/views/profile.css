@@ -1802,6 +1802,11 @@
   border: 1px solid var(--border-soft, #f0f0ec);
 }
 .pf-edit-hint { font-size: .75rem; color: var(--text-dim, #9CA3AF); }
+/* Directory opt-in checkbox row (member "phone book"). */
+.pf-edit-check { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
+.pf-edit-check input { margin-top: .2rem; flex-shrink: 0; }
+.pf-edit-check > span { display: flex; flex-direction: column; gap: .15rem; }
+.pf-edit-check-title { font-size: .9rem; }
 .pf-edit-error { font-size: .81rem; color: var(--danger, #ef4444); padding: 8px 12px; background: var(--danger-soft, #FEF2F2); border-radius: 8px; }
 .pf-edit-footer {
   display: flex; justify-content: flex-end; gap: 10px;

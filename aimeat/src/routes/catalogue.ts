@@ -214,10 +214,11 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     }));
   });
 
-  // GET /v1/catalogue/directory — people directory search (Tier 0, Phase 1.4)
-  // Consent note: DirectoryService only indexes profiles with an active "federation"
-  // consent grant, so all entries returned here have already opted in to public listing.
-  router.get('/v1/catalogue/directory', async (req, res) => {
+  // GET /v1/catalogue/directory — people directory search (the member "phone book").
+  // Privacy: (1) requireAuth() — you must be a SIGNED-IN user to browse it (the anonymous internet
+  // is rejected); (2) opt-in — DirectoryService only indexes profiles with an active "federation"
+  // consent grant, so every entry has already opted in to being listed.
+  router.get('/v1/catalogue/directory', requireAuth(), async (req, res) => {
     if (!directoryService) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
       return;

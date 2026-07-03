@@ -49,7 +49,10 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     filters.page = parseInt(req.query.page as string) || 1;
     filters.perPage = parseInt(req.query.per_page as string) || 20;
 
-    if (!req.auth) {
+    // Anonymous callers (incl. the shared anonymous identity injected by global optionalAuth in
+    // anonymous mode — req.auth is TRUTHY then) see only PUBLIC + active capabilities. Testing
+    // `!req.auth` alone leaked owner-marked-private rows (ownerGhii, webhookUrl) to the anon internet.
+    if (!req.auth || req.auth.anonymous) {
       filters.visibility = 'public';
       if (!filters.status) filters.status = 'active';
     }
