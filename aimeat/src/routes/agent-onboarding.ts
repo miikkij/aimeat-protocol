@@ -222,6 +222,29 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     }
 
     const steps = createDefaultSteps(agent.mode);
+
+    // Preserve progress across re-starts: carry over the 'passed' status of every step that also
+    // exists in the (possibly mode-changed) new flow. Re-running start must NEVER discard a
+    // legitimately-completed step -- that reset is what stranded the api_call steps
+    // (identify_platform / install_skill / publish_config) at e.g. 4/7 when onboarding was
+    // re-started underneath a running deterministic driver. The test-task pair is exempt: it is a
+    // cheap auto-active smoke test and preserving it would dangle a stale testTaskId, so it always
+    // starts fresh (recreated below).
+    const existing = await storage.getOnboarding(agentGaii);
+    if (existing) {
+      const priorById = new Map(existing.steps.map(s => [s.id, s]));
+      for (const step of steps) {
+        if (step.id === 'accept_test_task' || step.id === 'complete_test_task') continue;
+        const prior = priorById.get(step.id);
+        if (prior?.status === 'passed') {
+          step.status = 'passed';
+          step.validatedAt = prior.validatedAt;
+          step.validationMethod = prior.validationMethod;
+          step.details = prior.details;
+        }
+      }
+    }
+
     // First step is always `authenticate` -- auto-pass it from the agent record
     const authStep = steps.find(s => s.id === 'authenticate');
     if (authStep) {
@@ -234,7 +257,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     const userAgent = req.headers['user-agent'];
     const detected = detectPlatform(userAgent as string | undefined);
     const platformStep = steps.find(s => s.id === 'identify_platform');
-    if (detected && platformStep) {
+    if (detected && platformStep && platformStep.status !== 'passed') {
       platformStep.status = 'passed';
       platformStep.validatedAt = new Date().toISOString();
       platformStep.validationMethod = 'automatic';
@@ -246,18 +269,25 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       });
     }
 
-    // Create a test task only when the agent's Hello Integration includes
-    // accept_test_task / complete_test_task (i.e. non-task-runner modes).
+    // Create a test task whenever the agent's Hello Integration includes
+    // accept_test_task / complete_test_task (both task-runner and the full flows do).
     const acceptStep = steps.find(s => s.id === 'accept_test_task');
     if (acceptStep) {
       const testTaskId = randomUUID();
+      const testNow = new Date().toISOString();
+      // The onboarding test task is a throwaway smoke test, NOT real work, so it is created
+      // 'active' for EVERY mode -- the agent can propose todos, execute, and complete it
+      // immediately without the owner having to click "Start" in the dashboard. The owner-
+      // approval gate (queued -> owner /start -> active) exists to guard REAL tasks; it does
+      // not belong on the Hello Integration smoke test. Real tasks still follow the mode gate
+      // (task-runner auto-activates on create; other modes stay queued -- see agent-tasks.ts).
       const testTask = {
         id: testTaskId,
         agentGaii,
         ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
         title: t(req, 'agentOnboarding.errors.testTaskTitle'),
         description: t(req, 'agentOnboarding.errors.testTaskDescription'),
-        status: 'queued' as const,
+        status: 'active' as const,
         scope: [],
         rules: [],
         todos: [],
@@ -265,14 +295,22 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
           userExpects: 'Agent completes the onboarding test task successfully',
           technicalChecks: [],
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: testNow,
+        updatedAt: testNow,
+        lastEventAt: testNow,
       };
       await storage.createAgentTask(testTask);
+      // Record the auto-start so the task's event history matches an owner-approved start.
+      await storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: testTaskId,
+        type: 'started',
+        message: 'Onboarding test task auto-started (Hello Integration smoke test — no owner approval needed)',
+        timestamp: testNow,
+      });
       acceptStep.details = { testTaskId };
     }
 
-    const existing = await storage.getOnboarding(agentGaii);
     const now = new Date().toISOString();
 
     let onboarding;
