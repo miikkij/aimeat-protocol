@@ -421,6 +421,14 @@ await test('14. POST start to get a fresh onboarding with test task', async () =
     assert(taskStep, 'accept_test_task step must exist');
     assert(typeof taskStep.details?.testTaskId === 'string', 'accept_test_task should have testTaskId');
     fullTestTaskId = taskStep.details.testTaskId;
+
+    // The onboarding test task is a smoke test: it must be created 'active' (auto-started) for
+    // every mode, so the agent can execute + complete it without the owner clicking "Start".
+    const { body: taskBody } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(taskBody.data.task.status === 'active',
+        `onboarding test task should be created active, got ${taskBody.data.task.status}`);
 });
 
 await test('15. Step 1: authenticate is auto-passed', async () => {
@@ -751,6 +759,40 @@ await test('31. Task completion health reflects completed test task', async () =
     assert(ob.healthComponents.taskCompletion === 1, `taskCompletion should be 1.0 (1 done, 0 failed), got ${ob.healthComponents.taskCompletion}`);
 });
 
+await test('31b. Re-running onboarding/start preserves already-passed steps (no reset)', async () => {
+    // Snapshot the non-test-task steps that are currently passed.
+    const before = await json(`/v1/agents/${agentName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const passedBefore: string[] = before.body.data.onboarding.steps
+        .filter((s: any) => s.status === 'passed' && s.id !== 'accept_test_task' && s.id !== 'complete_test_task')
+        .map((s: any) => s.id);
+    assert(passedBefore.includes('identify_platform'),
+        'precondition: identify_platform should be passed before the re-start');
+
+    // Re-start onboarding -- this must NOT discard legitimately-passed api_call/config steps
+    // (the reset that stranded agents at 4/7). The test-task pair is the only thing reset.
+    const { status } = await json(`/v1/agents/${agentName}/onboarding/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `re-start status ${status}`);
+
+    const after = await json(`/v1/agents/${agentName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const statusById = new Map<string, string>(
+        after.body.data.onboarding.steps.map((s: any) => [s.id, s.status]),
+    );
+    for (const id of passedBefore) {
+        assert(statusById.get(id) === 'passed',
+            `step '${id}' must stay passed across a re-start, got '${statusById.get(id)}'`);
+    }
+    // The test-task pair is exempt -- it resets to pending and a fresh (auto-active) test task is made.
+    assert(statusById.get('accept_test_task') === 'pending',
+        `accept_test_task should reset to pending on re-start, got '${statusById.get('accept_test_task')}'`);
+});
+
 // ─── Phase 9: Auto-check tests ───
 console.log('\nPhase 9 -- Auto-Check on GET');
 
@@ -860,11 +902,18 @@ await test('35. Provision server state for auto-checkable steps (no POST step ye
     });
     assert(todoStatus === 200, `PATCH task todos failed: ${todoStatus}`);
 
-    const { status: startStatus } = await json(`/v1/agents/${agent2Name}/tasks/${autoTestTaskId}/start`, {
-        method: 'POST',
+    // The onboarding test task is created 'active' (auto-started smoke test), so it is ready to
+    // complete directly. Only POST /start if it is somehow still queued (defensive).
+    const { body: autoTaskState } = await json(`/v1/agents/${agent2Name}/tasks/${autoTestTaskId}`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(startStatus === 200, `POST task start failed: ${startStatus}`);
+    if (autoTaskState.data.task.status === 'queued') {
+        const { status: startStatus } = await json(`/v1/agents/${agent2Name}/tasks/${autoTestTaskId}/start`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(startStatus === 200, `POST task start failed: ${startStatus}`);
+    }
 
     const { status: doneStatus } = await json(`/v1/agents/${agent2Name}/tasks/${autoTestTaskId}/complete`, {
         method: 'POST',
