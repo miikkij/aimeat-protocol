@@ -91,7 +91,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/boards — list boards (public boards no auth, private/shared need auth)
   router.get('/v1/boards', async (req, res) => {
     const boards = await storage.listBoards();
-    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    // The shared anonymous identity (global optionalAuth in anonymous mode) is NOT a real
+    // principal — treat it as anonymous so the owner_gaii/allowed_gaiis (board member roster)
+    // fields below are never handed to the anon internet.
+    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
 
     const visible = boards.filter(b => {
       if (b.visibility === 'public' || b.visibility === 'system') return true;

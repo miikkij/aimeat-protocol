@@ -4536,6 +4536,8 @@
       "profileBtn": "Profiili",
       "editLocaleHint": "Ensisijainen kielesi. Käytetään portaalin käyttöliittymässä; agentit voivat lukea sen profiilistasi ja vastata sillä.",
       "editEmailLink": "Vaihda Sähköposti-välilehdellä →",
+      "editDirectoryListed": "Näytä minut jäsenluettelossa",
+      "editDirectoryHint": "Oletuksena pois päältä. Päällä muut kirjautuneet jäsenet löytävät sinut (nimi, bio, avatar) luettelosta. Anonyymit vierailijat eivät koskaan näe sitä.",
       "pwMin": "Vähintään 8 merkkiä",
       "pwUpper": "Iso kirjain",
       "pwLower": "Pieni kirjain",

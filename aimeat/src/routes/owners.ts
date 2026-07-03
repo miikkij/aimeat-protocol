@@ -129,7 +129,10 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('owners');
   });
 
-  // GET /v1/owners/:name — public owner profile
+  // GET /v1/owners/:name — public owner profile. The AGENT ROSTER (GAIIs) and ROLES (which would
+  // disclose who the operators are) are NOT public — only the owner themselves (a real signed-in
+  // principal) or an operator sees them; the shared anonymous identity and other users get the
+  // minimal public card.
   router.get('/v1/owners/:name', async (req, res) => {
     const owner = await storage.getOwner(req.params.name);
     if (!owner) {
@@ -137,18 +140,19 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const agents = await storage.getAgentsByOwner(owner.name);
+    const isSelf = !!req.auth && !req.auth.anonymous && req.auth.owner === owner.name;
+    const isOperator = !!req.auth && !req.auth.anonymous && req.auth.roles?.includes('operator');
+    const privileged = isSelf || isOperator;
+    const agents = privileged ? await storage.getAgentsByOwner(owner.name) : [];
 
     res.json(success(config.nodeId, {
       name: owner.name,
       display_name: owner.displayName,
-      roles: owner.roles,
-      agents: agents.map(a => ({
-        gaii: a.gaii,
-        display_name: a.displayName,
-        trust_score: a.trustScore,
-      })),
       created_at: owner.createdAt,
+      ...(privileged ? {
+        roles: owner.roles,
+        agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+      } : {}),
     }));
   });
 

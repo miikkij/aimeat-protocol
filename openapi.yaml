@@ -14601,13 +14601,17 @@ paths:
   /v1/catalogue/directory:
     get:
       operationId: searchDirectory
-      summary: Search the people directory
+      summary: Search the people directory (the member "phone book")
       description: |
-        Search the people directory with faceted filtering. Supports filtering
-        by type, city, area, country, interests, and geo-radius. Returns
-        paginated results with facet counts for cities and interests.
-        No authentication required (Tier 0).
+        Search the people directory with faceted filtering (type, city, area, country,
+        interests, geo-radius) with facet counts.
+
+        Privacy (2026-07-03): **requires authentication** — you must be a signed-in user to
+        browse the directory (the anonymous internet is rejected). Entries are opt-in: only
+        profiles that chose to be listed appear.
       tags: [Directories]
+      security:
+        - BearerAuth: []
       parameters:
         - name: type
           in: query
