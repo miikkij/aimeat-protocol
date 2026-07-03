@@ -162,6 +162,42 @@ def _install_propose_todos_repair(tool: Any) -> None:
         pass
 
 
+def _install_agent_name_default(tool: Any, agent_name: str) -> None:
+    """
+    Default a tool's `agent_name` arg to THIS liaison's agent when the caller leaves it blank.
+
+    A SHARED ``aimeat connect serve`` daemon fronts every agent in a fleet; each aimeat_* tool routes
+    by its ``agent_name`` parameter and FALLS BACK to the daemon's PRIMARY agent when it is absent. A
+    caller that omits agent_name -- the deterministic Hello Integration driver, or any raw liaison tool
+    call -- therefore reads/writes the WRONG agent: e.g. ``aimeat_onboarding_status`` returns the
+    primary's completed 7/7, so the driver concludes "done" and never drives THIS agent's steps, and it
+    stalls at its auto-passed steps. (Proven: same tool with/without agent_name returns 4/7 vs 7/7.)
+
+    Inject agent_name BEFORE validation (so the None-strip in _strip_none_kwargs can't drop it), only
+    for tools whose schema actually declares agent_name, and only when the caller left it blank -- an
+    explicit agent_name always wins. Same single-choke-point trick as _install_propose_todos_repair.
+    """
+    schema = getattr(tool, "args_schema", None)
+    if not isinstance(schema, type):
+        return
+    if "agent_name" not in getattr(schema, "model_fields", {}):
+        return  # this tool does not route by agent_name -- nothing to default
+
+    class _AgentNameDefaultedSchema(schema):  # type: ignore[valid-type,misc]
+        @classmethod
+        def model_validate(cls, obj: Any, *args: Any, **kwargs: Any) -> Any:
+            if isinstance(obj, dict) and not obj.get("agent_name"):
+                obj = {**obj, "agent_name": agent_name}
+            return super().model_validate(obj, *args, **kwargs)
+
+    _AgentNameDefaultedSchema.__name__ = getattr(schema, "__name__", "Args")
+    _AgentNameDefaultedSchema.__qualname__ = _AgentNameDefaultedSchema.__name__
+    try:
+        tool.args_schema = _AgentNameDefaultedSchema
+    except Exception:  # pragma: no cover -- defensive; never break tool wiring
+        pass
+
+
 def _strip_none_kwargs(tool: Any) -> Any:
     """
     Wrap a CrewAI tool so its `_run` filters out kwargs where the value is None
@@ -713,6 +749,13 @@ def create_liaison_agent(
         # zod .optional() validation. See _strip_none_kwargs docstring.
         tools = [_strip_none_kwargs(t) for t in tools]
 
+        # Default agent_name to THIS agent on every routed tool, so a SHARED serve daemon does not
+        # answer as its PRIMARY agent when a caller (the onboarding driver, a raw tool call) omits it.
+        # See _install_agent_name_default. Requires the resolved agent_name.
+        if agent_name:
+            for t in tools:
+                _install_agent_name_default(t, agent_name)
+
         # Append the local offers tools (offline validate + REST publish). They
         # are NOT part of the MCP surface, so the tool_filter above never reaches
         # them -- without this, the backstory's references to aimeat_offers_check
@@ -763,7 +806,7 @@ def create_liaison_agent(
                 pass
 
 
-def liaison_tools(mcp_server_params: Any) -> list[Any]:
+def liaison_tools(mcp_server_params: Any, agent_name: str | None = None) -> list[Any]:
     """
     Return the raw list of AIMEAT MCP tools without wrapping them in a CrewAI
     Agent. Use this when you want to attach AIMEAT tools to your OWN custom
@@ -776,9 +819,17 @@ def liaison_tools(mcp_server_params: Any) -> list[Any]:
 
     Args:
         mcp_server_params: Same as `create_liaison_agent`.
+        agent_name: When set, every routed tool defaults its `agent_name` arg to
+            this value so a SHARED `aimeat connect serve` daemon does not answer
+            as its PRIMARY agent for calls that omit it (the cause of onboarding
+            stalls on multi-agent fleets). Pass the agent these tools speak for.
 
     Returns:
         The list of tool objects discovered through the MCP adapter.
     """
     adapter = MCPServerAdapter(mcp_server_params)
-    return [_strip_none_kwargs(t) for t in adapter.tools]
+    tools = [_strip_none_kwargs(t) for t in adapter.tools]
+    if agent_name:
+        for t in tools:
+            _install_agent_name_default(t, agent_name)
+    return tools
