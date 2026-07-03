@@ -7,6 +7,8 @@
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-07-03 — Contract engagements: active/retired lifecycle chips (Adopt writes an active
+ *     engagement, Retire flips it to retired), a legacy-agent one-click Retire, and re-adopt.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -14,6 +16,13 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+
+/** Short calendar day for a retired-since stamp (locale date, no time). '' if absent/unparseable. */
+function fmtDay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+}
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { Mermaid } from '/components/Mermaid.js';
@@ -33,24 +42,64 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   // straight away which of their agents can serve it.
   const [contractAgents, setContractAgents] = useState([]);
   const [adoptBusy, setAdoptBusy] = useState('');   // `${gaii}:${contract}` of the in-flight adopt
+  // Engagements = the first-class (agent × contract × workspace) bindings with an active/retired
+  // lifecycle. They drive the chips below (vs. the coarse "active here" record trace), so a contract
+  // can be adopted AND retired — a real off-switch, and retired ones stay as "used here until <date>".
+  const [engagements, setEngagements] = useState([]);
+  const [retireBusy, setRetireBusy] = useState('');
   useEffect(() => {
     listAgents().then(a => setContractAgents((a || []).filter(offersWorkspaceContract))).catch(() => {});
   }, []);
-  // One-click adoption: queue the agreed adopt-contract task (docs/agent-workspace-contracts.md
-  // §7c) — the agent provisions its contract's spaces itself and the task completion is the ack.
+  // The engagement for (agent, contract) in THIS workspace, or undefined. contract '' = bare marker.
+  const engFor = (a, contract) => engagements.find(e => e.agent === a.gaii && (e.contract || '') === (contract || ''));
+  // One-click adoption: write an ACTIVE engagement (immediately visible + the source of truth the
+  // agent's loop obeys) AND queue the agreed adopt-contract task (docs/agent-workspace-contracts.md
+  // §7c) so the agent provisions its contract's spaces itself and reports back.
   const adopt = async (a, contract) => {
     const key = `${a.gaii}:${contract || ''}`;
     setAdoptBusy(key);
     try {
+      await orgService.activateEngagement(orgId, wsId, a.gaii, contract).catch(() => {});
       const r = await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract });
       if (r?.ok === false) showToast?.(r?.error?.message || (t('organisms.adoptFailed') || 'Could not queue the adoption task'));
       else showToast?.((t('organisms.adoptQueued') || 'Adoption task queued for {agent} — it provisions the contract and reports back').replace('{agent}', a.display_name || a.name));
+      await refreshEngagements();
     } catch (e) { showToast?.((e && e.message) || (t('organisms.adoptFailed') || 'Could not queue the adoption task')); }
     finally { setAdoptBusy(''); }
   };
+  // Retire a contract engagement — the agent's loop then skips this workspace. Works even with no
+  // prior engagement (a pre-contracts agent, "active here" only from record traces): it writes a
+  // retired marker so the history reads "used here until <date>".
+  const retire = async (a, contract) => {
+    const key = `${a.gaii}:${contract || ''}`;
+    setRetireBusy(key);
+    try {
+      const r = await orgService.retireEngagement(orgId, wsId, a.gaii, contract);
+      if (r?.ok === false) showToast?.(r?.error?.message || (t('organisms.retireFailed') || 'Could not retire the contract'));
+      else showToast?.((t('organisms.retired') || '{agent} retired from this workspace').replace('{agent}', a.display_name || a.name));
+      await refreshEngagements();
+    } catch (e) { showToast?.((e && e.message) || (t('organisms.retireFailed') || 'Could not retire the contract')); }
+    finally { setRetireBusy(''); }
+  };
+  // Retire every advertised contract of an agent from this workspace (used for a "legacy" agent that
+  // is working here — trace only — with no engagement records yet, so one click stops it entirely).
+  const retireAll = async (a) => {
+    const names = contractNamesOf(a);
+    const actions = names.length ? names : [''];
+    setRetireBusy(`${a.gaii}:*`);
+    try {
+      for (const c of actions) await orgService.retireEngagement(orgId, wsId, a.gaii, c).catch(() => {});
+      showToast?.((t('organisms.retired') || '{agent} retired from this workspace').replace('{agent}', a.display_name || a.name));
+      await refreshEngagements();
+    } finally { setRetireBusy(''); }
+  };
+  const refreshEngagements = () => orgService.getWorkspaceEngagements(orgId, wsId).then(setEngagements).catch(() => {});
   useEffect(() => {
     let cancelled = false;
-    const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    const fetchIt = () => {
+      orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+      orgService.getWorkspaceEngagements(orgId, wsId).then(e => { if (!cancelled) setEngagements(e); }).catch(() => {});
+    };
     fetchIt();
     const off = onLiveUpdate(['organisms'], fetchIt);
     return () => { cancelled = true; off(); };
@@ -83,24 +132,47 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
               <div class="pj-part-agents">
                 ${contractAgents.map(a => {
                   const names = contractNamesOf(a);
-                  // An agent already working in THIS workspace (it appears among the viewer's own
-                  // agents in the participants data) gets a ✓ instead of Adopt buttons — offering
-                  // adoption for an agent that is already here is noise, and the task would be a
-                  // no-op re-provision anyway.
-                  const here = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
-                  // One adopt action per advertised contract (a single unnamed one falls back to
-                  // the bare marker). The agent does the rest — join, provision, complete the task.
+                  // One control per advertised contract (a single unnamed one falls back to the bare
+                  // marker). The agent does the rest — join, provision, complete the task.
                   const actions = names.length ? names : [''];
+                  // "Legacy" = the agent appears in the record traces (it has worked here) but carries
+                  // no engagement record yet — it started before contracts were first-class. Offer one
+                  // agent-level Retire so it can be stopped; new adopts get precise per-contract chips.
+                  const traceHere = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
+                  const hasAnyEng = actions.some(c => engFor(a, c));
+                  const legacyActive = traceHere && !hasAnyEng;
                   return html`
                     <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
                       ${'📜 '}${a.display_name || a.name}
-                      ${here ? html`<span class="badge badge-success pj-mini" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}</span>`
-                        : actions.map(c => html`
-                        <button class="btn-outline btn-sm pj-adopt-btn" key=${c} disabled=${adoptBusy === `${a.gaii}:${c}`}
-                          title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
-                          onClick=${() => adopt(a, c)}>
-                          ${adoptBusy === `${a.gaii}:${c}` ? '…' : `${t('organisms.adoptContract') || 'Adopt'}${c ? ` ${c}` : ''}`}
-                        </button>`)}
+                      ${legacyActive ? html`
+                        <span class="badge badge-success pj-mini" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}</span>
+                        <button class="btn-ghost btn-sm pj-retire-btn" disabled=${retireBusy === `${a.gaii}:*`}
+                          title=${t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
+                          onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}</button>`
+                        : actions.map(c => {
+                          const eng = engFor(a, c);
+                          const label = c || (t('organisms.bareContract') || 'contract');
+                          const bkey = `${a.gaii}:${c}`;
+                          if (eng?.state === 'active') return html`
+                            <span class="pj-eng" key=${c}>
+                              <span class="badge badge-success pj-mini">${'✓ '}${label}</span>
+                              <button class="btn-ghost btn-sm pj-retire-btn" disabled=${retireBusy === bkey}
+                                title=${t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
+                                onClick=${() => retire(a, c)}>${retireBusy === bkey ? '…' : (t('organisms.retire') || 'Retire')}</button>
+                            </span>`;
+                          if (eng?.state === 'retired') return html`
+                            <span class="pj-eng" key=${c}>
+                              <span class="badge badge-muted pj-mini" title=${(t('organisms.retiredUntilHint') || 'Retired — this agent served here until this date. Its past work stays visible.')}>${label}${' · '}${t('organisms.retiredTag') || 'retired'} ${fmtDay(eng.retiredAt)}</span>
+                              <button class="btn-outline btn-sm pj-adopt-btn" disabled=${adoptBusy === bkey}
+                                onClick=${() => adopt(a, c)}>${adoptBusy === bkey ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}</button>
+                            </span>`;
+                          return html`
+                            <button class="btn-outline btn-sm pj-adopt-btn" key=${c} disabled=${adoptBusy === bkey}
+                              title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
+                              onClick=${() => adopt(a, c)}>
+                              ${adoptBusy === bkey ? '…' : `${t('organisms.adoptContract') || 'Adopt'}${c ? ` ${c}` : ''}`}
+                            </button>`;
+                        })}
                     </span>`;
                 })}
               </div>

@@ -265,6 +265,41 @@ it is omitted when the agent advertises only the bare `workspace-contract` marke
 the workspace creator grants the agent's owner the `contributor` role first (the same People panel) —
 the adopt task itself is created by the agent's OWN owner.
 
+## 7d. Contract engagements — the active/retired lifecycle (loop MUST obey this)
+
+Adoption used to be fire-and-forget: the task ran, the agent started polling, and the only record it
+was "here" was the trace of what it wrote. There was no way to see an agent's live contracts from the
+agent side, and no way to *stop* a same-owner agent from a workspace (it has no access grant to
+revoke). A **contract engagement** fixes this — a first-class record, one per **(agent × contract ×
+workspace)**, with an `active | retired` lifecycle:
+
+```jsonc
+{
+  "organism_id": "…", "ws": "ws-…",
+  "agent": "web-researcher#alice@node", "owner": "alice", "agentName": "web-researcher",
+  "contract": "research",                 // '' for the bare workspace-contract marker
+  "state": "active",                      // active | retired
+  "adoptedAt": "…", "adoptedBy": "alice",
+  "retiredAt": null, "retiredBy": null
+}
+```
+
+- **Adopt** (People panel, or `POST /v1/organisms/:id/workspace/engagements`) writes an `active`
+  engagement AND queues the §7c task. The engagement is the INTENT; the task provisions.
+- **Retire** (`POST …/workspace/engagements/retire`) flips it to `retired` (kept as history: "served
+  here until <date>"). Allowed for the agent's owner OR the workspace creator/admin.
+- Read them by workspace (`GET …/workspace/engagements?ws=`) or by agent
+  (`GET /v1/agents/:name/engagements`, same-owner). The agent-detail **Contracts** tab renders the
+  by-agent view; the workspace **People** panel renders the by-workspace chips.
+
+**The processing loop MUST respect engagements** (this is what makes Retire a real off-switch):
+
+- A workspace whose engagement for your (contract) is **`retired`** → **SKIP it** (do not process).
+- **`active`** → process normally.
+- **No engagement record** → legacy discovery (process by input-space presence, §5) AND write an
+  `active` engagement so the contract becomes visible (backfill-on-first-process). *(Python connector
+  follow-up — the node is the source of truth; `aimeat-crewai` mirrors it.)*
+
 ## 8. Checklist for building a workspace-processing agent
 
 1. Define the **contract** (inputs/outputs/schemas/lifecycle) — §2.

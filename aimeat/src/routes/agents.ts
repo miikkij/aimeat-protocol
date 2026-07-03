@@ -10,6 +10,7 @@
  *   app.use(agentsRouter(config, storage));
  * @version-history
  *   v1.0.0 -- 2026-03-15 -- Initial agent routes
+ *   v1.x -- 2026-07-03 -- Add GET /v1/agents/:name/engagements (same-owner contract-engagement list)
  *   v1.1.0 -- 2026-05-28 -- Expose owner-managed shared-memory tags
  *   v1.2.0 -- 2026-06-24 -- PATCH /tags is same-owner gated (was owner-role only); agents
  *     may now self-tag (parity with capabilities self-report + server-MCP tags_set). Tag pattern
@@ -48,6 +49,7 @@ import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../services/offer-prereqs.js';
 import { listWorkflows } from '../services/workflow/store.js';
 import { markAgentSeen, evictAgentTelemetry } from '../services/telemetry-buffer.js';
+import { listByAgent as listEngagementsByAgent } from '../services/workspace-engagements.js';
 
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
@@ -972,6 +974,41 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       tags: updated.tags ?? [],
     }));
     emitChange('agents');
+  });
+
+  // GET /v1/agents/:name/engagements — the agent's contract engagements across every organism/workspace
+  // (active + retired), for the agent-detail Contracts tab. Same-owner gated (only the owner sees where
+  // their agent works). Enriched with organism + workspace display names.
+  router.get('/v1/agents/:name/engagements', requireAuth(), requireRole('owner'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) { res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`)); return; }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only view engagements for agents you own')); return;
+    }
+    const engagements = await listEngagementsByAgent(storage, agent.owner, agent.name);
+    // Enrich with organism + workspace names (one lookup per distinct organism).
+    const orgIds = [...new Set(engagements.map(e => e.organism_id))];
+    const orgNames = new Map<string, string>();
+    const wsNames = new Map<string, string>();               // key: `${orgId}::${wsId}`
+    for (const orgId of orgIds) {
+      const org = await storage.getOrganism(orgId);
+      if (org) orgNames.set(orgId, org.name ?? orgId);
+      const { items } = await storage.listAllMemory({ prefix: `organism.${orgId}.meta.workspaces`, limit: 1000 });
+      for (const rec of items) {
+        if (rec.key !== `organism.${orgId}.meta.workspaces`) continue;
+        for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [])) {
+          if (w.id) wsNames.set(`${orgId}::${w.id}`, w.name ?? w.id);
+        }
+      }
+    }
+    const enriched = engagements.map(e => ({
+      ...e,
+      organismName: orgNames.get(e.organism_id) ?? e.organism_id,
+      wsName: wsNames.get(`${e.organism_id}::${e.ws}`) ?? e.ws,
+    }));
+    res.json(success(config.nodeId, { agent: agent.name, engagements: enriched }));
   });
 
   // PATCH /v1/agents/:name/mode — set agent operational mode
