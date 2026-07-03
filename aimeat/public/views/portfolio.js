@@ -3,6 +3,10 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.3.0 — 2026-07-03 — Public viewer renders full-bleed: portfolio iframe fills the
+ *     viewport below the nav (no more 900px column), slim toolbar with back link + owner
+ *     name + a native Fullscreen button; drop the dead contentDocument autosize hack
+ *     (opaque-origin sandbox always threw). Campsite: btn btn-* → btn-*.
  *   v1.2.0 — 2026-06-10 — Workflow round: ①②③ flow banner explains the AI-chat round-trip;
  *     group summaries show selected/total + select-all checkbox; Generate disabled with a hint
  *     when nothing is selected; "Custom" type and custom auth-gate open describe-textareas that
@@ -481,7 +485,7 @@ function PortfolioBuilder({ session, navigate }) {
           <span class="portfolio-published-dot">●</span>
           <span>${t('portfolio.builder.enabled')}</span>
           <a href=${publicUrl} target="_blank" class="portfolio-published-link">${t('portfolio.builder.viewPublic')}</a>
-          <button class="btn btn-ghost btn-sm" disabled=${uploading} onClick=${handleUnpublish}>
+          <button class="btn-ghost btn-sm" disabled=${uploading} onClick=${handleUnpublish}>
             ${tr('portfolio.builder.unpublish', 'Unpublish')}
           </button>
         </div>
@@ -684,7 +688,7 @@ function PortfolioBuilder({ session, navigate }) {
           <h3><span class="portfolio-step-number">4</span> ${t('portfolio.builder.step4Title')}</h3>
 
           <div class="portfolio-generate-row">
-            <button class="btn btn-primary" disabled=${totalSelected === 0} onClick=${handleGenerate}>
+            <button class="btn-primary" disabled=${totalSelected === 0} onClick=${handleGenerate}>
               ${t('portfolio.builder.generateBtn')}
             </button>
             ${totalSelected === 0 && html`
@@ -698,7 +702,7 @@ function PortfolioBuilder({ session, navigate }) {
             <div class="portfolio-prompt-actions">
               <${CopyButton} text=${generatedPrompt} className="btn-primary"
                 label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('portfolio.builder.promptCopied')} />
-              <button class="btn btn-ghost" onClick=${handleDownloadPrompt}>
+              <button class="btn-ghost" onClick=${handleDownloadPrompt}>
                 ${t('portfolio.builder.downloadPrompt')}
               </button>
             </div>
@@ -750,11 +754,11 @@ function PortfolioBuilder({ session, navigate }) {
           ></textarea>
           ${pastedHtml.trim() && html`
             <div class="portfolio-paste-actions">
-              <button class="btn btn-primary"
+              <button class="btn-primary"
                 onClick=${handlePublishPaste} disabled=${uploading}>
                 ${uploading ? '...' : tr('portfolio.builder.publishPaste', 'Publish pasted HTML')}
               </button>
-              <button class="btn btn-ghost" onClick=${() => setShowPreview(p => !p)}>
+              <button class="btn-ghost" onClick=${() => setShowPreview(p => !p)}>
                 ${showPreview ? tr('portfolio.builder.closePreview', 'Close preview') : tr('portfolio.builder.previewBtn', 'Preview')}
               </button>
             </div>
@@ -778,7 +782,7 @@ function PortfolioBuilder({ session, navigate }) {
       </div>
 
       <div style="margin-top:2rem;">
-        <button class="btn btn-ghost" onClick=${() => navigate('/v1/profile')}>
+        <button class="btn-ghost" onClick=${() => navigate('/v1/profile')}>
           ← ${tr('portfolio.builder.backToProfile', 'Profile')}
         </button>
       </div>
@@ -792,6 +796,7 @@ function PortfolioViewer({ username, navigate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState(null);
+  const frameRef = useRef(null);
 
   useEffect(() => {
     fetch(`${NODE_URL}/v1/portfolio/data/${encodeURIComponent(username)}`)
@@ -818,7 +823,7 @@ function PortfolioViewer({ username, navigate }) {
         <div class="portfolio-not-found">
           <h2>${t('portfolio.viewer.notFound')}</h2>
           <p>${t('portfolio.viewer.notFoundDesc')}</p>
-          <button class="btn btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
+          <button class="btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
             ${t('portfolio.viewer.backToPortal')}
           </button>
         </div>
@@ -826,25 +831,26 @@ function PortfolioViewer({ username, navigate }) {
     `;
   }
 
-  // If portfolio HTML exists, render it in a sandboxed iframe
+  // If portfolio HTML exists, render it full-bleed in a sandboxed iframe:
+  // the frame fills the viewport below the nav + toolbar, the portfolio
+  // scrolls inside it. The toolbar offers native fullscreen for a truly
+  // chrome-free view (Esc exits).
   if (data.has_html && data.portfolio_html) {
     return html`
-      <div class="portfolio-container portfolio-viewer">
-        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
-          <button class="btn btn-ghost" onClick=${() => navigate('/v1/portal')}>
+      <div class="portfolio-viewer-full">
+        <div class="portfolio-viewer-bar">
+          <button class="btn-ghost btn-sm" onClick=${() => navigate('/v1/portal')}>
             ← ${t('portfolio.viewer.backToPortal')}
           </button>
-          <span style="color:var(--text-dim);">${escHtml(data.display_name || username)}'s portfolio</span>
+          <span class="portfolio-viewer-owner">${escHtml(data.display_name || username)}'s portfolio</span>
+          <button class="btn-ghost btn-sm portfolio-viewer-fs"
+            title=${tr('portfolio.viewer.fullscreen', 'Fullscreen')}
+            onClick=${() => frameRef.current?.requestFullscreen?.()}>
+            ⛶ ${tr('portfolio.viewer.fullscreen', 'Fullscreen')}
+          </button>
         </div>
-        <iframe class="portfolio-viewer-frame" srcdoc=${data.portfolio_html}
-          sandbox="allow-scripts"
-          onLoad=${(e) => {
-            try {
-              const h = e.target.contentDocument?.body?.scrollHeight;
-              if (h) e.target.style.height = h + 40 + 'px';
-            } catch (_) { /* cross-origin — ignore */ }
-          }}
-        ></iframe>
+        <iframe ref=${frameRef} class="portfolio-viewer-frame portfolio-viewer-frame-full"
+          srcdoc=${data.portfolio_html} sandbox="allow-scripts"></iframe>
       </div>
     `;
   }
@@ -855,7 +861,7 @@ function PortfolioViewer({ username, navigate }) {
       <div class="portfolio-not-found">
         <h2>${escHtml(data.display_name || username)}</h2>
         <p>${data.bio ? escHtml(data.bio) : t('portfolio.viewer.notFoundDesc')}</p>
-        <button class="btn btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
+        <button class="btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
           ${t('portfolio.viewer.backToPortal')}
         </button>
       </div>
