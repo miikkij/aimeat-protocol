@@ -643,6 +643,7 @@ model Organism {
   joinPolicy       String   @default("open")
   maxMembers       Int      @default(100)
   visibility       String   @default("public")
+  memberVisibility String?
   moderationConfig Json
   memoryNamespace  String
   semantic         Json?

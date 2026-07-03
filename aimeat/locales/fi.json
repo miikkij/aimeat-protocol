@@ -7788,6 +7788,14 @@
     "fieldInterests": "Aiheet",
     "fieldType": "Tyyppi",
     "fieldVisibility": "Näkyvyys",
+    "memberVisLabel": "Jäsenlista",
+    "memberVisHint": "Kuka näkee ketkä kuuluvat tänne. Piilottaa vain jäsenLISTAN — sisällön tekijät (kommentit, tietueet, aktiviteetti) näkyvät silti, ja luoja/adminit näytetään aina.",
+    "memberVis": {
+      "authenticated": "Kirjautuneet käyttäjät",
+      "members": "Vain jäsenet",
+      "admins": "Vain adminit",
+      "public": "Julkinen (kaikki)"
+    },
     "formIdentity": "Identiteetti",
     "formAccess": "Pääsy",
     "addTag": "Lisää…",

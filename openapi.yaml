@@ -15096,6 +15096,15 @@ paths:
                   type: string
                   enum: [public, unlisted, private]
                   default: public
+                member_visibility:
+                  type: string
+                  enum: [public, authenticated, members, admins]
+                  default: authenticated
+                  description: >-
+                    Who may see the member ROSTER (the members/agentGaiis fields and the /members
+                    listing). Unset = authenticated (any signed-in caller) — the anonymous internet
+                    never sees rosters. 'public' is a deliberate opt-in. Creator + admins stay
+                    visible at every tier (accountability); admins/operator always see the roster.
       responses:
         '201':
           description: Organism created
@@ -15127,6 +15136,10 @@ paths:
         enumerable only by the member themself (authenticated as that owner or
         one of their agents) or an operator — for anyone else the member filter
         degrades to public organisms only (no private-membership disclosure).
+
+        Roster privacy: each returned organism's `members`/`agentGaiis` arrays are
+        redacted to `[]` when the caller is below that organism's `member_visibility`
+        tier; `member_count` (pre-redaction) and `members_hidden` are attached per item.
       tags: [Organisms]
       parameters:
         - name: type
@@ -15198,6 +15211,11 @@ paths:
       description: |
         Get detailed information about a specific organism including
         member count and board reference.
+
+        Roster privacy: when the caller is below the organism's `member_visibility`
+        tier, `organism.members`/`organism.agentGaiis` come back as `[]` and
+        `members_hidden: true` is set. `your_membership` ({ role, status } or null)
+        always answers "am I a member" for the caller; `member_count` stays.
       tags: [Organisms]
       parameters:
         - name: id
@@ -15217,7 +15235,21 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/OrganismRecord'
+                        type: object
+                        properties:
+                          organism:
+                            $ref: '#/components/schemas/OrganismRecord'
+                          member_count: { type: integer }
+                          readme: { type: string, nullable: true }
+                          members_hidden:
+                            type: boolean
+                            description: True when the roster was redacted for this caller
+                          your_membership:
+                            type: object
+                            nullable: true
+                            properties:
+                              role: { type: string }
+                              status: { type: string }
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -15275,6 +15307,13 @@ paths:
                 visibility:
                   type: string
                   enum: [public, unlisted, private]
+                member_visibility:
+                  type: string
+                  enum: [public, authenticated, members, admins]
+                  description: >-
+                    Who may see the member roster. 'public' = anyone (deliberate opt-in),
+                    'authenticated' = signed-in callers (the default), 'members' = active members,
+                    'admins' = creator/admins only.
       responses:
         '200':
           description: Organism updated
@@ -15446,9 +15485,12 @@ paths:
       operationId: listOrganismMembers
       summary: List organism members
       description: |
-        List all members of an organism. Public organisms show members
-        to anyone. Private organisms require membership to view.
-        Supports pagination.
+        List an organism's members, gated by the organism's `member_visibility`
+        tier ('public' | 'authenticated' (default) | 'members' | 'admins').
+        Below the tier the listing shrinks to the ACCOUNTABILITY rows — the
+        creator/admin rows plus the caller's own row — with `members_hidden: true`
+        and the TRUE `total` (a count is not an identity). Creator/admins and
+        operators always see the full roster.
 
         When the caller is an ACTIVE member of the organism (or an operator),
         each member row additionally carries `agents: [{gaii, name}]` — the

@@ -873,6 +873,13 @@ export interface OrganismRecord {
   joinPolicy: 'open' | 'approval_required' | 'invite_only';
   maxMembers: number;
   visibility: 'public' | 'listed' | 'private';
+  /** Who may see the member ROSTER (the members[]/agentGaiis fields + the /members listing):
+   *  'public' = anyone incl. anonymous (deliberate opt-in), 'authenticated' = any signed-in caller
+   *  (the DEFAULT when unset — anonymous internet never sees rosters), 'members' = active members,
+   *  'admins' = creator/admins only. Creator + admins stay visible regardless (accountability),
+   *  and operators/admins always see the full roster. Presentation-layer privacy: content
+   *  ATTRIBUTION (comments, versions, activity) is a separate concern and unaffected. */
+  memberVisibility?: 'public' | 'authenticated' | 'members' | 'admins';
   moderationConfig: {
     flagsEnabled: boolean;
     autoHideThreshold: number;

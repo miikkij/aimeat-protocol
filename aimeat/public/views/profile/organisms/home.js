@@ -12,6 +12,10 @@
  *     development timeline; rename the structure overview to "table of contents" (Osa A/C/D).
  *   v1.1.1 — 2026-06-23 — Mindmap space-node click now deep-links into the workspace on that space's
  *     tab (onOpenWs gained a second `space` arg); was opening the workspace overview.
+ *   v1.2.0 — 2026-07-03 — Roster privacy: Settings → Access gains the "Member list" visibility
+ *     select (member_visibility: signed-in default / members / admins / public) with an honest
+ *     hint (hides the LIST, not content authorship); isMember now prefers `your_membership` from
+ *     GET /:id since members[] can be roster-redacted for this caller.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
@@ -50,7 +54,10 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
   const isCreator = org.creatorGhii === ghii;
   const isAdmin = org.admins?.includes(ghii);
-  const isMember = org.members?.includes(ghii);
+  // members[] can be roster-redacted (memberVisibility) — your_membership from GET /:id is the
+  // caller-scoped truth, with the array as fallback for orgs whose roster this caller CAN see.
+  const [yourMembership, setYourMembership] = useState(null);
+  const isMember = (yourMembership?.status === 'active') || org.members?.includes(ghii);
   const canEdit = isCreator || isAdmin;
   const typeLabel = t(`organisms.types.${org.type}`) || org.type;
 
@@ -70,6 +77,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       if (cancelled) return;
       setGraph(g);
       setReadme(full?.data?.readme || '');
+      setYourMembership(full?.data?.your_membership ?? null);
       setTocSeed(toc || '');
     };
     loadExtras();
@@ -112,6 +120,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const baseline = useMemo(() => ({
     name: org.name || '', description: org.description || '', type: org.type || 'community',
     join_policy: org.joinPolicy || 'open', visibility: org.visibility || 'public',
+    member_visibility: org.memberVisibility || 'authenticated',
     interests: [...(org.interests || [])],
   }), [org]);
   const [form, setForm] = useState(baseline);
@@ -124,12 +133,14 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     const prev = prevBaselineRef.current;
     const untouched = form.name === prev.name && form.description === prev.description
       && form.type === prev.type && form.join_policy === prev.join_policy
-      && form.visibility === prev.visibility && form.interests.join(' ') === prev.interests.join(' ');
+      && form.visibility === prev.visibility && form.member_visibility === prev.member_visibility
+      && form.interests.join(' ') === prev.interests.join(' ');
     if (untouched) setForm(baseline);
     prevBaselineRef.current = baseline;
   }, [baseline]);  const dirty = form.name !== baseline.name || form.description !== baseline.description
     || form.type !== baseline.type || form.join_policy !== baseline.join_policy
     || form.visibility !== baseline.visibility
+    || form.member_visibility !== baseline.member_visibility
     || form.interests.join(' ') !== baseline.interests.join(' ');
   // Save doubles as the unsaved-changes indicator: enabled ⇔ something actually changed.
   const saveEdit = async () => {
@@ -138,7 +149,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     try {
       const result = await orgService.updateOrganism(org.id, {
         name: form.name.trim(), description: form.description.trim(),
-        type: form.type, join_policy: form.join_policy, visibility: form.visibility, interests: form.interests,
+        type: form.type, join_policy: form.join_policy, visibility: form.visibility,
+        member_visibility: form.member_visibility, interests: form.interests,
       });
       if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
@@ -262,8 +274,16 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
               <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
               <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
             </select></label>
+          <label class="pj-field"><span>${t('organisms.memberVisLabel') || 'Member list'}</span>
+            <select class="input-field input-sm" value=${form.member_visibility} onChange=${(e) => setForm(f => ({ ...f, member_visibility: e.target.value }))}>
+              <option value="authenticated">${t('organisms.memberVis.authenticated') || 'Signed-in users'}</option>
+              <option value="members">${t('organisms.memberVis.members') || 'Members only'}</option>
+              <option value="admins">${t('organisms.memberVis.admins') || 'Admins only'}</option>
+              <option value="public">${t('organisms.memberVis.public') || 'Public (anyone)'}</option>
+            </select></label>
         </div>
         ${hintText ? html`<div class="pj-form-hint">${hintText}</div>` : null}
+        <div class="pj-form-hint">${t('organisms.memberVisHint') || 'Who can see who belongs here. Hides the member LIST only — content authorship (comments, records, activity) stays visible, and the creator/admins are always shown.'}</div>
 
         <div class="form-actions">
           <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>

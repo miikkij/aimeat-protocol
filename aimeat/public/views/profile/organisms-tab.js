@@ -410,7 +410,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <div class="pj-org-stats">
           ${isMine && wsCounts[org.id] !== undefined ? html`
             <span class="pj-org-stat" title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${'📁'} ${wsCounts[org.id]}</span>` : null}
-          <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'👥'} ${(org.members || []).length}</span>
+          <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'👥'} ${org.member_count ?? (org.members || []).length}</span>
           <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'🤖'} ${(org.agentGaiis || []).length}</span>
           ${org.createdAt ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>` : null}
         </div>

@@ -38,6 +38,7 @@ import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
 import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
 import { setOrganismReadme } from '../services/organism-readme.js';
+import { canSeeMembers } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -89,7 +90,11 @@ export function registerOrganismsTools(
             const organism = await storage.getOrganism(id);
             if (!organism) return { contents: [{ uri: uri.toString(), text: 'Organism not found' }] };
             if (!(await canSeeOrganism(organism))) return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
-            const members = await storage.listMembers(id, { status: 'active' });
+            const allMembers = await storage.listMembers(id, { status: 'active' });
+            // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
+            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const members = canSeeRoster ? allMembers
+                : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
             return {
                 contents: [{
                     uri: uri.toString(),
@@ -106,7 +111,8 @@ export function registerOrganismsTools(
                         admins: organism.admins,
                         interests: organism.interests,
                         location: organism.location,
-                        member_count: members.length,
+                        member_count: allMembers.length,
+                        members_hidden: !canSeeRoster,
                         members: members.map(m => ({
                             id: m.id,
                             ghii: m.ghii,
@@ -176,7 +182,11 @@ export function registerOrganismsTools(
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             if (!(await canSeeOrganism(organism))) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
 
-            const members = await storage.listMembers(organism_id, { status: 'active' });
+            const allMembers = await storage.listMembers(organism_id, { status: 'active' });
+            // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
+            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const members = canSeeRoster ? allMembers
+                : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
 
             return {
                 content: [{
@@ -194,7 +204,8 @@ export function registerOrganismsTools(
                         admins: organism.admins,
                         interests: organism.interests,
                         location: organism.location,
-                        member_count: members.length,
+                        member_count: allMembers.length,
+                        members_hidden: !canSeeRoster,
                         members: members.map(m => ({
                             id: m.id,
                             ghii: m.ghii,
@@ -358,10 +369,16 @@ export function registerOrganismsTools(
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             if (!(await canSeeOrganism(organism))) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
 
-            const members = await storage.listMembers(organism_id, {
+            const allMembers = await storage.listMembers(organism_id, {
                 role,
                 status: status || 'active',
             });
+
+            // Roster privacy (memberVisibility): below the tier the listing shrinks to the
+            // accountability rows — creator/admins + the caller's own row (matches REST /members).
+            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const members = canSeeRoster ? allMembers
+                : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
 
             // Same-owner agents inherit a member's access implicitly — list them per member so
             // "who can touch this organism" is enumerable (matches the REST members route). Only
