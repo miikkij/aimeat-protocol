@@ -5,6 +5,8 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.13.1 — 2026-07-03 — Execution log line shows the human-readable job label (displayName when set,
+ *     falling back to name) plus the job type, instead of only the machine name `schedule:<id>`.
  *   v2.13.0 — 2026-07-01 — Light-vs-heavy seam: the tick no longer cheap-authors content (the one-shot
  *     authoring in the now-removed secretary-authoring.ts hallucinated). It now detects STRUCTURAL gaps
  *     (empty/thin workspaces, stale content, off-target KPIs) and proposes grounded Work Briefs a Builder
@@ -386,7 +388,7 @@ export class Scheduler {
 
     this.executing.add(job.id);
     const startTime = Date.now();
-    logger.info(`Scheduler executing job: ${job.id} (${job.name}) [${trigger}]`);
+    logger.info(`Scheduler executing job: ${job.id} (${job.displayName || job.name}) [${job.type}/${trigger}]`);
 
     let result: ExecutionLogEntry['result'] = 'success';
     let errorMessage: string | undefined;
@@ -467,12 +469,12 @@ export class Scheduler {
     }
 
     if (result === 'error') {
-      logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });
+      logger.error(`Scheduler job failed: ${job.id} (${job.displayName || job.name})`, { error: errorMessage, durationMs, trigger });
       this.notifyOwner(job, 'Schedule failed', errorMessage ?? 'Unknown error');
       return { code: 'error', detail: errorMessage };
     }
 
-    logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
+    logger.info(`Scheduler job completed: ${job.id} (${job.displayName || job.name}, ${durationMs}ms) [${trigger}]`, {
       memoryReads: run.reads.length,
       memoryWrites: run.writes.length,
     });
