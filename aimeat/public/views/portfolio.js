@@ -3,6 +3,11 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.3.1 — 2026-07-03 — Stamp the SPA's CSP nonce onto <script> tags before setting
+ *     srcdoc (viewer + builder preview): about:srcdoc inherits the parent document's
+ *     CSP (script-src 'self' 'nonce-…'), so the portfolio's nonce-less inline script
+ *     never executed. The sandbox (opaque origin, no allow-same-origin) remains the
+ *     security boundary — same trust level as the app-launch 'unsafe-inline' CSP.
  *   v1.3.0 — 2026-07-03 — Public viewer renders full-bleed: portfolio iframe fills the
  *     viewport below the nav (no more 900px column), slim toolbar with back link + owner
  *     name + a native Fullscreen button; drop the dead contentDocument autosize hack
@@ -30,6 +35,24 @@ import TagCloud from '/js/components/tag-cloud.js';
 import { CopyButton } from '/components/CopyButton.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+
+/* ── CSP nonce stamping for srcdoc iframes ──
+   about:srcdoc inherits the SPA document's CSP, whose script-src is
+   'self' + a per-request nonce (no 'unsafe-inline') — so a portfolio's
+   inline <script> is blocked unless it carries that nonce. Stamp the
+   SPA's own nonce onto the portfolio's script tags before rendering
+   (client-side mirror of src/utils/csp-nonce.ts). Isolation does not
+   rest on CSP here: the sandbox (allow-scripts only → opaque origin,
+   no session/cookies/storage) is the security boundary, matching the
+   'unsafe-inline' CSP the app-launch endpoint grants published apps. */
+function stampCspNonce(htmlStr) {
+  let nonce = '';
+  for (const s of document.scripts) {
+    if (s.nonce) { nonce = s.nonce; break; }
+  }
+  if (!nonce) return htmlStr;
+  return htmlStr.replace(/<script(?=[\s>])/gi, `<script nonce="${nonce}"`);
+}
 
 /* ── Auth helpers ── */
 function getSession() {
@@ -765,7 +788,7 @@ function PortfolioBuilder({ session, navigate }) {
           `}
           ${showPreview && pastedHtml.trim() && html`
             <!-- Same sandbox as the public viewer: opaque origin, no session access. -->
-            <iframe class="portfolio-viewer-frame portfolio-preview-frame" srcdoc=${pastedHtml}
+            <iframe class="portfolio-viewer-frame portfolio-preview-frame" srcdoc=${stampCspNonce(pastedHtml)}
               sandbox="allow-scripts"></iframe>
           `}
 
@@ -850,7 +873,7 @@ function PortfolioViewer({ username, navigate }) {
           </button>
         </div>
         <iframe ref=${frameRef} class="portfolio-viewer-frame portfolio-viewer-frame-full"
-          srcdoc=${data.portfolio_html} sandbox="allow-scripts"></iframe>
+          srcdoc=${stampCspNonce(data.portfolio_html)} sandbox="allow-scripts"></iframe>
       </div>
     `;
   }
