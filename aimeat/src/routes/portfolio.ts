@@ -1,3 +1,14 @@
+/**
+ * @file portfolio.ts
+ * @description Portfolio routes — builder content catalog, per-user portfolio config,
+ *   HTML upload (stored as a storage file), public showcase listing, and the public
+ *   portfolio-data endpoint consumed by the SPA viewer.
+ * @structure catalog / members / config (GET+PUT) / upload / data/:username
+ * @version-history
+ *   v1.1.0 — 2026-07-03 — Catalog memories entries carry the owning gaii so the builder
+ *     can compose anonymous public-read URLs (/v1/memory/:gaii/:key) into the prompt.
+ *   v1.0.0 — 2026-03-06 — Initial portfolio API.
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -77,8 +88,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       }));
     }
 
-    // Gather public/owner memory entries (exclude system keys)
-    const memories: Array<{ key: string; visibility: string; tags: string[]; preview: string }> = [];
+    // Gather public/owner memory entries (exclude system keys). gaii identifies the
+    // record's owning identity — the builder needs it to compose the anonymous
+    // public-read URL (/v1/memory/:gaii/:key) for the generated portfolio.
+    const memories: Array<{ key: string; gaii: string; visibility: string; tags: string[]; preview: string }> = [];
     for (const agent of agents) {
       const mems = await storage.listMemory(agent.gaii);
       for (const m of mems) {
@@ -95,7 +108,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
             }
             if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
           }
-          memories.push({ key: m.key, visibility: m.visibility, tags: m.tags || [], preview });
+          memories.push({ key: m.key, gaii: agent.gaii, visibility: m.visibility, tags: m.tags || [], preview });
         }
       }
     }
