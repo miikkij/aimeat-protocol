@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-07-03 — Contract engagements: active/retired lifecycle chips (Adopt writes an active
  *     engagement, Retire flips it to retired), a legacy-agent one-click Retire, and re-adopt.
+ *   v1.2.0 — 2026-07-03 — Collapse a fully-retired agent (every advertised contract retired, none active)
+ *     into ONE "retired from here" chip + Bring back, so contracts never used here don't read as history.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -93,6 +95,19 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
       await refreshEngagements();
     } finally { setRetireBusy(''); }
   };
+  // Bring a fully-retired agent back: re-adopt every advertised contract (inverse of retireAll). Used by
+  // the collapsed "retired from here" chip so one click puts the agent back to work in this workspace.
+  const readoptAll = async (a) => {
+    const names = contractNamesOf(a);
+    const actions = names.length ? names : [''];
+    setAdoptBusy(`${a.gaii}:*`);
+    try {
+      for (const c of actions) await orgService.activateEngagement(orgId, wsId, a.gaii, c).catch(() => {});
+      await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract: actions[0] }).catch(() => {});
+      showToast?.((t('organisms.broughtBack') || '{agent} is working here again').replace('{agent}', a.display_name || a.name));
+      await refreshEngagements();
+    } finally { setAdoptBusy(''); }
+  };
   const refreshEngagements = () => orgService.getWorkspaceEngagements(orgId, wsId).then(setEngagements).catch(() => {});
   useEffect(() => {
     let cancelled = false;
@@ -139,8 +154,16 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
                   // no engagement record yet — it started before contracts were first-class. Offer one
                   // agent-level Retire so it can be stopped; new adopts get precise per-contract chips.
                   const traceHere = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
-                  const hasAnyEng = actions.some(c => engFor(a, c));
+                  const engs = actions.map(c => engFor(a, c));
+                  const hasAnyEng = engs.some(Boolean);
+                  const activeCount = engs.filter(e => e?.state === 'active').length;
+                  const retiredCount = engs.filter(e => e?.state === 'retired').length;
                   const legacyActive = traceHere && !hasAnyEng;
+                  // Fully retired here: every advertised contract retired, none active — the one-click
+                  // "Retire from here" outcome. Collapse to ONE agent-level chip instead of a per-contract
+                  // "retired" row each, so contracts that never actually ran here don't read as history.
+                  const allRetired = activeCount === 0 && retiredCount > 0 && retiredCount === actions.length;
+                  const retiredAt = allRetired ? engs.filter(e => e?.state === 'retired').map(e => e.retiredAt).filter(Boolean).sort().slice(-1)[0] : null;
                   return html`
                     <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
                       ${'📜 '}${a.display_name || a.name}
@@ -149,6 +172,10 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
                         <button class="btn-ghost btn-sm pj-retire-btn" disabled=${retireBusy === `${a.gaii}:*`}
                           title=${t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
                           onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}</button>`
+                        : allRetired ? html`
+                        <span class="badge badge-muted pj-mini" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace — its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}</span>
+                        <button class="btn-outline btn-sm pj-adopt-btn" disabled=${adoptBusy === `${a.gaii}:*`}
+                          onClick=${() => readoptAll(a)}>${adoptBusy === `${a.gaii}:*` ? '…' : (t('organisms.bringBack') || 'Bring back')}</button>`
                         : actions.map(c => {
                           const eng = engFor(a, c);
                           const label = c || (t('organisms.bareContract') || 'contract');
