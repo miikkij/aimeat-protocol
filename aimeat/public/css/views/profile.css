@@ -4,6 +4,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.10.0 — 2026-07-03 — Contract-engagement chips: .pj-eng + .pj-retire-btn for the People panel.
  *   v2.9.0 — 2026-07-02 — Workspace Apps strip: .pj-apps-strip/-head/-title/-hint/-grid, launch
  *     cards .pj-app-card/-name/-desc/-meta/-missing, and the pin/unpin picker .pj-apps-picker(-row/
  *     -name/-owner) + .pj-apps-empty.
@@ -2181,6 +2182,10 @@
 .pj-contract-agents { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; background: var(--card); }
 /* The per-contract one-click adopt action inside a contract-agent chip. */
 .pj-adopt-btn { margin-left: 0.4rem; padding: 0.1rem 0.5rem; font-size: 0.78rem; }
+/* A per-contract engagement group (state badge + its adopt/retire action). */
+.pj-eng { display: inline-flex; align-items: center; gap: 0.2rem; }
+/* Retire an active contract engagement — quiet, so it reads as secondary to the green "active" badge. */
+.pj-retire-btn { margin-left: 0.25rem; padding: 0.1rem 0.5rem; font-size: 0.78rem; color: var(--text-dim); }
 .pj-draft-form { margin: 0.4rem 0; }
 .pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }

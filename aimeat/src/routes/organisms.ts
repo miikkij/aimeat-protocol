@@ -10,6 +10,8 @@
  *   - GET /v1/organisms/:id/workspace — manifest-driven, membership-gated workspace aggregation
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   v1.x -- 2026-07-03 -- Contract engagements: POST/GET /:id/workspace/engagements + /retire (first-class
+ *     agent×contract×workspace lifecycle; see src/services/workspace-engagements.ts).
  *   v1.1.0 -- 2026-06-07 -- Phase 3: add the generic GET /:id/workspace read.
  *   v1.2.0 -- 2026-06-07 -- Phase 4: gate primitive (approvals) + draft/publish/versioning + publish-gate.
  *   v1.3.0 -- 2026-06-08 -- Multi-workspace: one organism holds many workspaces under
@@ -93,6 +95,7 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth, MEMBER_VISIBILITY_VALUES } from '../services/organism-privacy.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, deriveWorkspaceEvents, aggregateParticipants } from '../services/workspace-enrichment.js';
+import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../services/workspace-engagements.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from '../services/archive.js';
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
@@ -2136,6 +2139,79 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!createdBy) return;
     const revoked = await revokeWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee);
     res.json(success(config.nodeId, { ws, grantee: parseGaiiLoose(grantee).owner || grantee, revoked }));
+  });
+
+  /* ── Contract engagements — the first-class link between an agent's contract capability and a
+   * workspace, with an active/retired lifecycle (docs/agent-workspace-contracts.md §7d). Adopt
+   * writes an `active` engagement; Retire flips it to `retired` (kept as history). Distinct from the
+   * derived "active here" trace: the engagement is INTENT, the trace is EVIDENCE. ── */
+
+  // Normalize an `agent` body field (full GAII or bare name → full GAII under the given owner).
+  const toAgentGaii = (agent: unknown, owner: string): string => {
+    const s = String(agent || '').trim();
+    return s.includes('#') ? s : `${s}#${owner}@${config.nodeId}`;
+  };
+
+  /* ── POST /v1/organisms/:id/workspace/engagements — ACTIVATE (adopt) a contract engagement. Body:
+   * { ws, agent, contract? }. The caller must own the agent (you bring your OWN agent in) and be a
+   * member of the organism. ── */
+  router.post('/v1/organisms/:id/workspace/engagements', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, agent, contract } = req.body ?? {};
+    if (!ws || typeof ws !== 'string' || !agent || typeof agent !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws and agent are required')); return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const agentGaii = toAgentGaii(agent, req.auth!.owner as string);
+    if ((parseGaiiLoose(agentGaii).owner || '') !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only adopt a contract for an agent you own')); return;
+    }
+    const eng = await activateEngagement(storage, config.nodeId, { orgId: id, ws, agentGaii, contract: typeof contract === 'string' ? contract : undefined, by: req.auth!.owner as string });
+    emitChange('organisms');
+    res.json(success(config.nodeId, { engagement: eng }));
+  });
+
+  /* ── POST /v1/organisms/:id/workspace/engagements/retire — RETIRE a contract engagement (real
+   * off-switch: an agent's processing loop skips a workspace whose engagement is retired). Body:
+   * { ws, agent, contract? }. Allowed for the agent's OWNER (my agent, I pull it) OR the workspace
+   * creator/admin (I run this workspace, I remove your agent). ── */
+  router.post('/v1/organisms/:id/workspace/engagements/retire', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, agent, contract } = req.body ?? {};
+    if (!ws || typeof ws !== 'string' || !agent || typeof agent !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws and agent are required')); return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerRole = await memberRole(req, organism, id);
+    if (!callerRole) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const agentGaii = toAgentGaii(agent, req.auth!.owner as string);
+    const ownsAgent = (parseGaiiLoose(agentGaii).owner || '') === req.auth!.owner;
+    if (!ownsAgent) {
+      // Not my agent → I must be able to manage this workspace's access to retire someone else's.
+      const entry = await findWsEntry(id, ws);
+      const createdBy = entry ? (entry.createdBy ?? bareOwner(entry.ownerGaii)) : null;
+      const isManager = createdBy === req.auth!.owner || callerRole === 'creator' || callerRole === 'admin';
+      if (!isManager) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the agent’s owner or the workspace creator can retire a contract')); return; }
+    }
+    const eng = await retireEngagement(storage, config.nodeId, { orgId: id, ws, agentGaii, contract: typeof contract === 'string' ? contract : undefined, by: req.auth!.owner as string });
+    emitChange('organisms');
+    res.json(success(config.nodeId, { engagement: eng }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/engagements?ws= — list the contract engagements declared in a
+   * workspace (active + retired), for the People panel chips. Member-gated. ── */
+  router.get('/v1/organisms/:id/workspace/engagements', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const engagements = await listEngagementsByWorkspace(storage, id, ws);
+    res.json(success(config.nodeId, { ws, engagements }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/activity?ws= — deterministic activity feed for a workspace,

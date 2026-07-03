@@ -53,6 +53,15 @@ export async function adoptContractTask(agentName, { organismId, ws, contract })
   });
 }
 
+/** The agent's contract engagements across every organism/workspace (active + retired), enriched
+ *  with organism + workspace display names. Powers the agent-detail Contracts tab. Returns array. */
+export async function getAgentEngagements(agentName) {
+  try {
+    const data = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/engagements`);
+    return Array.isArray(data?.data?.engagements) ? data.data.engagements : [];
+  } catch { return []; }
+}
+
 /** List chat session agents (name starts with 'session-'). */
 export async function listChatSessions(owner) {
   const agents = await listAgents(owner);

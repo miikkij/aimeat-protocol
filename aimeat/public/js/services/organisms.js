@@ -718,6 +718,29 @@ export async function revokeWorkspaceRole(orgId, ws, grantee) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/revoke`, { ws, grantee });
 }
 
+/* ── Contract engagements — the first-class (agent × contract × workspace) binding with an
+ * active/retired lifecycle. Adopt writes `active`; Retire flips to `retired` (kept as history).
+ * Distinct from the derived "active here" trace: the engagement is the deactivatable INTENT. ── */
+
+/** List the contract engagements declared in a workspace (active + retired). Returns array. */
+export async function getWorkspaceEngagements(orgId, ws) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/engagements?ws=${encodeURIComponent(ws)}`);
+    return Array.isArray(resp?.data?.engagements) ? resp.data.engagements : [];
+  } catch { return []; }
+}
+
+/** Activate (adopt) a contract engagement for one of your agents. `agent` = full GAII. */
+export async function activateEngagement(orgId, ws, agent, contract) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/engagements`, { ws, agent, contract });
+}
+
+/** Retire a contract engagement — the agent's loop then skips this workspace (real off-switch).
+ *  Allowed for the agent's owner or the workspace creator. `agent` = full GAII. */
+export async function retireEngagement(orgId, ws, agent, contract) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/engagements/retire`, { ws, agent, contract });
+}
+
 /* ── Public document-space sharing (meta.share) ──
  * Independent of the access roles above: this controls what PUBLISHED document-space pages are
  * readable by ANYONE with the public viewer link (no login). Creator/admin manages it. ── */

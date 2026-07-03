@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.14.0 -- 2026-07-03 -- Add Contracts sub-tab styles (.pf-agd-contracts, .agc-caps, .agc-list,
+ *     .agc-row, .agc-where, .agc-org, .agc-since) — agent-side contract-engagement visibility.
  *   v1.13.0 -- 2026-06-24 -- Secretary P5 (S-A): add .pf-agd-badge--specialist (specialist agent type badge).
  *   v1.12.0 -- 2026-06-22 -- Add .pf-agd-capwrap rule so the capabilities summary
  *     ("N tools · N skills · N langs") gets the card content inset (1rem) instead of
@@ -3646,3 +3648,18 @@
 .pf .pf-agd-json-bool { color: var(--accent, #E8564A); font-family: var(--font-mono, monospace); }
 .pf .pf-agd-json-null,
 .pf .pf-agd-json-empty { color: var(--text-muted, #9CA3AF); font-style: italic; }
+
+/* ── Contracts sub-tab — agent-side contract-engagement visibility (active / retired). ── */
+.pf .pf-agd-contracts { padding: 0.25rem 0; }
+.pf .pf-agd-contracts .agc-mt { margin-top: 1rem; }
+.pf .pf-agd-contracts .agc-caps { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0 0.2rem; }
+.pf .pf-agd-contracts .agc-list { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.4rem; }
+.pf .pf-agd-contracts .agc-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.45rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-xs, 6px);
+  background: var(--card);
+}
+.pf .pf-agd-contracts .agc-row--retired { opacity: 0.72; }
+.pf .pf-agd-contracts .agc-where { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; font-size: 0.85rem; }
+.pf .pf-agd-contracts .agc-org { color: var(--text-dim); font-size: 0.78rem; }
+.pf .pf-agd-contracts .agc-since { color: var(--text-muted); font-size: 0.75rem; }

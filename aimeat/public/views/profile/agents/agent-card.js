@@ -3,6 +3,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.19.0 -- 2026-07-03 -- Add Contracts sub-tab (tab-contracts.js) — agent-side contract-engagement view.
  *   v1.18.0 -- 2026-06-30 -- Onboarding step labels use tOr() so a missing agentOnboarding.steps.*
  *     key falls back to the server-provided step.title instead of rendering the raw key.
  *   v1.17.0 -- 2026-06-24 -- Secretary P5 (S-A): render a "Specialist · <role>" badge for agents tagged
@@ -71,6 +72,7 @@ import TabIntegration from './tab-integration.js';
 import TabTasks from './tab-tasks.js';
 import TabMessages from './tab-messages.js';
 import TabDataAccess from './tab-data-access.js';
+import TabContracts from './tab-contracts.js';
 import TabDirectives from './tab-directives.js';
 import TabAgentConfig from './tab-agent-config.js';
 import TabActivity from './tab-activity.js';
@@ -94,6 +96,7 @@ const TABS = [
   { id: 'tasks', key: 'profile.agents.detail.tabs.tasks' },
   { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
   { id: 'data-access', key: 'profile.agents.detail.tabs.data_access' },
+  { id: 'contracts', key: 'profile.agents.detail.tabs.contracts' },
   { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
   { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
   { id: 'schedules', key: 'profile.agents.detail.tabs.schedules' },
@@ -695,6 +698,7 @@ function renderTabContent(activeTab, agent, onboarding, session, showToast, allA
     case 'tasks': return html`<${TabTasks} ...${props} openTaskId=${openTaskId} openTaskNonce=${openTaskNonce} />`;
     case 'messages': return html`<${TabMessages} ...${props} />`;
     case 'data-access': return html`<${TabDataAccess} ...${props} />`;
+    case 'contracts': return html`<${TabContracts} ...${props} />`;
     case 'directives': return html`<${TabDirectives} ...${props} />`;
     case 'agent-config': return html`<${TabAgentConfig} ...${props} onDeleteClick=${onDeleteClick} />`;
     case 'activity': return html`<${TabActivity} ...${props} />`;

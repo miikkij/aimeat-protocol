@@ -6057,6 +6057,32 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/engagements:
+    get:
+      operationId: listAgentEngagements
+      summary: List an agent's contract engagements across all workspaces (same-owner)
+      description: |
+        The agent's contract engagements (active + retired) across every organism/workspace, enriched
+        with organism + workspace display names — powers the agent-detail Contracts tab. Same-owner
+        gated: only the owner sees where their agent works.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name or URL-encoded GAII
+      responses:
+        '200':
+          description: '{ agent, engagements: [{ organism_id, ws, agent, contract, state, adoptedAt, retiredAt, organismName, wsName }] }'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/checkin:
     post:
       operationId: agentCheckin
@@ -16182,6 +16208,81 @@ paths:
                 decision: { type: string, enum: [approve, deny], description: Approve grants access; deny revokes it }
       responses:
         '200': { description: Decision applied }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace/engagements:
+    get:
+      operationId: listWorkspaceEngagements
+      summary: List a workspace's contract engagements (active + retired)
+      description: |
+        The first-class binding between an agent's contract capability and a workspace, with an
+        active/retired lifecycle — distinct from the derived "active here" record trace. Member-gated.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ ws, engagements: [{ organism_id, ws, agent, owner, agentName, contract, state, adoptedAt, adoptedBy, retiredAt, retiredBy }] }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: activateWorkspaceEngagement
+      summary: Adopt (activate) a contract engagement for one of your agents
+      description: |
+        Writes an ACTIVE engagement for (agent × contract × workspace) — the source of truth an agent's
+        processing loop obeys. The caller must own the agent and be an organism member. Typically paired
+        with the adopt-contract task so the agent provisions the contract's spaces itself.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, agent]
+              properties:
+                ws: { type: string, description: Workspace id }
+                agent: { type: string, description: The agent (full GAII or bare name — must be owned by the caller) }
+                contract: { type: string, description: Contract id (a contract.<id> tag); omit for the bare workspace-contract marker }
+      responses:
+        '200': { description: '{ engagement }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace/engagements/retire:
+    post:
+      operationId: retireWorkspaceEngagement
+      summary: Retire a contract engagement (real off-switch)
+      description: |
+        Flips an engagement to `retired` (kept as history: who served here, until when). The agent's
+        processing loop then skips this workspace. Allowed for the agent's OWNER or the workspace
+        creator/admin. Creates a retired marker even with no prior active engagement, so an agent that
+        started working before contracts were first-class can still be retired.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, agent]
+              properties:
+                ws: { type: string, description: Workspace id }
+                agent: { type: string, description: The agent (full GAII or bare name) }
+                contract: { type: string, description: Contract id; omit for the bare marker }
+      responses:
+        '200': { description: '{ engagement }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
