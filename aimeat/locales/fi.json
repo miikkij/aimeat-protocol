@@ -7213,7 +7213,8 @@
       "notFound": "Portfoliota ei löytynyt",
       "notFoundDesc": "Tämä käyttäjä ei ole julkaissut portfoliota.",
       "loginToSeeMore": "Kirjaudu sisään nähdäksesi lisää",
-      "backToPortal": "Koti"
+      "backToPortal": "Koti",
+      "fullscreen": "Koko näyttö"
     }
   },
   "cli": {
