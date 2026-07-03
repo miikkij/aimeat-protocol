@@ -5,6 +5,8 @@
  *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.
  * @version-history
  *   v1.0.0 -- 2026-06-03 -- Initial scheduler styles
+ *   v1.1.0 -- 2026-07-03 -- Add the day/week/month calendar (.sch-cal-*) + .sch-flash highlight used
+ *     when a calendar event scrolls to its schedule card/row. Kind colour via a --k custom property.
  */
 
 .sch-tab { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -114,3 +116,83 @@
 .sch-dispatch-title { font-weight: 600; font-size: 0.9rem; color: var(--text); white-space: pre-wrap; }
 .sch-dispatch-body { font-size: 0.84rem; color: var(--text-dim); margin-top: 0.15rem; white-space: pre-wrap; word-break: break-word; }
 .sch-edit { display: flex; flex-direction: column; gap: 0.55rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
+
+/* ══ Calendar (day / week / month cadence view) ══ */
+.sch-cal-section { gap: 0.6rem; }
+.sch-cal { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.sch-cal-head { display: flex; flex-direction: column; gap: 0.35rem; }
+.sch-cal-nav { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.sch-cal-modes, .sch-cal-move { display: inline-flex; gap: 0.25rem; }
+.sch-cal-range { color: var(--text-dim); font-size: 0.85rem; }
+.sch-cal-trunc { color: var(--warn-fg); font-size: 0.78rem; }
+
+.sch-cal-legend { display: inline-flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; margin-left: auto; }
+.sch-cal-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-dim); }
+.sch-cal-swatch { width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block; background: var(--k, var(--border)); }
+
+/* kind → colour (one custom property drives both the chip stripe and the legend swatch) */
+.sch-cal-ev--ai    { --k: var(--info-fg); }
+.sch-cal-ev--agent { --k: var(--warn-fg); }
+.sch-cal-ev--ext   { --k: var(--success-fg); }
+.sch-cal-ev--eco   { --k: var(--accent); }
+.sch-cal-ev--sec   { --k: var(--accent); }
+.sch-cal-ev--core  { --k: var(--text-dim); }
+
+/* event chip (a reset button so it's clickable + keyboard-focusable) */
+.sch-cal-ev {
+  display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit;
+  font-size: 0.72rem; padding: 0.12rem 0.4rem; border-radius: 4px;
+  border: 0; border-left: 3px solid var(--k, var(--border));
+  background: var(--card); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sch-cal-ev--past { opacity: 0.55; }
+.sch-cal-ev--click { cursor: pointer; }
+.sch-cal-ev--click:hover { filter: brightness(1.15); border-color: var(--accent); }
+.sch-cal-ev--dot { padding: 0.05rem 0.35rem; border-radius: 3px; border-left-width: 3px; }
+.sch-cal-evtime { color: var(--text-dim); }
+.sch-cal-more { font-size: 0.66rem; color: var(--text-dim); padding-left: 0.15rem; }
+.sch-cal-empty { text-align: center; color: var(--text-dim); font-size: 0.85rem; padding: 0.75rem; }
+.sch-cal-dotempty { color: var(--text-dim); text-align: center; font-size: 0.8rem; }
+
+/* month grid */
+.sch-cal-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.sch-cal-wd { font-size: 0.72rem; color: var(--text-dim); text-align: center; padding: 0.2rem 0; }
+.sch-cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.sch-cal-cell {
+  min-height: 66px; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.25rem;
+  background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px;
+}
+.sch-cal-cell--dim { opacity: 0.45; }
+.sch-cal-cell--today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.sch-cal-daynum { font-size: 0.78rem; color: var(--text); font-weight: 600; }
+.sch-cal-cell-evs { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
+
+/* week grid */
+.sch-cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.sch-cal-weekcol { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; min-height: 120px; min-width: 0; display: flex; flex-direction: column; }
+.sch-cal-weekcol--today { border-color: var(--accent); }
+.sch-cal-weekcol-head { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.3rem; border-bottom: 1px solid var(--border); }
+.sch-cal-weekcol-evs { display: flex; flex-direction: column; gap: 2px; padding: 0.25rem; min-width: 0; }
+
+/* day rail */
+.sch-cal-day { display: flex; flex-direction: column; gap: 1px; }
+.sch-cal-hourrow, .sch-cal-bucket { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 0.5rem; align-items: start; }
+.sch-cal-hourrow { min-height: 1.9rem; border-top: 1px solid var(--border); padding-top: 0.2rem; }
+.sch-cal-bucket { margin: 0.3rem 0; }
+.sch-cal-hour { font-size: 0.72rem; color: var(--text-dim); padding-top: 0.15rem; }
+.sch-cal-hour-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* highlight a card/row jumped to from the calendar */
+.sch-flash { outline: 2px solid transparent; outline-offset: 2px; animation: schFlash 1.6s ease-out; }
+@keyframes schFlash {
+  0%   { outline-color: var(--accent); background-color: var(--bg-dim); }
+  70%  { outline-color: var(--accent); }
+  100% { outline-color: transparent; background-color: transparent; }
+}
+
+@media (max-width: 640px) {
+  .sch-cal-legend { margin-left: 0; width: 100%; }
+  .sch-cal-cell { min-height: 52px; }
+}

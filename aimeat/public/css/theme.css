@@ -10,6 +10,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.20.0 — 2026-07-03 — Toast legibility: .toast max-width 420px → min(92vw, 40rem) (was hard-capped
+       narrow on wide screens so longer messages wrapped into a tall skinny "tower"), plus line-height 1.45,
+       centered text, overflow-wrap:anywhere (guards long GAIIs/URLs) and a --shadow-xl lift. One class fixes
+       every toast pathway. Appearance of short toasts unchanged (still a compact pill via width:fit-content).
      v1.19.0 — 2026-06-10 — Controls get their own surface: new --control-bg/--control-border tokens
        (light: white + gray-300; dark: raised #262934 + #4A4E5A). .btn-outline/.btn-ghost drop
        background:transparent (they melted into the page as "framed text") and .input-field drops
@@ -1241,10 +1245,12 @@ select.input-field { cursor: pointer; }
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-  z-index: 9999; max-width: min(90vw, 420px); width: fit-content;
-  padding: 0.75rem 1.25rem; border-radius: var(--radius-xs);
-  font-size: 0.85rem; font-weight: 600;
+  z-index: 9999; max-width: min(92vw, 40rem); width: fit-content;
+  padding: 0.7rem 1.15rem; border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 600; line-height: 1.45;
+  text-align: center; text-wrap: pretty; overflow-wrap: anywhere; white-space: normal;
   background: var(--toast-success-bg); color: var(--toast-fg);
+  box-shadow: var(--shadow-xl);
   animation: toastIn 0.3s ease, toastOut 0.4s ease 2.4s forwards;
   pointer-events: auto; box-sizing: border-box;
 }

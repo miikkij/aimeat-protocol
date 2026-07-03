@@ -6,11 +6,16 @@
  *   scheduler. The server owns the clock; the owner can create, pause/resume,
  *   run-now, and cancel managed schedules (including any an agent created).
  * @structure
- *   - SchedulerTab (default) — loads /v1/schedules, renders grouped sections + create form
+ *   - SchedulerTab (default) — loads /v1/schedules, renders a day/week/month calendar
+ *     (SchedulerCalendar) + grouped sections + create form
+ *   - jumpToSchedule — scroll to + flash a schedule's card/row when its calendar event is clicked
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
  *   v1.0.0 -- 2026-06-03 -- Initial master scheduler view
  *   v1.0.1 -- 2026-06-03 -- Extension cron "Next run" uses formatUntil (was timeAgo → negative "ago")
+ *   v1.1.0 -- 2026-07-03 -- Add SchedulerCalendar (day/week/month cadence view) at the top; clicking a
+ *     calendar event scrolls to + flashes that schedule's card (id=sch-card-*) or extension row
+ *     (id=sch-ext-*). loadData bumps reloadTick so the calendar refetches occurrences on any change.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -21,8 +26,18 @@ import { timeAgo } from '/js/utils.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, createSchedule } from '/js/services/schedules.js';
 import ScheduleItem, { formatUntil } from './schedule-item.js';
+import SchedulerCalendar from './scheduler-calendar.js';
 
 const html = htm.bind(h);
+
+/** Scroll to and briefly flash a schedule's card (or extension row) by id. */
+function jumpToSchedule(id) {
+  const el = document.getElementById(`sch-card-${id}`) || document.getElementById(`sch-ext-${id}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('sch-flash');
+  setTimeout(() => { el.classList.remove('sch-flash'); }, 1600);
+}
 
 const CRON_PRESETS = [
   { key: 'morning', cron: '0 7 * * *' },
@@ -55,6 +70,9 @@ export default function SchedulerTab({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  // Bumped on every (re)load so the calendar refetches its projected fire-times
+  // whenever a schedule is created / paused / edited / cancelled or a live update lands.
+  const [reloadTick, setReloadTick] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
@@ -62,6 +80,7 @@ export default function SchedulerTab({ showToast }) {
       setData(schedRes?.data || { managed: [], extensions: [], agentInternal: [] });
       setAgents(agentsRes?.data?.agents || []);
       setError(null);
+      setReloadTick((n) => n + 1);
     } catch (e) {
       setError(e.message || 'Failed to load schedules');
     } finally {
@@ -95,6 +114,15 @@ export default function SchedulerTab({ showToast }) {
       ${showForm && html`<${CreateForm} agents=${agents} showToast=${showToast}
         onCreated=${() => { setShowForm(false); loadData(); }} />`}
 
+      <!-- Calendar: when things fire, across day / week / month -->
+      <div class="sch-section sch-cal-section">
+        <h3 class="sch-section-title">${t('profile.scheduler.cal.title')}</h3>
+        <${SchedulerCalendar}
+          schedules=${[...data.managed, ...data.extensions]}
+          reloadKey=${reloadTick}
+          onJumpTo=${jumpToSchedule} />
+      </div>
+
       <!-- AIMEAT-managed -->
       <div class="sch-section">
         <h3 class="sch-section-title">${t('profile.scheduler.managedTitle')}</h3>
@@ -113,7 +141,7 @@ export default function SchedulerTab({ showToast }) {
           <th>${t('profile.scheduler.col.lastRun')}</th>
           <th>${t('profile.scheduler.col.nextRun')}</th>
         </tr></thead><tbody>
-          ${data.extensions.map(j => html`<tr key=${j.id}>
+          ${data.extensions.map(j => html`<tr key=${j.id} id=${'sch-ext-' + j.id}>
             <td>${j.displayName || j.name}</td>
             <td><code class="sch-cron">${j.extensionName}${j.actionId ? '/' + j.actionId : ''}</code></td>
             <td><code class="sch-cron">${j.cron}</code></td>

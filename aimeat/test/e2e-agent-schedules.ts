@@ -321,6 +321,56 @@ await test('20. Cross-owner target is rejected (sibling cannot schedule another 
     assert(status === 404 || status === 403, `expected 404/403 cross-owner, got ${status}`);
 });
 
+console.log('\nPhase 10 -- Occurrences projection (calendar)');
+
+function occUrl(from: Date, to: Date): string {
+    return `/v1/schedules/occurrences?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+}
+
+await test('21. Occurrences projects the enabled daily schedule into the window', async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() + 4 * 86400000);
+    const { status, body } = await json(occUrl(from, to), { headers: auth1 });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(Array.isArray(body.data.occurrences), 'occurrences array present');
+    const mine = body.data.occurrences.filter((o: any) => o.scheduleId === agentTaskScheduleId);
+    assert(mine.length >= 3, `expected the daily "0 7 * * *" schedule to project ≥3 fires in 4 days, got ${mine.length}`);
+    for (const o of mine) {
+        const at = new Date(o.at).getTime();
+        assert(at >= from.getTime() && at <= to.getTime(), `occurrence ${o.at} within [from,to]`);
+    }
+});
+
+await test('22. Occurrences excludes disabled schedules', async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() + 7 * 86400000);
+    const { body } = await json(occUrl(from, to), { headers: auth1 });
+    const ids = new Set(body.data.occurrences.map((o: any) => o.scheduleId));
+    assert(!ids.has(maxRunsScheduleId), 'the max_runs auto-disabled schedule is not projected');
+});
+
+await test('23. Occurrences rejects an inverted range (to <= from)', async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() - 86400000);
+    const { status } = await json(occUrl(from, to), { headers: auth1 });
+    assert(status === 400, `expected 400 for inverted range, got ${status}`);
+});
+
+await test('24. Occurrences is owner-scoped (cross-owner cannot see the schedule)', async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() + 7 * 86400000);
+    const { body } = await json(occUrl(from, to), { headers: auth2 });
+    const ids = new Set((body.data.occurrences || []).map((o: any) => o.scheduleId));
+    assert(!ids.has(agentTaskScheduleId), "another owner's schedule is not projected for auth2");
+});
+
+await test('25. Occurrences requires auth', async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() + 86400000);
+    const { status } = await json(occUrl(from, to));
+    assert(status === 401, `expected 401 without auth, got ${status}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owner 1', async () => {
     const { status } = await json(`/v1/owners/${encodeURIComponent(o1.ownerName)}`, { method: 'DELETE', headers: auth1 });
