@@ -3,6 +3,13 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.3.2 — 2026-07-03 — Builder prompt fixes for the sandboxed viewer reality:
+ *     memory fetch URLs now use the anonymous public route /v1/memory/:gaii/:key
+ *     (old /v1/memory/:key always 401s without auth) and only for public-visibility
+ *     records; forbid credentialed fetch() (Origin:null + wildcard CORS rejects it);
+ *     auth-gate pattern defaults to logged-out placeholder + listens for an
+ *     'aimeat-portfolio-auth' postMessage instead of window.AIMEAT (unreachable
+ *     from the opaque-origin sandbox).
  *   v1.3.1 — 2026-07-03 — Stamp the SPA's CSP nonce onto <script> tags before setting
  *     srcdoc (viewer + builder preview): about:srcdoc inherits the parent document's
  *     CSP (script-src 'self' 'nonce-…'), so the portfolio's nonce-less inline script
@@ -154,12 +161,25 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     }
   }
 
-  // Selected memory entries
+  // Selected memory entries. Only PUBLIC records are live-fetchable by visitors:
+  // the portfolio runs anonymously in a sandboxed iframe, and the only route it can
+  // reach without auth is /v1/memory/:gaii/:key (public visibility). The old prompt
+  // pointed at /v1/memory/:key — an auth-required owner route that always 401s there.
   if (selectedMemories.length > 0) {
+    const publicMems = selectedMemories.filter(m => m.visibility === 'public');
+    const gatedMems = selectedMemories.filter(m => m.visibility !== 'public');
     prompt += `\n## Memory Entries\n`;
-    prompt += `These entries can be fetched live from the node API for dynamic portfolio content:\n`;
-    for (const mem of selectedMemories) {
-      prompt += `- ${mem.key} (${mem.visibility}) → GET ${url}/v1/memory/${encodeURIComponent(mem.key)}\n`;
+    if (publicMems.length > 0) {
+      prompt += `These PUBLIC entries can be fetched live (anonymously, no auth) for dynamic portfolio content:\n`;
+      for (const mem of publicMems) {
+        prompt += `- ${mem.key} → GET ${url}/v1/memory/${encodeURIComponent(mem.gaii || ghii)}/${encodeURIComponent(mem.key)}\n`;
+      }
+    }
+    if (gatedMems.length > 0) {
+      prompt += `These entries are NOT publicly readable — visitors' browsers cannot fetch them (any attempt returns 401/404). Represent each with its preview text baked into the HTML, or a placeholder the user can edit:\n`;
+      for (const mem of gatedMems) {
+        prompt += `- ${mem.key} (visibility: ${mem.visibility})${mem.preview ? ` — preview: ${mem.preview}` : ''}\n`;
+      }
     }
   }
 
@@ -210,7 +230,8 @@ The user wants to create a personal portfolio website. Generate a single, self-c
 - **CRITICAL — Images and files:** ONLY use URLs listed in the "Selected Images" section above. Do NOT invent, guess, or fabricate any URLs. If a resource (avatar, resume, screenshot, etc.) is not listed above, it does not exist.
 ${resourceNotes}${sectionNotes}- For missing images: Use inline SVG placeholders, CSS gradients, or emoji — never a broken image URL
 - For project screenshots: If no screenshot URL is provided for a project, use a styled CSS placeholder card instead of an <img> tag
-- If memory entries are selected: Fetch them live with fetch() calls to the node API URLs above
+- If PUBLIC memory entries are listed above: fetch them live with plain \`fetch(url)\` calls to those exact URLs
+- **CRITICAL — fetch() must stay credential-free:** always call \`fetch(url)\` with no options object — never set \`credentials\` ('include'/'same-origin'), and never send an Authorization header. The portfolio runs in an opaque-origin sandbox (the browser sends \`Origin: null\`); the node answers CORS with a wildcard, and browsers reject credentialed requests to wildcard responses. Only the anonymous public URLs listed above are reachable.
 - Mobile-responsive design (works on phone, tablet, desktop)
 - Include proper <meta> tags for SEO and social sharing (og:title, og:description, og:image)
 - **IMPORTANT — CSP compatibility:** The portfolio HTML will be rendered inside a sandboxed iframe. All JavaScript MUST be inside a single \`<script>\` tag at the end of \`<body>\`. Do NOT use inline event handlers (onclick=, onload=, etc.) — use addEventListener instead. Do NOT use external script/CSS CDN links.
@@ -219,26 +240,34 @@ ${resourceNotes}${sectionNotes}- For missing images: Use inline SVG placeholders
   if (authGates.length > 0) {
     prompt += `
 ## Auth-Gated Sections Implementation
-Sections marked as auth-gated should be hidden by default and only shown when the viewer is
-logged in to the AIMEAT node. Use this detection pattern:
+The portfolio renders inside a sandboxed iframe with an opaque origin: it has NO access to the
+hosting page's session, cookies, or \`window.AIMEAT\` — login state cannot be read directly.
+Implement gated sections so they default to the logged-out placeholder and activate only on an
+explicit signal posted by the hosting AIMEAT viewer:
 
 \`\`\`javascript
-// Check if the viewer is authenticated on this AIMEAT node
-const isLoggedIn = window.AIMEAT?.auth?.hasSession?.() || false;
-document.querySelectorAll('[data-auth-required]').forEach(el => {
-  el.style.display = isLoggedIn ? '' : 'none';
-});
-// Show placeholder for unauthenticated viewers
-document.querySelectorAll('[data-auth-placeholder]').forEach(el => {
-  el.style.display = isLoggedIn ? 'none' : '';
+// Default: logged out — placeholders visible, gated content hidden.
+function applyAuthState(isLoggedIn) {
+  document.querySelectorAll('[data-auth-required]').forEach(el => {
+    el.style.display = isLoggedIn ? '' : 'none';
+  });
+  document.querySelectorAll('[data-auth-placeholder]').forEach(el => {
+    el.style.display = isLoggedIn ? 'none' : '';
+  });
+}
+applyAuthState(false);
+// The AIMEAT viewer may post the visitor's login state into this frame.
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'aimeat-portfolio-auth') applyAuthState(!!e.data.loggedIn);
 });
 \`\`\`
 
 Wrap auth-gated content in \`<div data-auth-required>\` and add a placeholder:
 \`<div data-auth-placeholder>Log in to see more content</div>\`
 
-NOTE: This is a convenience feature, not a security boundary. The content is in the HTML source.
-For truly private data, use the AIMEAT consent system.
+NOTE: This is a convenience feature, not a security boundary — gated content is still present in
+the HTML source. Keep truly private data OUT of the portfolio HTML entirely (and do not try to
+fetch it: non-public API data is unreachable from this sandbox, see the fetch rules above).
 `;
   }
 
