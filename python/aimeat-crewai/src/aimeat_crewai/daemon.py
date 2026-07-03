@@ -14,6 +14,11 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.14.0 -- Contract-engagement gate (docs/agent-workspace-contracts.md §7d). A pushed workspace-record
+    wake is now dropped when this agent's engagement for that workspace/contract is RETIRED — the
+    deterministic half of "Retire actually stops the agent" (retired -> skip; active/absent -> process;
+    legacy ws with a known contract -> process + backfill an active engagement). Fail-open on any read
+    error. See _engagement_verdict / _agent_engagements / _space_contract / _backfill_engagement.
   0.9.0 -- Interactive messages (federated AskUserQuestion). The dm.inbound wake now carries
     `interactive` ("questions" | "answers" | None) so an on_dm handler can tell a question it should
     answer from an answer to one it asked. New crew helpers in aimeat_crewai.messaging: ask() sends a
@@ -524,6 +529,82 @@ def _drain_records(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
         except Exception:
             break
     return out
+
+
+def _agent_engagements(api: _Api, org: str, ws: str, agent_name: str) -> list[dict[str, Any]] | None:
+    """This agent's contract engagements (active + retired) in one workspace, or None on read error.
+
+    Uses the member-gated by-workspace endpoint (the agent's owner is a member, so the agent token can
+    read it) and filters to this agent. None signals "could not read" so callers fail OPEN — a transient
+    node hiccup must never wedge processing. See docs/agent-workspace-contracts.md §7d.
+    """
+    try:
+        r = api.get(f"/v1/organisms/{org}/workspace/engagements", params={"ws": ws}, timeout=10)
+        if r.status_code != 200:
+            return None
+        engs = (r.json().get("data") or {}).get("engagements") or []
+    except Exception:
+        return None
+    return [e for e in engs if isinstance(e, dict) and e.get("agentName") == agent_name]
+
+
+def _space_contract(api: _Api, org: str, ws: str, space: str, cache: dict[str, dict[str, str]]) -> str | None:
+    """The contract id the workspace manifest stamps on ``space``'s objectType, or None if the manifest
+    doesn't declare one. Cached per workspace for the daemon's lifetime (the manifest is stable). Read
+    failures are not cached (so a later retry can succeed)."""
+    key = f"{org}/{ws}"
+    if key not in cache:
+        try:
+            r = api.get(f"/v1/organisms/{org}/workspace", params={"ws": ws}, timeout=10)
+            if r.status_code != 200:
+                return None
+            ots = ((r.json().get("data") or {}).get("manifest") or {}).get("objectTypes") or []
+            cache[key] = {
+                ot["name"]: ot["contract"]
+                for ot in ots
+                if isinstance(ot, dict) and ot.get("name") and ot.get("contract")
+            }
+        except Exception:
+            return None
+    return cache.get(key, {}).get(space)
+
+
+def _engagement_verdict(mine: list[dict[str, Any]], space_contract: str | None) -> str:
+    """Pure decision for the contract-engagement gate (§7d), split out so it is unit-testable.
+
+    ``mine`` = this agent's engagements in the workspace (each a dict with ``contract`` + ``state``).
+    ``space_contract`` = the contract the triggering record's space belongs to, or None when the manifest
+    doesn't map it. Returns one of:
+      • ``"process"``  — act on the record
+      • ``"skip"``     — the relevant contract is retired; do nothing
+      • ``"backfill"`` — process AND register an active engagement (legacy ws, contract now known)
+    """
+    if space_contract is not None:
+        for e in mine:
+            if (e.get("contract") or "") == space_contract:
+                return "skip" if e.get("state") == "retired" else "process"
+        return "backfill"
+    # No space->contract mapping: decide at the workspace level.
+    if any(e.get("state") == "active" for e in mine):
+        return "process"
+    if any(e.get("state") == "retired" for e in mine):
+        return "skip"
+    return "process"
+
+
+def _backfill_engagement(api: _Api, org: str, ws: str, agent_name: str, contract: str) -> None:
+    """Best-effort: register an ACTIVE engagement for an agent already working a workspace that has none
+    yet (§7d backfill-on-first-process), so the contract becomes visible on the agent + workspace views.
+    Only called with a KNOWN contract id — never a bare marker, which a per-contract Retire couldn't
+    later target. Silent on any failure (visibility is a nicety, not a correctness requirement)."""
+    try:
+        api.post(
+            f"/v1/organisms/{org}/workspace/engagements",
+            json={"ws": ws, "agent": agent_name, "contract": contract},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def _drain_dms(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
@@ -1044,8 +1125,44 @@ def run_crew_daemon(
     ) as liaison:
         print(f"[daemon:{agent_name}] liaison ready, entering poll loop")
 
+        # Per-workspace {space: contract} map from the manifest, for the engagement gate below. Cached
+        # for the daemon's lifetime (manifests are stable); populated lazily on the first record per ws.
+        _space_contract_cache: dict[str, dict[str, str]] = {}
+
+        def _engagement_gate(event: dict[str, Any]) -> bool:
+            """Contract-engagement off-switch (docs/agent-workspace-contracts.md §7d). Return False to
+            SKIP a record for a workspace/contract this agent has been RETIRED from — the deterministic
+            half of "Retire actually stops the agent". Rules, fail-OPEN throughout:
+
+              • read error / no org+ws  -> process (never wedge on a transient hiccup)
+              • the record's space maps to a contract (manifest stamps it):
+                    that contract retired -> SKIP;  active/absent -> process (+ backfill if absent)
+              • space->contract unknown -> workspace-level: any active -> process;
+                    only retired -> SKIP;  none -> process
+            A legacy workspace (agent working via record traces, no engagement yet) is processed AND, when
+            the contract is known, backfilled to `active` so it becomes visible on both views.
+            """
+            org, ws, space = event.get("organism_id"), event.get("ws"), event.get("space")
+            if not org or not ws:
+                return True
+            mine = _agent_engagements(api, org, ws, agent_name)
+            if mine is None:
+                return True  # read failed -> fail open
+            space_contract = _space_contract(api, org, ws, space, _space_contract_cache) if space else None
+            verdict = _engagement_verdict(mine, space_contract)
+            if verdict == "skip":
+                where = f"{org}/{ws}" + (f"/{space}" if space_contract else "")
+                print(f"[daemon:{agent_name}] skip record in {where}: contract engagement retired")
+                return False
+            if verdict == "backfill" and space_contract:
+                _backfill_engagement(api, org, ws, agent_name, space_contract)
+            return True
+
         def _handle_record(event: dict[str, Any]) -> None:
-            """Act on one record event: the caller's on_record, else wrap as a synthetic task -> crew."""
+            """Act on one record event: the caller's on_record, else wrap as a synthetic task -> crew.
+            Gated by contract engagements — a retired workspace/contract is skipped (§7d)."""
+            if not _engagement_gate(event):
+                return
             if on_record is not None:
                 try:
                     on_record(event)
