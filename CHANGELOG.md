@@ -11,6 +11,15 @@ in place) or cold-opens the right view, and the whole bell inbox mirrors to web 
 that conversation, an organism event opens the Organisms tab. Apps, agents, and extensions gained a
 first-class way to notify their owner: an app's notification deep-links back to the app itself.
 
+Contract agents can now be **retired** from a workspace, not just adopted. Until now a workspace only
+knew an agent was "active here" as a derived record trace — there was no object to cancel, and a
+same-owner agent (no access grant to revoke) couldn't be switched off at all. A **contract engagement**
+makes the (agent × contract × workspace) binding first-class with an `active`/`retired` lifecycle:
+Adopt writes it, Retire flips it (kept as history, "used here until <date>"), and the workspace People
+panel + a new agent-detail **Contracts** tab both show and drive it. On the Python side, `aimeat-crewai`
+0.14.0 teaches the processing loop to obey it — a pushed workspace-record wake is dropped when the
+agent's engagement for that workspace/contract is retired, so Retire actually stops a running crew.
+
 ### Fixed
 
 - **Push-notification clicks opened a dead route.** The test push, the PWA manifest `start_url`, and the
@@ -50,6 +59,15 @@ first-class way to notify their owner: an app's notification deep-links back to 
 - **Extension `ctx.notify()` is visible now.** It used to write only a private memory list nobody rendered;
   all three runtimes (REST, MCP, scheduler) now also drop a bell notification + push, deep-linked to the
   Extensions tab.
+- **Contract engagements — adopt/retire a contract agent per workspace.** New memory-backed engagement
+  object (`services/workspace-engagements.ts`, no migration) with an `active`/`retired` lifecycle, keyed
+  `wsengage.{org}.{ws}.{owner}.{agent}.{contract}`. Routes: `POST`/`GET /v1/organisms/:id/workspace/engagements`
+  + `/retire` (member/owner/creator gated) and `GET /v1/agents/:name/engagements` (same-owner, enriched with
+  org + ws names). The workspace **People** panel gains per-contract active/retired chips with Retire +
+  Re-adopt (plus a one-click Retire for a legacy trace-only agent); a new agent-detail **Contracts** tab shows
+  where each contract is active or retired. OpenAPI + en/fi in sync; `docs/agent-workspace-contracts.md` §7d;
+  new `e2e-organism-workspace-engagements` suite (15/15). `aimeat-crewai` 0.14.0 gates the record-push loop on
+  engagements (retired → skip; fail-open), making Retire a real off-switch.
 
 ## [1.36.0] - 2026-07-02
 
