@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-05-29 — Initial.
  *   v1.1.0 — 2026-06-25 — Cover GET /v1/ai/available (auth + keyless-owner false) and assert the
  *     aimeat-ai.js lib probes it.
+ *   v1.2.0 — 2026-07-05 — Assert per-app quota default is null (= the daily budget) and that a
+ *     per-app quota round-trips through /v1/ai/settings.
  */
 // Run: cd aimeat && pnpm exec tsx test/ai.ts
 // Requires: server running on port 40251 with AIMEAT_ENCRYPTION_KEY set
@@ -159,10 +161,12 @@ await test('GET /v1/ai/settings shows defaults for a fresh user', async () => {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
   assert(status === 200, `expected 200, got ${status}`);
-  const d = body.data as { daily_budget_usd?: number; app_quotas?: Record<string, unknown>; app_allowlist?: unknown };
+  const d = body.data as { daily_budget_usd?: number; app_quotas?: Record<string, unknown>; app_allowlist?: unknown; defaults?: { per_app_daily_usd?: number | null } };
   assert(d?.daily_budget_usd === 1.0, `expected default $1, got ${d?.daily_budget_usd}`);
   assert(typeof d?.app_quotas === 'object', 'app_quotas object present');
   assert(d?.app_allowlist === null, 'app_allowlist null by default');
+  // v1.4.0: an app defaults to the whole daily budget — no separate hidden per-app cap.
+  assert(d?.defaults?.per_app_daily_usd === null, `expected per_app_daily_usd default null, got ${d?.defaults?.per_app_daily_usd}`);
 });
 
 await test('POST /v1/ai/settings updates daily budget', async () => {
@@ -181,6 +185,18 @@ await test('GET /v1/ai/settings reflects updated budget', async () => {
   });
   const d = body.data as { daily_budget_usd?: number };
   assert(d?.daily_budget_usd === 2.5, `expected $2.5, got ${d?.daily_budget_usd}`);
+});
+
+await test('POST + GET /v1/ai/settings round-trips a per-app quota', async () => {
+  const post = await json('/v1/ai/settings', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ app_quotas: { drop: { daily_usd: 0.5 } } }),
+  });
+  assert(post.status === 200, `expected 200, got ${post.status}: ${JSON.stringify(post.body)}`);
+  const { body } = await json('/v1/ai/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const q = (body.data as { app_quotas?: Record<string, { daily_usd?: number }> })?.app_quotas ?? {};
+  assert(q.drop?.daily_usd === 0.5, `expected drop cap 0.5, got ${JSON.stringify(q.drop)}`);
 });
 
 await test('POST /v1/ai/settings with negative budget → 400 INVALID_BUDGET', async () => {

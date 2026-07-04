@@ -8,6 +8,8 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.3.0 — 2026-07-05 — AI apps budget panel: per-app daily caps are now VISIBLE + EDITABLE inline
+ *     (each app defaults to the whole daily budget; set a cap to throttle one app). Was API-only.
  *   v1.2.0 — 2026-06-24 — Add a Vision model selector (a vision-capable model, e.g. qwen-2.5-VL) used
  *     for image inputs — the Secretary's doc/image intake sends attached images to this model.
  *   v1.1.0 — 2026-04-01 — Add temperature, top_p, max_tokens model parameter fields
@@ -362,7 +364,8 @@ export function OpenRouterSettings({ onSettingsChange }) {
  *
  * Numbers come from the server's tracked usage (token counts always exact,
  * cost is OpenRouter-reported when available, rough estimate otherwise).
- * Per-app quotas + allowlist editing is out of scope for v1 — set via API.
+ * Each app may spend up to the daily budget; a per-app cap (edited inline here)
+ * throttles a single app below it.
  */
 function AiAppsBudgetPanel() {
   const [usage, setUsage] = useState(null);
@@ -371,6 +374,9 @@ function AiAppsBudgetPanel() {
   const [budgetInput, setBudgetInput] = useState('1');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [caps, setCaps] = useState({});          // app → cap input string ('' = use the daily budget)
+  const [savingCaps, setSavingCaps] = useState(false);
+  const [capsMsg, setCapsMsg] = useState(null);
 
   useEffect(() => { reload(); }, []);
 
@@ -383,7 +389,34 @@ function AiAppsBudgetPanel() {
     if (s && s.ok !== false && s.data) {
       setSettings(s.data);
       setBudgetInput(String(s.data.daily_budget_usd ?? 1));
+      const q = s.data.app_quotas || {};
+      setCaps(Object.fromEntries(Object.entries(q).map(([app, v]) =>
+        [app, (v && v.daily_usd != null) ? String(v.daily_usd) : ''])));
     }
+  }
+
+  async function saveCaps() {
+    setSavingCaps(true); setCapsMsg(null);
+    const app_quotas = {};
+    for (const [app, val] of Object.entries(caps)) {
+      const s = String(val).trim();
+      if (s === '') continue;                    // blank = no override → app uses the daily budget
+      const n = Number(s);
+      if (!Number.isFinite(n) || n < 0 || n > 1000) {
+        setCapsMsg({ text: `Cap for "${app}" must be a number 0–1000.`, error: true });
+        setSavingCaps(false); return;
+      }
+      app_quotas[app] = { daily_usd: n };
+    }
+    try {
+      const r = await apiPost('/v1/ai/settings', { app_quotas });
+      if (r.ok === false) throw new Error(r.error?.message || 'Save failed');
+      setCapsMsg({ text: 'Per-app limits saved.' });
+      await reload();
+    } catch (e) {
+      setCapsMsg({ text: e.message || 'Save failed', error: true });
+    }
+    setSavingCaps(false);
   }
 
   async function saveBudget() {
@@ -410,13 +443,16 @@ function AiAppsBudgetPanel() {
   const spent = usage.spent_today_usd;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
   const perAppEntries = Object.entries(usage.per_app || {});
+  // apps that have spent today OR have a configured per-app cap
+  const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...Object.keys(caps)]));
 
   return html`
     <div class="pf-gen-or-field" style="border-top:2px solid var(--cl-ink,#e5e5e5);padding-top:14px;margin-top:14px;">
       <label class="pf-gen-or-label">💸 AI apps daily budget</label>
       <div style="font-size:12px;color:#666;margin-bottom:8px;">
-        Apps that call <code>AIMEAT.ai.complete()</code> use this key. When today's
-        spend hits the budget, further calls return <code>QUOTA_EXHAUSTED</code>.
+        Apps that call <code>AIMEAT.ai.complete()</code> use this key. This is the TOTAL across all
+        apps for the day; each app may spend up to this much unless you set a per-app limit below.
+        When the budget is hit, further calls return <code>QUOTA_EXHAUSTED</code>.
       </div>
 
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -441,31 +477,48 @@ function AiAppsBudgetPanel() {
 
       ${message && html`<div class="pf-gen-or-message ${message.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}" style="margin-top:8px;">${message.text}</div>`}
 
-      ${perAppEntries.length > 0 && html`
-        <details style="margin-top:10px;">
+      ${appNames.length > 0 && html`
+        <details style="margin-top:10px;" open>
           <summary style="cursor:pointer;font-size:12px;color:#666;">
-            Per-app breakdown (${perAppEntries.length} app${perAppEntries.length === 1 ? '' : 's'})
+            Per-app limits & spend (${appNames.length} app${appNames.length === 1 ? '' : 's'})
           </summary>
-          <table style="width:100%;margin-top:6px;font-size:12px;border-collapse:collapse;">
+          <div style="font-size:11px;color:#999;margin:6px 0;">
+            Each app may spend up to the daily budget above. Set a cap to throttle one app below it;
+            leave blank to use the full budget.
+          </div>
+          <table style="width:100%;margin-top:4px;font-size:12px;border-collapse:collapse;">
             <thead>
               <tr style="border-bottom:1px solid #e5e5e5;">
                 <th style="text-align:left;padding:4px;">App</th>
-                <th style="text-align:right;padding:4px;">Cost</th>
+                <th style="text-align:right;padding:4px;">Spent today</th>
+                <th style="text-align:right;padding:4px;">Daily cap ($)</th>
                 <th style="text-align:right;padding:4px;">Calls</th>
-                <th style="text-align:right;padding:4px;">Tokens</th>
               </tr>
             </thead>
             <tbody>
-              ${perAppEntries.map(([app, s]) => html`
-                <tr>
+              ${appNames.map((app) => {
+                const s = usage.per_app[app] || { cost_usd: 0, calls: 0 };
+                return html`
+                <tr key=${app}>
                   <td style="padding:4px;">${app}</td>
                   <td style="text-align:right;padding:4px;">$${(s.cost_usd || 0).toFixed(4)}</td>
+                  <td style="text-align:right;padding:4px;">
+                    <input type="number" min="0" max="1000" step="0.10"
+                      value=${caps[app] ?? ''} placeholder=${budget.toFixed(2)}
+                      onInput=${e => setCaps(c => ({ ...c, [app]: e.target.value }))}
+                      style="width:74px;padding:3px 5px;font-size:12px;text-align:right;" />
+                  </td>
                   <td style="text-align:right;padding:4px;">${s.calls || 0}</td>
-                  <td style="text-align:right;padding:4px;">${s.tokens || 0}</td>
-                </tr>
-              `)}
+                </tr>`;
+              })}
             </tbody>
           </table>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <button class="btn-primary btn-sm" onClick=${saveCaps} disabled=${savingCaps}>
+              ${savingCaps ? '...' : 'Save per-app limits'}
+            </button>
+            ${capsMsg && html`<span class="pf-gen-or-message ${capsMsg.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}">${capsMsg.text}</span>`}
+          </div>
         </details>
       `}
 

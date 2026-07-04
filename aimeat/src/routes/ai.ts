@@ -35,7 +35,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
-  DEFAULT_DAILY_BUDGET_USD, DEFAULT_APP_DAILY_USD,
+  DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
@@ -189,7 +189,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         app_allowlist: Array.isArray(prefs.app_allowlist) ? prefs.app_allowlist : null,
         defaults: {
           daily_budget_usd: DEFAULT_DAILY_BUDGET_USD,
-          per_app_daily_usd: DEFAULT_APP_DAILY_USD,
+          // null = an app defaults to the whole daily budget; app_quotas.<app> overrides it.
+          per_app_daily_usd: null,
           max_tokens_ceiling: null,
         },
       }));
