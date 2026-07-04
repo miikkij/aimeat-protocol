@@ -2343,6 +2343,7 @@ import type { AgentMessageRepository } from './repositories/agent-message.reposi
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
+import type { InvitationRepository } from './repositories/invitation.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -2367,4 +2368,5 @@ export interface Storage extends
   DirectMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,
   AgentOnboardingRepository,
+  InvitationRepository,
   StatsRepository { }

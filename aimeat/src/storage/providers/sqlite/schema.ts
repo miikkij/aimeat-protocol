@@ -760,6 +760,28 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_pat_tokenHash ON personal_access_tokens(tokenHash);
     CREATE INDEX IF NOT EXISTS idx_pat_owner ON personal_access_tokens(owner);
 
+    -- ── Email invitations (invite people not yet in the system into an organism + workspaces) ──
+    CREATE TABLE IF NOT EXISTS invitations (
+      id           TEXT PRIMARY KEY,
+      tokenHash    TEXT NOT NULL,
+      organismId   TEXT NOT NULL,
+      orgRole      TEXT NOT NULL DEFAULT 'member',
+      workspaces   TEXT NOT NULL DEFAULT '[]',
+      email        TEXT NOT NULL,
+      emailHash    TEXT NOT NULL,
+      invitedBy    TEXT NOT NULL,
+      message      TEXT,
+      status       TEXT NOT NULL DEFAULT 'pending',
+      createdAt    TEXT NOT NULL,
+      expiresAt    TEXT NOT NULL,
+      acceptedAt   TEXT,
+      acceptedBy   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_invitations_tokenHash ON invitations(tokenHash);
+    CREATE INDEX IF NOT EXISTS idx_invitations_organismId ON invitations(organismId);
+    CREATE INDEX IF NOT EXISTS idx_invitations_emailHash ON invitations(emailHash);
+    CREATE INDEX IF NOT EXISTS idx_invitations_expiresAt ON invitations(expiresAt);
+
     -- ── Revoked Tokens ──
     CREATE TABLE IF NOT EXISTS revoked_tokens (
       token_hash     TEXT PRIMARY KEY,

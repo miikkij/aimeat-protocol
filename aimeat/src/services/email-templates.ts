@@ -1,8 +1,13 @@
 /**
- * Email Templates — Phase 1.1
- *
- * Clean, minimal HTML email templates with AIMEAT branding.
- * Supports 'en' (default) and 'fi' locales.
+ * @file email-templates.ts
+ * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default)
+ *   and 'fi' locales. Templates: verification code, magic link, notification, match suggestion,
+ *   and organism invitation.
+ * @structure i18n string table + wrapHtml() layout + per-template builder functions.
+ * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
+ * @version-history
+ *   v1.0.0 — 2026-04-10 — Initial (verification, magic link, notification, match).
+ *   v1.1.0 — 2026-07-04 — Add inviteEmailHtml/inviteEmailSubject + esc() for user-controlled fields.
  */
 
 export interface MatchSuggestion {
@@ -35,6 +40,18 @@ const i18n: Record<string, Record<string, string>> = {
     matchSharedInterests: 'Shared interests:',
     matchDistance: 'Distance:',
     matchViewProfile: 'View Profile',
+    inviteSubject: "You're invited to join {org} on AIMEAT",
+    inviteHeading: "You're invited to AIMEAT",
+    inviteSentence: '{inviter} invited you to join {org} on AIMEAT.',
+    inviteNewAccount: "You don't need an account yet — the link below lets you register and join in a single step.",
+    inviteWorkspacesLabel: "You'll get access to:",
+    inviteButton: 'Accept invitation',
+    inviteExpiryPrefix: 'This invitation expires on',
+    inviteFallback: 'Or copy and paste this URL into your browser:',
+    inviteIgnore: "If you weren't expecting this invitation, you can safely ignore this email.",
+    inviteMessageLabel: 'Personal message:',
+    roleViewer: 'viewer',
+    roleContributor: 'contributor',
     footer: 'Sent by AIMEAT Protocol',
     footerUnsubscribe: 'Manage your notification settings in your AIMEAT profile.',
   },
@@ -58,10 +75,32 @@ const i18n: Record<string, Record<string, string>> = {
     matchSharedInterests: 'Yhteiset kiinnostukset:',
     matchDistance: 'Etäisyys:',
     matchViewProfile: 'Näytä profiili',
+    inviteSubject: 'Sinut on kutsuttu liittymään: {org}',
+    inviteHeading: 'Sinut on kutsuttu AIMEAT-palveluun',
+    inviteSentence: '{inviter} kutsui sinut liittymään: {org}.',
+    inviteNewAccount: 'Et tarvitse vielä tiliä — alla oleva linkki antaa sinun rekisteröityä ja liittyä yhdellä kertaa.',
+    inviteWorkspacesLabel: 'Saat käyttöoikeuden:',
+    inviteButton: 'Hyväksy kutsu',
+    inviteExpiryPrefix: 'Tämä kutsu vanhenee',
+    inviteFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
+    inviteIgnore: 'Jos et odottanut tätä kutsua, voit ohittaa tämän viestin.',
+    inviteMessageLabel: 'Henkilökohtainen viesti:',
+    roleViewer: 'katselija',
+    roleContributor: 'osallistuja',
     footer: 'Lähetetty AIMEAT-protokollan kautta',
     footerUnsubscribe: 'Hallinnoi ilmoitusasetuksiasi AIMEAT-profiilissasi.',
   },
 };
+
+/** Minimal HTML escape for user-controlled fields interpolated into email HTML. */
+function esc(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function t(locale: string | undefined, key: string): string {
   const lang = locale === 'fi' ? 'fi' : 'en';
@@ -160,6 +199,73 @@ export function magicLinkEmailHtml(loginUrl: string, locale?: string): { html: s
     t(locale, 'magicLinkExpiry'),
     '',
     t(locale, 'magicLinkIgnore'),
+    '',
+    `-- ${t(locale, 'footer')}`,
+  ].join('\n');
+
+  return { html, text };
+}
+
+export interface InviteEmailArgs {
+  orgName: string;
+  inviterName: string;
+  acceptUrl: string;
+  workspaces: { ws: string; role: string }[];
+  message?: string | null;
+  expiresLabel?: string; // preformatted date string for display
+}
+
+/** Subject line for an invitation email. */
+export function inviteEmailSubject(orgName: string, locale?: string): string {
+  return t(locale, 'inviteSubject').replace('{org}', orgName);
+}
+
+export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html: string; text: string } {
+  const roleLabel = (role: string) => t(locale, role === 'contributor' ? 'roleContributor' : 'roleViewer');
+  const sentence = t(locale, 'inviteSentence')
+    .replace('{inviter}', esc(args.inviterName))
+    .replace('{org}', `<strong>${esc(args.orgName)}</strong>`);
+
+  const wsHtml = args.workspaces.length > 0
+    ? `<p style="margin-top:16px;">${t(locale, 'inviteWorkspacesLabel')}</p>
+       <ul style="color:#555;font-size:14px;line-height:1.6;">
+         ${args.workspaces.map(w => `<li>${esc(w.ws)} — ${roleLabel(w.role)}</li>`).join('\n')}
+       </ul>`
+    : '';
+  const messageHtml = args.message
+    ? `<p style="background:#f0f0f5;border-radius:6px;padding:12px;color:#444;"><em>${t(locale, 'inviteMessageLabel')}</em><br>${esc(args.message)}</p>`
+    : '';
+  const expiryHtml = args.expiresLabel
+    ? `<p style="font-size:13px;color:#999;">${t(locale, 'inviteExpiryPrefix')} ${esc(args.expiresLabel)}.</p>`
+    : '';
+
+  const html = wrapHtml(t(locale, 'inviteHeading'), `
+    <p>${sentence}</p>
+    <p>${t(locale, 'inviteNewAccount')}</p>
+    ${wsHtml}
+    ${messageHtml}
+    <p style="text-align: center;">
+      <a href="${args.acceptUrl}" class="btn">${t(locale, 'inviteButton')}</a>
+    </p>
+    ${expiryHtml}
+    <p style="font-size: 13px; color: #999;">${t(locale, 'inviteFallback')}</p>
+    <p class="url-fallback">${args.acceptUrl}</p>
+    <p style="color: #999; font-size: 13px;">${t(locale, 'inviteIgnore')}</p>
+  `, locale);
+
+  const text = [
+    t(locale, 'inviteHeading'),
+    '',
+    t(locale, 'inviteSentence').replace('{inviter}', args.inviterName).replace('{org}', args.orgName),
+    '',
+    t(locale, 'inviteNewAccount'),
+    '',
+    ...(args.workspaces.length ? [t(locale, 'inviteWorkspacesLabel'), ...args.workspaces.map(w => `  - ${w.ws} (${roleLabel(w.role)})`), ''] : []),
+    ...(args.message ? [`${t(locale, 'inviteMessageLabel')} ${args.message}`, ''] : []),
+    args.acceptUrl,
+    '',
+    ...(args.expiresLabel ? [`${t(locale, 'inviteExpiryPrefix')} ${args.expiresLabel}.`, ''] : []),
+    t(locale, 'inviteIgnore'),
     '',
     `-- ${t(locale, 'footer')}`,
   ].join('\n');

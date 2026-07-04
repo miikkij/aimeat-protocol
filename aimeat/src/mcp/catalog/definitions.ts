@@ -1057,6 +1057,40 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        // Server-only: an owner/admin inviting people not yet on the node by email. Not on the connector/CLI surface.
+        name: 'aimeat_organism_invite_email',
+        description: 'Invite a person who is NOT yet on this node into an organism by EMAIL. Creator/admin only. Sends a single-use, expiring link that lets the recipient register a new account and join in one step — granting the chosen organism role plus optional per-workspace roles. Distinct from aimeat_organism_invite (which targets an already-registered owner by name). Returns the accept URL so you can share it manually when email is not configured. Cancel a pending one with aimeat_organism_invitation_email_cancel.',
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            email: { type: 'string', required: true, description: 'Email address of the person to invite.' },
+            org_role: { type: 'string', enum: ['member', 'admin'], description: 'Organism role granted on accept (default "member").' },
+            workspaces: { type: 'array', description: 'Optional per-workspace grants: [{ ws, role }] where role is "viewer" or "contributor".' },
+            message: { type: 'string', description: 'Optional personal note included in the invitation email.' },
+            expires_in_days: { type: 'number', description: 'Days until the invitation expires (1–30, default 7).' },
+        },
+    },
+    {
+        name: 'aimeat_organism_invitations_email',
+        description: 'List the PENDING email invitations for an organism (creator/admin only) — each invitee email, organism role, workspace grants, and expiry. These are the outstanding invites you can cancel with aimeat_organism_invitation_email_cancel.',
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+        },
+    },
+    {
+        name: 'aimeat_organism_invitation_email_cancel',
+        description: 'Cancel a PENDING email invitation before it is used (creator/admin only). Invalidates the link so it can no longer be accepted.',
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            invitation_id: { type: 'string', required: true, description: 'The invitation id (from aimeat_organism_invitations_email).' },
+        },
+    },
+    {
         name: 'aimeat_organism_search',
         description: 'Search the records + documents across an organism\'s workspaces by text (case-insensitive substring). Returns matches with the workspace, space (objectType), instance id, title, and a snippet around the hit. Searches only workspaces you may read; scope to one with `ws`. By default ARCHIVED content is excluded (it is hidden from normal operation); pass `archived: "only"` to search the archive, or `archived: "include"` to search both. Use this to FIND content before reading it with aimeat_workspace_read.',
         caller: 'agent',

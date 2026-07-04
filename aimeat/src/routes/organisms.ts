@@ -8,8 +8,13 @@
  * @structure
  *   - organismsRouter(config, storage) — POST/GET/PUT/DELETE /v1/organisms (+ :id sub-resources)
  *   - GET /v1/organisms/:id/workspace — manifest-driven, membership-gated workspace aggregation
+ *   - Email invitations: POST/GET/cancel /:id/invitations/email + PUBLIC GET/POST /v1/invitations/:token[/accept]
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   v1.x -- 2026-07-04 -- Email invitations for unregistered users: creator/admin invites an external
+ *     email into an organism (+ selected workspaces w/ viewer|contributor); the emailed single-use,
+ *     expiring, cancellable token lets the recipient register + join in one step. Public accept
+ *     endpoints; new invitations storage repo + inviteEmailHtml/sendInvite + provisionOwner service.
  *   v1.x -- 2026-07-03 -- Contract engagements: POST/GET /:id/workspace/engagements + /retire (first-class
  *     agent×contract×workspace lifecycle; see src/services/workspace-engagements.ts).
  *   v1.1.0 -- 2026-06-07 -- Phase 3: add the generic GET /:id/workspace read.
@@ -74,9 +79,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
+import { rateLimit } from '../middleware/rate-limit.js';
+import { hashPassword } from '../services/password.js';
+import { validatePasswordStrength } from '../utils/password-validation.js';
+import { provisionOwner } from '../services/owner-provisioning.js';
+import { establishOwnerSession } from '../services/owner-session.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
-import { resolveIdentity, parseGaiiLoose, isSameOwner, isGEAI } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose, isSameOwner, isGEAI, validateOwnerName } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { ecoMayReadKey } from '../services/ecosystem-access.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
@@ -101,6 +111,7 @@ import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
+import { createEmailInvitation, invitePublic, hashInviteToken, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -2169,6 +2180,223 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!createdBy) return;
     const revoked = await revokeWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee);
     res.json(success(config.nodeId, { ws, grantee: parseGaiiLoose(grantee).owner || grantee, revoked }));
+  });
+
+  /* ══ Email invitations — invite people NOT yet in the system into this organism (+ workspaces) ══
+   * A creator/admin invites an external email; a single-use, time-limited token goes out in an
+   * emailed link. On accept the recipient registers a brand-new account (or uses their session) and
+   * is joined to the organism + the selected workspaces with the chosen roles. Invites expire and
+   * are cancellable before use. The token's raw value lives only in the link; only its hash is stored.
+   * Distinct from the name-based /:id/invitations flow above, which targets already-registered owners.
+   * The invite-creation core lives in services/invitations.ts (shared with the MCP tools); the accept
+   * side stays here — it is session-bound and reuses this router's workspace-role helpers. */
+  /** Creator/admin gate shared by the email-invite management routes. */
+  const requireOrgAdmin = async (req: Request, res: Response, id: string): Promise<OrganismRecord | null> => {
+    const callerGhii = req.auth!.owner as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
+    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage invitations'));
+      return null;
+    }
+    return organism;
+  };
+
+  /* POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin only).
+   * Throttle a single inviter to bound outbound email; the per-organism pending cap in
+   * createEmailInvitation() is the harder backstop against accumulating spam invites. */
+  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireRole('agent'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const organism = await requireOrgAdmin(req, res, id);
+    if (!organism) return;
+
+    const { email, orgRole, workspaces, message, expiresInDays } = req.body ?? {};
+
+    // Normalize + authorize each selected workspace grant (the inviter must be able to manage it).
+    const wsGrants = normalizeWorkspaceGrants(workspaces);
+    for (const g of wsGrants) {
+      const createdBy = await requireWsManager(req, res, id, g.ws);
+      if (!createdBy) return; // requireWsManager already responded (ws missing / not permitted)
+    }
+
+    try {
+      const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, {
+        organism,
+        inviterGhii: callerGhii,
+        email,
+        orgRole: normalizeOrgRole(orgRole),
+        workspaces: wsGrants,
+        message,
+        expiresInDays,
+      });
+      res.status(201).json(success(config.nodeId, {
+        invitation: invitePublic(invitation),
+        email_sent: emailSent,
+        // Returned to the authorized inviter so they can share the link manually (essential when SMTP is off).
+        accept_url: acceptUrl,
+      }));
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
+    }
+  });
+
+  /* GET /v1/organisms/:id/invitations/email — list pending email invitations (creator/admin) */
+  router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await requireOrgAdmin(req, res, id);
+    if (!organism) return;
+    const invitations = (await storage.listInvitationsByOrganism(id, { status: 'pending' })).map(invitePublic);
+    res.json(success(config.nodeId, { invitations, total: invitations.length }));
+  });
+
+  /* POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invite (creator/admin) */
+  router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const invId = req.params.invId as string;
+    const organism = await requireOrgAdmin(req, res, id);
+    if (!organism) return;
+    const inv = await storage.getInvitation(invId);
+    if (!inv || inv.organismId !== id) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Invitation is already ${inv.status}`)); return; }
+    await storage.updateInvitation(invId, { status: 'cancelled' });
+    res.json(success(config.nodeId, { status: 'cancelled' }));
+    emitChange('organisms');
+  });
+
+  /* GET /v1/invitations/:token — PUBLIC: invite details for the accept page (token carried in the URL) */
+  router.get('/v1/invitations/:token', rateLimit({ max: 30, windowMs: 60_000 }), async (req, res) => {
+    const token = req.params.token as string;
+    const inv = await storage.getInvitationByHash(hashInviteToken(token));
+    if (!inv || inv.status === 'cancelled') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
+    if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
+      if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
+      res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
+      return;
+    }
+    const organism = await storage.getOrganism(inv.organismId);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const registered = !!(await storage.getGHIIByEmailHash(inv.emailHash));
+    const wsDisplay: Array<{ ws: string; name: string; role: string }> = [];
+    for (const g of inv.workspaces) {
+      const entry = await findWsEntry(inv.organismId, g.ws);
+      wsDisplay.push({ ws: g.ws, name: entry?.name || g.ws, role: g.role });
+    }
+    res.json(success(config.nodeId, {
+      invitation: {
+        email: inv.email,
+        org_role: inv.orgRole,
+        workspaces: wsDisplay,
+        message: inv.message,
+        invited_by: inv.invitedBy,
+        expires_at: inv.expiresAt,
+        registered,
+        organism: { id: organism.id, name: organism.name, description: organism.description, type: organism.type, visibility: organism.visibility },
+      },
+    }));
+  });
+
+  /* POST /v1/invitations/:token/accept — PUBLIC: register (or use current session) + join org + workspaces */
+  router.post('/v1/invitations/:token/accept', optionalAuth(), rateLimit({ max: 10, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    const token = req.params.token as string;
+    const inv = await storage.getInvitationByHash(hashInviteToken(token));
+    if (!inv || inv.status === 'cancelled') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
+    if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
+      if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
+      res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
+      return;
+    }
+    const organism = await storage.getOrganism(inv.organismId);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+
+    // Who is accepting: a real (non-anonymous) session, else create a fresh account from the register form.
+    const authed = req.auth && req.auth.anonymous !== true ? (req.auth.owner as string) : null;
+    let ownerName: string;
+    let createdAccount = false;
+    if (authed) {
+      ownerName = authed;
+    } else {
+      let { username } = req.body ?? {};
+      const { password, display_name, locale } = req.body ?? {};
+      if (!username || typeof username !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required')); return; }
+      username = username.trim().toLowerCase();
+      if (username.includes('@')) username = username.split('@')[0];
+      const nameErr = validateOwnerName(username);
+      if (nameErr) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameErr)); return; }
+      if (!password || typeof password !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required')); return; }
+      const pwErr = validatePasswordStrength(password);
+      if (pwErr) { res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr)); return; }
+      if (await storage.getOwner(username)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`)); return; }
+      const passwordHash = await hashPassword(password);
+      const { owner } = await provisionOwner(storage, config, {
+        username,
+        displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
+        passwordHash,
+        locale: typeof locale === 'string' ? locale : undefined,
+        verifiedEmail: inv.email, // the invite proves reachability → the new account's email is verified
+        enableMagicLink: true,
+      });
+      ownerName = owner.name;
+      createdAccount = true;
+      emitChange('ghii');
+    }
+
+    // Join the organism: membership row + roster arrays kept in sync (mirrors the accept handler above).
+    const nowIso = new Date().toISOString();
+    const existingMembership = await storage.getMembership(inv.organismId, ownerName);
+    if (existingMembership) {
+      if (existingMembership.status !== 'active') {
+        await storage.updateMembership(existingMembership.id, { status: 'active', role: inv.orgRole, joinedAt: nowIso });
+      }
+    } else {
+      await storage.createMembership({
+        id: uuidv4(), organismId: inv.organismId, ghii: ownerName,
+        role: inv.orgRole, status: 'active', invitedBy: inv.invitedBy, joinedAt: nowIso,
+      });
+    }
+    const nextMembers = [...new Set([...organism.members, ownerName])];
+    const nextAdmins = inv.orgRole === 'admin' ? [...new Set([...organism.admins, ownerName])] : organism.admins;
+    await storage.updateOrganism(inv.organismId, { members: nextMembers, admins: nextAdmins, updatedAt: nowIso });
+
+    // Apply the workspace grants (resolve each workspace's creator = the consent owner).
+    const grantedWs: string[] = [];
+    for (const g of inv.workspaces) {
+      const entry = await findWsEntry(inv.organismId, g.ws);
+      if (!entry) continue; // workspace deleted since the invite — skip
+      const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+      if (createdBy === ownerName) continue; // creator already has full access to their workspace
+      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, inv.organismId, g.ws, ownerName, g.role);
+      grantedWs.push(g.ws);
+    }
+
+    // Consume the invite (single-use) + tell the inviter.
+    await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });
+    await notify(storage, `${inv.invitedBy}@${config.nodeId}`, {
+      type: 'organism_invitation_accepted',
+      title: `${ownerName} accepted your invitation to "${organism.name}"`,
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+    emitChange('organisms');
+
+    // Log the accepting user straight in (fresh roles), so the SPA lands authenticated.
+    const ownerRecord = await storage.getOwner(ownerName);
+    const roles = ownerRecord?.roles ?? ['owner'];
+    const session = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
+
+    res.set('Cache-Control', 'no-store');
+    res.json(success(config.nodeId, {
+      status: 'joined',
+      organism_id: inv.organismId,
+      created_account: createdAccount,
+      workspaces: grantedWs,
+      token: session.token,
+      expires_in: session.expiresIn,
+      redirect: '/v1/profile#organisms',
+    }));
   });
 
   /* ── Contract engagements — the first-class link between an agent's contract capability and a

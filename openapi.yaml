@@ -20505,6 +20505,128 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/invitations/email:
+    post:
+      operationId: inviteOrganismMemberByEmail
+      summary: Invite a person (not yet on the node) to an organism by email
+      description: >-
+        Creator/admin invites an external email into the organism plus optional workspaces. Sends a
+        single-use, time-limited link that lets the recipient register a new account and join in one
+        step, granting the chosen organism role and per-workspace roles (viewer|contributor). Returns
+        the accept URL so the inviter can share it manually when SMTP is not configured. Rate-limited.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, description: Email address of the person to invite }
+                orgRole: { type: string, enum: [member, admin], description: 'Organism role granted on accept (default: member)' }
+                workspaces:
+                  type: array
+                  description: Optional per-workspace grants.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
+                message: { type: string, description: Optional personal note included in the email }
+                expiresInDays: { type: integer, minimum: 1, maximum: 30, description: 'Days until the invitation expires (default: 7)' }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/BadRequest' }
+    get:
+      operationId: listOrganismEmailInvitations
+      summary: List pending email invitations
+      description: Creator/admin lists the organism's pending email invitations (token never returned).
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations/email/{invId}/cancel:
+    post:
+      operationId: cancelOrganismEmailInvitation
+      summary: Cancel a pending email invitation
+      description: Creator/admin cancels a pending email invitation, invalidating its link before use.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: invId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/invitations/{token}:
+    get:
+      operationId: getEmailInvitation
+      summary: Get email invitation details (public)
+      description: >-
+        Public — resolve an email-invitation token for the accept page: returns the organism summary,
+        organism role, workspace grants (with names), the inviter, the invited email, and whether that
+        email already maps to a registered account. Returns 410 when the invitation is expired/used.
+      tags: [Organisms]
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/invitations/{token}/accept:
+    post:
+      operationId: acceptEmailInvitation
+      summary: Accept an email invitation (public)
+      description: >-
+        Public — accept an email invitation. With an authenticated session, joins as the current
+        account; otherwise creates a new account from { username, password, display_name } (the
+        invited email is recorded as verified). Applies organism membership + the workspace grants,
+        marks the invitation accepted (single-use), and establishes a login session (refresh cookie).
+      tags: [Organisms]
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Required only when NOT authenticated (creating a new account).
+              properties:
+                username: { type: string }
+                password: { type: string }
+                display_name: { type: string }
+                locale: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/AimeatError' }
+
   /v1/organisms/{id}/agents:
     post:
       operationId: attachOrganismAgent
