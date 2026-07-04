@@ -3,6 +3,8 @@
  * @description Memory CRUD routes, file storage, search, and federated memory
  *   browsing (pull/push/list across nodes).
  * @version-history
+ *   v (2026-07-04) — /v1/memory/files upload + download accept external principals (agent/ecosystem/app)
+ *     via requireExternalPrincipal, so H-2 app-grant sessions (role 'app') can store/preview drop files.
  *   v1.0.0 — 2026-03-15 — Initial memory routes
  *   v1.1.0 — 2026-05-22 — Add list-home, list-remote, pull-remote federation endpoints
  *   v1.2.0 — 2026-05-22 — Add discover and copy endpoints for cross-user public memory
@@ -1233,7 +1235,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // ── /v1/memory/files — File storage (MUST be before :key routes) ──
 
   // POST /v1/memory/files — upload file (base64 JSON body)
-  router.post('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
     const { key, content, mime_type, visibility, tags } = req.body ?? {};
 
@@ -1387,7 +1389,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/files/:key — download file
-  router.get('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
     const file = await storage.getStorageFile(gaii, key);

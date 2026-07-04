@@ -10,11 +10,16 @@
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: Tier-1 fan-across librarian search.
+ *   v1.1.0 — 2026-07-04 — classify/plan/distribute accept an `ai:use`-scoped token (H-2 app-grant)
+ *     in addition to an owner session — the same capability boundary as /v1/ai/complete, so a
+ *     sandboxed browser app on an isolated app origin (Notebook-engine apps like DROP) can run
+ *     the owner's AI over the owner's own material once the owner granted ai:use.
  */
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { librarianSearch } from '../services/librarian.js';
@@ -26,6 +31,20 @@ const MAX_LIMIT = 100;
 
 export function librarianRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** Owner session, or any token (agent / H-2 app-grant) carrying the `ai:use` scope.
+   *  These endpoints run the owner's AI over the owner's own material — the same capability
+   *  boundary as /v1/ai/complete, and the same gate shape (see ai.ts gateOwnerOrAiUseAgent),
+   *  so a sandboxed app-origin session (role 'app') works once the owner granted ai:use. */
+  function gateOwnerOrAiUse(req: Request, res: Response): boolean {
+    const roles = req.auth?.roles ?? [];
+    if (roles.includes('owner')) return true;
+    const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
+    if (scopes.includes('ai:use') || scopes.includes('*')) return true;
+    res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+      'This endpoint requires an owner session or a token with the ai:use scope.'));
+    return false;
+  }
 
   // GET /v1/librarian/search — ranked full-text search across all of the caller's content.
   router.get('/v1/librarian/search', requireAuth(), async (req, res) => {
@@ -67,7 +86,8 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
   // POST /v1/librarian/classify — AI placement suggestion for a free-text note (notebook slice B).
   // Owner-scoped: it decrypts the caller's own OpenRouter key. The materialize step runs client-side
   // over the generic memory/organism APIs.
-  router.post('/v1/librarian/classify', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/librarian/classify', requireAuth(), async (req, res) => {
+    if (!gateOwnerOrAiUse(req, res)) return;
     const { text } = req.body as { text?: string };
     if (!text || typeof text !== 'string' || !text.trim()) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
@@ -97,7 +117,8 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
   // Owner-scoped: decrypts the caller's own OpenRouter key. Multistep reasoning produces an ordered
   // plan of enrichment steps (reason about the note / assess the user's own material via the
   // librarian); the steps are then executed client-side. No writes happen here.
-  router.post('/v1/librarian/plan', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/librarian/plan', requireAuth(), async (req, res) => {
+    if (!gateOwnerOrAiUse(req, res)) return;
     const { text, catalogue } = req.body as { text?: string; catalogue?: unknown };
     if (!text || typeof text !== 'string' || !text.trim()) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
@@ -127,7 +148,8 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
   // POST /v1/librarian/distribute — split a note into chunks, each with a suggested home (notebook
   // stage 3). Owner-scoped (decrypts the caller's own OpenRouter key). The per-chunk materialize runs
   // client-side over the generic memory/organism APIs; nothing is written here.
-  router.post('/v1/librarian/distribute', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/librarian/distribute', requireAuth(), async (req, res) => {
+    if (!gateOwnerOrAiUse(req, res)) return;
     const { text } = req.body as { text?: string };
     if (!text || typeof text !== 'string' || !text.trim()) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'text is required'));
