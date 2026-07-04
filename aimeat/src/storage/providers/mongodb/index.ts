@@ -3929,6 +3929,92 @@ export class PrismaStorage implements Storage {
         await this.prisma.personalAccessToken.update({ where: { id }, data: { lastUsedAt: new Date(usedAtIso) } });
     }
 
+    // ── Email invitations ─────────────────────────────────────
+
+    async createInvitation(rec: import('../../../storage/repositories/invitation.repository.js').InvitationRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.invitation.create({
+            data: {
+                id: rec.id,
+                tokenHash: rec.tokenHash,
+                organismId: rec.organismId,
+                orgRole: rec.orgRole,
+                workspaces: rec.workspaces ?? [],
+                email: rec.email,
+                emailHash: rec.emailHash,
+                invitedBy: rec.invitedBy,
+                message: rec.message ?? null,
+                status: rec.status,
+                createdAt: new Date(rec.createdAt),
+                expiresAt: new Date(rec.expiresAt),
+                acceptedAt: rec.acceptedAt ? new Date(rec.acceptedAt) : null,
+                acceptedBy: rec.acceptedBy ?? null,
+            },
+        });
+    }
+
+    async getInvitationByHash(tokenHash: string): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.invitation.findFirst({ where: { tokenHash } });
+        return row ? this.toInvitationRecord(row) : null;
+    }
+
+    async getInvitation(id: string): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.invitation.findUnique({ where: { id } });
+        return row ? this.toInvitationRecord(row) : null;
+    }
+
+    async listInvitationsByOrganism(organismId: string, opts?: { status?: string }): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.invitation.findMany({
+            where: { organismId, ...(opts?.status ? { status: opts.status } : {}) },
+            orderBy: { createdAt: 'desc' },
+        });
+        return rows.map((r: unknown) => this.toInvitationRecord(r));
+    }
+
+    async updateInvitation(id: string, updates: Partial<import('../../../storage/repositories/invitation.repository.js').InvitationRecord>): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
+        this.ensureReady();
+        try {
+            const data: Record<string, unknown> = {};
+            if (updates.status !== undefined) data.status = updates.status;
+            if (updates.acceptedAt !== undefined) data.acceptedAt = updates.acceptedAt ? new Date(updates.acceptedAt) : null;
+            if (updates.acceptedBy !== undefined) data.acceptedBy = updates.acceptedBy;
+            const row = await this.prisma.invitation.update({ where: { id }, data });
+            return this.toInvitationRecord(row);
+        } catch { return null; }
+    }
+
+    async cleanupExpiredInvitations(nowIso: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.invitation.updateMany({
+            where: { status: 'pending', expiresAt: { lte: new Date(nowIso) } },
+            data: { status: 'expired' },
+        });
+        return result.count;
+    }
+
+    private toInvitationRecord(row: any): import('../../../storage/repositories/invitation.repository.js').InvitationRecord {
+        const toIso = (v: any): string | null => (v ? (v instanceof Date ? v.toISOString() : v) : null);
+        return {
+            id: row.id,
+            tokenHash: row.tokenHash,
+            organismId: row.organismId,
+            orgRole: row.orgRole ?? 'member',
+            workspaces: Array.isArray(row.workspaces) ? row.workspaces : (row.workspaces ? JSON.parse(row.workspaces) : []),
+            email: row.email,
+            emailHash: row.emailHash,
+            invitedBy: row.invitedBy,
+            message: row.message ?? null,
+            status: row.status,
+            createdAt: toIso(row.createdAt) as string,
+            expiresAt: toIso(row.expiresAt) as string,
+            acceptedAt: toIso(row.acceptedAt),
+            acceptedBy: row.acceptedBy ?? null,
+        };
+    }
+
     // ── Token Revocation ──────────────────────────────────────
 
     async revokeToken(tokenHash: string, expiresAt: number): Promise<void> {

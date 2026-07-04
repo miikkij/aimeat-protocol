@@ -4,7 +4,7 @@
  *   and privacy-first logging (never logs email addresses). Supports verification codes,
  *   magic links, notifications, match suggestions, and raw HTML emails.
  * @structure
- *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendMatchSuggestion, sendRaw)
+ *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendMatchSuggestion, sendInvite, sendRaw)
  *   - withRetry() exponential backoff helper
  *   - createDisabledService() stub for when SMTP is not configured
  *   - createEmailService() factory (configures nodemailer transport)
@@ -18,6 +18,7 @@
  *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (email_sent, email_failed, email_retried)
  *   v1.3.0 -- 2026-06-15 -- Add a process-wide active-service handle (set/getActiveEmailService) so the
  *     agent-task completion hook (B6) can reuse the configured transport without re-threading it.
+ *   v1.4.0 -- 2026-07-04 -- Add sendInvite() for email invitations to unregistered users.
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -29,6 +30,8 @@ import {
   magicLinkEmailHtml,
   notificationEmailHtml,
   matchSuggestionEmailHtml,
+  inviteEmailHtml,
+  inviteEmailSubject,
 } from './email-templates.js';
 
 export type { MatchSuggestion } from './email-templates.js';
@@ -39,6 +42,7 @@ export interface EmailService {
   sendMagicLink(to: string, loginUrl: string, locale?: string): Promise<boolean>;
   sendNotification(to: string, subject: string, body: string): Promise<boolean>;
   sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
+  sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
 }
 
@@ -86,6 +90,7 @@ function createDisabledService(): EmailService {
     sendMagicLink: () => warn('sendMagicLink'),
     sendNotification: () => warn('sendNotification'),
     sendMatchSuggestion: () => warn('sendMatchSuggestion'),
+    sendInvite: () => warn('sendInvite'),
     sendRaw: () => warn('sendRaw'),
   };
 }
@@ -156,6 +161,12 @@ export function createEmailService(config: AimeatConfig): EmailService {
       const { html, text } = matchSuggestionEmailHtml(matches, locale);
       const subject = locale === 'fi' ? 'Uusia ehdotuksia AIMEAT:ssa' : 'New Match Suggestions on AIMEAT';
       return send(to, subject, html, text, 'match_suggestion');
+    },
+
+    async sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean> {
+      const { html, text } = inviteEmailHtml(args, locale);
+      const subject = inviteEmailSubject(args.orgName, locale);
+      return send(to, subject, html, text, 'invitation');
     },
 
     async sendRaw(to: string, subject: string, rawHtml: string, rawText: string): Promise<boolean> {

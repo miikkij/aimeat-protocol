@@ -1,0 +1,27 @@
+/**
+ * @file invite-accept.css
+ * @description Styles for the public email-invitation accept page (/v1/invite). A single centered
+ *   card: invitation summary + either a register-and-join form or an accept-as-me button.
+ * @usage loaded by spa.html; classes prefixed inv-.
+ * @version-history
+ *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
+ */
+
+.inv-wrap { min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+.inv-card { width: 100%; max-width: 460px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem 1.8rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
+.inv-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--accent); background: var(--bg-dim); border-radius: 999px; padding: 0.15rem 0.6rem; margin-bottom: 0.6rem; }
+.inv-title { font-size: 1.35rem; font-weight: 700; color: var(--text); margin: 0 0 0.8rem; }
+.inv-muted { color: var(--muted); font-size: 0.88rem; line-height: 1.5; margin: 0.2rem 0; }
+.inv-summary { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); padding: 0.8rem 0.9rem; margin-bottom: 1.1rem; }
+.inv-org-name { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.inv-wslabel { font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0 0.2rem; }
+.inv-wslist { margin: 0; padding-left: 1.1rem; color: var(--text); font-size: 0.86rem; line-height: 1.5; }
+.inv-message { margin: 0.6rem 0 0; font-style: italic; color: var(--text); font-size: 0.88rem; }
+.inv-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.inv-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.inv-field label { font-size: 0.76rem; color: var(--muted); }
+.inv-actions { margin-top: 0.6rem; }
+.inv-btn { width: 100%; }
+.inv-or { text-align: center; color: var(--muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; margin: 1rem 0 0.7rem; }
+.inv-signin { font-size: 0.85rem; }
+.inv-error { color: var(--danger, #ef4444); font-size: 0.82rem; margin: 0.2rem 0 0; }

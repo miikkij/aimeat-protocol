@@ -69,6 +69,7 @@
   <link rel="stylesheet" href="/css/components/markdown.css">
   <link rel="stylesheet" href="/css/components/app-sandbox.css">
   <link rel="stylesheet" href="/css/views/app-grant.css">
+  <link rel="stylesheet" href="/css/views/invite-accept.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/portal.css">
@@ -393,6 +394,7 @@
       '/v1/my-company':  () => import('/views/my-company.js' + B),
       '/v1/companies':   () => import('/views/companies.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
+      '/v1/invite':      () => import('/views/invite-accept.js' + B),
       '/v1/guides':      () => import('/views/guides.js' + B),
       '/v1/hobbies':     () => import('/views/hobbies.js' + B),
       '/v1/marketplace': () => import('/views/marketplace.js' + B),

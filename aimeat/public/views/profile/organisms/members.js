@@ -10,6 +10,8 @@
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — Per-member workspace access uses one getWorkspaceAccessAll(orgId) call
  *     instead of a per-owned-workspace getWorkspaceAccess fan-out.
+ *   v1.2.0 — 2026-07-04 — Invite people not yet on the node by email: an "Invite by email" form
+ *     (org role + per-workspace viewer/contributor + expiry) and a cancellable pending list.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -42,6 +44,12 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const [inviteName, setInviteName] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Email invitations (invite people not yet on the node).
+  const [emailInvites, setEmailInvites] = useState([]);
+  const [showEmailInvite, setShowEmailInvite] = useState(false);
+  const [wsOptions, setWsOptions] = useState([]);      // [{ id, name }] workspaces available to grant
+  const [emForm, setEmForm] = useState({ email: '', orgRole: 'member', message: '', expiresInDays: 7, ws: {} });
+  const [emResult, setEmResult] = useState(null);      // { accept_url, email_sent } after a successful send
   const [wsAccess, setWsAccess] = useState(null);   // bare owner name → [{ ws, role }] (best effort)
 
   const load = useCallback(async () => {
@@ -51,14 +59,16 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         orgService.listJoinRequests(orgId).catch(() => null),
         orgService.listMembers(orgId, 'banned').catch(() => null),
         orgService.listInvitations(orgId).catch(() => null),
+        orgService.listEmailInvitations(orgId).catch(() => null),
       );
     }
-    const [mb, rq, bn, inv] = await Promise.all(tasks);
+    const [mb, rq, bn, inv, eminv] = await Promise.all(tasks);
     setMembers(mb?.data?.members || []);
     if (canManage) {
       setRequests(rq?.data?.join_requests || []);
       setBanned(bn?.data?.members || []);
       setInvitations(inv?.data?.invitations || []);
+      setEmailInvites(eminv?.data?.invitations || []);
     }
   }, [orgId, canManage]);
 
@@ -117,6 +127,50 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     run(() => orgService.inviteMember(orgId, name), (t('organisms.invitationSent') || 'Invitation sent'), 'organisms.inviteFailed');
   };
 
+  // ── Email invitations (invite people not yet on the node) ──
+  const openEmailInvite = async () => {
+    setShowInvite(false);
+    setShowEmailInvite(s => !s);
+    setEmResult(null);
+    try {
+      const wss = await orgService.discoverWorkspaces(orgId);
+      setWsOptions((wss || []).map(w => ({ id: w.id, name: w.name || w.id })));
+    } catch { setWsOptions([]); }
+  };
+  const toggleWs = (wsId, checked) => setEmForm(f => {
+    const ws = { ...f.ws };
+    if (checked) ws[wsId] = ws[wsId] || 'viewer'; else delete ws[wsId];
+    return { ...f, ws };
+  });
+  const setWsRole = (wsId, role) => setEmForm(f => ({ ...f, ws: { ...f.ws, [wsId]: role } }));
+  const sendEmailInvite = async () => {
+    const email = emForm.email.trim();
+    if (!email) return;
+    const workspaces = Object.entries(emForm.ws).map(([ws, role]) => ({ ws, role }));
+    setBusy(true);
+    try {
+      const r = await orgService.inviteByEmail(orgId, {
+        email,
+        orgRole: emForm.orgRole,
+        workspaces,
+        message: emForm.message.trim() || undefined,
+        expiresInDays: Number(emForm.expiresInDays) || 7,
+      });
+      if (r?.ok === false) { showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed')); }
+      else {
+        setEmResult({ accept_url: r?.data?.accept_url, email_sent: r?.data?.email_sent });
+        setEmForm({ email: '', orgRole: 'member', message: '', expiresInDays: 7, ws: {} });
+        showToast(r?.data?.email_sent ? (t('organisms.inviteEmailSent') || 'Invitation email sent') : (t('organisms.inviteCreated') || 'Invitation created — share the link'));
+      }
+      await load(); onChanged?.();
+    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed')); }
+    finally { setBusy(false); }
+  };
+  const cancelEmail = (invId) => run(() => orgService.cancelEmailInvitation(orgId, invId), (t('organisms.inviteCancelled') || 'Invitation cancelled'), 'organisms.inviteFailed');
+  const copyAcceptUrl = async (url) => {
+    try { await navigator.clipboard.writeText(url); showToast(t('organisms.linkCopied') || 'Link copied'); } catch { /* clipboard blocked */ }
+  };
+
   const remove = (memberGhii, ban) => confirm(
     (ban ? (t('organisms.confirmBlockMember') || 'Block {member} and remove them from this organism?') : (t('organisms.confirmRemoveMember') || 'Revoke {member}’s access to this organism?')).replace('{member}', memberGhii),
     () => run(() => orgService.removeMember(orgId, memberGhii, ban), ban ? (t('organisms.memberBlocked') || 'Member blocked') : (t('organisms.memberRemoved') || 'Member removed'), 'organisms.removeFailed'),
@@ -147,7 +201,10 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
       <div class="pj-tabhead">
         <div class="section-desc pj-tabhead-desc">${t('organisms.membersDesc') || 'Members can join workspaces; their agents inherit the role.'}
           ${' '}<span class="pj-members-cap">${(members || []).length}/${org.maxMembers || 500}</span></div>
-        ${canManage ? html`<button class="btn-primary btn-sm" onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.invite') || 'Invite'}</button>` : null}
+        ${canManage ? html`<div class="pj-invite-btns">
+          <button class="btn-outline btn-sm" onClick=${() => { setShowEmailInvite(false); setShowInvite(s => !s); }}>${'+ '}${t('organisms.invite') || 'Invite'}</button>
+          <button class="btn-primary btn-sm" onClick=${openEmailInvite}>${'✉ '}${t('organisms.inviteByEmail') || 'Invite by email'}</button>
+        </div>` : null}
       </div>
 
       ${canManage && showInvite ? html`
@@ -159,6 +216,76 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         </div>` : null}
       ${canManage && invitations.length > 0 ? html`
         <div class="section-desc">${t('organisms.outstandingInvites') || 'Awaiting acceptance'}: ${invitations.map(m => (m.ghii)).join(', ')}</div>
+      ` : null}
+
+      ${canManage && showEmailInvite ? html`
+        <div class="pj-eminvite">
+          <div class="pj-eminvite-grid">
+            <div class="pj-eminvite-field">
+              <label>${t('organisms.inviteEmailLabel') || 'Email address'}</label>
+              <input class="input-field input-sm pj-eminvite-email" type="email" autofocus placeholder=${t('organisms.inviteEmailPlaceholder') || 'name@example.com'}
+                value=${emForm.email} onInput=${(e) => setEmForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div class="pj-eminvite-field">
+              <label>${t('organisms.inviteRoleLabel') || 'Role'}</label>
+              <select class="input-field input-sm" value=${emForm.orgRole} onChange=${(e) => setEmForm(f => ({ ...f, orgRole: e.target.value }))}>
+                <option value="member">${t('organisms.roleMember') || 'Member'}</option>
+                <option value="admin">${t('organisms.roleAdmin') || 'Admin'}</option>
+              </select>
+            </div>
+            <div class="pj-eminvite-field">
+              <label>${t('organisms.inviteExpiryLabel') || 'Expires in'}</label>
+              <select class="input-field input-sm" value=${String(emForm.expiresInDays)} onChange=${(e) => setEmForm(f => ({ ...f, expiresInDays: Number(e.target.value) }))}>
+                <option value="1">${t('organisms.expiry1d') || '1 day'}</option>
+                <option value="7">${t('organisms.expiry7d') || '7 days'}</option>
+                <option value="30">${t('organisms.expiry30d') || '30 days'}</option>
+              </select>
+            </div>
+          </div>
+
+          ${wsOptions.length > 0 ? html`
+            <div class="pj-eminvite-wslabel">${t('organisms.inviteWorkspacesLabel') || 'Grant workspace access (optional)'}</div>
+            <div class="pj-eminvite-wslist">
+              ${wsOptions.map(w => html`
+                <div class="pj-eminvite-wsrow" key=${w.id}>
+                  <label>
+                    <input type="checkbox" checked=${!!emForm.ws[w.id]} onChange=${(e) => toggleWs(w.id, e.target.checked)} />
+                    ${w.name}
+                  </label>
+                  ${emForm.ws[w.id] ? html`
+                    <select class="input-field input-sm" value=${emForm.ws[w.id]} onChange=${(e) => setWsRole(w.id, e.target.value)}>
+                      <option value="viewer">${t('organisms.roleViewer') || 'Viewer'}</option>
+                      <option value="contributor">${t('organisms.roleContributor') || 'Contributor'}</option>
+                    </select>` : null}
+                </div>`)}
+            </div>` : null}
+
+          <div class="pj-eminvite-field">
+            <label>${t('organisms.inviteMessageLabel') || 'Personal message (optional)'}</label>
+            <textarea class="input-field input-sm" rows="2" value=${emForm.message} onInput=${(e) => setEmForm(f => ({ ...f, message: e.target.value }))}></textarea>
+          </div>
+
+          <div class="pj-eminvite-actions">
+            <button class="btn-primary btn-sm" disabled=${busy || !emForm.email.trim()} onClick=${sendEmailInvite}>${t('organisms.sendInvite') || 'Send invitation'}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => { setShowEmailInvite(false); setEmResult(null); }}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>
+
+          ${emResult ? html`
+            <div class="pj-eminvite-url">
+              <div class="section-desc">${emResult.email_sent ? (t('organisms.inviteEmailSentHint') || 'Email sent. You can also share this link:') : (t('organisms.inviteLinkHint') || 'Share this link with the invitee:')}</div>
+              ${emResult.accept_url}
+              <div><button class="btn-outline btn-sm" onClick=${() => copyAcceptUrl(emResult.accept_url)}>${t('organisms.copyLink') || 'Copy link'}</button></div>
+            </div>` : null}
+        </div>` : null}
+
+      ${canManage && emailInvites.length > 0 ? html`
+        <div class="detail-label">${t('organisms.pendingEmailInvites') || 'Pending email invitations'}</div>
+        ${emailInvites.map(inv => html`
+          <div class="pj-eminvite-pending-row" key=${inv.id}>
+            <span>${inv.email}</span>
+            <span class="pj-eminvite-pending-meta">${inv.org_role}${(inv.workspaces && inv.workspaces.length) ? ` · ${inv.workspaces.length} ${t('organisms.workspacesShort') || 'ws'}` : ''}${inv.expires_at ? ` · ${t('organisms.expiresLabel') || 'expires'} ${fmtDate(inv.expires_at)}` : ''}</span>
+            <button class="btn-ghost btn-sm pj-eminvite-pending-cancel" disabled=${busy} onClick=${() => cancelEmail(inv.id)}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>`)}
       ` : null}
 
       ${canManage && pending.length > 0 ? pending.map(r => html`

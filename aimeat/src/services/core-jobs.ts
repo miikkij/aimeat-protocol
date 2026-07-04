@@ -17,6 +17,7 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('board-post-ttl-cleanup', () => runBoardPostTtlCleanupJob(storage));
   scheduler.registerCoreHandler('dispute-timeout', () => runDisputeTimeoutJob(config, storage));
   scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(config, storage));
+  scheduler.registerCoreHandler('invitation-expiry', () => runInvitationExpiryJob(storage));
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
     scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
@@ -207,6 +208,11 @@ async function runConsentExpiryJob(storage: Storage): Promise<void> {
 async function runNonceCleanupJob(storage: Storage): Promise<void> {
   const cleaned = await storage.cleanExpiredNonces();
   if (cleaned > 0) logger.info(`Nonce cleanup: removed ${cleaned} expired verification nonces`);
+}
+
+async function runInvitationExpiryJob(storage: Storage): Promise<void> {
+  const expired = await storage.cleanupExpiredInvitations(new Date().toISOString());
+  if (expired > 0) logger.info(`Invitation expiry: marked ${expired} email invitations expired`);
 }
 
 async function runExecutionLogPruneJob(config: AimeatConfig, storage: Storage): Promise<void> {

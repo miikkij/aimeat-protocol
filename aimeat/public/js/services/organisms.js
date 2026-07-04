@@ -196,6 +196,23 @@ export async function declineInvitation(id) {
   return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations/decline`, {});
 }
 
+/** Invite an external EMAIL (person not yet on the node) into an organism + optional workspaces.
+ *  Creator/admin only. payload: { email, orgRole?, workspaces?: [{ ws, role }], message?, expiresInDays? }.
+ *  Returns { invitation, email_sent, accept_url } — accept_url is shareable if email is not configured. */
+export async function inviteByEmail(id, payload) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations/email`, payload);
+}
+
+/** List pending EMAIL invitations for an organism. Creator/admin only. */
+export async function listEmailInvitations(id) {
+  return apiGet(`/v1/organisms/${encodeURIComponent(id)}/invitations/email`);
+}
+
+/** Cancel a pending EMAIL invitation before it is used. Creator/admin only. */
+export async function cancelEmailInvitation(id, invId) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations/email/${encodeURIComponent(invId)}/cancel`, {});
+}
+
 /** Attach one of your own agents (GAII) to an organism you belong to. */
 export async function attachAgent(id, agentGaii) {
   return apiPost(`/v1/organisms/${encodeURIComponent(id)}/agents`, { agent_gaii: agentGaii });

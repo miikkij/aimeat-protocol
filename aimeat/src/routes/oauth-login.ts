@@ -40,9 +40,9 @@ import type { GHIIRecord } from '../storage/interface.js';
 import type { OidcProvider, ProviderId } from '../services/oidc-providers.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { generateKeyPair } from '../auth/keypair.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
 import { establishOwnerSession } from '../services/owner-session.js';
+import { provisionOwner } from '../services/owner-provisioning.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -210,58 +210,16 @@ async function createOwnerForProvider(
   opts: { providerId: ProviderId; username: string; displayName: string; sub: string; email: string | null; emailVerified: boolean },
 ): Promise<GHIIRecord> {
   const { providerId, username, displayName, sub, email, emailVerified } = opts;
-  const now = new Date().toISOString();
-  const keyPair = await generateKeyPair();
-
-  // First real owner becomes operator (same self-heal logic as registration).
-  const allOwners = await storage.listOwners();
-  const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-  const hasOperator = allOwners.some(o => o.roles.includes('operator'));
-  const roles: string[] = ['owner'];
-  if (realOwners.length === 0 || !hasOperator) roles.push('operator');
-
-  const owner = await storage.createOwner({
-    name: username,
-    displayName,
-    publicKey: keyPair.publicKey,
-    roles,
-    createdAt: now,
-  });
-
-  const ghii = `${username}@${config.nodeId}`;
-  const ghiiRecord = await storage.createGHII({
+  const { ghii } = await provisionOwner(storage, config, {
     username,
-    nodeId: config.nodeId,
-    ghii,
     displayName,
+    // The IdP asserts the email; record it as a verified email (level 1) when trusted.
+    verifiedEmail: emailVerified && email ? email : null,
     externalIdentities: { [providerId]: sub },
     // Keep the indexed googleSub mirror for the google provider (fast returning-user lookup).
     googleSub: providerId === 'google' ? sub : undefined,
-    // The IdP asserts the email; record it as a verified email (level 1) when trusted.
-    emailHash: emailVerified && email ? emailHashOf(email) : undefined,
-    emailVerifiedAt: emailVerified && email ? now : undefined,
-    notificationEmail: emailVerified && email ? email.toLowerCase().trim() : undefined,
-    verificationLevel: emailVerified ? 1 : 0,
-    verificationMethod: emailVerified ? 'email' : undefined,
-    ownerName: owner.name,
-    totpEnabled: false,
-    morselBalance: config.welcomeBonus,
-    loginCount: 0,
-    createdAt: now,
-    updatedAt: now,
   });
-
-  if (config.welcomeBonus > 0) {
-    await storage.addTransaction({
-      id: `tx-${randomUUID()}`,
-      gaii: ghii,
-      type: 'welcome_bonus',
-      amount: config.welcomeBonus,
-      timestamp: now,
-    });
-  }
-
-  return ghiiRecord;
+  return ghii;
 }
 
 export function oauthLoginRouter(
