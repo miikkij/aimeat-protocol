@@ -25,6 +25,9 @@
  *     default, so image intake works without an explicit model override.
  *   v1.3.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
  *     fallback with OpenRouter's free-models router 'openrouter/free' (no specific vendor hardcoded).
+ *   v1.4.0 — 2026-07-05 — Per-app quota default is now the owner's daily budget, not a separate
+ *     hidden $0.10 cap. "AI apps daily budget" IS what an app may spend; a per-app override in
+ *     app_quotas throttles a single app below it when wanted. Removed DEFAULT_APP_DAILY_USD.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -47,9 +50,10 @@ const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
 const FALLBACK_PROMPT_COST_PER_TOKEN = 0.000005;
 const FALLBACK_COMPLETION_COST_PER_TOKEN = 0.000015;
 
-/** Defaults applied when the user hasn't set explicit values. */
+/** Default applied when the owner hasn't set an explicit daily budget. A per-app cap defaults to
+ *  this same budget (an app may spend the whole "AI apps daily budget"); set app_quotas.<app> to
+ *  throttle a single app below it. */
 export const DEFAULT_DAILY_BUDGET_USD = 1.0;
-export const DEFAULT_APP_DAILY_USD = 0.10;
 
 export interface UsageRecord {
   /** ISO date key (YYYY-MM-DD). */
@@ -204,7 +208,10 @@ export async function completeForOwner(
   }
   const appQuotas = (prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined) ?? {};
   if (opts.appId) {
-    const appQuota = appQuotas[opts.appId]?.daily_usd ?? DEFAULT_APP_DAILY_USD;
+    // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
+    // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
+    // override throttles that one app below the budget when the owner wants it.
+    const appQuota = appQuotas[opts.appId]?.daily_usd ?? dailyBudget;
     const appSpent = usage.per_app[opts.appId]?.cost_usd ?? 0;
     if (appSpent >= appQuota) {
       throw new AiCompletionError('APP_QUOTA_EXHAUSTED', 402,
