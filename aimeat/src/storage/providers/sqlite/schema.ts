@@ -762,25 +762,28 @@ export function initializeSchema(db: Database.Database): void {
 
     -- ── Email invitations (invite people not yet in the system into an organism + workspaces) ──
     CREATE TABLE IF NOT EXISTS invitations (
-      id           TEXT PRIMARY KEY,
-      tokenHash    TEXT NOT NULL,
-      organismId   TEXT NOT NULL,
-      orgRole      TEXT NOT NULL DEFAULT 'member',
-      workspaces   TEXT NOT NULL DEFAULT '[]',
-      email        TEXT NOT NULL,
-      emailHash    TEXT NOT NULL,
-      invitedBy    TEXT NOT NULL,
-      message      TEXT,
-      status       TEXT NOT NULL DEFAULT 'pending',
-      createdAt    TEXT NOT NULL,
-      expiresAt    TEXT NOT NULL,
-      acceptedAt   TEXT,
-      acceptedBy   TEXT
+      id               TEXT PRIMARY KEY,
+      tokenHash        TEXT NOT NULL,
+      organismId       TEXT NOT NULL,
+      orgRole          TEXT NOT NULL DEFAULT 'member',
+      type             TEXT NOT NULL DEFAULT 'link',
+      workspaces       TEXT NOT NULL DEFAULT '[]',
+      email            TEXT NOT NULL,
+      emailHash        TEXT NOT NULL,
+      invitedBy        TEXT NOT NULL,
+      provisionedOwner TEXT,
+      message          TEXT,
+      status           TEXT NOT NULL DEFAULT 'pending',
+      createdAt        TEXT NOT NULL,
+      expiresAt        TEXT NOT NULL,
+      acceptedAt       TEXT,
+      acceptedBy       TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_invitations_tokenHash ON invitations(tokenHash);
     CREATE INDEX IF NOT EXISTS idx_invitations_organismId ON invitations(organismId);
     CREATE INDEX IF NOT EXISTS idx_invitations_emailHash ON invitations(emailHash);
     CREATE INDEX IF NOT EXISTS idx_invitations_expiresAt ON invitations(expiresAt);
+    CREATE INDEX IF NOT EXISTS idx_invitations_invitedBy ON invitations(invitedBy);
 
     -- ── Revoked Tokens ──
     CREATE TABLE IF NOT EXISTS revoked_tokens (
@@ -1830,6 +1833,16 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('apps', 'operatorHiddenBy', 'TEXT');
   safeAddColumn('apps', 'operatorHiddenAt', 'TEXT');
   safeAddColumn('apps', 'operatorHideReason', 'TEXT');
+
+  // Provisioned-code invitations — a second invitation type whose account is created at MINT time
+  // and whose emailed code IS the account password. `type` discriminates it from the existing
+  // magic-link invites ('link'); `provisionedOwner` links back to the created account so a cancel
+  // (or expiry sweep) can delete it. idx_invitations_invitedBy backs the per-inviter quota count
+  // (invitedBy is an original column, so the index is upgrade-safe here). Additive/nullable;
+  // existing invitations read back as type='link', provisionedOwner=NULL.
+  safeAddColumn('invitations', 'type', "TEXT NOT NULL DEFAULT 'link'");
+  safeAddColumn('invitations', 'provisionedOwner', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_invitedBy ON invitations(invitedBy)');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the

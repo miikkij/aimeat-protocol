@@ -3939,10 +3939,12 @@ export class PrismaStorage implements Storage {
                 tokenHash: rec.tokenHash,
                 organismId: rec.organismId,
                 orgRole: rec.orgRole,
+                type: rec.type ?? 'link',
                 workspaces: rec.workspaces ?? [],
                 email: rec.email,
                 emailHash: rec.emailHash,
                 invitedBy: rec.invitedBy,
+                provisionedOwner: rec.provisionedOwner ?? null,
                 message: rec.message ?? null,
                 status: rec.status,
                 createdAt: new Date(rec.createdAt),
@@ -3974,6 +3976,18 @@ export class PrismaStorage implements Storage {
         return rows.map((r: unknown) => this.toInvitationRecord(r));
     }
 
+    async countInvitationsByInviter(invitedBy: string, opts?: { organismId?: string; type?: 'link' | 'code'; statuses?: string[] }): Promise<number> {
+        this.ensureReady();
+        return this.prisma.invitation.count({
+            where: {
+                invitedBy,
+                ...(opts?.organismId ? { organismId: opts.organismId } : {}),
+                ...(opts?.type ? { type: opts.type } : {}),
+                ...(opts?.statuses && opts.statuses.length ? { status: { in: opts.statuses } } : {}),
+            },
+        });
+    }
+
     async updateInvitation(id: string, updates: Partial<import('../../../storage/repositories/invitation.repository.js').InvitationRecord>): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
         this.ensureReady();
         try {
@@ -3988,8 +4002,10 @@ export class PrismaStorage implements Storage {
 
     async cleanupExpiredInvitations(nowIso: string): Promise<number> {
         this.ensureReady();
+        // Only magic-link invites auto-expire; code invites hold a real account and are reclaimed
+        // only by an explicit cancel (which deletes the account). See routes/organisms.ts.
         const result = await this.prisma.invitation.updateMany({
-            where: { status: 'pending', expiresAt: { lte: new Date(nowIso) } },
+            where: { status: 'pending', type: 'link', expiresAt: { lte: new Date(nowIso) } },
             data: { status: 'expired' },
         });
         return result.count;
@@ -4002,10 +4018,12 @@ export class PrismaStorage implements Storage {
             tokenHash: row.tokenHash,
             organismId: row.organismId,
             orgRole: row.orgRole ?? 'member',
+            type: row.type ?? 'link',
             workspaces: Array.isArray(row.workspaces) ? row.workspaces : (row.workspaces ? JSON.parse(row.workspaces) : []),
             email: row.email,
             emailHash: row.emailHash,
             invitedBy: row.invitedBy,
+            provisionedOwner: row.provisionedOwner ?? null,
             message: row.message ?? null,
             status: row.status,
             createdAt: toIso(row.createdAt) as string,

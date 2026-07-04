@@ -9,8 +9,15 @@
  *   - organismsRouter(config, storage) — POST/GET/PUT/DELETE /v1/organisms (+ :id sub-resources)
  *   - GET /v1/organisms/:id/workspace — manifest-driven, membership-gated workspace aggregation
  *   - Email invitations: POST/GET/cancel /:id/invitations/email + PUBLIC GET/POST /v1/invitations/:token[/accept]
+ *   - Provisioned-code invitations ("keys"): POST/GET/cancel /:id/invitations/code (account provisioned at
+ *     mint, emailed code = its password; per-inviter quota; app-origin callable via organism:invite scope)
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   v1.x -- 2026-07-05 -- Provisioned-code invitations: POST/GET/cancel /:id/invitations/code. A member
+ *     provisions a numbered guest account whose emailed code IS its password; per-inviter quota
+ *     (INVITE_CODE_QUOTA_PER_MEMBER, org creator/admin unlimited); cancel while un-activated deletes the
+ *     account + frees the slot. Authorized by membership + organism:invite scope (requireExternalPrincipal)
+ *     so it works from an H-2 app origin. Adds sendKeyInvite email template.
  *   v1.x -- 2026-07-04 -- Email invitations for unregistered users: creator/admin invites an external
  *     email into an organism (+ selected workspaces w/ viewer|contributor); the emailed single-use,
  *     expiring, cancellable token lets the recipient register + join in one step. Public accept
@@ -78,7 +85,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole, optionalAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { hashPassword } from '../services/password.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
@@ -111,7 +118,9 @@ import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
-import { createEmailInvitation, invitePublic, hashInviteToken, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
+import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../services/invitations.js';
+import { getActiveEmailService } from '../services/email.js';
+import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -2263,6 +2272,195 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     await storage.updateInvitation(invId, { status: 'cancelled' });
     res.json(success(config.nodeId, { status: 'cancelled' }));
     emitChange('organisms');
+  });
+
+  /* ══ Provisioned-code invitations ("keys") — a second invitation TYPE whose account is created at
+   * MINT time and whose emailed code IS the account password. The recipient logs in with the code on
+   * the client (no magic-link accept step). A per-inviter quota (INVITE_CODE_QUOTA_PER_MEMBER) makes
+   * exclusivity spread virally; the org creator/admin is unlimited. Cancellable while un-activated →
+   * deletes the account + frees the slot. Authorized by ORG MEMBERSHIP + the organism:invite scope
+   * (not role) via requireExternalPrincipal, so it works from an H-2 app origin (role 'app') for the
+   * operator AND for keyholders. Service-specific naming/format/email copy stays in the CLIENT: the
+   * caller supplies username + code (its password) + a localized message + landing_url. */
+  const codeInviteGuards = [requireAuth(), requireExternalPrincipal(), requireScope('organism:invite')];
+  /** Shared member gate for the code routes; returns { organism, membership, unlimited } or null (responded). */
+  const requireOrgMember = async (req: Request, res: Response, id: string): Promise<{ organism: OrganismRecord; role: string; unlimited: boolean } | null> => {
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
+    const membership = await storage.getMembership(id, req.auth!.owner as string);
+    if (!membership || membership.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return null; }
+    const unlimited = membership.role === 'creator' || membership.role === 'admin';
+    return { organism, role: membership.role, unlimited };
+  };
+
+  /* POST /v1/organisms/:id/invitations/code — mint a key (provisions an account, emails the code). */
+  router.post('/v1/organisms/:id/invitations/code', ...codeInviteGuards, rateLimit({ max: 30, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    const id = req.params.id as string;
+    const inviter = req.auth!.owner as string;
+    const gate = await requireOrgMember(req, res, id);
+    if (!gate) return;
+    const { organism, unlimited } = gate;
+
+    const { email, username, code, display_name, locale, message, landing_url, workspaces, org_role, expires_in_days } = req.body ?? {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid "email" is required')); return; }
+    if (!code || typeof code !== 'string' || code.length < 8) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A "code" (min 8 chars) is required')); return; }
+    let uname = typeof username === 'string' ? username.trim().toLowerCase() : '';
+    if (uname.includes('@')) uname = uname.split('@')[0];
+    const nameErr = validateOwnerName(uname);
+    if (nameErr) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameErr)); return; }
+
+    // Per-inviter quota (creator/admin exempt): every non-cancelled code key this inviter minted counts
+    // (activation does not change the count — only cancelling an un-activated key frees a slot).
+    if (!unlimited) {
+      const used = await storage.countInvitationsByInviter(inviter, { type: 'code', statuses: ['pending'] });
+      if (used >= INVITE_CODE_QUOTA_PER_MEMBER) { res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Key quota reached (${INVITE_CODE_QUOTA_PER_MEMBER}). Cancel an un-activated key to free a slot.`)); return; }
+    }
+    if (await storage.getOwner(uname)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${uname}" is already registered`)); return; }
+
+    // Provision the guest account: the code IS the password (hashed here → a minted high-entropy
+    // credential, so the interactive strength validator is intentionally not run). verifiedEmail lifts
+    // the email-confirmation gate in one step (verificationLevel 1).
+    const passwordHash = await hashPassword(code);
+    await provisionOwner(storage, config, {
+      username: uname,
+      displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
+      passwordHash,
+      locale: typeof locale === 'string' ? locale : undefined,
+      verifiedEmail: cleanEmail,
+      enableMagicLink: false,
+    });
+    emitChange('ghii');
+
+    // Join the organism (mirrors the accept handler: membership row + roster arrays in sync).
+    const nowIso = new Date().toISOString();
+    const orgRole = normalizeOrgRole(org_role);
+    await storage.createMembership({ id: uuidv4(), organismId: id, ghii: uname, role: orgRole, status: 'active', invitedBy: inviter, joinedAt: nowIso });
+    await storage.updateOrganism(id, {
+      members: [...new Set([...organism.members, uname])],
+      admins: orgRole === 'admin' ? [...new Set([...organism.admins, uname])] : organism.admins,
+      updatedAt: nowIso,
+    });
+
+    // Grant the selected workspaces (creator-owned viewer/contributor consents).
+    const wsGrants = normalizeWorkspaceGrants(workspaces);
+    const grantedWs: string[] = [];
+    for (const g of wsGrants) {
+      const entry = await findWsEntry(id, g.ws);
+      if (!entry) continue;
+      const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+      if (createdBy === uname) continue;
+      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, g.ws, uname, g.role);
+      grantedWs.push(g.ws);
+    }
+
+    // Record the invitation (type 'code'; the token is unused — the provisioned account is the artifact).
+    // expiresAt is retained for the record but NOT auto-swept: a code key is reclaimed only by an
+    // explicit cancel (see the expiry job, which skips type='code').
+    const days = Number.isFinite(Number(expires_in_days)) ? Math.min(INVITE_MAX_EXPIRY_DAYS, Math.max(1, Math.floor(Number(expires_in_days)))) : INVITE_DEFAULT_EXPIRY_DAYS;
+    const invitation: InvitationRecord = {
+      id: uuidv4(),
+      tokenHash: hashInviteToken(uuidv4()),
+      organismId: id,
+      orgRole,
+      type: 'code',
+      workspaces: wsGrants,
+      email: cleanEmail,
+      emailHash: inviteEmailHash(cleanEmail),
+      invitedBy: inviter,
+      provisionedOwner: uname,
+      message: (typeof message === 'string' && message.trim()) ? message.trim().slice(0, 1000) : null,
+      status: 'pending',
+      createdAt: nowIso,
+      expiresAt: new Date(Date.now() + days * 86_400_000).toISOString(),
+      acceptedAt: null,
+      acceptedBy: null,
+    };
+    await storage.createInvitation(invitation);
+
+    // Email the code + landing link (best-effort; a disabled transport returns false).
+    const emailSvc = getActiveEmailService();
+    let emailSent = false;
+    if (emailSvc?.enabled) {
+      emailSent = await emailSvc.sendKeyInvite(cleanEmail, {
+        code,
+        landingUrl: (typeof landing_url === 'string' && landing_url) ? landing_url : config.baseUrl,
+        orgName: organism.name,
+        inviterName: inviter,
+        message: invitation.message,
+      }, typeof locale === 'string' ? locale : undefined);
+    }
+
+    emitChange('organisms');
+    res.status(201).json(success(config.nodeId, { invitation: invitePublic(invitation), email_sent: emailSent, workspaces: grantedWs }));
+  });
+
+  /* GET /v1/organisms/:id/invitations/code — the caller's own keys (creator/admin may pass ?all=1). */
+  router.get('/v1/organisms/:id/invitations/code', ...codeInviteGuards, async (req, res) => {
+    const id = req.params.id as string;
+    const inviter = req.auth!.owner as string;
+    const gate = await requireOrgMember(req, res, id);
+    if (!gate) return;
+    const all = req.query.all === '1' && gate.unlimited;
+    const rows = (await storage.listInvitationsByOrganism(id, { status: 'pending' })).filter(v => v.type === 'code' && (all || v.invitedBy === inviter));
+    const items: Array<{ id: string; email: string; display: string | null; status: string; activated: boolean; created_at: string; expires_at: string }> = [];
+    for (const v of rows) {
+      // Activation is derived, not stored: the provisioned account has logged in at least once.
+      let activated = false;
+      if (v.provisionedOwner) {
+        const g = await storage.getGHII(`${v.provisionedOwner}@${config.nodeId}`);
+        activated = !!g?.lastLoginAt;
+      }
+      items.push({
+        id: v.id, email: v.email,
+        display: v.provisionedOwner ? v.provisionedOwner.toUpperCase() : null,
+        status: v.status, activated,
+        created_at: v.createdAt, expires_at: v.expiresAt,
+      });
+    }
+    const used = await storage.countInvitationsByInviter(inviter, { type: 'code', statuses: ['pending'] });
+    res.json(success(config.nodeId, { items, total: items.length, quota: { used, limit: gate.unlimited ? 'unlimited' : INVITE_CODE_QUOTA_PER_MEMBER } }));
+  });
+
+  /* POST /v1/organisms/:id/invitations/code/:invId/cancel — cancel while un-activated (inviter or admin). */
+  router.post('/v1/organisms/:id/invitations/code/:invId/cancel', ...codeInviteGuards, async (req, res) => {
+    const id = req.params.id as string;
+    const invId = req.params.invId as string;
+    const inviter = req.auth!.owner as string;
+    const gate = await requireOrgMember(req, res, id);
+    if (!gate) return;
+    const inv = await storage.getInvitation(invId);
+    if (!inv || inv.organismId !== id || inv.type !== 'code') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Key not found')); return; }
+    if (inv.invitedBy !== inviter && !gate.unlimited) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the inviter or an org admin can cancel this key')); return; }
+    if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Key is already ${inv.status}`)); return; }
+
+    // Refuse if the account has already been used (activated) — a live keyholder cannot be cancelled.
+    if (inv.provisionedOwner) {
+      const g = await storage.getGHII(`${inv.provisionedOwner}@${config.nodeId}`);
+      if (g?.lastLoginAt) {
+        res.status(409).json(error(config.nodeId, 'ALREADY_ACTIVATED', 'This key has already been used — it can no longer be cancelled'));
+        return;
+      }
+      // Tear down the provisioned account: revoke ws grants, drop membership + roster, delete the account.
+      for (const g2 of inv.workspaces) {
+        const entry = await findWsEntry(id, g2.ws);
+        if (!entry) continue;
+        const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+        await revokeWorkspaceRole(`${createdBy}@${config.nodeId}`, id, g2.ws, inv.provisionedOwner);
+      }
+      const m = await storage.getMembership(id, inv.provisionedOwner);
+      if (m) await storage.deleteMembership(m.id);
+      await storage.updateOrganism(id, {
+        members: gate.organism.members.filter(x => x !== inv.provisionedOwner),
+        admins: gate.organism.admins.filter(x => x !== inv.provisionedOwner),
+        updatedAt: new Date().toISOString(),
+      });
+      await storage.deleteOwner(inv.provisionedOwner);
+      emitChange('ghii');
+    }
+    await storage.updateInvitation(invId, { status: 'cancelled' });
+    emitChange('organisms');
+    res.json(success(config.nodeId, { status: 'cancelled' }));
   });
 
   /* GET /v1/invitations/:token — PUBLIC: invite details for the accept page (token carried in the URL) */

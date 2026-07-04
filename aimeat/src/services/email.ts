@@ -32,6 +32,8 @@ import {
   matchSuggestionEmailHtml,
   inviteEmailHtml,
   inviteEmailSubject,
+  keyInviteEmailHtml,
+  keyInviteEmailSubject,
 } from './email-templates.js';
 
 export type { MatchSuggestion } from './email-templates.js';
@@ -43,6 +45,7 @@ export interface EmailService {
   sendNotification(to: string, subject: string, body: string): Promise<boolean>;
   sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
   sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
+  sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
 }
 
@@ -91,6 +94,7 @@ function createDisabledService(): EmailService {
     sendNotification: () => warn('sendNotification'),
     sendMatchSuggestion: () => warn('sendMatchSuggestion'),
     sendInvite: () => warn('sendInvite'),
+    sendKeyInvite: () => warn('sendKeyInvite'),
     sendRaw: () => warn('sendRaw'),
   };
 }
@@ -167,6 +171,12 @@ export function createEmailService(config: AimeatConfig): EmailService {
       const { html, text } = inviteEmailHtml(args, locale);
       const subject = inviteEmailSubject(args.orgName, locale);
       return send(to, subject, html, text, 'invitation');
+    },
+
+    async sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean> {
+      const { html, text } = keyInviteEmailHtml(args, locale);
+      const subject = keyInviteEmailSubject(args.orgName, locale);
+      return send(to, subject, html, text, 'key_invitation');
     },
 
     async sendRaw(to: string, subject: string, rawHtml: string, rawText: string): Promise<boolean> {

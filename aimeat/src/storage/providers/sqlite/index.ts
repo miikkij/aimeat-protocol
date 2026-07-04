@@ -4284,10 +4284,12 @@ export class SqliteStorage implements Storage {
       tokenHash: row.tokenHash as string,
       organismId: row.organismId as string,
       orgRole: (row.orgRole as 'member' | 'admin') ?? 'member',
+      type: (row.type as 'link' | 'code') ?? 'link',
       workspaces: row.workspaces ? JSON.parse(row.workspaces as string) : [],
       email: row.email as string,
       emailHash: row.emailHash as string,
       invitedBy: row.invitedBy as string,
+      provisionedOwner: (row.provisionedOwner as string | null) ?? null,
       message: (row.message as string | null) ?? null,
       status: row.status as 'pending' | 'accepted' | 'cancelled' | 'expired',
       createdAt: row.createdAt as string,
@@ -4300,11 +4302,11 @@ export class SqliteStorage implements Storage {
   async createInvitation(rec: import('../../../storage/repositories/invitation.repository.js').InvitationRecord): Promise<void> {
     this.db.prepare(
       `INSERT INTO invitations
-         (id, tokenHash, organismId, orgRole, workspaces, email, emailHash, invitedBy, message, status, createdAt, expiresAt, acceptedAt, acceptedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, tokenHash, organismId, orgRole, type, workspaces, email, emailHash, invitedBy, provisionedOwner, message, status, createdAt, expiresAt, acceptedAt, acceptedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      rec.id, rec.tokenHash, rec.organismId, rec.orgRole, JSON.stringify(rec.workspaces ?? []),
-      rec.email, rec.emailHash, rec.invitedBy, rec.message ?? null, rec.status,
+      rec.id, rec.tokenHash, rec.organismId, rec.orgRole, rec.type ?? 'link', JSON.stringify(rec.workspaces ?? []),
+      rec.email, rec.emailHash, rec.invitedBy, rec.provisionedOwner ?? null, rec.message ?? null, rec.status,
       rec.createdAt, rec.expiresAt, rec.acceptedAt ?? null, rec.acceptedBy ?? null,
     );
   }
@@ -4326,6 +4328,19 @@ export class SqliteStorage implements Storage {
     return rows.map((r) => this.mapInvitationRow(r));
   }
 
+  async countInvitationsByInviter(invitedBy: string, opts?: { organismId?: string; type?: 'link' | 'code'; statuses?: string[] }): Promise<number> {
+    const where: string[] = ['invitedBy = ?'];
+    const values: unknown[] = [invitedBy];
+    if (opts?.organismId) { where.push('organismId = ?'); values.push(opts.organismId); }
+    if (opts?.type) { where.push('type = ?'); values.push(opts.type); }
+    if (opts?.statuses && opts.statuses.length) {
+      where.push(`status IN (${opts.statuses.map(() => '?').join(', ')})`);
+      values.push(...opts.statuses);
+    }
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM invitations WHERE ${where.join(' AND ')}`).get(...values) as { n: number };
+    return row.n;
+  }
+
   async updateInvitation(id: string, updates: Partial<import('../../../storage/repositories/invitation.repository.js').InvitationRecord>): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -4340,8 +4355,10 @@ export class SqliteStorage implements Storage {
   }
 
   async cleanupExpiredInvitations(nowIso: string): Promise<number> {
+    // Only magic-link invites auto-expire. Code invites provisioned a real account, so they are
+    // reclaimed by an explicit cancel (which deletes the account) — never blindly swept to 'expired'.
     const result = this.db.prepare(
-      `UPDATE invitations SET status = 'expired' WHERE status = 'pending' AND expiresAt <= ?`
+      `UPDATE invitations SET status = 'expired' WHERE status = 'pending' AND type = 'link' AND expiresAt <= ?`
     ).run(nowIso);
     return result.changes;
   }
