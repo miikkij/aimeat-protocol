@@ -181,5 +181,30 @@ await test('11. Own scope does NOT return another user\'s public content', async
     assert((r.body.data.hits || []).length === 0, `own scope must not see A's content, got ${r.body.data.total}`);
 });
 
+// -- v1.1.0: the AI endpoints accept an ai:use-scoped token (H-2 app-grant class) --
+/** Device-auth an agent for an owner with an explicit scope set; return its token. */
+async function connectAgent(ownerToken: string, ownerName: string, agentName: string, scopes: string[]) {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: ownerName }) });
+    assert(da.status === 200, `device-authorize ${da.status}: ${JSON.stringify(da.body)}`);
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: ownerToken }) });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error ?? v.body)}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    assert(t.status === 200, `device-token ${t.status}: ${JSON.stringify(t.body)}`);
+    return { token: t.body.token as string };
+}
+
+await test('12. plan accepts an ai:use-scoped token (gate passes; fails later only on the missing AI key)', async () => {
+    const scoped = await connectAgent(A.token, A.name, 'lib-scoped', ['ai:use']);
+    const r = await json('/v1/librarian/plan', { method: 'POST', headers: auth(scoped.token), body: JSON.stringify({ text: 'a note about zub' }) });
+    assert(r.status !== 403, `ai:use token must pass the gate, got 403: ${JSON.stringify(r.body.error)}`);
+    assert(r.body?.error?.code === 'NO_OPENROUTER_KEY', `expected NO_OPENROUTER_KEY past the gate, got ${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('13. plan rejects a token WITHOUT ai:use (403 FORBIDDEN)', async () => {
+    const unscoped = await connectAgent(A.token, A.name, 'lib-unscoped', ['memory:read']);
+    const r = await json('/v1/librarian/plan', { method: 'POST', headers: auth(unscoped.token), body: JSON.stringify({ text: 'a note about zub' }) });
+    assert(r.status === 403, `no-scope token must be rejected, got ${r.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);
