@@ -2,12 +2,13 @@
  * @file email-templates.ts
  * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default)
  *   and 'fi' locales. Templates: verification code, magic link, notification, match suggestion,
- *   and organism invitation.
+ *   organism invitation, and provisioned-code access-key invitation.
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
  *   v1.0.0 — 2026-04-10 — Initial (verification, magic link, notification, match).
  *   v1.1.0 — 2026-07-04 — Add inviteEmailHtml/inviteEmailSubject + esc() for user-controlled fields.
+ *   v1.2.0 — 2026-07-05 — Add keyInviteEmailHtml/keyInviteEmailSubject (provisioned-code access keys).
  */
 
 export interface MatchSuggestion {
@@ -50,6 +51,14 @@ const i18n: Record<string, Record<string, string>> = {
     inviteFallback: 'Or copy and paste this URL into your browser:',
     inviteIgnore: "If you weren't expecting this invitation, you can safely ignore this email.",
     inviteMessageLabel: 'Personal message:',
+    keySubject: 'Your access key to {org} on AIMEAT',
+    keyHeading: "You've received an access key",
+    keyCodeLabel: 'Your access code:',
+    keyInstructions: 'Open the link below and enter this code to step in. The code is your password — keep it to yourself.',
+    keyButton: 'Enter',
+    keyExpiryPrefix: 'This key expires on',
+    keyFallback: 'Or copy and paste this address into your browser:',
+    keyIgnore: "If you weren't expecting this key, you can safely ignore this email.",
     roleViewer: 'viewer',
     roleContributor: 'contributor',
     footer: 'Sent by AIMEAT Protocol',
@@ -85,6 +94,14 @@ const i18n: Record<string, Record<string, string>> = {
     inviteFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
     inviteIgnore: 'Jos et odottanut tätä kutsua, voit ohittaa tämän viestin.',
     inviteMessageLabel: 'Henkilökohtainen viesti:',
+    keySubject: 'Pääsyavaimesi: {org} — AIMEAT',
+    keyHeading: 'Sait pääsyavaimen',
+    keyCodeLabel: 'Pääsykoodisi:',
+    keyInstructions: 'Avaa alla oleva linkki ja syötä tämä koodi päästäksesi sisään. Koodi on salasanasi — pidä se omana tietonasi.',
+    keyButton: 'Astu sisään',
+    keyExpiryPrefix: 'Tämä avain vanhenee',
+    keyFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
+    keyIgnore: 'Jos et odottanut tätä avainta, voit ohittaa tämän viestin.',
     roleViewer: 'katselija',
     roleContributor: 'osallistuja',
     footer: 'Lähetetty AIMEAT-protokollan kautta',
@@ -266,6 +283,65 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
     '',
     ...(args.expiresLabel ? [`${t(locale, 'inviteExpiryPrefix')} ${args.expiresLabel}.`, ''] : []),
     t(locale, 'inviteIgnore'),
+    '',
+    `-- ${t(locale, 'footer')}`,
+  ].join('\n');
+
+  return { html, text };
+}
+
+export interface KeyInviteEmailArgs {
+  code: string;          // the access code (also the account password) — displayed once, prominently
+  landingUrl: string;    // where the recipient enters the code
+  orgName: string;
+  inviterName: string;   // bare owner name of the inviter (available for future framing; body uses `message`)
+  message?: string | null; // the caller-composed, already-localized explanation (operator vs referrer variant)
+  expiresLabel?: string;
+}
+
+/** Subject line for a provisioned-code invitation ("key") email. */
+export function keyInviteEmailSubject(orgName: string, locale?: string): string {
+  return t(locale, 'keySubject').replace('{org}', orgName);
+}
+
+/** A provisioned-code invitation ("key") email: the M-ROOM-style explanation (from `message`) + the
+ *  access code shown prominently + a CTA to the landing URL. All service-specific copy arrives in
+ *  `message` (localized by the caller), so this template stays generic. */
+export function keyInviteEmailHtml(args: KeyInviteEmailArgs, locale?: string): { html: string; text: string } {
+  const messageHtml = args.message
+    ? `<p style="background:#f0f0f5;border-radius:6px;padding:12px;color:#444;line-height:1.6;">${esc(args.message)}</p>`
+    : '';
+  const codeHtml = `<p style="margin:8px 0 4px;color:#555;font-size:14px;">${t(locale, 'keyCodeLabel')}</p>
+    <p style="text-align:center;font-family:'Courier New',monospace;font-size:22px;font-weight:bold;letter-spacing:2px;background:#111;color:#fff;border-radius:6px;padding:14px;">${esc(args.code)}</p>`;
+  const expiryHtml = args.expiresLabel
+    ? `<p style="font-size:13px;color:#999;">${t(locale, 'keyExpiryPrefix')} ${esc(args.expiresLabel)}.</p>`
+    : '';
+
+  const html = wrapHtml(t(locale, 'keyHeading'), `
+    ${messageHtml}
+    ${codeHtml}
+    <p>${t(locale, 'keyInstructions')}</p>
+    <p style="text-align: center;">
+      <a href="${args.landingUrl}" class="btn">${t(locale, 'keyButton')}</a>
+    </p>
+    ${expiryHtml}
+    <p style="font-size: 13px; color: #999;">${t(locale, 'keyFallback')}</p>
+    <p class="url-fallback">${args.landingUrl}</p>
+    <p style="color: #999; font-size: 13px;">${t(locale, 'keyIgnore')}</p>
+  `, locale);
+
+  const text = [
+    t(locale, 'keyHeading'),
+    '',
+    ...(args.message ? [args.message, ''] : []),
+    `${t(locale, 'keyCodeLabel')} ${args.code}`,
+    '',
+    t(locale, 'keyInstructions'),
+    '',
+    args.landingUrl,
+    '',
+    ...(args.expiresLabel ? [`${t(locale, 'keyExpiryPrefix')} ${args.expiresLabel}.`, ''] : []),
+    t(locale, 'keyIgnore'),
     '',
     `-- ${t(locale, 'footer')}`,
   ].join('\n');

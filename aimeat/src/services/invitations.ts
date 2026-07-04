@@ -11,6 +11,7 @@
  * @usage const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, input);
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
+ *   v1.1.0 — 2026-07-05 — Add INVITE_CODE_QUOTA_PER_MEMBER + type/provisionedOwner on the record (provisioned-code keys live in routes/organisms.ts).
  */
 import { randomBytes, createHash } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,6 +25,7 @@ import { getActiveEmailService } from './email.js';
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
 export const INVITE_MAX_PENDING_PER_ORG = 50; // abuse cap on outstanding email invites per organism
+export const INVITE_CODE_QUOTA_PER_MEMBER = 3; // per-inviter cap on provisioned-code keys; org creators/admins are exempt (unlimited)
 const INVITE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DAY_MS = 86_400_000;
 
@@ -51,6 +53,8 @@ export function invitePublic(inv: InvitationRecord) {
     email: inv.email,
     organism_id: inv.organismId,
     org_role: inv.orgRole,
+    type: inv.type,
+    provisioned_owner: inv.provisionedOwner,
     workspaces: inv.workspaces,
     status: inv.status,
     invited_by: inv.invitedBy,
@@ -132,10 +136,12 @@ export async function createEmailInvitation(
     tokenHash: hashInviteToken(rawToken),
     organismId: id,
     orgRole: input.orgRole,
+    type: 'link',
     workspaces: input.workspaces,
     email: cleanEmail,
     emailHash,
     invitedBy: input.inviterGhii,
+    provisionedOwner: null,
     message: (input.message && input.message.trim()) ? input.message.trim().slice(0, 1000) : null,
     status: 'pending',
     createdAt: new Date(now).toISOString(),

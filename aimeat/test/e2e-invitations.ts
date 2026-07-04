@@ -5,8 +5,13 @@
  *   registering + joining via the token in one step, the applied membership + workspace read, the
  *   single-use guard, cancel-then-rejected, an already-logged-in user accepting, and the failure
  *   modes (non-admin invite, invalid email, bogus token, taken username).
+ *   Also covers PROVISIONED-CODE invitations ("keys"): mint provisions a verified, joined account
+ *   whose emailed code is its password (C1–C2), activation is derived from first login and blocks
+ *   cancel (C3), the per-inviter quota caps a plain member at 3 (C4), cancelling an un-activated key
+ *   deletes the account + frees a slot (C5), input validation (C6), and non-members are refused (C7).
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
+ *   v1.1.0 — 2026-07-05 — Add provisioned-code invitation ("key") coverage (C1–C7).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -178,7 +183,89 @@ await test('14. A taken username on accept → 409 (invite not consumed)', async
     assert(get.status === 200, `invite should still be pending, got ${get.status}`);
 });
 
+// ── Provisioned-code invitations ("keys"): the emailed code IS the account password ──
+const provisioned: { u: string; c: string }[] = []; // for cleanup (login + delete self)
+const codeUser1 = `e2ekey1${Date.now()}`;
+const codeCode1 = 'EXC91-ABCD-EFGH-JKLM';
+let codeInvId1 = '';
+
+await test('C1. A (creator) mints a code key → provisions a verified, joined account (unlimited)', async () => {
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `key1.${Date.now()}@example.com`, username: codeUser1, code: codeCode1, display_name: 'EXC_VIP_91', locale: 'en', message: 'welcome', landing_url: 'https://m-room.apps.aimeat.io/', workspaces: [{ ws: WS, role: 'viewer' }] }) });
+    assert(r.status === 201, `mint ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.invitation.type === 'code', 'invitation type is code');
+    assert(r.body.data.invitation.status === 'pending', 'pending');
+    assert(r.body.data.invitation.provisioned_owner === codeUser1, 'links the provisioned owner');
+    codeInvId1 = r.body.data.invitation.id;
+    provisioned.push({ u: codeUser1, c: codeCode1 });
+});
+
+await test('C2. The code IS the password: the provisioned account logs in and reads the room', async () => {
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: codeCode1 }) });
+    assert(lg.status === 200, `login ${lg.status}: ${JSON.stringify(lg.body.error)}`); // email gate lifted at mint
+    const tok = lg.body.data.token as string;
+    assert(typeof tok === 'string' && tok.length > 0, 'login returns a session token');
+    const read = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(tok) });
+    assert(read.status === 200 && !!read.body.data.manifest, `keyholder can read the room with a viewer grant (${read.status})`);
+});
+
+await test('C3. After activation the key shows activated and cannot be cancelled (409)', async () => {
+    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(A.token) });
+    assert(list.status === 200, `list ${list.status}`);
+    const it = (list.body.data.items || []).find((x: any) => x.id === codeInvId1);
+    assert(it && it.activated === true, `key is activated after login (got ${JSON.stringify(it)})`);
+    const cancel = await json(`/v1/organisms/${orgId}/invitations/code/${codeInvId1}/cancel`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(cancel.status === 409, `activated cancel expected 409, got ${cancel.status}`);
+});
+
+const bMints: { u: string; c: string; id: string }[] = [];
+await test('C4. Per-inviter quota: a plain member mints 3, the 4th is 429', async () => {
+    for (let i = 0; i < 3; i++) {
+        const u = `e2eq${i}${Date.now()}`;
+        const c = `EXC8${i}-ABCD-EFGH-JKLM`;
+        const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q${i}.${Date.now()}@example.com`, username: u, code: c }) });
+        assert(r.status === 201, `member mint ${i} ${r.status}: ${JSON.stringify(r.body.error)}`);
+        bMints.push({ u, c, id: r.body.data.invitation.id }); provisioned.push({ u, c });
+    }
+    const over = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q4.${Date.now()}@example.com`, username: `e2eq4${Date.now()}`, code: 'EXC84-ABCD-EFGH-JKLM' }) });
+    assert(over.status === 429, `4th mint expected 429, got ${over.status}`);
+    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(B.token) });
+    assert(list.body.data.quota.used === 3 && list.body.data.quota.limit === 3, `quota reports 3/3 (got ${JSON.stringify(list.body.data.quota)})`);
+});
+
+await test('C5. Cancelling an un-activated key deletes the account and frees a slot', async () => {
+    const target = bMints[0];
+    const cancel = await json(`/v1/organisms/${orgId}/invitations/code/${target.id}/cancel`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(cancel.status === 200 && cancel.body.data.status === 'cancelled', `cancel ${cancel.status}: ${JSON.stringify(cancel.body.error)}`);
+    // The provisioned account is gone (login now fails).
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: target.u, password: target.c }) });
+    assert(lg.status !== 200, `deleted account should not log in, got ${lg.status}`);
+    // Slot freed → B can mint again.
+    const u = `e2eq5${Date.now()}`, c = 'EXC85-ABCD-EFGH-JKLM';
+    const again = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q5.${Date.now()}@example.com`, username: u, code: c }) });
+    assert(again.status === 201, `mint after cancel expected 201, got ${again.status}`);
+    provisioned.push({ u, c });
+});
+
+await test('C6. Mint validates: bad email → 400, short code → 400', async () => {
+    const bad1 = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: 'nope', username: `e2ebad${Date.now()}`, code: 'EXC90-ABCD-EFGH-JKLM' }) });
+    assert(bad1.status === 400, `bad email expected 400, got ${bad1.status}`);
+    const bad2 = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `ok.${Date.now()}@example.com`, username: `e2ebad2${Date.now()}`, code: 'short' }) });
+    assert(bad2.status === 400, `short code expected 400, got ${bad2.status}`);
+});
+
+await test('C7. A non-member cannot mint a key (403)', async () => {
+    const D = await setupOwner('d');
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(D.token), body: JSON.stringify({ email: `z.${Date.now()}@example.com`, username: `e2ez${Date.now()}`, code: 'EXC99-ABCD-EFGH-JKLM' }) });
+    assert(r.status === 403, `non-member mint expected 403, got ${r.status}`);
+    await json(`/v1/owners/${D.name}`, { method: 'DELETE', headers: auth(D.token) });
+});
+
 await test('Cleanup', async () => {
+    // Delete any provisioned key accounts that still exist (login with the code, then delete self).
+    for (const p of provisioned) {
+        const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: p.u, password: p.c }) });
+        if (lg.status === 200) await json(`/v1/owners/${p.u}`, { method: 'DELETE', headers: auth(lg.body.data.token) });
+    }
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });
     await json(`/v1/owners/${newUsername}`, { method: 'DELETE', headers: auth(newUserToken) });

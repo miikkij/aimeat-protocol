@@ -6,11 +6,12 @@
  *   recipient registers a brand-new account and is joined to the organism + workspaces. Only the
  *   SHA-256 hash of the raw token is ever stored; the raw token lives only in the emailed URL.
  * @structure InvitationWorkspaceGrant + InvitationRecord shapes; InvitationRepository interface
- *   (create / get-by-hash / get-by-id / list-by-organism / update / cleanup-expired).
+ *   (create / get-by-hash / get-by-id / list-by-organism / count-by-inviter / update / cleanup-expired).
  * @usage Implemented by each storage provider (SQLite, MongoDB) and composed into the Storage
  *   interface. Consumed by src/routes/organisms.ts (invite/accept) and the invitation-expiry job.
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
+ *   v1.1.0 — 2026-07-05 — Add provisioned-code invitations: type ('link'|'code'), provisionedOwner, countInvitationsByInviter (per-inviter quota).
  */
 
 /** One selected workspace + the role the invitee should receive there. */
@@ -24,16 +25,18 @@ export interface InvitationRecord {
   tokenHash: string; // SHA-256 of the raw token (lookup key) — raw token is never stored
   organismId: string; // the organism the invitee joins
   orgRole: 'member' | 'admin'; // organism role granted on accept
+  type: 'link' | 'code'; // 'link' = magic-link self-register (default); 'code' = account provisioned at mint, code is its password
   workspaces: InvitationWorkspaceGrant[]; // per-workspace roles to grant on accept
   email: string; // invited address (plaintext — shown to inviter, pre-filled + locked on accept)
   emailHash: string; // SHA-256 of the lowercased email — existing-user detection + lookup
   invitedBy: string; // bare owner name of the inviter (creator/admin)
+  provisionedOwner: string | null; // (code only) bare name of the account this invite created — deleted on cancel/expiry
   message: string | null; // optional personal note included in the email
   status: 'pending' | 'accepted' | 'cancelled' | 'expired';
   createdAt: string; // ISO
   expiresAt: string; // ISO — hard expiry (lazy-checked at read/accept + swept by a core job)
   acceptedAt: string | null;
-  acceptedBy: string | null; // bare owner name of the account that accepted
+  acceptedBy: string | null; // bare owner name of the account that accepted (code: set when the provisioned account first logs in)
 }
 
 export interface InvitationRepository {
@@ -45,6 +48,8 @@ export interface InvitationRepository {
   getInvitation(id: string): Promise<InvitationRecord | null>;
   /** List an organism's invitations, optionally filtered by status. Never returns the token. */
   listInvitationsByOrganism(organismId: string, opts?: { status?: InvitationRecord['status'] }): Promise<InvitationRecord[]>;
+  /** Count invitations by inviter for quota enforcement (per-inviter cap on code keys). */
+  countInvitationsByInviter(invitedBy: string, opts?: { organismId?: string; type?: InvitationRecord['type']; statuses?: InvitationRecord['status'][] }): Promise<number>;
   /** Partial update (status flip on accept/cancel, acceptedAt/acceptedBy). */
   updateInvitation(id: string, updates: Partial<InvitationRecord>): Promise<InvitationRecord | null>;
   /** Sweep: flip still-pending invitations whose expiry has passed to `expired`. Returns count. */

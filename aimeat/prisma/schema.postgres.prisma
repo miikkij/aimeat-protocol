@@ -945,25 +945,28 @@ model PersonalAccessToken {
 }
 
 model Invitation {
-  id         String    @id
-  tokenHash  String
-  organismId String
-  orgRole    String    @default("member")
-  workspaces Json
-  email      String
-  emailHash  String
-  invitedBy  String
-  message    String?
-  status     String    @default("pending")
-  createdAt  DateTime
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  acceptedBy String?
+  id               String    @id
+  tokenHash        String
+  organismId       String
+  orgRole          String    @default("member")
+  type             String    @default("link")
+  workspaces       Json
+  email            String
+  emailHash        String
+  invitedBy        String
+  provisionedOwner String?
+  message          String?
+  status           String    @default("pending")
+  createdAt        DateTime
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedBy       String?
 
   @@index([tokenHash])
   @@index([organismId])
   @@index([emailHash])
   @@index([expiresAt])
+  @@index([invitedBy])
 }
 
 model RevokedToken {

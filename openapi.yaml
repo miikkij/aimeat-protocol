@@ -20578,6 +20578,93 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/organisms/{id}/invitations/code:
+    post:
+      operationId: mintOrganismCodeInvitation
+      summary: Mint a provisioned-code invitation ("key") to an organism
+      description: >-
+        Any active member mints an access key: the server provisions a guest account (email verified)
+        whose password IS the supplied code, joins it to the organism (+ optional workspaces), and
+        emails the code + landing link. The recipient logs in with the code on the client — there is no
+        magic-link accept step. A per-inviter quota applies (org creator/admin unlimited); each
+        un-cancelled key counts. Authorized by organism membership + the organism:invite scope, so it
+        works from an H-2 app-origin session (role app). Rate-limited.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, code]
+              properties:
+                email: { type: string, format: email, description: Recipient email — the code + explanation are sent here, and stored (verified) on the account }
+                username: { type: string, description: Desired account username (must be free); the client owns the naming scheme }
+                code: { type: string, minLength: 8, description: The access code — also the account password (delivered once by email; never stored in plaintext) }
+                display_name: { type: string, description: Optional display name for the provisioned account }
+                locale: { type: string, enum: [en, fi], description: Language of the invitation email }
+                message: { type: string, description: Caller-composed, already-localized explanation shown in the email }
+                landing_url: { type: string, description: Where the recipient enters the code (defaults to the node base URL) }
+                org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member)' }
+                workspaces:
+                  type: array
+                  description: Optional per-workspace grants.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
+                expires_in_days: { type: integer, minimum: 1, maximum: 30, description: Retained on the record (code keys are not auto-swept; reclaimed by cancel) }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/BadRequest' }
+    get:
+      operationId: listOrganismCodeInvitations
+      summary: List the caller's minted access keys
+      description: >-
+        Lists the code keys the caller minted for this organism (each with recipient email, status, and
+        whether the account has been activated i.e. logged in at least once), plus the caller's quota
+        usage. Org creator/admin may pass all=1 to see every code key in the organism.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: all, in: query, required: false, schema: { type: string, enum: ['1'] }, description: Creator/admin only — list every code key in the organism }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations/code/{invId}/cancel:
+    post:
+      operationId: cancelOrganismCodeInvitation
+      summary: Cancel an un-activated access key (frees a quota slot)
+      description: >-
+        The inviter (or an org admin) cancels a code key that has NOT been activated — this deletes the
+        provisioned account and frees the inviter's quota slot. Returns 409 if the key was already used
+        (activated) or is not pending.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: invId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /v1/invitations/{token}:
     get:
       operationId: getEmailInvitation
