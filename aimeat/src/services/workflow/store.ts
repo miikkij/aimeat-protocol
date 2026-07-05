@@ -20,6 +20,8 @@
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + DAG/offer validation + blueprint.
  *   v1.1.0 — 2026-06-15 — Persist the notify_on_finish opt-in on save.
  *   v1.2.0 — 2026-07-05 — Persist the resume opt-in on save (resume-on-retry downstream decoupling).
+ *   v1.3.0 — 2026-07-05 — Persist the fresh opt-in + allow built-in {run}/{date} vars undeclared in
+ *     key templates (re-run freshness / run-scoped keys).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -34,6 +36,9 @@ export const defKey = (id: string): string => `workflows.def.${id}`;
 export const runKeyPrefix = (id: string): string => `workflows.run.${id}.`;
 export const runKey = (id: string, runId: string): string => `workflows.run.${id}.${runId}`;
 export const DEF_LIST_PREFIX = 'workflows.def.';
+
+/** Vars the engine always provides to key templates (no declaration needed). See resolveVars. */
+export const BUILTIN_VARS = ['run', 'date'] as const;
 
 // ── pure validation helpers (exported for unit tests) ──────────────────────────
 
@@ -180,7 +185,9 @@ export async function validateWorkflow(
   if (cycle) errors.push(`dependency cycle: ${cycle.join(' → ')}`);
 
   // 4. offer resolution (workflow-compatibility) + 5. declared-var coverage
-  const declaredVars = new Set(input.vars.map(v => v.name));
+  // Built-in run-scoping vars are always available to key templates without declaration (the engine
+  // fills them at run time): `{run}` = the run id, `{date}` = the run date.
+  const declaredVars = new Set([...input.vars.map(v => v.name), ...BUILTIN_VARS]);
   const resolved: ResolvedStep[] = [];
   for (const step of input.steps) {
     // export-out / trigger-geai steps don't dispatch an agent offer — they push to / invoke a GEAI.
@@ -267,6 +274,7 @@ export async function saveWorkflow(
     on_step_fail: input.on_step_fail,
     notify_on_finish: input.notify_on_finish ?? false,
     resume: input.resume ?? false,
+    fresh: input.fresh ?? false,
     llm: input.llm,
     costCapMorsels: input.costCapMorsels ?? null,
     createdBy: prior?.createdBy ?? createdBy,

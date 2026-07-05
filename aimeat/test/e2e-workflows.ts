@@ -11,6 +11,8 @@
  *   v1.2.0 — 2026-07-05 — resume: downstream re-gates on its own required_to_function (input present →
  *     runs; input absent → input-red) instead of blanket-skip on a failed parent. (The watchdog's
  *     re-check + sliding no-progress timeout are unit-covered — not black-box-able under the 60s sweep.)
+ *   v1.3.0 — 2026-07-05 — Re-run freshness: built-in {run}/{date} vars (save undeclared + resolve at
+ *     run) and the fresh flag (a prior run's stable output key is deleted before the step re-dispatches).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -96,6 +98,14 @@ const SCHEMA_OFFER = {
   required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
   success_signal: { kind: 'deterministic', key: 'demo.doc', op: 'json_schema', schema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } },
 };
+// Stable-key offer for the `fresh` test: its success + deliverable is a fixed key (fresh.out) that a
+// prior run leaves behind, so `fresh` must delete it before the step re-runs.
+const FRESH_OFFER = {
+  id: 'freshgen', title: 'Freshgen', ask: 'produce fresh.out (same key every run)',
+  deliverable: { format: 'document', location: { key: 'fresh.out' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key: 'fresh.out', op: 'nonempty' },
+};
 // Unique key never written in the real namespace — to prove full-sandbox reads the prefixed copy.
 const SBX_OFFER = {
   id: 'sbx', title: 'Sandbox', ask: 'produce sbx.out',
@@ -139,7 +149,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, FRESH_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -413,6 +423,70 @@ async function run() {
       `use (input present) should RUN despite gen failing, got ${r.body.data.steps.use.state}`);
     assert(r.body.data.steps.use2.state === 'input-red',
       `use2 (input absent) should be input-red, not skipped/run, got ${r.body.data.steps.use2.state}`);
+  });
+
+  // ── run-scoped keys: built-in {run}/{date} vars need no declaration + resolve at run time ──
+  await test('built-in {run}/{date} template vars: save without declaring them, engine resolves them', async () => {
+    const scopedWf = {
+      title: { en_US: 'Run-scoped' }, description: { en_US: 'keys scoped by {date}/{run}' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{
+        id: 'scoped', agent: agentName, offer: 'fetch', required_to_function: 'none', timeout_min: 10,
+        // step-level success over a run-scoped key referencing ONLY built-in vars (no declared vars).
+        success_signal: { kind: 'deterministic', key: 'scoped.{date}.{run}.done', op: 'exists' },
+        description: { en_US: 'Scoped' },
+      }],
+    };
+    const put = await json('/v1/workflows/scoped-wf', { method: 'PUT', headers: auth, body: JSON.stringify(scopedWf) });
+    assert(put.status === 200, `built-in vars should save undeclared, got ${put.status}: ${JSON.stringify(put.body)}`);
+
+    // A NON-built-in undeclared var must still be rejected.
+    const bogus = { ...scopedWf, steps: [{ ...scopedWf.steps[0], success_signal: { kind: 'deterministic', key: 'x.{bogus}.y', op: 'exists' } }] };
+    const bad = await json('/v1/workflows/scoped-bad', { method: 'PUT', headers: auth, body: JSON.stringify(bogus) });
+    assert(bad.status === 400, `an undeclared non-built-in var should be rejected, got ${bad.status}`);
+
+    // Run it: the engine fills {run} = runId and {date} = today into run.vars.
+    const run = await json('/v1/workflows/scoped-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    const runId = run.body.data.runId;
+    const r = await json(`/v1/workflows/scoped-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.vars.run === runId, `run.vars.run should equal the runId, got ${r.body.data.vars.run}`);
+    assert(/^\d{4}-\d{2}-\d{2}$/.test(r.body.data.vars.date || ''), `run.vars.date should be YYYY-MM-DD, got ${r.body.data.vars.date}`);
+    assert(r.body.data.steps.scoped.state === 'output-red', `the run-scoped key is absent this run → output-red, got ${r.body.data.steps.scoped.state}`);
+  });
+
+  // ── fresh: clear a step's stable-key outputs before it re-runs (so a skip-existing crew regenerates) ──
+  await test('fresh: a stale output key from a prior run is DELETED before the step dispatches', async () => {
+    const freshWf = {
+      title: { en_US: 'Fresh pipeline' }, description: { en_US: 'clears outputs each run' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', fresh: true,
+      steps: [{ id: 'gen', agent: agentName, offer: 'freshgen', required_to_function: 'none', description: { en_US: 'Gen' }, timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/fresh-wf', { method: 'PUT', headers: auth, body: JSON.stringify(freshWf) });
+    assert(put.status === 200, `put fresh-wf ${put.status}: ${JSON.stringify(put.body)}`);
+    const def = await json('/v1/workflows/fresh-wf', { headers: auth });
+    assert(def.body.data.fresh === true, `fresh should persist as true, got ${def.body.data.fresh}`);
+
+    // Seed a STALE value from a "previous run" at the step's deliverable key.
+    await writeMem('fresh.out', 'STALE output from a previous run');
+    const stale = await json('/v1/memory/fresh.out', { headers: auth });
+    assert(stale.status === 200, `precondition: fresh.out present, got ${stale.status}`);
+
+    const run = await json('/v1/workflows/fresh-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    let r = await json(`/v1/workflows/fresh-wf/runs/${runId}`, { headers: auth });
+    const taskId = r.body.data.steps.gen.taskIds?.[0];
+    assert(typeof taskId === 'string', 'gen dispatched (not immediately greened on the stale key)');
+    // fresh cleared the stale key BEFORE dispatch → it is gone now.
+    const cleared = await json('/v1/memory/fresh.out', { headers: auth });
+    assert(cleared.status === 404, `fresh should have deleted the stale fresh.out, got ${cleared.status}`);
+
+    // The crew now writes a FRESH value → complete → green.
+    await writeMem('fresh.out', 'freshly regenerated output');
+    const c = await json(`/v1/agents/${agentName}/tasks/${taskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    assert(c.status === 200, `complete gen ${c.status}`);
+    await sleep(700);
+    r = await json(`/v1/workflows/fresh-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'green', `gen should be green from the fresh value, got ${r.body.data.steps.gen.state}`);
   });
 
   // ── full-sandbox namespaces keys, isolated from production ──

@@ -21,6 +21,8 @@
  *   v1.3.0 — 2026-07-05 — Resume-on-retry: WorkflowRunStep.progress (live fill count for slow-vs-stuck
  *     + dashboard) and WorkflowDef.resume (owner opt-in to gate downstream steps on their own
  *     required_to_function instead of parent success).
+ *   v1.4.0 — 2026-07-05 — Re-run freshness: WorkflowDef.fresh (clear a step's outputs before it runs)
+ *     + built-in {run}/{date} key-template vars (run-scoped keys, the non-destructive default).
  */
 import { z } from 'zod';
 
@@ -157,6 +159,18 @@ export interface WorkflowDef {
    * timeout are ALWAYS on and need no flag — `resume` gates only the downstream decoupling.
    */
   resume?: boolean;
+  /**
+   * Owner opt-in (default false): before a step is (first) dispatched, DELETE the memory keys its
+   * success_signal checks (minus any it also reads as input), so an idempotent skip-existing crew
+   * regenerates them from empty instead of finding a prior run's output already present (which would
+   * false-green the step and waste a no-op crew pass). Use this when a workflow deliberately writes to
+   * the SAME (non-run-scoped) keys every run and wants each run to overwrite. DESTRUCTIVE by design —
+   * it discards the previous run's deliverable for that step. The non-destructive alternative is to
+   * template the keys per run with the built-in `{run}`/`{date}` vars (see engine resolveVars), which
+   * keeps history. Only clears at attempt 0 (a within-run retry preserves partial gap-fill). Orthogonal
+   * to `resume`.
+   */
+  fresh?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
   createdBy: string;                  // GAII/GHII of the author (audit)
@@ -295,6 +309,7 @@ export const WorkflowDefInputSchema = z.object({
   on_step_fail: z.literal('inspect'),
   notify_on_finish: z.boolean().optional(),
   resume: z.boolean().optional(),
+  fresh: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });

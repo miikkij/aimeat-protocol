@@ -29,6 +29,11 @@
  *     WorkflowDef.resume, a downstream step gates on its own required_to_function (via
  *     computeReadySteps + failDownstream) rather than parent success. Terminal paths trust the signal
  *     over the crew's self-report (output present ⇒ green even if the task reported failed).
+ *   v1.3.0 — 2026-07-05 — Re-run freshness. resolveVars injects built-in {run}/{date} template vars so
+ *     deliverable keys can be run-scoped (a re-run then never sees a prior run's output — the
+ *     non-destructive default). Opt-in WorkflowDef.fresh clears a step's success-signal output keys at
+ *     its first dispatch (clearStepOutputs) so an idempotent skip-existing crew regenerates the SAME
+ *     keys each run instead of no-op-ing on stale output.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -42,7 +47,8 @@ import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 import { evaluateSignal, extractProgress, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
-import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
+import { getWorkflow, validateWorkflow, runKey, collectSignalKeys, type ResolvedStep } from './store.js';
+import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
 import type {
@@ -163,7 +169,7 @@ export class WorkflowEngine {
     }
 
     const runId = randomUUID();
-    const vars = this.resolveVars(def, opts.vars);
+    const vars = this.resolveVars(def, opts.vars, runId);
     const now = new Date().toISOString();
     const steps: Record<string, WorkflowRunStep> = {};
     for (const s of def.steps) steps[s.id] = { state: 'pending', attempt: 0, reads: [], writes: [] };
@@ -232,6 +238,9 @@ export class WorkflowEngine {
         await this.onStepFail(ownerGhii, run, step.id, 'input-red');
         continue;
       }
+      // fresh mode: on this step's FIRST dispatch, wipe its prior-run output so an idempotent
+      // skip-existing crew regenerates from empty (a within-run retry keeps partial gap-fill).
+      if (run.defSnapshot.fresh && rs.attempt === 0) await this.clearStepOutputs(ownerGhii, run, r);
       // dispatch
       const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
       rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
@@ -504,7 +513,7 @@ export class WorkflowEngine {
 
   // ── helpers ──────────────────────────────────────────────────────────────────────
 
-  private resolveVars(def: WorkflowDef, overrides?: Record<string, string>): Record<string, string> {
+  private resolveVars(def: WorkflowDef, overrides: Record<string, string> | undefined, runId: string): Record<string, string> {
     const today = new Date().toISOString().slice(0, 10);
     const out: Record<string, string> = {};
     for (const v of def.vars) {
@@ -512,6 +521,13 @@ export class WorkflowEngine {
       const def0 = v.default === '<run-date>' ? today : v.default;
       out[v.name] = override ?? def0 ?? '';
     }
+    // Built-in run-scoping vars (available to key templates WITHOUT declaration; a declared var of the
+    // same name wins). `{run}` = this run's id (unique per invocation); `{date}` = the run date. Templating
+    // deliverable keys with one of these gives each run its OWN keyspace — so a re-run never sees a prior
+    // run's output (no stale false-green, no wasted crew re-run over already-present keys) and history is
+    // preserved. See docs — this is the recommended alternative to the destructive `fresh` clear.
+    if (!('run' in out)) out.run = runId;
+    if (!('date' in out)) out.date = today;
     return out;
   }
 
@@ -576,6 +592,42 @@ export class WorkflowEngine {
       lastProgressAt: increasing ? nowIso : (rs.progress?.lastProgressAt ?? rs.startedAt ?? nowIso),
     };
     return increasing;
+  }
+
+  /**
+   * `fresh` mode: delete the memory keys a step's success_signal checks (minus any it also reads as
+   * INPUT — never wipe an upstream input), plus its deliverable key, so an idempotent skip-existing
+   * crew regenerates them instead of finding the previous run's output already present. Reads across
+   * OWNER-SCOPE (the deliverable may live in the producing agent's keyspace) and honors the sandbox
+   * keyPrefix. Best-effort: a delete failure is logged, not fatal (the run still proceeds).
+   */
+  private async clearStepOutputs(ownerGhii: string, run: WorkflowRun, resolved?: ResolvedStep): Promise<void> {
+    if (!resolved) return;
+    const outKeys = new Set(collectSignalKeys(resolved.success_signal));
+    for (const inKey of collectSignalKeys(resolved.required_to_function)) outKeys.delete(inKey);
+    if (resolved.deliverableKey) outKeys.add(resolved.deliverableKey);
+    if (outKeys.size === 0) return;
+    const ownerName = ownerGhii.split('@')[0];
+    const prefix = run.keyPrefix ?? '';
+    let cleared = 0;
+    for (const tmpl of outKeys) {
+      let full: string;
+      try { full = prefix + this.template(tmpl, run.vars); } catch { continue; }
+      try {
+        if (full.includes('*')) {
+          const listPrefix = full.slice(0, full.indexOf('*'));
+          const recs = await listOwnerScopeMemory(this.storage, this.config.nodeId, ownerName, { prefix: listPrefix });
+          const re = globToRegExp(full);
+          for (const rec of recs) if (re.test(rec.key)) { await this.storage.deleteMemory(rec.ownerGaii, rec.key); cleared++; }
+        } else {
+          const rec = await getOwnerScopeMemory(this.storage, this.config.nodeId, ownerName, full);
+          if (rec) { await this.storage.deleteMemory(rec.ownerGaii, rec.key); cleared++; }
+        }
+      } catch (err) {
+        logger.warn('fresh clearStepOutputs failed', { workflowId: run.workflowId, stepId: resolved.stepId, key: full, error: String(err) });
+      }
+    }
+    if (cleared) logger.info(`workflow ${run.workflowId} run ${run.runId} step "${resolved.stepId}": fresh cleared ${cleared} prior-run key(s)`);
   }
 
   /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
