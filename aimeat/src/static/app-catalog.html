@@ -2473,6 +2473,8 @@
       'detail.versions': 'Versions',
       'detail.loadingVersions': 'Loading versions…',
       'detail.noVersions': 'No published versions yet.',
+      'detail.skills': 'Skills for this app',
+      'detail.noSkills': 'No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.',
       'detail.needServerVersions': 'Set the AIMEAT server URL in Settings to see published versions.',
       'detail.editAi': '✨ Edit with AI',
       'detail.editAiHint': 'Describe a change. The AI rewrites the app using your own OpenRouter key, saves a draft you can test, then keep or discard.',
@@ -2734,6 +2736,8 @@
       'detail.versions': 'Versiot',
       'detail.loadingVersions': 'Ladataan versioita…',
       'detail.noVersions': 'Ei vielä julkaistuja versioita.',
+      'detail.skills': 'Sovelluksen taidot',
+      'detail.noSkills': 'Tähän sovellukseen ei ole vielä sidottu taitoja. Taito opettaa agenteille sovelluksen käytön — sido taito profiilin Sovellukset-välilehdeltä.',
       'detail.needServerVersions': 'Aseta AIMEAT-palvelimen osoite asetuksissa nähdäksesi julkaistut versiot.',
       'detail.editAi': '✨ Muokkaa tekoälyllä',
       'detail.editAiHint': 'Kuvaile muutos. Tekoäly kirjoittaa sovelluksen uudelleen omalla OpenRouter-avaimellasi, tallentaa luonnoksen jota voit testata, ja sitten säilytät tai hylkäät sen.',
@@ -5865,6 +5869,7 @@
   var detailDraftBlob = null;   // base64 of the pending AI-generated draft (never overwrites app.blob until Keep)
   var detailAiAvailable = false;
   var detailVersionsHtml = null; // cached rendered versions list, survives re-renders
+  var detailSkillsHtml = null;   // cached rendered bound-skills list (skills registry, 2d)
   var detailEditingAbout = false; // true while the About name/description inline editor is open
   var detailEditAboutOnOpen = false; // when set, open the About editor as soon as the detail view renders
 
@@ -5903,6 +5908,7 @@
     detailAppId = appId;
     detailDraftBlob = null;
     detailVersionsHtml = null;
+    detailSkillsHtml = null;
     detailEditingAbout = false;
     var app = detailGetApp();
     if (!app) return;
@@ -5913,6 +5919,7 @@
     var owner = currentOwnerName();
     if (app.published && app.publishedFilename && owner) {
       detailLoadVersions(owner, app.publishedFilename);
+      detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
     }
     // Opened via a pencil ("edit the name") → jump straight into the About editor.
     if (detailEditAboutOnOpen) {
@@ -6152,8 +6159,61 @@
         '</div>' +
       '</div>';
 
+    // ── SKILLS (skills registry, 2d) — expertise that teaches agents this app ──
+    var skillsHtml = '';
+    if (app.published) {
+      skillsHtml =
+        '<div class="dtl-section">' +
+          '<h3>' + (t('detail.skills') || 'Skills for this app') + '</h3>' +
+          '<div id="detail-skills-list">' +
+            (detailSkillsHtml !== null ? detailSkillsHtml
+              : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') +
+          '</div>' +
+        '</div>';
+    }
+
     document.getElementById('detail-body').innerHTML =
-      statusHtml + aboutHtml + aiHtml + versionsHtml + actionsHtml;
+      statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + actionsHtml;
+  }
+
+  // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.
+  // Anonymous/visitor sessions see only publicly-visible skills; owners manage the bindings in
+  // the profile Apps tab (attach/detach) or the Skills tab (frontmatter). Best-effort: any
+  // error renders as "none".
+  function detailLoadSkills(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t('detail.noSkills') || 'No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.') + '</span>';
+    var skillHeaders = {};
+    try {
+      var jwt = (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt)
+        || (JSON.parse(localStorage.getItem('aimeat_session') || '{}').jwt);
+      if (jwt) skillHeaders['Authorization'] = 'Bearer ' + jwt;
+    } catch (e) {}
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/skills', { headers: skillHeaders })
+      .then(function(resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
+      .then(function(json) {
+        var listEl = document.getElementById('detail-skills-list');
+        var skills = (json.data && json.data.skills) ? json.data.skills : [];
+        if (skills.length === 0) { detailSkillsHtml = noneHtml; if (listEl) listEl.innerHTML = detailSkillsHtml; return; }
+        var out = '';
+        for (var i = 0; i < skills.length; i++) {
+          var s = skills[i];
+          out += '<div style="margin-bottom:.4rem">' +
+            '<code>' + escapeHtml(s.ref || s.name) + '</code>' +
+            ' <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || '')) + '</span>' +
+            '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || '') + '</div>' +
+          '</div>';
+        }
+        detailSkillsHtml = out;
+        if (listEl) listEl.innerHTML = detailSkillsHtml;
+      })
+      .catch(function() {
+        detailSkillsHtml = noneHtml;
+        var listEl = document.getElementById('detail-skills-list');
+        if (listEl) listEl.innerHTML = detailSkillsHtml;
+      });
   }
 
   // ── About: inline name + description editing ──────

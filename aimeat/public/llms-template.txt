@@ -398,6 +398,14 @@ for completeness but are NOT needed for typical app building:
   _run (signals-only = check vs memory, no dispatch; full = execute). Stored in owner memory
   (workflows.def.* / workflows.run.*); API under /v1/workflows. Plan:
   docs/plans/2026-06-13-agent-workflows-node-plan.md.
+- Skills registry: SKILL.md packs (Claude/CrewAI-compatible) in scoped registries — node
+  (system library incl. seeded operator/user runbooks), user, workspace (rides workspace
+  exports/templates), plus app-bound skills (frontmatter metadata.binding: app:{owner}/{file}).
+  Agents hold refs (node:{name} | user:{owner}/{name} | ws:{org}/{ws}/{name}, all pinnable
+  @{semver}) at agents.{name}.skills — resolved fresh at load. MCP: aimeat_skill_publish /
+  _list (library|linked|mine|workspace|binding=) / _get / _link / _unlink. REST: /v1/skills,
+  /v1/agents/{name}/skills, /v1/apps/{owner}/{file}/skills. Before driving a published app,
+  list its bound skills and apply them. Guide: docs/skills-registry.md.
 - Organism workspaces: an organism can hold manifest-driven workspaces of markdown documents
   (a wiki) and schema-locked record lists, with a draft -> publish -> version flow. Connected
   agents use the aimeat_workspace_* MCP tools (list / read / write / publish / object_delete /

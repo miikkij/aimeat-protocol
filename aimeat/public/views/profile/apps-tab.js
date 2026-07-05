@@ -2,6 +2,8 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.5.0 — 2026-07-06 — Bound skills (2d): each My-Apps card shows the skills that teach agents
+ *     this app + an attach/detach picker (rewrites the skill's frontmatter metadata.binding).
  *   v1.4.0 — 2026-06-26 — Add "Edit details" (rename + edit description) to My Apps — updates the
  *     display name in place without re-publishing; the app link (owner/filename) stays the same.
  *   v1.3.0 — 2026-06-24 — Show a "moderated by operator: hidden" badge + hint (with reason) on My Apps
@@ -21,8 +23,94 @@ import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
+import * as skillsService from '/js/services/skills.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
+
+/**
+ * Per-app bound skills (2d): the skills that teach agents how to use THIS app.
+ * Binding lives in the SKILL's frontmatter (metadata.binding: app:{owner}/{filename});
+ * attach/detach here rewrites that frontmatter and republishes the skill.
+ */
+function AppSkills({ owner, filename, showToast }) {
+  const [skills, setSkills] = useState(null);
+  const [mySkills, setMySkills] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selected, setSelected] = useState('');
+  const [busy, setBusy] = useState(false);
+  const binding = `app:${owner}/${filename}`;
+
+  async function load() {
+    try { setSkills(await skillsService.listAppSkills(owner, filename)); } catch { setSkills([]); }
+  }
+  useEffect(() => { load(); }, [owner, filename]);
+
+  async function openPicker() {
+    if (pickerOpen) { setPickerOpen(false); return; }
+    setPickerOpen(true);
+    if (!mySkills) {
+      try {
+        const mine = await skillsService.listScope('user');
+        const bound = new Set((skills ?? []).map(s => s.ref));
+        const options = mine.filter(s => !bound.has(s.ref));
+        setMySkills(options);
+        setSelected(options[0]?.name ?? '');
+      } catch { setMySkills([]); }
+    }
+  }
+
+  async function attach() {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await skillsService.setSkillBinding(selected, binding);
+      showToast(t('profile.apps.skillAttached') || 'Skill attached to this app');
+      setPickerOpen(false); setMySkills(null);
+      await load();
+    } catch (err) {
+      showToast((t('profile.apps.skillAttachError') || 'Failed to attach skill') + ': ' + err.message, true);
+    } finally { setBusy(false); }
+  }
+
+  async function detach(skill) {
+    setBusy(true);
+    try {
+      await skillsService.setSkillBinding(skill.name, null);
+      showToast(t('profile.apps.skillDetached') || 'Skill detached');
+      setMySkills(null);
+      await load();
+    } catch (err) {
+      showToast((t('profile.apps.skillAttachError') || 'Failed to attach skill') + ': ' + err.message, true);
+    } finally { setBusy(false); }
+  }
+
+  return html`
+    <div class="pf-app-skills">
+      <span class="text-meta">${t('profile.apps.skillsLabel') || 'Skills'}:</span>
+      ${skills === null ? html`<span class="text-meta-sm">…</span>`
+        : skills.length === 0 ? html`<span class="text-meta-sm">${t('profile.apps.skillsNone') || 'none — attach a skill that teaches agents this app'}</span>`
+        : skills.map(s => html`
+            <span key=${s.ref} class="badge badge-info pf-app-skill-chip" title=${s.description}>
+              ${escHtml(s.name)}
+              ${s.scope === 'user' ? html`<button class="pf-app-skill-x" disabled=${busy} onClick=${() => detach(s)} title=${t('profile.apps.skillDetach') || 'Detach'}>×</button>` : ''}
+            </span>
+          `)}
+      <button class="btn-ghost btn-sm" onClick=${openPicker}>+ ${t('profile.apps.skillAttach') || 'Attach skill'}</button>
+      ${pickerOpen ? html`
+        <span class="pf-app-skill-picker">
+          ${mySkills === null ? html`<span class="text-meta-sm">…</span>` : mySkills.length === 0
+            ? html`<span class="text-meta-sm">${t('profile.apps.skillsNoneToAttach') || 'No unbound skills — create one in the Skills tab first'}</span>`
+            : html`
+              <select value=${selected} onChange=${e => setSelected(e.target.value)}>
+                ${mySkills.map(s => html`<option key=${s.name} value=${s.name}>${s.name} — ${s.description.slice(0, 50)}</option>`)}
+              </select>
+              <button class="btn-primary btn-sm" disabled=${busy || !selected} onClick=${attach}>${t('profile.apps.skillAttachConfirm') || 'Attach'}</button>
+            `}
+        </span>
+      ` : ''}
+    </div>
+  `;
+}
 
 export default function AppsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -195,6 +283,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             <button class=${a.parked ? 'btn-success btn-sm' : 'btn-outline btn-sm'} onClick=${() => handleTogglePark(a)}>${a.parked ? (t('profile.apps.unpark') || 'Unpark') : (t('profile.apps.park') || 'Park')}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
+          <${AppSkills} owner=${a.owner || session.owner} filename=${a.filename || a.name} showToast=${showToast} />
           ${editingMeta === a.filename ? html`
             <div class="pf-edit-panel">
               <label class="text-meta mb-half">${t('profile.apps.nameLabel') || 'App Name'}</label>

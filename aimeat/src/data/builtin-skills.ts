@@ -206,6 +206,49 @@ Three separate "routing" layers — identify which one the owner means:
 `,
   },
   {
+    name: 'use-app-bound-skills',
+    skillMd: `---
+name: use-app-bound-skills
+description: How to discover and load the skills bound to an AIMEAT app before driving it — and how to bind one when you author app expertise. Use whenever you are asked to operate, automate, or build on top of a published app.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Use app-bound skills
+
+An AI-boosted app's usage knowledge lives WITH the app as bound skills, not in your prompt.
+Before driving any app, check for them.
+
+## Before operating an app
+1. \`aimeat_skill_list\` with \`binding: "app:{owner}/{filename}"\` (or
+   \`GET /v1/apps/{owner}/{filename}/skills\`) — the skills that teach this app.
+2. If any exist, load each with \`aimeat_skill_get\` and APPLY it — a description saying
+   "use whenever operating X" is required reading, not optional.
+3. Nothing bound? Proceed with the app's own docs, and consider authoring a skill once you
+   have learned the app (below) so the next agent starts smarter.
+
+## Authoring app expertise
+Put the binding in the SKILL.md frontmatter so it travels with the skill:
+
+    ---
+    name: my-app-guide
+    description: How to use {app} well. Use whenever operating {app}.
+    metadata:
+      binding: app:{owner}/{filename}
+    ---
+
+Publish with \`aimeat_skill_publish\`. Owners can also attach/detach an existing skill from
+the profile Apps tab. The app catalog shows bound skills on the app's detail page.
+
+## Principles
+- One skill per app, focused on OPERATING it (workflow, data keys, quirks) — not a copy of
+  the app's marketing description.
+- Update the skill when the app changes; republish bumps the version, and consumers always
+  fetch fresh.
+`,
+  },
+  {
     name: 'diagnose-a-workflow',
     skillMd: `---
 name: diagnose-a-workflow

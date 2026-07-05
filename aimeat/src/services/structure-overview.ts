@@ -35,6 +35,9 @@
  *   v1.4.0 — 2026-06-26 — Organism archive: archived workspaces are excluded by default (listed only
  *     with includeArchived) and summarised as a count + footer; per-workspace archived-record counts
  *     surfaced; archived org/workspace flagged with a 🗄️ marker.
+ *   v1.5.0 — 2026-07-06 — Workspace-scope SKILLS (skills registry) surfaced in both overviews as a
+ *     "Skills (loadable expertise)" table with ready-to-use ws:{org}/{ws}/{name} refs — an agent
+ *     reading the map sees available expertise without a separate listing call.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -72,12 +75,23 @@ export interface ObjectiveSummary {
   status?: string;
   kpis: KpiSummary[];
 }
+/** One workspace-scope skill (skills registry), surfaced in the overview so an agent reading the
+ *  map immediately knows which expertise it can load (ref `ws:{org}/{ws}/{name}`) — no extra
+ *  listing call needed. */
+export interface WsSkillSummary {
+  name: string;
+  description: string;
+  version: string;
+  updatedAt: string;
+}
 export interface WorkspaceSummary {
   ws: string;
   name: string;
   readme: string | null;
   readable: boolean;
   spaces: SpaceSummary[];
+  /** Workspace-scope skills (skills registry) — loadable expertise, not content spaces. */
+  skills: WsSkillSummary[];
   objectives: ObjectiveSummary[];   // measurability convention (empty when the manifest declares none)
   totalRecords: number;
   totalDocuments: number;
@@ -149,7 +163,7 @@ export async function collectWorkspaceSummary(
   const manRec = items.find(r => r.key === `${root}.meta.manifest`);
   const summary: WorkspaceSummary = {
     ws, name: opts.name || ws, readme: null, readable: false,
-    spaces: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
+    spaces: [], skills: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
     archived: opts.archived ?? false, archivedCount: 0,
   };
   if (!manRec) return summary;   // empty / non-existent workspace
@@ -203,6 +217,28 @@ export async function collectWorkspaceSummary(
   }
   // Stable space order: most-populated first, then by name — deterministic regardless of manifest order.
   summary.spaces.sort((a, b) => (b.total - a.total) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+  // Workspace-scope SKILLS (skills registry, keys `{root}.skills.{name}.manifest`) — loadable
+  // expertise, surfaced in the map so agents see it without a separate listing call. Multi-member
+  // republish copies collapse freshest-wins (same rule as the registry resolver).
+  const skillManifestRe = new RegExp(`^${root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.skills\\.([a-z0-9-]+)\\.manifest$`);
+  const freshestSkill = new Map<string, MemoryRecord>();
+  for (const r of items) {
+    if (!skillManifestRe.test(r.key)) continue;
+    const prev = freshestSkill.get(r.key);
+    if (!prev || String(r.updatedAt) > String(prev.updatedAt)) freshestSkill.set(r.key, r);
+  }
+  summary.skills = [...freshestSkill.values()]
+    .map(r => {
+      const v = r.value as { name?: unknown; description?: unknown; version?: unknown } | null;
+      return {
+        name: typeof v?.name === 'string' ? v.name : (r.key.match(skillManifestRe)?.[1] ?? ''),
+        description: typeof v?.description === 'string' ? clip(v.description, 140) : '',
+        version: typeof v?.version === 'string' ? v.version : '?',
+        updatedAt: r.updatedAt,
+      };
+    })
+    .sort((a, b) => (a.name < b.name ? -1 : 1));
 
   // Objectives + KPIs (measurability convention). A `from:'records'` KPI's `current` is computed from
   // this workspace's published records (the `items` already read above — no extra storage hit, same
@@ -291,7 +327,22 @@ export async function buildWorkspaceOverview(
   out.push(...objectiveLines(s.objectives, '##'));
   if (!s.spaces.length) out.push('_No spaces with content yet._\n');
   for (const sp of s.spaces) out.push(...spaceLines(sp, '##'));
+  out.push(...skillLines(opts.orgId, s.ws, s.skills, '##'));
   return { markdown: out.join('\n'), readable: true, summary: s };
+}
+
+/** Render a workspace's registry skills: loadable expertise with ready-to-use refs. An agent copies
+ *  the ref straight into aimeat_skill_get / aimeat_skill_link — the map answers "what expertise is
+ *  here" without a separate listing call. */
+function skillLines(orgId: string, ws: string, skills: WsSkillSummary[], hashes: string): string[] {
+  if (!skills.length) return [];
+  const lines = [`${hashes} Skills (loadable expertise) — ${skills.length}`, ''];
+  lines.push('| Skill | Ref | v | Description |', '|---|---|---|---|');
+  for (const sk of skills) {
+    lines.push(`| **${cell(sk.name)}** | \`ws:${orgId}/${ws}/${sk.name}\` | ${sk.version} | ${cell(sk.description)} |`);
+  }
+  lines.push('');
+  return lines;
 }
 
 /** A title is rendered into a Markdown table CELL — the table parser splits on raw `|`, so a pipe in
@@ -408,8 +459,9 @@ export async function buildOrganismOverview(
     const arch = s.archivedCount ? ` · ${s.archivedCount} archived` : '';
     out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents${arch} · last activity ${date(s.lastActivity)}\n`);
     out.push(...objectiveLines(s.objectives, '###'));
-    if (!s.spaces.length && !s.objectives.length) { out.push('_no content yet_\n'); continue; }
+    if (!s.spaces.length && !s.objectives.length && !s.skills.length) { out.push('_no content yet_\n'); continue; }
     for (const sp of s.spaces) out.push(...spaceLines(sp, '###'));
+    out.push(...skillLines(orgId, s.ws, s.skills, '###'));
   }
   // Footer: name the archived workspaces (not their content) so a reader knows what to ask for.
   if (archivedWss.length && !includeArchived) {
