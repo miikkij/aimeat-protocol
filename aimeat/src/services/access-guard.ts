@@ -76,22 +76,27 @@ export async function authorizeRead(
     return { allowed: true, reason: 'members_data' };
   }
 
-  // 'workspace' = readable by members of the organism workspace in `workspaceRef` ("org/ws"). Gated by
-  // the SAME workspace read gate as GET /v1/organisms/:id/workspace (membership + manifest read), so a
+  // 'workspace' = readable by members of the organism workspace(s) in `workspaceRef`. That field is a
+  // SPACE-SEPARATED list of one or more "<org>/<ws>" bindings — a file/record can be shared into several
+  // workspaces, and the caller is allowed if they can read ANY ONE of them. Each binding is gated by the
+  // SAME workspace read gate as GET /v1/organisms/:id/workspace (membership + manifest read), so a
   // file/record authorizes identically to workspace content. Dynamic import breaks the access-guard ↔
   // workspace-access cycle (workspace-access imports authorizeRead for its own manifest gate). Node-local.
   if (visibility === 'workspace') {
-    const ref = args.workspaceRef || '';
-    const slash = ref.indexOf('/');
-    const orgId = slash >= 0 ? ref.slice(0, slash) : '';
-    const ws = slash >= 0 ? ref.slice(slash + 1) : '';
-    if (!orgId || !ws) return { allowed: false, reason: 'workspace_unbound' };
-    const organism = await storage.getOrganism(orgId);
-    if (!organism) return { allowed: false, reason: 'workspace_org_missing' };
+    const refs = (args.workspaceRef || '').split(/\s+/).filter(Boolean);
+    if (!refs.length) return { allowed: false, reason: 'workspace_unbound' };
     const { canReadWorkspace } = await import('./workspace-access.js');
-    const ok = await canReadWorkspace(storage, config, organism, args.accessorSub, args.accessorOwner, accessorGaii, ws);
-    if (!ok) await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
-    return { allowed: ok, reason: ok ? 'workspace_member' : 'workspace_denied' };
+    for (const ref of refs) {
+      const slash = ref.indexOf('/');
+      if (slash < 1 || slash >= ref.length - 1) continue;
+      const organism = await storage.getOrganism(ref.slice(0, slash));
+      if (!organism) continue;
+      if (await canReadWorkspace(storage, config, organism, args.accessorSub, args.accessorOwner, accessorGaii, ref.slice(slash + 1))) {
+        return { allowed: true, reason: 'workspace_member' };
+      }
+    }
+    await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
+    return { allowed: false, reason: 'workspace_denied' };
   }
 
   if (!config.consentEnabled) {

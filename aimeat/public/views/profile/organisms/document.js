@@ -13,6 +13,10 @@
  *     an auth'd blob fetch — a plain <img> can't send the token. /v1/pub carries the file owner, so a
  *     WORKSPACE-visibility image renders for the author AND workspace members (gated by canReadWorkspace),
  *     never made public. (See the authed-image-embed / workspace-file-tier design.)
+ *   v1.2.0 — 2026-07-05 — Only IMAGE embeds (![](…)) are eagerly blob-fetched; plain [file](/v1/…) LINKS
+ *     (pdf etc.) keep their raw URL and are fetched ON CLICK (onDocClick) — fetch-with-token → open the
+ *     blob in a new tab — so a private/workspace file opens without a big eager download and without a
+ *     token-less navigation 401'ing.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -55,18 +59,20 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
   const shown = (hasBoth && tab === 'published') ? page._pub : page;
   const [rendered, setRendered] = useState(shown.markdown || '');
 
-  // Resolve private /v1/storage AND /v1/memory/files images to auth'd blob: URLs IN THE MARKDOWN TEXT
-  // (declarative), then render that. Doing it in the text — instead of mutating <img src> after render
-  // — means a re-render (toggling Draft/Published, a live-update refresh) can never leave a stale or
-  // revoked object URL on a reused <img> node, which previously showed a broken image. Re-runs per
-  // version. (DROP files its dropped images as /v1/memory/files/<key> refs; a plain <img> can't send
-  // the token, so those are fetched with the session token and swapped to a blob: URL here too.)
+  // Resolve private IMAGE embeds (/v1/storage, /v1/memory/files, /v1/pub) to auth'd blob: URLs IN THE
+  // MARKDOWN TEXT (declarative), then render that. Doing it in the text — instead of mutating <img src>
+  // after render — means a re-render (toggling Draft/Published, a live-update refresh) can never leave a
+  // stale or revoked object URL on a reused <img> node, which previously showed a broken image. Re-runs
+  // per version. Only ![](…) IMAGE URLs are eagerly fetched here — plain [file](…) LINKS (pdf etc.) keep
+  // their raw URL and are fetched on click (onDocClick below), so a large file isn't downloaded on open.
+  // A plain <img>/link can't send the token; /v1/pub carries the owner so a workspace-visibility file
+  // renders/opens for the author AND workspace members (canReadWorkspace-gated), never public.
   useEffect(() => {
     let cancelled = false; const created = [];
     const raw = shown.markdown || '';
     setRendered(raw);   // show text/structure at once; images swap in a moment later
     (async () => {
-      const urls = [...new Set(raw.match(/\/v1\/(?:storage|memory\/files|pub)\/[^\s)\]"'>]+/g) || [])];
+      const urls = [...new Set([...raw.matchAll(/!\[[^\]]*\]\((\/v1\/(?:storage|memory\/files|pub)\/[^\s)]+)\)/g)].map(m => m[1]))];
       if (!urls.length) return;
       let out = raw;
       for (const su of urls) {
@@ -77,6 +83,23 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     })();
     return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } }); };
   }, [shown.markdown]);
+
+  // A [file](/v1/…) LINK (pdf etc.) can't carry the session token on a plain navigation, so intercept
+  // the click: fetch the bytes with the token (owner-addressed /v1/pub → workspace-member-readable), then
+  // point a new tab at the resulting blob. Open the tab synchronously in the click gesture so it isn't
+  // popup-blocked, then set its location once the fetch resolves.
+  const onDocClick = (e) => {
+    const a = e.target?.closest?.('a');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (!/\/v1\/(?:storage|memory\/files|pub)\//.test(href) || href.startsWith('blob:')) return;
+    e.preventDefault();
+    const tab = window.open('', '_blank', 'noopener');
+    orgService.fetchStorageObjectUrl(href).then(bu => {
+      if (tab) tab.location.href = bu; else window.open(bu, '_blank', 'noopener');
+      setTimeout(() => { try { URL.revokeObjectURL(bu); } catch (err) { /* noop */ } }, 60_000);
+    }).catch(() => { try { tab?.close(); } catch (err) { /* noop */ } });
+  };
 
   // created/saved/published timestamps come from the workspace read (record metadata on the value).
   const created = page._createdAt || page._pub?._createdAt;
@@ -101,7 +124,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
         ${savedAt ? html`<${KeyValueRow} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
         ${publishedAt ? html`<${KeyValueRow} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
       </div>` : null}
-    <div class="pj-doc-view"><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
+    <div class="pj-doc-view" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
 }
 
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
