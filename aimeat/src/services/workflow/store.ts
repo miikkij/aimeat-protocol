@@ -22,6 +22,7 @@
  *   v1.2.0 — 2026-07-05 — Persist the resume opt-in on save (resume-on-retry downstream decoupling).
  *   v1.3.0 — 2026-07-05 — Persist the fresh opt-in + allow built-in {run}/{date} vars undeclared in
  *     key templates (re-run freshness / run-scoped keys).
+ *   v1.4.0 — 2026-07-06 — Persist the skip_done opt-in (skip already-done steps on re-run).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -275,6 +276,7 @@ export async function saveWorkflow(
     notify_on_finish: input.notify_on_finish ?? false,
     resume: input.resume ?? false,
     fresh: input.fresh ?? false,
+    skip_done: input.skip_done ?? false,
     llm: input.llm,
     costCapMorsels: input.costCapMorsels ?? null,
     createdBy: prior?.createdBy ?? createdBy,
