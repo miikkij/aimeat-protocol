@@ -3466,7 +3466,14 @@ components:
         title: { $ref: '#/components/schemas/LocalizedString' }
         description: { $ref: '#/components/schemas/LocalizedString' }
         trigger: { $ref: '#/components/schemas/WorkflowTrigger' }
-        vars: { type: array, items: { $ref: '#/components/schemas/WorkflowVar' } }
+        vars:
+          type: array
+          items: { $ref: '#/components/schemas/WorkflowVar' }
+          description: >-
+            Declared run parameters. Two vars are ALWAYS available to key templates without declaration:
+            {run} (the run id) and {date} (the run date, YYYY-MM-DD). Template deliverable/signal keys
+            with one of these to give each run its own keyspace (run-scoped keys) — the non-destructive
+            way to keep re-runs from seeing a prior run's output. A declared var of the same name wins.
         steps: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
         on_step_fail: { type: string, enum: [inspect] }
         notify_on_finish:
@@ -3488,6 +3495,18 @@ components:
             of this flag, the watchdog always re-checks a step's success_signal before failing it (a
             slow step whose output arrived late recovers to green) and only times out after
             timeout_min of NO progress.
+        fresh:
+          type: boolean
+          description: >-
+            Owner opt-in (default false). Before a step is first dispatched, delete the memory keys its
+            success_signal checks (minus any it also reads as input), so an idempotent skip-existing
+            crew regenerates them from empty instead of finding the previous run's output already
+            present (which would false-green the step and waste a no-op crew pass). Use when a workflow
+            deliberately writes to the SAME keys every run and wants each run to overwrite. DESTRUCTIVE
+            — discards the prior run's deliverable for that step. The non-destructive alternative is to
+            template deliverable keys per run with the built-in vars {run} (the run id) and {date} (the
+            run date), which are always available to key templates without declaration and keep history.
+            Only clears at attempt 0; orthogonal to resume.
         llm:
           type: object
           description: Owner consent to use the node OpenRouter for `llm` signal leaves.

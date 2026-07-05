@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectSignalKeys, collectVarRefs, missingAfterRefs, detectCycle } from '../../src/services/workflow/store.js';
+import { collectSignalKeys, collectVarRefs, missingAfterRefs, detectCycle, BUILTIN_VARS } from '../../src/services/workflow/store.js';
 import type { Signal, WorkflowStep } from '../../src/models/workflow-schemas.js';
 
 describe('collectSignalKeys', () => {
@@ -26,6 +26,18 @@ describe('collectVarRefs', () => {
   it('extracts {var} tokens from key templates', () => {
     expect([...collectVarRefs(['news.{date}.{edition}', 'static.key', 'a.{date}'])].sort())
       .toEqual(['date', 'edition']);
+  });
+});
+
+describe('BUILTIN_VARS (run-scoped keys)', () => {
+  it('run + date are always available to key templates without declaration', () => {
+    expect([...BUILTIN_VARS].sort()).toEqual(['date', 'run']);
+  });
+  it('collectVarRefs surfaces {run}/{date} so save-time validation can allow them as built-ins', () => {
+    // A key template scoped per run + per day references only built-ins → no declared var needed.
+    const refs = collectVarRefs(['news.{date}.{run}.article', 'scoped.{run}.done']);
+    expect([...refs].every(v => (BUILTIN_VARS as readonly string[]).includes(v))).toBe(true);
+    expect([...refs].sort()).toEqual(['date', 'run']);
   });
 });
 
