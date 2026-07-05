@@ -7,6 +7,9 @@
  *   empty result, and the implicit auth scope (another owner's search never returns A's content).
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: fan-across librarian retrieval over searchText() FTS.
+ *   v1.1.0 — 2026-07-05 — Fan-out gating: a grant with `memory:read` searches the owner's full read
+ *     surface (finds a sibling agent's private record); without it the search stays self-scoped. This
+ *     closes the gap that hid the DROP app's app-grant scope collapse (only ever searched as owner before).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=librarian
 
@@ -204,6 +207,33 @@ await test('13. plan rejects a token WITHOUT ai:use (403 FORBIDDEN)', async () =
     const unscoped = await connectAgent(A.token, A.name, 'lib-unscoped', ['memory:read']);
     const r = await json('/v1/librarian/plan', { method: 'POST', headers: auth(unscoped.token), body: JSON.stringify({ text: 'a note about zub' }) });
     assert(r.status === 403, `no-scope token must be rejected, got ${r.status}`);
+});
+
+// -- v1.1.0: search fan-out is gated by memory:read, not owner-session alone. An agent (or H-2 app
+// grant) that resolves to the owner reaches the owner's FULL read surface — including a SIBLING
+// agent's private, GAII-owned records — only when the grant carries memory:read. This is the exact
+// path that was hiding the DROP app's librarian_assess results. --
+const GHOST = 'zorptagentmarker';
+await test('Setup: agent G (owned by A) authors a private record under its own GAII namespace', async () => {
+    const G = await connectAgent(A.token, A.name, 'lib-writer', ['memory:read', 'memory:write']);
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(G.token), body: JSON.stringify({ key: 'notebook.gsecret.n1', value: { text: `agent-authored ${GHOST} note` }, visibility: 'private' }) });
+    assert(w.status === 201 || w.status === 200, `agent write ${w.status}: ${JSON.stringify(w.body.error)}`);
+});
+
+await test('14. A memory:read grant fans across the owner\'s agents — finds a sibling agent\'s private record', async () => {
+    const H = await connectAgent(A.token, A.name, 'lib-reader', ['memory:read']);
+    const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(H.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const hit = (r.body.data.hits || []).find((h: any) => h.key === 'notebook.gsecret.n1');
+    assert(!!hit, `memory:read must fan across the owner's agents, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
+await test('15. Without memory:read, the search stays self-scoped — a sibling agent\'s private record is NOT visible', async () => {
+    const H2 = await connectAgent(A.token, A.name, 'lib-noread', ['ai:use']);
+    const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(H2.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const hit = (r.body.data.hits || []).find((h: any) => h.key === 'notebook.gsecret.n1');
+    assert(!hit, `a token without memory:read must not see a sibling agent's private record, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

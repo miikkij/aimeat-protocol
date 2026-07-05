@@ -5,8 +5,9 @@
  *   Backed by the generic `storage.searchText()` FTS primitive via the librarian service. Generic
  *   and reusable: any client (the organism-notebook app, an agent, a CLI) can ask "give me what I
  *   have about X" and get back ranked, snippeted, organism-annotated hits to pick from.
- * @structure GET /v1/librarian/search?q=&limit= — requireAuth; owner sessions fan across GHII +
- *   agents + ecosystem apps, agent sessions are scoped to themselves.
+ * @structure GET /v1/librarian/search?q=&limit= — requireAuth; the `own` search fans across the
+ *   owner's full read surface (GHII + agents + ecosystem apps) for an owner session OR any grant
+ *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: Tier-1 fan-across librarian search.
@@ -14,6 +15,10 @@
  *     in addition to an owner session — the same capability boundary as /v1/ai/complete, so a
  *     sandboxed browser app on an isolated app origin (Notebook-engine apps like DROP) can run
  *     the owner's AI over the owner's own material once the owner granted ai:use.
+ *   v1.2.0 — 2026-07-05 — Fan-out is now gated by `memory:read`, not by an owner session alone:
+ *     an app/agent grant that resolves to the owner's GHII previously searched only GHII-owned rows
+ *     (missing every agent-authored namespace); with `memory:read` it searches the owner's full read
+ *     surface. Consent lives in the grant (mirrors discovery/memory-source). Fixes DROP librarian_assess.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -61,11 +66,19 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     const keyPrefix = (req.query.prefix as string | undefined)?.trim() || undefined;
     const scope = req.query.scope === 'public' ? 'public' : 'own';
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // Fan the `own` search across the owner's FULL read surface (GHII + every agent + every ecosystem
+    // app) for an owner session, OR for any grant that carries `memory:read` — an app/agent token that
+    // resolves to the owner's GHII sees only GHII-owned rows (published .latest docs + GHII memory)
+    // without it, missing everything the owner's agents authored in their own namespaces. The consent
+    // to read the owner's private surface lives in the GRANT, not in content classification (mirrors
+    // discovery/sources/memory-source.ts). Without it, the search stays scoped to the caller's own id.
+    const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
+    const fanOutOwner = isOwnerSession || scopes.includes('memory:read') || scopes.includes('*');
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
 
     const { hits, ownersSearched } = await librarianSearch(storage, config, {
       ownerName: req.auth!.owner as string,
-      isOwnerSession,
+      fanOutOwner,
       viewerGaii,
       query: q,
       limit,

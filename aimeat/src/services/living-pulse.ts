@@ -231,7 +231,7 @@ export async function pulseInstanceServer(
       // 1. Gather from the owner's own material.
       try {
         const { hits } = await librarianSearch(storage, config, {
-          ownerName, isOwnerSession: true, viewerGaii: ownerGaii,
+          ownerName, fanOutOwner: true, viewerGaii: ownerGaii,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
         });
         const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });

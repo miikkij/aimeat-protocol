@@ -3,18 +3,21 @@
  * @description Tier-1 "librarian" retrieval: a single ranked full-text search fanned across ALL of
  *   a viewer's own memory (their GHII + every agent + every ecosystem app), so one query reaches
  *   every organism they have contributed to plus their personal notebook content. Built on the
- *   generic `storage.searchText()` FTS primitive (SQLite FTS5 / MongoDB $text); this service adds
- *   the fan-across identity set, key→organism/workspace annotation, title extraction and snippeting.
- *   Auth is implicit: only the viewer's OWN data is searched, so there is no cross-member read to
- *   gate. (Cross-member organism content readable via consent is a deliberate follow-up — see the
- *   design doc §5.)
+ *   generic `storage.searchText()` primitive (SQLite FTS5; MongoDB is a per-token substring scan over
+ *   a precomputed `searchBlob`, NOT a `$text` index); this service adds the fan-across identity set,
+ *   key→organism/workspace annotation, title extraction and snippeting. Auth is implicit: only the
+ *   viewer's OWN data is searched, so there is no cross-member read to gate. (Cross-member organism
+ *   content readable via consent is a deliberate follow-up — see the design doc §5.)
  * @structure
  *   - librarianSearch() — resolve identity set → searchText → annotate → LibrarianHit[]
  *   - annotate()/titleOf()/snippetOf() — presentation helpers
  * @usage
- *   const { hits } = await librarianSearch(storage, config, { ownerName, isOwnerSession, viewerGaii, query });
+ *   const { hits } = await librarianSearch(storage, config, { ownerName, fanOutOwner, viewerGaii, query });
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: fan-across-organisms full-text librarian over searchText().
+ *   v1.1.0 — 2026-07-05 — `isOwnerSession` → `fanOutOwner`: the fan-across set is now chosen by the
+ *     route from (owner session OR memory:read grant), so app/agent grants with memory:read reach the
+ *     owner's full read surface. Corrected the stale "MongoDB $text" note (it is a substring scan).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -121,7 +124,7 @@ function snippetOf(text: string, tokens: string[]): string {
 export async function librarianSearch(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; isOwnerSession: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public' },
+  opts: { ownerName: string; fanOutOwner: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public' },
 ): Promise<{ hits: LibrarianHit[]; ownersSearched: number }> {
   const tokens = queryTokens(opts.query);
   if (tokens.length === 0) return { hits: [], ownersSearched: 0 };
@@ -134,7 +137,9 @@ export async function librarianSearch(
     ownersSearched = -1;   // public: the whole node, not a counted owner set
   } else {
     let ownerGaiis: string[];
-    if (opts.isOwnerSession) {
+    if (opts.fanOutOwner) {
+      // The caller acts for the owner (owner session, or a grant with memory:read): search the owner's
+      // full read surface — their GHII + every agent + every ecosystem app they own.
       const ghii = `${opts.ownerName}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(opts.ownerName);
       const ecoApps = await storage.getEcosystemAppsByOwner(opts.ownerName);

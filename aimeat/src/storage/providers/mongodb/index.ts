@@ -837,8 +837,11 @@ export class PrismaStorage implements Storage {
             });
     }
 
-    /** Flatten a record into searchable text: key + string/number leaves of value + tags. Indexed
-     *  by the `searchBlob` `$text` index (created in init). Mirrors what SQLite FTS5 indexes. */
+    /** Flatten a record into searchable text: key + string/number leaves of value + tags, stored on
+     *  `searchBlob`. NOTE: `searchText` below queries this with a per-token `contains` (a substring
+     *  scan / regex), NOT a MongoDB `$text` index — there is no `$text` index on this collection.
+     *  Substring matching finds infixes (e.g. "portaat" inside "kyvykkyysportaat"), which SQLite's
+     *  FTS5 `tok*` prefix match does not; the tradeoff is no index-backed scalability here. */
     private buildSearchBlob(record: MemoryRecord): string {
         const parts: string[] = [record.key, ...(record.tags ?? [])];
         const collect = (v: unknown, depth: number): void => {
@@ -2701,7 +2704,7 @@ export class PrismaStorage implements Storage {
             // Delete ALL content under the organism's key namespace, across every owner — workspace
             // records/documents/meta are keyed `organism.{id}.…` but owned by the member who wrote
             // them, NOT by memoryNamespace, so a delete-by-ownerGaii left them orphaned (and still
-            // findable via $text search). Delete by key prefix; also the trackable-version history and
+            // findable via librarian search). Delete by key prefix; also the trackable-version history and
             // any locked schemas under the prefix.
             const orgKey = `organism.${id}`;
             const keyFilter = { OR: [{ key: orgKey }, { key: { startsWith: `${orgKey}.` } }] };
