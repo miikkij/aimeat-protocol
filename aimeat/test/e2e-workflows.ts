@@ -12,7 +12,8 @@
  *     runs; input absent → input-red) instead of blanket-skip on a failed parent. (The watchdog's
  *     re-check + sliding no-progress timeout are unit-covered — not black-box-able under the 60s sweep.)
  *   v1.3.0 — 2026-07-05 — Re-run freshness: built-in {run}/{date} vars (save undeclared + resolve at
- *     run) and the fresh flag (a prior run's stable output key is deleted before the step re-dispatches).
+ *     run) and the fresh flag (a prior run's output keys are deleted once at run start), incl. the
+ *     no-clobber guard: an earlier step's output survives a later step that shares its output glob.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -106,6 +107,21 @@ const FRESH_OFFER = {
   required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
   success_signal: { kind: 'deterministic', key: 'fresh.out', op: 'nonempty' },
 };
+// Two offers whose success shares the SAME glob (g.out.*) but write disjoint keys — the sanomat shape
+// (write-a/write-b/space-weather all under article.*). Under fresh, an EARLIER step's output must
+// survive a LATER step running (clear happens once at run start, not per-step).
+const EARLY_SHARED_OFFER = {
+  id: 'early-shared', title: 'Early', ask: 'produce g.out.early',
+  deliverable: { format: 'document', location: { key: 'g.out.early' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key: 'g.out.early', op: 'nonempty' },
+};
+const LATE_SHARED_OFFER = {
+  id: 'late-shared', title: 'Late', ask: 'produce g.out.late (success spans the shared glob)',
+  deliverable: { format: 'document', location: { key: 'g.out.late' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key_glob: 'g.out.*', op: 'count_nonempty', min: 2 },
+};
 // Unique key never written in the real namespace — to prove full-sandbox reads the prefixed copy.
 const SBX_OFFER = {
   id: 'sbx', title: 'Sandbox', ask: 'produce sbx.out',
@@ -149,7 +165,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, FRESH_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, FRESH_OFFER, EARLY_SHARED_OFFER, LATE_SHARED_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -487,6 +503,55 @@ async function run() {
     await sleep(700);
     r = await json(`/v1/workflows/fresh-wf/runs/${runId}`, { headers: auth });
     assert(r.body.data.steps.gen.state === 'green', `gen should be green from the fresh value, got ${r.body.data.steps.gen.state}`);
+  });
+
+  // fresh clears ONCE at run start, not per-step: an EARLIER step's output must survive a LATER step
+  // that shares its output glob (the sanomat write-a/write-b/space-weather-under-article.* shape).
+  await test('fresh: an earlier step\'s output is NOT clobbered when a later step shares its output glob', async () => {
+    await writeMem('config.enabled', '1'); // both offers gate on it (though steps set required none)
+    const noclobberWf = {
+      title: { en_US: 'Fresh no-clobber' }, description: { en_US: 'shared output glob, cleared once' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', fresh: true,
+      steps: [
+        { id: 'early', agent: agentName, offer: 'early-shared', required_to_function: 'none', description: { en_US: 'Early' }, timeout_min: 10 },
+        { id: 'late', agent: agentName, offer: 'late-shared', after: ['early'], required_to_function: 'none', description: { en_US: 'Late' }, timeout_min: 10 },
+      ],
+    };
+    const put = await json('/v1/workflows/fresh-noclobber', { method: 'PUT', headers: auth, body: JSON.stringify(noclobberWf) });
+    assert(put.status === 200, `put fresh-noclobber ${put.status}: ${JSON.stringify(put.body)}`);
+
+    // Seed a stale key in the shared glob so we can confirm the run-start clear wiped it.
+    await writeMem('g.out.stale', 'stale from a previous run');
+    const run = await json('/v1/workflows/fresh-noclobber/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    // run-start clear wiped the whole g.out.* glob before any dispatch.
+    const staleGone = await json('/v1/memory/g.out.stale', { headers: auth });
+    assert(staleGone.status === 404, `fresh should have cleared g.out.stale at run start, got ${staleGone.status}`);
+
+    // early runs first and writes its key.
+    let r = await json(`/v1/workflows/fresh-noclobber/runs/${runId}`, { headers: auth });
+    const earlyTask = r.body.data.steps.early.taskIds?.[0];
+    assert(typeof earlyTask === 'string', 'early dispatched');
+    await writeMem('g.out.early', 'EARLY output');
+    await json(`/v1/agents/${agentName}/tasks/${earlyTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    await sleep(700);
+
+    // late becomes ready and dispatches — with the per-step bug it would clear g.out.* here and DELETE
+    // g.out.early; with the fix (cleared only at run start) g.out.early survives.
+    r = await json(`/v1/workflows/fresh-noclobber/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.early.state === 'green', `early should be green, got ${r.body.data.steps.early.state}`);
+    const lateTask = r.body.data.steps.late.taskIds?.[0];
+    assert(typeof lateTask === 'string', `late should be dispatched after early green, got ${r.body.data.steps.late.state}`);
+    const earlyStillThere = await json('/v1/memory/g.out.early', { headers: auth });
+    assert(earlyStillThere.status === 200, `early's output must survive late's dispatch (not clobbered), got ${earlyStillThere.status}`);
+
+    // late writes its own key → its success (count g.out.* >= 2) now sees BOTH keys → green → run done.
+    await writeMem('g.out.late', 'LATE output');
+    await json(`/v1/agents/${agentName}/tasks/${lateTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    await sleep(700);
+    r = await json(`/v1/workflows/fresh-noclobber/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.late.state === 'green', `late should be green (both shared keys present), got ${r.body.data.steps.late.state}`);
+    assert(r.body.data.status === 'done', `run should be done, got ${r.body.data.status}`);
   });
 
   // ── full-sandbox namespaces keys, isolated from production ──

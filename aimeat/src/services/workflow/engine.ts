@@ -31,9 +31,10 @@
  *     over the crew's self-report (output present ⇒ green even if the task reported failed).
  *   v1.3.0 — 2026-07-05 — Re-run freshness. resolveVars injects built-in {run}/{date} template vars so
  *     deliverable keys can be run-scoped (a re-run then never sees a prior run's output — the
- *     non-destructive default). Opt-in WorkflowDef.fresh clears a step's success-signal output keys at
- *     its first dispatch (clearStepOutputs) so an idempotent skip-existing crew regenerates the SAME
- *     keys each run instead of no-op-ing on stale output.
+ *     non-destructive default). Opt-in WorkflowDef.fresh clears the workflow's produced keys ONCE at
+ *     run start (clearRunOutputs) so an idempotent skip-existing crew regenerates the SAME keys each
+ *     run instead of no-op-ing on stale output. Cleared up front (not per-step) so parallel steps
+ *     sharing an output namespace can't wipe each other's fresh output.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -186,7 +187,12 @@ export class WorkflowEngine {
       await this.persist(ownerGhii, run);
       // Under the run lock: an ecosystem action step's async reply (onPushTerminal, which also locks)
       // must not advance the run before this initial tick has persisted the 'dispatched' state.
-      await this.withLock(runId, () => this.tick(ownerGhii, run));
+      await this.withLock(runId, async () => {
+        // fresh mode: wipe the workflow's prior-run output ONCE, before any step dispatches, so an
+        // idempotent skip-existing crew regenerates it (parallel shared-namespace steps can't clobber).
+        if (run.defSnapshot.fresh) await this.clearRunOutputs(ownerGhii, run);
+        await this.tick(ownerGhii, run);
+      });
     }
     return { runId };
   }
@@ -238,10 +244,7 @@ export class WorkflowEngine {
         await this.onStepFail(ownerGhii, run, step.id, 'input-red');
         continue;
       }
-      // fresh mode: on this step's FIRST dispatch, wipe its prior-run output so an idempotent
-      // skip-existing crew regenerates from empty (a within-run retry keeps partial gap-fill).
-      if (run.defSnapshot.fresh && rs.attempt === 0) await this.clearStepOutputs(ownerGhii, run, r);
-      // dispatch
+      // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
       const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
       rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
       dispatchedAny = true;
@@ -595,22 +598,28 @@ export class WorkflowEngine {
   }
 
   /**
-   * `fresh` mode: delete the memory keys a step's success_signal checks (minus any it also reads as
-   * INPUT — never wipe an upstream input), plus its deliverable key, so an idempotent skip-existing
-   * crew regenerates them instead of finding the previous run's output already present. Reads across
-   * OWNER-SCOPE (the deliverable may live in the producing agent's keyspace) and honors the sandbox
-   * keyPrefix. Best-effort: a delete failure is logged, not fatal (the run still proceeds).
+   * `fresh` mode: at RUN START (before any step dispatches), delete every key the workflow PRODUCES —
+   * the union over steps of (success_signal keys minus that step's own inputs) + deliverable key — so an
+   * idempotent skip-existing crew regenerates them instead of finding a prior run's output present.
+   * Cleared ONCE up front, NOT per-step: parallel steps that share an output namespace (e.g. write-a +
+   * write-b + an independent step all under `article.*`) would otherwise wipe each other's fresh output
+   * when a later step's clear runs after an earlier one already wrote. Pure external inputs (read but
+   * produced by no step) are preserved — a key is only cleared if some step declares it as output. Reads
+   * across OWNER-SCOPE (+ sandbox prefix); best-effort (a delete failure is logged, not fatal).
    */
-  private async clearStepOutputs(ownerGhii: string, run: WorkflowRun, resolved?: ResolvedStep): Promise<void> {
-    if (!resolved) return;
-    const outKeys = new Set(collectSignalKeys(resolved.success_signal));
-    for (const inKey of collectSignalKeys(resolved.required_to_function)) outKeys.delete(inKey);
-    if (resolved.deliverableKey) outKeys.add(resolved.deliverableKey);
-    if (outKeys.size === 0) return;
+  private async clearRunOutputs(ownerGhii: string, run: WorkflowRun): Promise<void> {
+    const produced = new Set<string>();
+    for (const r of run.resolved ?? []) {
+      const outs = new Set(collectSignalKeys(r.success_signal));
+      for (const inKey of collectSignalKeys(r.required_to_function)) outs.delete(inKey);
+      if (r.deliverableKey) outs.add(r.deliverableKey);
+      for (const k of outs) produced.add(k);
+    }
+    if (produced.size === 0) return;
     const ownerName = ownerGhii.split('@')[0];
     const prefix = run.keyPrefix ?? '';
     let cleared = 0;
-    for (const tmpl of outKeys) {
+    for (const tmpl of produced) {
       let full: string;
       try { full = prefix + this.template(tmpl, run.vars); } catch { continue; }
       try {
@@ -624,10 +633,10 @@ export class WorkflowEngine {
           if (rec) { await this.storage.deleteMemory(rec.ownerGaii, rec.key); cleared++; }
         }
       } catch (err) {
-        logger.warn('fresh clearStepOutputs failed', { workflowId: run.workflowId, stepId: resolved.stepId, key: full, error: String(err) });
+        logger.warn('fresh clearRunOutputs failed', { workflowId: run.workflowId, key: full, error: String(err) });
       }
     }
-    if (cleared) logger.info(`workflow ${run.workflowId} run ${run.runId} step "${resolved.stepId}": fresh cleared ${cleared} prior-run key(s)`);
+    if (cleared) logger.info(`workflow ${run.workflowId} run ${run.runId}: fresh cleared ${cleared} prior-run output key(s)`);
   }
 
   /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
