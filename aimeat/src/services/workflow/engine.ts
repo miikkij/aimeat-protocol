@@ -22,6 +22,13 @@
  *     advance, notBefore-backoff retry + timeout via the watchdog sweep, restart recovery.
  *   v1.1.0 — 2026-06-15 — Finish notification: terminal full-live runs of a notify_on_finish workflow
  *     drop an in-app + (when configured) email notification with outcome + per-step log, once.
+ *   v1.2.0 — 2026-07-05 — Resume-on-retry / re-evaluate-against-reality. The watchdog now RE-CHECKS a
+ *     dispatched step's success_signal against current memory before failing it (a slow step whose
+ *     leaves finished late recovers to green instead of timing out), tracks fill progress, and only
+ *     times out after timeout_min of NO progress (slide, don't restart-and-skip). Under the opt-in
+ *     WorkflowDef.resume, a downstream step gates on its own required_to_function (via
+ *     computeReadySteps + failDownstream) rather than parent success. Terminal paths trust the signal
+ *     over the crew's self-report (output present ⇒ green even if the task reported failed).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -33,7 +40,7 @@ import { buildGAII } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
-import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
+import { evaluateSignal, extractProgress, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
@@ -58,15 +65,24 @@ function loc(s: LocalizedString | undefined): string {
 const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped']);
 
 /**
- * The steps that may start now: pending, all `after` deps green, and past any retry backoff.
+ * The steps that may start now: pending, past any retry backoff, and their `after` deps satisfied.
+ * "Satisfied" depends on the workflow's resume policy:
+ *   - default: every `after` dep must be GREEN (a failed dep blocks the subtree — restart-and-skip).
+ *   - resume:  every `after` dep must be TERMINAL (green OR failed) — `after` is ordering only; the
+ *     step's OWN required_to_function (evaluated in tick) becomes the real gate, so a dependent whose
+ *     input is present runs even when a parent timed out / went red.
  * Pure — operates on the def + the current run-step map.
  */
 export function computeReadySteps(def: WorkflowDef, steps: Record<string, WorkflowRunStep>, now: string): WorkflowStep[] {
+  const resume = def.resume === true;
   return def.steps.filter(s => {
     const rs = steps[s.id];
     if (!rs || rs.state !== 'pending') return false;
     if (rs.notBefore && rs.notBefore > now) return false;
-    return (s.after ?? []).every(dep => steps[dep]?.state === 'green');
+    return (s.after ?? []).every(dep => {
+      const st = steps[dep]?.state;
+      return resume ? !!st && TERMINAL_STEP_STATES.has(st) : st === 'green';
+    });
   });
 }
 
@@ -212,7 +228,7 @@ export class WorkflowEngine {
       rs.reads = [...reads];
       if (!input.ok) {
         rs.state = 'input-red'; rs.inputObserved = input.observed; rs.endedAt = now;
-        this.skipSubtree(run, step.id);
+        this.failDownstream(run, step.id);
         await this.onStepFail(ownerGhii, run, step.id, 'input-red');
         continue;
       }
@@ -264,18 +280,22 @@ export class WorkflowEngine {
       const now = new Date().toISOString();
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
+      this.recordProgress(rs, output.observed);
       if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(r.deliverableKey, run.vars)])];
 
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
-      if (output.ok && outcome === 'done') {
+      if (output.ok) {
+        // Reality check wins: if the leaves are present, the step is green even when the crew task
+        // reported `failed` — a slow/partial crew that ultimately filled the keys still produced.
         rs.state = 'green'; rs.endedAt = now;
       } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
         // Deterministic retry with backoff: back to pending, gated by notBefore; the sweep re-ticks.
+        // Idempotent crew stages make the re-dispatch a gap-fill (only absent keys get written).
         rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
       } else {
         rs.state = 'output-red'; rs.endedAt = now;
-        this.skipSubtree(run, stepId);
+        this.failDownstream(run, stepId);
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
 
@@ -299,26 +319,59 @@ export class WorkflowEngine {
       const r = fresh.value as WorkflowRun;
       if (r.status !== 'running' && r.status !== 'waiting-step') return;
       const now = Date.now();
+      const nowIso = new Date().toISOString();
+      const resolved = this.resolvedMap(r);
+      const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, r);
       let changed = false;
-      // timeouts on dispatched steps
+
       for (const step of r.defSnapshot.steps) {
         const rs = r.steps[step.id];
-        if (rs.state === 'dispatched' && rs.startedAt) {
-          const deadline = new Date(rs.startedAt).getTime() + (step.timeout_min ?? 60) * 60_000;
-          if (now >= deadline) {
-            if (step.retry && rs.attempt < step.retry.max) {
-              rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
-              rs.notBefore = new Date(now + step.retry.backoff_min * 60_000).toISOString();
-            } else {
-              rs.state = 'timed-out'; rs.endedAt = new Date().toISOString();
-              this.skipSubtree(r, step.id);
-              await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
-            }
-            changed = true;
-          }
+        if (rs.state !== 'dispatched' || !rs.startedAt) continue;
+
+        // Re-evaluate the success signal against CURRENT memory. The task-runner crew runs on its own
+        // clock and does not abort when we stop waiting — a merely-slow step may have filled its
+        // leaves after we parked. Re-check-before-failing recovers it instead of discarding the work.
+        const rdef = resolved.get(step.id);
+        const reads = new Set<string>(rs.reads);
+        const output = await this.evalSignal(rdef?.success_signal, ctx, reads);
+        rs.reads = [...reads];
+
+        // Track fill progress (count_nonempty leaves). A rising count = the crew is still filling
+        // keys (in-progress); a flat count = stuck.
+        const increased = this.recordProgress(rs, output.observed);
+        if (increased) changed = true;
+
+        if (output.ok) {
+          // Recovered: the deliverable is present. Green retroactively; tick un-blocks dependents so a
+          // slow edition's downstream (features/editorial) runs instead of being skipped.
+          rs.state = 'green'; rs.endedAt = nowIso; rs.outputObserved = output.observed;
+          if (rdef?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(rdef.deliverableKey, r.vars)])];
+          changed = true;
+          continue;
         }
+        rs.outputObserved = output.observed;
+
+        // Not satisfied yet — slow (still progressing) vs stuck (no new keys for timeout_min). The
+        // no-progress deadline slides to lastProgressAt + timeout_min; a step that never progressed
+        // anchors at startedAt, so it times out exactly as before.
+        const anchorIso = rs.progress?.lastProgressAt ?? rs.startedAt;
+        const stallDeadline = new Date(anchorIso).getTime() + (step.timeout_min ?? 60) * 60_000;
+        if (now < stallDeadline) continue; // still within the wait window — keep waiting.
+
+        // Stalled past timeout_min with no new keys → the existing retry-or-timed-out policy.
+        if (step.retry && rs.attempt < step.retry.max) {
+          // Re-dispatch; idempotent crew stages make this a gap-fill (only absent keys get written).
+          rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
+          rs.notBefore = new Date(now + step.retry.backoff_min * 60_000).toISOString();
+        } else {
+          rs.state = 'timed-out'; rs.endedAt = nowIso;
+          this.failDownstream(r, step.id);
+          await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
+        }
+        changed = true;
       }
-      // re-tick (fires any now-due pending retries), using the run's pinned resolved signals.
+      // re-tick (fires any now-due pending retries + dispatches steps un-blocked by a recovery),
+      // using the run's pinned resolved signals.
       if (changed) await this.persist(ownerGhii, r);
       await this.tick(ownerGhii, r);
     });
@@ -489,6 +542,42 @@ export class WorkflowEngine {
     }
   }
 
+  /**
+   * On a step failure, decide the fate of its dependents. Default policy skips the whole subtree.
+   * Under `resume`, skip NOTHING here: computeReadySteps lets each dependent become ready once its
+   * deps are terminal, and tick re-evaluates the dependent's OWN required_to_function against current
+   * memory — so a dependent whose input the crew actually produced runs, and one whose input is
+   * genuinely missing goes input-red (which cascades the same way). This is the "re-evaluate against
+   * reality" contract; it is safe only when crew stages are idempotent, hence opt-in.
+   */
+  private failDownstream(run: WorkflowRun, failedId: string): void {
+    if (run.defSnapshot.resume) return;
+    this.skipSubtree(run, failedId);
+  }
+
+  /**
+   * Sample a dispatched step's fill progress from its success-signal `observed` (count_nonempty
+   * leaves). Records rs.progress and returns whether the count rose since the last sample — the
+   * watchdog treats a rising count as "still filling" (slides the no-progress deadline) and a flat
+   * one as "stuck". No-op (returns false) for signals with no countable leaf.
+   */
+  private recordProgress(rs: WorkflowRunStep, observed: unknown): boolean {
+    const prog = extractProgress(observed);
+    if (!prog) return false;
+    // Baseline 0 (not -1): a step sitting at 0 keys must NOT read as "progressed" on its first sample,
+    // else a genuinely-stuck step would slide its deadline forever instead of timing out.
+    const prevCount = rs.progress?.count ?? 0;
+    const increasing = prog.count > prevCount;
+    const nowIso = new Date().toISOString();
+    rs.progress = {
+      count: prog.count,
+      min: prog.min,
+      increasing,
+      lastProgressAt: increasing ? nowIso : (rs.progress?.lastProgressAt ?? rs.startedAt ?? nowIso),
+    };
+    return increasing;
+  }
+
   /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
   private async dispatchStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved?: ResolvedStep): Promise<string[]> {
     // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
@@ -582,6 +671,7 @@ export class WorkflowEngine {
       const now = new Date().toISOString();
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
+      this.recordProgress(rs, output.observed);
 
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (ok && output.ok) {
@@ -591,7 +681,7 @@ export class WorkflowEngine {
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
       } else {
         rs.state = 'output-red'; rs.endedAt = now;
-        this.skipSubtree(run, stepId);
+        this.failDownstream(run, stepId);
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
       await this.tick(ownerGhii, run);

@@ -10,6 +10,7 @@
  *   docs/plans/2026-06-13-agent-workflows-node-plan.md §3.
  * @structure
  *   - evaluateSignal(signal, ctx) — the recursive entry point
+ *   - extractProgress(observed) — sum count_nonempty progress for slow-vs-stuck (watchdog)
  *   - SignalEvalCtx — the injected I/O surface
  *   - templateKey / globToRegExp / getByPath / isNonEmpty — internal helpers
  *   - SignalTemplateError — thrown when {var} templating would escape the owner namespace
@@ -18,6 +19,8 @@
  *   const { ok, observed } = await evaluateSignal(step.success_signal, ctx);
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial: deterministic ops + llm leaf (degrades when disabled) + composites.
+ *   v1.1.0 — 2026-07-05 — Add extractProgress(observed) — sums count_nonempty progress for the
+ *     watchdog's slow-vs-stuck decision (resume-on-retry).
  */
 import type { Signal, DeterministicSignal } from '../../models/workflow-schemas.js';
 
@@ -163,6 +166,32 @@ async function evalDeterministic(sig: DeterministicSignal, ctx: SignalEvalCtx): 
     default:
       return { ok: false, observed: { error: `unknown deterministic op` } };
   }
+}
+
+// ── progress extraction (slow-vs-stuck) ────────────────────────────────────────────
+/**
+ * Sum the `count_nonempty` progress across a signal's `observed` payload (the tree returned by
+ * evaluateSignal). Returns { count, min } summed over every count_nonempty leaf found — the watchdog
+ * uses a rising `count` as "the crew is still filling keys" (in-progress) and a flat one as "stuck".
+ * Returns null when the signal has no countable leaf (exists / nonempty / json_*), so those signals
+ * recover on the plain re-check but never extend their deadline. Pure — walks the observed object.
+ */
+export function extractProgress(observed: unknown): { count: number; min: number } | null {
+  let count = 0, min = 0, found = false;
+  const walk = (o: unknown): void => {
+    if (o === null || typeof o !== 'object') return;
+    const rec = o as Record<string, unknown>;
+    if (rec.op === 'count_nonempty' && typeof rec.count === 'number' && typeof rec.min === 'number') {
+      count += rec.count; min += rec.min; found = true;
+      return;
+    }
+    if (Array.isArray(rec.all)) rec.all.forEach(walk);
+    if (Array.isArray(rec.any)) rec.any.forEach(walk);
+    if ('when' in rec) walk(rec.when);
+    if ('then' in rec) walk(rec.then);
+  };
+  walk(observed);
+  return found ? { count, min } : null;
 }
 
 // ── the recursive entry point ─────────────────────────────────────────────────────

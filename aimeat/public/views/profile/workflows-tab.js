@@ -9,6 +9,9 @@
  * @structure WorkflowsTab (default) — view state machine (list | detail | run)
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v1.3.0 -- 2026-07-05 -- Run view shows per-step fill progress (ProgressChip: "leaves N/M" +
+ *     still-filling / stalled while dispatched) from run.steps[].progress — so a slow step reads as
+ *     in-progress, not a hard timed-out, while the crew is still filling keys (resume-on-retry).
  *   v1.2.0 -- 2026-06-22 -- List uses listWorkflows({include:'health'}) so health arrives inline in
  *     one request instead of a per-workflow getHealth fan-out.
  *   v1.0.0 -- 2026-06-13 -- Phase 9: list + blueprint + runs + run-now + health.
@@ -53,6 +56,22 @@ function statusClass(status) {
 function StatusBadge({ status }) {
   if (!status) return html`<span class="wf-muted">—</span>`;
   return html`<span class="wf-badge ${statusClass(status)}">${status}</span>`;
+}
+
+/**
+ * Live fill progress for a step (from run.steps[id].progress, sampled by the engine watchdog from the
+ * success signal's count_nonempty leaves). Shows "leaves N/M"; while the step is still dispatched it
+ * also says whether the count is still rising (in-progress) or flat (stalled) — so a slow crew reads
+ * as "in progress", not a hard failure. Absent for signals with no countable leaf.
+ */
+function ProgressChip({ progress, dispatched }) {
+  const { count = 0, min = 0, increasing = false } = progress || {};
+  const live = dispatched && increasing;
+  const qualifier = dispatched
+    ? html` · ${increasing ? t('profile.workflows.progressIncreasing') : t('profile.workflows.progressStalled')}`
+    : '';
+  return html`<span class="wf-progress ${live ? 'wf-progress--live' : ''}"
+    title=${t('profile.workflows.progressTitle')}>${t('profile.workflows.progress', { count, min })}${qualifier}</span>`;
 }
 
 /** A tiny sparkline of the last-N run states for one step (green/red bars). */
@@ -284,6 +303,7 @@ function RunView({ id, runId, onBack, showToast }) {
             ${s.reads?.length > 0 && html`<span class="wf-muted">↘ ${s.reads.length}</span>`}
             ${s.writes?.length > 0 && html`<span class="wf-muted">↗ ${s.writes.length}</span>`}
             ${s.attempt > 0 && html`<span class="wf-muted">${t('profile.workflows.attempt')} ${s.attempt + 1}</span>`}
+            ${s.progress && html`<${ProgressChip} progress=${s.progress} dispatched=${s.state === 'dispatched'} />`}
           </div>
           ${agents && html`<div class="wf-node-agent">${agents} · ${sd.offer}</div>`}
           ${(() => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateSignal, globToRegExp, SignalTemplateError, type SignalEvalCtx, type MemoryValue } from '../../src/services/workflow/signal-eval.js';
+import { evaluateSignal, extractProgress, globToRegExp, SignalTemplateError, type SignalEvalCtx, type MemoryValue } from '../../src/services/workflow/signal-eval.js';
 import type { Signal } from '../../src/models/workflow-schemas.js';
 
 /** Build an eval context backed by an in-memory key→value map. */
@@ -123,6 +123,36 @@ describe('llm leaf', () => {
     const r = await evaluateSignal(sig, ctxFrom({ doc: 'ERROR 500' }, { llm: judge }));
     expect(r.ok).toBe(false);
     expect((r.observed as { reason?: string }).reason).toMatch(/error/);
+  });
+});
+
+describe('extractProgress (slow-vs-stuck)', () => {
+  it('reads count + min from a count_nonempty observed leaf', async () => {
+    const store = { 'art.a': 'x', 'art.b': 'y', 'art.c': '' };
+    const { observed } = await evaluateSignal({ kind: 'deterministic', key_glob: 'art.*', op: 'count_nonempty', min: 3 }, ctxFrom(store));
+    expect(extractProgress(observed)).toEqual({ count: 2, min: 3 });
+  });
+
+  it('sums progress across nested composites (all/any/when)', async () => {
+    const store = { 'a.1': 'x', 'a.2': 'y', 'b.1': 'z', gate: 'open' };
+    const sig: Signal = {
+      all: [
+        { kind: 'deterministic', key_glob: 'a.*', op: 'count_nonempty', min: 2 },
+        { when: { kind: 'deterministic', key: 'gate', op: 'exists' }, then: { kind: 'deterministic', key_glob: 'b.*', op: 'count_nonempty', min: 5 } },
+      ],
+    };
+    const { observed } = await evaluateSignal(sig, ctxFrom(store));
+    expect(extractProgress(observed)).toEqual({ count: 3, min: 7 }); // (2 + 1) counts, (2 + 5) mins
+  });
+
+  it('returns null for a signal with no countable leaf (binary recovery only, no slide)', async () => {
+    const { observed } = await evaluateSignal({ kind: 'deterministic', key: 'a', op: 'exists' }, ctxFrom({ a: 1 }));
+    expect(extractProgress(observed)).toBeNull();
+  });
+
+  it('reports count 0 (found) when the glob matches nothing — a stuck step, not "no metric"', async () => {
+    const { observed } = await evaluateSignal({ kind: 'deterministic', key_glob: 'none.*', op: 'count_nonempty', min: 3 }, ctxFrom({ other: 'x' }));
+    expect(extractProgress(observed)).toEqual({ count: 0, min: 3 });
   });
 });
 
