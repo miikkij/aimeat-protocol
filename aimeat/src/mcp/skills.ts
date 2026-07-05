@@ -42,7 +42,12 @@ export function registerSkillsTools(
 
     const accessor = async (): Promise<SkillAccessor> => {
         const owner = ownerName ? await storage.getOwner(ownerName) : null;
-        return { ownerName, isOperator: owner?.roles?.includes('operator') ?? false };
+        return {
+            ownerName,
+            isOperator: owner?.roles?.includes('operator') ?? false,
+            sub: agentGaii,
+            gaii: agentGaii,
+        };
     };
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
@@ -55,16 +60,21 @@ export function registerSkillsTools(
         {
             skill_md: z.string().optional().describe('The SKILL.md content (YAML frontmatter + markdown body). Omit to receive a presigned upload URL for a skill-directory ZIP instead.'),
             files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/). Only with skill_md.'),
-            scope: z.enum(['user', 'node']).optional().describe('Registry scope (default user). node is operator-only.'),
-            visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility. Defaults: user->owner, node->members. public = federated.'),
+            scope: z.enum(['user', 'node', 'workspace']).optional().describe('Registry scope (default user). node is operator-only; workspace requires organism_id + workspace_id and organism membership.'),
+            visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility (node/user scopes). Defaults: user->owner, node->members. public = federated. Workspace skills are always workspace-visible.'),
+            organism_id: z.string().optional().describe('Workspace scope: the organism id.'),
+            workspace_id: z.string().optional().describe('Workspace scope: the workspace id.'),
         },
         annotationsFor('aimeat_skill_publish'),
-        async ({ skill_md, files, scope, visibility }) => {
+        async ({ skill_md, files, scope, visibility, organism_id, workspace_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
-            const targetScope: SkillScope = scope === 'node' ? 'node' : 'user';
+            const targetScope: SkillScope = scope === 'node' ? 'node' : scope === 'workspace' ? 'workspace' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {
                 return err('Node-scope skills are operator-managed — your owner is not an operator on this node');
+            }
+            if (targetScope === 'workspace' && (!organism_id || !workspace_id)) {
+                return err('Workspace scope requires organism_id and workspace_id');
             }
 
             // Upload mode: no inline content -> presigned URL for a skill-dir ZIP.
@@ -72,7 +82,11 @@ export function registerSkillsTools(
                 const token = await generateUploadToken({
                     sub: agentGaii,
                     utype: 'skill',
-                    meta: { scope: targetScope, ...(visibility ? { visibility } : {}) },
+                    meta: {
+                        scope: targetScope,
+                        ...(visibility ? { visibility } : {}),
+                        ...(targetScope === 'workspace' ? { organism: organism_id, ws: workspace_id } : {}),
+                    },
                     maxBytes: 20 * 1024 * 1024,
                     contentType: 'application/zip',
                 });
@@ -96,6 +110,7 @@ export function registerSkillsTools(
                     publisher: agentGaii,
                     files: fileMap,
                     visibility,
+                    ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id, accessor: acc } : {}),
                 });
                 emitResourceListChanged(agentGaii);
                 return ok({ published: true, skill: summary });
@@ -110,11 +125,13 @@ export function registerSkillsTools(
         'aimeat_skill_list',
         descriptionFor('aimeat_skill_list'),
         {
-            view: z.enum(['library', 'linked', 'mine']).optional().describe('library (default): everything you can load, grouped by scope. linked: skills attached to an agent. mine: your owner\'s user-scope registry only.'),
+            view: z.enum(['library', 'linked', 'mine', 'workspace']).optional().describe('library (default): everything you can load, grouped by scope (node + user + workspace memberships). linked: skills attached to an agent. mine: your owner\'s user-scope registry only. workspace: one workspace\'s skills (requires organism_id + workspace_id).'),
             agent_name: z.string().optional().describe('For view=linked: which same-owner agent (default: yourself).'),
+            organism_id: z.string().optional().describe('For view=workspace: the organism id.'),
+            workspace_id: z.string().optional().describe('For view=workspace: the workspace id.'),
         },
         annotationsFor('aimeat_skill_list'),
-        async ({ view, agent_name }) => {
+        async ({ view, agent_name, organism_id, workspace_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
             const mode = view ?? 'library';
@@ -126,6 +143,11 @@ export function registerSkillsTools(
             if (mode === 'mine') {
                 const skills = await listSkills(storage, config, 'user', acc, ownerName);
                 return ok({ view: 'mine', skills });
+            }
+            if (mode === 'workspace') {
+                if (!organism_id || !workspace_id) return err('view=workspace requires organism_id and workspace_id');
+                const skills = await listSkills(storage, config, 'workspace', acc, undefined, { org: organism_id, ws: workspace_id });
+                return ok({ view: 'workspace', organism_id, workspace_id, skills });
             }
             const library = await listSkillLibrary(storage, config, acc);
             return ok({ view: 'library', library });
@@ -181,7 +203,7 @@ export function registerSkillsTools(
             const target = await storage.getAgent(targetGaii);
             if (!target) return err(`No agent "${agentName}" under owner ${ownerName}`);
             try {
-                const links = await linkSkillToAgent(storage, config, ownerName, agentName, ref, agentGaii);
+                const links = await linkSkillToAgent(storage, config, ownerName, agentName, ref, agentGaii, await accessor());
                 emitResourceListChanged(agentGaii);
                 return ok({ agent: agentName, links });
             } catch (e) {

@@ -7399,6 +7399,8 @@
     "mySkills": "Omat taidot",
     "nodeLibrary": "Noden kirjasto",
     "nodeLibraryHint": "Taidot, jotka noden operaattori tarjoaa kaikille tämän noden agenteille.",
+    "workspaceSkills": "Työtilojen taidot",
+    "workspaceSkillsHint": "Taidot, jotka on jaettu organismityötiloissa, joihin kuulut. Ne kulkevat työtilan vientien ja mallipohjien mukana.",
     "newSkill": "Uusi taito",
     "publish": "Julkaise",
     "publishing": "Julkaistaan…",

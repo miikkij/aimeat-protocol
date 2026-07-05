@@ -42,7 +42,7 @@ Write the expertise here. This markdown body is injected into an agent's prompt 
 
 export default function SkillsTab({ showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [library, setLibrary] = useState({ node: [], user: [] });
+  const [library, setLibrary] = useState({ node: [], user: [], workspace: [] });
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMd, setEditorMd] = useState(SKILL_TEMPLATE);
@@ -211,6 +211,16 @@ export default function SkillsTab({ showToast }) {
             : library.node.map(s => renderRow(s, { editable: false }))
         )}
       </div>
+
+      ${!loading && (library.workspace ?? []).length > 0 && html`
+        <div class="pf-skl-section">
+          <div class="pf-skl-section-header">
+            <span class="pf-skl-section-title">${t('skills.workspaceSkills')}</span>
+          </div>
+          <div class="pf-skl-section-hint">${t('skills.workspaceSkillsHint')}</div>
+          ${library.workspace.map(s => renderRow(s, { editable: false }))}
+        </div>
+      `}
     </div>
   `;
 }

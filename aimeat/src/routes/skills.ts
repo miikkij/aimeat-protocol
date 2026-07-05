@@ -23,6 +23,7 @@ import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -36,13 +37,16 @@ import {
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  /** Caller identity for the read gate — anonymous sessions carry no owner. */
+  /** Caller identity for the read gate — anonymous sessions carry no owner. sub/gaii feed
+   *  the workspace membership gate (canReadWorkspace). */
   function accessorOf(req: Express.Request): SkillAccessor {
     const auth = req.auth as (typeof req.auth & { anonymous?: boolean }) | undefined;
     if (!auth || auth.anonymous === true) return { ownerName: null };
     return {
       ownerName: (auth.owner as string) ?? null,
       isOperator: (auth.roles as string[]).includes('operator'),
+      sub: auth.sub as string,
+      gaii: resolveIdentity(req.auth!, config.nodeId),
     };
   }
 
@@ -75,12 +79,19 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, { library }));
         return;
       }
-      if (scope !== 'node' && scope !== 'user') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be library, node, or user'));
+      if (scope !== 'node' && scope !== 'user' && scope !== 'workspace') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be library, node, user, or workspace'));
+        return;
+      }
+      if (scope === 'workspace' && (!req.query.organism || !req.query.ws)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'workspace scope requires organism and ws query params'));
         return;
       }
       const owner = (req.query.owner as string) ?? accessor.ownerName ?? undefined;
-      const skills = await listSkills(storage, config, scope as SkillScope, accessor, owner);
+      const wsTarget = scope === 'workspace'
+        ? { org: req.query.organism as string, ws: req.query.ws as string }
+        : undefined;
+      const skills = await listSkills(storage, config, scope as SkillScope, accessor, owner, wsTarget);
       res.json(success(config.nodeId, { scope, skills }));
     } catch (err) {
       sendSkillError(res, err);
@@ -95,10 +106,14 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
       }
-      const { skill_md, files: extraFiles, scope: scopeRaw, visibility } = req.body ?? {};
-      const scope: SkillScope = scopeRaw === 'node' ? 'node' : 'user';
+      const { skill_md, files: extraFiles, scope: scopeRaw, visibility, organism, ws } = req.body ?? {};
+      const scope: SkillScope = scopeRaw === 'node' ? 'node' : scopeRaw === 'workspace' ? 'workspace' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Node-scope skills are operator-managed'));
+        return;
+      }
+      if (scope === 'workspace' && (typeof organism !== 'string' || typeof ws !== 'string')) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'workspace scope requires organism and ws in the body'));
         return;
       }
       if (typeof skill_md !== 'string' || skill_md.length === 0) {
@@ -125,6 +140,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         publisher: req.auth!.sub as string,
         files,
         visibility: visibility as 'owner' | 'members' | 'public' | undefined,
+        ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws, accessor } : {}),
       });
       emitChange('skills');
       res.status(201).json(success(config.nodeId, { skill: summary }, [
@@ -147,7 +163,15 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const refs: string[] = [];
       if (scopeQ === 'node') refs.push(`node:${name}`);
       else if (scopeQ === 'user') refs.push(`user:${ownerQ}/${name}`);
-      else {
+      else if (scopeQ === 'workspace') {
+        const org = req.query.organism as string | undefined;
+        const wsId = req.query.ws as string | undefined;
+        if (!org || !wsId) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'workspace scope requires organism and ws query params'));
+          return;
+        }
+        refs.push(`ws:${org}/${wsId}/${name}`);
+      } else {
         // Unscoped lookup: the caller's own registry first, then the node library.
         if (ownerQ) refs.push(`user:${ownerQ}/${name}`);
         refs.push(`node:${name}`);
@@ -178,12 +202,15 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
       }
-      const scope: SkillScope = req.query.scope === 'node' ? 'node' : 'user';
+      const scope: SkillScope = req.query.scope === 'node' ? 'node' : req.query.scope === 'workspace' ? 'workspace' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Node-scope skills are operator-managed'));
         return;
       }
-      const deleted = await deleteSkill(storage, config, scope, name, accessor.ownerName);
+      const deleted = await deleteSkill(storage, config, scope, name, {
+        owner: accessor.ownerName ?? undefined,
+        ...(scope === 'workspace' ? { org: req.query.organism as string, ws: req.query.ws as string, accessor } : {}),
+      });
       if (!deleted) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Skill not found: ${name}`));
         return;

@@ -646,6 +646,125 @@ await test('34. scope WIDENING is rejected even at propose time', async () => {
     assert(rejected || wildcarded, `got: ${text.slice(0, 150)}`);
 });
 
+// ─── Phase 8: Workspace scope (2c) ───
+console.log('\nPhase 8 -- Workspace scope');
+
+let orgId = '';
+const WS = 'ws-skilltest1';
+const WS_SKILL_MD = SKILL_MD.replace('research-briefs', 'team-style');
+
+await test('35. Setup: organism + workspace manifest', async () => {
+    const o = await json('/v1/organisms', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'Skills Test Org', type: 'project', join_policy: 'open', visibility: 'public' }),
+    });
+    assert(o.status === 201, `org status ${o.status}: ${JSON.stringify(o.body)}`);
+    orgId = o.body.data.organism.id;
+    const ts = new Date().toISOString();
+    await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Skill WS', createdAt: ts, createdBy: ownerName }] }, visibility: 'private' }),
+    });
+    const manifest = { manifestVersion: '1.0', id: orgId, name: 'Skill WS', kind: 'project', status: 'active', objectTypes: [
+        { name: 'item', schemaRef: 'schema:item@1', namespace: 'shared.items', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' },
+    ] };
+    const m = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `organism.${orgId}.w.${WS}.meta.manifest`, value: manifest, visibility: 'private' }),
+    });
+    assert(m.status === 200 || m.status === 201, `manifest ${m.status}`);
+});
+
+await test('36. Member publishes a workspace-scope skill', async () => {
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: WS_SKILL_MD, scope: 'workspace', organism: orgId, ws: WS }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.skill.ref === `ws:${orgId}/${WS}/team-style`, `ref ${body.data.skill.ref}`);
+    assert(body.data.skill.visibility === 'workspace', `visibility ${body.data.skill.visibility}`);
+});
+
+await test('37. Workspace listing + library workspace group contain it', async () => {
+    const list = await json(`/v1/skills?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(list.status === 200 && list.body.data.skills.some((s: any) => s.name === 'team-style'), `list: ${JSON.stringify(list.body.data)}`);
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((lib.body.data.library.workspace ?? []).some((s: any) => s.ref === `ws:${orgId}/${WS}/team-style`),
+        `library.workspace: ${JSON.stringify(lib.body.data.library.workspace)}`);
+});
+
+await test('38. Resolve loads the workspace skill body', async () => {
+    const { status, body } = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.skill.fileContents['SKILL.md'].includes('Research briefs'), 'body loaded');
+});
+
+await test('39. Non-member can neither read nor publish', async () => {
+    const read = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(read.status === 403 || read.status === 404, `read status ${read.status}`);
+    const pub = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ skill_md: WS_SKILL_MD, scope: 'workspace', organism: orgId, ws: WS }),
+    });
+    assert(pub.status === 403, `publish status ${pub.status}: ${JSON.stringify(pub.body)}`);
+});
+
+await test('40. Workspace skill links to an agent and resolves', async () => {
+    const link = await json(`/v1/agents/${agentName}/skills`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ref: `ws:${orgId}/${WS}/team-style` }),
+    });
+    assert(link.status === 200, `link status ${link.status}: ${JSON.stringify(link.body)}`);
+    const { body } = await json(`/v1/agents/${agentName}/skills`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    const ws = body.data.skills.find((s: any) => s.ref === `ws:${orgId}/${WS}/team-style`);
+    assert(!!ws && ws.fileContents['SKILL.md'].includes('Research briefs'), `resolved: ${JSON.stringify(body.data.unresolved)}`);
+});
+
+await test('41. Workspace skills ride the workspace export/import round-trip', async () => {
+    const exp = await json(`/v1/organisms/${orgId}/workspace/export?ws=${WS}&format=base64`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(exp.status === 200, `export ${exp.status}`);
+    const imp = await json(`/v1/organisms/${orgId}/workspace/import`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ zip_base64: exp.body.data.zip_base64 }),
+    });
+    assert(imp.status === 200 || imp.status === 201, `import ${imp.status}: ${JSON.stringify(imp.body)}`);
+    const newWs = imp.body.data.ws ?? imp.body.data.workspace ?? imp.body.data.new_ws;
+    assert(typeof newWs === 'string', `new ws id: ${JSON.stringify(imp.body.data)}`);
+    const list = await json(`/v1/skills?scope=workspace&organism=${orgId}&ws=${newWs}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(list.body.data.skills.some((s: any) => s.name === 'team-style'), `imported ws skills: ${JSON.stringify(list.body.data.skills)}`);
+});
+
+await test('42. Member deletes the workspace skill', async () => {
+    const del = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body)}`);
+    const read = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(read.status === 404, `after delete: ${read.status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

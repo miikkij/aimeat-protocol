@@ -19771,9 +19771,10 @@ paths:
       summary: List skills
       description: >-
         List skills without loading bodies (manifests only). scope=library (default) returns
-        everything the caller can load, grouped by scope (node-wide library + own user registry);
-        scope=node or scope=user list one registry (user accepts an owner query for reading
-        another user's visible skills).
+        everything the caller can load, grouped by scope (node-wide library + own user registry
+        + workspaces of organisms the caller belongs to); scope=node/user/workspace list one
+        registry (user accepts an owner query; workspace requires organism + ws and organism
+        membership).
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -19782,8 +19783,16 @@ paths:
           in: query
           schema:
             type: string
-            enum: [library, node, user]
+            enum: [library, node, user, workspace]
         - name: owner
+          in: query
+          schema:
+            type: string
+        - name: organism
+          in: query
+          schema:
+            type: string
+        - name: ws
           in: query
           schema:
             type: string
@@ -19818,10 +19827,16 @@ paths:
                     type: string
                 scope:
                   type: string
-                  enum: [user, node]
+                  enum: [user, node, workspace]
                 visibility:
                   type: string
                   enum: [owner, members, public]
+                organism:
+                  type: string
+                  description: Workspace scope — the organism id (membership-gated)
+                ws:
+                  type: string
+                  description: Workspace scope — the workspace id
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -19838,8 +19853,8 @@ paths:
       summary: Resolve one skill
       description: >-
         Resolve a skill to its manifest plus file bodies. Unscoped lookups search the caller's
-        own registry first, then the node library; scope/owner query parameters address a
-        specific registry. manifest_only=true skips bodies.
+        own registry first, then the node library; scope/owner (or scope=workspace with
+        organism + ws) address a specific registry. manifest_only=true skips bodies.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -19853,8 +19868,16 @@ paths:
           in: query
           schema:
             type: string
-            enum: [node, user]
+            enum: [node, user, workspace]
         - name: owner
+          in: query
+          schema:
+            type: string
+        - name: organism
+          in: query
+          schema:
+            type: string
+        - name: ws
           in: query
           schema:
             type: string
@@ -19872,7 +19895,9 @@ paths:
     delete:
       operationId: deleteSkill
       summary: Delete a skill
-      description: Delete a skill (manifest + files). Own user-scope skills; scope=node is operator-only.
+      description: >-
+        Delete a skill (manifest + files). Own user-scope skills; scope=node is operator-only;
+        scope=workspace (organism + ws) is membership-gated and removes every member's copies.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -19886,7 +19911,15 @@ paths:
           in: query
           schema:
             type: string
-            enum: [node, user]
+            enum: [node, user, workspace]
+        - name: organism
+          in: query
+          schema:
+            type: string
+        - name: ws
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

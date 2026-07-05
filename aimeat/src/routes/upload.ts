@@ -272,7 +272,8 @@ async function handleSkillUpload(
 ): Promise<void> {
     const parsedSub = parseGAII(sub);
     const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
-    const scope = (meta.scope as SkillScope) === 'node' ? 'node' : 'user';
+    const metaScope = meta.scope as SkillScope;
+    const scope: SkillScope = metaScope === 'node' ? 'node' : metaScope === 'workspace' ? 'workspace' : 'user';
     const visibility = meta.visibility as 'owner' | 'members' | 'public' | undefined;
 
     let entries: Map<string, Buffer>;
@@ -308,6 +309,11 @@ async function handleSkillUpload(
             files,
             visibility,
             expectedName: wrapper,
+            ...(scope === 'workspace' ? {
+                organismId: meta.organism as string,
+                workspaceId: meta.ws as string,
+                accessor: { ownerName, sub, gaii: sub },
+            } : {}),
         });
         logger.info(`Skill published via upload: ${summary.ref} v${summary.version}`, { by: sub });
         emitResourceListChanged(sub);

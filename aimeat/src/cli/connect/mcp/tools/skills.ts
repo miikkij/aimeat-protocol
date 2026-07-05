@@ -22,15 +22,17 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
   mcp.tool('aimeat_skill_publish', descriptionFor('aimeat_skill_publish'), {
     skill_md: z.string().optional().describe('The SKILL.md content (frontmatter + body). Required on this surface (no presigned upload mode here).'),
     files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/).'),
-    scope: z.enum(['user', 'node']).optional().describe('Registry scope (default user). node is operator-only.'),
-    visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility.'),
+    scope: z.enum(['user', 'node', 'workspace']).optional().describe('Registry scope (default user). node is operator-only; workspace requires organism_id + workspace_id.'),
+    visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility (node/user; workspace skills are always workspace-visible).'),
+    organism_id: z.string().optional().describe('Workspace scope: the organism id.'),
+    workspace_id: z.string().optional().describe('Workspace scope: the workspace id.'),
     agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_skill_publish'), async ({ skill_md, files, scope, visibility, agent_name }) => {
+  }, annotationsFor('aimeat_skill_publish'), async ({ skill_md, files, scope, visibility, organism_id, workspace_id, agent_name }) => {
     if (!skill_md) {
       return { content: [{ type: 'text' as const, text: 'skill_md is required on this surface — pass the SKILL.md content inline.' }], isError: true };
     }
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post('/v1/skills', { skill_md, files, scope, visibility });
+    const resp = await client.post('/v1/skills', { skill_md, files, scope, visibility, organism: organism_id, ws: workspace_id });
     return json(resp.data ?? resp);
   });
 
@@ -57,14 +59,16 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     const { client } = pickAgent(registry, agent_name);
     let path: string;
     if (ref) {
-      // Decompose the ref into the name + scope/owner query the REST route expects.
-      const m = ref.match(/^node:([a-z0-9-]+)$/) ?? ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
-      if (!m) {
+      // Decompose the ref into the name + scope query the REST route expects.
+      const node = ref.match(/^node:([a-z0-9-]+)$/);
+      const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
+      const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+)$/);
+      if (node) path = `/v1/skills/${encodeURIComponent(node[1])}?scope=node`;
+      else if (user) path = `/v1/skills/${encodeURIComponent(user[2])}?scope=user&owner=${encodeURIComponent(user[1])}`;
+      else if (ws) path = `/v1/skills/${encodeURIComponent(ws[3])}?scope=workspace&organism=${encodeURIComponent(ws[1])}&ws=${encodeURIComponent(ws[2])}`;
+      else {
         return { content: [{ type: 'text' as const, text: `Not a valid skill ref: ${ref}` }], isError: true };
       }
-      path = m.length === 2
-        ? `/v1/skills/${encodeURIComponent(m[1])}?scope=node`
-        : `/v1/skills/${encodeURIComponent(m[2])}?scope=user&owner=${encodeURIComponent(m[1])}`;
     } else if (name) {
       path = `/v1/skills/${encodeURIComponent(name)}`;
     } else {

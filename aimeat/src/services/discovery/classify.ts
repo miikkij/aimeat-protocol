@@ -17,6 +17,7 @@ import type { DiscoveryType } from './types.js';
 
 const ORG_KEY = /^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)/; // organism.{id}.w.{ws}.{space}…
 const SKILL_KEY = /^skills\.([a-z0-9-]+)\.manifest$/; // skills.{name}.manifest (registry manifests only)
+const WS_SKILL_KEY = /^organism\.[^.]+\.w\.[^.]+\.skills\.[a-z0-9-]+\.manifest$/; // workspace-scope skill manifests
 const PKG_KEY = /^packages\/([^/]+)\//; // packages/{id}/…
 const WF_KEY = /^workflows\.def\.([^.]+)/; // workflows.def.{id}
 const ORG_META = /^org\.([^.]+)\.meta$/; // org.{slug}.meta
@@ -71,6 +72,10 @@ export function classifyMemoryKey(
     // Segment = registry scope, carried as a scope: tag on the manifest record (node/user).
     const scopeTag = hints.tags?.find(t => typeof t === 'string' && t.startsWith('scope:'));
     return { type: 'skill', segment: scopeTag ? scopeTag.slice('scope:'.length) : null };
+  }
+
+  if (WS_SKILL_KEY.test(key)) {
+    return { type: 'skill', segment: 'workspace' };
   }
 
   if ((m = key.match(ORG_KEY))) {
