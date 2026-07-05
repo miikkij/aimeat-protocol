@@ -15,6 +15,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.9.0 — 2026-07-05 — Home AiSpendCard: 24h/7d/30d AI token + cost tiles, a per-app stacked bar
+ *     of the last 30 days, and a "where it went" top-apps breakdown, backed by GET
+ *     /v1/ai/usage/history. Hidden until there is any AI-apps spend.
  *   v3.8.0 — 2026-06-22 — Home UsageCard: quota usage bars (memory / files / micro-memory) + resource
  *     counts (agents, organisms, apps, connected apps, extensions, cortexes, services), backed by the
  *     cached GET /v1/owner/usage endpoint (60s server-side TTL).
@@ -95,6 +98,7 @@ import { getMyPresence, setMyPresence } from '/js/services/presence.js';
 import { apiGet } from '/js/api.js';
 import { Spinner } from './shared.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
@@ -633,6 +637,83 @@ function UsageCard({ switchTab }) {
       </div>
     </div>
   `;
+}
+
+/* "AI spend" — token/cost analytics for the owner's AI apps over the last 24h / 7d / 30d,
+ * plus a per-app stacked bar of the last 30 days. Backed by GET /v1/ai/usage/history (reads the
+ * retained per-day ai-usage records). Hidden until there is any spend, so it never shows an empty
+ * chart to users who don't run AI apps. */
+function fmtUsd(n) {
+  const v = Number(n) || 0;
+  return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2));
+}
+function fmtCompact(n) {
+  const v = Number(n) || 0;
+  if (v < 1000) return String(Math.round(v));
+  if (v < 1_000_000) return (v / 1000).toFixed(v < 10_000 ? 1 : 0) + 'k';
+  return (v / 1_000_000).toFixed(1) + 'M';
+}
+
+function AiSpendCard() {
+  const [data, setData] = useState(null);
+  const load = useCallback(async () => {
+    try { const r = await apiGet('/v1/ai/usage/history?days=30'); setData(r?.data || null); }
+    catch { setData(null); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => onLiveUpdate(['apps', 'memory'], () => liveRef.current()), []);
+
+  if (!data || !Array.isArray(data.days) || data.days.length === 0) return null;
+
+  const { days, apps = [], windows } = data;
+  const labels = days.map((d) => d.date.slice(5));
+  const datasets = apps.map((app, i) => ({
+    label: app,
+    data: days.map((d) => (d.per_app && d.per_app[app] ? d.per_app[app].cost_usd : 0) || 0),
+    backgroundColor: colorForIndex(i),
+  }));
+
+  const d30 = (windows && windows.d30) || { cost_usd: 0, per_app: {} };
+  const totalCost = d30.cost_usd || 0;
+  const topApps = Object.entries(d30.per_app || {})
+    .sort((a, b) => b[1].cost_usd - a[1].cost_usd).slice(0, 5);
+
+  const win = (label, w) => html`
+    <div class="pf-ai-win">
+      <span class="pf-ai-win-label">${label}</span>
+      <span class="pf-ai-win-cost">${fmtUsd(w && w.cost_usd)}</span>
+      <span class="pf-ai-win-sub">${fmtCompact(w && w.tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'}</span>
+    </div>`;
+
+  return html`
+    <div class="pf-home-card pf-ai-card">
+      <div class="pf-home-card-title">${t('profile.landing.aiSpendTitle') || 'AI apps spend'}</div>
+      <div class="pf-ai-windows">
+        ${win(t('profile.landing.aiWin24h') || 'Today', windows && windows.d1)}
+        ${win(t('profile.landing.aiWin7d') || '7 days', windows && windows.d7)}
+        ${win(t('profile.landing.aiWin30d') || '30 days', windows && windows.d30)}
+      </div>
+      ${datasets.length > 0 && html`
+        <div class="pf-ai-chart">
+          <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${180}
+            legend=${false} yFormat=${fmtUsd} />
+        </div>`}
+      ${topApps.length > 0 && html`
+        <div class="pf-ai-apps">
+          <div class="pf-ai-apps-head">${t('profile.landing.aiWhereMoney') || 'Where it went (30d)'}</div>
+          ${topApps.map(([app, m]) => {
+            const pct = totalCost > 0 ? Math.round((m.cost_usd / totalCost) * 100) : 0;
+            return html`
+              <div class="pf-ai-app-row" key=${app}>
+                <span class="pf-ai-app-dot" style=${`background:${colorForIndex(apps.indexOf(app))}`}></span>
+                <span class="pf-ai-app-name">${app}</span>
+                <span class="pf-ai-app-cost">${fmtUsd(m.cost_usd)}</span>
+                <span class="pf-ai-app-pct">${pct}%</span>
+              </div>`;
+          })}
+        </div>`}
+    </div>`;
 }
 
 /* "Presence" — the owner's own availability control. Lives as a compact status
@@ -1264,6 +1345,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
             hasApps=${appsLoaded ? apps.length > 0 : undefined} />
           <div class="pf-home-grid">
             <${UsageCard} switchTab=${(id) => open(id, 'main')} />
+            <${AiSpendCard} />
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
           </div>

@@ -204,6 +204,15 @@ export const getStats = (from, to) => {
   return apiGet('/v1/stats' + (qs ? '?' + qs : ''));
 };
 
+/** Operator-only node-wide AI-spend aggregate (per-app + per-user) over a date range. */
+export const getAiUsage = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return apiGet('/v1/admin/ai-usage' + (qs ? '?' + qs : ''));
+};
+
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);

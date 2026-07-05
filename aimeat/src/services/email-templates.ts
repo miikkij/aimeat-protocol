@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-04-10 — Initial (verification, magic link, notification, match).
  *   v1.1.0 — 2026-07-04 — Add inviteEmailHtml/inviteEmailSubject + esc() for user-controlled fields.
  *   v1.2.0 — 2026-07-05 — Add keyInviteEmailHtml/keyInviteEmailSubject (provisioned-code access keys).
+ *   v1.2.1 — 2026-07-05 — wrapHtml takes optional brand/footer; key-invite email shows the AIME♥AT
+ *     wordmark + a "Sent from the AIMEAT machine room" footer (scoped to that template only).
  */
 
 export interface MatchSuggestion {
@@ -54,11 +56,12 @@ const i18n: Record<string, Record<string, string>> = {
     keySubject: 'Your access key to {org} on AIMEAT',
     keyHeading: "You've received an access key",
     keyCodeLabel: 'Your access code:',
-    keyInstructions: 'Open the link below and enter this code to step in. The code is your password — keep it to yourself.',
+    keyInstructions: 'The code is your password, keep it to yourself.',
     keyButton: 'Enter',
     keyExpiryPrefix: 'This key expires on',
     keyFallback: 'Or copy and paste this address into your browser:',
     keyIgnore: "If you weren't expecting this key, you can safely ignore this email.",
+    keyFooter: 'Sent from the AIMEAT machine room',
     roleViewer: 'viewer',
     roleContributor: 'contributor',
     footer: 'Sent by AIMEAT Protocol',
@@ -97,11 +100,12 @@ const i18n: Record<string, Record<string, string>> = {
     keySubject: 'Pääsyavaimesi: {org} — AIMEAT',
     keyHeading: 'Sait pääsyavaimen',
     keyCodeLabel: 'Pääsykoodisi:',
-    keyInstructions: 'Avaa alla oleva linkki ja syötä tämä koodi päästäksesi sisään. Koodi on salasanasi — pidä se omana tietonasi.',
+    keyInstructions: 'Koodi on salasanasi, pidä se omanasi.',
     keyButton: 'Astu sisään',
     keyExpiryPrefix: 'Tämä avain vanhenee',
     keyFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
-    keyIgnore: 'Jos et odottanut tätä avainta, voit ohittaa tämän viestin.',
+    keyIgnore: 'Jos et odottanut tätä avainta, voit jättää viestin huomiotta.',
+    keyFooter: 'Lähetetty AIMEATin konehuoneesta',
     roleViewer: 'katselija',
     roleContributor: 'osallistuja',
     footer: 'Lähetetty AIMEAT-protokollan kautta',
@@ -126,7 +130,10 @@ function t(locale: string | undefined, key: string): string {
 
 // ── Shared layout ────────────────────────────────────────
 
-function wrapHtml(heading: string, bodyHtml: string, locale?: string): string {
+function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { brand?: string; footer?: string }): string {
+  // brand/footer are trusted constants (never user input) — brand may carry inline HTML (e.g. a heart).
+  const brand = opts?.brand ?? 'AIMEAT';
+  const footer = opts?.footer ?? t(locale, 'footer');
   return `<!DOCTYPE html>
 <html lang="${locale === 'fi' ? 'fi' : 'en'}">
 <head>
@@ -138,6 +145,7 @@ function wrapHtml(heading: string, bodyHtml: string, locale?: string): string {
     .container { max-width: 580px; margin: 0 auto; padding: 20px; }
     .card { background: #ffffff; border-radius: 8px; padding: 32px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .logo { text-align: center; padding: 20px 0 0; font-size: 24px; font-weight: 700; color: #333; letter-spacing: 1px; }
+    .logo .hrt { color: #E8564A; }
     h1 { color: #333; font-size: 20px; margin: 0 0 16px; }
     p { color: #555; font-size: 15px; line-height: 1.6; margin: 0 0 12px; }
     .code { display: block; text-align: center; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #333; background: #f0f0f5; border-radius: 6px; padding: 16px; margin: 20px 0; }
@@ -153,13 +161,13 @@ function wrapHtml(heading: string, bodyHtml: string, locale?: string): string {
 </head>
 <body>
   <div class="container">
-    <div class="logo">AIMEAT</div>
+    <div class="logo">${brand}</div>
     <div class="card">
       <h1>${heading}</h1>
       ${bodyHtml}
     </div>
     <div class="footer">
-      <p>${t(locale, 'footer')}</p>
+      <p>${footer}</p>
       <p>${t(locale, 'footerUnsubscribe')}</p>
     </div>
   </div>
@@ -328,7 +336,7 @@ export function keyInviteEmailHtml(args: KeyInviteEmailArgs, locale?: string): {
     <p style="font-size: 13px; color: #999;">${t(locale, 'keyFallback')}</p>
     <p class="url-fallback">${args.landingUrl}</p>
     <p style="color: #999; font-size: 13px;">${t(locale, 'keyIgnore')}</p>
-  `, locale);
+  `, locale, { brand: 'AIME<span class="hrt">&#9829;</span>AT', footer: t(locale, 'keyFooter') });
 
   const text = [
     t(locale, 'keyHeading'),

@@ -46,3 +46,4 @@ export { DataTable } from './DataTable.js';
 export { Collapsible } from './Collapsible.js';
 export { Markdown, sanitizeHref } from './Markdown.js';
 export { useViewCSS } from './useViewCSS.js';
+export { UsageChart, colorForIndex, APP_PALETTE } from './UsageChart.js';

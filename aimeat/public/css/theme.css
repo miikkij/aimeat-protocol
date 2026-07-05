@@ -1075,6 +1075,11 @@ a { color: inherit; text-decoration: none; }
    for admin tables; this one covers DataTable used outside `.adm`). */
 .scrollable { max-height: 600px; overflow-y: auto; }
 
+/* ── Chart canvas wrapper (components/UsageChart.js) ──
+   Chart.js runs with maintainAspectRatio:false, so it needs a sized relative box.
+   Height is supplied per-instance via the --usage-chart-h custom property. */
+.usage-chart { position: relative; width: 100%; height: var(--usage-chart-h, 220px); }
+
 /* ── Section divider ── */
 .section-divider {
   position: relative;

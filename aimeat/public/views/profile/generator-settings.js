@@ -8,6 +8,8 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.4.0 — 2026-07-05 — AI apps budget panel: add a per-app stacked "usage over time" chart (30 days,
+ *     cost⇄tokens toggle) fed by GET /v1/ai/usage/history, below the today bar + per-app table.
  *   v1.3.0 — 2026-07-05 — AI apps budget panel: per-app daily caps are now VISIBLE + EDITABLE inline
  *     (each app defaults to the whole daily budget; set a cap to throttle one app). Was API-only.
  *   v1.2.0 — 2026-06-24 — Add a Vision model selector (a vision-capable model, e.g. qwen-2.5-VL) used
@@ -22,6 +24,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { saveProjectSettings, getProjectSettings } from '/js/services/generator.js';
+import { UsageChart, colorForIndex } from '/components/UsageChart.js';
+
+/** Compact number (73306 → "73.3k") for token axis/labels. */
+function fmtCompact(n) {
+  const v = Number(n) || 0;
+  if (v < 1000) return String(Math.round(v));
+  if (v < 1_000_000) return (v / 1000).toFixed(v < 10_000 ? 1 : 0) + 'k';
+  return (v / 1_000_000).toFixed(1) + 'M';
+}
 
 /* ── OpenRouter / LM Studio / Custom Settings ────────── */
 
@@ -377,14 +388,18 @@ function AiAppsBudgetPanel() {
   const [caps, setCaps] = useState({});          // app → cap input string ('' = use the daily budget)
   const [savingCaps, setSavingCaps] = useState(false);
   const [capsMsg, setCapsMsg] = useState(null);
+  const [history, setHistory] = useState(null);  // GET /v1/ai/usage/history — per-day series + rollups
+  const [metric, setMetric] = useState('cost');  // chart metric: 'cost' | 'tokens'
 
   useEffect(() => { reload(); }, []);
 
   async function reload() {
-    const [u, s] = await Promise.all([
+    const [u, s, hist] = await Promise.all([
       apiGet('/v1/ai/usage').catch(() => null),
       apiGet('/v1/ai/settings').catch(() => null),
+      apiGet('/v1/ai/usage/history?days=30').catch(() => null),
     ]);
+    if (hist && hist.ok !== false && hist.data) setHistory(hist.data);
     if (u && u.ok !== false && u.data) setUsage(u.data);
     if (s && s.ok !== false && s.data) {
       setSettings(s.data);
@@ -521,6 +536,32 @@ function AiAppsBudgetPanel() {
           </div>
         </details>
       `}
+
+      ${history && Array.isArray(history.days) && history.days.length > 0 && (() => {
+        const labels = history.days.map((d) => d.date.slice(5));
+        const chartApps = history.apps || [];
+        const isTokens = metric === 'tokens';
+        const datasets = chartApps.map((app, i) => ({
+          label: app,
+          data: history.days.map((d) => {
+            const m = (d.per_app && d.per_app[app]) || {};
+            return (isTokens ? m.tokens : m.cost_usd) || 0;
+          }),
+          backgroundColor: colorForIndex(i),
+        }));
+        const yFormat = isTokens ? (v) => fmtCompact(v) : (v) => '$' + (Number(v) < 1 ? Number(v).toFixed(3) : Number(v).toFixed(2));
+        return html`
+          <div style="margin-top:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+              <span style="font-size:12px;font-weight:600;color:#666;">${t('profile.generator.aiUsageOverTime') || 'Usage over time (30 days)'}</span>
+              <span style="display:inline-flex;gap:4px;">
+                <button class=${!isTokens ? 'btn-primary btn-sm' : 'btn-outline btn-sm'} onClick=${() => setMetric('cost')}>${t('profile.generator.aiMetricCost') || 'Cost'}</button>
+                <button class=${isTokens ? 'btn-primary btn-sm' : 'btn-outline btn-sm'} onClick=${() => setMetric('tokens')}>${t('profile.generator.aiMetricTokens') || 'Tokens'}</button>
+              </span>
+            </div>
+            <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${220} yFormat=${yFormat} />
+          </div>`;
+      })()}
 
       <div style="font-size:11px;color:#999;margin-top:8px;">
         Cost is estimated when the provider doesn't report it (LM Studio, custom). Your

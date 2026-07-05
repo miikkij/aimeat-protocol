@@ -7475,6 +7475,91 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/usage:
+    get:
+      operationId: aiUsage
+      summary: Today's AI spend for the caller's owner (per-app breakdown)
+      description: >
+        Owner-only. Returns the current UTC day's AI spend against the daily budget, with a per-app
+        breakdown — the numbers behind the "AI apps daily budget" bar. Data comes from the retained
+        `ai-usage.<gaii>.<day>` usage record. Response `data`: `{ date, daily_budget_usd,
+        spent_today_usd, remaining_usd, total_calls, total_tokens, per_app }`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/usage/history:
+    get:
+      operationId: aiUsageHistory
+      summary: AI spend history (per-day series + 24h/7d/30d rollups)
+      description: >
+        Owner-only. Reads the retained per-UTC-day usage records and returns a per-day series plus
+        24h (today) / 7d / 30d rollups, each with a per-app breakdown — the data behind the profile
+        home AI-spend card and the Generator time-series chart. Response `data`: `{ daily_budget_usd,
+        days: [{ date, total_cost_usd, total_calls, total_tokens, per_app }], apps: [appId…],
+        windows: { d1, d7, d30 } }` where each window is `{ cost_usd, tokens, calls, per_app }`.
+        Granularity is per-day (UTC); there is no intra-day data.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+          description: How many of the most recent daily records to include in the series.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/admin/ai-usage:
+    get:
+      operationId: adminAiUsage
+      summary: Operator-only node-wide AI-spend aggregate (per-app + per-user)
+      description: >
+        Operator-only. Aggregates AI spend across every owner over a date range: a per-day series
+        (summed across users), grand per-app totals, per-user top spenders, and overall totals —
+        backing the admin dashboard "AI Apps Usage" tab. Per-app attribution uses the self-reported
+        `app_id` (spoofable) and is intended for reporting, not as a security boundary. Response
+        `data`: `{ from, to, days, per_app, per_user, totals, apps }`.
+      tags: [Stats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Inclusive start date (YYYY-MM-DD, UTC). Defaults to 30 days ago.
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Inclusive end date (YYYY-MM-DD, UTC). Defaults to today.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/librarian/search:
     get:
       operationId: librarianSearch
