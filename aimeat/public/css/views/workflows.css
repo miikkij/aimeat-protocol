@@ -8,6 +8,8 @@
  *   v1.1.0 -- 2026-06-15 -- Form contrast fix: fields use --control-bg/--control-border (not
  *     --bg-input, which = page --bg in light theme) + focus rings, grouped section surfaces,
  *     carded step editors, branded accent checkboxes.
+ *   v1.2.0 -- 2026-07-05 -- .wf-progress chip ("leaves N/M") + .wf-progress--live pulse for a
+ *     still-filling dispatched step (resume-on-retry progress surfacing).
  */
 
 .wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
@@ -29,6 +31,22 @@
 .wf-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
 .wf-badge--run { background: var(--info-bg); color: var(--info-fg); }
 .wf-badge--muted { background: var(--bg-dim); color: var(--text-dim); }
+
+/* ── per-step fill progress ("leaves N/M") ── */
+.wf-progress {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem; font-weight: 600; line-height: 1.5;
+  background: var(--bg-dim); color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+/* Still-filling (dispatched + rising count): info accent + a gentle pulse so a live crew is visible. */
+.wf-progress--live {
+  background: var(--info-bg); color: var(--info-fg); border-color: transparent;
+  animation: wf-progress-pulse 1.6s ease-in-out infinite;
+}
+@keyframes wf-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .wf-progress--live { animation: none; } }
 
 /* ── list ── */
 .wf-card-list { display: flex; flex-direction: column; gap: 0.75rem; }

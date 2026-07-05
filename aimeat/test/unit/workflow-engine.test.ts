@@ -41,6 +41,21 @@ describe('computeReadySteps', () => {
     const d = def([{ id: 'a' }, { id: 'b' }]);
     expect(computeReadySteps(d, { a: step('pending'), b: step('pending') }, NOW).map(s => s.id).sort()).toEqual(['a', 'b']);
   });
+
+  it('resume: a dependent becomes ready when its dep is TERMINAL (green OR failed), not only green', () => {
+    const d: WorkflowDef = { ...def([{ id: 'a' }, { id: 'b', after: ['a'] }]), resume: true };
+    // Default policy would keep b blocked while a is timed-out; resume treats a terminal dep as
+    // satisfied so b runs and re-gates on its OWN required_to_function inside tick.
+    expect(computeReadySteps(d, { a: step('timed-out'), b: step('pending') }, NOW).map(s => s.id)).toEqual(['b']);
+    expect(computeReadySteps(d, { a: step('output-red'), b: step('pending') }, NOW).map(s => s.id)).toEqual(['b']);
+    // Still blocked while the dep is non-terminal (dispatched).
+    expect(computeReadySteps(d, { a: step('dispatched'), b: step('pending') }, NOW).map(s => s.id)).toEqual([]);
+  });
+
+  it('default (no resume): a dependent stays blocked while its dep is timed-out', () => {
+    const d = def([{ id: 'a' }, { id: 'b', after: ['a'] }]);
+    expect(computeReadySteps(d, { a: step('timed-out'), b: step('pending') }, NOW).map(s => s.id)).toEqual([]);
+  });
 });
 
 describe('runOutcome', () => {

@@ -19,6 +19,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + DAG/offer validation + blueprint.
  *   v1.1.0 — 2026-06-15 — Persist the notify_on_finish opt-in on save.
+ *   v1.2.0 — 2026-07-05 — Persist the resume opt-in on save (resume-on-retry downstream decoupling).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -265,6 +266,7 @@ export async function saveWorkflow(
     steps: input.steps,
     on_step_fail: input.on_step_fail,
     notify_on_finish: input.notify_on_finish ?? false,
+    resume: input.resume ?? false,
     llm: input.llm,
     costCapMorsels: input.costCapMorsels ?? null,
     createdBy: prior?.createdBy ?? createdBy,

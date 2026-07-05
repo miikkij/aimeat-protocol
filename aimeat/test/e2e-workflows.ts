@@ -8,6 +8,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial Phase 4 coverage.
  *   v1.1.0 — 2026-06-15 — notify_on_finish: opt-in gate + success/failure finish-notification coverage.
+ *   v1.2.0 — 2026-07-05 — resume: downstream re-gates on its own required_to_function (input present →
+ *     runs; input absent → input-red) instead of blanket-skip on a failed parent. (The watchdog's
+ *     re-check + sliding no-progress timeout are unit-covered — not black-box-able under the 60s sweep.)
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -368,6 +371,48 @@ async function run() {
     assert(typeof r.body.data.steps.gen.notBefore === 'string', 'a backoff notBefore is set');
     // NOTE: the timeout→timed-out transition is driven by the 60s watchdog sweep and is not
     // black-box e2e-able in <1min; it is covered by the engine's sweep logic (unit-level).
+  });
+
+  // ── resume: downstream gates on its OWN required_to_function, not parent success ──
+  await test('resume: a failed parent does NOT blanket-skip — a dependent whose input is present RUNS, one whose input is absent goes input-red', async () => {
+    // gen (srcfail) always goes output-red. Under resume, its dependents re-gate on their OWN input:
+    //   use  — input `news.raw nonempty` is MET (we write it) → must RUN (dispatched), not skipped.
+    //   use2 — input `absent.forsure exists` is UNMET → must go input-red (not run, not blanket-skipped).
+    const resumeWf = {
+      title: { en_US: 'Resume pipeline' }, description: { en_US: 'downstream re-gates on reality' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', resume: true,
+      steps: [
+        { id: 'gen', agent: agentName, offer: 'srcfail', description: { en_US: 'Gen' }, required_to_function: 'none', timeout_min: 10 },
+        { id: 'use', agent: agentName, offer: 'write', after: ['gen'], description: { en_US: 'Use' }, required_to_function: { kind: 'deterministic', key: 'news.raw', op: 'nonempty' }, timeout_min: 10 },
+        { id: 'use2', agent: agentName, offer: 'write', after: ['gen'], description: { en_US: 'Use2' }, required_to_function: { kind: 'deterministic', key: 'absent.forsure', op: 'exists' }, timeout_min: 10 },
+      ],
+    };
+    const put = await json('/v1/workflows/resume-wf', { method: 'PUT', headers: auth, body: JSON.stringify(resumeWf) });
+    assert(put.status === 200, `put resume-wf ${put.status}: ${JSON.stringify(put.body)}`);
+    // resume flag round-trips through save.
+    const def = await json('/v1/workflows/resume-wf', { headers: auth });
+    assert(def.body.data.resume === true, `resume should persist as true, got ${def.body.data.resume}`);
+
+    // use's input gate must be satisfiable when gen fails.
+    await writeMem('news.raw', 'present so use can run');
+
+    const run = await json('/v1/workflows/resume-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    let r = await json(`/v1/workflows/resume-wf/runs/${runId}`, { headers: auth });
+    const genTaskId = r.body.data.steps.gen.taskIds?.[0];
+    assert(typeof genTaskId === 'string', 'gen dispatched');
+
+    // Complete gen with no output → gen output-red. Under resume the dependents then re-gate.
+    const c = await json(`/v1/agents/${agentName}/tasks/${genTaskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'produced nothing' }) });
+    assert(c.status === 200, `complete gen ${c.status}: ${JSON.stringify(c.body)}`);
+    await sleep(800);
+
+    r = await json(`/v1/workflows/resume-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'output-red', `gen should be output-red, got ${r.body.data.steps.gen.state}`);
+    assert(typeof r.body.data.steps.use.taskIds?.[0] === 'string' && r.body.data.steps.use.state === 'dispatched',
+      `use (input present) should RUN despite gen failing, got ${r.body.data.steps.use.state}`);
+    assert(r.body.data.steps.use2.state === 'input-red',
+      `use2 (input absent) should be input-red, not skipped/run, got ${r.body.data.steps.use2.state}`);
   });
 
   // ── full-sandbox namespaces keys, isolated from production ──

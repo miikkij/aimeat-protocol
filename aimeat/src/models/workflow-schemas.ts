@@ -18,6 +18,9 @@
  *   v1.1.0 — 2026-06-13 — Phase 3: Zod for the descriptor (WorkflowDefInputSchema) — CRUD validation.
  *   v1.2.0 — 2026-06-15 — Add WorkflowDef.notify_on_finish (owner opt-in finish notification) +
  *     WorkflowRun.notifiedFinish (fire-once guard).
+ *   v1.3.0 — 2026-07-05 — Resume-on-retry: WorkflowRunStep.progress (live fill count for slow-vs-stuck
+ *     + dashboard) and WorkflowDef.resume (owner opt-in to gate downstream steps on their own
+ *     required_to_function instead of parent success).
  */
 import { z } from 'zod';
 
@@ -143,6 +146,17 @@ export interface WorkflowDef {
    *  drop a finish notification (in-app inbox + email when configured) summarizing outcome + a
    *  per-step log. Default false (no finish notification). */
   notify_on_finish?: boolean;
+  /**
+   * Owner opt-in (default false): re-evaluate the DAG against reality instead of restart-and-skip.
+   * When true, a downstream step gates on its OWN `required_to_function` (evaluated against current
+   * memory) rather than requiring every `after` dependency to have succeeded — so `after` becomes
+   * ordering and the input gate becomes the real gate. A dependent whose input is genuinely present
+   * runs even if a parent step timed out / went red; a dependent whose input is missing goes
+   * input-red (never blanket-skipped). Safe only when crew stages are idempotent (a re-run fills
+   * absent keys, never rewrites). The watchdog's re-check-before-failing + sliding no-progress
+   * timeout are ALWAYS on and need no flag — `resume` gates only the downstream decoupling.
+   */
+  resume?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
   createdBy: string;                  // GAII/GHII of the author (audit)
@@ -165,6 +179,15 @@ export interface WorkflowRunStep {
   endedAt?: string;
   /** Retry backoff: the engine won't (re-)dispatch this pending step before this ISO time. */
   notBefore?: string;
+  /**
+   * Live fill progress for a dispatched step, sampled by the watchdog each sweep from the success
+   * signal's observed count (count_nonempty leaves summed). Drives slow-vs-stuck: while `count` keeps
+   * increasing the step is in-progress (its no-progress deadline slides to `lastProgressAt +
+   * timeout_min`); it only times out after `timeout_min` with `increasing:false`. Absent for signals
+   * with no countable leaf (exists/json_*) — those recover on the plain re-check but never extend.
+   * Also surfaced to the dashboard as "leaves N/M, still increasing".
+   */
+  progress?: { count: number; min: number; increasing: boolean; lastProgressAt: string };
 }
 
 /**
@@ -271,6 +294,7 @@ export const WorkflowDefInputSchema = z.object({
   steps: z.array(WorkflowStepSchema).min(1).max(50),
   on_step_fail: z.literal('inspect'),
   notify_on_finish: z.boolean().optional(),
+  resume: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });
