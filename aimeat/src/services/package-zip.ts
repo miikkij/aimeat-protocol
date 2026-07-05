@@ -14,6 +14,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-20 — Initial implementation
  *   v1.0.1 — 2026-06-13 — archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
+ *     drive-letter / null-byte rejection on top of ../ and absolute paths).
  */
 
 import { createHash } from 'node:crypto';
@@ -21,6 +23,7 @@ import { ZipArchive } from 'archiver';
 import yauzl from 'yauzl';
 import YAML from 'yaml';
 import type { PackageRecord, PackageComponentType } from '../storage/interface.js';
+import { isUnsafeName } from './safe-zip.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -169,8 +172,8 @@ function readAllEntries(
 
       const fileName: string = entry.fileName;
 
-      // Path traversal checks
-      if (fileName.includes('../') || fileName.startsWith('/')) {
+      // Path traversal checks (shared guard: ../, absolute, drive-letter, backslash, null byte)
+      if (isUnsafeName(fileName)) {
         zipfile.close();
         return reject(new ZipValidationError('PATH_TRAVERSAL', `Dangerous path detected: ${fileName}`));
       }

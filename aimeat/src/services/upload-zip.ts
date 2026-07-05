@@ -11,6 +11,8 @@
  *   import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial implementation
+ *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
+ *     drive-letter / null-byte rejection on top of ../ and absolute paths).
  */
 
 import yauzl from 'yauzl';
@@ -18,6 +20,7 @@ import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { parseCortexManifest } from './cortex-manifest.js';
+import { isUnsafeName } from './safe-zip.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const MAX_FILES = 50;
@@ -248,7 +251,7 @@ function extractZipEntries(buffer: Buffer): Promise<Map<string, Buffer>> {
 
                 const fileName: string = entry.fileName;
 
-                if (fileName.includes('../') || fileName.startsWith('/')) {
+                if (isUnsafeName(fileName)) {
                     zipfile!.close();
                     return reject(new Error(`Dangerous path detected: ${fileName}`));
                 }

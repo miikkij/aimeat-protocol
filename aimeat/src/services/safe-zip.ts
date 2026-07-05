@@ -13,13 +13,15 @@
  * @structure ZipSecurityError; SafeZipLimits; safeUnzip(buffer, limits) -> Map<string, Buffer>
  * @usage import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
  * @version-history
+ *   v1.1.0 -- 2026-07-05 -- Reject symlink entries (unix mode check); export isUnsafeName +
+ *     isSymlinkEntry so the hand-rolled extractors (upload-zip, package-zip) share the guards.
  *   v1.0.0 -- 2026-06-09 -- Initial: hardened extractor with bomb + traversal + format guards.
  */
 import yauzl from 'yauzl';
 
 export type ZipSecurityCode =
   | 'NOT_A_ZIP' | 'TOO_MANY_FILES' | 'FILE_TOO_LARGE' | 'TOTAL_TOO_LARGE'
-  | 'RATIO_EXCEEDED' | 'PATH_TRAVERSAL' | 'BAD_FORMAT' | 'READ_ERROR';
+  | 'RATIO_EXCEEDED' | 'PATH_TRAVERSAL' | 'SYMLINK' | 'BAD_FORMAT' | 'READ_ERROR';
 
 export class ZipSecurityError extends Error {
   constructor(public readonly code: ZipSecurityCode, message: string, public readonly entry?: string) {
@@ -49,8 +51,14 @@ export const BACKUP_ZIP_LIMITS: SafeZipLimits = {
   maxRatio: 200,                     // decompressed may be at most 200× the zip size
 };
 
+/** Whether a ZIP entry is a symlink (unix mode in the high 16 bits of externalFileAttributes). */
+export function isSymlinkEntry(entry: { externalFileAttributes: number }): boolean {
+  const unixMode = entry.externalFileAttributes >>> 16;
+  return (unixMode & 0o170000) === 0o120000;
+}
+
 /** A name is hostile if it escapes its root, is absolute, uses backslashes, or contains a null byte. */
-function isUnsafeName(name: string): boolean {
+export function isUnsafeName(name: string): boolean {
   if (name.includes('\0') || name.includes('\\')) return true;
   if (name.startsWith('/') || /^[a-zA-Z]:/.test(name)) return true;          // absolute / drive-letter
   const parts = name.split('/');
@@ -82,6 +90,7 @@ export function safeUnzip(buffer: Buffer, limits: SafeZipLimits): Promise<Map<st
         if (/\/$/.test(name)) { zipfile.readEntry(); return; }   // directory entry — skip
         if (++fileCount > limits.maxFiles) { fail(new ZipSecurityError('TOO_MANY_FILES', `Archive has more than ${limits.maxFiles} files`)); return; }
         if (isUnsafeName(name)) { fail(new ZipSecurityError('PATH_TRAVERSAL', `Unsafe entry name: ${name}`, name)); return; }
+        if (isSymlinkEntry(entry)) { fail(new ZipSecurityError('SYMLINK', `Symlink entries are not allowed: ${name}`, name)); return; }
         if (limits.allowName && !limits.allowName(name)) { fail(new ZipSecurityError('BAD_FORMAT', `Unexpected entry for this format: ${name}`, name)); return; }
         if (entry.uncompressedSize > limits.maxFileBytes) { fail(new ZipSecurityError('FILE_TOO_LARGE', `Entry ${name} exceeds the per-file size cap`, name)); return; }
 
