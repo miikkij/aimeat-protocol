@@ -76,9 +76,10 @@ model Memory {
   allowedOrigins String[]
   groupId    String?
   // Flattened searchable text (key + string leaves of value + tags), maintained on every write.
-  // A MongoDB `$text` index on this field is created at startup (see MongoStorage.init) — Tier-1
-  // librarian full-text search. SQLite indexes the value directly via FTS5, so this field is
-  // MongoDB/Postgres-only. See docs/internal/design-organism-notebook-and-librarian.md §4.
+  // Tier-1 librarian full-text search queries this with a per-token `contains` (substring/regex)
+  // scan — there is NO MongoDB `$text` index on it (none is created at startup). SQLite indexes the
+  // value directly via FTS5, so this field is MongoDB/Postgres-only. A real `$text` (or Atlas
+  // Search) index is a possible future scalability upgrade. See design-organism-notebook-and-librarian.md §4.
   searchBlob String?
   // Opt-in version tracking: when true, the previous value is archived to MemoryVersion on overwrite
   // (latest stays here, history queried on demand). Default false → no change for existing keys.
