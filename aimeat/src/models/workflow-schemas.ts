@@ -160,15 +160,16 @@ export interface WorkflowDef {
    */
   resume?: boolean;
   /**
-   * Owner opt-in (default false): before a step is (first) dispatched, DELETE the memory keys its
-   * success_signal checks (minus any it also reads as input), so an idempotent skip-existing crew
-   * regenerates them from empty instead of finding a prior run's output already present (which would
-   * false-green the step and waste a no-op crew pass). Use this when a workflow deliberately writes to
-   * the SAME (non-run-scoped) keys every run and wants each run to overwrite. DESTRUCTIVE by design —
-   * it discards the previous run's deliverable for that step. The non-destructive alternative is to
-   * template the keys per run with the built-in `{run}`/`{date}` vars (see engine resolveVars), which
-   * keeps history. Only clears at attempt 0 (a within-run retry preserves partial gap-fill). Orthogonal
-   * to `resume`.
+   * Owner opt-in (default false): at RUN START (before any step dispatches), DELETE every key the
+   * workflow produces — the union of each step's success_signal output keys (minus keys it also reads
+   * as input) + deliverable keys — so an idempotent skip-existing crew regenerates them from empty
+   * instead of finding a prior run's output already present (which would false-green the step and
+   * waste a no-op crew pass). Cleared ONCE up front (not per-step) so parallel steps sharing an output
+   * namespace can't wipe each other's fresh output; pure external inputs (produced by no step) are
+   * kept. Use when a workflow deliberately writes to the SAME (non-run-scoped) keys every run and wants
+   * each run to overwrite. DESTRUCTIVE by design — discards the previous run's deliverables. The
+   * non-destructive alternative is per-run keys via the built-in `{run}`/`{date}` vars (see engine
+   * resolveVars), which keeps history. Orthogonal to `resume`.
    */
   fresh?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
