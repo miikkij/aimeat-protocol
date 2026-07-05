@@ -48,6 +48,12 @@
       the aimeat-markdown line so generated apps use render(text, target)/renderToString (render
       returns an Element — assigning it to innerHTML shows "[object HTMLDivElement]") and mention
       renderRich (task lists, footnotes, highlighting, Mermaid).
+    v2.6.1 — 2026-07-05 — Fix "Review & import" (server → local) silently importing nothing on a local
+      dev server: importServerApps fetched with ?mode=inline, which 301-redirects to the isolated app
+      origin (…apps.<host>) under H-2, and this page's connect-src CSP does not cover
+      http://*.apps.localhost:* so every fetch was blocked (prod worked only via the blanket `https:`).
+      Now reuses fetchAppContentBase64 (raw same-origin fetch + owner token + byte-accurate base64),
+      matching the Restore-local-twin flow.
 -->
 <html lang="en">
 <head>
@@ -5405,10 +5411,16 @@
   function importServerApps(toImport, aimeatUrl) {
     if (toImport.length === 0) return Promise.resolve(false);
     return Promise.all(toImport.map(function (sa) {
-      var url = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename) + '?mode=inline';
-      return fetch(url)
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-        .then(function (source) {
+      // Fetch the RAW app source (no ?mode=inline). The inline form 301-redirects to
+      // the isolated app origin (…apps.<host>) when H-2 app isolation is enabled, and
+      // this page's connect-src CSP does not cover http://*.apps.localhost:* — so on a
+      // local dev server every import fetch was silently blocked and nothing imported
+      // (works on prod only because the CSP's blanket `https:` covers the app origin).
+      // The raw form is served same-origin from the apex on every deployment.
+      // fetchAppContentBase64 also sends the owner token (imports the owner's own
+      // protected/operator-hidden apps) and produces byte-accurate base64.
+      return fetchAppContentBase64(aimeatUrl, sa.owner || '', sa.filename)
+        .then(function (b64) {
           var manifest = sa.manifest || {};
           var app = {
             id: generateId(),
@@ -5417,7 +5429,7 @@
             source: 'aimeat',
             origin: 'ai-published',
             url: null,
-            blob: btoa(unescape(encodeURIComponent(source))),
+            blob: b64,
             tags: manifest.tags || [],
             openMode: 'tab',
             icon: manifest.icon || '\u{1F916}',
