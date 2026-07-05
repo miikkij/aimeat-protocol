@@ -8,6 +8,10 @@
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
+ *   v1.1.0 — 2026-07-05 — DocumentView private-image resolution now also covers /v1/memory/files/<key>
+ *     refs (not just /v1/storage), so images DROP files into a doc render for the author via an
+ *     auth'd blob fetch — a plain <img> can't send the token. (Cross-member visibility is a separate
+ *     workspace-scoped file tier, see docs / authed-image-embed design.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -50,16 +54,18 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
   const shown = (hasBoth && tab === 'published') ? page._pub : page;
   const [rendered, setRendered] = useState(shown.markdown || '');
 
-  // Resolve private /v1/storage images to auth'd blob: URLs IN THE MARKDOWN TEXT (declarative), then
-  // render that. Doing it in the text — instead of mutating <img src> after render — means a
-  // re-render (toggling Draft/Published, a live-update refresh) can never leave a stale or revoked
-  // object URL on a reused <img> node, which previously showed a broken image. Re-runs per version.
+  // Resolve private /v1/storage AND /v1/memory/files images to auth'd blob: URLs IN THE MARKDOWN TEXT
+  // (declarative), then render that. Doing it in the text — instead of mutating <img src> after render
+  // — means a re-render (toggling Draft/Published, a live-update refresh) can never leave a stale or
+  // revoked object URL on a reused <img> node, which previously showed a broken image. Re-runs per
+  // version. (DROP files its dropped images as /v1/memory/files/<key> refs; a plain <img> can't send
+  // the token, so those are fetched with the session token and swapped to a blob: URL here too.)
   useEffect(() => {
     let cancelled = false; const created = [];
     const raw = shown.markdown || '';
     setRendered(raw);   // show text/structure at once; images swap in a moment later
     (async () => {
-      const urls = [...new Set(raw.match(/\/v1\/storage\/[^\s)\]"'>]+/g) || [])];
+      const urls = [...new Set(raw.match(/\/v1\/(?:storage|memory\/files)\/[^\s)\]"'>]+/g) || [])];
       if (!urls.length) return;
       let out = raw;
       for (const su of urls) {
