@@ -61,4 +61,6 @@ export const agentProfileOutput = {
     capabilities: z.array(z.string()).optional(),
     trust_score: z.number().optional(),
     created_at: z.string().optional(),
+    /** Linked skill refs from the skills registry (same-owner agents only; empty otherwise). */
+    skills: z.array(z.object({ ref: z.string(), name: z.string(), description: z.string() })).optional(),
 };

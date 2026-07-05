@@ -808,6 +808,48 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/links`),
     },
     {
+        name: 'aimeat_skill_publish',
+        handler: ({ client }, input) => client.post('/v1/skills', {
+            skill_md: requiredString(input, 'skill_md'),
+            files: input.files,
+            scope: optionalString(input, 'scope'),
+            visibility: optionalString(input, 'visibility'),
+        }),
+    },
+    {
+        name: 'aimeat_skill_list',
+        handler: ({ client, agentPath }, input) => {
+            const view = optionalString(input, 'view') ?? 'library';
+            if (view === 'linked') return client.get(`/v1/agents/${agentPath}/skills/links`);
+            return client.get(`/v1/skills?scope=${view === 'mine' ? 'user' : 'library'}`);
+        },
+    },
+    {
+        name: 'aimeat_skill_get',
+        handler: ({ client }, input) => {
+            const ref = optionalString(input, 'ref');
+            const manifestOnly = optionalBoolean(input, 'manifest_only') ? '&manifest_only=true' : '';
+            if (ref) {
+                const node = ref.match(/^node:([a-z0-9-]+)$/);
+                if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}?scope=node${manifestOnly}`);
+                const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
+                if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}?scope=user&owner=${encodeURIComponent(user[1])}${manifestOnly}`);
+                throw new Error(`Not a valid skill ref: ${ref}`);
+            }
+            return client.get(`/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}?${manifestOnly.replace('&', '')}`);
+        },
+    },
+    {
+        name: 'aimeat_skill_link',
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/skills`, {
+            ref: requiredString(input, 'ref'),
+        }),
+    },
+    {
+        name: 'aimeat_skill_unlink',
+        handler: ({ client, agentPath }, input) => client.delete(`/v1/agents/${agentPath}/skills?ref=${encodeURIComponent(requiredString(input, 'ref'))}`),
+    },
+    {
         name: 'aimeat_memory_read_public',
         handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'gaii'))}/${encodeURIComponent(requiredString(input, 'key'))}`),
     },

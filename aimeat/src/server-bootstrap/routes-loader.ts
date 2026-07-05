@@ -119,6 +119,7 @@ import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
+import { skillsRouter } from '../routes/skills.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
 import { subdomainServeRouter, subdomainAdminRouter } from '../routes/subdomains.js';
@@ -313,6 +314,7 @@ export async function mountRoutes(
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));
+  app.use(skillsRouter(config, storage));  // Skills registry (dedicated system, Phase 2a)
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));

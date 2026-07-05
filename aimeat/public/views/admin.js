@@ -63,6 +63,7 @@ import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
 import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
 import SubdomainsAdminTab from './admin/subdomains-tab.js';
 import AppsAdminTab        from './admin/apps-tab.js';
+import SkillsAdminTab      from './admin/skills-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -113,6 +114,7 @@ const NAV_GROUPS = [
     { id: 'cortex',      icon: '\u{1F4E6}', key: 'dashboard.cortexTab',      component: CortexTab },
     { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
     { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
+    { id: 'skills',      icon: '\u{1F393}', key: 'dashboard.skills.tabLabel',  component: SkillsAdminTab },
     { id: 'packages',    icon: '\u{1F9F0}', key: 'dashboard.packagesTab',      component: PackagesAdminTab },
   ]},
   { key: 'dashboard.navIntegrations', items: [

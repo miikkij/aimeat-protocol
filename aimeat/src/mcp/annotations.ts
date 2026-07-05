@@ -65,6 +65,16 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_memory_read_public: { title: 'Read Public Memory', readOnlyHint: true },
     aimeat_memory_write: { title: 'Write Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
+    // ── Skills registry ──
+    aimeat_skill_list: { title: 'Browse Skills Registry', readOnlyHint: true },
+    aimeat_skill_get: { title: 'Resolve Skill', readOnlyHint: true },
+    aimeat_skill_publish: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_skill_link: { title: 'Link Skill to Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_skill_unlink: { title: 'Unlink Skill from Agent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+
+    // ── Operator config enactment ──
+    aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
     aimeat_storage_upload: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

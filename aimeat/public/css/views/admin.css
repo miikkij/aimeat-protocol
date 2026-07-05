@@ -766,3 +766,17 @@
 .adm-sec-line2 { font-size: 0.82rem; color: var(--text); margin: 0.25rem 0; word-break: break-word; }
 .adm-sec-line3 { font-size: 0.76rem; color: var(--muted); }
 .adm-sec-actions { display: flex; gap: 0.35rem; flex-shrink: 0; flex-wrap: wrap; }
+
+/* ── Skills admin tab (adm-skills) — node registry Phase 2b ── */
+.adm-skills-row { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 0.55rem 0.75rem; margin-bottom: 0.5rem; }
+.adm-skills-row-main { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.adm-skills-version { font-size: 0.74rem; color: var(--muted); }
+.adm-skills-actions { margin-left: auto; display: flex; gap: 0.3rem; }
+.adm-skills-desc { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
+.adm-skills-body { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; font-size: 0.78rem; max-height: 24rem; overflow: auto; white-space: pre-wrap; margin-top: 0.5rem; }
+.adm-skills-editor { margin: 0.5rem 0 0.75rem; }
+.adm-skills-editor-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.adm-skills-editor-md { width: 100%; min-height: 24rem; font-family: var(--mono); font-size: 0.82rem; resize: vertical; }
+.adm-skills-detail { margin-top: 0.5rem; }
+.adm-skills-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
+.adm-skills-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }

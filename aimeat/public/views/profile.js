@@ -58,6 +58,7 @@ import NodeStatsTab from './profile/node-stats-tab.js';
 import SecurityTab from './profile/security-tab.js';
 import EmailTab from './profile/email-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
+import SkillsTab from './profile/skills-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
@@ -89,6 +90,7 @@ const TABS = [
   { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'active' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
+  { id: 'skills',        key: 'skills.tabLabel',             component: SkillsTab,         minTier: 'active' },
   { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
   { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
   { id: 'notebook',      key: 'profile.tabs.notebook',       component: NotebookTab,       minTier: 'new' },

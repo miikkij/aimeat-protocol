@@ -11,10 +11,12 @@
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial implementation
+ *   v1.1.0 — 2026-07-05 — Add 'skill' upload type; add a jti nonce (deterministic EdDSA made
+ *     same-second identical mints collide with the single-use guard).
  */
 
 import { SignJWT, jwtVerify } from 'jose';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
@@ -43,7 +45,7 @@ export function initUploadTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey)
 
 export interface UploadTokenPayload {
     sub: string;
-    utype: 'app' | 'storage' | 'extension' | 'cortex';
+    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
     meta: Record<string, unknown>;
     maxBytes: number;
     contentType: string;
@@ -51,7 +53,7 @@ export interface UploadTokenPayload {
 
 export interface VerifiedUploadToken {
     sub: string;
-    utype: 'app' | 'storage' | 'extension' | 'cortex';
+    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
     meta: Record<string, unknown>;
     maxBytes: number;
     contentType: string;
@@ -81,6 +83,10 @@ export async function generateUploadToken(payload: UploadTokenPayload, ttlSecond
         contentType: payload.contentType,
     })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+        // EdDSA signing is deterministic: without a nonce, two tokens minted in the same
+        // second with identical payloads are the SAME JWT — the second upload then trips
+        // the single-use guard (TOKEN_USED). jti makes every mint unique.
+        .setJti(randomUUID())
         .setSubject(payload.sub)
         .setIssuedAt()
         .setExpirationTime(`${ttlSeconds}s`)

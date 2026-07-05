@@ -92,6 +92,8 @@ tags:
     description: Phase 2.5 — Community Service Manifest template library
   - name: Knowledge
     description: Knowledge packages — import, link, share, clone, contribute
+  - name: Skills
+    description: Skills registry — SKILL.md packs in scoped registries (node/user), linked to agents by ref
   - name: Cortex
     description: AI model management — register, activate, prompt templates
   - name: Stats
@@ -19761,6 +19763,243 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  # ── Skills Registry ─────────────────────────────────────────
+  /v1/skills:
+    get:
+      operationId: listSkills
+      summary: List skills
+      description: >-
+        List skills without loading bodies (manifests only). scope=library (default) returns
+        everything the caller can load, grouped by scope (node-wide library + own user registry);
+        scope=node or scope=user list one registry (user accepts an owner query for reading
+        another user's visible skills).
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [library, node, user]
+        - name: owner
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+    post:
+      operationId: publishSkill
+      summary: Publish or update a skill
+      description: >-
+        Publish a SKILL.md pack into the registry. Frontmatter (name, description, optional
+        license/compatibility/metadata) is validated against the shared contract; republishing
+        the same name bumps the version. scope=node is operator-only. Additional files
+        (scripts/, references/, assets/) are passed as relative-path -> content.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_md]
+              properties:
+                skill_md:
+                  type: string
+                  description: The SKILL.md content (YAML frontmatter + markdown body)
+                files:
+                  type: object
+                  additionalProperties:
+                    type: string
+                scope:
+                  type: string
+                  enum: [user, node]
+                visibility:
+                  type: string
+                  enum: [owner, members, public]
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: SKILL.md violates the shared contract
+
+  /v1/skills/{name}:
+    get:
+      operationId: resolveSkill
+      summary: Resolve one skill
+      description: >-
+        Resolve a skill to its manifest plus file bodies. Unscoped lookups search the caller's
+        own registry first, then the node library; scope/owner query parameters address a
+        specific registry. manifest_only=true skips bodies.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [node, user]
+        - name: owner
+          in: query
+          schema:
+            type: string
+        - name: manifest_only
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteSkill
+      summary: Delete a skill
+      description: Delete a skill (manifest + files). Own user-scope skills; scope=node is operator-only.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [node, user]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/skills:
+    get:
+      operationId: getAgentSkills
+      summary: Get an agent's linked skills (resolved)
+      description: >-
+        The consumer read: resolves every SkillRef linked to the agent into manifest + file
+        bodies (manifest_only=true skips bodies). Unresolvable refs are reported in an
+        `unresolved` array, never silently dropped. Owner sessions may read any of their
+        agents; an agent may read only itself.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: manifest_only
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: linkAgentSkill
+      summary: Link a skill to an agent
+      description: >-
+        Attach a skill by ref (node:{name} or user:{owner}/{name}) to an agent under the
+        caller's owner. Links store references, never copies. Idempotent per ref.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref]
+              properties:
+                ref:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: unlinkAgentSkill
+      summary: Unlink a skill from an agent
+      description: Detach a skill ref (body or ?ref= query). The skill itself stays in the registry.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/agents/{name}/skills/links:
+    get:
+      operationId: getAgentSkillLinks
+      summary: Get an agent's skill link records (unresolved)
+      description: The raw link entries (ref, name, description, linkedAt) without resolving bodies — cheap, for UIs.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   # ── Knowledge Packages ──────────────────────────────────────
   /v1/knowledge/import:

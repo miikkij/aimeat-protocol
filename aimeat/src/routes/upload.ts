@@ -17,6 +17,9 @@
  *   v1.1.0 — 2026-06-09 — handleAppUpload derives a BARE ownerName (never the
  *     @node-suffixed GHII) so presigned publishes land in the same canonical app
  *     bucket as inline publishes (see canonicalOwner in routes/apps.ts).
+ *   v1.2.0 — 2026-07-05 — handleSkillUpload: skill-directory ZIPs (utype 'skill') extracted
+ *     via the hardened safeUnzip (traversal/symlink/bomb guards + skill-layout allowlist)
+ *     and published into the skills registry.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -24,6 +27,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
+import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
+import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
+import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
@@ -92,6 +98,9 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                     return;
                 case 'cortex':
                     await handleCortexUpload(res, config, storage, verified.sub, data);
+                    return;
+                case 'skill':
+                    await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
                     return;
                 default:
                     res.status(400).json({ success: false, error: 'INVALID_TYPE', message: `Unknown upload type` });
@@ -240,6 +249,76 @@ async function handleExtensionUpload(
         status: created.status,
         actions: created.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
     });
+}
+
+// ── Handler: Skill (registry publish via presigned ZIP) ──
+
+/** Skill-directory ZIP layout: SKILL.md (+ scripts/references/assets), optionally inside ONE wrapping dir. */
+const SKILL_ZIP_LIMITS = {
+    maxFiles: 200,
+    maxFileBytes: 5 * 1024 * 1024,     // 5 MB per entry
+    maxTotalBytes: 20 * 1024 * 1024,   // 20 MB total decompressed
+    maxRatio: 50,
+    allowName: (name: string) => {
+        const parts = name.split('/');
+        const rel = parts.length > 1 ? parts.slice(1).join('/') : name;
+        return isAllowedSkillPath(name) || isAllowedSkillPath(rel);
+    },
+};
+
+async function handleSkillUpload(
+    res: Response, config: AimeatConfig, storage: Storage,
+    sub: string, meta: Record<string, unknown>, data: Buffer,
+): Promise<void> {
+    const parsedSub = parseGAII(sub);
+    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+    const scope = (meta.scope as SkillScope) === 'node' ? 'node' : 'user';
+    const visibility = meta.visibility as 'owner' | 'members' | 'public' | undefined;
+
+    let entries: Map<string, Buffer>;
+    try {
+        entries = await safeUnzip(data, SKILL_ZIP_LIMITS);
+    } catch (err) {
+        if (err instanceof ZipSecurityError) {
+            logger.warn('Skill upload ZIP rejected', { code: err.code, entry: err.entry, by: sub });
+            res.status(422).json({ success: false, error: 'ZIP_REJECTED', message: err.message, code: err.code });
+            return;
+        }
+        throw err;
+    }
+
+    // Strip a single wrapping directory when every entry shares it (skill-name/SKILL.md ...).
+    const names = [...entries.keys()];
+    let wrapper: string | undefined;
+    const firstSlash = names[0]?.indexOf('/') ?? -1;
+    if (firstSlash > 0) {
+        const candidate = names[0].slice(0, firstSlash);
+        if (names.every(n => n.startsWith(`${candidate}/`))) wrapper = candidate;
+    }
+    const files = new Map<string, string | Buffer>();
+    for (const [name, content] of entries) {
+        files.set(wrapper ? name.slice(wrapper.length + 1) : name, content);
+    }
+
+    try {
+        const summary = await publishSkill(storage, config, {
+            scope,
+            owner: ownerName,
+            publisher: sub,
+            files,
+            visibility,
+            expectedName: wrapper,
+        });
+        logger.info(`Skill published via upload: ${summary.ref} v${summary.version}`, { by: sub });
+        emitResourceListChanged(sub);
+        res.json({ success: true, type: 'skill', skill: summary });
+    } catch (err) {
+        if (err instanceof SkillValidationError) {
+            res.status(422).json({ success: false, error: 'SKILL_INVALID', message: err.message, code: err.code });
+            return;
+        }
+        throw err;
+    }
 }
 
 // ── Handler: Cortex ──

@@ -46,6 +46,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
+import { getAgentSkillLinks } from '../services/skills.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -185,7 +186,7 @@ export function registerCoreTools(
     const discoveryRegistry = buildDiscoveryRegistry(storage, config);
     const VALID_DISCOVER_TYPES = new Set<DiscoveryType>([
         'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-        'company', 'offering', 'document', 'organism', 'app', 'memory',
+        'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'memory',
     ]);
     const discoverCsv = (v: string | undefined): string[] =>
         typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -242,6 +243,13 @@ export function registerCoreTools(
         async ({ gaii }) => {
             const agent = await storage.getAgent(gaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            // Linked skills (registry refs) — only exposed for same-owner agents.
+            let skills: Array<{ ref: string; name: string; description: string }> = [];
+            const callerOwner = parseGAII(agentGaii)?.owner;
+            if (callerOwner && agent.owner === callerOwner) {
+                const links = await getAgentSkillLinks(storage, config, agent.owner, agent.name);
+                skills = links.map(l => ({ ref: l.ref, name: l.name, description: l.description }));
+            }
             return structuredResult('aimeat_agent_profile', undefined, {
                 gaii: agent.gaii,
                 display_name: agent.displayName,
@@ -249,6 +257,7 @@ export function registerCoreTools(
                 capabilities: agent.capabilities,
                 trust_score: agent.trustScore,
                 created_at: agent.createdAt,
+                skills,
             });
         },
     );
