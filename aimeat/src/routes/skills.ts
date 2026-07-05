@@ -31,7 +31,7 @@ import { SkillValidationError } from '../services/skill-md.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
-  SkillAccessError, type SkillAccessor, type SkillScope,
+  listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -73,6 +73,12 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/skills', requireAuth(), async (req, res) => {
     try {
       const accessor = accessorOf(req);
+      // 2d: ?binding=app:{owner}/{filename} — skills bound to one app, across scopes.
+      if (typeof req.query.binding === 'string') {
+        const skills = await listSkillsByBinding(storage, config, req.query.binding, accessor);
+        res.json(success(config.nodeId, { binding: req.query.binding, skills }));
+        return;
+      }
       const scope = (req.query.scope as string) ?? 'library';
       if (scope === 'library') {
         const library = await listSkillLibrary(storage, config, accessor);
@@ -288,6 +294,22 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const links = await unlinkSkillFromAgent(storage, config, owner, agentName, ref);
       emitChange('skills', `${owner}@${config.nodeId}`);
       res.json(success(config.nodeId, { agent: agentName, links }));
+    } catch (err) {
+      sendSkillError(res, err);
+    }
+  });
+
+  /* ── 2d: GET /v1/apps/:owner/:filename/skills — registry skills bound to one app.
+   *    Mounted before the apps router, so this wins over the greedy app-download route.
+   *    Anonymous callers see only public-bound skills (the scope read gates apply). ── */
+  router.get('/v1/apps/:owner/:filename/skills', requireAuth(), async (req, res) => {
+    try {
+      const ownerParam = req.params.owner as string;
+      const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+      const filename = req.params.filename as string;
+      const binding = `app:${owner}/${filename}`;
+      const skills = await listSkillsByBinding(storage, config, binding, accessorOf(req));
+      res.json(success(config.nodeId, { binding, skills }));
     } catch (err) {
       sendSkillError(res, err);
     }

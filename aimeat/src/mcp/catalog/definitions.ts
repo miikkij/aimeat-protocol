@@ -335,6 +335,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
             definition: { type: 'object', required: true, description: 'The descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved} }.' },
+            propose: { type: 'boolean', description: 'Operator flow (server MCP only): return a diff vs the current definition + a single-use confirm_token WITHOUT saving.' },
+            confirm_token: { type: 'string', description: 'Token from the propose step — applies exactly the proposed definition.' },
         },
     },
     {
@@ -1001,11 +1003,12 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             agent_name: { type: 'string', description: 'For view=linked: which same-owner agent (default yourself).' },
             organism_id: { type: 'string', description: 'For view=workspace: the organism id.' },
             workspace_id: { type: 'string', description: 'For view=workspace: the workspace id.' },
+            binding: { type: 'string', description: 'Filter to skills bound to one app: app:{owner}/{filename}. Overrides view.' },
         },
     },
     {
         name: 'aimeat_skill_get',
-        description: 'Resolve one skill from the registry: manifest (name, description, version, file index) plus the file bodies (SKILL.md and any scripts/, references/, assets/). Address it by full ref (node:{name} or user:{owner}/{name}) or by bare name (your own registry is searched first, then the node library). Set manifest_only=true to skip bodies. Access follows the skill\'s scope + visibility.',
+        description: 'Resolve one skill from the registry: manifest (name, description, version, file index) plus the file bodies (SKILL.md and any scripts/, references/, assets/). Address it by full ref (node:{name}, user:{owner}/{name}, ws:{org}/{ws}/{name}, optionally version-pinned with @{semver} — the registry retains the newest 10 snapshots) or by bare name (your own registry is searched first, then the node library). Set manifest_only=true to skip bodies. Access follows the skill\'s scope + visibility.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1046,6 +1049,19 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             mode: { type: 'string', enum: ['interactive', 'autonomous', 'task-runner', 'coordinator', 'workstation'], description: 'New agent mode.' },
             tags: { type: 'array', description: 'Replacement tag list.' },
             scopes: { type: 'array', description: 'Replacement scope list (narrowing only).' },
+            confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
+        },
+    },
+    {
+        name: 'aimeat_operator_ai_config',
+        description: 'Inspect or change the owner\'s AI routing + daily budget with PROPOSE-THEN-CONFIRM. With no fields: returns the current safe view (daily_budget_usd, model, reasoning_model, execution_model). With fields but no confirm_token: applies NOTHING — returns current/proposed/diff + a single-use token (10 min) bound to exactly this change; show the diff to the owner. With the token: applies. The API key is stored separately and can NEVER be read or changed through this tool.',
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            daily_budget_usd: { type: 'number', description: 'Daily AI spend cap in USD (0-1000).' },
+            model: { type: 'string', description: 'Default model id.' },
+            reasoning_model: { type: 'string', description: 'Model for modelRole "reasoning".' },
+            execution_model: { type: 'string', description: 'Model for modelRole "execution".' },
             confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
         },
     },

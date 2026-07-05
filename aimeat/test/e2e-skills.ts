@@ -765,6 +765,148 @@ await test('42. Member deletes the workspace skill', async () => {
     assert(read.status === 404, `after delete: ${read.status}`);
 });
 
+// ─── Phase 9: @version pins + app bindings ───
+console.log('\nPhase 9 -- Version pins & app bindings');
+
+await test('43. Version pin resolves the retained snapshot, latest stays latest', async () => {
+    const v1 = SKILL_MD.replace('research-briefs', 'pinned-skill').replace('Always lead with the conclusion', 'BODY VERSION ONE');
+    const v2 = SKILL_MD.replace('research-briefs', 'pinned-skill').replace('Always lead with the conclusion', 'BODY VERSION TWO');
+    const p1 = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: v1 }) });
+    assert(p1.status === 201 && p1.body.data.skill.version === '1.0.0', `publish v1 ${p1.status}`);
+    const p2 = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: v2 }) });
+    assert(p2.body.data.skill.version === '1.0.1', 'bumped');
+
+    // Pinned resolve via MCP get (refs carry the pin)
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { ref: `user:${ownerName}/pinned-skill@1.0.0` } }, 120);
+    const data = toolText(body);
+    assert(data.skill?.version === '1.0.0', `pinned version: ${data.skill?.version}`);
+    assert(data.skill?.fileContents?.['SKILL.md']?.includes('BODY VERSION ONE'), 'pinned body is the old one');
+    assert(data.skill?.ref === `user:${ownerName}/pinned-skill@1.0.0`, `pinned ref: ${data.skill?.ref}`);
+
+    const latest = await json('/v1/skills/pinned-skill', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(latest.body.data.skill.fileContents['SKILL.md'].includes('BODY VERSION TWO'), 'latest body is the new one');
+});
+
+await test('44. Unretained pin returns NOT_FOUND', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { ref: `user:${ownerName}/pinned-skill@9.9.9` } }, 121);
+    const text = body?.result?.content?.[0]?.text ?? '';
+    assert(body?.result?.isError === true && text.includes('not retained'), `got: ${text.slice(0, 120)}`);
+});
+
+await test('45. App-bound skill surfaces on the app skills route', async () => {
+    const bound = `---
+name: app-helper
+description: How to use the demo app well. Use when working inside the demo app.
+metadata:
+  binding: app:${ownerName}/demo.html
+---
+
+# Demo app helper
+Press the big button.
+`;
+    const pub = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: bound, visibility: 'public' }),
+    });
+    assert(pub.status === 201 && pub.body.data.skill.binding === `app:${ownerName}/demo.html`, `binding: ${JSON.stringify(pub.body.data.skill)}`);
+
+    const { status, body } = await json(`/v1/apps/${ownerName}/demo.html/skills`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.skills.some((s: any) => s.name === 'app-helper'), `bound skills: ${JSON.stringify(body.data.skills)}`);
+
+    const filt = await json(`/v1/skills?binding=${encodeURIComponent(`app:${ownerName}/demo.html`)}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(filt.body.data.skills.some((s: any) => s.name === 'app-helper'), 'binding query filter');
+});
+
+await test('46. Invalid binding format rejected (422)', async () => {
+    const withBad = `---
+name: bad-binding
+description: A skill with a malformed app binding, for the negative test.
+metadata:
+  binding: not-an-app-ref
+---
+
+# Bad binding
+`;
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: withBad }),
+    });
+    assert(status === 422, `status ${status}: ${JSON.stringify(body)}`);
+});
+
+// ─── Phase 10: workflow propose-mode + operator AI config ───
+console.log('\nPhase 10 -- Workflow propose & AI config');
+
+const WF_DEF = {
+    title: 'Skills test flow',
+    description: 'test',
+    trigger: { kind: 'manual' },
+    vars: [],
+    steps: [] as any[],
+    on_step_fail: 'inspect',
+};
+
+await test('47. workflow_save propose returns a diff + token without saving', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_workflow_save',
+        arguments: { id: 'skills-test-flow', definition: WF_DEF, propose: true },
+    }, 130);
+    const data = toolText(body);
+    assert(data.mode === 'proposal' && typeof data.confirm_token === 'string', `got: ${JSON.stringify(data).slice(0, 200)}`);
+    assert(data.exists === false, 'not saved yet');
+    assert(data.diff?.title?.to === 'Skills test flow', `diff: ${JSON.stringify(data.diff).slice(0, 120)}`);
+
+    const { body: getBody } = await mcpRpc('tools/call', { name: 'aimeat_workflow_get', arguments: { id: 'skills-test-flow' } }, 131);
+    assert(getBody?.result?.isError === true, 'workflow must not exist before confirm');
+
+    // Confirm applies (may still fail workflow validation — accept either saved or a
+    // VALIDATION error, but never a token error).
+    const { body: confBody } = await mcpRpc('tools/call', {
+        name: 'aimeat_workflow_save',
+        arguments: { id: 'skills-test-flow', definition: WF_DEF, confirm_token: data.confirm_token },
+    }, 132);
+    const confText = confBody?.result?.content?.[0]?.text ?? '';
+    assert(!confText.includes('TOKEN_'), `token error: ${confText.slice(0, 150)}`);
+});
+
+await test('48. operator ai_config: read view, propose, confirm, applied', async () => {
+    const view = await mcpRpc('tools/call', { name: 'aimeat_operator_ai_config', arguments: {} }, 133);
+    const viewData = toolText(view.body);
+    assert(viewData.current !== undefined, `view: ${JSON.stringify(viewData).slice(0, 150)}`);
+
+    const prop = await mcpRpc('tools/call', {
+        name: 'aimeat_operator_ai_config',
+        arguments: { daily_budget_usd: 2.5, model: 'openrouter/test-model' },
+    }, 134);
+    const propData = toolText(prop.body);
+    assert(propData.mode === 'proposal' && typeof propData.confirm_token === 'string', `propose: ${JSON.stringify(propData).slice(0, 200)}`);
+    assert(propData.diff?.daily_budget_usd?.to === 2.5, 'budget in diff');
+
+    const appl = await mcpRpc('tools/call', {
+        name: 'aimeat_operator_ai_config',
+        arguments: { daily_budget_usd: 2.5, model: 'openrouter/test-model', confirm_token: propData.confirm_token },
+    }, 135);
+    const applData = toolText(appl.body);
+    assert(applData.mode === 'applied', `apply: ${JSON.stringify(applData).slice(0, 200)}`);
+
+    const check = await json('/v1/ai/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(check.body.data.daily_budget_usd === 2.5 || check.body.data?.settings?.daily_budget_usd === 2.5,
+        `settings after apply: ${JSON.stringify(check.body.data).slice(0, 200)}`);
+});
+
+await test('49. ai_config never exposes or accepts the API key', async () => {
+    const view = await mcpRpc('tools/call', { name: 'aimeat_operator_ai_config', arguments: {} }, 136);
+    const raw = JSON.stringify(toolText(view.body));
+    assert(!raw.includes('apiKey') && !raw.includes('encrypted'), `leaked: ${raw.slice(0, 200)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

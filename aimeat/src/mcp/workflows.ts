@@ -9,6 +9,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-07-06 — aimeat_workflow_save gains opt-in propose-then-confirm (propose:true →
+ *     diff + single-use payload-bound confirm_token; plain saves unchanged). Server MCP only.
  *   v1.0.0 — 2026-06-13 — Phase 8: tight MCP surface (save/get/run) for agent-authored workflows.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -24,6 +26,7 @@ import {
   saveWorkflow, getWorkflow, listWorkflows, listRuns, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
+import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 
 export function registerWorkflowTools(
   mcp: McpServer,
@@ -45,10 +48,45 @@ export function registerWorkflowTools(
     {
       id: z.string().describe('Workflow id (lowercase slug). Creating with an existing id updates it.'),
       definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved} }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
+      propose: z.boolean().optional().describe('Operator flow: return a diff vs the current definition + a single-use confirm_token WITHOUT saving. Default false (direct save, unchanged behavior).'),
+      confirm_token: z.string().optional().describe('Token from the propose step — applies exactly the proposed definition.'),
     },
     annotationsFor('aimeat_workflow_save'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
+
+      // Operator propose-then-confirm (opt-in; plain saves stay untouched).
+      if (a.propose && !a.confirm_token) {
+        const current = await getWorkflow(storage, ownerGhii, a.id);
+        const INPUT_FIELDS = ['title', 'description', 'trigger', 'vars', 'steps', 'on_step_fail', 'llm'] as const;
+        const diff: Record<string, { from: unknown; to: unknown }> = {};
+        const cur = (current ?? {}) as Record<string, unknown>;
+        const next = a.definition as Record<string, unknown>;
+        for (const f of INPUT_FIELDS) {
+          if (JSON.stringify(cur[f] ?? null) !== JSON.stringify(next[f] ?? null)) {
+            diff[f] = { from: cur[f] ?? null, to: next[f] ?? null };
+          }
+        }
+        const token = await mintConfirmToken(agentGaii, 'workflow_save', { id: a.id, definition: a.definition });
+        return text({
+          mode: 'proposal',
+          id: a.id,
+          exists: !!current,
+          diff,
+          confirm_token: token,
+          expires_in_seconds: 600,
+          instructions: 'Show this diff to the owner. To apply EXACTLY this definition, call again with the same id + definition plus confirm_token. Any change invalidates the token.',
+        });
+      }
+      if (a.confirm_token) {
+        try {
+          await verifyConfirmToken(a.confirm_token, agentGaii, 'workflow_save', { id: a.id, definition: a.definition });
+        } catch (e) {
+          if (e instanceof ConfirmTokenError) return err(`${e.code}: ${e.message}`);
+          throw e;
+        }
+      }
+
       const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii);
       if (!result.ok) return err(`Validation failed:\n- ${(result.errors ?? []).join('\n- ')}`);
       const scheduler = getActiveScheduler();

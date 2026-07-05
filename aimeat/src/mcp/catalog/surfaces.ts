@@ -68,7 +68,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_dm_send', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink',
-        'aimeat_operator_agent_configure',
+        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
@@ -107,7 +107,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
         'aimeat_agent_mode_set', 'aimeat_agent_tags_set',
-        'aimeat_operator_agent_configure',
+        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
 };
 

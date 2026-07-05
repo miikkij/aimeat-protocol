@@ -74,6 +74,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
     // ── Operator config enactment ──
     aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_operator_ai_config: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
