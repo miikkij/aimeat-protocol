@@ -11,6 +11,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial (Phase 1): reason + librarian-assess steps only.
  *   v1.1.0 — 2026-06-21 — Phase 2: add `delegate` step kind + {{capabilities}} offer catalogue.
+ *   v1.2.0 — 2026-07-05 — B1: don't re-derive a note's own explicit next steps as llm_reason steps
+ *     (they are mined separately as actions); enrichment steps target what makes the note itself
+ *     more useful. Keeps the planner and the action miner from duplicating the same next-steps.
  */
 
 /** System/behavioural framing for the planner model. */
@@ -48,6 +51,7 @@ export const NOTEBOOK_PLAN_TEMPLATE = [
   '- Only propose a step if it clearly helps. A trivial, already-complete note may need ZERO steps — return an empty "steps" array in that case.',
   '- Prefer doing cheap reasoning/assessment yourself (llm_reason / librarian_assess). Delegate only when the work needs something you cannot do here (live web, image generation, external/grounded research).',
   '- Order steps so earlier results can inform later ones.',
+  '- If the note contains explicit next steps or open items, do not re-derive them as llm_reason steps; they are extracted separately as actions. Focus enrichment steps on what makes the note itself more useful.',
   '- "gate": true if the user should confirm before this step runs; default delegate steps to gate=true (they spend agent time/morsels). false only for clearly safe, cheap, self-run steps.',
   '- Do NOT claim to browse the web or generate images yourself — that is what "delegate" is for.',
   '',

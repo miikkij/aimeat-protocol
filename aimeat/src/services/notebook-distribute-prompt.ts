@@ -8,6 +8,8 @@
  *   Placeholders: {{structure}} (organism/workspace/document-space JSON) and {{note}} (the note text).
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial (Phase 3): split a note into placed chunks.
+ *   v1.1.0 — 2026-07-05 — B3: raise the split ceiling from 6 to 12 chunks (a real 12-item note was
+ *     being truncated); the over-split guard is unchanged. Paired with MAX_CHUNKS=12 in notebook-classify.ts.
  */
 
 /** System/behavioural framing for the distributor model. */
@@ -28,7 +30,7 @@ export const NOTEBOOK_DISTRIBUTE_TEMPLATE = [
   '{{note}}',
   '"""',
   '',
-  'Split this note into 1 to 6 SELF-CONTAINED chunks, each covering one coherent topic/sub-topic, and decide the best place to FILE EACH chunk as its own DOCUMENT.',
+  'Split this note into 1 to 12 SELF-CONTAINED chunks, each covering one coherent topic/sub-topic, and decide the best place to FILE EACH chunk as its own DOCUMENT.',
   'Rules:',
   '- A note about a single thing may be ONE chunk — do not over-split. Split only when the note genuinely covers distinct topics that belong in different places.',
   '- Each chunk must stand on its own: give it a clear "title" and a clean, self-contained "markdown" body (preserve the user\'s meaning and any relevant sources; do not invent facts).',
