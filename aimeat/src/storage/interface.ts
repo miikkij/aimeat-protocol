@@ -181,10 +181,14 @@ export interface MemoryRecord {
   key: string;
   ownerGaii: string;    // the agent GAII that owns this memory
   value: unknown;
-  // 'members' = readable by any authenticated user of this node (NOT the shared
-  // anonymous identity); sits between 'group' and 'public'.
-  visibility: 'private' | 'owner' | 'group' | 'members' | 'public';
+  // 'members'   = readable by any authenticated user of this node (NOT the shared anonymous identity).
+  // 'workspace' = readable by members of the organism workspace named in `workspaceRef` (org/ws) —
+  //               node-local (DMZ), never federated; the read is gated by canReadWorkspace().
+  // Ordering low→high reach: private < owner < group < workspace < members < public.
+  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
   groupId?: string;
+  /** For visibility 'workspace': the "<organismId>/<workspaceId>" whose members may read this record. */
+  workspaceRef?: string;
   tags: string[];
   ttlHours: number | null;
   version: number;
@@ -467,8 +471,13 @@ export interface MicroMemoryRecord {
 export interface StorageFileRecord {
   key: string;
   ownerGaii: string;
-  visibility: 'private' | 'owner' | 'group' | 'public';
+  // Same tiers as MemoryRecord (files were lagging): 'members' = any authenticated node user;
+  // 'workspace' = members of the organism workspace in `workspaceRef`. Both gated by the SAME
+  // authorizeRead() core as memory, so a file authorizes identically to a memory record.
+  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
   groupId?: string;
+  /** For visibility 'workspace': the "<organismId>/<workspaceId>" whose members may read this file. */
+  workspaceRef?: string;
   mimeType: string;
   size: number;
   data: Buffer;

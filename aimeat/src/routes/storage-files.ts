@@ -124,9 +124,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let mimeType: string;
         let federateFlag = false;
         let groupId: string | undefined;
+        let workspaceRef: string | undefined;
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId } = req.body ?? {};
+            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef } = req.body ?? {};
             federateFlag = reqFederate === true;
 
             // --- PRESIGNED MODE: return upload URL ---
@@ -166,6 +167,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             key = k;
             visibility = v ?? 'private';
             groupId = visibility === 'group' ? reqGroupId : undefined;
+            workspaceRef = visibility === 'workspace' ? reqWorkspaceRef : undefined;
+            if (visibility === 'workspace' && (typeof workspaceRef !== 'string' || workspaceRef.indexOf('/') < 1)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_ref as "<organismId>/<workspaceId>"'));
+                return;
+            }
             fileData = decoded;
             mimeType = mime_type ?? 'application/octet-stream';
         } else {
@@ -202,8 +208,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const file = await storage.createStorageFile({
             key,
             ownerGaii: gaii,
-            visibility: visibility as 'private' | 'owner' | 'group' | 'public',
+            visibility: visibility as 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public',
             groupId,
+            workspaceRef,
             mimeType,
             size: fileData.length,
             data: fileData,
@@ -524,23 +531,37 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Same access decision + audit as memory, threading file.groupId so visibility:'group'
-        // files are membership-checked. An anonymous caller holding a matching grant can still
-        // be allowed (parity with the prior behavior).
-        const accessorGaii = req.auth?.sub ?? 'anonymous';
+        // Same access decision + audit as memory, threading file.groupId (visibility:'group'),
+        // file.workspaceRef + the accessor's sub/owner (visibility:'workspace' → canReadWorkspace).
+        // An anonymous caller holding a matching grant can still be allowed (parity with the prior
+        // behavior). The <img>-loadable path for a NON-public file is: the reader's app blob-fetches
+        // /v1/pub with the reader's Bearer, and this decision gates it.
+        const isAnonymous = !req.auth?.sub || req.auth.anonymous === true;
+        // Resolve to the GHII/GAII — an OWNER session carries a BARE `sub`, but consent grants and the
+        // workspace manifest gate are keyed under the resolved identity (owner@node). Passing the bare
+        // name would miss the grant. This mirrors what the workspace route (canReadWorkspace) resolves.
+        const accessorGaii = isAnonymous ? 'anonymous' : resolveIdentity(req.auth!, config.nodeId);
+        // 'members' = any authenticated node user; authorizeRead trusts the caller to reject the shared
+        // anonymous identity, so gate it here — a token-less <img> must not read a members-only file.
+        if (file.visibility === 'members' && isAnonymous) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
         const result = await authorizeRead(storage, config, {
             ownerGaii: gaii,
             accessorGaii,
             resourceKey: `storage:${key}`,
             visibility: file.visibility,
             groupId: file.groupId,
+            workspaceRef: file.workspaceRef,
+            accessorSub: req.auth?.sub,
+            accessorOwner: req.auth?.owner as string | undefined,
             action: 'read',
         });
 
         if (!result.allowed) {
             // Authenticated-but-denied → 403 (matches GET /v1/memory/:gaii/:key). Anonymous or
             // unauthenticated callers keep the 404 existence-hiding convention for file URLs.
-            const isAnonymous = !req.auth?.sub || req.auth.anonymous === true;
             if (isAnonymous) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
                 return;

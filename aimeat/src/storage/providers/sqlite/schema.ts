@@ -1755,6 +1755,9 @@ export function initializeSchema(db: Database.Database): void {
   // Agent Dashboard Phase 1 — sharing group references + agent capabilities/activity
   safeAddColumn('memory', 'groupId', 'TEXT');
   safeAddColumn('storage_files', 'groupId', 'TEXT');
+  // Workspace-scoped visibility tier (files reach parity with memory): "<org>/<ws>" whose members may read.
+  safeAddColumn('memory', 'workspaceRef', 'TEXT');
+  safeAddColumn('storage_files', 'workspaceRef', 'TEXT');
   safeAddColumn('agents', 'technicalCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'domainCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");

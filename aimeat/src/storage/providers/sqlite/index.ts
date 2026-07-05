@@ -546,10 +546,10 @@ export class SqliteStorage implements Storage {
       }
       record.version = existing.version + 1;
       this.db.prepare(
-        `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
+        `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
          createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ? WHERE ownerGaii = ? AND key = ?`
       ).run(
-        JSON.stringify(record.value), record.visibility,
+        JSON.stringify(record.value), record.visibility, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
@@ -559,11 +559,11 @@ export class SqliteStorage implements Storage {
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
-        JSON.stringify(record.value), record.visibility,
+        JSON.stringify(record.value), record.visibility, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
@@ -592,10 +592,10 @@ export class SqliteStorage implements Storage {
 
   async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
     const result = this.db.prepare(
-      `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
+      `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
        updatedAt = ?, flagCount = ?, allowedOrigins = ? WHERE ownerGaii = ? AND key = ? AND version = ?`
     ).run(
-      JSON.stringify(record.value), record.visibility,
+      JSON.stringify(record.value), record.visibility, record.workspaceRef ?? null,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.updatedAt,
       record.flagCount ?? 0,
@@ -788,6 +788,7 @@ export class SqliteStorage implements Storage {
     }
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.groupId) record.groupId = row.groupId as string;
+    if (row.workspaceRef) record.workspaceRef = row.workspaceRef as string;
     if (row.trackable) record.trackable = true;
     if (row.archived) record.archived = true;
     if (row.archivedAt) record.archivedAt = row.archivedAt as string;
@@ -1500,10 +1501,10 @@ export class SqliteStorage implements Storage {
 
   async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, mimeType, size, data, accessCode, tags, createdAt, federate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, accessCode, tags, createdAt, federate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      file.ownerGaii, file.key, file.visibility, file.groupId ?? null,
+      file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
       file.mimeType, file.size, file.data,
       file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
       file.federate ? 1 : 0,
@@ -1526,6 +1527,7 @@ export class SqliteStorage implements Storage {
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.groupId) record.groupId = row.groupId as string;
+    if (row.workspaceRef) record.workspaceRef = row.workspaceRef as string;
     record.federate = (row as any).federate === 1;
     return record;
   }
@@ -1545,6 +1547,7 @@ export class SqliteStorage implements Storage {
       };
       if (r.accessCode) record.accessCode = r.accessCode as string;
       if (r.groupId) record.groupId = r.groupId as string;
+      if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
       record.federate = (r as any).federate === 1;
       return record;
     });
@@ -1563,10 +1566,12 @@ export class SqliteStorage implements Storage {
     return this.getStorageFile(ownerGaii, key);
   }
 
-  async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): Promise<StorageFileRecord | null> {
-    const result = this.db.prepare(
-      'UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?'
-    ).run(visibility, ownerGaii, key);
+  async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null> {
+    // workspaceRef undefined → change visibility only (keep any existing ref); provided → set both
+    // (pass '' to clear). Lets a caller flip a file to 'workspace' AND bind it to its org/ws in one call.
+    const result = workspaceRef === undefined
+      ? this.db.prepare('UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?').run(visibility, ownerGaii, key)
+      : this.db.prepare('UPDATE storage_files SET visibility = ?, workspaceRef = ? WHERE ownerGaii = ? AND key = ?').run(visibility, workspaceRef || null, ownerGaii, key);
     if (result.changes === 0) return null;
     return this.getStorageFile(ownerGaii, key);
   }

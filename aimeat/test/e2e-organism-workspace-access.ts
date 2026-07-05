@@ -47,6 +47,7 @@ console.log('\n=== AIMEAT Organism Workspace Access E2E ===\n');
 
 let A: Awaited<ReturnType<typeof setupOwner>>;
 let B: Awaited<ReturnType<typeof setupOwner>>;
+let C: Awaited<ReturnType<typeof setupOwner>> | undefined;
 let orgId = '';
 const WS = 'ws-acc1';
 const root = () => `organism.${orgId}.w.${WS}`;
@@ -139,9 +140,54 @@ await test('10. mark read clears the unread count', async () => {
     assert(bn.body.data.unread === 0, `B unread should be 0, got ${bn.body.data.unread}`);
 });
 
-await test('Cleanup A + B', async () => {
+// ─── Phase 2: workspace-scoped FILE visibility. A file BOUND to this workspace (visibility:'workspace',
+//     workspace_ref="org/ws") is readable by exactly the people who can read the workspace — the creator
+//     and members WITH access — via GET /v1/pub, and nobody else. Same canReadWorkspace gate as the
+//     manifest read above, now applied to storage files (files reached parity with memory). ───
+const A_GHII = `${A.name}@${NODE_ID}`;
+const wsFileKey = `wsfile-${Date.now()}`;
+const wsFileB64 = Buffer.from('workspace-only bytes').toString('base64');
+const pubUrl = () => `${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(wsFileKey)}`;
+
+await test('11. A uploads a workspace-visibility file bound to this org/ws', async () => {
+    const r = await json('/v1/storage', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: wsFileKey, data: wsFileB64, mime_type: 'text/plain', visibility: 'workspace', workspace_ref: `${orgId}/${WS}` }) });
+    assert(r.status === 201, `upload ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.visibility === 'workspace', `visibility ${r.body.data.visibility}`);
+});
+
+await test('12. A (creator) reads the workspace file via /v1/pub → 200 (not public)', async () => {
+    const res = await fetch(pubUrl(), { headers: auth(A.token) });
+    assert(res.status === 200, `creator expected 200, got ${res.status}`);
+});
+
+await test('13. Anonymous cannot read the workspace file → 404 (never public)', async () => {
+    const res = await fetch(pubUrl());
+    assert(res.status === 404, `anon expected 404, got ${res.status}`);
+});
+
+await test('14. Member B WITHOUT workspace access cannot read the file → 403', async () => {
+    // B's access was revoked in test 8: a member who cannot read the workspace cannot read its files.
+    const res = await fetch(pubUrl(), { headers: auth(B.token) });
+    assert(res.status === 403, `revoked member expected 403, got ${res.status}`);
+});
+
+await test('15. A re-approves B → B (member WITH access) reads the file → 200', async () => {
+    const ap = await json(`/v1/organisms/${orgId}/workspace-access/decision`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS, requester: B.name, decision: 'approve' }) });
+    assert(ap.status === 200, `approve ${ap.status}: ${JSON.stringify(ap.body.error)}`);
+    const res = await fetch(pubUrl(), { headers: auth(B.token) });
+    assert(res.status === 200, `member with access expected 200, got ${res.status}`);
+});
+
+await test('16. A non-member (fresh owner C) cannot read the workspace file → 403', async () => {
+    C = await setupOwner('c');
+    const res = await fetch(pubUrl(), { headers: auth(C.token) });
+    assert(res.status === 403, `non-member expected 403, got ${res.status}`);
+});
+
+await test('Cleanup A + B + C', async () => {
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });
+    if (C) await json(`/v1/owners/${C.name}`, { method: 'DELETE', headers: auth(C.token) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
