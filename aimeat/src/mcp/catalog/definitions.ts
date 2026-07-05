@@ -979,24 +979,28 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Default scope is your owner\'s user registry; scope=node (operator-only) publishes to the node-wide library. Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.',
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             skill_md: { type: 'string', description: 'SKILL.md content (frontmatter + body). Omit for presigned ZIP upload mode.' },
             files: { type: 'object', description: 'Additional files as relative-path -> content (scripts/, references/, assets/).' },
-            scope: { type: 'string', enum: ['user', 'node'], description: 'Registry scope (default user). node is operator-only.' },
-            visibility: { type: 'string', enum: ['owner', 'members', 'public'], description: 'Registry visibility. Defaults: user->owner, node->members. public = federated.' },
+            scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Registry scope (default user).' },
+            visibility: { type: 'string', enum: ['owner', 'members', 'public'], description: 'Registry visibility (node/user). Defaults: user->owner, node->members. public = federated.' },
+            organism_id: { type: 'string', description: 'Workspace scope: the organism id.' },
+            workspace_id: { type: 'string', description: 'Workspace scope: the workspace id.' },
         },
     },
     {
         name: 'aimeat_skill_list',
-        description: 'Browse the skills registry without loading bodies (progressive disclosure — manifests only). view=library (default) returns everything you can load right now grouped by scope: the node-wide library plus your owner\'s user registry. view=linked shows the skill refs attached to an agent (default: yourself). view=mine lists only your owner\'s user-scope skills. Load a skill\'s actual content with aimeat_skill_get.',
+        description: 'Browse the skills registry without loading bodies (progressive disclosure — manifests only). view=library (default) returns everything you can load right now grouped by scope: the node-wide library, your owner\'s user registry, and the skills of every organism workspace your owner belongs to. view=linked shows the skill refs attached to an agent (default: yourself). view=mine lists only your owner\'s user-scope skills. view=workspace lists one workspace\'s skills (organism_id + workspace_id). Load a skill\'s actual content with aimeat_skill_get.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            view: { type: 'string', enum: ['library', 'linked', 'mine'], description: 'Which listing (default library).' },
+            view: { type: 'string', enum: ['library', 'linked', 'mine', 'workspace'], description: 'Which listing (default library).' },
             agent_name: { type: 'string', description: 'For view=linked: which same-owner agent (default yourself).' },
+            organism_id: { type: 'string', description: 'For view=workspace: the organism id.' },
+            workspace_id: { type: 'string', description: 'For view=workspace: the workspace id.' },
         },
     },
     {
@@ -1005,7 +1009,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            ref: { type: 'string', description: 'Full skill ref: node:{name} or user:{owner}/{name}.' },
+            ref: { type: 'string', description: 'Full skill ref: node:{name}, user:{owner}/{name}, or ws:{org}/{ws}/{name}.' },
             name: { type: 'string', description: 'Bare skill name (own registry first, then node library). Ignored when ref is given.' },
             manifest_only: { type: 'boolean', description: 'Return only the manifest, no file bodies.' },
         },

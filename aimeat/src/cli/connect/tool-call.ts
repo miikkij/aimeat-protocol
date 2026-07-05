@@ -814,6 +814,8 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             files: input.files,
             scope: optionalString(input, 'scope'),
             visibility: optionalString(input, 'visibility'),
+            organism: optionalString(input, 'organism_id'),
+            ws: optionalString(input, 'workspace_id'),
         }),
     },
     {
@@ -834,6 +836,8 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
                 if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}?scope=node${manifestOnly}`);
                 const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
                 if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}?scope=user&owner=${encodeURIComponent(user[1])}${manifestOnly}`);
+                const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+)$/);
+                if (ws) return client.get(`/v1/skills/${encodeURIComponent(ws[3])}?scope=workspace&organism=${encodeURIComponent(ws[1])}&ws=${encodeURIComponent(ws[2])}${manifestOnly}`);
                 throw new Error(`Not a valid skill ref: ${ref}`);
             }
             return client.get(`/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}?${manifestOnly.replace('&', '')}`);

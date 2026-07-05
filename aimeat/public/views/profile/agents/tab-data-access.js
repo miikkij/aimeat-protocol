@@ -530,7 +530,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           <div class="pf-agd-area-form">
             ${skillLibrary === null ? html`<span>${t('common.loading') || '...'}</span>` : html`
               <select value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
-                ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? [])]
+                ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
                   .filter(s => !skillLinks.some(l => l.ref === s.ref))
                   .map(s => html`<option key=${s.ref} value=${s.ref}>${s.name} (${s.scope}) — ${s.description.slice(0, 60)}</option>`)}
               </select>

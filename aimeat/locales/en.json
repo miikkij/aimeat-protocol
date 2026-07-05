@@ -7399,6 +7399,8 @@
     "mySkills": "My skills",
     "nodeLibrary": "Node library",
     "nodeLibraryHint": "Skills the node operator makes available to every agent on this node.",
+    "workspaceSkills": "Workspace skills",
+    "workspaceSkillsHint": "Skills shared inside organism workspaces you belong to. They travel with workspace exports and templates.",
     "newSkill": "New skill",
     "publish": "Publish",
     "publishing": "Publishing…",
