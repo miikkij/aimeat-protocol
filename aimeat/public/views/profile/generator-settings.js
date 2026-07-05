@@ -8,6 +8,11 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.5.0 — 2026-07-05 — Model dropdown now populates for custom OpenAI-compatible providers
+ *     (e.g. NVIDIA NIM https://integrate.api.nvidia.com/v1): reload models after every save (not
+ *     only when a new key is typed, so switching base URL refreshes the list), surface model-load
+ *     failures inline, and add a "Refresh models" button with a live count. Pairs with the
+ *     listModels() name→id fallback fix in services/openrouter.ts.
  *   v1.4.1 — 2026-07-05 — Per-app limits table also lists apps active in the last 30 days (from the
  *     history chart), not only apps that spent TODAY — so a cap can be set even when today's spend is $0.
  *   v1.4.0 — 2026-07-05 — AI apps budget panel: add a per-app stacked "usage over time" chart (30 days,
@@ -46,6 +51,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
   const [visionModel, setVisionModel] = useState('');
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState(null);
   const [autoRetry, setAutoRetry] = useState(false);
   const [maxRetries, setMaxRetries] = useState(3);
   const [provider, setProvider] = useState('openrouter');
@@ -89,12 +95,20 @@ export function OpenRouterSettings({ onSettingsChange }) {
 
   async function loadModels() {
     setModelsLoading(true);
+    setModelsError(null);
     try {
       const resp = await apiGet('/v1/openrouter/models');
-      if (resp.ok !== false && resp.data?.models) {
+      if (resp.ok !== false && Array.isArray(resp.data?.models)) {
         setModels(resp.data.models);
+        if (resp.data.models.length === 0) setModelsError(t('profile.generator.openrouter.modelsEmpty'));
+      } else {
+        setModels([]);
+        setModelsError(resp.error?.message || t('profile.generator.openrouter.modelsError'));
       }
-    } catch { /* couldn't fetch models */ }
+    } catch (e) {
+      setModels([]);
+      setModelsError(e?.message || t('profile.generator.openrouter.modelsError'));
+    }
     setModelsLoading(false);
   }
 
@@ -118,7 +132,10 @@ export function OpenRouterSettings({ onSettingsChange }) {
         showMsg(t('profile.generator.openrouter.apiKeySaved'));
         setHasApiKey(true);
         setApiKey('');
-        if (apiKey) loadModels();
+        // Reload models after every save — the list is fetched from the provider's
+        // /v1/models using the just-saved base URL + key, so switching provider (e.g.
+        // to NVIDIA's integrate.api.nvidia.com/v1) refreshes it even with no new key.
+        loadModels();
       }
     } catch (e) {
       showMsg(e.message, true);
@@ -150,6 +167,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
       setModel('');
       setVisionModel('');
       setModels([]);
+      setModelsError(null);
       setAutoRetry(false);
       setMaxRetries(3);
       setTemperature('');
@@ -237,6 +255,15 @@ export function OpenRouterSettings({ onSettingsChange }) {
                 </select>
               `
             }
+            <div class="pf-gen-or-param-row pf-gen-or-model-row">
+              <button type="button" class="btn-outline btn-sm"
+                onClick=${loadModels} disabled=${modelsLoading || !hasApiKey}>
+                ${t('profile.generator.openrouter.modelsRefresh')}${models.length ? ` (${models.length})` : ''}
+              </button>
+              <span class=${modelsError ? 'pf-gen-or-param-hint pf-gen-or-model-error' : 'pf-gen-or-param-hint'}>
+                ${modelsError || t('profile.generator.openrouter.modelsHint')}
+              </span>
+            </div>
           </div>
 
           <!-- Vision model (image inputs — Secretary doc/image intake) -->
