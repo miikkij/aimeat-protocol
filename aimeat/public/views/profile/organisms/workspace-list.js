@@ -15,9 +15,13 @@
  *     the 'organisms' live refresh is debounced (1.5s) so an agent-driven event burst is one reload.
  *   v1.2.0 — 2026-06-26 — Archive/unarchive a workspace (creator/admin) via the kebab menu + an
  *     "archived" badge; archived workspaces are read-only and hidden from AI materials.
+ *   v1.3.0 — 2026-07-05 — Per-user manual ordering of the active workspace list: drag rows to
+ *     reorder + a sort control (My order / Name / Newest), mirroring the organisms list. The order
+ *     is a private per-user preference stored in owner memory (organisms.ws.{orgId}); no server
+ *     change. Archived workspaces are not reorderable.
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
@@ -27,6 +31,7 @@ import { useConfirm } from '/components/Modal.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { Mermaid } from '/components/Mermaid.js';
 import * as orgService from '/js/services/organisms.js';
+import * as memoryService from '/js/services/memory.js';
 import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
 
@@ -50,6 +55,65 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const [archivedOpen, setArchivedOpen] = useState(false); // collapsible "Archived workspaces" section
   const [wsStats, setWsStats] = useState({});             // wsId → { recs, docs, lastEv, hasManifest }
   const [apprByWs, setApprByWs] = useState({});           // wsId → pending review count
+
+  // ── Per-user manual ordering (mirrors the organisms list) ──────────────────────────────────────
+  // The active workspace order is a private, per-user preference — NOT organism content — so it lives
+  // in the owner's own memory under a per-organism key. Only this user sees their order; no server or
+  // consent change. Archived workspaces are excluded from ordering (they collapse into their own list).
+  const UI_PREFS_KEY = `organisms.ws.${orgId}`;
+  const [customOrder, setCustomOrder] = useState([]);     // wsIds in the user's manual order
+  const [sortMode, setSortMode] = useState('custom');     // 'custom' | 'name' | 'newest'
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragIdRef = useRef(null);
+  // Load saved order/sort for THIS organism; reset first so switching organisms never carries prefs over.
+  useEffect(() => {
+    let alive = true;
+    setCustomOrder([]); setSortMode('custom');
+    (async () => {
+      try {
+        const r = await memoryService.getMemory(UI_PREFS_KEY, { soft: true });
+        const v = r?.data?.value;
+        if (alive && v && typeof v === 'object') {
+          if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
+          if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
+        }
+      } catch { /* no saved prefs yet */ }
+    })();
+    return () => { alive = false; };
+  }, [UI_PREFS_KEY]);
+  const savePrefs = useCallback((order, sort) => {
+    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(() => {});
+  }, [UI_PREFS_KEY]);
+
+  // Active workspaces sorted for display; archived ones stay in server order in their own section.
+  // Stable sort keeps server order for ids missing from the saved manual order (appended at the end).
+  const activeSorted = useMemo(() => {
+    const arr = (list || []).filter(w => !w.archived);
+    if (sortMode === 'name') arr.sort((a, b) => (a.name || a.id || '').localeCompare(b.name || b.id || '', undefined, { sensitivity: 'base' }));
+    else if (sortMode === 'newest') arr.sort((a, b) => +new Date(b.created_at || 0) - +new Date(a.created_at || 0));
+    else if (customOrder.length) {
+      const pos = new Map(customOrder.map((id, i) => [id, i]));
+      arr.sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : Infinity) - (pos.has(b.id) ? pos.get(b.id) : Infinity));
+    }
+    return arr;
+  }, [list, sortMode, customOrder]);
+  const archivedList = useMemo(() => (list || []).filter(w => w.archived), [list]);
+
+  // Drop on a row: move the dragged workspace to the target's position; switch to manual order and save.
+  const onDropRow = (targetId) => {
+    const fromId = dragIdRef.current;
+    dragIdRef.current = null;
+    setDragOverId(null);
+    if (!fromId || fromId === targetId) return;
+    const ids = activeSorted.map(w => w.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setCustomOrder(ids);
+    setSortMode('custom');
+    savePrefs(ids, 'custom');
+  };
 
   // Discovery: every workspace in the org (membership-gated) with this user's access status. A member
   // sees workspaces they can't yet read (access:'none') so they can request access. Row enrichment
@@ -216,7 +280,14 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         ` : html`
           <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
           <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>
-          ${overview ? html`<button class="btn-outline btn-sm ${showOverview ? 'pj-org-btn-active' : ''}" onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}`}
+          ${overview ? html`<button class="btn-outline btn-sm ${showOverview ? 'pj-org-btn-active' : ''}" onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}
+          ${activeSorted.length > 1 ? html`
+            <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+              onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
+              <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
+              <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
+              <option value="newest">${t('organisms.sortNewest') || 'Newest first'}</option>
+            </select>` : null}`}
       </div>
 
       <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
@@ -224,7 +295,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
       ${list === null ? html`<${Spinner} />`
         : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
         : (() => {
-          const renderWsRow = (w) => {
+          const renderWsRow = (w, canDrag) => {
             const locked = w.access === 'none';
             const reviews = apprByWs[w.id] || 0;
             const menuItems = w.access === 'owner' ? [
@@ -236,7 +307,13 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
               { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
             ] : [];
             return html`
-            <div class="pj-org-row" key=${w.id}>
+            <div class="pj-org-row ${dragOverId === w.id ? 'pj-org-drag-over' : ''}" key=${w.id}
+              draggable=${canDrag}
+              onDragStart=${canDrag ? ((e) => { dragIdRef.current = w.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
+              onDragOver=${canDrag ? ((e) => { e.preventDefault(); setDragOverId(w.id); }) : undefined}
+              onDragLeave=${canDrag ? (() => setDragOverId(d => (d === w.id ? null : d))) : undefined}
+              onDrop=${canDrag ? (() => onDropRow(w.id)) : undefined}
+              onDragEnd=${canDrag ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
               <div class="pj-org-avatar" aria-hidden="true">${'🗂'}</div>
               <div class="pj-org-main ${locked ? 'pj-org-main-static' : ''}" role=${locked ? undefined : 'button'} tabindex=${locked ? undefined : '0'}
                 onClick=${locked ? undefined : (() => onOpen(w.id))}
@@ -285,17 +362,19 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
                 </div>` : null}
             </div>`;
           };
-          // Active workspaces in the main list; archived ones collapse into a section below (restorable).
-          const active = list.filter(w => !w.archived);
-          const archived = list.filter(w => w.archived);
+          // Active workspaces in the main list (reorderable); archived ones collapse into a section
+          // below (restorable, not reorderable). Ordering is a per-user preference (see activeSorted).
+          const archived = archivedList;
           return html`
-            <div class="pj-org-list">${active.map(renderWsRow)}</div>
+            <div class="pj-org-list">${activeSorted.map(w => renderWsRow(w, true))}</div>
+            ${sortMode === 'custom' && activeSorted.length > 1 ? html`
+              <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
             ${archived.length > 0 ? html`
               <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
                 <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
                 <span>${'🗄️ '}${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))}</span>
               </button>
-              ${archivedOpen ? html`<div class="pj-org-list">${archived.map(renderWsRow)}</div>` : null}` : null}
+              ${archivedOpen ? html`<div class="pj-org-list">${archived.map(w => renderWsRow(w, false))}</div>` : null}` : null}
           `;
         })()}
 
