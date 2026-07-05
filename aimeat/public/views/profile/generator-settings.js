@@ -8,6 +8,8 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.4.1 — 2026-07-05 — Per-app limits table also lists apps active in the last 30 days (from the
+ *     history chart), not only apps that spent TODAY — so a cap can be set even when today's spend is $0.
  *   v1.4.0 — 2026-07-05 — AI apps budget panel: add a per-app stacked "usage over time" chart (30 days,
  *     cost⇄tokens toggle) fed by GET /v1/ai/usage/history, below the today bar + per-app table.
  *   v1.3.0 — 2026-07-05 — AI apps budget panel: per-app daily caps are now VISIBLE + EDITABLE inline
@@ -458,8 +460,11 @@ function AiAppsBudgetPanel() {
   const spent = usage.spent_today_usd;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
   const perAppEntries = Object.entries(usage.per_app || {});
-  // apps that have spent today OR have a configured per-app cap
-  const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...Object.keys(caps)]));
+  // apps to offer a per-app cap for: spent today, OR active in the last 30 days (from the history
+  // chart), OR already have a configured cap. Without the history apps the table is hidden whenever
+  // today's spend is $0 — leaving nowhere to set a cap for an app that only ran on earlier days.
+  const historyApps = (history && Array.isArray(history.apps)) ? history.apps : [];
+  const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...historyApps, ...Object.keys(caps)]));
 
   return html`
     <div class="pf-gen-or-field" style="border-top:2px solid var(--cl-ink,#e5e5e5);padding-top:14px;margin-top:14px;">
