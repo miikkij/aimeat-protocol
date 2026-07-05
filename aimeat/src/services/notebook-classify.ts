@@ -15,6 +15,9 @@
  *   v1.0.0 — 2026-06-19 — Initial: AI placement classifier over OpenRouter (slice B).
  *   v1.1.0 — 2026-06-21 — Key/model resolution + completion extracted to notebook-ai.ts (shared with
  *     the planner); ClassifyError now extends NotebookAiError.
+ *   v1.2.0 — 2026-07-05 — B2/B3: buildPlacementContext now attaches up to 3 recent doc titles per
+ *     document space as `examples` (placement bias — file beside same-type docs); MAX_CHUNKS 6→12 to
+ *     match the raised distribute split ceiling.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -24,7 +27,7 @@ import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
 
-export interface PlacementSpace { namespace: string; name: string }
+export interface PlacementSpace { namespace: string; name: string; examples?: string[] }
 export interface PlacementWorkspace { id: string; name: string; documentSpaces: PlacementSpace[] }
 export interface PlacementOrganism { id: string; name: string; description: string; workspaces: PlacementWorkspace[] }
 
@@ -81,9 +84,15 @@ export async function buildPlacementContext(
     for (const w of [...wsSeen.values()].slice(0, MAX_WS_PER_ORG)) {
       const summary = await collectWorkspaceSummary(storage, config, { orgId: org.id, ws: w.id, name: w.name, viewerGaii: opts.viewerGaii });
       if (!summary.readable) continue;
+      // B2 (placement bias): carry a few recent document titles per space as "examples" so the
+      // classifier can prefer the space where the SAME TYPE of material already lives, rather than
+      // filing on topical keyword overlap alone. `recent` is already newest-first (collectWorkspaceSummary).
       const documentSpaces = summary.spaces
         .filter(s => s.mode === 'document')
-        .map(s => ({ namespace: s.namespace, name: s.name }));
+        .map(s => {
+          const examples = s.recent.slice(0, 3).map(e => e.title).filter(Boolean);
+          return examples.length ? { namespace: s.namespace, name: s.name, examples } : { namespace: s.namespace, name: s.name };
+        });
       workspaces.push({ id: w.id, name: summary.name, documentSpaces });
     }
     organisms.push({ id: org.id, name: org.name, description: org.description || '', workspaces });
@@ -187,7 +196,7 @@ export interface DistributeResult {
   model: string;
 }
 
-const MAX_CHUNKS = 6;
+const MAX_CHUNKS = 12;   // B3: the distribute prompt now allows up to 12 chunks — keep the code cap in step
 
 async function loadDistributeTemplate(storage: Storage): Promise<string> {
   try {
