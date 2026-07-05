@@ -62,6 +62,7 @@ import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.j
 import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
 import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
 import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
+import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
 import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
 
 /* ───────────────── Organism workspace (manifest-driven) ─────────────────
@@ -1127,6 +1128,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     { id: 'people', label: t('organisms.tabPeople') || 'People', count: null },
     { id: 'share', label: t('organisms.share') || 'Share', count: null },
     { id: 'sources', label: t('organisms.sources') || 'Sources', count: null },
+    { id: 'skills', label: t('skills.wsTabLabel') || 'Skills', count: null },
     { id: 'review', label: t('organisms.tabReview') || 'Review', count: approvals.length || null },
   ];
   const stackedGroup = (id, label, desc, spaces) => ({
@@ -1565,6 +1567,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       `}
 
       ${activeTab === 'sources' ? html`<${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
+
+      ${activeTab === 'skills' ? html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
 
       ${activeTab === 'share' ? html`
         <div class="pj-section">

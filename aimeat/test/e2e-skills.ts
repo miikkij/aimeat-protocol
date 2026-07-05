@@ -699,6 +699,16 @@ await test('37. Workspace listing + library workspace group contain it', async (
         `library.workspace: ${JSON.stringify(lib.body.data.library.workspace)}`);
 });
 
+await test('37b. Workspace overview map surfaces the skill with its ws: ref', async () => {
+    const { status, body } = await json(`/v1/organisms/${orgId}/workspace/overview?ws=${WS}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const md = body.data?.markdown ?? JSON.stringify(body.data);
+    assert(md.includes('Skills (loadable expertise)'), 'skills section present');
+    assert(md.includes(`ws:${orgId}/${WS}/team-style`), `ref in map: ${md.slice(md.indexOf('Skills'), md.indexOf('Skills') + 200)}`);
+});
+
 await test('38. Resolve loads the workspace skill body', async () => {
     const { status, body } = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
