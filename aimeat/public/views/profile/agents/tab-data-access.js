@@ -11,6 +11,8 @@
  *   v1.5.0 -- 2026-05-31 -- Stored Memory Keys: show per-key created + last-updated timestamps (relative, full date on hover) and add a sort control (by updated or created, newest/oldest toggle). List now carries createdAt.
  *   v1.6.0 -- 2026-06-10 -- Empty sections compact to one row (title + "none" + Add button on the
  *     same line) — section order unchanged; a section grows when content arrives.
+ *   v1.7.0 -- 2026-07-05 -- Skills section: link/unlink registry skills (SkillRefs on
+ *     agents.{name}.skills via /v1/agents/:name/skills) — distinct from knowledge packages.
  */
 
 import { h } from 'preact';
@@ -22,6 +24,7 @@ import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
 import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
+import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
 
 const html = htm.bind(h);
@@ -45,6 +48,11 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [addingPackage, setAddingPackage] = useState(false);
   const [newPkgName, setNewPkgName] = useState('');
   const [newPkgDesc, setNewPkgDesc] = useState('');
+  // Skills registry links (SkillRefs on agents.{name}.skills — NOT directives resources).
+  const [skillLinks, setSkillLinks] = useState([]);
+  const [addingSkill, setAddingSkill] = useState(false);
+  const [skillLibrary, setSkillLibrary] = useState(null);   // null until the picker opens
+  const [selectedSkillRef, setSelectedSkillRef] = useState('');
   const [memoryKeys, setMemoryKeys] = useState([]);
   // Stored-key sorting: field (updated|created) + direction (desc=newest first).
   const [keySortField, setKeySortField] = useState('updated');
@@ -88,13 +96,15 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const [dirResp, memResp] = await Promise.all([
+      const [dirResp, memResp, links] = await Promise.all([
         getDirectives(agentName).catch(() => null),
         apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(() => null),
+        skillsService.getAgentSkillLinks(agentName).catch(() => []),
       ]);
       const data = dirResp?.data || {};
       setMemoryAreas(data.memory_areas || []);
       setResources(data.resources || []);
+      setSkillLinks(links);
       const items = memResp?.data?.items || memResp?.data || [];
       const keys = (Array.isArray(items) ? items : [])
         .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, createdAt: item.created_at ?? item.createdAt, updatedAt: item.updated_at ?? item.updatedAt }));
@@ -137,8 +147,45 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     // full-tab "Loading..." overlay. Showing the spinner on every tick
     // (the SSE bus debounces to ~500ms but still fires often) made the
     // whole panel flash blank every time anything changed server-side.
-    return onLiveUpdate(['memory', 'agents'], () => loadRef.current({ showSpinner: false }));
+    return onLiveUpdate(['memory', 'agents', 'skills'], () => loadRef.current({ showSpinner: false }));
   }, []);
+
+  async function openSkillPicker() {
+    if (addingSkill) { setAddingSkill(false); return; }
+    setAddingSkill(true);
+    if (!skillLibrary) {
+      try {
+        const lib = await skillsService.getLibrary();
+        setSkillLibrary(lib);
+        const first = [...lib.user, ...lib.node].find(s => !skillLinks.some(l => l.ref === s.ref));
+        setSelectedSkillRef(first?.ref ?? '');
+      } catch {
+        setSkillLibrary({ node: [], user: [] });
+      }
+    }
+  }
+
+  async function handleLinkSkill() {
+    if (!selectedSkillRef) return;
+    try {
+      const links = await skillsService.linkSkill(agentName, selectedSkillRef);
+      setSkillLinks(links);
+      setAddingSkill(false);
+      showToast(t('profile.agents.detail.data_access.skillLinked'));
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.data_access.skillLinkError'), true);
+    }
+  }
+
+  async function handleUnlinkSkill(ref) {
+    try {
+      const links = await skillsService.unlinkSkill(agentName, ref);
+      setSkillLinks(links);
+      showToast(t('profile.agents.detail.data_access.skillUnlinked'));
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.data_access.skillLinkError'), true);
+    }
+  }
 
   async function handleAddTag() {
     const tag = newTag.trim().toLowerCase();
@@ -470,6 +517,38 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}
           </div>
         `) : null}
+      </div>
+
+      <!-- SKILLS (registry refs — distinct from knowledge packages) -->
+      <div class="pf-agd-data-section">
+        <div class="pf-agd-section-header">
+          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.skillsTitle')}</span>
+          ${skillLinks.length === 0 && !addingSkill && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+          <button class="btn-outline btn-sm" onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}</button>
+        </div>
+        ${addingSkill && html`
+          <div class="pf-agd-area-form">
+            ${skillLibrary === null ? html`<span>${t('common.loading') || '...'}</span>` : html`
+              <select value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
+                ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? [])]
+                  .filter(s => !skillLinks.some(l => l.ref === s.ref))
+                  .map(s => html`<option key=${s.ref} value=${s.ref}>${s.name} (${s.scope}) — ${s.description.slice(0, 60)}</option>`)}
+              </select>
+              <button class="btn-primary btn-sm" disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}</button>
+            `}
+            <button class="btn-outline btn-sm" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}</button>
+          </div>
+        `}
+        ${skillLinks.map(link => html`
+          <div key=${link.ref} class="pf-agd-area-row">
+            <span class="pf-agd-area-key">${link.name}</span>
+            <span class="pf-agd-area-desc">${link.description || link.ref}</span>
+            <span class="pf-agd-area-actions">
+              <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}</button>
+            </span>
+          </div>
+        `)}
+        ${skillLinks.length > 0 && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.skillsHelp')}</div>`}
       </div>
 
       <!-- STORED MEMORY KEYS -->

@@ -6,6 +6,7 @@ import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from './keypair.js';
 import { initNodeKeys, getNodeCryptoKeys } from './jwt.js';
 import { initUploadTokenKeys } from '../services/upload-token.js';
+import { initConfirmTokenKeys } from '../services/operator-confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { logger } from '../utils/logger.js';
 
@@ -140,6 +141,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     const { privateKey, publicKey } = getNodeCryptoKeys();
     initUploadTokenKeys(privateKey, publicKey);
     initDownloadTokenKeys(privateKey, publicKey);
+    initConfirmTokenKeys(privateKey, publicKey);
     logger.info('Node keys initialized for JWT signing');
   } catch (err) {
     logger.error('Failed to initialize node keys', { error: err });

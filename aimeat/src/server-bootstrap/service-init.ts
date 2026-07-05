@@ -36,6 +36,7 @@ import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
+import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
@@ -125,6 +126,12 @@ export async function initializeServices(
   seedSystemPrompts(storage)
     .then(() => {})
     .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
+
+  // Seed built-in node-scope skills (operator + user runbooks) — create-if-missing,
+  // operator edits never overwritten.
+  seedBuiltinSkills(storage, config)
+    .then(count => { if (count > 0) logger.info(`Seeded ${count} built-in skill(s)`); })
+    .catch(err => logger.error('Failed to seed built-in skills', { error: String(err) }));
 
   // Auto-install bundled cortex extensions (aimeat-ui-*, aimeat-canvas, aimeat-charts)
   seedBundledCortexes(storage, `system@${config.nodeId}`)

@@ -32,7 +32,7 @@ import {
 const MAX_PER_PAGE = 100;
 const VALID_TYPES = new Set<DiscoveryType>([
   'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-  'company', 'offering', 'document', 'organism', 'app', 'memory',
+  'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'memory',
 ]);
 
 /** Split a CSV query param into a trimmed, non-empty list. */

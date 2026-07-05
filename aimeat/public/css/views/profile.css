@@ -3202,3 +3202,28 @@
 .pj-apps-picker-row { display: flex; align-items: center; gap: .6rem; padding: .35rem .5rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); }
 .pj-apps-picker-name { font-size: .87rem; }
 .pj-apps-picker-owner { flex: 1; font-size: .74rem; color: var(--muted); font-family: var(--mono); }
+
+/* ── Skills tab (pf-skl) — Skills registry Phase 2b ── */
+.pf-skl-section { margin-top: 1.25rem; }
+.pf-skl-section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.pf-skl-section-title { font-weight: 600; font-size: 0.95rem; }
+.pf-skl-section-hint { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+.pf-skl-row { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 0.55rem 0.75rem; margin-bottom: 0.5rem; }
+.pf-skl-row-main { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.pf-skl-name { font-weight: 600; font-family: var(--mono); font-size: 0.9rem; }
+.pf-skl-version { font-size: 0.74rem; color: var(--muted); }
+.pf-skl-files { font-size: 0.74rem; color: var(--muted); }
+.pf-skl-actions { margin-left: auto; display: flex; gap: 0.25rem; }
+.pf-skl-danger { color: var(--danger); }
+.pf-skl-desc { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
+.pf-skl-detail { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.pf-skl-detail-ref { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); margin-bottom: 0.35rem; }
+.pf-skl-body { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; font-size: 0.78rem; max-height: 24rem; overflow: auto; white-space: pre-wrap; }
+.pf-skl-file-row { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); padding: 0.15rem 0; }
+.pf-skl-editor { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-dim); padding: 0.75rem; margin-bottom: 0.75rem; }
+.pf-skl-editor-md { width: 100%; font-family: var(--mono); font-size: 0.82rem; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; }
+.pf-skl-editor-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.pf-skl-editor-hint { font-size: 0.76rem; color: var(--muted); margin-top: 0.4rem; }
+.pf-skl-empty { font-size: 0.84rem; color: var(--muted); padding: 0.4rem 0; }
+.pf-skl-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
+.pf-skl-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }
