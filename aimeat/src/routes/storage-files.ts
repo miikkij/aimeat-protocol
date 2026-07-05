@@ -32,6 +32,7 @@ import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 
@@ -127,7 +128,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let workspaceRef: string | undefined;
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef } = req.body ?? {};
+            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs } = req.body ?? {};
             federateFlag = reqFederate === true;
 
             // --- PRESIGNED MODE: return upload URL ---
@@ -167,9 +168,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             key = k;
             visibility = v ?? 'private';
             groupId = visibility === 'group' ? reqGroupId : undefined;
-            workspaceRef = visibility === 'workspace' ? reqWorkspaceRef : undefined;
-            if (visibility === 'workspace' && (typeof workspaceRef !== 'string' || workspaceRef.indexOf('/') < 1)) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_ref as "<organismId>/<workspaceId>"'));
+            workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) : undefined;
+            if (visibility === 'workspace' && !workspaceRef) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
                 return;
             }
             fileData = decoded;

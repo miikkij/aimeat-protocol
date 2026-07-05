@@ -184,6 +184,21 @@ await test('16. A non-member (fresh owner C) cannot read the workspace file → 
     assert(res.status === 403, `non-member expected 403, got ${res.status}`);
 });
 
+await test('17. A file bound to MULTIPLE workspaces is readable via ANY one the caller can read', async () => {
+    // Bound to a workspace B canNOT read (bogus) AND the real WS (B has access from test 15). The loop
+    // in authorizeRead allows if the caller can read ANY binding — so B reads it via the WS binding.
+    const multiKey = `wsfile-multi-${Date.now()}`;
+    const up = await json('/v1/storage', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: multiKey, data: wsFileB64, mime_type: 'text/plain', visibility: 'workspace', workspace_refs: [`${orgId}/ws-does-not-exist`, `${orgId}/${WS}`] }) });
+    assert(up.status === 201, `multi upload ${up.status}: ${JSON.stringify(up.body.error)}`);
+    const res = await fetch(`${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(multiKey)}`, { headers: auth(B.token) });
+    assert(res.status === 200, `member of one of the bound workspaces expected 200, got ${res.status}`);
+    // C (member of NEITHER) is still denied.
+    if (C) {
+        const cres = await fetch(`${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(multiKey)}`, { headers: auth(C.token) });
+        assert(cres.status === 403, `non-member expected 403 on multi-bound file, got ${cres.status}`);
+    }
+});
+
 await test('Cleanup A + B + C', async () => {
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });

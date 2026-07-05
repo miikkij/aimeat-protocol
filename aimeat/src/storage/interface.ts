@@ -187,7 +187,9 @@ export interface MemoryRecord {
   // Ordering low→high reach: private < owner < group < workspace < members < public.
   visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
   groupId?: string;
-  /** For visibility 'workspace': the "<organismId>/<workspaceId>" whose members may read this record. */
+  /** For visibility 'workspace': a SPACE-SEPARATED list of one or more "<organismId>/<workspaceId>"
+   *  bindings whose members may read this — a file/record shared into several workspaces is readable
+   *  by members of ANY of them. */
   workspaceRef?: string;
   tags: string[];
   ttlHours: number | null;
@@ -476,7 +478,9 @@ export interface StorageFileRecord {
   // authorizeRead() core as memory, so a file authorizes identically to a memory record.
   visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
   groupId?: string;
-  /** For visibility 'workspace': the "<organismId>/<workspaceId>" whose members may read this file. */
+  /** For visibility 'workspace': a SPACE-SEPARATED list of one or more "<organismId>/<workspaceId>"
+   *  bindings whose members may read this file (a file shared into several workspaces is readable by
+   *  members of ANY of them). */
   workspaceRef?: string;
   mimeType: string;
   size: number;

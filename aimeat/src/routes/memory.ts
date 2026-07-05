@@ -28,6 +28,7 @@ import { Router } from 'express';
 import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, StorageFileRecord } from '../storage/interface.js';
+import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
@@ -80,7 +81,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, agent: agentParam } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
     if (typeof key === 'string' && key.startsWith('organism.')) {
@@ -219,8 +220,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
-      // 'workspace' = readable by members of this "<org>/<ws>" (parity with storage files).
-      ...(vis === 'workspace' && typeof workspace_ref === 'string' ? { workspaceRef: workspace_ref } : {}),
+      // 'workspace' = readable by members of one or more "<org>/<ws>" (parity with storage files).
+      ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),
     });
 
     // C.3: Event-driven replication queue integration
@@ -1240,22 +1241,23 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // POST /v1/memory/files — upload file (base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
-    const { key, content, mime_type, visibility, tags, workspaceRef } = req.body ?? {};
+    const { key, content, mime_type, visibility, tags, workspaceRef, workspace_refs } = req.body ?? {};
 
     if (!key || !content) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
       return;
     }
 
-    // Files now share memory's full tier set. 'workspace' must name its "<org>/<ws>" so members of
-    // that workspace can read it (the shared authorizeRead/canReadWorkspace gate).
+    // Files now share memory's full tier set. 'workspace' names one or more "<org>/<ws>" (a file can be
+    // shared into several workspaces) so members of ANY of them can read it (authorizeRead/canReadWorkspace).
     const VIS = ['private', 'owner', 'group', 'workspace', 'members', 'public'];
     if (visibility !== undefined && !VIS.includes(visibility)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${VIS.join(', ')}`));
       return;
     }
-    if (visibility === 'workspace' && (typeof workspaceRef !== 'string' || workspaceRef.indexOf('/') < 1)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspaceRef as "<organismId>/<workspaceId>"'));
+    const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
+    if (visibility === 'workspace' && !wsRefStr) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
       return;
     }
 
@@ -1283,7 +1285,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key,
       ownerGaii: gaii,
       visibility: (visibility as StorageFileRecord['visibility']) ?? 'private',
-      workspaceRef: visibility === 'workspace' ? (workspaceRef as string) : undefined,
+      workspaceRef: visibility === 'workspace' ? wsRefStr : undefined,
       mimeType: mime_type ?? 'application/octet-stream',
       size: fileData.length,
       data: fileData,
@@ -1312,17 +1314,26 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // PATCH /v1/memory/files/:key/visibility — update file visibility
   // Registered BEFORE generic :key PATCH to avoid Express matching "key/visibility" as a single param
-  router.patch('/v1/memory/files/:key/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/memory/files/:key/visibility', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
-    const { visibility } = req.body ?? {};
+    const { visibility, workspaceRef, workspace_refs } = req.body ?? {};
 
-    if (!visibility || !['private', 'owner', 'public'].includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "owner", or "public"'));
+    // Full tier parity (was private/owner/public only). 'workspace' (re)binds the file to one or more
+    // "<org>/<ws>" — this is how a file gets shared into an ADDITIONAL workspace: PATCH the full desired
+    // list. requireExternalPrincipal (not requireRole('agent')) so an app/owner can rebind its OWN file.
+    const VIS = ['private', 'owner', 'group', 'workspace', 'members', 'public'];
+    if (!visibility || !VIS.includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${VIS.join(', ')}`));
+      return;
+    }
+    const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
+    if (visibility === 'workspace' && !wsRefStr) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
       return;
     }
 
-    const updated = await storage.updateFileVisibility(gaii, key, visibility);
+    const updated = await storage.updateFileVisibility(gaii, key, visibility, visibility === 'workspace' ? wsRefStr : undefined);
     if (!updated) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
       return;
