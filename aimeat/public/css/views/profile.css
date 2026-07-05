@@ -1207,6 +1207,10 @@
 .pf-gen-or-input-sm { max-width: 100px; }
 .pf-gen-or-param-row { display: flex; align-items: center; gap: 10px; }
 .pf-gen-or-param-hint { font-size: 0.8em; color: var(--text-dim, #888); white-space: nowrap; }
+/* Model refresh row: sits below the model <select>; let the hint/error wrap on narrow widths. */
+.pf-gen-or-model-row { margin-top: 8px; flex-wrap: wrap; }
+.pf-gen-or-model-row .pf-gen-or-param-hint { white-space: normal; }
+.pf-gen-or-model-error { color: var(--danger, #ef4444); }
 .pf-gen-or-select {
   width: 100%;
   padding: 8px 12px;

@@ -16,6 +16,11 @@
  *     (data: URLs or https URLs). When present the user message is sent as an
  *     OpenAI-compatible multimodal content array (text + image_url parts) so a
  *     vision-capable model can read attachments. Text-only callers are unaffected.
+ *   v1.4.0 — 2026-07-05 — `listModels()` no longer assumes a `name` field: OpenAI-compatible
+ *     providers (NVIDIA NIM's integrate.api.nvidia.com/v1, LM Studio, OpenAI) return models with
+ *     only an `id`. Name now falls back to `id` and the alphabetical sort is guarded, so the model
+ *     list populates instead of throwing on `undefined.localeCompare` (which surfaced as an empty
+ *     dropdown for custom providers). `owned_by` is carried into `description` when present.
  */
 import { logger } from '../utils/logger.js';
 
@@ -178,12 +183,18 @@ export async function listModels(
     throw err;
   }
 
-  const data = await resp.json() as { data?: OpenRouterModel[] };
-  return (data.data ?? []).map(m => ({
-    id: m.id,
-    name: m.name,
-    description: m.description,
-    context_length: m.context_length,
-    pricing: m.pricing,
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  const data = await resp.json() as { data?: Array<OpenRouterModel & { owned_by?: string }> };
+  return (data.data ?? [])
+    .filter((m): m is OpenRouterModel & { owned_by?: string } => !!m && typeof m.id === 'string')
+    .map(m => ({
+      id: m.id,
+      // OpenRouter returns a human `name`; OpenAI-compatible providers (NVIDIA NIM,
+      // LM Studio, OpenAI, …) return only `id`. Fall back to the id so the option
+      // label — and the sort below — never dereference `undefined`.
+      name: m.name || m.id,
+      description: m.description || m.owned_by,
+      context_length: m.context_length,
+      pricing: m.pricing,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
