@@ -20,6 +20,8 @@
  *     `workspaceRef` ("org/ws"), gated by canReadWorkspace() (membership + manifest read). Brings storage
  *     files to parity with memory (both now share private/owner/group/workspace/members/public through
  *     this one guard). New optional args: workspaceRef, accessorSub, accessorOwner (workspace check only).
+ *   v1.2.0 -- 2026-07-05 -- Owner-self bypass: an accessor that is EXACTLY the resource owner is always
+ *     allowed (the /v1/pub author-reads-own case), regardless of the visibility tier's membership gate.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -63,6 +65,17 @@ export async function authorizeRead(
   args: AuthorizeReadArgs,
 ): Promise<{ allowed: boolean; consentId?: string; reason?: string }> {
   const { ownerGaii, accessorGaii, resourceKey, visibility, groupId, action } = args;
+
+  // Owner reading their OWN resource is always allowed. This is the foreign-read path
+  // (GET /v1/pub) where the accessor happens to BE the owner — e.g. the author viewing
+  // their own workspace-scoped image embed in a filed doc. Without this, a file whose
+  // owner is not (or no longer) a member of the workspace it's bound to could not be read
+  // by its own owner. EXACT identity only (not isSameOwner) so an owner's scoped agent
+  // still goes through the normal visibility/consent checks and can't ride the human's
+  // ownership to read arbitrary private data. 'anonymous' never owns a resource. Not audited.
+  if (accessorGaii && accessorGaii !== 'anonymous' && accessorGaii === ownerGaii) {
+    return { allowed: true, reason: 'owner' };
+  }
 
   if (visibility === 'public') {
     return { allowed: true, reason: 'public_data' };
