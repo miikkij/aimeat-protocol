@@ -27,7 +27,7 @@
 import { Router } from 'express';
 import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
@@ -62,6 +62,7 @@ function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' 
     case 'private': return 'private';
     case 'owner': return 'dmz';
     case 'group': return 'dmz';
+    case 'workspace': return 'dmz'; // node-local: readable by workspace members, never federated
     case 'members': return 'dmz'; // node-local: never replicated to federation
     case 'public': return 'federation';
     default: return 'private';
@@ -79,7 +80,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours, group_id, agent: agentParam } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, agent: agentParam } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
     if (typeof key === 'string' && key.startsWith('organism.')) {
@@ -211,13 +212,15 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key,
       ownerGaii: gaii,
       value,
-      visibility: vis as 'private' | 'owner' | 'group' | 'members' | 'public',
+      visibility: vis as MemoryRecord['visibility'],
       tags: Array.isArray(tags) ? tags : [],
       ttlHours: ttl_hours ?? null,
       version: existing ? existing.version + 1 : 1,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
+      // 'workspace' = readable by members of this "<org>/<ws>" (parity with storage files).
+      ...(vis === 'workspace' && typeof workspace_ref === 'string' ? { workspaceRef: workspace_ref } : {}),
     });
 
     // C.3: Event-driven replication queue integration
@@ -1237,10 +1240,22 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // POST /v1/memory/files — upload file (base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
-    const { key, content, mime_type, visibility, tags } = req.body ?? {};
+    const { key, content, mime_type, visibility, tags, workspaceRef } = req.body ?? {};
 
     if (!key || !content) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
+      return;
+    }
+
+    // Files now share memory's full tier set. 'workspace' must name its "<org>/<ws>" so members of
+    // that workspace can read it (the shared authorizeRead/canReadWorkspace gate).
+    const VIS = ['private', 'owner', 'group', 'workspace', 'members', 'public'];
+    if (visibility !== undefined && !VIS.includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${VIS.join(', ')}`));
+      return;
+    }
+    if (visibility === 'workspace' && (typeof workspaceRef !== 'string' || workspaceRef.indexOf('/') < 1)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspaceRef as "<organismId>/<workspaceId>"'));
       return;
     }
 
@@ -1267,7 +1282,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const file = await storage.createStorageFile({
       key,
       ownerGaii: gaii,
-      visibility: (visibility as 'private' | 'owner' | 'public') ?? 'private',
+      visibility: (visibility as StorageFileRecord['visibility']) ?? 'private',
+      workspaceRef: visibility === 'workspace' ? (workspaceRef as string) : undefined,
       mimeType: mime_type ?? 'application/octet-stream',
       size: fileData.length,
       data: fileData,
@@ -1284,6 +1300,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     res.status(201).json(success(config.nodeId, {
       key: file.key,
+      owner_gaii: file.ownerGaii,   // so a client can build the owner-addressed /v1/pub/<owner>/<key> embed URL
       size: file.size,
       mime_type: file.mimeType,
       visibility: file.visibility,
@@ -1888,7 +1905,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // Non-public data with consent enabled: shared guard decides + audits the attempt.
+    // Non-public data with consent enabled: shared guard decides + audits the attempt. For a
+    // 'workspace' record the guard runs canReadWorkspace(record.workspaceRef) — thread the ref + the
+    // accessor's sub/owner so a workspace member is recognised (parity with the storage-file /v1/pub path).
     const accessorGaii = req.auth?.sub ?? 'anonymous';
     const consentResult = await authorizeRead(storage, config, {
       ownerGaii: record.ownerGaii,
@@ -1896,6 +1915,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       resourceKey: key,
       visibility: record.visibility,
       groupId: record.groupId,
+      workspaceRef: record.workspaceRef,
+      accessorSub: req.auth?.sub,
+      accessorOwner: req.auth?.owner as string | undefined,
       action: 'read',
     });
 

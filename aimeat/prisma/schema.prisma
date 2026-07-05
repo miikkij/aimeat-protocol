@@ -75,6 +75,9 @@ model Memory {
   flagCount  Int      @default(0)
   allowedOrigins String[]
   groupId    String?
+  // Workspace-scoped visibility tier: "<org>/<ws>" whose members may read this record when
+  // visibility === 'workspace'. Gated by the shared authorizeRead()/canReadWorkspace() core.
+  workspaceRef String?
   // Flattened searchable text (key + string leaves of value + tags), maintained on every write.
   // Tier-1 librarian full-text search queries this with a per-token `contains` (substring/regex)
   // scan — there is NO MongoDB `$text` index on it (none is created at startup). SQLite indexes the
@@ -276,6 +279,9 @@ model StorageFile {
   tags       String[] @default([])
   federate   Boolean  @default(false)
   groupId    String?
+  // Workspace-scoped visibility tier (parity with Memory): "<org>/<ws>" whose members may read this
+  // file when visibility === 'workspace'. Gated by the shared authorizeRead()/canReadWorkspace() core.
+  workspaceRef String?
   createdAt  DateTime @default(now())
 
   @@unique([ownerGaii, key])

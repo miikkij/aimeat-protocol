@@ -16,6 +16,10 @@
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
  *   v1.0.0 -- 2026-06-07 -- Extract memory/storage read guard into a shared authorizeRead().
+ *   v1.1.0 -- 2026-07-05 -- Add the `workspace` tier: readable by members of the organism workspace in
+ *     `workspaceRef` ("org/ws"), gated by canReadWorkspace() (membership + manifest read). Brings storage
+ *     files to parity with memory (both now share private/owner/group/workspace/members/public through
+ *     this one guard). New optional args: workspaceRef, accessorSub, accessorOwner (workspace check only).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -31,6 +35,12 @@ export interface AuthorizeReadArgs {
   visibility: string;
   /** Sharing-group id — REQUIRED for `visibility:'group'` to membership-check. */
   groupId?: string;
+  /** "<organismId>/<workspaceId>" — REQUIRED for `visibility:'workspace'` to member-check via canReadWorkspace. */
+  workspaceRef?: string;
+  /** The accessor's raw auth `sub` (agent GAII / bare owner) — needed for the workspace membership check. */
+  accessorSub?: string;
+  /** The accessor's bare owner name — needed for the workspace membership check. */
+  accessorOwner?: string;
   action: 'read' | 'list' | 'search';
 }
 
@@ -64,6 +74,24 @@ export async function authorizeRead(
   // string. Like public, allowed member reads are not audited.
   if (visibility === 'members') {
     return { allowed: true, reason: 'members_data' };
+  }
+
+  // 'workspace' = readable by members of the organism workspace in `workspaceRef` ("org/ws"). Gated by
+  // the SAME workspace read gate as GET /v1/organisms/:id/workspace (membership + manifest read), so a
+  // file/record authorizes identically to workspace content. Dynamic import breaks the access-guard ↔
+  // workspace-access cycle (workspace-access imports authorizeRead for its own manifest gate). Node-local.
+  if (visibility === 'workspace') {
+    const ref = args.workspaceRef || '';
+    const slash = ref.indexOf('/');
+    const orgId = slash >= 0 ? ref.slice(0, slash) : '';
+    const ws = slash >= 0 ? ref.slice(slash + 1) : '';
+    if (!orgId || !ws) return { allowed: false, reason: 'workspace_unbound' };
+    const organism = await storage.getOrganism(orgId);
+    if (!organism) return { allowed: false, reason: 'workspace_org_missing' };
+    const { canReadWorkspace } = await import('./workspace-access.js');
+    const ok = await canReadWorkspace(storage, config, organism, args.accessorSub, args.accessorOwner, accessorGaii, ws);
+    if (!ok) await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
+    return { allowed: ok, reason: ok ? 'workspace_member' : 'workspace_denied' };
   }
 
   if (!config.consentEnabled) {

@@ -9,9 +9,10 @@
  * @version-history
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-07-05 — DocumentView private-image resolution now also covers /v1/memory/files/<key>
- *     refs (not just /v1/storage), so images DROP files into a doc render for the author via an
- *     auth'd blob fetch — a plain <img> can't send the token. (Cross-member visibility is a separate
- *     workspace-scoped file tier, see docs / authed-image-embed design.)
+ *     and /v1/pub/<owner>/<key> refs (not just /v1/storage), so images DROP files into a doc render via
+ *     an auth'd blob fetch — a plain <img> can't send the token. /v1/pub carries the file owner, so a
+ *     WORKSPACE-visibility image renders for the author AND workspace members (gated by canReadWorkspace),
+ *     never made public. (See the authed-image-embed / workspace-file-tier design.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -65,7 +66,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     const raw = shown.markdown || '';
     setRendered(raw);   // show text/structure at once; images swap in a moment later
     (async () => {
-      const urls = [...new Set(raw.match(/\/v1\/(?:storage|memory\/files)\/[^\s)\]"'>]+/g) || [])];
+      const urls = [...new Set(raw.match(/\/v1\/(?:storage|memory\/files|pub)\/[^\s)\]"'>]+/g) || [])];
       if (!urls.length) return;
       let out = raw;
       for (const su of urls) {

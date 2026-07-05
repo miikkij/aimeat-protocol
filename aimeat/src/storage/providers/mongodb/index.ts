@@ -631,37 +631,43 @@ export class PrismaStorage implements Storage {
                 update: {},
             });
         }
+        // `as any` on the data objects: workspaceRef is new in the Prisma schema; the generated client
+        // gets it on the next `prisma generate` (deploy). Matches the storage-file writes above.
+        const memCreate: any = {
+            key: record.key,
+            ownerGaii: record.ownerGaii,
+            value: record.value as any,
+            visibility: record.visibility,
+            groupId: record.groupId ?? null,
+            workspaceRef: record.workspaceRef ?? null,
+            tags: record.tags,
+            ttlHours: record.ttlHours,
+            version: record.version,
+            flagCount: record.flagCount ?? 0,
+            allowedOrigins: record.allowedOrigins ?? [],
+            trackable,
+            searchBlob: this.buildSearchBlob(record),
+            createdAt: new Date(record.createdAt),
+            updatedAt: new Date(record.updatedAt),
+        };
+        const memUpdate: any = {
+            value: record.value as any,
+            visibility: record.visibility,
+            groupId: record.groupId ?? null,
+            workspaceRef: record.workspaceRef ?? null,
+            tags: record.tags,
+            ttlHours: record.ttlHours,
+            version: record.version,
+            flagCount: record.flagCount ?? 0,
+            allowedOrigins: record.allowedOrigins ?? [],
+            trackable,
+            searchBlob: this.buildSearchBlob(record),
+            updatedAt: new Date(record.updatedAt),
+        };
         const row = await this.prisma.memory.upsert({
             where: { ownerGaii_key: { ownerGaii: record.ownerGaii, key: record.key } },
-            create: {
-                key: record.key,
-                ownerGaii: record.ownerGaii,
-                value: record.value as any,
-                visibility: record.visibility,
-                groupId: record.groupId ?? null,
-                tags: record.tags,
-                ttlHours: record.ttlHours,
-                version: record.version,
-                flagCount: record.flagCount ?? 0,
-                allowedOrigins: record.allowedOrigins ?? [],
-                trackable,
-                searchBlob: this.buildSearchBlob(record),
-                createdAt: new Date(record.createdAt),
-                updatedAt: new Date(record.updatedAt),
-            },
-            update: {
-                value: record.value as any,
-                visibility: record.visibility,
-                groupId: record.groupId ?? null,
-                tags: record.tags,
-                ttlHours: record.ttlHours,
-                version: record.version,
-                flagCount: record.flagCount ?? 0,
-                allowedOrigins: record.allowedOrigins ?? [],
-                trackable,
-                searchBlob: this.buildSearchBlob(record),
-                updatedAt: new Date(record.updatedAt),
-            },
+            create: memCreate,
+            update: memUpdate,
         });
         return this.toMemoryRecord(row);
     }
@@ -687,24 +693,26 @@ export class PrismaStorage implements Storage {
     async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
         this.ensureReady();
         // Atomic version-checked update using raw MongoDB $set + version filter
+        const cvData: any = {
+            value: record.value as any,
+            visibility: record.visibility,
+            groupId: record.groupId ?? null,
+            workspaceRef: record.workspaceRef ?? null,
+            tags: record.tags,
+            ttlHours: record.ttlHours,
+            version: record.version,
+            flagCount: record.flagCount ?? 0,
+            allowedOrigins: record.allowedOrigins ?? [],
+            searchBlob: this.buildSearchBlob(record),
+            updatedAt: new Date(record.updatedAt),
+        };
         const result = await this.prisma.memory.updateMany({
             where: {
                 ownerGaii: record.ownerGaii,
                 key: record.key,
                 version: expectedVersion,
             },
-            data: {
-                value: record.value as any,
-                visibility: record.visibility,
-                groupId: record.groupId ?? null,
-                tags: record.tags,
-                ttlHours: record.ttlHours,
-                version: record.version,
-                flagCount: record.flagCount ?? 0,
-                allowedOrigins: record.allowedOrigins ?? [],
-                searchBlob: this.buildSearchBlob(record),
-                updatedAt: new Date(record.updatedAt),
-            },
+            data: cvData,
         });
         if (result.count === 0) return null; // version conflict
         return this.getMemory(record.ownerGaii, record.key);
@@ -1593,8 +1601,9 @@ export class PrismaStorage implements Storage {
                 tags: file.tags || [],
                 federate: file.federate ?? false,
                 groupId: file.groupId ?? null,
+                workspaceRef: file.workspaceRef ?? null,
                 createdAt: new Date(file.createdAt),
-            },
+            } as any,
             update: {
                 visibility: file.visibility,
                 mimeType: file.mimeType,
@@ -1603,8 +1612,9 @@ export class PrismaStorage implements Storage {
                 tags: file.tags || [],
                 federate: file.federate ?? false,
                 groupId: file.groupId ?? null,
+                workspaceRef: file.workspaceRef ?? null,
                 createdAt: new Date(file.createdAt),
-            },
+            } as any,
         });
         return file;
     }
@@ -1615,17 +1625,17 @@ export class PrismaStorage implements Storage {
             where: { ownerGaii_key: { ownerGaii, key } },
         });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, groupId: row.groupId ?? undefined, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, groupId: row.groupId ?? undefined, workspaceRef: (row as any).workspaceRef ?? undefined, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
     async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.storageFile.findMany({
             where: { ownerGaii },
-            select: { key: true, ownerGaii: true, visibility: true, groupId: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
+            select: { key: true, ownerGaii: true, visibility: true, groupId: true, workspaceRef: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true } as any,
         });
         return rows.map((r: any) => ({
-            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
+            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
         }));
     }
 
@@ -1647,12 +1657,11 @@ export class PrismaStorage implements Storage {
         return this.getStorageFile(ownerGaii, key);
     }
 
-    async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): Promise<StorageFileRecord | null> {
+    async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null> {
         this.ensureReady();
-        const updated = await this.prisma.storageFile.updateMany({
-            where: { ownerGaii, key },
-            data: { visibility },
-        });
+        // workspaceRef undefined → visibility only; provided → set both (bind the file to its org/ws).
+        const data: any = workspaceRef === undefined ? { visibility } : { visibility, workspaceRef: workspaceRef || null };
+        const updated = await this.prisma.storageFile.updateMany({ where: { ownerGaii, key }, data });
         if (updated.count === 0) return null;
         return this.getStorageFile(ownerGaii, key);
     }
@@ -1763,7 +1772,7 @@ export class PrismaStorage implements Storage {
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? row.archivedAt.toISOString() : undefined, archivedBy: row.archivedBy ?? undefined, archivedRoot: row.archivedRoot ?? undefined };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, workspaceRef: row.workspaceRef ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? row.archivedAt.toISOString() : undefined, archivedBy: row.archivedBy ?? undefined, archivedRoot: row.archivedRoot ?? undefined };
     }
 
     /** Prisma `where` fragment restricting memory rows by archive filter. Default `exclude` uses
