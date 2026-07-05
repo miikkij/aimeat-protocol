@@ -7,6 +7,7 @@
  *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  *   v1.2.0 — 2026-06-24 — Add Applications moderation tab (operator hide/restore apps).
+ *   v1.3.0 — 2026-07-05 — Add "AI Apps Usage" tab (operator cross-user AI-spend charts).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -29,6 +30,7 @@ import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
 import PortalTab       from './admin/portal-tab.js';
 import StatsTab        from './admin/stats-tab.js';
+import AiUsageTab      from './admin/ai-usage-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
 import AgentsTab       from './admin/agents-tab.js';
 import GhiiTab         from './admin/ghii-tab.js';
@@ -75,6 +77,7 @@ const NAV_GROUPS = [
     { id: 'portal',       icon: '\u{1F310}', key: 'dashboard.portal',     component: PortalTab },
     { id: 'subdomains',   icon: '\u{1F517}', key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        icon: '\u{1F4C8}', key: 'dashboard.stats',      component: StatsTab },
+    { id: 'ai-usage',     icon: '\u{1F4B8}', key: 'dashboard.aiUsage',    component: AiUsageTab },
     { id: 'prompts',      icon: '\u{1F4DD}', key: 'dashboard.promptsTab', component: PromptsTab },
   ]},
   { key: 'dashboard.navIdentity', items: [

@@ -2857,6 +2857,20 @@
 .pf-usage-chip:not([disabled]):hover { border-color: var(--accent); }
 .pf-usage-chip-val { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-usage-chip-label { font-size: 0.7rem; color: var(--muted); }
+/* Home "AI apps spend" card — 24h/7d/30d windows + per-app stacked bar + top apps */
+.pf-ai-card { grid-column: 1 / -1; }
+.pf-ai-windows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0.4rem 0 0.8rem; }
+.pf-ai-win { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); }
+.pf-ai-win-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.pf-ai-win-cost { font-size: 1.15rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-win-sub { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-ai-chart { margin: 0.2rem 0 0.6rem; }
+.pf-ai-apps-head { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
+.pf-ai-app-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.82rem; }
+.pf-ai-app-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.pf-ai-app-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.pf-ai-app-cost { color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-app-pct { width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pf-promo-dismiss { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
 .pf-promo-dismiss:hover { color: var(--text); }
 /* Edit profile / password dialogs */

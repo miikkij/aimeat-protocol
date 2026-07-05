@@ -7,11 +7,13 @@
  *   services/ai-completion.ts module (also used by the scheduler's `ai` jobs);
  *   this router is a thin HTTP wrapper + the owner-only settings/usage endpoints.
  * @structure
- *   - POST /v1/ai/complete   — owner or any token with ai:use scope, runs one completion
- *   - GET  /v1/ai/available  — owner or ai:use token, boolean "is AI configured?" probe
- *   - GET  /v1/ai/usage      — owner-only, today's spend per-app breakdown
- *   - POST /v1/ai/settings   — owner-only, update budget/quotas/allowlist
- *   - GET  /v1/ai/settings   — owner-only, read budget/quotas/allowlist
+ *   - POST /v1/ai/complete       — owner or any token with ai:use scope, runs one completion
+ *   - GET  /v1/ai/available      — owner or ai:use token, boolean "is AI configured?" probe
+ *   - GET  /v1/ai/usage          — owner-only, today's spend per-app breakdown
+ *   - GET  /v1/ai/usage/history  — owner-only, per-day spend series + 24h/7d/30d rollups (charts)
+ *   - GET  /v1/admin/ai-usage    — operator-only, cross-user AI-spend aggregate (admin dashboard)
+ *   - POST /v1/ai/settings       — owner-only, update budget/quotas/allowlist
+ *   - GET  /v1/ai/settings       — owner-only, read budget/quotas/allowlist
  * @usage
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
@@ -24,6 +26,8 @@
  *   v1.3.0 — 2026-06-25 — Gate is role-agnostic on the ai:use scope so app-grant tokens
  *     (sandboxed apps on the isolated app origin) can spend the owner's AI budget; add
  *     GET /v1/ai/available so such apps can gate their UI without owner-only settings.
+ *   v1.4.0 — 2026-07-05 — Add GET /v1/ai/usage/history (owner per-day series + rollups) and
+ *     GET /v1/admin/ai-usage (operator cross-user aggregate) backing the AI-spend charts.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -34,9 +38,10 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
-  completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
+  completeForOwner, AiCompletionError, getTodayUsage, getUsageHistory, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
+import { getAdminAiUsage } from '../services/ai-usage-admin.js';
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -174,6 +179,37 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         total_tokens: usage.total_tokens,
         per_app: usage.per_app,
       }));
+    });
+
+  // ── GET /v1/ai/usage/history ── owner-only, per-day spend series + 24h/7d/30d rollups (per-app).
+  // Reads the retained ai-usage.<gaii>.<day> records; feeds the profile home card + Generator chart.
+  router.get('/v1/ai/usage/history',
+    requireAuth(), requireRole('owner'),
+    async (req: Request, res: Response) => {
+      const gaii = resolve(req);
+      const days = Number(req.query.days);
+      const history = await getUsageHistory(storage, gaii, Number.isFinite(days) ? days : 30);
+      const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
+      const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
+      res.json(success(config.nodeId, {
+        daily_budget_usd: getDailyBudgetUsd(prefs),
+        ...history,
+      }));
+    });
+
+  // ── GET /v1/admin/ai-usage ── operator-only cross-user AI-spend aggregate (per-app + per-user).
+  // Note: per-app attribution uses the self-reported app_id (spoofable) — fine for reporting, not a
+  // security boundary. Backs the admin dashboard "AI Apps Usage" tab.
+  router.get('/v1/admin/ai-usage',
+    requireAuth(),
+    async (req: Request, res: Response) => {
+      if (!req.auth?.roles?.includes('operator')) {
+        return res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Operator role required.'));
+      }
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      const data = await getAdminAiUsage(storage, { from, to });
+      res.json(success(config.nodeId, data));
     });
 
   // ── GET /v1/ai/settings ──
