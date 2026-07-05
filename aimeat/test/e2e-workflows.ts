@@ -14,6 +14,8 @@
  *   v1.3.0 — 2026-07-05 — Re-run freshness: built-in {run}/{date} vars (save undeclared + resolve at
  *     run) and the fresh flag (a prior run's output keys are deleted once at run start), incl. the
  *     no-clobber guard: an earlier step's output survives a later step that shares its output glob.
+ *   v1.4.0 — 2026-07-06 — skip_done: a fully-done re-run greens every step with no crew dispatch; with
+ *     one output cleared, only that step re-runs (continue-from / re-run-one-step).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -122,6 +124,19 @@ const LATE_SHARED_OFFER = {
   required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
   success_signal: { kind: 'deterministic', key_glob: 'g.out.*', op: 'count_nonempty', min: 2 },
 };
+// Two chained offers for the skip_done test (dedicated sd.* keys so other tests don't perturb them).
+const SD_FETCH_OFFER = {
+  id: 'sd-fetch', title: 'SD fetch', ask: 'produce sd.raw',
+  deliverable: { format: 'document', location: { key: 'sd.raw' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key: 'sd.raw', op: 'nonempty' },
+};
+const SD_WRITE_OFFER = {
+  id: 'sd-write', title: 'SD write', ask: 'produce sd.article from sd.raw',
+  deliverable: { format: 'document', location: { key: 'sd.article' } },
+  required_to_function: { kind: 'deterministic', key: 'sd.raw', op: 'nonempty' },
+  success_signal: { kind: 'deterministic', key: 'sd.article', op: 'nonempty' },
+};
 // Unique key never written in the real namespace — to prove full-sandbox reads the prefixed copy.
 const SBX_OFFER = {
   id: 'sbx', title: 'Sandbox', ask: 'produce sbx.out',
@@ -165,7 +180,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, FRESH_OFFER, EARLY_SHARED_OFFER, LATE_SHARED_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, FRESH_OFFER, EARLY_SHARED_OFFER, LATE_SHARED_OFFER, SD_FETCH_OFFER, SD_WRITE_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -552,6 +567,52 @@ async function run() {
     r = await json(`/v1/workflows/fresh-noclobber/runs/${runId}`, { headers: auth });
     assert(r.body.data.steps.late.state === 'green', `late should be green (both shared keys present), got ${r.body.data.steps.late.state}`);
     assert(r.body.data.status === 'done', `run should be done, got ${r.body.data.status}`);
+  });
+
+  // ── skip_done: a re-run skips already-satisfied steps (no crew dispatch) and continues from the rest ──
+  await test('skip_done: a fully-done workflow re-run greens every step WITHOUT dispatching any crew', async () => {
+    const sdWf = {
+      title: { en_US: 'Skip-done' }, description: { en_US: 'skip already-done steps' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', skip_done: true,
+      steps: [
+        { id: 'fetch', agent: agentName, offer: 'sd-fetch', required_to_function: 'none', description: { en_US: 'Fetch' }, timeout_min: 10 },
+        { id: 'write', agent: agentName, offer: 'sd-write', after: ['fetch'], description: { en_US: 'Write' }, timeout_min: 10 },
+      ],
+    };
+    const put = await json('/v1/workflows/skipdone-wf', { method: 'PUT', headers: auth, body: JSON.stringify(sdWf) });
+    assert(put.status === 200, `put skipdone-wf ${put.status}: ${JSON.stringify(put.body)}`);
+    const def = await json('/v1/workflows/skipdone-wf', { headers: auth });
+    assert(def.body.data.skip_done === true, `skip_done should persist, got ${def.body.data.skip_done}`);
+
+    // Both deliverables already present (a prior run's output).
+    await writeMem('sd.raw', 'raw already here');
+    await writeMem('sd.article', 'article already here');
+
+    const run = await json('/v1/workflows/skipdone-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const r = await json(`/v1/workflows/skipdone-wf/runs/${run.body.data.runId}`, { headers: auth });
+    assert(r.body.data.status === 'done', `all-done re-run should finish done, got ${r.body.data.status}`);
+    assert(r.body.data.steps.fetch.state === 'green' && r.body.data.steps.write.state === 'green', 'both green');
+    assert(!(r.body.data.steps.fetch.taskIds?.length) && !(r.body.data.steps.write.taskIds?.length),
+      `no crew should be dispatched — got fetch=${JSON.stringify(r.body.data.steps.fetch.taskIds)} write=${JSON.stringify(r.body.data.steps.write.taskIds)}`);
+  });
+
+  await test('skip_done: with one output cleared, ONLY that step re-runs (continue-from / re-run one step)', async () => {
+    // sd.raw still present (fetch done); clear sd.article so only `write` is not-done.
+    await json('/v1/memory/sd.article', { method: 'DELETE', headers: auth });
+
+    const run = await json('/v1/workflows/skipdone-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    let r = await json(`/v1/workflows/skipdone-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.fetch.state === 'green' && !(r.body.data.steps.fetch.taskIds?.length),
+      `fetch is already done → skipped green, no dispatch; got ${r.body.data.steps.fetch.state} tasks=${JSON.stringify(r.body.data.steps.fetch.taskIds)}`);
+    const writeTask = r.body.data.steps.write.taskIds?.[0];
+    assert(typeof writeTask === 'string', `write (cleared) should be the only dispatched step, got ${r.body.data.steps.write.state}`);
+
+    await writeMem('sd.article', 'freshly rewritten article');
+    await json(`/v1/agents/${agentName}/tasks/${writeTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    await sleep(700);
+    r = await json(`/v1/workflows/skipdone-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.status === 'done' && r.body.data.steps.write.state === 'green', `run should finish done with write green, got ${r.body.data.status}/${r.body.data.steps.write.state}`);
   });
 
   // ── full-sandbox namespaces keys, isolated from production ──

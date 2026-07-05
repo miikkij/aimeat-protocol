@@ -23,6 +23,8 @@
  *     required_to_function instead of parent success).
  *   v1.4.0 — 2026-07-05 — Re-run freshness: WorkflowDef.fresh (clear a step's outputs before it runs)
  *     + built-in {run}/{date} key-template vars (run-scoped keys, the non-destructive default).
+ *   v1.5.0 — 2026-07-06 — WorkflowDef.skip_done: a re-run skips already-satisfied steps (green without
+ *     dispatching the crew) and continues from the not-yet-done ones.
  */
 import { z } from 'zod';
 
@@ -172,6 +174,18 @@ export interface WorkflowDef {
    * resolveVars), which keeps history. Orthogonal to `resume`.
    */
   fresh?: boolean;
+  /**
+   * Owner opt-in (default false): before dispatching a ready step, check its success_signal against
+   * current memory; if the deliverable is ALREADY present, mark the step green WITHOUT dispatching the
+   * crew. So a re-run continues from the not-yet-done steps instead of re-invoking crews for work that
+   * is already complete — and re-running a single step = delete its output key(s) + run (every other
+   * step skips, only the cleared one + its dependents re-run). Safe only when a present deliverable
+   * genuinely means "done" (idempotent producers); a workflow whose crew is meant to OVERWRITE stable
+   * keys each run should NOT set this (it would skip the refresh) — use `fresh` instead. Mutually
+   * moot with `fresh` (fresh clears outputs at run start, so nothing is ever already-done). Orthogonal
+   * to `resume`.
+   */
+  skip_done?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
   createdBy: string;                  // GAII/GHII of the author (audit)
@@ -311,6 +325,7 @@ export const WorkflowDefInputSchema = z.object({
   notify_on_finish: z.boolean().optional(),
   resume: z.boolean().optional(),
   fresh: z.boolean().optional(),
+  skip_done: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });

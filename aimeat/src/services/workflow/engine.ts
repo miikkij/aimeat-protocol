@@ -35,6 +35,10 @@
  *     run start (clearRunOutputs) so an idempotent skip-existing crew regenerates the SAME keys each
  *     run instead of no-op-ing on stale output. Cleared up front (not per-step) so parallel steps
  *     sharing an output namespace can't wipe each other's fresh output.
+ *   v1.4.0 — 2026-07-06 — Opt-in WorkflowDef.skip_done: tick checks a ready step's success_signal and,
+ *     if already satisfied, greens it WITHOUT dispatching the crew — a re-run continues from the not-
+ *     yet-done steps (and re-running one step = clear its output + run). tick is now a fixpoint loop so
+ *     a skip-greened step's dependents advance in the same tick.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -231,23 +235,52 @@ export class WorkflowEngine {
     const now = new Date().toISOString();
     const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
     let dispatchedAny = false;
+    let mutated = false;
 
-    for (const step of computeReadySteps(run.defSnapshot, run.steps, now)) {
-      const r = resolved.get(step.id);
-      const rs = run.steps[step.id];
-      const reads = new Set<string>();
-      const input = await this.evalSignal(r?.required_to_function, ctx, reads);
-      rs.reads = [...reads];
-      if (!input.ok) {
-        rs.state = 'input-red'; rs.inputObserved = input.observed; rs.endedAt = now;
-        this.failDownstream(run, step.id);
-        await this.onStepFail(ownerGhii, run, step.id, 'input-red');
-        continue;
+    // Fixpoint: a step reaching a TERMINAL state this tick (green via skip-done, or input-red) can
+    // unblock its dependents, so keep re-computing ready steps until only dispatched (non-terminal)
+    // steps remain. Each step is processed at most once (once non-pending it leaves computeReadySteps),
+    // so this terminates in ≤ N passes.
+    for (;;) {
+      const ready = computeReadySteps(run.defSnapshot, run.steps, now);
+      if (ready.length === 0) break;
+      let advancedTerminal = false;
+      for (const step of ready) {
+        const r = resolved.get(step.id);
+        const rs = run.steps[step.id];
+        const reads = new Set<string>();
+        const input = await this.evalSignal(r?.required_to_function, ctx, reads);
+        rs.reads = [...reads];
+        if (!input.ok) {
+          rs.state = 'input-red'; rs.inputObserved = input.observed; rs.endedAt = now;
+          this.failDownstream(run, step.id);
+          await this.onStepFail(ownerGhii, run, step.id, 'input-red');
+          advancedTerminal = true; mutated = true;
+          continue;
+        }
+        // skip-if-done (opt-in): if the deliverable is already present, mark the step green WITHOUT
+        // dispatching the crew — a re-run then continues from the not-yet-done steps instead of
+        // redoing completed work. (fresh cleared outputs at run start, so it never skips there.)
+        if (run.defSnapshot.skip_done) {
+          const outReads = new Set<string>(rs.reads);
+          const output = await this.evalSignal(r?.success_signal, ctx, outReads);
+          rs.reads = [...outReads];
+          if (output.ok) {
+            rs.state = 'green'; rs.startedAt = rs.startedAt ?? now; rs.endedAt = now;
+            rs.outputObserved = output.observed;
+            this.recordProgress(rs, output.observed);
+            if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(r.deliverableKey, run.vars)])];
+            advancedTerminal = true; mutated = true;
+            continue;
+          }
+        }
+        // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
+        const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
+        rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
+        dispatchedAny = true; mutated = true;
       }
-      // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
-      const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
-      rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
-      dispatchedAny = true;
+      // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
+      if (!advancedTerminal) break;
     }
 
     const outcome = runOutcome(run.steps);
@@ -257,7 +290,7 @@ export class WorkflowEngine {
       run.status = Object.values(run.steps).some(s => s.state === 'dispatched') ? 'waiting-step' : 'running';
     }
     await this.persist(ownerGhii, run);
-    if (dispatchedAny || outcome !== 'running') emitChange('workflows');
+    if (mutated || dispatchedAny || outcome !== 'running') emitChange('workflows');
   }
 
   // ── task terminal → advance ────────────────────────────────────────────────────
