@@ -154,4 +154,109 @@ export function registerOperatorConfigTools(
             return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(updated) });
         },
     );
+
+    // ── aimeat_operator_ai_config — the owner's AI routing + budget (NEVER the API key) ──
+    // Safe subset of the `openrouter.settings` record: daily budget and model routing.
+    // The encrypted key lives in a SEPARATE record (openrouter.apikey) this tool cannot touch.
+    const AI_CONFIG_ACTION = 'ai_config';
+    const AI_SETTINGS_KEY = 'openrouter.settings';
+
+    interface AiConfigChange {
+        daily_budget_usd?: number;
+        model?: string;
+        reasoning_model?: string;
+        execution_model?: string;
+    }
+
+    mcp.tool(
+        'aimeat_operator_ai_config',
+        descriptionFor('aimeat_operator_ai_config'),
+        {
+            daily_budget_usd: z.number().min(0).max(1000).optional().describe('Daily AI spend cap in USD (0-1000).'),
+            model: z.string().optional().describe('Default model id.'),
+            reasoning_model: z.string().optional().describe('Model routed for modelRole "reasoning".'),
+            execution_model: z.string().optional().describe('Model routed for modelRole "execution".'),
+            confirm_token: z.string().optional().describe('Token from the propose step. Omit to get a proposal + diff without applying anything.'),
+        },
+        annotationsFor('aimeat_operator_ai_config'),
+        async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
+            if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
+            const ownerGhii = `${callerOwner}@${config.nodeId}`;
+            const record = await storage.getMemory(ownerGhii, AI_SETTINGS_KEY);
+            const settings = (record?.value ?? {}) as Record<string, unknown>;
+
+            const proposed: AiConfigChange = {};
+            if (daily_budget_usd !== undefined) proposed.daily_budget_usd = daily_budget_usd;
+            if (model !== undefined) proposed.model = model;
+            if (reasoning_model !== undefined) proposed.reasoning_model = reasoning_model;
+            if (execution_model !== undefined) proposed.execution_model = execution_model;
+            if (Object.keys(proposed).length === 0) {
+                return ok({
+                    current: {
+                        daily_budget_usd: settings.daily_budget_usd ?? 1.0,
+                        model: settings.model ?? null,
+                        reasoning_model: settings.reasoningModel ?? null,
+                        execution_model: settings.executionModel ?? null,
+                    },
+                    note: 'Nothing proposed — pass the fields to change.',
+                });
+            }
+
+            const current: AiConfigChange = {
+                daily_budget_usd: typeof settings.daily_budget_usd === 'number' ? settings.daily_budget_usd : 1.0,
+                model: settings.model as string | undefined,
+                reasoning_model: settings.reasoningModel as string | undefined,
+                execution_model: settings.executionModel as string | undefined,
+            };
+            const diff: Record<string, { from: unknown; to: unknown }> = {};
+            for (const key of Object.keys(proposed) as Array<keyof AiConfigChange>) {
+                if (JSON.stringify(current[key] ?? null) !== JSON.stringify(proposed[key] ?? null)) {
+                    diff[key] = { from: current[key] ?? null, to: proposed[key] };
+                }
+            }
+            if (Object.keys(diff).length === 0) {
+                return ok({ current, diff, note: 'Proposed values equal current state — nothing to apply.' });
+            }
+
+            if (!confirm_token) {
+                const token = await mintConfirmToken(agentGaii, AI_CONFIG_ACTION, proposed);
+                return ok({
+                    mode: 'proposal',
+                    current,
+                    proposed,
+                    diff,
+                    confirm_token: token,
+                    expires_in_seconds: 600,
+                    instructions: 'Show this diff to the owner. To apply EXACTLY this change, call again with the same arguments plus confirm_token.',
+                });
+            }
+
+            try {
+                await verifyConfirmToken(confirm_token, agentGaii, AI_CONFIG_ACTION, proposed);
+            } catch (e) {
+                if (e instanceof ConfirmTokenError) return err(`${e.code}: ${e.message}`);
+                throw e;
+            }
+
+            const now = new Date().toISOString();
+            const merged: Record<string, unknown> = { ...settings };
+            if (proposed.daily_budget_usd !== undefined) merged.daily_budget_usd = proposed.daily_budget_usd;
+            if (proposed.model !== undefined) merged.model = proposed.model;
+            if (proposed.reasoning_model !== undefined) merged.reasoningModel = proposed.reasoning_model;
+            if (proposed.execution_model !== undefined) merged.executionModel = proposed.execution_model;
+            await storage.setMemory({
+                key: AI_SETTINGS_KEY,
+                ownerGaii: ownerGhii,
+                value: merged,
+                visibility: record?.visibility ?? 'private',
+                tags: record?.tags ?? ['openrouter'],
+                ttlHours: null,
+                version: (record?.version ?? 0) + 1,
+                createdAt: record?.createdAt ?? now,
+                updatedAt: now,
+            });
+            logger.info(`Operator ai-config applied for ${callerOwner}`, { by: agentGaii, fields: Object.keys(diff) });
+            return ok({ mode: 'applied', applied: diff });
+        },
+    );
 }

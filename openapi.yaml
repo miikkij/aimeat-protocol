@@ -3505,10 +3505,22 @@ components:
             crew regenerates them from empty instead of finding the previous run's output already
             present (which would false-green the step and waste a no-op crew pass). Use when a workflow
             deliberately writes to the SAME keys every run and wants each run to overwrite. DESTRUCTIVE
-            — discards the prior run's deliverable for that step. The non-destructive alternative is to
-            template deliverable keys per run with the built-in vars {run} (the run id) and {date} (the
-            run date), which are always available to key templates without declaration and keep history.
-            Only clears at attempt 0; orthogonal to resume.
+            — discards the prior run's deliverables. Cleared once up front (not per-step) so parallel
+            steps sharing an output namespace can't wipe each other's fresh output; pure external inputs
+            are kept. The non-destructive alternative is per-run keys via the built-in vars {run} (the
+            run id) and {date} (the run date), always available to key templates without declaration,
+            which keep history. Orthogonal to resume.
+        skip_done:
+          type: boolean
+          description: >-
+            Owner opt-in (default false). Before dispatching a ready step, check its success_signal
+            against current memory; if the deliverable is already present, mark the step green WITHOUT
+            dispatching the crew. So a re-run continues from the not-yet-done steps instead of
+            re-invoking crews for completed work — and re-running a single step = delete its output
+            key(s) then run (every other step skips, only the cleared one + its dependents re-run).
+            Safe only when a present deliverable genuinely means "done" (idempotent producers); a
+            workflow whose crew is meant to OVERWRITE stable keys each run should use fresh instead.
+            Moot with fresh (which clears outputs at run start). Orthogonal to resume.
         llm:
           type: object
           description: Owner consent to use the node OpenRouter for `llm` signal leaves.
@@ -19796,6 +19808,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: binding
+          in: query
+          description: Filter to skills bound to one app (app:{owner}/{filename}); overrides scope
+          schema:
+            type: string
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -20013,6 +20030,31 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /v1/apps/{owner}/{filename}/skills:
+    get:
+      operationId: getAppBoundSkills
+      summary: Registry skills bound to an app
+      description: >-
+        Skills whose frontmatter metadata.binding names this app (app:{owner}/{filename}),
+        across node + user scopes. Anonymous callers see only public-bound skills.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/agents/{name}/skills/links:
     get:

@@ -25,7 +25,7 @@ import { generateUploadToken } from '../services/upload-token.js';
 import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef,
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent,
-  type SkillAccessor, type SkillScope,
+  listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 
 export function registerSkillsTools(
@@ -129,11 +129,16 @@ export function registerSkillsTools(
             agent_name: z.string().optional().describe('For view=linked: which same-owner agent (default: yourself).'),
             organism_id: z.string().optional().describe('For view=workspace: the organism id.'),
             workspace_id: z.string().optional().describe('For view=workspace: the workspace id.'),
+            binding: z.string().optional().describe('Filter to skills bound to one app: app:{owner}/{filename}. Overrides view.'),
         },
         annotationsFor('aimeat_skill_list'),
-        async ({ view, agent_name, organism_id, workspace_id }) => {
+        async ({ view, agent_name, organism_id, workspace_id, binding }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
+            if (binding) {
+                const skills = await listSkillsByBinding(storage, config, binding, acc);
+                return ok({ binding, skills });
+            }
             const mode = view ?? 'library';
             if (mode === 'linked') {
                 const agentName = agent_name ?? parsed!.agent;
