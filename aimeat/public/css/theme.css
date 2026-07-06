@@ -10,6 +10,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.21.0 — 2026-07-06 — Toast variants + mobile width: add --toast-info-bg/--toast-warn-bg tokens +
+       .toast-info/.toast-warn classes (call sites pass 'info'/'warning' kinds; they previously fell into the
+       truthy-isError red path). .toast width fit-content → max-content: anchored at left:50%, fit-content
+       shrink-to-fit capped the pill at 50vw (a skinny tower on phones); max-width min(92vw, 40rem) now rules.
      v1.20.0 — 2026-07-03 — Toast legibility: .toast max-width 420px → min(92vw, 40rem) (was hard-capped
        narrow on wide screens so longer messages wrapped into a tall skinny "tower"), plus line-height 1.45,
        centered text, overflow-wrap:anywhere (guards long GAIIs/URLs) and a --shadow-xl lift. One class fixes
@@ -117,7 +121,10 @@
      the hue. --toast-danger-bg equals --danger at the legacy 0.95 alpha. */
   --toast-success-bg: rgba(34, 197, 94, 0.95);
   --toast-danger-bg:  rgba(239, 68, 68, 0.95);  /* = --danger #EF4444 @ .95 */
+  --toast-info-bg:    rgba(59, 130, 246, 0.95); /* = --blue #3B82F6 @ .95 */
+  --toast-warn-bg:    rgba(245, 158, 11, 0.95); /* amber-500; pairs with dark fg */
   --toast-fg:         #FFFFFF;
+  --toast-warn-fg:    #1A1A2E;                  /* white fails contrast on amber */
 
   /* Borders */
   --border: #E5E7EB;
@@ -1249,8 +1256,11 @@ select.input-field { cursor: pointer; }
 
 /* ── Toast ── */
 .toast {
+  /* width: max-content (NOT fit-content/auto): a fixed box anchored at left:50%
+     shrink-to-fits against the remaining 50vw, capping the pill at half the
+     viewport — a tall skinny tower on phones. max-width does the real capping. */
   position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-  z-index: 9999; max-width: min(92vw, 40rem); width: fit-content;
+  z-index: 9999; max-width: min(92vw, 40rem); width: max-content;
   padding: 0.7rem 1.15rem; border-radius: var(--radius-sm);
   font-size: 0.9rem; font-weight: 600; line-height: 1.45;
   text-align: center; text-wrap: pretty; overflow-wrap: anywhere; white-space: normal;
@@ -1261,6 +1271,8 @@ select.input-field { cursor: pointer; }
 }
 .toast.error, .toast-error { background: var(--toast-danger-bg); color: var(--toast-fg); }
 .toast-success { background: var(--toast-success-bg); color: var(--toast-fg); }
+.toast-info { background: var(--toast-info-bg); color: var(--toast-fg); }
+.toast-warn { background: var(--toast-warn-bg); color: var(--toast-warn-fg); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
 

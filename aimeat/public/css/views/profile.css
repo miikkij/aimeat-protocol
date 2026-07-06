@@ -4,6 +4,10 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.13.0 — 2026-07-06 — Toast fixes: drop the dead .pf.toast-container rule (profile.js no longer
+ *     wraps its toast — the fixed+transform wrapper was the containing block of the fixed .toast inside,
+ *     collapsing it to a one-character-per-line sliver) and give .pj-doc-solo-toast the shared
+ *     max-width: min(92vw, 40rem) + wrapping so long messages stay readable on mobile.
  *   v2.12.0 — 2026-07-03 — Collection cart: .mem-cart-btn(-—on) per-row toggles + the .mem-cart tray
  *     (.mem-cart-head/-title/-count/-body/-list/-item/-actions/-send) for URL-list/ZIP/workspace export.
  *   v2.11.0 — 2026-07-03 — Files preview + search: .mem-file-search (name/type filter box),
@@ -1624,9 +1628,6 @@
 .pf .pf-inline-view-body .section-title { margin-top: .5rem; }
 .pf .pf-inline-view-body .card { border-radius: 14px; }
 
-/* Toast container fix for split layout */
-.pf.toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; }
-
 /* Container */
 .pf .pf-landing { display: flex; flex-direction: column; gap: 16px; }
 
@@ -2337,7 +2338,7 @@
 /* Popped-out single-document window (doc-solo.js) */
 .pj-doc-solo { max-width: 920px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
 .pj-doc-solo-empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
-.pj-doc-solo-toast { position: fixed; bottom: 1.1rem; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--card); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; box-shadow: var(--shadow-md); z-index: 50; }
+.pj-doc-solo-toast { position: fixed; bottom: 1.1rem; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--card); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; box-shadow: var(--shadow-md); z-index: 50; width: max-content; max-width: min(92vw, 40rem); text-align: center; overflow-wrap: anywhere; box-sizing: border-box; }
 
 /* Document typography — make rendered markdown read like a real document.
    Generous line-height, clear space above headings, comfortable list + code styling. */
