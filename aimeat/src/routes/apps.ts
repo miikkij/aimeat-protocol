@@ -64,6 +64,10 @@
  *   v1.13.0 -- 2026-06-25 -- Operator hard delete: DELETE /v1/admin/apps/:owner/:filename (operator)
  *     permanently removes an app (every version + screenshot, any owner) from the node — the
  *     irreversible counterpart to the moderation hide.
+ *   v1.14.0 -- 2026-07-06 -- Inline-app CSP: font-src gains 'self' so an app can @font-face fonts
+ *     from its own origin's public storage (/v1/pub/...). https: already covered prod app origins
+ *     but not the http://*.apps.localhost dev origin; 'self' is a tightening-style addition
+ *     (same-origin only), verified against the TDR-kit font test (securitypolicyviolation on dev).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -616,7 +620,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         res.setHeader('Content-Length', body.length.toString());
 
         if (mode === 'inline') {
-            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
+            // font-src includes 'self' so an app can load fonts from its own origin's public
+            // storage (/v1/pub/...) — https: does not cover the http://*.apps.localhost dev origin.
+            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
             // Force browsers to always validate with the server (ETag round-trip).
             // Without this, heuristic caching can keep users on a stale app
             // version for hours after a republish. We still respond 304 when
