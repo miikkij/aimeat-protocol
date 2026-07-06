@@ -20,6 +20,9 @@
  *   - Debug panel
  *   - Responsive breakpoints
  * @version-history
+ *   v1.1.0 — 2026-07-06 — Drop the dead .pf.toast-container rule (duplicate of profile.css's;
+ *     profile.js no longer wraps its toast — the fixed+transform wrapper collapsed the fixed
+ *     .toast inside to a one-character-per-line sliver).
  *   v1.0.0 — 2026-03-26 — Extracted from profile.css generator block (lines 502-1775),
  *     prefix changed from pf-gen- to fnd- for foundry namespace
  */
@@ -863,9 +866,6 @@
 /* Give tab content inside inline views more breathing room */
 .pf .pf-inline-view-body .section-title { margin-top: .5rem; }
 .pf .pf-inline-view-body .card { border-radius: 14px; }
-
-/* Toast container fix for split layout */
-.pf.toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; }
 
 /* Container */
 .pf .pf-landing { display: flex; flex-direction: column; gap: 16px; }

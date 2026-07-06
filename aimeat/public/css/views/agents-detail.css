@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.15.0 -- 2026-07-06 -- .pf-agd-solo-toast gets the shared toast max-width min(92vw, 40rem)
+ *     + centered wrapping so long messages stay readable, incl. mobile.
  *   v1.14.0 -- 2026-07-03 -- Add Contracts sub-tab styles (.pf-agd-contracts, .agc-caps, .agc-list,
  *     .agc-row, .agc-where, .agc-org, .agc-since) — agent-side contract-engagement visibility.
  *   v1.13.0 -- 2026-06-24 -- Secretary P5 (S-A): add .pf-agd-badge--specialist (specialist agent type badge).
@@ -1530,6 +1532,11 @@
   font-size: 0.85rem;
   z-index: 1000;
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.18));
+  width: max-content;
+  max-width: min(92vw, 40rem);
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 .pf .pf-agd-solo-toast--err { background: var(--danger, #EF4444); }
 

@@ -8,6 +8,11 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   v1.3.0 — 2026-07-06 — Toast fix: drop the .pf.toast-container wrapper (its
+ *     fixed+transform box was the containing block of the fixed .toast inside,
+ *     collapsing it to a one-character-per-line sliver) and adopt Toast.js's
+ *     canonical .toast.toast-{type} markup + normalizeToastType so string kinds
+ *     ('success'/'info'/'warning') stop rendering as red error toasts.
  *   v1.2.0 — 2026-06-09 — Persist the remembered tab in sessionStorage instead of
  *     localStorage (aimeat-profile-tab) so it is per browser tab; matches the
  *     landing page, which owns the actual restored-on-F5 view.
@@ -24,6 +29,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { normalizeToastType } from '/components/Toast.js';
 import { getSession, getNodeUrl, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { listAgents } from '/js/services/agents.js';
@@ -136,15 +142,16 @@ export default function Profile({ navigate, locale }) {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
-  // NOTE: this is a THIRD toast pathway alongside /components/Toast.js's
-  // useToast() and the admin shell's useToast tuple. It renders a distinct
-  // <.pf.toast-container> wrapper + <.toast.error> markup (vs Toast.js's bare
-  // <.toast.toast-error/.toast-success>), so it is a convergence candidate but
-  // is NOT migrated here — adopting Toast.js would change DOM/behavior. The
-  // .toast colors are now tokenized in theme.css (--toast-*).
-  const showToast = useCallback((msg, isError) => {
+  // NOTE: this is a toast pathway alongside /components/Toast.js's useToast()
+  // and the admin shell's useToast tuple. It keeps its own state (showToast is
+  // passed down to every tab as a prop) but now renders Toast.js's canonical
+  // bare <.toast.toast-{type}> markup and shares its kind normalization. The
+  // old <.pf.toast-container> wrapper was removed: its fixed+transform box
+  // became the containing block of the fixed .toast inside, collapsing it to
+  // a zero-width column (one character per line).
+  const showToast = useCallback((msg, kind) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ msg, isError });
+    setToast({ msg, type: normalizeToastType(kind) });
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
@@ -311,5 +318,5 @@ export default function Profile({ navigate, locale }) {
     </div>
 
     <!-- Toast -->
-    ${toast && html`<div class="pf toast-container"><div class="toast ${toast?.isError ? 'error' : ''}">${toast?.msg}</div></div>`}`;
+    ${toast && html`<div class="toast toast-${toast.type}">${toast.msg}</div>`}`;
 }

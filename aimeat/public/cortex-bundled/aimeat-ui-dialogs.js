@@ -104,10 +104,13 @@
       filter: brightness(1.1); box-shadow: 0 4px 14px rgba(239,68,68,0.3);
     }
 
-    /* Toast */
+    /* Toast. Container gets width:max-content — a fixed box anchored at left:50%
+       otherwise shrink-to-fits against the remaining 50vw, capping toasts at half
+       the viewport (badly narrow on phones). */
     .aui-toast-container {
       position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column-reverse; gap: 0.5rem;
+      display: flex; flex-direction: column-reverse; gap: 0.5rem; align-items: center;
+      width: max-content; max-width: 92vw;
       z-index: 10001; pointer-events: none;
     }
     .aui-toast {
@@ -117,7 +120,7 @@
       animation: auiSlideUp 0.2s ease;
       pointer-events: auto; cursor: pointer;
       font-family: 'DM Sans', system-ui, sans-serif;
-      max-width: 400px;
+      max-width: min(92vw, 400px); overflow-wrap: anywhere; box-sizing: border-box;
     }
     .aui-toast-success { background: var(--success, #10B981); color: white }
     .aui-toast-error { background: var(--danger, #EF4444); color: white }
