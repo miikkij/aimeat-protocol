@@ -62,7 +62,7 @@ function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
     for (const run of runs) {
       const st = run.steps[s.id]?.state;
       if (st === 'green') green++;
-      else if (st === 'input-red' || st === 'output-red' || st === 'timed-out') red++;
+      else if (st === 'input-red' || st === 'output-red' || st === 'timed-out' || st === 'agent-offline') red++;
     }
     return { stepId: s.id, green, red, sample };
   });

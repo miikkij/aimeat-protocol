@@ -25,6 +25,8 @@
  *     + built-in {run}/{date} key-template vars (run-scoped keys, the non-destructive default).
  *   v1.5.0 — 2026-07-06 — WorkflowDef.skip_done: a re-run skips already-satisfied steps (green without
  *     dispatching the crew) and continues from the not-yet-done ones.
+ *   v1.6.0 — 2026-07-06 — StepState 'agent-offline': a dispatched step whose agent is unreachable and
+ *     produced nothing fails fast (offline grace) with a distinct state, not a slow timed-out.
  */
 import { z } from 'zod';
 
@@ -194,7 +196,11 @@ export interface WorkflowDef {
 }
 
 export type StepState =
-  | 'pending' | 'input-red' | 'dispatched' | 'green' | 'output-red' | 'timed-out' | 'skipped';
+  | 'pending' | 'input-red' | 'dispatched' | 'green' | 'output-red' | 'timed-out' | 'skipped'
+  // agent-offline: the step's agent was unreachable (no working webhook + stale lastSeen) and produced
+  // nothing within the offline grace — a connectivity failure, distinct from a productive-but-slow
+  // timed-out. Terminal + counts as a failure (partial run).
+  | 'agent-offline';
 
 export interface WorkflowRunStep {
   state: StepState;

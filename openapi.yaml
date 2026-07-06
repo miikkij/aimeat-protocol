@@ -3570,7 +3570,7 @@ components:
           additionalProperties:
             type: object
             properties:
-              state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped] }
+              state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped, agent-offline] }
               attempt: { type: integer }
               taskIds: { type: array, items: { type: string } }
               reads: { type: array, items: { type: string } }
