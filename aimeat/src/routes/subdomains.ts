@@ -30,6 +30,9 @@
  *     Injects the standalone bridge (aimeat-auth + portfolio-standalone.js + memory:read
  *     scopes meta); aimeat badge per-portfolio optional (showBadge, default on);
  *     'portfolio' added to RESERVED_SUBDOMAINS.
+ *   v1.6.1 — 2026-07-06 — appCsp font-src gains 'self' (fonts from the app origin's own
+ *     /v1/pub public storage on the http dev origin) — completes the same addition made to
+ *     the /v1/apps inline route in apps.ts v1.14.0; https: already covered prod.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -66,7 +69,10 @@ function appCsp(apexOrigin: string): string {
   // /v1/app-grants/token) and the silent bridge, so connect-src must allow the apex origin
   // (https://aimeat.io is covered by `https:`; an http dev apex like http://localtest.me is not).
   const apexAllow = apexOrigin ? ' ' + apexOrigin : '';
-  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
+  // font-src includes 'self' so apps can @font-face fonts from their own origin's public
+  // storage (/v1/pub/...) — https: covers prod app origins but not the http://*.apps.localhost
+  // dev origin. Mirrors the same addition on the /v1/apps inline route (apps.ts v1.14.0).
+  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
 }
 
 /**
