@@ -9,6 +9,8 @@
  * @structure WorkflowsTab (default) — view state machine (list | detail | run)
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v1.4.0 -- 2026-07-06 -- statusClass maps the agent-offline step state to a distinct amber badge
+ *     (wf-badge--offline) — a connectivity failure, not a productive-but-slow timed-out.
  *   v1.3.0 -- 2026-07-05 -- Run view shows per-step fill progress (ProgressChip: "leaves N/M" +
  *     still-filling / stalled while dispatched) from run.steps[].progress — so a slow step reads as
  *     in-progress, not a hard timed-out, while the crew is still filling keys (resume-on-retry).
@@ -48,6 +50,8 @@ function triggerSummary(trigger) {
 /** Map a run/step status to a badge CSS modifier. */
 function statusClass(status) {
   if (status === 'done' || status === 'green') return 'wf-badge--ok';
+  // agent-offline is a connectivity failure — its own amber badge, distinct from a productive-but-slow timed-out.
+  if (status === 'agent-offline') return 'wf-badge--offline';
   if (status === 'partial' || status === 'red' || (typeof status === 'string' && status.endsWith('-red')) || status === 'timed-out') return 'wf-badge--err';
   if (status === 'skipped' || status === 'cancelled') return 'wf-badge--muted';
   return 'wf-badge--run';

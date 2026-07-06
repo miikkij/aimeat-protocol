@@ -1,29 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { WorkflowEngine } from '../../src/services/workflow/engine.js';
+import { WorkflowEngine, isAgentReachable } from '../../src/services/workflow/engine.js';
 import type { AimeatConfig } from '../../src/config.js';
-import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
+import type { Storage, MemoryRecord, AgentRecord } from '../../src/storage/interface.js';
 import type { WorkflowRun, WorkflowDef, WorkflowRunStep, ResolvedStepSignals, Signal } from '../../src/models/workflow-schemas.js';
 
 // In-memory Storage covering the watchdog sweep path: getMemory/setMemory/listMemory(prefix) +
-// getAgent/getAgentTask → null + the owner-scope aggregation helpers (getAgentsByOwner /
-// getEcosystemAppsByOwner → []). Cast to Storage. The sweep now re-evaluates the success signal via
-// buildEvalCtx → owner-memory helpers, so the mock supports prefix listing + the two aggregation calls.
-function memStorage(): Storage {
+// getAgentTask → null + the owner-scope aggregation helpers (getAgentsByOwner / getEcosystemAppsByOwner
+// → []). getAgent is gaii-aware: it returns the configured step agent for `bot@…` and null otherwise
+// (so the inspector agent is absent → no inspector dispatch). Default step agent null = unreachable.
+function memStorage(opts?: { stepAgent?: Partial<AgentRecord> | null }): Storage {
   const map = new Map<string, MemoryRecord>();
   const k = (owner: string, key: string) => `${owner}|${key}`;
   return {
     getMemory: async (owner: string, key: string) => map.get(k(owner, key)) ?? null,
     setMemory: async (rec: MemoryRecord) => { map.set(k(rec.ownerGaii, rec.key), rec); return rec; },
-    listMemory: async (owner: string, opts?: { prefix?: string }) => {
-      const prefix = opts?.prefix ?? '';
+    listMemory: async (owner: string, opts2?: { prefix?: string }) => {
+      const prefix = opts2?.prefix ?? '';
       return [...map.values()].filter(r => r.ownerGaii === owner && r.key.startsWith(prefix));
     },
-    getAgent: async () => null,
+    getAgent: async (gaii: string) => (gaii.startsWith('bot#') ? (opts?.stepAgent ?? null) as AgentRecord | null : null),
     getAgentTask: async () => null,
     getAgentsByOwner: async () => [],
     getEcosystemAppsByOwner: async () => [],
   } as unknown as Storage;
 }
+
+/** A reachable agent (fresh lastSeen) for the "online but slow" case. */
+const reachableAgent = (): Partial<AgentRecord> => ({ gaii: `bot#alice@${NODE}`, lastSeen: new Date().toISOString(), webhookEnabled: false, webhookFailCount: 0 });
 
 const NODE = 'test-node';
 const OWNER = `alice@${NODE}`;
@@ -145,5 +148,54 @@ describe('watchdog: slow vs stuck (sliding no-progress window)', () => {
     expect(run.steps.a.state).toBe('pending');   // back to pending for a gap-fill re-dispatch
     expect(run.steps.a.attempt).toBe(1);
     expect(run.steps.a.notBefore).toBeDefined();
+  });
+});
+
+const NOTHING: Signal = { kind: 'deterministic', key: 'k', op: 'exists' }; // 'k' never seeded → count 0
+
+describe('isAgentReachable', () => {
+  const now = Date.parse('2026-07-06T12:00:00.000Z');
+  const A = (o: Partial<AgentRecord>) => o as AgentRecord;
+  it('a null agent (never registered / deleted) is unreachable', () => {
+    expect(isAgentReachable(null, now)).toBe(false);
+  });
+  it('a healthy webhook is reachable regardless of lastSeen', () => {
+    expect(isAgentReachable(A({ webhookEnabled: true, webhookUrl: 'https://x', webhookFailCount: 0, lastSeen: '2020-01-01T00:00:00.000Z' }), now)).toBe(true);
+  });
+  it('webhook_down (failCount ≥ 10) + stale lastSeen is unreachable', () => {
+    expect(isAgentReachable(A({ webhookEnabled: true, webhookUrl: 'https://x', webhookFailCount: 10, lastSeen: '2020-01-01T00:00:00.000Z' }), now)).toBe(false);
+  });
+  it('no webhook + fresh lastSeen (a live polling daemon) is reachable', () => {
+    expect(isAgentReachable(A({ webhookEnabled: false, webhookFailCount: 0, lastSeen: new Date(now - 60_000).toISOString() }), now)).toBe(true);
+  });
+  it('no webhook + stale lastSeen (> online window) is unreachable', () => {
+    expect(isAgentReachable(A({ webhookEnabled: false, webhookFailCount: 0, lastSeen: new Date(now - 11 * 60_000).toISOString() }), now)).toBe(false);
+  });
+});
+
+describe('watchdog: agent-offline fast-fail', () => {
+  it('a no-progress step whose agent is UNREACHABLE fails as agent-offline past the grace (not the 60-min timeout)', async () => {
+    const storage = memStorage(); // default: bot agent → null → unreachable
+    seed(storage, { successSignal: NOTHING, startedAtMsAgo: 6 * 60_000, timeoutMin: 60 });
+    await engineFor(storage).sweep();
+    const run = await readRun(storage, 'run-1');
+    expect(run.steps.a.state).toBe('agent-offline');
+    expect(run.status).toBe('partial');
+  });
+
+  it('the SAME no-progress step with a REACHABLE agent is NOT offline-failed (kept waiting within timeout)', async () => {
+    const storage = memStorage({ stepAgent: reachableAgent() });
+    seed(storage, { successSignal: NOTHING, startedAtMsAgo: 6 * 60_000, timeoutMin: 60 });
+    await engineFor(storage).sweep();
+    const run = await readRun(storage, 'run-1');
+    expect(run.steps.a.state).toBe('dispatched'); // agent online → no fast-fail, still within the 60-min wait
+  });
+
+  it('an unreachable agent WITHIN the grace window is not failed yet', async () => {
+    const storage = memStorage(); // unreachable
+    seed(storage, { successSignal: NOTHING, startedAtMsAgo: 2 * 60_000, timeoutMin: 60 }); // 2 min < 5-min grace
+    await engineFor(storage).sweep();
+    const run = await readRun(storage, 'run-1');
+    expect(run.steps.a.state).toBe('dispatched');
   });
 });

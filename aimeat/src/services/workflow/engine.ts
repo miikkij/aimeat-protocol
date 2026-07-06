@@ -39,10 +39,14 @@
  *     if already satisfied, greens it WITHOUT dispatching the crew — a re-run continues from the not-
  *     yet-done steps (and re-running one step = clear its output + run). tick is now a fixpoint loop so
  *     a skip-greened step's dependents advance in the same tick.
+ *   v1.5.0 — 2026-07-06 — agent-offline handling. isAgentReachable (webhook-healthy OR fresh lastSeen);
+ *     tick fires a heads-up notification when it dispatches to an offline agent; the sweep fast-fails a
+ *     no-progress step whose agent is unreachable at the offline grace (AGENT_OFFLINE_GRACE_MS) into the
+ *     new `agent-offline` state — instead of waiting the full timeout_min for a generic timed-out.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskScope } from '../../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskScope, AgentRecord } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
@@ -73,7 +77,28 @@ function loc(s: LocalizedString | undefined): string {
   return s.en_US ?? s.fi_FI ?? Object.values(s)[0] ?? '';
 }
 
-const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped']);
+const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped', 'agent-offline']);
+
+// ── agent reachability (agent-offline fast-fail) ──────────────────────────────────
+/** lastSeen within this window ⇒ the agent is "online now" (a live polling daemon heartbeats ~1/min). */
+const AGENT_ONLINE_WINDOW_MS = 10 * 60_000;
+/** Consecutive webhook delivery failures ⇒ webhook_down (matches the stall detector). */
+const AGENT_WEBHOOK_DOWN_THRESHOLD = 10;
+/** How long after dispatch to wait before failing a no-progress step whose agent is unreachable. */
+const AGENT_OFFLINE_GRACE_MS = 5 * 60_000;
+
+/**
+ * Is an agent reachable RIGHT NOW to pick up a dispatched task? True when it has a healthy push
+ * webhook, OR its lastSeen heartbeat is fresh (an active polling serve-daemon). A null agent (never
+ * registered / deleted) is unreachable. Pure — `nowMs` injected for testability.
+ */
+export function isAgentReachable(agent: AgentRecord | null | undefined, nowMs: number): boolean {
+  if (!agent) return false;
+  const webhookOk = !!(agent.webhookEnabled && agent.webhookUrl) && (agent.webhookFailCount ?? 0) < AGENT_WEBHOOK_DOWN_THRESHOLD;
+  if (webhookOk) return true;
+  const lastSeenMs = new Date(agent.lastSeen).getTime();
+  return Number.isFinite(lastSeenMs) && (nowMs - lastSeenMs) < AGENT_ONLINE_WINDOW_MS;
+}
 
 /**
  * The steps that may start now: pending, past any retry backoff, and their `after` deps satisfied.
@@ -278,6 +303,8 @@ export class WorkflowEngine {
         const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
         dispatchedAny = true; mutated = true;
+        // Heads-up if we just dispatched to an offline agent (the sweep fails it after the grace).
+        await this.maybeAlertAgentOffline(ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
       if (!advancedTerminal) break;
@@ -365,6 +392,7 @@ export class WorkflowEngine {
       if (r.status !== 'running' && r.status !== 'waiting-step') return;
       const now = Date.now();
       const nowIso = new Date().toISOString();
+      const ownerName = ownerGhii.split('@')[0];
       const resolved = this.resolvedMap(r);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, r);
       let changed = false;
@@ -395,6 +423,21 @@ export class WorkflowEngine {
           continue;
         }
         rs.outputObserved = output.observed;
+
+        // agent-offline fast-fail: an agent step that has produced NOTHING and whose agent is
+        // unreachable won't complete — fail it at the offline grace (not the full timeout_min) with a
+        // distinct state. A step that made ANY progress, or whose agent is reachable (working but slow),
+        // falls through to the timeout policy below.
+        const producedNothing = (rs.progress?.count ?? 0) === 0;
+        const sinceDispatch = now - new Date(rs.startedAt).getTime();
+        if (this.isAgentStep(step) && producedNothing && sinceDispatch >= AGENT_OFFLINE_GRACE_MS
+            && !(await this.anyAgentReachable(ownerName, step))) {
+          rs.state = 'agent-offline'; rs.endedAt = nowIso;
+          this.failDownstream(r, step.id);
+          await this.onStepFail(ownerGhii, r, step.id, 'agent-offline');
+          changed = true;
+          continue;
+        }
 
         // Not satisfied yet — slow (still progressing) vs stuck (no new keys for timeout_min). The
         // no-progress deadline slides to lastProgressAt + timeout_min; a step that never progressed
@@ -672,6 +715,46 @@ export class WorkflowEngine {
     if (cleared) logger.info(`workflow ${run.workflowId} run ${run.runId}: fresh cleared ${cleared} prior-run output key(s)`);
   }
 
+  /** A default agent-dispatch step (has an agent), not an ecosystem export-out/trigger-geai step. */
+  private isAgentStep(step: WorkflowStep): boolean {
+    return !step.action || step.action.kind === 'agent';
+  }
+
+  /** True if ANY of a step's target agents is reachable now (so the task can be picked up). */
+  private async anyAgentReachable(ownerName: string, step: WorkflowStep): Promise<boolean> {
+    const agents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
+    if (agents.length === 0) return true; // nothing to check (e.g. ecosystem step) ⇒ don't offline-fail
+    const now = Date.now();
+    for (const name of agents) {
+      const agent = await this.storage.getAgent(buildGAII(name, ownerName, this.config.nodeId));
+      if (isAgentReachable(agent, now)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Heads-up alert (owner opt-in via pushService + always the in-app inbox) fired at dispatch when a
+   * step's agent(s) look OFFLINE — so the owner can bring the crew online before the offline grace
+   * elapses and the step fails. Best-effort: a notify/push problem never disturbs the run.
+   */
+  private async maybeAlertAgentOffline(ownerGhii: string, run: WorkflowRun, step: WorkflowStep): Promise<void> {
+    if (!this.isAgentStep(step)) return;
+    const ownerName = ownerGhii.split('@')[0];
+    if (await this.anyAgentReachable(ownerName, step)) return;
+    const agents = (Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : [])).join(', ');
+    const name = loc(run.defSnapshot.title) || run.workflowId;
+    const graceMin = Math.round(AGENT_OFFLINE_GRACE_MS / 60_000);
+    const title = 'Workflow agent offline';
+    const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
+    logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
+    try { await notify(this.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows' }); }
+    catch { /* in-app notify best-effort */ }
+    if (this.pushService?.enabled) {
+      this.pushService.sendNotification(ownerName, { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
+        .catch(() => { /* push best-effort */ });
+    }
+  }
+
   /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
   private async dispatchStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved?: ResolvedStep): Promise<string[]> {
     // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
@@ -850,7 +933,7 @@ export class WorkflowEngine {
   }
 
   private static readonly TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled']);
-  private static readonly FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out']);
+  private static readonly FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out', 'agent-offline']);
 
   /**
    * Finish-notification (Rule: owner opt-in). When a full-live run reaches a terminal state AND the

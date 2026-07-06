@@ -10,6 +10,7 @@
  *     carded step editors, branded accent checkboxes.
  *   v1.2.0 -- 2026-07-05 -- .wf-progress chip ("leaves N/M") + .wf-progress--live pulse for a
  *     still-filling dispatched step (resume-on-retry progress surfacing).
+ *   v1.3.0 -- 2026-07-06 -- .wf-badge--offline (amber-outlined) for the agent-offline step state.
  */
 
 .wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
@@ -31,6 +32,9 @@
 .wf-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
 .wf-badge--run { background: var(--info-bg); color: var(--info-fg); }
 .wf-badge--muted { background: var(--bg-dim); color: var(--text-dim); }
+/* agent-offline: a connectivity failure — an amber-outlined chip, visually distinct from the solid
+   red timed-out/-red states and the solid green ok. Uses theme tokens only. */
+.wf-badge--offline { background: var(--bg-dim); color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange); }
 
 /* ── per-step fill progress ("leaves N/M") ── */
 .wf-progress {
