@@ -80,6 +80,7 @@ export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gai
 
 // ── Applications (moderation) ──
 export const getAdminApps    = ()       => apiGet('/v1/admin/apps');
+export const scanAppCopies   = (threshold) => apiGet(`/v1/admin/apps/similar${threshold ? `?threshold=${threshold}` : ''}`);
 export const moderateApp     = (owner, filename, hidden, reason) =>
   apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/moderate`, { hidden, reason });
 export const deleteAppAdmin  = (owner, filename) =>

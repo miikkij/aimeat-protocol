@@ -12308,6 +12308,58 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/admin/apps/similar:
+    get:
+      operationId: scanAppCopies
+      summary: Scan the catalogue for unattributed copies (operator)
+      description: >-
+        Catalog-wide near-duplicate scan. Flags apps whose content closely matches another app they
+        are NOT fork-linked to (i.e. copied without going through Fork), using MOSS-style winnowing
+        fingerprints with catalogue boilerplate filtered out and fork chains collapsed. Also returns
+        watermark hits — a stored app whose bytes embed another app's per-serve fingerprint (stored
+        bytes never carry a watermark, so this is hard evidence of a paste). A moderation signal to
+        review, not proof. Operator-only.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: query, name: threshold, required: false, schema: { type: number, minimum: 0.1, maximum: 1 }, description: Similarity threshold 0.1-1 (default 0.7) }
+      responses:
+        '200':
+          description: Suspicious copies + watermark evidence
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          scanned: { type: integer }
+                          threshold: { type: number }
+                          truncated: { type: boolean }
+                          suspiciousPairs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                a: { type: string }
+                                b: { type: string }
+                                similarity: { type: number }
+                          watermarkHits:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                inApp: { type: string }
+                                watermarkOf: { type: string }
+                                viewer: { type: string }
+                                servedAt: { type: string, format: date-time }
+                          note: { type: string }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/admin/apps/watermark/decode:
     post:
       operationId: decodeAppWatermark

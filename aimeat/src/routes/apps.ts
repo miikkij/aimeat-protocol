@@ -78,6 +78,12 @@
  *     children); GET /v1/apps/:owner/:filename/forks lists the direct forks with each one's live
  *     status (public/parked/hidden/deleted); GET .../lineage returns the full cross-owner fork tree
  *     (ancestry via forkedFrom + descendants via app_forks, surviving deletions) as nodes/edges.
+ *   v1.17.0 -- 2026-07-07 -- Copy-protection (Phase 3): opt-in manifest.protection
+ *     (obfuscate/domainLock/watermark/noRawDownload) accepted on publish + PATCH, carried forward on
+ *     re-publish, applied to inline serves via applyAppProtection; the raw download 403s when
+ *     noRawDownload is set (owner/operator exempt); POST /v1/admin/apps/watermark/decode traces a
+ *     leaked fingerprint. Phase 4: GET /v1/admin/apps/similar flags unattributed copies (high
+ *     similarity with no fork link) + watermark hits.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -97,6 +103,7 @@ import { ensureAppSubdomain } from './subdomains.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
 import { collectAppLineage, resolveAppStatus } from '../services/app-lineage.js';
 import { sanitizeProtection, applyAppProtection, invalidateProtectionCache, hasAnyProtection, decodeWatermark } from '../utils/app-protect.js';
+import { scanCatalogForCopies } from '../services/app-similarity.js';
 import type { AppProtection } from '../storage/interface.js';
 
 /**
@@ -271,6 +278,23 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }));
 
         res.json(success(config.nodeId, { apps: result, total, offset, limit }));
+    });
+
+    // GET /v1/admin/apps/similar — operator-only: catalog-wide unattributed-copy scan. Flags
+    // apps whose content closely matches another they are NOT fork-linked to (copied without
+    // forking), plus any watermark evidence (a stored app that embeds another app's per-serve
+    // fingerprint). A moderation SIGNAL to review, not proof. ?threshold=0..1 (default 0.7).
+    router.get('/v1/admin/apps/similar', requireAuth(), requireRole('operator'), async (req, res) => {
+        const thresholdRaw = parseFloat(req.query.threshold as string);
+        const threshold = Number.isFinite(thresholdRaw) ? Math.min(1, Math.max(0.1, thresholdRaw)) : 0.7;
+        const { apps } = await storage.listApps({ adminView: true, limit: 1000, sort: 'newest' });
+        const result = scanCatalogForCopies(apps, config, { threshold });
+        res.json(success(config.nodeId, {
+            ...result,
+            note: result.suspiciousPairs.length || result.watermarkHits.length
+                ? 'Review these — high similarity or a watermark hit suggests a copy made without forking. This is a signal, not proof.'
+                : 'No unattributed copies detected above the threshold.',
+        }));
     });
 
     // POST /v1/admin/apps/watermark/decode — operator-only: trace a leaked copy. Given a
