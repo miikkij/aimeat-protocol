@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.31.0 - 2026-07-07 - New library aimeat-live.js (TARGET-012): a served, app-facing realtime
+ *   helper wrapping the node SSE transport (POST /v1/events/ticket -> GET /v1/events) behind
+ *   AIMEAT.live.subscribe(domains, fn) — one shared owner-scoped connection, selective re-fetch,
+ *   no polling/F5. Integrates with the aimeat-auth session (ticket via session.fetch). Listed in /v1/libs.
  * v1.30.0 - 2026-07-07 - aimeat-auth.js: loginWithPassword exposes session._keyCredentials (first-login
  *   durable creds, TARGET-011); logout() on an app origin now ends the SHARED apex session via the
  *   same-site bridge (?mode=logout) so EXIT sticks across the M-ROOM / LOOM / DROP family.
@@ -117,6 +121,7 @@ import { aimeatHeaderLib } from './lib-header.js';
 import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
 import { aimeatOrganismLib } from './lib-organism.js';
 import { aimeatEditorLib } from './lib-editor.js';
+import { aimeatLiveLib } from './lib-live.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -218,6 +223,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)
   router.get('/v1/libs/aimeat-editor.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatEditorLib(config));
+  });
+
+  // GET /v1/libs/aimeat-live.js — realtime live-updates (SSE subscribe helper, TARGET-012)
+  router.get('/v1/libs/aimeat-live.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatLiveLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -346,6 +356,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           description: 'Markdown editor: CodeMirror 6 (textarea fallback) with a uniform adapter, formatting toolbar, and an editor+live-preview split view rendered through aimeat-markdown.',
           size_estimate: '~8KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>\n<script src="${config.baseUrl}/v1/libs/aimeat-editor.js"></script>`,
+        },
+        {
+          name: 'aimeat-live',
+          url: '/v1/libs/aimeat-live.js',
+          description: 'Realtime live-updates: subscribe to server-pushed change domains (agent-tasks, agents, organisms, notifications, memory, ...) over one shared, owner-scoped SSE connection. Re-fetch only what changed, no polling or F5. AIMEAT.live.subscribe([\'agent-tasks\'], reload).',
+          size_estimate: '~5KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-live.js"></script>`,
+          requires: 'aimeat-auth',
         },
       ],
     });
