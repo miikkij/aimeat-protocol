@@ -13,6 +13,11 @@
 > boundaries. Doing the wrong work in the wrong layer is the most common
 > way these stacks fail. This guide names the layers, shows the data flow,
 > and lists every gotcha we've hit.
+>
+> **Deciding what to put where (esp. to protect it):** if your goal is to keep
+> valuable logic or data out of copyable client code, start with
+> [Protecting your work: move business logic into an extension](protecting-your-work-with-extensions.md),
+> then come back here for the mechanics.
 
 ---
 
