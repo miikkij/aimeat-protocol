@@ -4002,6 +4002,15 @@ export class PrismaStorage implements Storage {
         });
     }
 
+    async getCodeInvitationByProvisionedOwner(owner: string): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.invitation.findFirst({
+            where: { type: 'code', provisionedOwner: owner },
+            orderBy: { createdAt: 'desc' },
+        });
+        return row ? this.toInvitationRecord(row) : null;
+    }
+
     async updateInvitation(id: string, updates: Partial<import('../../../storage/repositories/invitation.repository.js').InvitationRecord>): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
         this.ensureReady();
         try {

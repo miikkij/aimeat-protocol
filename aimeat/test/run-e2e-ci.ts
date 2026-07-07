@@ -35,6 +35,7 @@ const ALL_SUITES = [
     // Self-spawns its own server with the portfolio-origin flag ON (same pattern).
     'test/e2e-portfolio-origin.ts',
     'test/e2e-app-grants.ts',
+    'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-silent.ts',
     'test/e2e-apps-backup.ts',
     'test/e2e-board-access.ts',

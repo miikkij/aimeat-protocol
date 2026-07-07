@@ -2,7 +2,9 @@
  * @file agent-tasks.ts
  * @description REST endpoints for agent task CRUD, lifecycle, and event log.
  *   Supports creating tasks for agents, transitioning status (draft->queued->active->done|failed),
- *   appending event logs, and listing task events.
+ *   appending event logs, and listing task events. Callers: owner sessions, same-owner agents, and
+ *   (since v1.9.0) H-2 app grants holding task:read (list/get/events) or task:write (create/start),
+ *   scoped strictly to the app's OWN owner's agents.
  * @structure
  *   - POST   /v1/agents/:name/tasks           -- Create task
  *   - GET    /v1/agents/:name/tasks           -- List tasks
@@ -37,6 +39,10 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-06-16 -- Record a public-activity-feed event on task completion when
  *     the agent published a PUBLIC deliverable.
+ *   v1.9.0 -- 2026-07-07 -- TARGET-006 AGENCY: a same-owner H-2 app grant may create + start tasks
+ *     (task:write) and list/get/read events (task:read via canReadTask) for its OWN owner's agents.
+ *     Additive app-role branches on create/start/list/get/events; owner/agent paths unchanged; the
+ *     write/lifecycle routes (PATCH/complete/fail/rate/...) stay owner/agent-only (canAccessTask).
  */
 
 import { Router } from 'express';
@@ -95,7 +101,29 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     return buildGAII(agentName, owner, config.nodeId);
   }
 
-  /** Check if current session can access a task (owner or the task's agent) */
+  /** Wildcard-aware scope check for the current token (mirrors auth/middleware.ts requireScope). */
+  function tokenHasScope(req: Express.Request, scope: string): boolean {
+    const scopes = (req.auth!.scopes as string[] | undefined) ?? [];
+    if (scopes.includes('*') || scopes.includes(scope)) return true;
+    return scopes.includes(`${scope.split(':')[0]}:*`);
+  }
+
+  /**
+   * An H-2 app grant acting for its OWN owner: role 'app' + the required task scope + the target
+   * agent belongs to the app's own owner (agent.owner === the app token's owner). This is the same
+   * "scoped external principal reaching its owner's own data" pattern agents/GEAIs use — never
+   * cross-owner, never a scope escalation (app tokens get no owner bypass in requireScope).
+   */
+  function appActsForOwner(req: Express.Request, agentOwner: string, scope: string): boolean {
+    return req.auth!.roles.includes('app') && tokenHasScope(req, scope) && agentOwner === req.auth!.owner;
+  }
+
+  /**
+   * Check if current session can access a task (owner or the task's agent). This is the gate for
+   * ALL task routes incl. write/lifecycle ones — an app grant is deliberately NOT admitted here.
+   * App access is granted narrowly, only on the read routes (canReadTask) and the two write actions
+   * that check task:write explicitly (create + start).
+   */
   function canAccessTask(req: Express.Request, task: AgentTaskRecord): boolean {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     if (isOwnerSession) {
@@ -104,6 +132,19 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     }
     // Agent session -- must match agent GAII
     return task.agentGaii === req.auth!.sub;
+  }
+
+  /**
+   * Read access for the task-detail + events routes: owner/agent (canAccessTask) OR a same-owner
+   * H-2 app grant holding task:read. Kept separate from canAccessTask so task:read never leaks into
+   * the write/lifecycle routes that gate on canAccessTask.
+   */
+  function canReadTask(req: Express.Request, task: AgentTaskRecord): boolean {
+    if (canAccessTask(req, task)) return true;
+    if (req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read')) {
+      return task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
+    }
+    return false;
   }
 
   /* ── POST /v1/agents/:name/tasks -- Create a task for an agent ──
@@ -138,12 +179,13 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    // Authorize: owner JWT OR same-owner agent JWT.
+    // Authorize: owner JWT, same-owner agent JWT, OR a same-owner app grant holding task:write.
     const callerRoles = req.auth!.roles as string[];
     const isOwner = callerRoles.includes('owner') && !callerRoles.includes('agent');
     const isAgent = callerRoles.includes('agent');
-    if (!isOwner && !isAgent) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners or agents may create tasks'));
+    const isApp = callerRoles.includes('app');
+    if (!isOwner && !isAgent && !isApp) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners, agents, or granted apps may create tasks'));
       return;
     }
     if (isAgent && agent.owner !== req.auth!.owner) {
@@ -152,6 +194,18 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         `Agent '${req.auth!.sub}' cannot create tasks for '${agentName}' -- different owner`,
       ));
       return;
+    }
+    // H-2 app grant: needs task:write AND may only target its own owner's agents (never cross-owner).
+    if (isApp) {
+      if (!tokenHasScope(req, 'task:write')) {
+        res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:write" required to create tasks'));
+        return;
+      }
+      if (agent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+          `App can only create tasks for its own owner's agents (agent '${agentName}' belongs to a different owner)`));
+        return;
+      }
     }
 
     // ownerGaii is always the OWNER's GHII (not the calling agent's GAII),
@@ -297,6 +351,10 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   router.get('/v1/agents/:name/tasks', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // An H-2 app grant with task:read reads its OWN owner's tasks, so it takes the owner-scoped
+    // path (listAgentTasksByOwner filters by the app's owner GHII — never another owner's tasks).
+    const isAppReading = req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read');
+    const actAsOwner = isOwnerSession || isAppReading;
 
     const status = req.query.status as string | undefined;
     const bucket = req.query.bucket as string | undefined;
@@ -306,9 +364,15 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
 
+    // An app principal without task:read cannot list tasks (owner bypass never applies to it).
+    if (req.auth!.roles.includes('app') && !isAppReading) {
+      res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:read" required to list tasks'));
+      return;
+    }
+
     // Authorize + resolve the target agent.
-    const agentGaii = isOwnerSession ? resolveAgentGaii(req, agentName) : req.auth!.sub;
-    if (!isOwnerSession && agentGaii !== resolveAgentGaii(req, agentName)) {
+    const agentGaii = actAsOwner ? resolveAgentGaii(req, agentName) : req.auth!.sub;
+    if (!actAsOwner && agentGaii !== resolveAgentGaii(req, agentName)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
       return;
     }
@@ -320,7 +384,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     // cost from O(all the agent's tasks) into O(one page) — the load 40 polling agents were paying
     // every cycle.
     if (status && !bucket && !q && !updatedAfter && !updatedBefore) {
-      const r = isOwnerSession
+      const r = actAsOwner
         ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, status, page, perPage })
         : await storage.listAgentTasks(agentGaii, { status, page, perPage });
       res.json(success(config.nodeId, { tasks: r.tasks, total: r.total, counts: { recent: 0, keep: 0, archive: 0 }, page, per_page: perPage }));
@@ -331,7 +395,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     // the bucket counts), paging through the storage layer.
     const all: AgentTaskRecord[] = [];
     for (let p = 1; ; p++) {
-      const r = isOwnerSession
+      const r = actAsOwner
         ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, page: p, perPage: 200 })
         : await storage.listAgentTasks(agentGaii, { page: p, perPage: 200 });
       all.push(...r.tasks);
@@ -373,7 +437,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (!canAccessTask(req, task)) {
+    if (!canReadTask(req, task)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
@@ -550,10 +614,17 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
   /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
-    // Owner-only: agents must not self-start tasks (propose-before-start rule)
-    const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (!isOwner) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can start tasks'));
+    // Owner OR a same-owner app grant holding task:write may start a task; agents must not
+    // self-start (propose-before-start rule).
+    const startRoles = req.auth!.roles;
+    const isOwner = startRoles.includes('owner') && !startRoles.includes('agent');
+    const isApp = startRoles.includes('app');
+    if (!isOwner && !isApp) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner or a granted app can start tasks'));
+      return;
+    }
+    if (isApp && !tokenHasScope(req, 'task:write')) {
+      res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:write" required to start tasks'));
       return;
     }
 
@@ -565,7 +636,9 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (!canAccessTask(req, task)) {
+    // Owner-match: an app (task:write) may only start its OWN owner's task.
+    const appOwnsTask = isApp && task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
+    if (!appOwnsTask && !canAccessTask(req, task)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
@@ -1351,7 +1424,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (!canAccessTask(req, task)) {
+    if (!canReadTask(req, task)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }

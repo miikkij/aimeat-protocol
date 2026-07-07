@@ -28,6 +28,10 @@
  *     visiting their OWN standalone portfolio auto-gets a scoped token (members data
  *     works); other visitors get consent_required and stay logged out — the visible
  *     authorize flow still resolves app targets only.
+ *   v1.4.0 — 2026-07-07 — Add task:read/task:write + workflow:read/workflow:write to
+ *     APP_GRANTABLE_SCOPES so a control-plane app (TARGET-006 AGENCY) can orchestrate the owner's
+ *     OWN agents/automations with explicit consent. Enforcement stays in the task routes
+ *     (owner-match) + requireScope on workflow routes — never cross-owner, never a scope escalation.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -59,6 +63,14 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'messages:read': 'Read direct messages addressed to you across the federation',
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
+  // task:* and workflow:* let a control-plane app (e.g. AGENCY) orchestrate the owner's OWN
+  // agents on their behalf. The task routes enforce an owner-match (an app may only create/read
+  // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to
+  // the owner's memory namespace, so a granted app never reaches another owner's agents/data.
+  'task:read': "See your agents' tasks, runs, and results",
+  'task:write': 'Create and start tasks for your own agents on your behalf',
+  'workflow:read': 'See your automations (workflows) and their runs',
+  'workflow:write': 'Create, save, and run your automations (workflows)',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',

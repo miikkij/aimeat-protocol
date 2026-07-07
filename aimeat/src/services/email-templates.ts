@@ -11,6 +11,8 @@
  *   v1.2.0 — 2026-07-05 — Add keyInviteEmailHtml/keyInviteEmailSubject (provisioned-code access keys).
  *   v1.2.1 — 2026-07-05 — wrapHtml takes optional brand/footer; key-invite email shows the AIME♥AT
  *     wordmark + a "Sent from the AIMEAT machine room" footer (scoped to that template only).
+ *   v1.3.0 — 2026-07-07 — Add keyCredentialsEmailHtml/keyCredentialsEmailSubject: durable login
+ *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
 
 export interface MatchSuggestion {
@@ -62,6 +64,15 @@ const i18n: Record<string, Record<string, string>> = {
     keyFallback: 'Or copy and paste this address into your browser:',
     keyIgnore: "If you weren't expecting this key, you can safely ignore this email.",
     keyFooter: 'Sent from the AIMEAT machine room',
+    credSubject: 'Your login to {org} on AIMEAT',
+    credHeading: "You're in. Here is your login.",
+    credIntro: 'Your access code opened the door. These are your durable login details for AIMEAT. Use them to sign in again on any device, and to reach the linked apps in read only mode.',
+    credUserLabel: 'Username',
+    credPwLabel: 'Password',
+    credInstructions: 'Sign in with these at the address below:',
+    credButton: 'Sign in',
+    credNote: 'Keep these to yourself. You can change your password later in your profile settings.',
+    credIgnore: "If you did not use an access code, you can safely ignore this email.",
     roleViewer: 'viewer',
     roleContributor: 'contributor',
     footer: 'Sent by AIMEAT Protocol',
@@ -106,6 +117,15 @@ const i18n: Record<string, Record<string, string>> = {
     keyFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
     keyIgnore: 'Jos et odottanut tätä avainta, voit jättää viestin huomiotta.',
     keyFooter: 'Lähetetty AIMEATin konehuoneesta',
+    credSubject: 'Kirjautumistietosi: {org} (AIMEAT)',
+    credHeading: 'Olet sisällä. Tässä kirjautumistietosi.',
+    credIntro: 'Pääsykoodisi avasi oven. Nämä ovat pysyvät AIMEAT-kirjautumistietosi. Käytä niitä kirjautuaksesi uudelleen millä tahansa laitteella ja päästäksesi liitettyihin appeihin lukutilassa.',
+    credUserLabel: 'Käyttäjätunnus',
+    credPwLabel: 'Salasana',
+    credInstructions: 'Kirjaudu näillä alla olevassa osoitteessa:',
+    credButton: 'Kirjaudu',
+    credNote: 'Pidä nämä omanasi. Voit vaihtaa salasanan myöhemmin profiiliasetuksissasi.',
+    credIgnore: 'Jos et käyttänyt pääsykoodia, voit jättää viestin huomiotta.',
     roleViewer: 'katselija',
     roleContributor: 'osallistuja',
     footer: 'Lähetetty AIMEAT-protokollan kautta',
@@ -352,6 +372,61 @@ export function keyInviteEmailHtml(args: KeyInviteEmailArgs, locale?: string): {
     t(locale, 'keyIgnore'),
     '',
     `-- ${t(locale, 'footer')}`,
+  ].join('\n');
+
+  return { html, text };
+}
+
+export interface KeyCredentialsEmailArgs {
+  username: string;   // the exact login username (e.g. "excvip001") — shown verbatim, no transforms
+  password: string;   // a clean, validator-passing password with no separators — shown verbatim
+  orgName: string;
+  loginUrl: string;   // where the recipient signs in (the apex, not an app origin)
+}
+
+/** Subject line for the first-login credentials email. */
+export function keyCredentialsEmailSubject(orgName: string, locale?: string): string {
+  return t(locale, 'credSubject').replace('{org}', orgName);
+}
+
+/** First-login credentials email: after a provisioned-code account's FIRST successful sign-in, it
+ *  receives its durable login (username + a freshly issued password) shown as two clearly separated,
+ *  copy-friendly fields — the exact values the login form accepts, with no dashes to mislead. */
+export function keyCredentialsEmailHtml(args: KeyCredentialsEmailArgs, locale?: string): { html: string; text: string } {
+  const field = (label: string, value: string) => `
+    <p style="margin:14px 0 4px;color:#555;font-size:14px;">${label}</p>
+    <p style="text-align:center;font-family:'Courier New',monospace;font-size:20px;font-weight:bold;letter-spacing:1px;background:#111;color:#fff;border-radius:6px;padding:12px;word-break:break-all;">${esc(value)}</p>`;
+
+  const html = wrapHtml(t(locale, 'credHeading'), `
+    <p>${t(locale, 'credIntro')}</p>
+    ${field(t(locale, 'credUserLabel'), args.username)}
+    ${field(t(locale, 'credPwLabel'), args.password)}
+    <p>${t(locale, 'credInstructions')}</p>
+    <p style="text-align: center;">
+      <a href="${args.loginUrl}" class="btn">${t(locale, 'credButton')}</a>
+    </p>
+    <p style="font-size: 13px; color: #999;">${t(locale, 'keyFallback')}</p>
+    <p class="url-fallback">${args.loginUrl}</p>
+    <p style="font-size: 13px; color: #777;">${t(locale, 'credNote')}</p>
+    <p style="color: #999; font-size: 13px;">${t(locale, 'credIgnore')}</p>
+  `, locale, { brand: 'AIME<span class="hrt">&#9829;</span>AT', footer: t(locale, 'keyFooter') });
+
+  const text = [
+    t(locale, 'credHeading'),
+    '',
+    t(locale, 'credIntro'),
+    '',
+    `${t(locale, 'credUserLabel')}: ${args.username}`,
+    `${t(locale, 'credPwLabel')}: ${args.password}`,
+    '',
+    t(locale, 'credInstructions'),
+    args.loginUrl,
+    '',
+    t(locale, 'credNote'),
+    '',
+    t(locale, 'credIgnore'),
+    '',
+    `-- ${t(locale, 'keyFooter')}`,
   ].join('\n');
 
   return { html, text };

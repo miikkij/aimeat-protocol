@@ -1167,6 +1167,11 @@ const auth = {
       homeUrl: d.home_url || '',
     });
 
+    // First sign-in of a provisioned-code ("key") account issues durable credentials (username + a
+    // clean, dash-free password) in the response. Expose them once on the returned session (NOT
+    // persisted) so the entry surface can show the user their real login. Absent on normal logins.
+    if (d.key_credentials) session._keyCredentials = d.key_credentials;
+
     persistSession(session);
 
     currentSession = session;
