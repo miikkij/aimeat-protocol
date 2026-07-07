@@ -13,6 +13,8 @@
  *   v1.0.0 — 2026-06-24 — Initial: list-all + hide/restore moderation tool.
  *   v1.1.0 — 2026-06-25 — Add operator hard-delete (type-to-confirm) — removes an
  *     app permanently from the node.
+ *   v1.2.0 — 2026-07-07 — Add "Scan for copies" (Phase 4): calls GET /v1/admin/apps/similar
+ *     and shows unattributed near-duplicates (high similarity, no fork link) + watermark hits.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
@@ -34,6 +36,9 @@ export default function AppsAdminTab() {
   // { owner, filename, name, typed } while the type-to-confirm delete modal is open
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Unattributed-copy scan (Phase 4): { suspiciousPairs, watermarkHits, scanned, note }
+  const [scanResult, setScanResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
   const [msg, showError, showSuccess, clearMsg] = useToast();
 
   const load = useCallback(async () => {
@@ -109,6 +114,18 @@ export default function AppsAdminTab() {
     }
   }, [deleting, load, showSuccess, showError]);
 
+  const runCopyScan = useCallback(async () => {
+    setScanning(true);
+    try {
+      const resp = await adminService.scanAppCopies();
+      setScanResult(resp?.data || null);
+    } catch (err) {
+      showError(err?.message || String(err));
+    } finally {
+      setScanning(false);
+    }
+  }, [showError]);
+
   return html`
     ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
     <p class="adm-text-sm adm-text-dim adm-mb-md">${t('admin.apps.desc')}</p>
@@ -123,8 +140,27 @@ export default function AppsAdminTab() {
             <input type="checkbox" checked=${hiddenOnly} onChange=${e => setHiddenOnly(e.target.checked)} />
             ${t('admin.apps.hiddenOnly')}
           </label>
+          <button class="adm-btn-sm adm-btn-info" onClick=${runCopyScan} disabled=${scanning}>
+            ${scanning ? t('admin.apps.scanning') : t('admin.apps.scanCopies')}
+          </button>
         </div>
       </div>
+
+      ${scanResult && html`
+        <div class="adm-card adm-mb-md">
+          <div class="adm-flex-between adm-mb-sm">
+            <b>${t('admin.apps.copyScanTitle')}</b>
+            <button class="adm-btn-sm adm-btn-ghost" onClick=${() => setScanResult(null)}>${t('common.close')}</button>
+          </div>
+          <div class="adm-text-sm adm-text-dim adm-mb-sm">${escHtml(scanResult.note || '')} (${scanResult.scanned} ${t('admin.apps.scanned')})</div>
+          ${scanResult.watermarkHits?.length ? html`
+            <div class="adm-text-sm"><b>${t('admin.apps.wmHits')}</b></div>
+            <ul>${scanResult.watermarkHits.map(w => html`<li class="adm-text-sm mono">${escHtml(w.inApp)} ⬅ ${escHtml(w.watermarkOf)} · ${escHtml(w.viewer)} · ${dt(w.servedAt)}</li>`)}</ul>` : ''}
+          ${scanResult.suspiciousPairs?.length ? html`
+            <div class="adm-text-sm"><b>${t('admin.apps.similarPairs')}</b></div>
+            <ul>${scanResult.suspiciousPairs.map(p => html`<li class="adm-text-sm mono">${escHtml(p.a)} ~ ${escHtml(p.b)} · ${Math.round(p.similarity * 100)}%</li>`)}</ul>` : ''}
+          ${(!scanResult.watermarkHits?.length && !scanResult.suspiciousPairs?.length) ? html`<div class="adm-text-sm adm-text-dim">${t('admin.apps.nothingFlagged')}</div>` : ''}
+        </div>` }
 
       ${error && html`<${ErrorBox} message=${error} />`}
       ${apps === null ? html`<${Spinner} />`
