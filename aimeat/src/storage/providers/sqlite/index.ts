@@ -42,7 +42,7 @@ import type {
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
-  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord,
+  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
   SubdomainSiteRecord,
   AppGrantRecord,
   NotificationTemplateRecord,
@@ -4549,7 +4549,7 @@ export class SqliteStorage implements Storage {
   async updateAppMeta(
     ownerGaii: string,
     filename: string,
-    meta: { name?: string; description?: string },
+    meta: { name?: string; description?: string; protection?: AppProtection },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
     // shows). Read the current manifest, merge only the supplied fields, write
@@ -4562,6 +4562,7 @@ export class SqliteStorage implements Storage {
     const manifest = JSON.parse(row.manifest) as AppManifest;
     if (meta.name !== undefined) manifest.name = meta.name;
     if (meta.description !== undefined) manifest.description = meta.description;
+    if (meta.protection !== undefined) manifest.protection = meta.protection;
     const result = this.db.prepare(
       'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'
     ).run(JSON.stringify(manifest), ownerGaii, filename, row.versionNumber);

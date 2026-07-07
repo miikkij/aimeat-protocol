@@ -29,6 +29,7 @@ const ALL_SUITES = [
     'test/e2e-access-tokens.ts',
     'test/e2e-apps.ts',
     'test/e2e-app-fork.ts',
+    'test/e2e-app-protect.ts',
     'test/e2e-apps-moderation.ts',
     // Self-spawns its own server with the app-origin flag ON (the shared server keeps it
     // OFF), so it owns its lifecycle rather than running against BASE_URL.
@@ -278,6 +279,9 @@ async function startServer(): Promise<ChildProcess> {
         // files are gitignored, so they can't carry this for CI).
         AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
+        // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
+        // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
+        AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
         // Short refresh-token rotation grace so e2e-session-refresh can exercise

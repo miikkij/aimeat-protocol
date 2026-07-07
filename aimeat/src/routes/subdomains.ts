@@ -37,6 +37,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { applyAppProtection, hasAnyProtection } from '../utils/app-protect.js';
 import type { Storage, AppRecord, SubdomainSiteRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -187,7 +188,7 @@ export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: 
  * author's own CSP meta is relaxed (frame-src/connect-src → allow the apex) so the H-2 silent-SSO
  * bridge + token exchange work even when the app sets `default-src 'self'`.
  */
-function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string): void {
+function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string, protect?: { config: AimeatConfig; viewer: string }): void {
   res.setHeader('Content-Type', app.mimeType);
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
@@ -201,7 +202,19 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
     const relaxed = apexOrigin
       ? relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin)
       : (app.data as Buffer | Uint8Array | string);
-    const buf = injectAimeatBadge(relaxed);
+    let buf = injectAimeatBadge(relaxed);
+    // Opt-in copy-protection (obfuscate / domainLock / watermark) on the runnable body.
+    if (protect && hasAnyProtection(app.manifest.protection)) {
+      buf = applyAppProtection(buf, {
+        protection: app.manifest.protection!,
+        config: protect.config,
+        viewer: protect.viewer,
+        appOwner: app.ownerName,
+        appFilename: app.filename,
+        version: app.versionNumber,
+        servedAt: new Date().toISOString(),
+      });
+    }
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
@@ -298,7 +311,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
 
-    serveApp(res, storage, app, csp, apexOrigin);  // the SDK (aimeat-auth.js) does the silent SSO itself
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
@@ -327,7 +340,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
       return;
     }
-    serveApp(res, storage, app, csp, apexOrigin); // no subdomain available → serve on the shared host (no SSO)
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;

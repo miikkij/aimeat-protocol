@@ -63,6 +63,9 @@
       always, community cards when N>0) that opens a lineage modal; showLineageModal fetches
       GET /v1/apps/:owner/:filename/lineage and renders the cross-owner fork tree (ancestry + descendants)
       with each node's live status (public/parked/hidden/deleted) and fork date.
+    v2.9.0 — 2026-07-07 — Copy protection (Phase 3): own server-app cards get a 🛡 button (🛡✓ when any
+      flag is on) opening a protection modal with four opt-in toggles (obfuscate / domain-lock / watermark
+      / no-raw-download) + honest-limits note; saveProtection PATCHes { protection }. All default off.
 -->
 <html lang="en">
 <head>
@@ -1601,6 +1604,19 @@
     .lineage-status.hidden { color: #fbbf24; }
     .lineage-status.deleted { color: var(--accent); text-decoration: line-through; }
     .lineage-when { color: var(--text-muted); font-size: .72rem; margin-left: 6px; }
+    /* Copy-protection modal rows */
+    .protect-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: .82rem;
+      line-height: 1.35;
+      cursor: pointer;
+    }
+    .protect-row input[type="checkbox"] { margin-top: 3px; flex: 0 0 auto; }
+    .protect-row span { color: var(--text-muted); }
+    .protect-row b { color: var(--text); }
 
     /* Even 2-up button grid, pushed to the card bottom (margin-top:auto) so the
        action block lines up across cards regardless of how many buttons / chips
@@ -2296,6 +2312,23 @@
     </div>
   </div>
 
+  <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
+  <div id="protection-overlay" hidden>
+    <div class="modal" id="protection-modal">
+      <h2>&#x1F6E1;&#xFE0F; <span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
+      <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-watermark"> <span><b data-i18n="protect.watermark">Watermark</b> — <span data-i18n="protect.watermarkHint">embed an invisible fingerprint so a leaked copy traces back to who was served it.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
+      <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('protection-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Generate App with AI — guided steps -->
   <div id="prompt-builder-overlay">
     <div class="prompt-builder-modal">
@@ -2499,6 +2532,20 @@
       'lineage.status.parked': 'parked',
       'lineage.status.hidden': 'hidden',
       'lineage.status.deleted': 'deleted',
+      'card.protectHint': 'Copy-protection options (obfuscate, domain-lock, watermark, no raw download)',
+      'protect.title': 'Copy protection',
+      'protect.help': 'Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.',
+      'protect.obfuscate': 'Obfuscate',
+      'protect.obfuscateHint': 'mangle the app\'s inline scripts so the source is hard to read.',
+      'protect.domainLock': 'Domain-lock',
+      'protect.domainLockHint': 'only run on this node\'s app origin; a rehosted copy is sent home.',
+      'protect.watermark': 'Watermark',
+      'protect.watermarkHint': 'embed an invisible fingerprint so a leaked copy traces back to who was served it.',
+      'protect.noRawDownload': 'No raw download',
+      'protect.noRawDownloadHint': 'block the raw source download; deliver the runnable app only.',
+      'protect.save': 'Save',
+      'protect.saving': 'Saving…',
+      'protect.saved': 'Saved',
       'detail.editDetails': '✏️ Edit',
       'detail.nameLabel': 'App name',
       'detail.descLabel': 'Description',
@@ -2782,6 +2829,20 @@
       'lineage.status.parked': 'parkissa',
       'lineage.status.hidden': 'piilotettu',
       'lineage.status.deleted': 'poistettu',
+      'card.protectHint': 'Kopiosuojausasetukset (obfuskointi, domain-lukko, vesileima, ei raakalatausta)',
+      'protect.title': 'Kopiosuojaus',
+      'protect.help': 'Valinnainen, sovelluskohtainen. Nämä nostavat satunnaisen kopioinnin kustannusta ja tekevät vuodoista jäljitettäviä — ne eivät estä sovelluksen näkevää kopioimasta sen HTML:ää. Suojataksesi logiikan tai datan aidosti, siirrä se palvelinpuolen laajennukseen.',
+      'protect.obfuscate': 'Obfuskoi',
+      'protect.obfuscateHint': 'sekoita sovelluksen inline-skriptit niin että lähdekoodia on vaikea lukea.',
+      'protect.domainLock': 'Domain-lukko',
+      'protect.domainLockHint': 'suorita vain tämän noden app-originissa; uudelleenjulkaistu kopio ohjataan kotiin.',
+      'protect.watermark': 'Vesileima',
+      'protect.watermarkHint': 'upota näkymätön sormenjälki, jotta vuotanut kopio jäljittyy siihen kenelle se tarjottiin.',
+      'protect.noRawDownload': 'Ei raakalatausta',
+      'protect.noRawDownloadHint': 'estä raaka lähdekoodilataus; tarjoa vain suoritettava sovellus.',
+      'protect.save': 'Tallenna',
+      'protect.saving': 'Tallennetaan…',
+      'protect.saved': 'Tallennettu',
       'detail.editDetails': '✏️ Muokkaa',
       'detail.nameLabel': 'Sovelluksen nimi',
       'detail.descLabel': 'Kuvaus',
@@ -5774,6 +5835,7 @@
         parked: !!sa.parked,
         forkable: !!sa.forkable,
         forks: sa.forks || 0,
+        protection: (sa.manifest && sa.manifest.protection) || {},
         operatorHidden: !!sa.operator_hidden,
         operatorHideReason: sa.operator_hide_reason || '',
         isOwn: true
@@ -5844,6 +5906,13 @@
       var forkBtnHtml = onServer
         ? '<button onclick="window._launcher.toggleForkApp(\'' + escapeHtml(app.filename) + '\', ' + (app.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(app.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(app.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>'
         : '';
+      // Copy-protection (opt-in). Stash current flags for the modal; badge the button
+      // when any protection is on so the owner sees at a glance which apps are hardened.
+      if (onServer) ownAppProtection[app.filename] = app.protection || {};
+      var anyProtect = onServer && app.protection && (app.protection.obfuscate || app.protection.domainLock || app.protection.watermark || app.protection.noRawDownload);
+      var protectBtnHtml = onServer
+        ? '<button onclick="window._launcher.showProtectionModal(\'' + escapeHtml(app.filename) + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProtect ? '🛡✓' : '🛡') + '</button>'
+        : '';
 
       html +=
         '<div class="published-card">' +
@@ -5864,6 +5933,7 @@
               (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
               parkBtnHtml +
               forkBtnHtml +
+              protectBtnHtml +
               subBtnHtml +
               (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
                app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
@@ -6854,6 +6924,58 @@
     var html = '';
     for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
     return html;
+  }
+
+  // ── Copy protection (opt-in, per-app) ──
+  // filename -> current protection object, populated as own cards render (avoids
+  // escaping a JSON object through an inline onclick).
+  var ownAppProtection = {};
+  var protectionTarget = null;
+  function showProtectionModal(filename) {
+    protectionTarget = { filename: filename };
+    var p = ownAppProtection[filename] || {};
+    document.getElementById('protect-obfuscate').checked = !!p.obfuscate;
+    document.getElementById('protect-domainLock').checked = !!p.domainLock;
+    document.getElementById('protect-watermark').checked = !!p.watermark;
+    document.getElementById('protect-noRawDownload').checked = !!p.noRawDownload;
+    document.getElementById('protection-title').textContent = filename;
+    document.getElementById('protection-status').textContent = '';
+    document.getElementById('protection-overlay').hidden = false;
+  }
+
+  function saveProtection() {
+    if (!protectionTarget) return;
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('common.loginRequired') || 'You must be logged in.'); return; }
+    var protection = {
+      obfuscate: document.getElementById('protect-obfuscate').checked,
+      domainLock: document.getElementById('protect-domainLock').checked,
+      watermark: document.getElementById('protect-watermark').checked,
+      noRawDownload: document.getElementById('protect-noRawDownload').checked
+    };
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var statusEl = document.getElementById('protection-status');
+    statusEl.textContent = t('protect.saving') || 'Saving…';
+    statusEl.style.color = 'var(--text-muted)';
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(protectionTarget.filename), {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ protection: protection })
+    })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          statusEl.textContent = '✔ ' + (t('protect.saved') || 'Saved');
+          statusEl.style.color = '#34d399';
+          loadPublishedApps();
+          setTimeout(function() { document.getElementById('protection-overlay').hidden = true; }, 800);
+        } else {
+          statusEl.textContent = '✘ ' + (json.error_description || (json.error && json.error.message) || 'Failed');
+          statusEl.style.color = 'var(--accent)';
+        }
+      })
+      .catch(function(err) { statusEl.textContent = '✘ ' + (err.message || 'Error'); statusEl.style.color = 'var(--accent)'; });
   }
 
   function showVersionsModal(owner, filename) {
@@ -7876,6 +7998,8 @@
     submitBackupRestore: submitBackupRestore,
     showVersionsModal: showVersionsModal,
     showLineageModal: showLineageModal,
+    showProtectionModal: showProtectionModal,
+    saveProtection: saveProtection,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
     openDetailView: openDetailView,

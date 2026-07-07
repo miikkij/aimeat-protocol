@@ -96,6 +96,8 @@ import { decodeStrictBase64 } from '../utils/base64.js';
 import { ensureAppSubdomain } from './subdomains.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
 import { collectAppLineage, resolveAppStatus } from '../services/app-lineage.js';
+import { sanitizeProtection, applyAppProtection, invalidateProtectionCache, hasAnyProtection, decodeWatermark } from '../utils/app-protect.js';
+import type { AppProtection } from '../storage/interface.js';
 
 /**
  * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
@@ -269,6 +271,31 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }));
 
         res.json(success(config.nodeId, { apps: result, total, offset, limit }));
+    });
+
+    // POST /v1/admin/apps/watermark/decode — operator-only: trace a leaked copy. Given a
+    // watermark token (the `iv:tag:ct` string or the full `<!--aimeat-wm:...-->` comment
+    // pulled from a suspiciously-copied app), decode it back to which viewer was served
+    // it, for which app/version, and when. Only decodable with the node key. Static path,
+    // registered before the parameterized moderate route below.
+    router.post('/v1/admin/apps/watermark/decode', requireAuth(), requireRole('operator'), async (req, res) => {
+        const token = typeof req.body?.token === 'string' ? req.body.token : '';
+        if (!token) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'token is required (the watermark string or the aimeat-wm comment from a leaked copy)'));
+            return;
+        }
+        const decoded = decodeWatermark(token, config);
+        if (!decoded) {
+            res.status(422).json(error(config.nodeId, 'UNDECODABLE', 'Could not decode this watermark. It may be tampered, from another node, or the node has no encryption key configured.'));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            viewer: decoded.viewer,
+            app: decoded.app,
+            version: decoded.version,
+            served_at: decoded.servedAt,
+            note: `This copy was served to "${decoded.viewer}" for app "${decoded.app}" (v${decoded.version}) at ${decoded.servedAt}.`,
+        }));
     });
 
     // POST /v1/admin/apps/:owner/:filename/moderate — operator-only: hide or
@@ -673,12 +700,38 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             }
         }
 
+        // Copy-protection `noRawDownload`: the owner can block the raw (attachment)
+        // source download so the app is only delivered in runnable inline form. The
+        // owner + operators may still download their own source (backup/management).
+        if (mode !== 'inline' && app.manifest.protection?.noRawDownload) {
+            const isOperator = !!req.auth?.roles?.includes('operator');
+            let isOwner = false;
+            if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = viewerOwner === app.ownerName; }
+            if (!isOperator && !isOwner) {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not available as a raw download. Open it inline (runnable) instead.'));
+                return;
+            }
+        }
+
         res.setHeader('Content-Type', app.mimeType);
 
         // Inline (runnable) HTML gets the viral "back to {node} · publish your own
         // app" badge appended; the raw download (attachment) is served byte-for-byte.
+        // Opt-in copy-protection (obfuscate / domainLock / watermark) is layered onto
+        // the inline body only — a no-op unless the owner enabled a flag.
         const isHtml = /html/i.test(app.mimeType);
-        const body = (mode === 'inline' && isHtml) ? injectAimeatBadge(app.data) : app.data;
+        let body = (mode === 'inline' && isHtml) ? injectAimeatBadge(app.data) : app.data;
+        if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {
+            body = applyAppProtection(body, {
+                protection: app.manifest.protection!,
+                config,
+                viewer: req.auth?.sub ?? 'anon',
+                appOwner: app.ownerName,
+                appFilename: filename,
+                version: app.versionNumber,
+                servedAt: new Date().toISOString(),
+            });
+        }
         res.setHeader('Content-Length', body.length.toString());
 
         if (mode === 'inline') {
@@ -713,7 +766,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
             name, description, version: semver, category, tags, icon,
-            uses_cortex, price_morsels, license_type,
+            uses_cortex, price_morsels, license_type, protection,
         } = req.body ?? {};
 
         if (!filename || typeof filename !== 'string') {
@@ -818,6 +871,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         let operatorHiddenBy: string | undefined;
         let operatorHiddenAt: string | undefined;
         let operatorHideReason: string | undefined;
+        // Copy-protection flags survive a re-publish too (an update never silently
+        // drops the owner's protection), unless the update explicitly sends `protection`.
+        let protectionState: AppProtection | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -826,6 +882,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             operatorHiddenBy = existingApp?.operatorHiddenBy;
             operatorHiddenAt = existingApp?.operatorHiddenAt;
             operatorHideReason = existingApp?.operatorHideReason;
+            protectionState = existingApp?.manifest?.protection;
         }
 
         const now = new Date().toISOString();
@@ -841,6 +898,14 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (typeof icon === 'string') manifest.icon = icon;
         if (typeof price_morsels === 'number' && price_morsels > 0) manifest.priceMorsels = price_morsels;
         if (license_type === 'single' || license_type === 'lifetime') manifest.licenseType = license_type;
+        // Opt-in copy-protection: use the body's `protection` when provided, else carry
+        // the existing flags forward on an update. Only stored when at least one is on.
+        const effectiveProtection = sanitizeProtection(protection) ?? protectionState;
+        if (effectiveProtection && Object.values(effectiveProtection).some(Boolean)) {
+            manifest.protection = effectiveProtection;
+        }
+        // A re-publish changes the bytes → drop any cached obfuscated/locked base.
+        invalidateProtectionCache(owner, filename);
 
         await storage.createApp({
             ownerGaii: ownerGhii,   // canonical owner key (NOT caller GAII)
@@ -1225,8 +1290,23 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 : 'Forking disabled. Only you and your agents can fork this app.');
         }
 
+        if ('protection' in body) {
+            const sanitized = sanitizeProtection(body.protection);
+            if (sanitized === undefined) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'protection must be an object of booleans (obfuscate, domainLock, watermark, noRawDownload)'));
+                return;
+            }
+            const toStore: AppProtection = Object.values(sanitized).some(Boolean) ? sanitized : {};
+            await storage.updateAppMeta(effectiveGaii, filename, { protection: toStore });
+            invalidateProtectionCache(owner, filename);
+            const on = Object.entries(toStore).filter(([, v]) => v).map(([k]) => k);
+            notes.push(on.length
+                ? `Copy-protection updated (${on.join(', ')}). Note: these raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic/data, move it into an extension.`
+                : 'Copy-protection cleared.');
+        }
+
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked or forkable).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable or protection).'));
             return;
         }
 
@@ -1240,6 +1320,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             protected: !!updated?.accessCode,
             parked: !!updated?.parked,
             forkable: !!updated?.forkable,
+            protection: updated?.manifest?.protection ?? null,
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

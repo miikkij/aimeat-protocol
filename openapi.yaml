@@ -12308,6 +12308,48 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/admin/apps/watermark/decode:
+    post:
+      operationId: decodeAppWatermark
+      summary: Decode an app watermark to trace a leaked copy (operator)
+      description: >-
+        Given a watermark token pulled from a suspiciously-copied app (either the raw `iv:tag:ct` string
+        or the full `<!--aimeat-wm:...-->` comment), decode it back to which viewer was served the copy,
+        for which app + version, and when. Only decodable with this node's encryption key. Operator-only.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, description: The watermark string or the aimeat-wm comment from a leaked copy }
+      responses:
+        '200':
+          description: Decoded watermark
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          viewer: { type: string }
+                          app: { type: string }
+                          version: { type: integer }
+                          served_at: { type: string, format: date-time }
+                          note: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: The token could not be decoded (tampered, foreign node, or no key configured) }
+
   /v1/admin/apps/{owner}/{filename}/moderate:
     post:
       operationId: moderateApp
@@ -12439,6 +12481,17 @@ paths:
                 forkable:
                   type: boolean
                   description: true lets any user fork this app; false restricts forking to you and your agents
+                protection:
+                  type: object
+                  description: >-
+                    Opt-in copy-protection applied to the app's runnable HTML (all flags default false).
+                    Raises the cost of casual copying and makes leaks traceable; it cannot prevent someone
+                    who can view the app from copying its HTML. Send {} to clear.
+                  properties:
+                    obfuscate: { type: boolean, description: Mangle the app's inline scripts }
+                    domainLock: { type: boolean, description: Only run on this node's app origin }
+                    watermark: { type: boolean, description: Embed an invisible, operator-decodable per-serve fingerprint }
+                    noRawDownload: { type: boolean, description: Block the raw source download (runnable only) }
       responses:
         '200':
           description: App updated
@@ -12458,6 +12511,7 @@ paths:
                           protected: { type: boolean }
                           parked: { type: boolean }
                           forkable: { type: boolean }
+                          protection: { type: object, nullable: true, description: The app's current copy-protection flags (null when none) }
                           download_url: { type: string }
                           note: { type: string }
         '400':
