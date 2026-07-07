@@ -817,7 +817,7 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: import('../../interface.js').ArchiveFilter }): Promise<MemoryRecord[]> {
+    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: import('../../interface.js').ArchiveFilter; limit?: number }): Promise<MemoryRecord[]> {
         this.ensureReady();
         // MongoDB text search — search keys and string values
         const where: any = { ownerGaii, ...this.archivedWhere(opts?.archived) };
@@ -826,7 +826,7 @@ export class PrismaStorage implements Storage {
 
         const rows = await this.prisma.memory.findMany({ where });
         const q = query.toLowerCase();
-        return rows
+        const out = rows
             .filter((r: any) => {
                 if (r.key.toLowerCase().includes(q)) return true;
                 const valStr = JSON.stringify(r.value).toLowerCase();
@@ -843,6 +843,8 @@ export class PrismaStorage implements Storage {
                 if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) return false;
                 return true;
             });
+        // Optional result cap (additive; omitted → full result set). Post-filter, matching SQLite.
+        return opts?.limit !== undefined ? out.slice(0, opts.limit) : out;
     }
 
     /** Flatten a record into searchable text: key + string/number leaves of value + tags, stored on

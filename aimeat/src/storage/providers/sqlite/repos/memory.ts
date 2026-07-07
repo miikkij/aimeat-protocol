@@ -260,7 +260,7 @@ export function incrementMemoryFlagCount(db: Database.Database, ownerGaii: strin
   ).run(ownerGaii, key);
 }
 
-export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter }): MemoryRecord[] {
+export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): MemoryRecord[] {
   const q = query.toLowerCase();
   let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
   const params: unknown[] = [ownerGaii];
@@ -292,6 +292,7 @@ export function searchMemory(db: Database.Database, ownerGaii: string, query: st
       record.tags.some(t => t.toLowerCase().includes(q))
     ) {
       results.push(record);
+      if (opts?.limit !== undefined && results.length >= opts.limit) break;   // additive result cap (post-filter)
     }
   }
   return results;

@@ -159,9 +159,9 @@ await test('3b. write_draft accepts a JSON-STRINGIFIED value (client coercion)',
     // schema ("must be object") and documents stored the raw string. The tool must coerce it.
     const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'n2', value: JSON.stringify({ title: 'From string', body: 'coerced' }) }, 1031);
     assert(b.result.isError !== true, `stringified value should be coerced, not rejected: ${b.result.content?.[0]?.text}`);
-    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1032);
-    const note = (JSON.parse(rd.result.content[0].text).drafts?.note || []).find((d: any) => d.id === 'n2');
-    assert(note && note.title === 'From string', 'stored as an object with the right fields (not a raw string)');
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n2'] }, 1032);
+    const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === 'n2');
+    assert(item && item.value.title === 'From string', 'stored as an object with the right fields (not a raw string)');
 });
 
 await test('4. write_draft rejects a schema-invalid record', async () => {
@@ -169,10 +169,13 @@ await test('4. write_draft rejects a schema-invalid record', async () => {
     assert(b.result.isError === true, 'rejected (missing required title)');
 });
 
-await test('5. workspace_read shows the draft', async () => {
+await test('5. workspace_read index flags the draft', async () => {
     const b = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 105);
     const data = JSON.parse(b.result.content[0].text);
-    assert((data.drafts?.note || []).some((d: any) => d.id === 'n1'), 'draft n1 present');
+    assert(data.mode === 'index', 'default read is index mode');
+    const entry = (data.index?.note || []).find((e: any) => e.id === 'n1');
+    assert(entry && entry.has_draft === true, 'draft n1 flagged in index');
+    assert(entry && entry.title === 'Hello', 'index carries the title without the body');
 });
 
 await test('6. publish snapshots the draft → latest + version 1', async () => {
@@ -184,8 +187,28 @@ await test('6. publish snapshots the draft → latest + version 1', async () => 
 await test('7. after publish: object present, draft gone', async () => {
     const b = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 107);
     const data = JSON.parse(b.result.content[0].text);
-    assert((data.objects?.note || []).some((o: any) => o.id === 'n1'), 'object n1 published');
-    assert(!(data.drafts?.note || []).some((d: any) => d.id === 'n1'), 'draft consumed');
+    const entry = (data.index?.note || []).find((e: any) => e.id === 'n1');
+    assert(entry && entry.published === true, 'object n1 published');
+    assert(entry && entry.has_draft === false, 'draft consumed');
+    // Batch-open returns the full published value for the id.
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n1'] }, 1071);
+    const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === 'n1');
+    assert(item && item.published === true && item.value.title === 'Hello', 'batch-open returns the full published value');
+});
+
+await test('7c. index carries bytes, and batch-open reports unknown ids as missing', async () => {
+    const b = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1072);
+    const data = JSON.parse(b.result.content[0].text);
+    const entry = (data.index?.note || []).find((e: any) => e.id === 'n1');
+    assert(entry && typeof entry.bytes === 'number' && entry.bytes > 0, 'index entry reports a byte size');
+    assert(entry && entry.body === undefined && entry.value === undefined, 'index carries NO body/value');
+    assert(typeof data.counts?.note === 'number', 'index reports per-space counts');
+    // Failure mode: a batch-open for an id that does not exist comes back in `missing`, not as a hard error.
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n1', 'does-not-exist'] }, 1073);
+    const res = JSON.parse(rd.result.content[0].text);
+    assert(rd.result.isError !== true, 'batch-open with a bad id is not a hard error');
+    assert((res.items || []).some((i: any) => i.id === 'n1'), 'the valid id still resolves');
+    assert((res.missing || []).includes('does-not-exist'), 'the unknown id is reported as missing');
 });
 
 await test('7b. agent write/publish → .latest owned by the GHII; read-dedup + collapse of a forked key', async () => {
@@ -276,12 +299,12 @@ await test('8d. delete also removes a BARE record key (no .latest) — regressio
     const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ key, value: { id: 'bare1', title: 'Bare note' }, visibility: 'private' }) });
     assert(w.status === 201 || w.status === 200, `bare write ${w.status}: ${JSON.stringify(w.body.error)}`);
     const rd1 = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1084);
-    assert((JSON.parse(rd1.result.content[0].text).objects?.note || []).some((o: any) => o.id === 'bare1'), 'bare record visible before delete');
+    assert((JSON.parse(rd1.result.content[0].text).index?.note || []).some((o: any) => o.id === 'bare1'), 'bare record visible before delete');
     const del = await A.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'bare1' }, 1085);
     assert(del.result.isError !== true, `delete error: ${del.result.content?.[0]?.text}`);
     assert(JSON.parse(del.result.content[0].text).keys >= 1, 'deleted the bare key');
     const rd2 = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1086);
-    assert(!(JSON.parse(rd2.result.content[0].text).objects?.note || []).some((o: any) => o.id === 'bare1'), 'bare record gone after delete');
+    assert(!(JSON.parse(rd2.result.content[0].text).index?.note || []).some((o: any) => o.id === 'bare1'), 'bare record gone after delete');
 });
 
 await test('9. membership gate: owner 1 agent cannot read owner 2 organism', async () => {
@@ -477,8 +500,8 @@ await test("25. workspace is SHARED — the creator sees a contributor's write (
     const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 125);
     assert(r.result.isError !== true, `creator read: ${r.result.content?.[0]?.text}`);
     const data = JSON.parse(r.result.content[0].text);
-    const itemDrafts = (data.drafts?.item || []);
-    assert(itemDrafts.some((o: any) => o.id === 'b-contrib'), `creator must see contributor B's draft: ${JSON.stringify(itemDrafts.map((o: any) => o.id))}`);
+    const itemIndex = (data.index?.item || []);
+    assert(itemIndex.some((o: any) => o.id === 'b-contrib' && o.has_draft), `creator must see contributor B's draft in the index: ${JSON.stringify(itemIndex.map((o: any) => o.id))}`);
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });

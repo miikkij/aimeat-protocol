@@ -38,6 +38,10 @@
  *   v1.5.0 — 2026-07-06 — Workspace-scope SKILLS (skills registry) surfaced in both overviews as a
  *     "Skills (loadable expertise)" table with ready-to-use ws:{org}/{ws}/{name} refs — an agent
  *     reading the map sees available expertise without a separate listing call.
+ *   v1.6.0 — 2026-07-07 — collectWorkspaceSummary takes an itemLimit; the DEEP workspace overview now
+ *     lists EVERY instance id (uncapped) so a big space exposes all ids for a targeted batch read
+ *     (the SHALLOW organism overview keeps the MAX_ITEMS cap). entryTitle exported for the
+ *     aimeat_workspace_read index to title instances the same way.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -108,8 +112,10 @@ type ObjType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unk
 type RawKpi = { name?: unknown; kind?: unknown; unit?: unknown; target?: unknown; source?: unknown; current?: unknown; measuredAt?: unknown };
 type RawObjective = { id?: unknown; statement?: unknown; why?: unknown; status?: unknown; kpis?: unknown };
 
-/** A short, human display title for a record/document value (best-effort, schema-agnostic). */
-function entryTitle(value: unknown, fallbackId: string): string {
+/** A short, human display title for a record/document value (best-effort, schema-agnostic).
+ *  Exported so the workspace-read index (aimeat_workspace_read) titles instances the SAME way the
+ *  OKF overview does — one title convention across the map and the index. */
+export function entryTitle(value: unknown, fallbackId: string): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const v = value as Record<string, unknown>;
     for (const k of ['title', 'name', 'label', 'summary', 'heading']) {
@@ -154,9 +160,10 @@ function oneLine(md: unknown): string | null {
 export async function collectWorkspaceSummary(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean },
+  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean; itemLimit?: number },
 ): Promise<WorkspaceSummary> {
   const { orgId, ws, viewerGaii } = opts;
+  const itemLimit = opts.itemLimit ?? MAX_ITEMS;
   const root = `organism.${orgId}.w.${ws}`;
   const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
 
@@ -210,7 +217,7 @@ export async function collectWorkspaceSummary(
       .map(([id, r]) => ({ id, title: entryTitle(r.value, id), updatedAt: r.updatedAt }))
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.id < b.id ? -1 : 1));
 
-    summary.spaces.push({ name, namespace, mode, total: entries.length, recent: entries.slice(0, MAX_ITEMS) });
+    summary.spaces.push({ name, namespace, mode, total: entries.length, recent: entries.slice(0, itemLimit) });
     if (mode === 'document') summary.totalDocuments += entries.length; else summary.totalRecords += entries.length;
     const newest = entries[0]?.updatedAt;
     if (newest && (!summary.lastActivity || newest > summary.lastActivity)) summary.lastActivity = newest;
@@ -299,13 +306,18 @@ function date(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '—';
 }
 
-/** DEEP overview of one workspace: per space, the last MAX_ITEMS entries with ids + titles. */
+/** DEEP overview of one workspace: per space, EVERY entry's id + title (uncapped — this is the
+ *  agent's table of contents for a targeted batch read). Titles-only keeps it small. */
 export async function buildWorkspaceOverview(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; ws: string; name?: string; viewerGaii: string },
 ): Promise<{ markdown: string; readable: boolean; summary: WorkspaceSummary }> {
-  const s = await collectWorkspaceSummary(storage, config, opts);
+  // DEEP view of ONE workspace: list EVERY instance id (uncapped), not just the MAX_ITEMS most-recent
+  // — this is the agent's "table of contents" for a targeted batch read, so a big space (e.g. 40+
+  // documents) must expose all ids. Titles-only, so even hundreds of rows stay small. The SHALLOW
+  // organism overview keeps the MAX_ITEMS cap (it composes every workspace, so it must stay bounded).
+  const s = await collectWorkspaceSummary(storage, config, { ...opts, itemLimit: Number.MAX_SAFE_INTEGER });
   const out: string[] = [];
   out.push(fm({
     okf_type: 'workspace-structure-overview',

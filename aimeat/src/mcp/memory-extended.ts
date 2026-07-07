@@ -13,6 +13,11 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-07-07 -- memory_search is size-bounded: returns a SNIPPET (~200 chars around the match)
+ *     + key/meta instead of every matching entry's FULL value (which grew unbounded — workspace
+ *     `.version.N` snapshots are owned by the agent GAII, so a broad query pulled the whole history).
+ *     Adds a `limit` (default 50) and skips `.version.N` history by default (include_versions to keep it).
+ *     Read a hit's full value with aimeat_memory_read on its exact key.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -33,30 +38,57 @@ export function registerMemoryExtendedTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 1: aimeat_memory_search ──
+    // Returns a SNIPPET per hit, not the full value — memory values can be large (a workspace document,
+    // a whole record set), and a broad query used to pull every match in full, including the agent's own
+    // `.version.N` workspace snapshots (owned by the agent GAII), blowing past a sane MCP payload. So:
+    // cap the count (`limit`, default 50), skip version history unless asked, and hand back a short
+    // window around the match. The agent reads a specific hit's full value via aimeat_memory_read(key).
+    const SNIPPET_RADIUS = 90;   // chars of context on each side of the match (≈200-char window)
+    const isVersionKey = (key: string): boolean => /\.version\.\d+$/.test(key);
+    const snippetOf = (text: string, needle: string): string => {
+        const i = text.toLowerCase().indexOf(needle.toLowerCase());
+        if (i < 0) return text.slice(0, SNIPPET_RADIUS * 2).trim() + (text.length > SNIPPET_RADIUS * 2 ? '…' : '');
+        const s = Math.max(0, i - SNIPPET_RADIUS), e = i + needle.length + SNIPPET_RADIUS;
+        return (s > 0 ? '…' : '') + text.slice(s, e).trim() + (e < text.length ? '…' : '');
+    };
+
     mcp.tool(
         'aimeat_memory_search',
         descriptionFor('aimeat_memory_search'),
         {
             query: z.string(),
             visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
+            limit: z.number().optional().describe('Max hits to return (default 50).'),
+            include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default — they are immutable history and the main source of bloat).'),
         },
         annotationsFor('aimeat_memory_search'),
-        async ({ query, visibility }) => {
-            const results = await storage.searchMemory(agentGaii, query, {
-                visibility,
-            });
-
+        async ({ query, visibility, limit, include_versions }) => {
+            const cap = Math.max(1, Math.min(limit ?? 50, 200));
+            // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
+            // version history in-tool and cap to `cap` non-version hits.
+            const candidates = await storage.searchMemory(agentGaii, query, { visibility, limit: cap * 4 });
+            const hits = (include_versions ? candidates : candidates.filter(r => !isVersionKey(r.key))).slice(0, cap);
+            const q = query.trim();
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify(results.map(r => ({
-                        key: r.key,
-                        value: r.value,
-                        visibility: r.visibility,
-                        tags: r.tags,
-                        created_at: r.createdAt,
-                        updated_at: r.updatedAt,
-                    })), null, 2),
+                    text: JSON.stringify({
+                        query: q,
+                        total: hits.length,
+                        truncated: (include_versions ? candidates.length : candidates.filter(r => !isVersionKey(r.key)).length) > hits.length,
+                        hits: hits.map(r => {
+                            const valStr = typeof r.value === 'string' ? r.value : JSON.stringify(r.value);
+                            return {
+                                key: r.key,
+                                snippet: snippetOf(valStr, q),
+                                bytes: valStr.length,
+                                visibility: r.visibility,
+                                tags: r.tags,
+                                updated_at: r.updatedAt,
+                            };
+                        }),
+                        hint: 'Snippets only. Read a full value with aimeat_memory_read(key).',
+                    }, null, 2),
                 }],
             };
         },
