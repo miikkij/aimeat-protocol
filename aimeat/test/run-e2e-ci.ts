@@ -81,6 +81,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-workspaces.ts',
     'test/e2e-organism-workspace-access.ts',
     'test/e2e-organism-workspace-engagements.ts',
+    'test/e2e-write-guards.ts',
     'test/e2e-invitations.ts',
     'test/e2e-agent-offers.ts',
     'test/e2e-organism-membership.ts',
