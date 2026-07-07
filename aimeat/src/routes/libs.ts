@@ -4,6 +4,13 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.32.0 - 2026-07-08 - aimeat-auth.js: recover legacy/unverified accounts during sign-in. api() now
+ *   preserves error.code/error.details on thrown errors; the sign-in modal catches EMAIL_NOT_VERIFIED
+ *   (correct password but no verified email) and opens a complete-account flow — enter/confirm an email
+ *   (POST /v1/ghii/login/attach-email), enter the code (POST /v1/ghii/verify-email), then it re-runs the
+ *   password login for a normal owner session. New modal i18n keys: completeAccountTitle/Desc/DescResend,
+ *   sendVerificationCode, enterCodeTitle/Desc, confirmAndSignIn, emailVerifiedSigningIn, errEmailInvalid,
+ *   errCodeRequired. Fixes legacy pre-email-mandate accounts being locked out with no way to add an email.
  * v1.31.0 - 2026-07-07 - New library aimeat-live.js (TARGET-012): a served, app-facing realtime
  *   helper wrapping the node SSE transport (POST /v1/events/ticket -> GET /v1/events) behind
  *   AIMEAT.live.subscribe(domains, fn) — one shared owner-scoped connection, selective re-fetch,
@@ -633,7 +640,14 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
   const resp = await fetch(url, { ...opts, headers });
   const data = await resp.json();
-  if (!data.ok) throw new Error(data.error?.message || 'API error');
+  if (!data.ok) {
+    // Preserve the machine-readable code + details on the thrown Error so callers can branch
+    // (e.g. EMAIL_NOT_VERIFIED → open the email-completion flow) instead of matching on text.
+    const err = new Error(data.error?.message || 'API error');
+    err.code = data.error?.code;
+    err.details = data.error?.details;
+    throw err;
+  }
   return data;
 }
 
@@ -1770,13 +1784,40 @@ function showLoginModal(opts, renderBtn) {
     + '</div>'
     + '<p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
     + '</div>'
+    // Complete-account sub-view (hidden) — shown after a correct password when the account still needs
+    // a verified email (legacy accounts with none, or a registered-but-unverified email to confirm).
+    + '<div id="aimeat-email-view" style="padding:24px 32px;display:none">'
+    + '<div id="aimeat-em-step1">'
+    + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.completeAccountTitle || 'One last step') + '</h3>'
+    + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.completeAccountDesc || 'Add an email to finish setting up your account. We\\u2019ll send a verification code to confirm it.') + '</p>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.emailLabel || 'Email') + '</label>'
+    + '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || 'Send Verification Code') + '</button>'
+    + '<button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-em-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '</div>'
+    + '<div id="aimeat-em-step2" style="display:none">'
+    + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.enterCodeTitle || 'Enter Verification Code') + '</h3>'
+    + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.enterCodeDesc || 'We sent a 6-digit code to your email. Enter it below to finish and sign in.') + '</p>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.codeLabel || 'Verification Code') + '</label>'
+    + '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || 'Confirm & Sign In') + '</button>'
+    + '<button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-em-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
+    + '<p id="aimeat-em-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '</div>'
+    + '</div>'
     // Features footer
     + '<div style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB">'
     + '<h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1A1A2E;display:flex;align-items:center;gap:6px">\\u2728 ' + escHtml(i.whyTitle || 'What do you get?') + '</h4>'
     + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">\\u2665</div><span>' + escHtml(i.whyGhii || 'A free GHII (Global Human Intelligence Identifier), your personal AI identity') + '</span></div>'
     + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#EFF6FF;color:#3B82F6">\\ud83d\\udd12</div><span>' + escHtml(i.whyPrivacy || 'Your own private memory space, protected by your password') + '</span></div>'
     + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#F0FDF4;color:#22C55E">\\ud83e\\udd16</div><span>' + escHtml(i.whyAgents || 'Connect AI agents that remember you and work on your behalf') + '</span></div>'
-    + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">\\u2665</div><span><strong>' + escHtml(i.whyMorsels || '100 free heart morsels to start! E.g. memory request ~ 1, board post ~ 2. You get 50 more every day') + '</strong></span></div>'
+    + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">\\u2665</div><span><strong>' + escHtml(i.whyMorsels || 'Your own AI-built apps and agents work for you \\u2014 a digital agency under your own roof.') + '</strong></span></div>'
     + '</div>'
     + '</div></div>';
   } // end buildModalInner
@@ -1805,6 +1846,30 @@ function showLoginModal(opts, renderBtn) {
     document.getElementById('aimeat-modal-body').style.display = view === 'login' ? '' : 'none';
     document.getElementById('aimeat-forgot-pw-view').style.display = view === 'forgot-pw' ? '' : 'none';
     document.getElementById('aimeat-forgot-user-view').style.display = view === 'forgot-user' ? '' : 'none';
+    document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
+  }
+
+  // Credentials captured from the last correct-password attempt that hit the email gate, reused to
+  // send the code (attach-email) and to re-login once the email is verified.
+  var pendingEmailLogin = null;
+
+  // Open the complete-account flow after a successful password but an unverified/missing email.
+  // hasEmail (from the server details) picks the prefill hint text.
+  function openEmailCompletion(user, pass, hasEmail) {
+    pendingEmailLogin = { username: user, password: pass };
+    showView('email');
+    document.getElementById('aimeat-em-step1').style.display = '';
+    document.getElementById('aimeat-em-step2').style.display = 'none';
+    var emailInput = document.getElementById('aimeat-em-email');
+    emailInput.value = '';
+    var desc = document.querySelector('#aimeat-em-step1 p');
+    if (desc) {
+      desc.textContent = hasEmail
+        ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We\\u2019ll send a verification code — edit the address if it\\u2019s wrong.')
+        : (i.completeAccountDesc || 'Add an email to finish setting up your account. We\\u2019ll send a verification code to confirm it.');
+    }
+    document.getElementById('aimeat-em-err').style.display = 'none';
+    setTimeout(function () { emailInput.focus(); }, 50);
   }
 
   // Forgot password link
@@ -1822,8 +1887,75 @@ function showLoginModal(opts, renderBtn) {
   });
 
   // Back to login buttons
-  ['aimeat-fpw-back', 'aimeat-fpw-back2', 'aimeat-fu-back'].forEach(function(id) {
+  ['aimeat-fpw-back', 'aimeat-fpw-back2', 'aimeat-fu-back', 'aimeat-em-back', 'aimeat-em-back2'].forEach(function(id) {
     document.getElementById(id).addEventListener('click', function() { showView('login'); });
+  });
+
+  // Complete-account step 1 — send a verification code to the entered email (re-verifies password server-side).
+  document.getElementById('aimeat-em-send').addEventListener('click', async function() {
+    var email = document.getElementById('aimeat-em-email').value.trim();
+    var errEl = document.getElementById('aimeat-em-err');
+    errEl.style.display = 'none';
+    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      errEl.textContent = i.errEmailInvalid || 'Please enter a valid email address.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (!pendingEmailLogin) { showView('login'); return; }
+    var btn = document.getElementById('aimeat-em-send');
+    btn.textContent = i.working || 'Working...';
+    btn.disabled = true;
+    try {
+      var res = await api('/v1/ghii/login/attach-email', {
+        method: 'POST',
+        body: JSON.stringify({ username: pendingEmailLogin.username, password: pendingEmailLogin.password, email: email }),
+      });
+      // Keep the id — /v1/ghii/verify-email requires it to confirm the code.
+      pendingEmailLogin.verificationId = res.data && res.data.verification_id;
+      document.getElementById('aimeat-em-step1').style.display = 'none';
+      document.getElementById('aimeat-em-step2').style.display = '';
+      setTimeout(function () { document.getElementById('aimeat-em-code').focus(); }, 50);
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.textContent = i.sendVerificationCode || 'Send Verification Code';
+      btn.disabled = false;
+    }
+  });
+
+  // Complete-account step 2 — confirm the code, then re-run the password login for a normal session.
+  document.getElementById('aimeat-em-confirm').addEventListener('click', async function() {
+    var code = document.getElementById('aimeat-em-code').value.trim();
+    var msgEl = document.getElementById('aimeat-em-msg2');
+    var errEl = document.getElementById('aimeat-em-err2');
+    msgEl.style.display = 'none';
+    errEl.style.display = 'none';
+    if (!code) { errEl.textContent = i.errCodeRequired || 'Enter the verification code.'; errEl.style.display = 'block'; return; }
+    if (!pendingEmailLogin) { showView('login'); return; }
+    var btn = document.getElementById('aimeat-em-confirm');
+    btn.textContent = i.working || 'Working...';
+    btn.disabled = true;
+    try {
+      // verify-email finalises the email + sets verificationLevel=1, keyed by the verification_id
+      // returned from attach-email above.
+      await api('/v1/ghii/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({ verification_id: pendingEmailLogin.verificationId, code: code }),
+      });
+      msgEl.textContent = i.emailVerifiedSigningIn || 'Verified! Signing you in...';
+      msgEl.style.display = 'block';
+      var session = await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
+      pendingEmailLogin = null;
+      modal.remove();
+      renderBtn();
+      if (opts.onLogin) opts.onLogin(session);
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      btn.textContent = i.confirmAndSignIn || 'Confirm & Sign In';
+      btn.disabled = false;
+    }
   });
 
   // Send password reset code
@@ -1949,6 +2081,14 @@ function showLoginModal(opts, renderBtn) {
         renderBtn();
         if (opts.onLogin) opts.onLogin(session);
       } catch(e2) {
+        // Password was correct but the account still needs a verified email — open the completion
+        // flow instead of a dead-end error. Federated accounts are completed on their home node.
+        if (e2.code === 'EMAIL_NOT_VERIFIED' && !isFederated) {
+          btn.textContent = i.signInBtn || 'Sign In / Register';
+          btn.disabled = false;
+          openEmailCompletion(username, password, !!(e2.details && e2.details.has_email));
+          return;
+        }
         errEl.textContent = e2.message.includes('Invalid username or password')
           ? (i.errWrongPass || 'Wrong password for that username.')
           : e2.message;
@@ -1974,6 +2114,13 @@ function showLoginModal(opts, renderBtn) {
           renderBtn();
           if (opts.onLogin) opts.onLogin(session);
         } catch(e2) {
+          // Correct password but the account needs a verified email → open the completion flow.
+          if (e2.code === 'EMAIL_NOT_VERIFIED') {
+            btn.textContent = i.signInBtn || 'Sign In / Register';
+            btn.disabled = false;
+            openEmailCompletion(username, password, !!(e2.details && e2.details.has_email));
+            return;
+          }
           errEl.textContent = e2.message.includes('Invalid username or password')
             ? (i.errWrongPass || 'Wrong password for that username.')
             : e2.message;

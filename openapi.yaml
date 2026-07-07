@@ -14533,6 +14533,89 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /v1/ghii/login/attach-email:
+    post:
+      operationId: ghiiLoginAttachEmail
+      summary: Attach and verify an email during sign-in (legacy/unverified accounts)
+      description: |
+        Completes an account that has a correct password but no verified email (verificationLevel < 1) —
+        e.g. legacy accounts created before email was mandatory. Re-verifies username + password (so an
+        email cannot be attached to someone else's account), stores the email as the account's
+        notification email, and sends a six-digit verification code (purpose `registration`).
+
+        The caller then confirms the code via `POST /v1/ghii/verify-email` (which sets verificationLevel
+        to 1) and re-runs `POST /v1/ghii/login` to obtain a normal session. No auth required; the password
+        is the authorization. Rate limited to 3 requests / 10 minutes.
+      tags: [GHII-Web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, email]
+              properties:
+                username:
+                  type: string
+                  description: Owner name or full GHII (federated identities are rejected).
+                password:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Verification code sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                          verification_id:
+                            type: string
+                            description: Pass to /v1/ghii/verify-email with the code.
+                          email_sent:
+                            type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: AUTH_REQUIRED
+        '409':
+          description: Account already verified, or the email belongs to another account
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: ALREADY_VERIFIED
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /v1/ghii/magic-link:
     post:
       operationId: ghiiMagicLink
