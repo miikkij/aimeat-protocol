@@ -5179,6 +5179,16 @@
     "emailLabel": "Email",
     "sendUsername": "Send My Username",
     "usernameSent": "If an account with that email exists, your username was sent.",
+    "completeAccountTitle": "One last step",
+    "completeAccountDesc": "Add an email to finish setting up your account. We’ll send a verification code to confirm it.",
+    "completeAccountDescResend": "Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong.",
+    "sendVerificationCode": "Send Verification Code",
+    "enterCodeTitle": "Enter Verification Code",
+    "enterCodeDesc": "We sent a 6-digit code to your email. Enter it below to finish and sign in.",
+    "confirmAndSignIn": "Confirm & Sign In",
+    "emailVerifiedSigningIn": "Verified! Signing you in...",
+    "errEmailInvalid": "Please enter a valid email address.",
+    "errCodeRequired": "Enter the verification code.",
     "signupTitle": "Choose your username",
     "signupIntro": "You're signing in for the first time. Pick the username for your AIMEAT account.",
     "signupEmailNote": "Signing up as {email}",
@@ -5198,7 +5208,7 @@
     "whyPrivacy": "Your own private memory space, protected by your password",
     "whyControl": "Full control: only you can access your data, no need to share with anyone",
     "whyAgents": "Connect AI agents that remember you and work on your behalf",
-    "whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 ❤️, board post ~ 2 ❤️. You get 50 more every day"
+    "whyMorsels": "Your own AI-built apps and agents work for you — a digital agency under your own roof."
   },
   "dashboard": {
     "title": "AIMEAT Admin Dashboard",
@@ -7007,7 +7017,7 @@
       "whyPrivacy": "Your own private memory space, protected by your password",
       "whyControl": "Full control: only you can access your data, no need to share with anyone",
       "whyAgents": "Connect AI agents that remember you and work on your behalf",
-      "whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 ❤️, board post ~ 2 ❤️. You get 50 more every day"
+      "whyMorsels": "Your own AI-built apps and agents work for you — a digital agency under your own roof."
     },
     "promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language. Works with Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them.",
     "morsels": {

@@ -22,6 +22,17 @@ import { validatePasswordStrength } from '../utils/password-validation.js';
 import { GhiiRegistrationSchema, GhiiWebRegistrationSchema, GhiiLoginSchema, validateBody } from '../models/schemas.js';
 
 /**
+ * @file ghii.ts
+ * @description GHII (Global Human Intelligence Identifier) routes — human identity on top of the owner
+ *   system: register, password/federated/social login, email verification, magic link, password reset,
+ *   account recovery, and legacy-account email completion during sign-in.
+ * @structure ghiiRouter(config, storage, emailService, onDirectoryChange, peers) registers all /v1/ghii/* routes.
+ * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts.
+ * @version-history
+ * v1.1.0 - 2026-07-08 - Added POST /v1/ghii/login/attach-email — legacy/unverified accounts (correct
+ *   password but verificationLevel < 1) can attach + verify an email during sign-in. The login gate now
+ *   returns details { email_required, has_email } so the client can drive the completion flow.
+ *
  * GHII — Global Human Intelligence Identifier
  *
  * Human identity layer on top of AIMEAT's owner system.
@@ -457,10 +468,15 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             await storage.updateGHII(ghiiRecord.ghii, { passwordHash: newHash });
         }
 
-        // Email confirmation check — if operator requires it, block unverified users
+        // Email confirmation check — if operator requires it, block unverified users.
+        // The password was already verified above, so we return a machine-readable signal
+        // letting the sign-in modal collect/confirm an email and finish account setup.
+        // `has_email` distinguishes legacy accounts with no email at all (attach one) from
+        // accounts registered with an unverified email (prefill + resend a code).
         if (config.emailConfirmationRequired && ghiiRecord.verificationLevel < 1) {
             res.status(403).json(error(config.nodeId, 'EMAIL_NOT_VERIFIED',
-                'Email verification is required before you can log in. Check your email for the verification code.'));
+                'Email verification is required before you can log in. Check your email for the verification code.',
+                undefined, { email_required: true, has_email: !!ghiiRecord.notificationEmail }));
             return;
         }
 
@@ -631,6 +647,132 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
         ]));
         emitChange('ghii');
+    });
+
+    // POST /v1/ghii/login/attach-email — Complete a legacy/unverified account during sign-in (no auth).
+    // Chicken-and-egg fix: /v1/ghii/email/verify requires a session, but login is blocked at the
+    // EMAIL_NOT_VERIFIED gate for accounts with verificationLevel < 1 — so those users can never reach
+    // it. This endpoint re-verifies username+password (so nobody can attach an email to someone else's
+    // account), attaches/updates the email, and sends a verification code. The caller then confirms via
+    // the existing /v1/ghii/verify-email (which sets verificationLevel=1), and re-runs the password
+    // login to obtain a normal owner session.
+    router.post('/v1/ghii/login/attach-email', rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
+        const { username, password, email } = req.body ?? {};
+
+        if (!username || typeof username !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
+            return;
+        }
+        if (!password || typeof password !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required'));
+            return;
+        }
+        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid email is required'));
+            return;
+        }
+
+        // Accept full GHII — strip @node-id for local lookup (federated accounts are managed by their home node)
+        let loginName = username.trim().toLowerCase();
+        if (loginName.includes('@')) {
+            const atIdx = loginName.indexOf('@');
+            const nodePart = loginName.substring(atIdx + 1);
+            loginName = loginName.substring(0, atIdx);
+            if (nodePart !== config.nodeId) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_UNSUPPORTED',
+                    'Email setup must be completed on your home node.'));
+                return;
+            }
+        }
+
+        const ghii = `${loginName}@${config.nodeId}`;
+        const ghiiRecord = await storage.getGHII(ghii);
+        // Uniform failure for missing account / no password / wrong password — never reveal which.
+        if (!ghiiRecord || !ghiiRecord.passwordHash) {
+            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
+            return;
+        }
+
+        // Per-account password lockout (mirror the login handler)
+        if (ghiiRecord.passwordLockedUntil) {
+            const lockExpires = new Date(ghiiRecord.passwordLockedUntil).getTime();
+            if (Date.now() < lockExpires) {
+                res.status(429).json(error(config.nodeId, 'PASSWORD_LOCKED',
+                    `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
+                return;
+            }
+            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+        }
+
+        const valid = await verifyPassword(password, ghiiRecord.passwordHash);
+        if (!valid) {
+            const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
+            const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
+            if (attempts >= config.passwordLockoutAttempts) {
+                update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
+            }
+            await storage.updateGHII(ghii, update);
+            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
+            return;
+        }
+        if (ghiiRecord.passwordFailedAttempts) {
+            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+        }
+
+        // This endpoint is only for accounts still short of email verification. Once verified there is
+        // nothing to complete — the user should just log in.
+        if (ghiiRecord.verificationLevel >= 1) {
+            res.status(409).json(error(config.nodeId, 'ALREADY_VERIFIED',
+                'This account is already verified. Please sign in.'));
+            return;
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
+
+        // Reject if the email already belongs to a different account (email is a recovery handle).
+        const emailOwner = await storage.getGHIIByEmailHash(emailHash);
+        if (emailOwner && emailOwner.ghii !== ghii) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN',
+                'That email is already associated with another account.'));
+            return;
+        }
+
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const codeHash = createHash('sha256').update(code).digest('hex');
+        const now = new Date().toISOString();
+        const verId = randomBytes(16).toString('hex');
+
+        // purpose 'registration' so the existing no-auth /v1/ghii/verify-email completes it.
+        await storage.createEmailVerification({
+            id: verId,
+            ownerName: loginName,
+            emailHash,
+            code: codeHash,
+            purpose: 'registration',
+            status: 'pending',
+            attempts: 0,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
+            createdAt: now,
+            verifiedAt: null,
+        });
+
+        // Attach the email now so notification/recovery work once the code is confirmed. emailHash +
+        // verificationLevel are finalised by /v1/ghii/verify-email on a correct code.
+        await storage.updateGHII(ghii, { notificationEmail: normalizedEmail, magicLinkEnabled: true });
+
+        if (emailService?.enabled) {
+            await emailService.sendVerificationCode(normalizedEmail, code, ghiiRecord.locale);
+        }
+
+        res.json(success(config.nodeId, {
+            ok: true,
+            verification_id: verId,
+            email_sent: !!emailService?.enabled,
+            message: 'Verification code sent',
+        }, [
+            { description: 'Confirm the code to finish setup', method: 'POST', url: '/v1/ghii/verify-email' },
+        ]));
     });
 
     // ── Phase 1.3 — Web Registration, Email Verification, Magic Link ──

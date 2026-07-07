@@ -5179,6 +5179,16 @@
     "emailLabel": "Sähköposti",
     "sendUsername": "Lähetä käyttäjätunnukseni",
     "usernameSent": "Jos sähköpostiosoitteella on tili, käyttäjätunnus lähetettiin.",
+    "completeAccountTitle": "Vielä yksi vaihe",
+    "completeAccountDesc": "Lisää sähköpostiosoite viimeistelläksesi tilisi. Lähetämme vahvistuskoodin sen vahvistamiseksi.",
+    "completeAccountDescResend": "Vahvista sähköpostiosoitteesi kirjautuaksesi sisään. Lähetämme vahvistuskoodin — muokkaa osoitetta, jos se on väärin.",
+    "sendVerificationCode": "Lähetä vahvistuskoodi",
+    "enterCodeTitle": "Syötä vahvistuskoodi",
+    "enterCodeDesc": "Lähetimme 6-numeroisen koodin sähköpostiisi. Syötä se alle viimeistelläksesi ja kirjautuaksesi sisään.",
+    "confirmAndSignIn": "Vahvista ja kirjaudu",
+    "emailVerifiedSigningIn": "Vahvistettu! Kirjaudutaan sisään...",
+    "errEmailInvalid": "Anna kelvollinen sähköpostiosoite.",
+    "errCodeRequired": "Syötä vahvistuskoodi.",
     "signupTitle": "Valitse käyttäjätunnuksesi",
     "signupIntro": "Kirjaudut ensimmäistä kertaa. Valitse AIMEAT-tilisi käyttäjätunnus.",
     "signupEmailNote": "Rekisteröidyt osoitteella {email}",
@@ -5198,7 +5208,7 @@
     "whyPrivacy": "Oman yksityisen muistitilan, suojattuna salasanallasi",
     "whyControl": "Täyden hallinnan: vain sinä pääset tietoihisi, ei tarvitse jakaa kenellekään",
     "whyAgents": "Yhdistä AI-agentteja jotka muistavat sinut ja toimivat puolestasi",
-    "whyMorsels": "100 ilmaista sydänmurusta alkuun! Esim. muistipyyntö ~ 1 ❤️, tauluviesti ~ 2 ❤️. Saat 50 lisää joka päivä"
+    "whyMorsels": "Omat tekoälyn rakentamat appisi ja agenttisi tekevät työtä puolestasi — digitaalinen agentuuri oman kattosi alla."
   },
   "dashboard": {
     "title": "AIMEAT Hallintapaneeli",
@@ -7007,7 +7017,7 @@
       "whyPrivacy": "Oman yksityisen muistitilan, suojattuna salasanallasi",
       "whyControl": "Täyden hallinnan: vain sinä pääset tietoihisi, ei tarvitse jakaa kenellekään",
       "whyAgents": "Yhdistä AI-agentteja jotka muistavat sinut ja toimivat puolestasi",
-      "whyMorsels": "100 ilmaista sydänmurusta alkuun! Esim. muistipyyntö ~ 1 ❤️, tauluviesti ~ 2 ❤️. Saat 50 lisää joka päivä"
+      "whyMorsels": "Omat tekoälyn rakentamat appisi ja agenttisi tekevät työtä puolestasi — digitaalinen agentuuri oman kattosi alla."
     },
     "promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi. Toimii Clauden, ChatGPT:n, Grokin, Geminin, Copilotin, DeepSeekin kanssa, kaikki käy.",
     "morsels": {

@@ -51,6 +51,9 @@ const ALL_SUITES = [
     // credentials configured to actually send email. Re-enable once a test mail
     // sender (or credentials) is available. -- disabled 2026-06-14
     // 'test/e2e-email.ts',
+    // Self-spawns its own server with AIMEAT_EMAIL_CONFIRMATION_REQUIRED=true (the shared server keeps
+    // it OFF) to exercise the login email-gate + /v1/ghii/login/attach-email recovery flow. No SMTP needed.
+    'test/e2e-login-attach-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
