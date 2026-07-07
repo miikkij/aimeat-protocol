@@ -89,7 +89,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
-    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord,
+    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord,
     SubdomainSiteRecord,
     AppGrantRecord,
     NotificationTemplateRecord,
@@ -4096,6 +4096,7 @@ export class PrismaStorage implements Storage {
             data: row.data,
             accessCode: row.accessCode ?? undefined,
             parked: row.parked ? true : undefined,
+            forkable: row.forkable ? true : undefined,
             operatorHidden: row.operatorHidden ? true : undefined,
             operatorHiddenBy: row.operatorHiddenBy ?? undefined,
             operatorHiddenAt: row.operatorHiddenAt
@@ -4120,6 +4121,7 @@ export class PrismaStorage implements Storage {
                 data: record.data,
                 accessCode: record.accessCode,
                 parked: record.parked ?? false,
+                forkable: record.forkable ?? false,
                 operatorHidden: record.operatorHidden ?? false,
                 operatorHiddenBy: record.operatorHiddenBy ?? null,
                 operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
@@ -4275,6 +4277,16 @@ export class PrismaStorage implements Storage {
         return result.count > 0;
     }
 
+    async setAppForkable(ownerGaii: string, filename: string, forkable: boolean): Promise<boolean> {
+        this.ensureReady();
+        // Fork-permission applies to the whole app — flag every version row.
+        const result = await this.prisma.app.updateMany({
+            where: { ownerGaii, filename },
+            data: { forkable },
+        });
+        return result.count > 0;
+    }
+
     async setAppOperatorHidden(
         ownerGaii: string,
         filename: string,
@@ -4311,6 +4323,49 @@ export class PrismaStorage implements Storage {
             update: { count: { increment: 1 } },
             create: { ownerGaii, filename, count: 1 },
         });
+    }
+
+    async recordAppFork(record: AppForkRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.appFork.create({
+            data: {
+                id: record.id,
+                sourceOwnerGaii: record.sourceOwnerGaii,
+                sourceOwnerName: record.sourceOwnerName,
+                sourceFilename: record.sourceFilename,
+                sourceVersion: record.sourceVersion,
+                childOwnerGaii: record.childOwnerGaii,
+                childOwnerName: record.childOwnerName,
+                childFilename: record.childFilename,
+                forkedByGaii: record.forkedByGaii,
+                forkedAt: new Date(record.forkedAt),
+            },
+        });
+    }
+
+    async countAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<number> {
+        this.ensureReady();
+        return this.prisma.appFork.count({ where: { sourceOwnerGaii, sourceFilename } });
+    }
+
+    async listAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.appFork.findMany({
+            where: { sourceOwnerGaii, sourceFilename },
+            orderBy: { forkedAt: 'desc' },
+        });
+        return rows.map((r: any) => ({
+            id: r.id,
+            sourceOwnerGaii: r.sourceOwnerGaii,
+            sourceOwnerName: r.sourceOwnerName,
+            sourceFilename: r.sourceFilename,
+            sourceVersion: r.sourceVersion,
+            childOwnerGaii: r.childOwnerGaii,
+            childOwnerName: r.childOwnerName,
+            childFilename: r.childFilename,
+            forkedByGaii: r.forkedByGaii,
+            forkedAt: r.forkedAt instanceof Date ? r.forkedAt.toISOString() : r.forkedAt,
+        }));
     }
 
     // ── Subdomain sites (operator-managed subdomain → app/redirect mappings) ──

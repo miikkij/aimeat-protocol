@@ -54,6 +54,11 @@
       http://*.apps.localhost:* so every fetch was blocked (prod worked only via the blanket `https:`).
       Now reuses fetchAppContentBase64 (raw same-origin fetch + owner token + byte-accurate base64),
       matching the Restore-local-twin flow.
+    v2.7.0 — 2026-07-07 — Fork control + provenance: the community-app Fork button shows only when the
+      app is flagged forkable; forkVersion now calls the server-side POST /v1/apps/:owner/:filename/fork
+      (which enforces the forkable/paid gates and records provenance) instead of read+republish; own
+      published cards get an "Allow forking" toggle (toggleForkApp → PATCH { forkable }); the detail
+      About panel credits the source app when manifest.forkedFrom is set.
 -->
 <html lang="en">
 <head>
@@ -2429,10 +2434,19 @@
       'card.remove': '🗑 Remove',
       'card.versions': '🕑 Versions',
       'card.fork': '⑂ Fork',
+      'card.forkHint': 'Copy this app into your own catalogue as a new app (its origin is recorded).',
+      'card.forkableOn': '⑂ Forking: on',
+      'card.forkableOff': '⑂ Allow forking',
+      'card.forkableOnHint': 'Others can fork this app. Click to restrict forking to you and your agents.',
+      'card.forkableOffHint': 'Only you and your agents can fork this app. Click to let anyone fork it.',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
       'card.park': '🅿 Park',
       'card.unpark': '🚀 Publish',
+      'fork.prompt': 'Fork this app into your catalogue.\n\nNew filename:',
+      'fork.success': 'Forked to',
+      'fork.failed': 'Fork failed',
+      'detail.forkedFrom': '⑂ Forked from',
       'detail.editDetails': '✏️ Edit',
       'detail.nameLabel': 'App name',
       'detail.descLabel': 'Description',
@@ -2692,10 +2706,19 @@
       'card.remove': '🗑 Poista',
       'card.versions': '🕑 Versiot',
       'card.fork': '⑂ Haaroita',
+      'card.forkHint': 'Kopioi tämä sovellus omaan katalogiisi uudeksi sovellukseksi (alkuperä tallennetaan).',
+      'card.forkableOn': '⑂ Haaroitus: päällä',
+      'card.forkableOff': '⑂ Salli haaroitus',
+      'card.forkableOnHint': 'Muut voivat haaroittaa tämän sovelluksen. Napsauta rajataksesi haaroituksen sinuun ja agentteihisi.',
+      'card.forkableOffHint': 'Vain sinä ja agenttisi voitte haaroittaa tämän. Napsauta salliaksesi kaikkien haaroittaa sen.',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
       'card.park': '🅿 Parkkiin',
       'card.unpark': '🚀 Julkaise',
+      'fork.prompt': 'Haaroita tämä sovellus katalogiisi.\n\nUusi tiedostonimi:',
+      'fork.success': 'Haaroitettu:',
+      'fork.failed': 'Haaroitus epäonnistui',
+      'detail.forkedFrom': '⑂ Haaroitettu kohteesta',
       'detail.editDetails': '✏️ Muokkaa',
       'detail.nameLabel': 'Sovelluksen nimi',
       'detail.descLabel': 'Kuvaus',
@@ -5599,7 +5622,11 @@
             '</div>' +
             '<div class="published-card-actions">' +
               '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
-              '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
+              // Fork is offered on a community (someone else's) app only when its owner
+              // marked it forkable; otherwise the server would reject the fork (403).
+              (sa.forkable
+                ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
+                : '') +
             '</div>' +
             (version ? '<div class="published-card-badgerow"><span class="pcb-version">' + escapeHtml(version) + '</span></div>' : '') +
           '</div>' +
@@ -5675,6 +5702,7 @@
         localId: localMatch ? localMatch.id : null,
         versionNumber: sa.version_number || null,
         parked: !!sa.parked,
+        forkable: !!sa.forkable,
         operatorHidden: !!sa.operator_hidden,
         operatorHideReason: sa.operator_hide_reason || '',
         isOwn: true
@@ -5740,6 +5768,11 @@
       var parkBtnHtml = onServer
         ? '<button onclick="window._launcher.toggleParkApp(\'' + escapeHtml(app.filename) + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>'
         : '';
+      // Fork permission toggle: let outsiders fork this app, or restrict to you + your
+      // agents. Only meaningful for an app that exists on the server.
+      var forkBtnHtml = onServer
+        ? '<button onclick="window._launcher.toggleForkApp(\'' + escapeHtml(app.filename) + '\', ' + (app.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(app.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(app.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>'
+        : '';
 
       html +=
         '<div class="published-card">' +
@@ -5759,6 +5792,7 @@
               (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + jsArg(app.name) + '\')">' + t('card.view') + '</button>' : '') +
               (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
               parkBtnHtml +
+              forkBtnHtml +
               subBtnHtml +
               (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
                app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
@@ -5825,6 +5859,30 @@
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ parked: !!parked })
+    })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          loadPublishedApps();
+        } else {
+          alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + (err.message || err)); });
+  }
+
+  // Allow / disallow others forking a server-published app. When forkable, any user
+  // can fork it into their own catalogue; otherwise only the owner and the owner's
+  // agents may. PATCH /v1/apps/:filename { forkable } toggles the state.
+  function toggleForkApp(filename, forkable) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forkable: !!forkable })
     })
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
@@ -6100,6 +6158,11 @@
           metaItem(t('detail.size'), app.blob ? fmtSize(localBytes) : '—') +
           metaItem(t('detail.created'), created) +
           metaItem(t('detail.usesCortex'), cortex) +
+          // Provenance: if this app was forked from another, credit the source app.
+          (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename
+            ? metaItem(t('detail.forkedFrom'), app.forkedFrom.owner + '/' + app.forkedFrom.filename
+                + (app.forkedFrom.version ? ' v' + app.forkedFrom.version : ''))
+            : '') +
         '</div>';
     }
     var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + '</div>';
@@ -6613,6 +6676,7 @@
           category: meta.category || 'utility',
           tags: meta.tags || [],
           usesCortex: meta.usesCortex || [],
+          forkedFrom: meta.forkedFrom || null,
           icon: meta.icon || '\u{1F4DD}',
           source: 'aimeat',
           url: null,
@@ -6766,10 +6830,10 @@
 
   function forkVersion(owner, filename, version) {
     var token = getCortexOwnerToken();
-    if (!token) { alert('You must be logged in to fork an app into your own catalogue. Sign in first.'); return; }
+    if (!token) { alert(t('common.loginRequired') || 'You must be logged in to fork an app into your own catalogue. Sign in first.'); return; }
     var base = (filename || 'app').replace(/\.html?$/i, '');
     var suggested = base + '-fork.html';
-    var newName = prompt('Fork version ' + version + ' of "' + filename + '" into a new app.\n\nNew filename:', suggested);
+    var newName = prompt(t('fork.prompt') || ('Fork "' + filename + '" into a new app.\n\nNew filename:'), suggested);
     if (!newName) return;
     newName = newName.trim();
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
@@ -6782,37 +6846,27 @@
     var inVersionsModal = !document.getElementById('versions-overlay').hidden;
     if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.style.color = '#34d399'; }
 
-    var meta = serverAppManifests[owner + '\n' + filename] || {};
-    fetchAppContentBase64(aimeatUrl, owner, filename, version)
-      .then(function(b64) {
-        var body = {
-          filename: newName,
-          content: b64,
-          mime_type: 'text/html',
-          name: (meta.name || base) + ' (fork)',
-          description: meta.description || '',
-          category: meta.category || 'utility',
-          tags: meta.tags || [],
-          uses_cortex: meta.usesCortex || []
-        };
-        if (meta.icon) body.icon = meta.icon;
-        return fetch(aimeatUrl + '/v1/apps', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify(body)
-        });
-      })
+    // Server-side fork: the server copies the source bytes + manifest, enforces the
+    // forkable / paid-license gates, and records provenance (manifest.forkedFrom + a
+    // lineage event). The client no longer downloads the bytes itself.
+    var body = { new_filename: newName };
+    if (version) body.version = version;
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/fork', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
+    })
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
-          var msg = '✔ Forked to "' + newName + '" (v' + (json.data.version_number || 1) + ')';
+          var msg = '✔ ' + (t('fork.success') || 'Forked to') + ' "' + newName + '"';
           if (inVersionsModal) { statusEl.textContent = msg; statusEl.style.color = '#34d399'; }
           else alert(msg);
           loadPublishedApps();
         } else {
           var err = json.error_description || (json.error && json.error.message) || 'Fork failed';
           if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
-          else alert('Fork failed: ' + err);
+          else alert((t('fork.failed') || 'Fork failed') + ': ' + err);
         }
       })
       .catch(function(err) {
@@ -7666,6 +7720,7 @@
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     toggleParkApp: toggleParkApp,
+    toggleForkApp: toggleForkApp,
     detailAboutEdit: detailAboutEdit,
     detailAboutCancel: detailAboutCancel,
     detailAboutSave: detailAboutSave,

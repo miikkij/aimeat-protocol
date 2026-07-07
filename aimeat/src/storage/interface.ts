@@ -502,6 +502,15 @@ export interface AppManifest {
   usesCortex: string[];         // cortex extension names used
   priceMorsels?: number;        // 0 or absent = free
   licenseType?: 'single' | 'lifetime';
+  // Provenance: when this app was created by forking another app, this records the
+  // source it derived from (cross-owner). Set by the fork endpoint, never accepted
+  // from the publish payload. Mirrors the Foundry packaging `forkedFrom` convention.
+  forkedFrom?: {
+    owner: string;              // source app's bare owner name
+    filename: string;           // source filename
+    version: number;            // source version that was forked
+    node?: string;              // source node id (reserved for cross-node forks)
+  };
 }
 
 export interface AppRecord {
@@ -519,6 +528,14 @@ export interface AppRecord {
   // usable by their owner (and the owner's agents). A property of the app
   // (owner+filename), mirrored onto every version row. Default false = published.
   parked?: boolean;
+  // Fork permission: when true, ANY authenticated user may fork this app into their
+  // own catalogue via POST /v1/apps/:owner/:filename/fork. When false (default), only
+  // the owner and the owner's own agents (same owner component) — and operators — may
+  // fork it. A property of the app (owner+filename), mirrored onto every version row.
+  // Governs the sanctioned Fork feature + provenance; it does NOT prevent manual
+  // copying of a viewable app's client HTML (see docs/app-developer-ai-guide.md).
+  // Default false.
+  forkable?: boolean;
   // Operator moderation: when true, the app is removed from EVERY public surface
   // (catalogue/gallery/search/discovery) AND from public download — only the owner
   // (who sees a "moderated by operator: hidden" badge) and operators can still see
@@ -584,6 +601,23 @@ export interface AppPurchaseRecord {
   signature: string;              // Ed25519 signature over transaction fields
   nodeId: string;                 // originating node
   nodePublicKey: string;          // node public key for verification
+}
+
+// Fork lineage event — one immutable row per fork, the source of truth for fork
+// statistics + the cross-owner lineage graph. Append-only (mirrors app_purchases).
+// The child app may later be parked or deleted; this row survives so lineage keeps
+// its edges even when a descendant no longer exists.
+export interface AppForkRecord {
+  id: string;                     // "fork_..."
+  sourceOwnerGaii: string;        // canonical GHII of the source app owner
+  sourceOwnerName: string;        // bare owner name of the source
+  sourceFilename: string;
+  sourceVersion: number;          // source version that was forked
+  childOwnerGaii: string;         // canonical GHII of the new (forked) app owner
+  childOwnerName: string;         // bare owner name of the fork
+  childFilename: string;
+  forkedByGaii: string;           // the GAII/GHII that performed the fork (audit)
+  forkedAt: string;               // ISO timestamp
 }
 
 export interface PeeringRequestRecord {

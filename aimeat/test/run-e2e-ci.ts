@@ -28,6 +28,7 @@ const ALL_SUITES = [
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
     'test/e2e-apps.ts',
+    'test/e2e-app-fork.ts',
     'test/e2e-apps-moderation.ts',
     // Self-spawns its own server with the app-origin flag ON (the shared server keeps it
     // OFF), so it owns its lifecycle rather than running against BASE_URL.

@@ -6,7 +6,9 @@
  *   SQLite and MongoDB providers.
  * @structure AppRepository interface — createApp, getApp, getAppByOwnerName,
  *   listApps, listAppVersions, getLatestVersionNumber, deleteApp,
- *   updateAppAccessCode, download counters, normalizeAppOwnerNames.
+ *   updateAppAccessCode, setAppParked/setAppForkable, download counters,
+ *   fork-lineage events (recordAppFork/countAppForks/listAppForks),
+ *   normalizeAppOwnerNames.
  * @usage Implemented by SqliteStorage / MongoStorage; consumed by routes/apps.ts
  *   and mcp/apps.ts.
  * @version-history
@@ -24,7 +26,7 @@
  *   v1.5.0 — 2026-06-26 — Add updateAppMeta() so an owner can rename an app (and
  *     edit its description) in place — without re-publishing or changing the URL.
  */
-import type { AppRecord, AppListOptions } from '../interface.js';
+import type { AppRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
@@ -57,6 +59,13 @@ export interface AppRepository {
      */
     setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean>;
     /**
+     * Set the fork-permission flag on EVERY version row of (ownerGaii, filename).
+     * When true, outsiders (users other than the owner and the owner's own agents)
+     * may fork the app; when false (default), only the owner/their agents/operators
+     * may. Mirrors setAppParked. Returns true if any row was updated.
+     */
+    setAppForkable(ownerGaii: string, filename: string, forkable: boolean): Promise<boolean>;
+    /**
      * Operator moderation: hide or un-hide an app from EVERY public surface
      * (catalogue/gallery/search/discovery + public download). Sets the
      * `operatorHidden` flag (and audit fields) on EVERY version row of
@@ -73,6 +82,16 @@ export interface AppRepository {
     ): Promise<boolean>;
     getAppDownloads(ownerGaii: string, filename: string): Promise<number>;
     incrementAppDownloads(ownerGaii: string, filename: string): Promise<void>;
+    /**
+     * Fork lineage (append-only). recordAppFork writes one immutable event when an
+     * app is forked; countAppForks returns how many times (ownerGaii, filename) has
+     * been forked (direct children); listAppForks returns the fork events where the
+     * given app is the SOURCE (its direct descendants), newest first. These back the
+     * fork-count column, the "who forked this" list, and the lineage graph.
+     */
+    recordAppFork(record: AppForkRecord): Promise<void>;
+    countAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<number>;
+    listAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]>;
     /**
      * Data hygiene: legacy publish paths stored `ownerName` as the full GHII
      * (`owner@node`) instead of the bare owner name. The catalog "my apps"

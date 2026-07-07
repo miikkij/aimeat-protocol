@@ -2371,6 +2371,7 @@ components:
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }
         parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
+        forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
         operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
         operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
@@ -12399,7 +12400,7 @@ paths:
   /v1/apps/{filename}:
     patch:
       operationId: updateApp
-      summary: Update an app you own (name, description, access code and/or parked state)
+      summary: Update an app you own (name, description, access code, parked and/or forkable state)
       description: |
         Update metadata on an app you own. Each field is independent and applied only when present
         in the body, so a `parked`-only request never clears the access code (and vice-versa).
@@ -12407,6 +12408,8 @@ paths:
         display name is metadata only, so the stable `owner/filename` download URL never changes
         (no re-publish needed). Parking hides the app from the public catalogue/gallery/search while
         keeping it fully usable by you (and your agents); unparking restores it to the catalogue.
+        `forkable` controls whether other users may fork the app (see POST
+        `/v1/apps/{owner}/{filename}/fork`); you and your agents can always fork your own apps.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -12432,6 +12435,9 @@ paths:
                 parked:
                   type: boolean
                   description: true hides the app from the public catalogue; false republishes it
+                forkable:
+                  type: boolean
+                  description: true lets any user fork this app; false restricts forking to you and your agents
       responses:
         '200':
           description: App updated
@@ -12450,6 +12456,7 @@ paths:
                           description: { type: string }
                           protected: { type: boolean }
                           parked: { type: boolean }
+                          forkable: { type: boolean }
                           download_url: { type: string }
                           note: { type: string }
         '400':
@@ -12505,6 +12512,76 @@ paths:
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/{owner}/{filename}/fork:
+    post:
+      operationId: forkApp
+      summary: Fork an app into your own catalogue
+      description: |
+        Copies a published app (source bytes + manifest) into the authenticated caller's catalogue as
+        a new, independent app (version 1), stamping `manifest.forkedFrom` provenance and recording a
+        fork lineage event. Two gates must both pass:
+
+        1. **Derivative permission** — the source owner, the owner's own agents (same owner component)
+           and operators may always fork; any other user may fork only when the source app is flagged
+           `forkable` (else `403`).
+        2. **Paywall** — a paid source still requires the caller to be the seller or hold a license
+           (else `402`), so a server-side copy never bypasses the read paywall.
+
+        The fork is created free (source price/license terms are dropped) and not itself forkable by
+        default. This is the sanctioned, provenance-recording path — prefer it over reading the bytes
+        and re-publishing them, which leaves no lineage.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_filename]
+              properties:
+                new_filename:
+                  type: string
+                  description: Filename for the fork in your catalogue (alphanumeric, dots, hyphens, underscores; max 100 chars)
+                version:
+                  type: integer
+                  description: Source version to fork (defaults to latest)
+      responses:
+        '201':
+          description: App forked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          version_number: { type: integer }
+                          forkable: { type: boolean }
+                          forked_from:
+                            type: object
+                            properties:
+                              owner: { type: string }
+                              filename: { type: string }
+                              version: { type: integer }
+                          download_url: { type: string }
+                          note: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { description: The source app is paid and the caller holds no license }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The caller already has an app with the requested new_filename }
+        '429': { description: The caller has reached their published-app quota }
 
   /v1/apps/{owner}/{filename}/screenshot:
     parameters:
