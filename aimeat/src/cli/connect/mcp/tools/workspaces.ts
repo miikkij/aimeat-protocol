@@ -12,6 +12,10 @@
  *     _create normalizes objectTypes (rejects backing 'storage'/'knowledge', infers mode:'document'
  *     from kind:'document'); _write refuses non-memory spaces and honours kind:'document' on old
  *     manifests instead of silently falling into records mode.
+ *   v1.2.0 -- 2026-07-07 -- _read is index-first (mirrors src/mcp/workspaces.ts): shapes the REST full
+ *     response into a lightweight INDEX by default (per space: id/title/updated/version/bytes, no
+ *     bodies), and returns full values only for the ids passed in `ids` — so the MCP payload stays
+ *     small instead of dumping every object in one blob.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -19,6 +23,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { normalizeObjectTypes, isMemoryBackedSpace, WorkspaceMetaError } from '../../../../services/workspace-meta.js';
+import { entryTitle } from '../../../../services/structure-overview.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -53,11 +58,74 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
-    { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)') },
+    { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
+      ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). Omit for the lightweight index.'),
+      space: z.string().optional().describe('With `ids`: optionally restrict the lookup to this space (objectType NAME or namespace).'),
+      include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false.') },
     annotationsFor('aimeat_workspace_read'),
-    async ({ organism_id, ws }) => {
-      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
-      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    async ({ organism_id, ws, ids, space, include_archived }) => {
+      // The REST read returns the whole workspace (manifest + every object's full value); that round-trip
+      // is local (loopback daemon → node), so it is cheap. We shape it HERE — index by default, full
+      // values only for the requested ids — so the MCP payload the LLM receives stays small (mirrors the
+      // server's src/mcp/workspaces.ts). Version history (.version.N) never reaches this path (REST omits it).
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}${include_archived ? '&archived=include' : ''}`);
+      if (resp.ok === false) return text(resp.error ?? resp, true);
+      const data = (resp.data ?? resp) as { manifest?: { objectTypes?: { name: string; namespace?: string }[] }; objects?: Record<string, Record<string, unknown>[]>; drafts?: Record<string, Record<string, unknown>[]>; apps?: unknown[] };
+      const manifest = data.manifest ?? null;
+      const objects = data.objects ?? {};
+      const drafts = data.drafts ?? {};
+      const idOf = (v: Record<string, unknown>): string => String(v.id ?? '');
+      const byteLen = (v: unknown): number => (typeof v === 'string' ? v.length : JSON.stringify(v ?? null).length);
+      // The REST value carries _createdAt/_updatedAt/_version merged in; split them back out.
+      const splitMeta = (v: Record<string, unknown>) => {
+        const { _createdAt, _updatedAt, _version, ...value } = v;
+        return { value, _createdAt, _updatedAt, _version };
+      };
+      // Resolve a space arg (name OR namespace) to the object-type NAME used to key objects/drafts.
+      const resolveSpace = (s?: string): string | undefined => s
+        ? ((manifest?.objectTypes ?? []).find(o => o.name === s || o.namespace === s)?.name ?? s)
+        : undefined;
+
+      // ── BATCH-OPEN: full value of the requested ids only. ──
+      if (ids && ids.length) {
+        const want = new Set(ids.map(String));
+        const scopedName = resolveSpace(space);
+        const names = scopedName ? [scopedName] : [...new Set([...Object.keys(objects), ...Object.keys(drafts)])];
+        const found: unknown[] = [];
+        const seen = new Set<string>();
+        for (const id of want) {
+          for (const name of names) {
+            const pub = (objects[name] ?? []).find(v => idOf(v) === id);
+            const drf = (drafts[name] ?? []).find(v => idOf(v) === id);
+            if (!pub && !drf) continue;
+            const cur = splitMeta((pub ?? drf) as Record<string, unknown>);
+            found.push({ space: name, id, value: cur.value, published: !!pub, _version: cur._version, _createdAt: cur._createdAt, _updatedAt: cur._updatedAt, ...(drf ? { draft: splitMeta(drf).value } : {}) });
+            seen.add(id); break;
+          }
+        }
+        const missing = [...want].filter(id => !seen.has(id));
+        return text({ organism_id, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) });
+      }
+
+      // ── INDEX (default): titles + ids, NO bodies. ──
+      const names = [...new Set([...Object.keys(objects), ...Object.keys(drafts)])];
+      const index: Record<string, unknown[]> = {};
+      const counts: Record<string, number> = {};
+      for (const name of names) {
+        const merged = new Map<string, { pub?: Record<string, unknown>; drf?: Record<string, unknown> }>();
+        for (const v of objects[name] ?? []) { const id = idOf(v); const slot = merged.get(id) ?? {}; slot.pub = v; merged.set(id, slot); }
+        for (const v of drafts[name] ?? []) { const id = idOf(v); const slot = merged.get(id) ?? {}; slot.drf = v; merged.set(id, slot); }
+        const entries = [...merged.entries()]
+          .map(([id, slot]) => {
+            const cur = slot.pub ?? slot.drf!;
+            return { id, title: entryTitle(splitMeta(cur).value, id), updated: String(cur._updatedAt ?? ''), version: Number(cur._version ?? 0), bytes: byteLen(splitMeta(cur).value), published: !!slot.pub, has_draft: !!slot.drf };
+          })
+          .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
+        index[name] = entries;
+        counts[name] = entries.length;
+      }
+      return text({ organism_id, ws, mode: 'index', manifest, apps: data.apps ?? [], counts, index,
+        hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.' });
     });
 
   mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),

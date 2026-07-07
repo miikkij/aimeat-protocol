@@ -54,7 +54,7 @@ export interface MemoryRepository {
   deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;
-  searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
+  searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]>;
   /**
    * Native full-text search over memory values (Tier-1 librarian retrieval). Indexed + ranked
    * (SQLite FTS5 / MongoDB `$text`), best-first. Unlike {@link searchMemory} (single owner, O(n)

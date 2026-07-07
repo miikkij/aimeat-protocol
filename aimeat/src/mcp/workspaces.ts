@@ -61,6 +61,10 @@
  *   v1.12.0 -- 2026-07-02 -- Workspace app bindings: _update accepts `apps` (FULL replace, [] clears —
  *     pins published apps {owner, filename} to the workspace via updateWorkspaceMeta) and _read
  *     returns the pinned `apps` list alongside the manifest.
+ *   v1.13.0 -- 2026-07-07 -- _read is index-first: DEFAULT returns a lightweight INDEX (per space, each
+ *     instance's id/title/updated/version/bytes — titles only, no bodies) instead of every object's full
+ *     value in one blob (which grew to 100s of KB, too big for an MCP round-trip). Pass `ids` to
+ *     batch-open the FULL value of just those instances. Version history is never surfaced by _read.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -74,7 +78,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
-import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
+import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
@@ -265,11 +269,19 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_read ──
+    // Two modes, one tool. DEFAULT (no `ids`) → the INDEX: per space, every instance's id + title +
+    // updated + version + byte-size — titles only, NO bodies — plus the manifest + pinned apps. This
+    // stays small no matter how many/large the documents are (the old "return every object's full value
+    // in one blob" grew to 100s of KB — too big for an MCP round-trip). BATCH-OPEN (`ids` given) →
+    // the FULL value of only the requested instances. So the flow is: read the index → pick the ids
+    // that likely hold what you need → read those ids. Both calls are size-bounded.
     mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
         { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
+          ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). Omit to get the lightweight index (titles + ids, no bodies).'),
+          space: z.string().optional().describe('With `ids`: optionally restrict the lookup to this space (objectType NAME or namespace). Ignored for the index.'),
           include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false — archived content is excluded from normal reads.') },
         annotationsFor('aimeat_workspace_read'),
-        async ({ organism_id, ws, include_archived }): Promise<TextResult> => {
+        async ({ organism_id, ws, ids, space, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller
@@ -287,18 +299,19 @@ export function registerWorkspaceTools(
                 }
             }
             if (!manRec || !canRead) return fail(`No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_access).`);
-            const mine: MemoryRecord[] = items;   // workspace-level read: a reader sees ALL content
             const manifest = manRec.value as Manifest;
-            const objects: Record<string, unknown[]> = {};
-            const drafts: Record<string, unknown[]> = {};
+
+            // Collapse each space's instances to their freshest { latest, draft } ONCE — reused by both
+            // the index and the batch-open. `latest` wins over a bare (un-suffixed) write; fresher()
+            // guards a key forked into duplicate-owner copies. Version history (.version.N) is never
+            // surfaced here (it is the main bloat source) — read a specific version via the memory API.
+            type Slot = { latest?: MemoryRecord; draft?: MemoryRecord };
+            const spaces = new Map<string, { ot: ObjType; inst: Map<string, Slot> }>();
             for (const ot of manifest.objectTypes ?? []) {
                 if (!ot.namespace || !isMemoryBackedSpace(ot)) continue;
                 const nsPrefix = `${root}.${ot.namespace}.`;
-                // Keep the FRESHEST record per (instance, role): a key that forked into duplicate-owner
-                // copies (a GHII + a legacy agent GAII) must never surface the stale one. fresher() wins on
-                // higher version, then newer updatedAt.
-                const inst = new Map<string, { latest?: MemoryRecord; draft?: MemoryRecord }>();
-                for (const r of mine) {
+                const inst = new Map<string, Slot>();
+                for (const r of items) {
                     if (!r.key.startsWith(nsPrefix)) continue;
                     const parts = r.key.slice(nsPrefix.length).split('.');
                     const role = parts.slice(1).join('.');
@@ -307,14 +320,49 @@ export function registerWorkspaceTools(
                     else if (role === 'draft') slot.draft = fresher(slot.draft, r);
                     inst.set(parts[0], slot);
                 }
-                const cur: unknown[] = []; const drf: unknown[] = [];
-                for (const s of inst.values()) { if (s.latest) cur.push(s.latest.value); if (s.draft) drf.push(s.draft.value); }
-                objects[ot.name] = cur;
-                if (drf.length) drafts[ot.name] = drf;
+                spaces.set(ot.name, { ot, inst });
             }
-            // Apps pinned to this workspace (meta.apps binding record) — launch-context only.
+            const byteLen = (v: unknown): number => (typeof v === 'string' ? v.length : JSON.stringify(v ?? null).length);
+
+            // ── BATCH-OPEN: the full value of the requested ids only. ──
+            if (ids && ids.length) {
+                const scoped = space ? [...spaces.values()].filter(s => s.ot.name === space || s.ot.namespace === space) : [...spaces.values()];
+                const found: unknown[] = [];
+                const missing: string[] = [];
+                for (const id of new Set(ids.map(String))) {
+                    let hit = false;
+                    for (const s of scoped) {
+                        const slot = s.inst.get(id);
+                        const cur = slot?.latest ?? slot?.draft;
+                        if (!slot || !cur) continue;
+                        found.push({
+                            space: s.ot.name, id, value: cur.value,
+                            published: !!slot.latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
+                            ...(slot.draft ? { draft: slot.draft.value } : {}),
+                        });
+                        hit = true; break;
+                    }
+                    if (!hit) missing.push(id);
+                }
+                return ok({ organism_id, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) });
+            }
+
+            // ── INDEX (default): titles + ids, NO bodies. Every instance (uncapped). ──
             const apps = ((items.find(r => r.key === `${root}.meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
-            return ok({ organism_id, ws, manifest, apps, objects, drafts });
+            const index: Record<string, unknown[]> = {};
+            const counts: Record<string, number> = {};
+            for (const [name, s] of spaces) {
+                const entries = [...s.inst.entries()]
+                    .map(([id, slot]) => {
+                        const cur = slot.latest ?? slot.draft!;
+                        return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft };
+                    })
+                    .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
+                index[name] = entries;
+                counts[name] = entries.length;
+            }
+            return ok({ organism_id, ws, mode: 'index', manifest, apps, counts, index,
+                hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.' });
         });
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)

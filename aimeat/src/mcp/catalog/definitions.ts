@@ -490,12 +490,14 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_search',
-        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility), returning matching entries with their values. Use when you know roughly what content you stored but not the exact key; if you already know the key use aimeat_memory_read, and to browse keys by prefix/tag use aimeat_memory_list.',
+        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility). Returns a SNIPPET per hit (a short window around the match) + key/bytes/tags — NOT the full value, so a broad query stays a sane size. Capped at `limit` hits (default 50) and skips `.version.N` history by default. Read a hit\'s full value with aimeat_memory_read on its exact key. Use when you know roughly what you stored but not the exact key; to browse keys by prefix/tag use aimeat_memory_list.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             query: { type: 'string', required: true, description: 'Search query.' },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.' },
+            limit: { type: 'number', description: 'Max hits to return (default 50, max 200).' },
+            include_versions: { type: 'boolean', description: 'Include `.version.N` history snapshots (skipped by default).' },
         },
     },
     {
@@ -1226,12 +1228,15 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_read',
-        description: 'Read one workspace: its manifest (the objectTypes it declares — each is a records space with a JSON schema, or a document space of markdown pages), plus the current published objects and any unpublished drafts grouped by type. This is how you LEARN a workspace before acting. Items are versioned: a working .draft, the published .latest, and .version.N history. Member-only.',
+        description: 'Read one workspace in TWO steps so you never pull a huge blob. DEFAULT (no `ids`) returns the INDEX: the manifest (the objectTypes it declares — each a records space with a JSON schema, or a document space of markdown pages) plus, per space, EVERY instance as { id, title, updated, version, bytes, published, has_draft } — titles only, NO bodies — so it stays small however many/large the documents are. Scan the index (or aimeat_workspace_overview for the same as a Markdown map), pick the ids that likely hold what you need, then call this again with `ids:[...]` to BATCH-OPEN just those instances\' full values. Version history (.version.N) is never returned here — read a specific version via the memory API. Member-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
+            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). Omit for the lightweight index.' },
+            space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
+            include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
         },
     },
     {

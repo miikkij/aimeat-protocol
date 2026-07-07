@@ -311,15 +311,21 @@ await test('3. Write public memory entry for search test', async () => {
     assert(result.key === 'search.test.public', `key: ${result.key}`);
 });
 
-await test('4. aimeat_memory_search finds entries by query', async () => {
+await test('4. aimeat_memory_search finds entries by query (snippet hits, no full value)', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_memory_search',
         arguments: { query: 'searchable' },
     }, 103);
     assert(body.result?.content?.[0]?.text !== undefined, 'has content');
-    const results = JSON.parse(body.result.content[0].text);
-    assert(Array.isArray(results), 'result is array');
-    assert(results.length >= 2, `expected at least 2 results, got ${results.length}`);
+    const res = JSON.parse(body.result.content[0].text);
+    assert(Array.isArray(res.hits), 'res.hits is array');
+    assert(res.hits.length >= 2, `expected at least 2 hits, got ${res.hits.length}`);
+    // Size-bounded: hits carry a snippet + key/bytes, NOT the full value blob.
+    for (const h of res.hits) {
+        assert(typeof h.snippet === 'string', 'hit has a snippet string');
+        assert(typeof h.bytes === 'number', 'hit reports bytes');
+        assert(h.value === undefined, 'hit does NOT carry the full value');
+    }
 });
 
 await test('5. aimeat_memory_search with visibility filter', async () => {
@@ -327,21 +333,40 @@ await test('5. aimeat_memory_search with visibility filter', async () => {
         name: 'aimeat_memory_search',
         arguments: { query: 'searchable', visibility: 'public' },
     }, 104);
-    const results = JSON.parse(body.result.content[0].text);
-    assert(Array.isArray(results), 'result is array');
-    for (const r of results) {
-        assert(r.visibility === 'public', `all results should be public, got: ${r.visibility}`);
+    const res = JSON.parse(body.result.content[0].text);
+    assert(Array.isArray(res.hits), 'res.hits is array');
+    for (const h of res.hits) {
+        assert(h.visibility === 'public', `all hits should be public, got: ${h.visibility}`);
     }
 });
 
-await test('6. aimeat_memory_search with no match returns empty array', async () => {
+await test('6. aimeat_memory_search with no match returns no hits', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_memory_search',
         arguments: { query: 'xyzzy-no-match-unique-12345' },
     }, 105);
-    const results = JSON.parse(body.result.content[0].text);
-    assert(Array.isArray(results), 'result is array');
-    assert(results.length === 0, `expected 0 results, got ${results.length}`);
+    const res = JSON.parse(body.result.content[0].text);
+    assert(Array.isArray(res.hits), 'res.hits is array');
+    assert(res.hits.length === 0, `expected 0 hits, got ${res.hits.length}`);
+    assert(res.total === 0, `expected total 0, got ${res.total}`);
+});
+
+await test('6b. aimeat_memory_search skips .version.N history by default (opt-in with include_versions)', async () => {
+    // A workspace-style version snapshot is owned by the agent GAII — the historical bloat source.
+    await mcpRpc('tools/call', { name: 'aimeat_memory_write', arguments: { key: 'search.ver.instance.version.1', value: { content: 'versioned gamma snapshot' } } }, 106);
+    await mcpRpc('tools/call', { name: 'aimeat_memory_write', arguments: { key: 'search.ver.instance.latest', value: { content: 'versioned gamma current' } } }, 107);
+    const def = JSON.parse((await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query: 'gamma' } }, 108)).body.result.content[0].text);
+    assert(def.hits.every((h: { key: string }) => !/\.version\.\d+$/.test(h.key)), 'default search excludes .version.N keys');
+    assert(def.hits.some((h: { key: string }) => h.key === 'search.ver.instance.latest'), 'default search still finds the .latest');
+    const inc = JSON.parse((await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query: 'gamma', include_versions: true } }, 109)).body.result.content[0].text);
+    assert(inc.hits.some((h: { key: string }) => h.key === 'search.ver.instance.version.1'), 'include_versions surfaces the .version.N snapshot');
+});
+
+await test('6c. aimeat_memory_search honours limit', async () => {
+    for (let i = 0; i < 5; i++) await mcpRpc('tools/call', { name: 'aimeat_memory_write', arguments: { key: `search.lim.${i}`, value: { content: 'limitword delta' } } }, 110 + i);
+    const res = JSON.parse((await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query: 'limitword', limit: 2 } }, 120)).body.result.content[0].text);
+    assert(res.hits.length <= 2, `limit 2 → at most 2 hits, got ${res.hits.length}`);
+    assert(res.truncated === true, 'truncated flag set when more matched than the limit');
 });
 
 // ─── Phase 3: Cross-agent public memory read ───

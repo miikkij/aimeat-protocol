@@ -714,7 +714,7 @@ export class SqliteStorage implements Storage {
     ).run(ownerGaii, key);
   }
 
-  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
+  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]> {
     const q = query.toLowerCase();
     let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
     const params: unknown[] = [ownerGaii];
@@ -746,6 +746,9 @@ export class SqliteStorage implements Storage {
         record.tags.some(t => t.toLowerCase().includes(q))
       ) {
         results.push(record);
+        // Optional result cap (additive; callers that omit it keep the full result set). The substring
+        // match is applied in JS, so the cap is enforced here — post-filter — not as a SQL LIMIT.
+        if (opts?.limit !== undefined && results.length >= opts.limit) break;
       }
     }
     return results;
