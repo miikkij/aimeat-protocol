@@ -448,6 +448,9 @@ make leaks traceable — they do **not** make client code secret:
 Rule of thumb: **hardening deters and detects; the extension moat prevents.** Reach for
 the flags for casual deterrence; reach for an extension when it actually matters.
 
+**Deep dive:** [Protecting your work: move business logic into an extension](guides/protecting-your-work-with-extensions.md)
+— how to decide what to move server-side, with a before/after worked example.
+
 ---
 
 ## Prompt-composition principles
