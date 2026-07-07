@@ -59,6 +59,10 @@
       (which enforces the forkable/paid gates and records provenance) instead of read+republish; own
       published cards get an "Allow forking" toggle (toggleForkApp → PATCH { forkable }); the detail
       About panel credits the source app when manifest.forkedFrom is set.
+    v2.8.0 — 2026-07-07 — Fork stats + lineage (Phase 2): cards show a "⑂ N" fork-count chip (own cards
+      always, community cards when N>0) that opens a lineage modal; showLineageModal fetches
+      GET /v1/apps/:owner/:filename/lineage and renders the cross-owner fork tree (ancestry + descendants)
+      with each node's live status (public/parked/hidden/deleted) and fork date.
 -->
 <html lang="en">
 <head>
@@ -1574,6 +1578,29 @@
       color: var(--text-dim);
       flex: 0 0 auto;
     }
+    /* Fork-count chip on a card — click to open the lineage modal. */
+    .published-card-badgerow .pcb-forks {
+      font-size: .72rem;
+      color: var(--text-muted);
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
+    .published-card-badgerow .pcb-forks:hover { color: var(--accent); }
+    /* Fork lineage tree (in #lineage-tree) */
+    .lineage-node { padding: 3px 0; white-space: nowrap; }
+    .lineage-node.self { font-weight: 700; }
+    .lineage-status {
+      font-size: .68rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 6px;
+      background: var(--bg-dim);
+    }
+    .lineage-status.public { color: #34d399; }
+    .lineage-status.parked { color: var(--text-muted); }
+    .lineage-status.hidden { color: #fbbf24; }
+    .lineage-status.deleted { color: var(--accent); text-decoration: line-through; }
+    .lineage-when { color: var(--text-muted); font-size: .72rem; margin-left: 6px; }
 
     /* Even 2-up button grid, pushed to the card bottom (margin-top:auto) so the
        action block lines up across cards regardless of how many buttons / chips
@@ -2255,6 +2282,20 @@
     </div>
   </div>
 
+  <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
+  <div id="lineage-overlay" hidden>
+    <div class="modal" id="lineage-modal">
+      <h2>&#x2942; <span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
+      <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
+      <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="lineage-tree" style="max-height:52vh;overflow-y:auto;font-size:.85rem"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('lineage-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Generate App with AI — guided steps -->
   <div id="prompt-builder-overlay">
     <div class="prompt-builder-modal">
@@ -2447,6 +2488,17 @@
       'fork.success': 'Forked to',
       'fork.failed': 'Fork failed',
       'detail.forkedFrom': '⑂ Forked from',
+      'card.forksHint': 'View the fork lineage (who forked this, and where it came from)',
+      'lineage.title': 'Fork lineage',
+      'lineage.help': 'Every app forked from this one (and where this one came from), with each fork\'s current status. The chain survives a fork being parked or deleted.',
+      'lineage.loading': 'Loading lineage…',
+      'lineage.direct': 'Direct forks',
+      'lineage.total': 'total descendants',
+      'lineage.none': 'No forks yet — this app has not been forked.',
+      'lineage.status.public': 'public',
+      'lineage.status.parked': 'parked',
+      'lineage.status.hidden': 'hidden',
+      'lineage.status.deleted': 'deleted',
       'detail.editDetails': '✏️ Edit',
       'detail.nameLabel': 'App name',
       'detail.descLabel': 'Description',
@@ -2719,6 +2771,17 @@
       'fork.success': 'Haaroitettu:',
       'fork.failed': 'Haaroitus epäonnistui',
       'detail.forkedFrom': '⑂ Haaroitettu kohteesta',
+      'card.forksHint': 'Näytä haaroitushistoria (kuka haaroitti ja mistä tämä on peräisin)',
+      'lineage.title': 'Haaroitushistoria',
+      'lineage.help': 'Kaikki tästä haaroitetut sovellukset (ja mistä tämä on peräisin), kunkin haaran nykyinen tila. Ketju säilyy, vaikka haara parkitaan tai poistetaan.',
+      'lineage.loading': 'Ladataan historiaa…',
+      'lineage.direct': 'Suorat haarat',
+      'lineage.total': 'jälkeläisiä yhteensä',
+      'lineage.none': 'Ei vielä haaroja — tätä sovellusta ei ole haaroitettu.',
+      'lineage.status.public': 'julkinen',
+      'lineage.status.parked': 'parkissa',
+      'lineage.status.hidden': 'piilotettu',
+      'lineage.status.deleted': 'poistettu',
       'detail.editDetails': '✏️ Muokkaa',
       'detail.nameLabel': 'Sovelluksen nimi',
       'detail.descLabel': 'Kuvaus',
@@ -5628,7 +5691,14 @@
                 ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
                 : '') +
             '</div>' +
-            (version ? '<div class="published-card-badgerow"><span class="pcb-version">' + escapeHtml(version) + '</span></div>' : '') +
+            ((version || (sa.forks && sa.forks > 0))
+              ? '<div class="published-card-badgerow">'
+                + ((sa.forks && sa.forks > 0)
+                  ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">⑂ ' + sa.forks + '</span>'
+                  : '')
+                + (version ? '<span class="pcb-version">' + escapeHtml(version) + '</span>' : '')
+                + '</div>'
+              : '') +
           '</div>' +
         '</div>';
     }
@@ -5703,6 +5773,7 @@
         versionNumber: sa.version_number || null,
         parked: !!sa.parked,
         forkable: !!sa.forkable,
+        forks: sa.forks || 0,
         operatorHidden: !!sa.operator_hidden,
         operatorHideReason: sa.operator_hide_reason || '',
         isOwn: true
@@ -5799,6 +5870,7 @@
             '</div>' +
             '<div class="published-card-badgerow">' +
               '<span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+              (onServer ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">⑂ ' + (app.forks || 0) + '</span>' : '') +
               (app.version ? '<span class="pcb-version">' + escapeHtml(app.version) + '</span>' : '') +
             '</div>' +
           '</div>' +
@@ -6724,6 +6796,64 @@
       }
       return btoa(binary);
     });
+  }
+
+  // ── Fork lineage: cross-owner tree of forks (ancestry + descendants) ──
+  function showLineageModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+    if (!aimeatUrl) { alert('Set AIMEAT server URL in Settings first'); return; }
+    document.getElementById('lineage-title').textContent = filename;
+    var summaryEl = document.getElementById('lineage-summary');
+    var statusEl = document.getElementById('lineage-status');
+    var treeEl = document.getElementById('lineage-tree');
+    summaryEl.textContent = '';
+    statusEl.textContent = t('lineage.loading') || 'Loading lineage…';
+    statusEl.style.color = 'var(--text-muted)';
+    treeEl.innerHTML = '';
+    document.getElementById('lineage-overlay').hidden = false;
+
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/lineage')
+      .then(function(resp) { if (!resp.ok) throw new Error('Server returned ' + resp.status); return resp.json(); })
+      .then(function(json) {
+        var d = json.data || {};
+        var nodes = d.nodes || [], edges = d.edges || [];
+        statusEl.textContent = '';
+        summaryEl.textContent = (t('lineage.direct') || 'Direct forks') + ': ' + (d.directForkCount || 0)
+          + ' · ' + (t('lineage.total') || 'total descendants') + ': ' + (d.descendantCount || 0);
+        if (nodes.length <= 1 && edges.length === 0) {
+          treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t('lineage.none') || 'No forks yet — this app has not been forked.') + '</div>';
+          return;
+        }
+        treeEl.innerHTML = renderLineageTree(d);
+      })
+      .catch(function(err) { statusEl.textContent = '✘ ' + (err.message || 'Failed to load lineage'); statusEl.style.color = 'var(--accent)'; });
+  }
+
+  function renderLineageTree(d) {
+    var byId = {}; (d.nodes || []).forEach(function(n) { byId[n.id] = n; });
+    var children = {}; var hasParent = {};
+    (d.edges || []).forEach(function(e) { (children[e.from] = children[e.from] || []).push(e.to); hasParent[e.to] = true; });
+    var roots = (d.nodes || []).filter(function(n) { return !hasParent[n.id]; }).map(function(n) { return n.id; });
+    if (!roots.length && d.self) roots = [d.self];
+    var seen = {};
+    function renderNode(id, depth) {
+      if (seen[id]) return ''; seen[id] = true;
+      var n = byId[id]; if (!n) return '';
+      var isSelf = (id === d.self);
+      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + '</span>' : '';
+      var statusTxt = t('lineage.status.' + n.status) || n.status;
+      var line = '<div class="lineage-node' + (isSelf ? ' self' : '') + '" style="margin-left:' + (depth * 16) + 'px">'
+        + (depth > 0 ? '↳ ' : '') + escapeHtml(n.owner + '/' + n.filename) + (isSelf ? ' ●' : '')
+        + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + '</span>' + when
+        + '</div>';
+      var kids = children[id] || [];
+      for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
+      return line;
+    }
+    var html = '';
+    for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
+    return html;
   }
 
   function showVersionsModal(owner, filename) {
@@ -7745,6 +7875,7 @@
     backupUpdateSummary: backupUpdateSummary,
     submitBackupRestore: submitBackupRestore,
     showVersionsModal: showVersionsModal,
+    showLineageModal: showLineageModal,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
     openDetailView: openDetailView,

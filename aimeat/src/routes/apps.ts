@@ -74,6 +74,10 @@
  *     manifest.forkedFrom and recording an app_forks lineage event. PATCH accepts a `forkable`
  *     boolean; it survives a re-publish; responses carry `forkable`. Replaces the old client-only
  *     read+republish fork (which had no gate or provenance).
+ *   v1.16.0 -- 2026-07-07 -- Fork stats + lineage (Phase 2): listings carry a `forks` count (direct
+ *     children); GET /v1/apps/:owner/:filename/forks lists the direct forks with each one's live
+ *     status (public/parked/hidden/deleted); GET .../lineage returns the full cross-owner fork tree
+ *     (ancestry via forkedFrom + descendants via app_forks, surviving deletions) as nodes/edges.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -91,6 +95,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { ensureAppSubdomain } from './subdomains.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
+import { collectAppLineage, resolveAppStatus } from '../services/app-lineage.js';
 
 /**
  * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
@@ -164,6 +169,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         const result = await Promise.all(apps.map(async (app) => {
             const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
+            const forks = await storage.countAppForks(app.ownerGaii, app.filename);
             const screenshotFile = await storage.getStorageFile(app.ownerGaii, `apps/screenshots/${app.filename}`);
             const hasScreenshot = !!screenshotFile;
             return {
@@ -180,6 +186,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 operator_hide_reason: app.operatorHideReason ?? null,
                 has_screenshot: hasScreenshot,
                 downloads,
+                forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                 screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot` : null,
                 created_at: app.createdAt,
@@ -239,6 +246,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         const result = await Promise.all(apps.map(async (app) => {
             const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
+            const forks = await storage.countAppForks(app.ownerGaii, app.filename);
             return {
                 owner: app.ownerName,
                 filename: app.filename,
@@ -254,6 +262,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 operator_hidden_at: app.operatorHiddenAt ?? null,
                 operator_hide_reason: app.operatorHideReason ?? null,
                 downloads,
+                forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                 created_at: app.createdAt,
             };
@@ -380,6 +389,51 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             })),
             total: versions.length,
         }));
+    });
+
+    // GET /v1/apps/:owner/:filename/forks — the direct forks of this app, each with
+    // its CURRENT live status (public / parked / hidden / deleted). Public read; the
+    // fork chain is public provenance. Answers "who forked this, when, and is it still
+    // around?". Rows come from the append-only app_forks log, so a fork that was later
+    // deleted still shows (as status: deleted).
+    router.get('/v1/apps/:owner/:filename/forks', async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        const events = await storage.listAppForks(app.ownerGaii, filename);
+        const forks = await Promise.all(events.map(async (f) => ({
+            owner: f.childOwnerName,
+            filename: f.childFilename,
+            forked_at: f.forkedAt,
+            forked_by: f.forkedByGaii,
+            status: await resolveAppStatus(storage, f.childOwnerName, f.childFilename),
+            download_url: `/v1/apps/${encodeURIComponent(f.childOwnerName)}/${encodeURIComponent(f.childFilename)}`,
+        })));
+        res.json(success(config.nodeId, { owner: app.ownerName, filename, count: forks.length, forks }));
+    });
+
+    // GET /v1/apps/:owner/:filename/lineage — the full cross-owner fork tree: ancestry
+    // (walking manifest.forkedFrom up) + descendants (walking app_forks down, which
+    // survives deletions), every node carrying its live status. Public read. Feeds the
+    // catalog's lineage view — "the chain of how different versions evolved from this".
+    router.get('/v1/apps/:owner/:filename/lineage', async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const lineage = await collectAppLineage(storage, owner, filename);
+        if (!lineage) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+        res.json(success(config.nodeId, lineage));
     });
 
     // GET /v1/apps/:owner/:filename/screenshot — Serve app screenshot (no auth)

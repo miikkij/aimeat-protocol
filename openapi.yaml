@@ -2376,6 +2376,7 @@ components:
         operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
         downloads: { type: integer }
+        forks: { type: integer, description: Number of direct forks of this app }
         download_url: { type: string }
         screenshot_url: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
@@ -12582,6 +12583,97 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: The caller already has an app with the requested new_filename }
         '429': { description: The caller has reached their published-app quota }
+
+  /v1/apps/{owner}/{filename}/forks:
+    get:
+      operationId: listAppForks
+      summary: List the direct forks of an app
+      description: |
+        Returns the apps that were forked directly from this one, each with its CURRENT live status
+        (`public`, `parked`, `hidden`, or `deleted`), who forked it, and when. Public read — the fork
+        chain is public provenance. Rows come from the append-only fork log, so a fork that was later
+        deleted still appears (as `status: deleted`). For the full multi-level tree use `/lineage`.
+      tags: [Apps]
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Direct forks of the app
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          count: { type: integer }
+                          forks:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner: { type: string }
+                                filename: { type: string }
+                                forked_at: { type: string, format: date-time }
+                                forked_by: { type: string }
+                                status: { type: string, enum: [public, parked, hidden, deleted] }
+                                download_url: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/{owner}/{filename}/lineage:
+    get:
+      operationId: getAppLineage
+      summary: Get the full cross-owner fork lineage of an app
+      description: |
+        Returns the whole fork tree around this app as `nodes` + `edges`: ancestry (walking
+        `manifest.forkedFrom` upward) and descendants (walking the fork log downward, which survives
+        a fork being deleted). Every node carries its live `status`. Public read. Intended for a
+        client to render the lineage as a tree/graph.
+      tags: [Apps]
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The app's fork lineage
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          self: { type: string, description: Node id of the queried app (owner/filename) }
+                          directForkCount: { type: integer }
+                          descendantCount: { type: integer }
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                owner: { type: string }
+                                filename: { type: string }
+                                status: { type: string, enum: [public, parked, hidden, deleted] }
+                                forkedAt: { type: string, nullable: true, format: date-time }
+                                relation: { type: string, enum: [self, ancestor, descendant] }
+                          edges:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                from: { type: string }
+                                to: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/apps/{owner}/{filename}/screenshot:
     parameters:

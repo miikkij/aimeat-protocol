@@ -222,6 +222,7 @@ export function registerAppsTools(
 
             const result = await Promise.all(apps.map(async (app) => {
                 const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
+                const forks = await storage.countAppForks(app.ownerGaii, app.filename);
                 return {
                     owner: app.ownerName,
                     filename: app.filename,
@@ -236,6 +237,7 @@ export function registerAppsTools(
                     parked: !!app.parked,
                     forkable: !!app.forkable,
                     downloads,
+                    forks,
                     download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                     created_at: app.createdAt,
                 };
@@ -266,6 +268,7 @@ export function registerAppsTools(
             }
 
             const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
+            const forks = await storage.countAppForks(app.ownerGaii, app.filename);
 
             return {
                 content: [{
@@ -282,6 +285,7 @@ export function registerAppsTools(
                         forkable: !!app.forkable,
                         forked_from: app.manifest.forkedFrom ?? null,
                         downloads,
+                        forks,
                         download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                         inline_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`,
                         created_at: app.createdAt,

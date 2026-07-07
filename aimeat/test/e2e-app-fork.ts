@@ -18,6 +18,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-07 — initial: forkable flag, fork authorization gates,
  *     provenance, paid paywall, input failure modes.
+ *   v1.1.0 — 2026-07-07 — Phase 4: fork statistics + lineage — listing forks count,
+ *     GET /forks (direct forks + live status), GET /lineage (cross-owner tree,
+ *     2-level ancestry/descendants), and a deleted fork surviving as status=deleted.
  */
 
 import * as ed from '@noble/ed25519';
@@ -281,6 +284,73 @@ await test('The seller (owner) can still fork their OWN paid app → 201', async
     const { body: listBody } = await json('/v1/apps?limit=200', aAuthed());
     const fork = (listBody.data?.apps ?? []).find((a: any) => a.filename === 'a-paid-fork.html' && a.owner === ownerAName);
     assert(!!fork && !fork.manifest?.priceMorsels, 'the fork is free (source price dropped)');
+});
+
+// ── Phase 4: fork statistics + lineage ──
+// By now SRC_FILE has 3 direct forks from earlier phases: a-own-fork.html (owner),
+// agent-fork.html (owner's agent), b-fork.html (owner B).
+console.log('\nPhase 4: fork statistics + lineage');
+
+await test('Listing carries a forks count for the source app (>= 3)', async () => {
+    const { body } = await json('/v1/apps?limit=200');
+    const src = (body.data?.apps ?? []).find((a: any) => a.filename === SRC_FILE && a.owner === ownerAName);
+    assert(!!src, 'source app listed');
+    assert(src.forks >= 3, `expected forks >= 3, got ${src.forks}`);
+});
+
+await test('GET /forks lists the direct forks with live status', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${SRC_FILE}/forks`);
+    assert(status === 200, `status ${status}`);
+    assert(body.data.count >= 3, `count >= 3, got ${body.data.count}`);
+    const bfork = (body.data.forks ?? []).find((f: any) => f.owner === ownerBName && f.filename === 'b-fork.html');
+    assert(!!bfork && bfork.status === 'public', `b-fork present + public, got ${JSON.stringify(bfork)}`);
+    assert(typeof bfork.forked_at === 'string', 'fork carries a forked_at timestamp');
+});
+
+await test('GET /lineage returns the tree (self + descendants, counts)', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${SRC_FILE}/lineage`);
+    assert(status === 200, `status ${status}`);
+    assert(body.data.self === `${ownerAName}/${SRC_FILE}`, `self id, got ${body.data.self}`);
+    assert(body.data.directForkCount >= 3, `directForkCount >= 3, got ${body.data.directForkCount}`);
+    const selfNode = (body.data.nodes ?? []).find((n: any) => n.id === body.data.self);
+    assert(selfNode?.relation === 'self', 'self node marked relation=self');
+    const bNode = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerBName}/b-fork.html`);
+    assert(!!bNode && bNode.relation === 'descendant', 'b-fork is a descendant node');
+});
+
+const ownerCName = `forkownc${Date.now() % 100000}`;
+let cToken = '';
+await test('A grandchild fork appears in the ANCESTOR lineage (2 levels deep)', async () => {
+    cToken = await registerOwner(ownerCName);
+    const open = await json(`/v1/apps/b-fork.html`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
+    assert(open.status === 200, `owner B enabling fork on b-fork status ${open.status}`);
+    const fork = await json(`/v1/apps/${ownerBName}/b-fork.html/fork`, {
+        method: 'POST', headers: { Authorization: `Bearer ${cToken}` }, body: JSON.stringify({ new_filename: 'c-grandfork.html' }),
+    });
+    assert(fork.status === 201, `owner C fork of b-fork status ${fork.status}: ${JSON.stringify(fork.body)}`);
+    const { body } = await json(`/v1/apps/${ownerAName}/${SRC_FILE}/lineage`);
+    const gNode = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerCName}/c-grandfork.html`);
+    assert(!!gNode, 'grandchild present in the root app lineage');
+    const edge = (body.data.edges ?? []).find((e: any) => e.from === `${ownerBName}/b-fork.html` && e.to === `${ownerCName}/c-grandfork.html`);
+    assert(!!edge, 'edge b-fork → c-grandfork present');
+    assert(body.data.descendantCount >= 4, `descendantCount >= 4, got ${body.data.descendantCount}`);
+});
+
+await test('Lineage of the grandchild shows its ancestry up to the root', async () => {
+    const { body } = await json(`/v1/apps/${ownerCName}/c-grandfork.html/lineage`);
+    const root = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerAName}/${SRC_FILE}`);
+    assert(!!root && root.relation === 'ancestor', 'root is an ancestor of the grandchild');
+    const parent = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerBName}/b-fork.html`);
+    assert(!!parent && parent.relation === 'ancestor', 'immediate parent is an ancestor');
+});
+
+await test('A DELETED fork still appears in lineage with status=deleted', async () => {
+    const del = await json(`/v1/apps/agent-fork.html`, aAuthed({ method: 'DELETE' }));
+    assert(del.status === 200, `delete agent-fork status ${del.status}`);
+    const { body } = await json(`/v1/apps/${ownerAName}/${SRC_FILE}/lineage`);
+    const gone = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerAName}/agent-fork.html`);
+    assert(!!gone, 'deleted fork still present in lineage (the event log survives)');
+    assert(gone.status === 'deleted', `status should be deleted, got ${gone.status}`);
 });
 
 // ── Summary ──
