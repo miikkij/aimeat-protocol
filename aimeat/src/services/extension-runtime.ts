@@ -9,6 +9,7 @@
  *   v1.0.0 -- 2026-03-01 -- Initial V8 sandbox implementation (isolated-vm)
  *   v1.1.0 -- 2026-03-15 -- Add memory access tracking (MemoryAccessLog + trackMemoryAccess)
  *   v2.0.0 -- 2026-04-29 -- Replace isolated-vm with quickjs-emscripten (pure WASM, no C++ build tools)
+ *   v2.1.0 -- 2026-07-07 -- Await/abort in-flight host calls before disposing the runtime; fixes JS_FreeRuntime gc assertion abort when a script rejects with sibling async calls still pending (e.g. multi-feed fetch, one feed fails)
  */
 import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSRuntime, QuickJSHandle } from 'quickjs-emscripten';
@@ -69,12 +70,18 @@ function setStringGlobal(vm: QuickJSContext, name: string, value: string | null)
     handle.dispose();
 }
 
+/** Flush the guest microtask queue only while the runtime is still alive. */
+function drainJobs(vm: QuickJSContext): void {
+    if (vm.runtime.alive) vm.runtime.executePendingJobs();
+}
+
 function registerAsyncHostFn(
     vm: QuickJSContext,
     name: string,
     fn: ((...args: string[]) => Promise<unknown>) | null,
     counter: { count: number },
     maxApiCalls: number,
+    inflight: Set<Promise<unknown>>,
 ): void {
     if (fn === null) {
         vm.setProp(vm.global, name, vm.null);
@@ -88,11 +95,11 @@ function registerAsyncHostFn(
         counter.count++;
         if (counter.count > maxApiCalls) {
             promise.reject(vm.newString('API call limit exceeded'));
-            promise.settled.then(vm.runtime.executePendingJobs);
+            promise.settled.then(() => drainJobs(vm));
             return promise.handle;
         }
 
-        fn(...args)
+        const hostCall: Promise<void> = fn(...args)
             .then(result => {
                 if (vm.alive) {
                     const jsonStr = JSON.stringify(result ?? null);
@@ -106,9 +113,13 @@ function registerAsyncHostFn(
                 }
             })
             .finally(() => {
-                promise.settled.then(vm.runtime.executePendingJobs);
+                inflight.delete(hostCall);
+                if (vm.alive) promise.settled.then(() => drainJobs(vm));
             });
 
+        // Track the in-flight call so teardown can wait for it to settle its
+        // guest promise (and dispose those handles) BEFORE the runtime is freed.
+        inflight.add(hostCall);
         return promise.handle;
     });
     vm.setProp(vm.global, name, fnHandle);
@@ -256,6 +267,14 @@ export async function executeExtensionAction(
 
     const vm = runtime.newContext();
 
+    // Aborted on teardown to cancel any in-flight host I/O (e.g. slow fetches)
+    // so cleanup doesn't block on the network.
+    const teardown = new AbortController();
+    // In-flight host calls whose guest promises have not settled yet. Disposing
+    // the runtime while any are live trips the QuickJS JS_FreeRuntime gc
+    // assertion (a hard WASM abort that poisons the shared engine singleton).
+    const inflight = new Set<Promise<unknown>>();
+
     try {
         const counter = { count: 0 };
 
@@ -268,26 +287,26 @@ export async function executeExtensionAction(
         // ── Memory API ────────────────────────────────────────
         registerAsyncHostFn(vm, '__memory_get',
             async (key) => ctx.memory.get(key),
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_set',
             async (key, valueJson) => { const value = JSON.parse(valueJson); await ctx.memory.set(key, value); },
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_search',
             async (prefix, optsJson) => {
                 const opts = JSON.parse(optsJson || '{}') as Record<string, unknown>;
                 return ctx.memory.search(prefix, opts);
             },
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_delete',
             async (key) => ctx.memory.delete(key),
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_getPublic',
             async (namespace, key) => ctx.memory.getPublic(namespace, key),
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Fetch API ─────────────────────────────────────────
         registerAsyncHostFn(vm, '__fetch',
@@ -303,7 +322,7 @@ export async function executeExtensionAction(
                     method: opts.method || 'GET',
                     headers: opts.headers,
                     body: opts.body,
-                    signal: AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000)),
+                    signal: AbortSignal.any([teardown.signal, AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000))]),
                 });
                 const buf = await resp.arrayBuffer();
                 const ct = resp.headers.get('content-type') || '';
@@ -338,40 +357,40 @@ export async function executeExtensionAction(
                 resp.headers.forEach((v, k) => { headers[k] = v; });
                 return { status: resp.status, ok: resp.ok, text, headers };
             },
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────
         registerAsyncHostFn(vm, '__wallet_consume',
             ctx.wallet.consume
                 ? async (amountStr, reason) => ctx.wallet.consume!(Number(amountStr), reason)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__wallet_balance',
             ctx.wallet.getBalance
                 ? async () => ctx.wallet.getBalance!()
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Consent API ───────────────────────────────────────
         registerAsyncHostFn(vm, '__consent_check',
             ctx.consent.check
                 ? async (gaii, scope) => ctx.consent.check!(gaii, scope)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__consent_require',
             ctx.consent.require
                 ? async (gaii, scope) => ctx.consent.require!(gaii, scope)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Trust API ─────────────────────────────────────────
         registerAsyncHostFn(vm, '__trust_getScore',
             ctx.trust.getScore
                 ? async (gaii) => ctx.trust.getScore!(gaii)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Log functions (no API count) ──────────────────────
         registerLogFn(vm, '__log_info', ctx.log.info);
@@ -383,13 +402,13 @@ export async function executeExtensionAction(
             ctx.notify
                 ? async (message, optsJson) => ctx.notify!(message, optsJson ? JSON.parse(optsJson) as Record<string, string> : undefined)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__email',
             ctx.email
                 ? async (to, subject, body) => ctx.email!(to, subject, body)
                 : null,
-            counter, limits.maxApiCalls);
+            counter, limits.maxApiCalls, inflight);
 
         // ── Build and evaluate ────────────────────────────────
         const userFnDecl = transformScript(scriptContent);
@@ -413,6 +432,22 @@ export async function executeExtensionAction(
 
         return JSON.parse(resultJson) as Record<string, unknown>;
     } finally {
+        // Cancel in-flight host I/O, then let every outstanding host call settle
+        // its guest promise WHILE the VM is still alive so its handles are
+        // disposed. Freeing the runtime with live promise objects aborts the
+        // WASM engine (JS_FreeRuntime gc assertion). A settling call can enqueue
+        // a guest microtask that starts another host call, so loop until drained
+        // -- bounded by maxApiCalls, and by teardown making new fetches fail fast.
+        teardown.abort();
+        while (inflight.size > 0) {
+            await Promise.allSettled([...inflight]);
+            // Let the .settled -> executePendingJobs microtasks run before we
+            // re-check, so guest reactions to the settlements are flushed.
+            await Promise.resolve();
+            if (runtime.alive) {
+                try { runtime.executePendingJobs(); } catch { /* runtime torn down mid-drain */ }
+            }
+        }
         if (vm.alive) vm.dispose();
         if (runtime.alive) runtime.dispose();
     }
