@@ -89,7 +89,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
-    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord,
+    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
     SubdomainSiteRecord,
     AppGrantRecord,
     NotificationTemplateRecord,
@@ -4243,7 +4243,7 @@ export class PrismaStorage implements Storage {
     async updateAppMeta(
         ownerGaii: string,
         filename: string,
-        meta: { name?: string; description?: string },
+        meta: { name?: string; description?: string; protection?: AppProtection },
     ): Promise<boolean> {
         this.ensureReady();
         // Rename/re-describe in place on the LATEST version (the one the catalogue
@@ -4260,6 +4260,7 @@ export class PrismaStorage implements Storage {
         const manifest = { ...(latest.manifest as any) } as AppManifest;
         if (meta.name !== undefined) manifest.name = meta.name;
         if (meta.description !== undefined) manifest.description = meta.description;
+        if (meta.protection !== undefined) manifest.protection = meta.protection;
         await this.prisma.app.update({
             where: { ownerGaii_filename_versionNumber: { ownerGaii, filename, versionNumber: latest.versionNumber } },
             data: { manifest: manifest as any },

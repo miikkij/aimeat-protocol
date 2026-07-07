@@ -49,7 +49,7 @@ export interface AppRepository {
     updateAppMeta(
         ownerGaii: string,
         filename: string,
-        meta: { name?: string; description?: string },
+        meta: { name?: string; description?: string; protection?: import('../interface.js').AppProtection },
     ): Promise<boolean>;
     /**
      * Park or unpark an app: set the `parked` flag on EVERY version row of

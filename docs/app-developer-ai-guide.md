@@ -418,6 +418,38 @@ invisible.
 
 ---
 
+## Protecting your app (and its honest limits)
+
+**The only durable protection is keeping value on the server.** A published app is
+single-file HTML the browser runs — anyone who can open it can read and copy its
+client code. That is inherent to the web, not a gap in AIMEAT. So:
+
+- **What CANNOT be protected:** your app's HTML, its inline scripts, and the public
+  `/v1/libs/*` + `/v1/cortex/*/libs/*` runtime. A determined person can always copy
+  the shell.
+- **What CANNOT be copied — the moat:** your **extension** action logic (runs in a
+  server-side WASM sandbox; its source is never shipped to the browser and can't be
+  re-installed without it), your **extension secrets** (API keys, encrypted at rest),
+  **gated memory**, and the user's **AI key** (never leaves the server). An app whose
+  value lives in an extension is copy-proof by construction — a copied shell is a dead
+  client. **If a piece of logic or data matters, put it in an extension**, not the app.
+
+**Opt-in shell hardening (Manage → 🛡 Copy protection, or PATCH `/v1/apps/:filename`
+with `{ protection }`).** All default OFF. These raise the cost of casual theft and
+make leaks traceable — they do **not** make client code secret:
+
+| Flag | What it does | Honest limit |
+|------|--------------|--------------|
+| `obfuscate` | Mangles the app's inline scripts at serve time | Deobfuscation is possible; raises cost only |
+| `domainLock` | App only runs on this node's app origin; a rehosted copy is sent home | Client-side guard — strippable |
+| `watermark` | Embeds an invisible, operator-decodable per-serve fingerprint | Traces a leak; doesn't prevent one. Decode via `POST /v1/admin/apps/watermark/decode` |
+| `noRawDownload` | Blocks the raw source download — runnable delivery only | Inline HTML is still in the browser |
+
+Rule of thumb: **hardening deters and detects; the extension moat prevents.** Reach for
+the flags for casual deterrence; reach for an extension when it actually matters.
+
+---
+
 ## Prompt-composition principles
 
 Your app already has structured data. Use it.

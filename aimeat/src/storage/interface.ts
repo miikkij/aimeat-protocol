@@ -511,6 +511,20 @@ export interface AppManifest {
     version: number;            // source version that was forked
     node?: string;              // source node id (reserved for cross-node forks)
   };
+  // Opt-in copy-protection applied to the app's inline (runnable) HTML at serve time.
+  // All flags default OFF. HONEST LIMITS: client HTML a browser runs can always be
+  // copied by anyone who can view it — these only raise the cost of casual theft
+  // (obfuscate), deter rehosting (domainLock), remove the one-click source download
+  // (noRawDownload), and make a leaked copy traceable (watermark). Real protection is
+  // keeping value in a server-side extension. See docs/app-developer-ai-guide.md.
+  protection?: AppProtection;
+}
+
+export interface AppProtection {
+  obfuscate?: boolean;      // obfuscate the app's inline <script> blocks at serve time
+  domainLock?: boolean;     // only run on this node's app origin (guard script)
+  watermark?: boolean;      // embed an invisible, operator-decodable per-serve fingerprint
+  noRawDownload?: boolean;  // block the raw attachment download — inline (runnable) only
 }
 
 export interface AppRecord {

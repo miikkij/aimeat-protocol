@@ -139,15 +139,16 @@ export function registerAppsTools(
             };
             if (icon) manifest.icon = icon;
 
-            // Carry the parked + forkable state forward across re-publishes (an update
-            // never silently re-exposes a parked app or flips fork permission).
-            // Mirrors POST /v1/apps.
+            // Carry the parked + forkable + copy-protection state forward across
+            // re-publishes (an update never silently re-exposes a parked app, flips fork
+            // permission, or drops the owner's copy-protection). Mirrors POST /v1/apps.
             let parkedState = false;
             let forkableState = false;
             if (isUpdate) {
                 const existingApp = await storage.getApp(ownerGaii, filename);
                 parkedState = !!existingApp?.parked;
                 forkableState = !!existingApp?.forkable;
+                if (existingApp?.manifest?.protection) manifest.protection = existingApp.manifest.protection;
             }
 
             try {
