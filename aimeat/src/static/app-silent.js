@@ -9,16 +9,33 @@
  * @usage Served at /app-silent.js; referenced by /app-silent.html.
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 seamless secure app SSO).
+ *   v1.1.0 — 2026-07-07 — Add `?mode=logout`: end the shared apex session first-party so a keyholder's
+ *     EXIT in any family app logs them out everywhere (apps cannot revoke the apex session cross-origin).
  */
 (function () {
   // The real embedding app origin. ancestorOrigins is the trustworthy source (Chrome/Safari);
-  // document.referrer is the Firefox fallback. We post the token ONLY to this origin.
+  // document.referrer is the Firefox fallback. We post the result ONLY to this origin.
   var appOrigin = '';
   try { if (location.ancestorOrigins && location.ancestorOrigins.length) appOrigin = location.ancestorOrigins[0]; } catch (e) { /* ignore */ }
   if (!appOrigin && document.referrer) { try { appOrigin = new URL(document.referrer).origin; } catch (e) { /* ignore */ } }
   if (!appOrigin) return; // cannot determine the parent → do nothing (never leak a token)
 
-  var scope = new URLSearchParams(location.search).get('scope') || '';
+  var params = new URLSearchParams(location.search);
+
+  // Logout bridge: the app cannot end the apex session itself (a credentialed cross-origin call to
+  // the apex is CORS-blocked), so it frames us in `?mode=logout` and we revoke the host-only session
+  // cookie same-origin. This ends the ONE apex session that every family app bridges → true EXIT.
+  if (params.get('mode') === 'logout') {
+    var postLogout = function (result) {
+      try { window.parent.postMessage({ type: 'aimeat_app_logout', result: result }, appOrigin); } catch (e) { /* ignore */ }
+    };
+    fetch('/v1/auth/revoke', { method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' } })
+      .then(function () { postLogout({ ok: true }); })
+      .catch(function () { postLogout({ ok: false }); });
+    return;
+  }
+
+  var scope = params.get('scope') || '';
   var post = function (result) {
     try { window.parent.postMessage({ type: 'aimeat_app_login', result: result }, appOrigin); } catch (e) { /* ignore */ }
   };
