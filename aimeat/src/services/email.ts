@@ -19,6 +19,8 @@
  *   v1.3.0 -- 2026-06-15 -- Add a process-wide active-service handle (set/getActiveEmailService) so the
  *     agent-task completion hook (B6) can reuse the configured transport without re-threading it.
  *   v1.4.0 -- 2026-07-04 -- Add sendInvite() for email invitations to unregistered users.
+ *   v1.5.0 -- 2026-07-07 -- Add sendKeyInvite()/sendKeyCredentials() for provisioned-code access keys
+ *     and the first-login durable-credentials email (TARGET-011).
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -34,6 +36,8 @@ import {
   inviteEmailSubject,
   keyInviteEmailHtml,
   keyInviteEmailSubject,
+  keyCredentialsEmailHtml,
+  keyCredentialsEmailSubject,
 } from './email-templates.js';
 
 export type { MatchSuggestion } from './email-templates.js';
@@ -46,6 +50,7 @@ export interface EmailService {
   sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
   sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
+  sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
 }
 
@@ -95,6 +100,7 @@ function createDisabledService(): EmailService {
     sendMatchSuggestion: () => warn('sendMatchSuggestion'),
     sendInvite: () => warn('sendInvite'),
     sendKeyInvite: () => warn('sendKeyInvite'),
+    sendKeyCredentials: () => warn('sendKeyCredentials'),
     sendRaw: () => warn('sendRaw'),
   };
 }
@@ -177,6 +183,12 @@ export function createEmailService(config: AimeatConfig): EmailService {
       const { html, text } = keyInviteEmailHtml(args, locale);
       const subject = keyInviteEmailSubject(args.orgName, locale);
       return send(to, subject, html, text, 'key_invitation');
+    },
+
+    async sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean> {
+      const { html, text } = keyCredentialsEmailHtml(args, locale);
+      const subject = keyCredentialsEmailSubject(args.orgName, locale);
+      return send(to, subject, html, text, 'key_credentials');
     },
 
     async sendRaw(to: string, subject: string, rawHtml: string, rawText: string): Promise<boolean> {

@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
  *   v1.1.0 — 2026-07-05 — Add provisioned-code invitation ("key") coverage (C1–C7).
+ *   v1.2.0 — 2026-07-07 — Cover first-login durable credentials (C2 + C2b): the response issues a
+ *     dash-free, validator-clean password once, rotating away the bootstrap code (TARGET-011).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -199,6 +201,7 @@ await test('C1. A (creator) mints a code key → provisions a verified, joined a
     provisioned.push({ u: codeUser1, c: codeCode1 });
 });
 
+let codeCred1: { username: string; password: string; email_sent: boolean } | null = null;
 await test('C2. The code IS the password: the provisioned account logs in and reads the room', async () => {
     const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: codeCode1 }) });
     assert(lg.status === 200, `login ${lg.status}: ${JSON.stringify(lg.body.error)}`); // email gate lifted at mint
@@ -206,6 +209,26 @@ await test('C2. The code IS the password: the provisioned account logs in and re
     assert(typeof tok === 'string' && tok.length > 0, 'login returns a session token');
     const read = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(tok) });
     assert(read.status === 200 && !!read.body.data.manifest, `keyholder can read the room with a viewer grant (${read.status})`);
+    // TARGET-011: first sign-in issues durable credentials in the response (username + clean password).
+    codeCred1 = lg.body.data.key_credentials;
+    assert(!!codeCred1, 'first login returns key_credentials');
+    assert(codeCred1!.username === codeUser1, `credential username is the exact login name (got ${codeCred1!.username})`);
+    provisioned[0].c = codeCred1!.password; // keep cleanup working after the rotation
+});
+
+await test('C2b. First-login credential: dash-free, validator-clean; old code dies, new password logs in', async () => {
+    assert(!!codeCred1, 'need credentials from C2');
+    const pw = codeCred1!.password;
+    assert(!pw.includes('-') && !/\s/.test(pw), `issued password has no dashes/spaces (got ${pw})`);
+    assert(pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw), `issued password passes strength rules (got ${pw})`);
+    assert(typeof codeCred1!.email_sent === 'boolean', 'email_sent is reported');
+    // The dash-carrying bootstrap code is now dead; the issued password is the durable login.
+    const old = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: codeCode1 }) });
+    assert(old.status !== 200, `old code should no longer log in, got ${old.status}`);
+    const fresh = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: pw }) });
+    assert(fresh.status === 200, `issued password logs in, got ${fresh.status}: ${JSON.stringify(fresh.body.error)}`);
+    // Idempotent: a later login does NOT re-issue credentials.
+    assert(!fresh.body.data.key_credentials, 'credentials are issued once, not on every login');
 });
 
 await test('C3. After activation the key shows activated and cannot be cancelled (409)', async () => {

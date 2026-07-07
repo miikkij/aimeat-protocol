@@ -12,6 +12,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
  *   v1.1.0 — 2026-07-05 — Add provisioned-code invitations: type ('link'|'code'), provisionedOwner, countInvitationsByInviter (per-inviter quota).
+ *   v1.2.0 — 2026-07-07 — Add getCodeInvitationByProvisionedOwner (first-login credential issuance, TARGET-011).
  */
 
 /** One selected workspace + the role the invitee should receive there. */
@@ -50,6 +51,10 @@ export interface InvitationRepository {
   listInvitationsByOrganism(organismId: string, opts?: { status?: InvitationRecord['status'] }): Promise<InvitationRecord[]>;
   /** Count invitations by inviter for quota enforcement (per-inviter cap on code keys). */
   countInvitationsByInviter(invitedBy: string, opts?: { organismId?: string; type?: InvitationRecord['type']; statuses?: InvitationRecord['status'][] }): Promise<number>;
+  /** Find the (single) code invitation that provisioned this owner account, if any. Used on the
+   *  provisioned account's first login to issue durable login credentials + flip the invite to
+   *  accepted. Returns null for accounts that were not created by a code key. */
+  getCodeInvitationByProvisionedOwner(owner: string): Promise<InvitationRecord | null>;
   /** Partial update (status flip on accept/cancel, acceptedAt/acceptedBy). */
   updateInvitation(id: string, updates: Partial<InvitationRecord>): Promise<InvitationRecord | null>;
   /** Sweep: flip still-pending invitations whose expiry has passed to `expired`. Returns count. */

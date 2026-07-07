@@ -4349,6 +4349,13 @@ export class SqliteStorage implements Storage {
     return row.n;
   }
 
+  async getCodeInvitationByProvisionedOwner(owner: string): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
+    const row = this.db.prepare(
+      "SELECT * FROM invitations WHERE type = 'code' AND provisionedOwner = ? ORDER BY createdAt DESC LIMIT 1"
+    ).get(owner) as Record<string, unknown> | undefined;
+    return row ? this.mapInvitationRow(row) : null;
+  }
+
   async updateInvitation(id: string, updates: Partial<import('../../../storage/repositories/invitation.repository.js').InvitationRecord>): Promise<import('../../../storage/repositories/invitation.repository.js').InvitationRecord | null> {
     const fields: string[] = [];
     const values: unknown[] = [];

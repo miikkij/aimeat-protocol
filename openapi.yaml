@@ -158,6 +158,9 @@ components:
         Agent scopes are enforced per token. Available scopes include:
         memory:read, memory:write, catalogue:read, social:read, social:write,
         work:read, work:write, wallet:read, wallet:write, admin:read, admin:write,
+        task:read, task:write (create/start tasks for your own agents — grantable to an H-2 app
+        so a control-plane app can drive your own fleet on your behalf; an app may only reach its
+        own owner's agents), workflow:read, workflow:write (see/create/run your automations),
         generator:read (read projects, interview specs, components, session state),
         generator:write (create projects, save interview spec, submit blueprint and components),
         generator:execute (claim/release sessions, register and activate components, write logs).
@@ -24627,7 +24630,12 @@ paths:
     post:
       operationId: createAgentTask
       summary: Create a task for an agent
-      description: Create a new task in draft or queued status for the specified agent.
+      description: >
+        Create a new task in draft or queued status for the specified agent. Callable by the owner,
+        a same-owner agent, or an H-2 app-grant token holding `task:write` (a control-plane app such
+        as AGENCY). An app may only create tasks for agents belonging to its OWN owner; the created
+        task's ownerGaii is always the owner GHII. Starting the task (POST .../{id}/start) likewise
+        accepts the owner or a same-owner app with `task:write`.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []

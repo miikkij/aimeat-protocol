@@ -13,6 +13,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 import { hashPassword, verifyPassword, isLegacyHash } from '../services/password.js';
+import { issueFirstLoginKeyCredentials } from '../services/key-credentials.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -549,11 +550,19 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         }
 
         // Password (+ TOTP if enabled) verified — track login
+        const isFirstLogin = (ghiiRecord.loginCount ?? 0) === 0;
         const loginNow = new Date().toISOString();
         await storage.updateGHII(ghiiRecord.ghii, {
             lastLoginAt: loginNow,
             loginCount: (ghiiRecord.loginCount ?? 0) + 1,
         });
+
+        // Provisioned-code ("key") account, first sign-in: rotate its dash-carrying bootstrap code to
+        // a durable, validator-clean password and hand the owner their real login (username + password),
+        // both in this response and by email. Runs exactly once (gated by the invite flipping accepted).
+        const keyCredentials = isFirstLogin
+            ? await issueFirstLoginKeyCredentials(storage, config, ghiiRecord)
+            : null;
 
         // Issue OWNER JWT (human users authenticate as owners, not agents)
         const ownerRecord = await storage.getOwner(loginName);
@@ -614,6 +623,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             // the client keeps the key it already holds in IndexedDB (see above).
             ...(ownerKeyPair ? { owner_private_key: ownerKeyPair.privateKey } : {}),
             owner_public_key: ownerKeyPair?.publicKey ?? ownerRecord?.publicKey ?? '',
+            // First-login durable credentials for a provisioned-code account (also emailed). Lets the
+            // entry surface show the exact username + password the login form accepts. Absent otherwise.
+            ...(keyCredentials ? { key_credentials: keyCredentials } : {}),
         }, [
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
