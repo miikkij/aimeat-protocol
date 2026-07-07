@@ -1470,6 +1470,18 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
     },
     {
+        name: 'aimeat_app_fork',
+        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            owner: { type: 'string', required: true, description: 'Owner name of the source app.' },
+            filename: { type: 'string', required: true, description: 'Filename of the source app.' },
+            new_filename: { type: 'string', required: true, description: 'Filename for the fork in your catalogue.' },
+            version: { type: 'number', description: 'Source version to fork (default: latest).' },
+        },
+    },
+    {
         name: 'aimeat_extension_list',
         description: 'List the node\'s ACTIVE server-side extensions with their version, description, author, available actions (id/method/path), and federation flags. Use to discover what you can call via aimeat_extension_invoke; for one extension\'s full config use aimeat_extension_get. Inactive/installed-but-not-activated extensions are not shown here.',
         caller: 'agent',

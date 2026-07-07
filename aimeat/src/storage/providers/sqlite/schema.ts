@@ -853,6 +853,7 @@ export function initializeSchema(db: Database.Database): void {
       data           BLOB,
       accessCode     TEXT,
       parked         INTEGER NOT NULL DEFAULT 0,
+      forkable       INTEGER NOT NULL DEFAULT 0,
       operatorHidden INTEGER NOT NULL DEFAULT 0,
       operatorHiddenBy   TEXT,
       operatorHiddenAt   TEXT,
@@ -867,6 +868,23 @@ export function initializeSchema(db: Database.Database): void {
       downloads      INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (ownerGaii, filename)
     );
+
+    -- ── App Fork lineage (append-only event log; source of truth for fork
+    --    statistics + the cross-owner lineage graph) ──
+    CREATE TABLE IF NOT EXISTS app_forks (
+      id                TEXT PRIMARY KEY,
+      sourceOwnerGaii   TEXT NOT NULL,
+      sourceOwnerName   TEXT NOT NULL,
+      sourceFilename    TEXT NOT NULL,
+      sourceVersion     INTEGER NOT NULL,
+      childOwnerGaii    TEXT NOT NULL,
+      childOwnerName    TEXT NOT NULL,
+      childFilename     TEXT NOT NULL,
+      forkedByGaii      TEXT NOT NULL,
+      forkedAt          TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_forks_source ON app_forks(sourceOwnerGaii, sourceFilename);
+    CREATE INDEX IF NOT EXISTS idx_app_forks_child ON app_forks(childOwnerGaii, childFilename);
 
     -- ── Subdomain Sites (operator-managed subdomain → app/redirect mappings) ──
     CREATE TABLE IF NOT EXISTS subdomain_sites (
@@ -1836,6 +1854,10 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('apps', 'operatorHiddenBy', 'TEXT');
   safeAddColumn('apps', 'operatorHiddenAt', 'TEXT');
   safeAddColumn('apps', 'operatorHideReason', 'TEXT');
+  // Fork-permission state: when 1, outsiders may fork the app; 0 (default) = only the
+  // owner/their agents/operators may. Additive/nullable-default; pre-existing apps are
+  // NOT forkable by outsiders (0), matching the new default.
+  safeAddColumn('apps', 'forkable', 'INTEGER NOT NULL DEFAULT 0');
 
   // Provisioned-code invitations — a second invitation type whose account is created at MINT time
   // and whose emailed code IS the account password. `type` discriminates it from the existing

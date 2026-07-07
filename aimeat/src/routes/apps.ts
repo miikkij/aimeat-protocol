@@ -68,6 +68,12 @@
  *     from its own origin's public storage (/v1/pub/...). https: already covered prod app origins
  *     but not the http://*.apps.localhost dev origin; 'self' is a tightening-style addition
  *     (same-origin only), verified against the TDR-kit font test (securitypolicyviolation on dev).
+ *   v1.15.0 -- 2026-07-07 -- Fork control + provenance: POST /v1/apps/:owner/:filename/fork copies an
+ *     app into the caller's catalogue behind two gates — derivative permission (owner/their agents/
+ *     operator always; outsiders only when `forkable`) and the paid-app paywall — stamping
+ *     manifest.forkedFrom and recording an app_forks lineage event. PATCH accepts a `forkable`
+ *     boolean; it survives a re-publish; responses carry `forkable`. Replaces the old client-only
+ *     read+republish fork (which had no gate or provenance).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -169,6 +175,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
                 parked: !!app.parked,
+                forkable: !!app.forkable,
                 operator_hidden: !!app.operatorHidden,
                 operator_hide_reason: app.operatorHideReason ?? null,
                 has_screenshot: hasScreenshot,
@@ -241,6 +248,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
                 parked: !!app.parked,
+                forkable: !!app.forkable,
                 operator_hidden: !!app.operatorHidden,
                 operator_hidden_by: app.operatorHiddenBy ?? null,
                 operator_hidden_at: app.operatorHiddenAt ?? null,
@@ -747,6 +755,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // parked (hidden) when updated, so an update never silently re-exposes it.
         // New apps are published (not parked) by default.
         let parkedState = false;
+        // The fork-permission flag must ALSO survive a re-publish, so an update never
+        // silently opens or closes forking. New apps are not forkable by default.
+        let forkableState = false;
         // Operator-hide must ALSO survive a re-publish — otherwise an owner could
         // simply re-upload to escape moderation. Carry the flag + audit forward.
         let operatorHiddenState = false;
@@ -756,6 +767,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
+            forkableState = !!existingApp?.forkable;
             operatorHiddenState = !!existingApp?.operatorHidden;
             operatorHiddenBy = existingApp?.operatorHiddenBy;
             operatorHiddenAt = existingApp?.operatorHiddenAt;
@@ -787,6 +799,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             data,
             accessCode,
             parked: parkedState,
+            forkable: forkableState,
             operatorHidden: operatorHiddenState,
             operatorHiddenBy,
             operatorHiddenAt,
@@ -856,6 +869,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             mime_type: mimeType,
             protected: !!accessCode,
             parked: parkedState,
+            forkable: forkableState,
             has_screenshot: hasScreenshot,
             download_url: downloadUrl,
             versions_url: `${downloadUrl}/versions`,
@@ -877,10 +891,175 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }).catch(() => { /* feed is best-effort */ });
     });
 
+    // POST /v1/apps/:owner/:filename/fork — Fork an app into YOUR OWN catalogue.
+    // Authorization has two independent gates, both must pass:
+    //   1. Derivative permission — the source owner and the owner's own agents (same
+    //      owner component) and operators may always fork; outsiders only when the
+    //      source app is flagged `forkable`.
+    //   2. Byte-access — a PAID source still requires the caller to be the seller or
+    //      hold a license, so a server-side copy never bypasses the read paywall
+    //      (mirrors the GET /v1/apps/:owner/:filename gate).
+    // On success the source bytes + manifest are copied under the caller's canonical
+    // owner as a NEW app (version 1), stamped with `manifest.forkedFrom` provenance,
+    // its own `forkable` defaulting to false, and a fork event is recorded for lineage.
+    router.post('/v1/apps/:owner/:filename/fork', requireAuth(), async (req, res) => {
+        const sourceOwnerParam = req.params.owner as string;
+        const sourceFilename = req.params.filename as string;
+        const sourceOwner = sourceOwnerParam.includes('@') ? sourceOwnerParam.split('@')[0] : sourceOwnerParam;
+
+        const body = req.body ?? {};
+        const newFilename = typeof body.new_filename === 'string' ? body.new_filename.trim() : '';
+        if (!newFilename || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newFilename)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'new_filename is required (alphanumeric, dots, hyphens, underscores; max 100 chars)'));
+            return;
+        }
+        const version = body.version !== undefined ? parseInt(String(body.version), 10) : undefined;
+
+        // Load the source app (specific version if given, else latest).
+        const source = await storage.getAppByOwnerName(sourceOwner, sourceFilename, version);
+        if (!source) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"${version ? ` (version ${version})` : ''}`));
+            return;
+        }
+
+        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+        const { owner: callerOwner, ownerGhii: callerGhii } = await canonicalOwner(req);
+        const sameOwner = callerOwner === source.ownerName;
+
+        // Operator-hidden apps are unreachable to everyone but their owner/operator —
+        // mirror the read gate's 404 so moderation status is not leaked via fork.
+        if (source.operatorHidden && !isOperator && !sameOwner) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"`));
+            return;
+        }
+
+        // Gate 1 — derivative permission.
+        if (!isOperator && !sameOwner && !source.forkable) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not open for forking by others. Ask the owner to enable forking.'));
+            return;
+        }
+
+        // Gate 2 — a paid source's bytes must not bypass the paywall.
+        if (config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0 && !sameOwner && !isOperator) {
+            const hasLicense = await storage.hasValidLicense(req.auth!.sub, source.ownerGaii, sourceFilename);
+            if (!hasLicense) {
+                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app costs ${source.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase before forking.`));
+                return;
+            }
+        }
+
+        // A fork is a NEW app in the caller's catalogue — refuse to shadow an app the
+        // caller already owns by that filename (to update, publish; don't fork).
+        const existingVersion = await storage.getLatestVersionNumber(callerGhii, newFilename);
+        if (existingVersion > 0) {
+            res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `You already have an app named "${newFilename}". Choose a different new_filename.`));
+            return;
+        }
+
+        // Per-owner app quota (same rule as publish).
+        if (config.maxAppsPerAgent > 0) {
+            const { total } = await storage.listApps({ ownerGaii: callerGhii, limit: 1 });
+            if (total >= config.maxAppsPerAgent) {
+                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
+                return;
+            }
+        }
+
+        const now = new Date().toISOString();
+        const forkedManifest: AppManifest = {
+            ...source.manifest,
+            name: `${source.manifest.name || sourceFilename.replace(/\.html?$/i, '')} (fork)`,
+            authorDisplay: callerOwner,
+            // A fork starts as its own independent, free app — drop the source's paid
+            // terms; the forker can price their own copy later. Record its origin.
+            forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber, node: config.nodeId },
+        };
+        delete forkedManifest.priceMorsels;
+        delete forkedManifest.licenseType;
+
+        await storage.createApp({
+            ownerGaii: callerGhii,
+            ownerName: callerOwner,
+            filename: newFilename,
+            versionNumber: 1,
+            manifest: forkedManifest,
+            mimeType: source.mimeType,
+            size: source.size,
+            data: source.data,
+            parked: false,
+            forkable: false,   // the forker decides their own copy's forkability later
+            createdAt: now,
+        });
+
+        // Copy the source screenshot into the fork's bucket (best-effort) so the fork
+        // renders with the same catalogue thumbnail.
+        try {
+            const srcShot = await storage.getStorageFile(source.ownerGaii, `apps/screenshots/${sourceFilename}`);
+            if (srcShot) {
+                await storage.createStorageFile({
+                    key: `apps/screenshots/${newFilename}`,
+                    ownerGaii: callerGhii,
+                    visibility: 'public',
+                    mimeType: srcShot.mimeType,
+                    size: srcShot.size,
+                    data: srcShot.data,
+                    createdAt: now,
+                });
+            }
+        } catch { /* screenshot copy is non-critical */ }
+
+        // Record the fork event — the source of truth for fork stats + lineage.
+        await storage.recordAppFork({
+            id: `fork-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            sourceOwnerGaii: source.ownerGaii,
+            sourceOwnerName: source.ownerName,
+            sourceFilename,
+            sourceVersion: source.versionNumber,
+            childOwnerGaii: callerGhii,
+            childOwnerName: callerOwner,
+            childFilename: newFilename,
+            forkedByGaii: callerGaii,
+            forkedAt: now,
+        });
+
+        const downloadUrl = `/v1/apps/${encodeURIComponent(callerOwner)}/${encodeURIComponent(newFilename)}`;
+
+        await storage.addSiteChangeLog({
+            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            action: 'app_publish',
+            summary: `Forked "${sourceFilename}" (by ${source.ownerName}) into "${newFilename}"`,
+            changedBy: callerOwner,
+            changedAt: now,
+        });
+
+        res.status(201).json(success(config.nodeId, {
+            filename: newFilename,
+            version_number: 1,
+            manifest: forkedManifest,
+            forkable: false,
+            forked_from: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber },
+            download_url: downloadUrl,
+            versions_url: `${downloadUrl}/versions`,
+            note: `Forked "${sourceFilename}" into your catalogue as "${newFilename}".`,
+        }, [
+            { description: 'Open the fork', method: 'GET', url: `${downloadUrl}?mode=inline` },
+        ]));
+        emitChange('apps');
+        void recordPublicActivity(storage, config, {
+            category: 'apps',
+            actor: callerGaii,
+            summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
+            detail: forkedManifest.description || '',
+            link: `${downloadUrl}?mode=inline`,
+        }).catch(() => { /* feed is best-effort */ });
+    });
+
     // PATCH /v1/apps/:filename — Update an app you own (requires auth). Accepts
     // `name` / `description` (rename / re-describe in place, no re-publish),
-    // `access_code` (set/remove protection) and/or `parked` (hide from / restore to
-    // the public catalogue). Fields are independent: each is applied only when present.
+    // `access_code` (set/remove protection), `parked` (hide from / restore to the
+    // public catalogue) and/or `forkable` (allow others to fork). Fields are
+    // independent: each is applied only when present.
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);
@@ -981,8 +1160,19 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 : 'App unparked. It is published in the public catalogue again.');
         }
 
+        if ('forkable' in body) {
+            if (typeof body.forkable !== 'boolean') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'forkable must be a boolean'));
+                return;
+            }
+            await storage.setAppForkable(effectiveGaii, filename, body.forkable);
+            notes.push(body.forkable
+                ? 'Forking enabled. Anyone can now fork this app into their own catalogue.'
+                : 'Forking disabled. Only you and your agents can fork this app.');
+        }
+
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code or parked).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked or forkable).'));
             return;
         }
 
@@ -995,6 +1185,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             description: updated?.manifest?.description,
             protected: !!updated?.accessCode,
             parked: !!updated?.parked,
+            forkable: !!updated?.forkable,
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

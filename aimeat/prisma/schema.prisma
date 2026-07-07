@@ -998,6 +998,7 @@ model App {
   data          Bytes
   accessCode    String?
   parked        Boolean  @default(false)
+  forkable      Boolean  @default(false)
   operatorHidden     Boolean   @default(false)
   operatorHiddenBy   String?
   operatorHiddenAt   DateTime?
@@ -1016,6 +1017,22 @@ model AppDownload {
   count     Int    @default(0)
 
   @@unique([ownerGaii, filename])
+}
+
+model AppFork {
+  id              String   @id @map("_id")
+  sourceOwnerGaii String
+  sourceOwnerName String
+  sourceFilename  String
+  sourceVersion   Int
+  childOwnerGaii  String
+  childOwnerName  String
+  childFilename   String
+  forkedByGaii    String
+  forkedAt        DateTime @default(now())
+
+  @@index([sourceOwnerGaii, sourceFilename])
+  @@index([childOwnerGaii, childFilename])
 }
 
 model AppPurchase {

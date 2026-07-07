@@ -42,7 +42,7 @@ import type {
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
-  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord,
+  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord,
   SubdomainSiteRecord,
   AppGrantRecord,
   NotificationTemplateRecord,
@@ -4404,12 +4404,12 @@ export class SqliteStorage implements Storage {
 
   async createApp(record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
-      record.accessCode ?? null, record.parked ? 1 : 0,
+      record.accessCode ?? null, record.parked ? 1 : 0, record.forkable ? 1 : 0,
       record.operatorHidden ? 1 : 0, record.operatorHiddenBy ?? null,
       record.operatorHiddenAt ?? null, record.operatorHideReason ?? null,
       record.createdAt,
@@ -4575,6 +4575,13 @@ export class SqliteStorage implements Storage {
     return result.changes > 0;
   }
 
+  async setAppForkable(ownerGaii: string, filename: string, forkable: boolean): Promise<boolean> {
+    // Fork-permission applies to the whole app — flag every version row.
+    const result = this.db.prepare('UPDATE apps SET forkable = ? WHERE ownerGaii = ? AND filename = ?')
+      .run(forkable ? 1 : 0, ownerGaii, filename);
+    return result.changes > 0;
+  }
+
   async setAppOperatorHidden(
     ownerGaii: string,
     filename: string,
@@ -4607,6 +4614,29 @@ export class SqliteStorage implements Storage {
       `INSERT INTO app_downloads (ownerGaii, filename, downloads) VALUES (?, ?, 1)
        ON CONFLICT(ownerGaii, filename) DO UPDATE SET downloads = downloads + 1`
     ).run(ownerGaii, filename);
+  }
+
+  async recordAppFork(record: AppForkRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO app_forks (id, sourceOwnerGaii, sourceOwnerName, sourceFilename, sourceVersion, childOwnerGaii, childOwnerName, childFilename, forkedByGaii, forkedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.id, record.sourceOwnerGaii, record.sourceOwnerName, record.sourceFilename,
+      record.sourceVersion, record.childOwnerGaii, record.childOwnerName, record.childFilename,
+      record.forkedByGaii, record.forkedAt,
+    );
+  }
+
+  async countAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<number> {
+    const row = this.db.prepare('SELECT COUNT(*) as c FROM app_forks WHERE sourceOwnerGaii = ? AND sourceFilename = ?')
+      .get(sourceOwnerGaii, sourceFilename) as { c: number } | undefined;
+    return row?.c ?? 0;
+  }
+
+  async listAppForks(sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM app_forks WHERE sourceOwnerGaii = ? AND sourceFilename = ? ORDER BY forkedAt DESC')
+      .all(sourceOwnerGaii, sourceFilename) as AppForkRecord[];
+    return rows;
   }
 
   // ── Subdomain sites (operator-managed subdomain → app/redirect mappings) ──
@@ -4847,6 +4877,7 @@ export class SqliteStorage implements Storage {
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.parked) record.parked = true;
+    if (row.forkable) record.forkable = true;
     if (row.operatorHidden) {
       record.operatorHidden = true;
       if (row.operatorHiddenBy) record.operatorHiddenBy = row.operatorHiddenBy as string;
