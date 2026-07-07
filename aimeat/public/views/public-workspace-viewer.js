@@ -16,6 +16,9 @@
  *   v1.1.0 — 2026-06-09 — Continuous whole-space render (all pages stacked → print captures everything)
  *     with scroll-spy TOC; "Copy AI link" button exposing the ?format=md Markdown-bundle API URL.
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.1.2 — 2026-07-07 — Fix: in isolated single-page mode (a per-doc "open ↗" deep-link) the TOC
+ *     now switches the rendered page instead of only moving the highlight — the visible page follows
+ *     `selected`, TOC clicks scroll back to top, and "Copy AI link" tracks the current page.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -76,8 +79,11 @@ export default function PublicWorkspaceViewer() {
   // &type=&id=. The plain whole-space link renders EVERY page stacked (continuous document) so the
   // browser print captures all of them at once.
   const isSingle = Array.isArray(docs) && !!type && !!id && docs.some(d => docKey(d) === `${type}/${id}`);
-  const visibleDocs = Array.isArray(docs) ? (isSingle ? docs.filter(d => docKey(d) === `${type}/${id}`) : docs) : [];
   const current = Array.isArray(docs) ? docs.find(d => docKey(d) === selected) : null;
+  // Isolated single-page mode shows ONE page at a time, but the TOC must still be able to switch
+  // which one: follow `selected` (seeded from the &type=&id= deep-link, then updated on every TOC
+  // click) instead of pinning to the URL, so clicking another shared page actually swaps the page.
+  const visibleDocs = Array.isArray(docs) ? (isSingle ? (current ? [current] : []) : docs) : [];
   useEffect(() => {
     if (current?.title) document.title = `${current.title} — AIMEAT`;
   }, [current?.title]);
@@ -85,8 +91,11 @@ export default function PublicWorkspaceViewer() {
   // Scroll a page into view and mark it active (TOC click + initial deep-link land).
   const goTo = useCallback((d) => {
     setSelected(docKey(d));
+    // Whole-space view: the page is already rendered — scroll it into view.
     const el = document.getElementById(anchorId(d));
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    // Isolated single-page view: the picked page renders on the next tick; jump back to the top.
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
   }, []);
 
   // On first load of the whole-space view, if a page was deep-linked, scroll to it.
@@ -120,8 +129,8 @@ export default function PublicWorkspaceViewer() {
 
   // The no-auth Markdown-bundle API URL — paste it to an AI agent to read the raw content directly.
   // Single-page link when isolated, whole-space bundle otherwise; drop &format=md for the JSON form.
-  const aiLink = isSingle
-    ? `${window.location.origin}/v1/organisms/${encodeURIComponent(org)}/workspace/public/document?ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&format=md`
+  const aiLink = isSingle && current
+    ? `${window.location.origin}/v1/organisms/${encodeURIComponent(org)}/workspace/public/document?ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(current.type)}&id=${encodeURIComponent(current.id)}&format=md`
     : `${window.location.origin}/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}&format=md`;
   const [copied, setCopied] = useState(false);
   const copyAiLink = useCallback(async () => {
