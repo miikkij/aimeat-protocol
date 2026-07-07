@@ -2758,6 +2758,8 @@
           "removeAreaError": "Muistialueen poisto epäonnistui",
           "confirmDeleteArea": "Poistetaanko tämä muistialue agentilta?",
           "addKey": "Lisää avain",
+          "imagePreviewAlt": "Tähän muistitietueeseen tallennettu kuva",
+          "openImageFull": "Avaa täysikokoisena",
           "keyNamePlaceholder": "Avain (esim. agents.myagent.notes)",
           "keyValuePlaceholder": "Arvo. Pelkkä teksti tai JSON",
           "noKeys": "Ei tallennettuja muistiavaimia vielä",

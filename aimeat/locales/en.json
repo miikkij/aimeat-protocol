@@ -2758,6 +2758,8 @@
           "removeAreaError": "Failed to remove memory area",
           "confirmDeleteArea": "Remove this memory area from the agent?",
           "addKey": "Add key",
+          "imagePreviewAlt": "Image stored in this memory entry",
+          "openImageFull": "Open full size",
           "keyNamePlaceholder": "Key (e.g., agents.myagent.notes)",
           "keyValuePlaceholder": "Value. Plain text or JSON",
           "noKeys": "No memory keys stored yet",

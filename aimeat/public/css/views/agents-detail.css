@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.16.0 -- 2026-07-07 -- Add inline image-preview styles for stored memory values that
+ *     reference image URLs (.pf-agd-memory-imgs, -img-link, -img) — e.g. crews.<agent>.images.*.
  *   v1.15.0 -- 2026-07-06 -- .pf-agd-solo-toast gets the shared toast max-width min(92vw, 40rem)
  *     + centered wrapping so long messages stay readable, incl. mobile.
  *   v1.14.0 -- 2026-07-03 -- Add Contracts sub-tab styles (.pf-agd-contracts, .agc-caps, .agc-list,
@@ -2462,6 +2464,30 @@
 }
 .pf .pf-agd-memory-detail .pf-agd-memory-preview {
   margin-left: 0;
+}
+
+/* Inline image preview(s) for a memory value that references image URLs
+   (e.g. crews.<agent>.images.* records from the image-maker crew). */
+.pf .pf-agd-memory-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem;
+}
+.pf .pf-agd-memory-img-link {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-dim);
+}
+.pf .pf-agd-memory-img {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 /* Inline value editor textarea for a stored memory key */

@@ -13,6 +13,9 @@
  *     same line) — section order unchanged; a section grows when content arrives.
  *   v1.7.0 -- 2026-07-05 -- Skills section: link/unlink registry skills (SkillRefs on
  *     agents.{name}.skills via /v1/agents/:name/skills) — distinct from knowledge packages.
+ *   v1.8.0 -- 2026-07-07 -- Stored Memory Keys: expanded entries whose value contains image
+ *     URLs (e.g. crews.<agent>.images.* records from the image-maker crew) now render the
+ *     image(s) inline as a preview above the raw value, each linking to the full-size file.
  */
 
 import { h } from 'preact';
@@ -28,6 +31,24 @@ import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
 
 const html = htm.bind(h);
+
+// Image URLs embedded in a memory value — e.g. the crews.<agent>.images.* records the
+// image-maker crew writes ({ prompt, url, mime, bytes }). We render these inline so the
+// operator sees the actual picture from the entry, not just the URL as text. Matches http(s)
+// URLs ending in a common image extension (with an optional query string).
+const IMG_URL_RE = /https?:\/\/[^\s"'<>()]+?\.(?:jpg|jpeg|png|webp|gif|svg|avif)(?:\?[^\s"'<>()]*)?/gi;
+function extractImageUrls(valueText) {
+  if (typeof valueText !== 'string' || valueText === '...') return [];
+  const seen = new Set();
+  const out = [];
+  IMG_URL_RE.lastIndex = 0;
+  let m;
+  while ((m = IMG_URL_RE.exec(valueText)) !== null) {
+    const url = m[0];
+    if (!seen.has(url)) { seen.add(url); out.push(url); }
+  }
+  return out;
+}
 
 export default function TabDataAccess({ agent, agentName, session, showToast, allAgents }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -616,6 +637,20 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
                       <button class="btn-outline btn-sm" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
                     </div>
                   ` : html`
+                    ${(() => {
+                      const imgs = extractImageUrls(expandedValue);
+                      return imgs.length ? html`
+                        <div class="pf-agd-memory-imgs">
+                          ${imgs.map(u => html`
+                            <a key=${u} href=${u} target="_blank" rel="noopener noreferrer"
+                               class="pf-agd-memory-img-link" title=${t('profile.agents.detail.data_access.openImageFull')}>
+                              <img class="pf-agd-memory-img" src=${u} loading="lazy"
+                                   alt=${t('profile.agents.detail.data_access.imagePreviewAlt')} />
+                            </a>
+                          `)}
+                        </div>
+                      ` : null;
+                    })()}
                     <pre class="pf-agd-memory-preview">${expandedValue}</pre>
                     <div class="pf-agd-memory-actions">
                       <button class="btn-ghost btn-sm" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
