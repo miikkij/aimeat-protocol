@@ -14,6 +14,8 @@
  *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document / _delete / _create
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v (2026-07-07) -- TARGET-009 S1: _publish takes expected_version (optimistic lock) and runs
+ *     the write guards via validateMemoryWrite ctx; _object_delete refuses append-only records.
  *   v1.0.0 -- 2026-06-08 -- Initial: 5 workspace tools wrapping the manifest/draft/publish convention.
  *   v1.1.0 -- 2026-06-08 -- write_draft coerces a JSON-stringified value (clients stringify untyped
  *     object params); add _delete (retract an object) and _create (bootstrap a workspace from a
@@ -69,6 +71,7 @@ import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
+import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
@@ -392,9 +395,11 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_publish ──
     mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),
-        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+        // expected_version: the publisher's optimistic lock — REQUIRED by namespaces whose manifest
+        // sets requires_expected_version (TARGET-009 S1); pass the version you read.
+        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string(), expected_version: z.number().optional() },
         annotationsFor('aimeat_workspace_publish'),
-        async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
+        async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const cfg = await storage.getMemory(ownerGhii, `organism.${organism_id}.meta.config`);
             const gate = (cfg?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
@@ -406,8 +411,8 @@ export function registerWorkspaceTools(
             const draft = items.filter(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)))
                 .reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
             if (!draft) return fail(`No draft at ${base}.draft`);
-            const valid = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
-            if (!valid.valid) return fail('Draft does not match the schema: ' + JSON.stringify(valid.errors));
+            const valid = await validateMemoryWrite(`${base}.latest`, draft.value, storage, { viaPublish: true, expectedVersion: expected_version ?? null });
+            if (!valid.valid) return fail('Publish refused: ' + JSON.stringify(valid.errors));
             let maxN = 0;
             for (const r of items) { if (r.key.startsWith(`${base}.version.`)) { const s = r.key.slice(`${base}.version.`.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); } }
             const now = new Date().toISOString();
@@ -508,6 +513,10 @@ export function registerWorkspaceTools(
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             const base = `${root}.${namespace}.${id}`;
+            // TARGET-009 S1/S3: an append-only namespace (manifest create_only) refuses record
+            // deletion on every path — existing events can never be erased.
+            const delGuard = await checkDeleteGuard(`${base}.latest`, storage);
+            if (!delGuard.valid) return fail('Delete refused: ' + (delGuard.errors?.[0]?.message ?? 'append-only namespace'));
             // List the WHOLE instance: the bare key `${base}` (an un-suffixed write — which
             // workspace_read surfaces as the current value) AND every role-suffixed key
             // (`.latest` / `.draft` / `.version.N`). Prefix `${base}` (no trailing dot) catches the

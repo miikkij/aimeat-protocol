@@ -1650,8 +1650,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
   // Publish a draft: snapshot organism.{id}.{ns}.{instance}.draft → a new .version.N and .latest.
   // Schema-validated (the draft must be a valid object). Returns the new version number.
+  // TARGET-009 S1: expectedVersion carries the publisher's optimistic lock into the write guards
+  // (a namespace with requires_expected_version refuses a publish over a version it didn't read).
   const publishDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
+    expectedVersion?: number | null,
   ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
@@ -1660,7 +1663,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
     if (!draft) return { ok: false, code: 'NO_DRAFT' };
 
-    const validation = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
+    const validation = await validateMemoryWrite(`${base}.latest`, draft.value, storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
     let maxN = 0;
@@ -3240,8 +3243,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const { namespace, id: instance, ws } = req.body ?? {};
+    const { namespace, id: instance, ws, expected_version: expectedRaw } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
+    // TARGET-009 S1: the publisher's optimistic lock (required by requires_expected_version spaces)
+    const expectedVersion = typeof expectedRaw === 'number' && Number.isFinite(expectedRaw) ? expectedRaw : null;
     if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
       return;
@@ -3268,7 +3273,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const aid = uuidv4();
       const record: PendingApprovalRecord = {
         id: aid, organismId: id, actor: publisher, action: 'publish',
-        arguments: { namespace, instance, ws: wsId }, risk: 'medium',
+        arguments: { namespace, instance, ws: wsId, expected_version: expectedVersion }, risk: 'medium',
         approverRole: approverRole as PendingApprovalRecord['approverRole'],
         prompt: `Publish ${namespace}.${instance}?`, status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -3281,12 +3286,20 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const result = await publishDraft(id, wsId, namespace, instance, publisher);
+    const result = await publishDraft(id, wsId, namespace, instance, publisher, expectedVersion);
     if (!result.ok) {
       if (result.code === 'NO_DRAFT') {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${namespace}.${instance}`));
       } else {
-        res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: result.violations }));
+        // A write-guard refusal is a CONFLICT (the record moved, or the space is append-only) —
+        // distinct from a schema shape violation so writers know to re-read, not to reshape.
+        const guardHit = (result.violations as Array<{ schema_rule?: string; message?: string }> | undefined)
+          ?.find(v => String(v.schema_rule ?? '').startsWith('write_guard'));
+        if (guardHit) {
+          res.status(409).json(error(config.nodeId, 'WRITE_CONFLICT', guardHit.message ?? 'Write refused by the workspace write guard', 409, { violations: result.violations }));
+        } else {
+          res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: result.violations }));
+        }
       }
       return;
     }
@@ -3396,7 +3409,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const inst = typeof pargs?.instance === 'string' ? pargs.instance : undefined;
       const pws = typeof pargs?.ws === 'string' ? pargs.ws : undefined;
       if (ns && inst) {
-        const pub = await publishDraft(id, pws, ns, inst, decider);
+        const pexp = typeof pargs?.expected_version === 'number' ? pargs.expected_version : null;
+        const pub = await publishDraft(id, pws, ns, inst, decider, pexp);
         if (!pub.ok) {
           if (pub.code === 'NO_DRAFT') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${ns}.${inst}`));

@@ -2,8 +2,13 @@
  * @file schema-validator.ts
  * @description Schema-lock validation service — compiles JSON Schemas (Ajv, cached) and
  *   validates memory writes against the applicable lock. Also validates schemas themselves
- *   before they are registered (validateSchemaItself).
+ *   before they are registered (validateSchemaItself). Since v1.2.0 every memory write is
+ *   also checked against the workspace manifest's write guards (services/write-guards.ts)
+ *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   v1.2.0 — 2026-07-07 — TARGET-009 S1: validateMemoryWrite runs checkWriteGuard first
+ *     (create_only / requires_expected_version manifest policies); optional writeCtx carries
+ *     the publish path's expected_version.
  *   v1.1.0 — 2026-06-10 — Register "x-default" as a no-op annotation keyword (UI pre-fill
  *     hint, e.g. "currentUser") so strict-mode schema locks accept generated schemas.
  */
@@ -78,8 +83,15 @@ export interface ValidationResult {
 export async function validateMemoryWrite(
   memoryKey: string,
   value: unknown,
-  storage: Storage
+  storage: Storage,
+  writeCtx?: import('./write-guards.js').WriteGuardCtx
 ): Promise<ValidationResult> {
+  // Write guards run first: a conflicting write in a guarded namespace is refused before any
+  // schema work, whatever surface it came through (REST memory write, MCP, publish).
+  const { checkWriteGuard } = await import('./write-guards.js');
+  const guard = await checkWriteGuard(memoryKey, value, storage, writeCtx);
+  if (!guard.valid) return guard;
+
   const schemaRecord = await storage.findApplicableSchema(memoryKey);
 
   if (!schemaRecord) {

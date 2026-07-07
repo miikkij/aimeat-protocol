@@ -34,6 +34,7 @@ import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 import { checkMemoryQuota, checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
+import { checkDeleteGuard } from '../services/write-guards.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { enqueueMemoryReplication } from '../services/memory-replication.js';
@@ -1570,6 +1571,14 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
     if (existing.ownerGaii !== effectiveOwner && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own memory records'));
+      return;
+    }
+
+    // TARGET-009 S1/S3: an append-only workspace namespace (manifest create_only) refuses
+    // .latest/.version deletes on every path — existing events can never be erased.
+    const delGuard = await checkDeleteGuard(key, storage);
+    if (!delGuard.valid) {
+      res.status(409).json(error(config.nodeId, 'WRITE_CONFLICT', delGuard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard', 409, { violations: delGuard.errors }));
       return;
     }
 
