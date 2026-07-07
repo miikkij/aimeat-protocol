@@ -214,6 +214,68 @@ describe('executeExtensionAction', () => {
         expect(result.after).toBeNull();
     });
 
+    it('cleans up when a script rejects with other async host calls still in flight', async () => {
+        // Mirrors a multi-feed fetcher: Promise.all over several ctx.memory/fetch
+        // calls where one rejects fast while siblings are still pending. The early
+        // rejection tears down the VM while in-flight deferred promises are still
+        // live -- which previously tripped the QuickJS JS_FreeRuntime gc assertion.
+        const script = `export default async function(ctx, input) {
+            await Promise.all([
+                ctx.memory.get('slow'),
+                ctx.memory.get('boom'),
+            ]);
+            return { ok: true };
+        }`;
+
+        const ctx = makeCtx({
+            memory: {
+                async get(key: string) {
+                    if (key === 'boom') throw new Error('boom failed');
+                    if (key === 'slow') {
+                        await new Promise((r) => setTimeout(r, 300));
+                        return { v: key };
+                    }
+                    return null;
+                },
+                async set() {},
+                async search() { return []; },
+                async delete() { return false; },
+                async getPublic() { return null; },
+            },
+        });
+
+        await expect(
+            executeExtensionAction(script, ctx, {}, defaultLimits()),
+        ).rejects.toThrow(/boom failed/);
+    });
+
+    it('cleans up a fire-and-forget async host call the script never awaits', async () => {
+        const script = `export default async function(ctx, input) {
+            // start a slow call but return without awaiting it
+            ctx.memory.get('slow');
+            return { done: true };
+        }`;
+
+        const ctx = makeCtx({
+            memory: {
+                async get(key: string) {
+                    if (key === 'slow') {
+                        await new Promise((r) => setTimeout(r, 300));
+                        return { v: key };
+                    }
+                    return null;
+                },
+                async set() {},
+                async search() { return []; },
+                async delete() { return false; },
+                async getPublic() { return null; },
+            },
+        });
+
+        const result = await executeExtensionAction(script, ctx, {}, defaultLimits());
+        expect(result).toEqual({ done: true });
+    });
+
     it('calls ctx.log methods', async () => {
         const logInfo = vi.fn();
         const logWarn = vi.fn();
