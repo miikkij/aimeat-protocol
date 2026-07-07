@@ -4,6 +4,9 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.30.0 - 2026-07-07 - aimeat-auth.js: loginWithPassword exposes session._keyCredentials (first-login
+ *   durable creds, TARGET-011); logout() on an app origin now ends the SHARED apex session via the
+ *   same-site bridge (?mode=logout) so EXIT sticks across the M-ROOM / LOOM / DROP family.
  * v1.29.0 - 2026-07-02 - New libraries: aimeat-organism.js (normalized workspace read + draft/publish
  *   client) and aimeat-editor.js (CodeMirror 6 markdown editor with toolbar + split live preview);
  *   aimeat-markdown gains renderRich/renderToString. Catalogue now lists aimeat-markdown (route
@@ -718,6 +721,39 @@ function silentAppToken() {
   });
 }
 
+// End the shared apex session from an APP ORIGIN. The app cannot revoke the apex cookie itself (a
+// credentialed cross-origin call to the apex is CORS-blocked), so it frames the same-site apex bridge
+// in ?mode=logout, which revokes the host-only cookie first-party. Resolves true on success, false on
+// timeout/error. On the apex itself this is a no-op (logout() revokes directly there).
+function apexLogout() {
+  return new Promise(function (resolve) {
+    var apexOrigin;
+    try { apexOrigin = new URL(APEX_URL).origin; } catch (e) { resolve(false); return; }
+    if (location.origin === apexOrigin) { resolve(false); return; }
+    var settled = false, iframe = null, timer = null;
+    function finish(v) {
+      if (settled) return; settled = true;
+      window.removeEventListener('message', onMsg);
+      if (timer) clearTimeout(timer);
+      if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      resolve(v);
+    }
+    function onMsg(e) {
+      if (e.origin !== apexOrigin) return;
+      var d = e.data || {};
+      if (d.type !== 'aimeat_app_logout') return;
+      finish(!!(d.result && d.result.ok));
+    }
+    window.addEventListener('message', onMsg);
+    iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.src = apexOrigin + '/app-silent.html?mode=logout';
+    (document.body || document.documentElement).appendChild(iframe);
+    timer = setTimeout(function () { finish(false); }, 8000);
+  });
+}
+
 // ── App-grant consent popup (H-2): for an app the user does NOT own and has not yet granted, the
 // silent bridge returns consent_required. The user approves ONCE in a visible popup (the PKCE code
 // flow); thereafter the silent bridge auto-issues a token (remembered grant). Popups need a user
@@ -1212,6 +1248,10 @@ const auth = {
         },
       });
     } catch (_) { /* best effort — still clear local state below */ }
+    // On an app origin the session is a bridge of the shared apex session; clearing local state alone
+    // would let the silent bridge re-log-in on the next load. End the apex session too so EXIT sticks
+    // across the whole family (M-ROOM / LOOM / DROP), not just this one app.
+    if (isAppOrigin()) { try { await apexLogout(); } catch (_) { /* best effort */ } }
     currentSession = null;
     remove('session');
     remove('owner_key');
