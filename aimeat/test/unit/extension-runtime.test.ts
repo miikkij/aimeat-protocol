@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { executeExtensionAction } from '../../src/services/extension-runtime.js';
+import { executeExtensionAction, isEngineAbort } from '../../src/services/extension-runtime.js';
 import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension-runtime.js';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -274,6 +274,24 @@ describe('executeExtensionAction', () => {
 
         const result = await executeExtensionAction(script, ctx, {}, defaultLimits());
         expect(result).toEqual({ done: true });
+    });
+
+    it('recognizes an emscripten engine abort (the production crash string)', () => {
+        const prod = 'Aborted(Assertion failed: list_empty(&rt->gc_obj_list), at: ../../vendor/quickjs/quickjs.c,2036,JS_FreeRuntime). Build with -sASSERTIONS for more info.';
+        expect(isEngineAbort(new Error(prod))).toBe(true);
+        expect(isEngineAbort(prod)).toBe(true);
+        expect(isEngineAbort(new Error('boom failed'))).toBe(false);
+        expect(isEngineAbort(new Error('API call limit exceeded'))).toBe(false);
+    });
+
+    it('keeps the engine healthy across error paths (no poisoning)', async () => {
+        const failing = `export default async function() { throw new Error('kaboom'); }`;
+        const ok = `export default async function() { return { ok: true }; }`;
+
+        // A run that throws must not corrupt the shared engine for the next run.
+        await expect(executeExtensionAction(failing, makeCtx(), {}, defaultLimits())).rejects.toThrow(/kaboom/);
+        const after = await executeExtensionAction(ok, makeCtx(), {}, defaultLimits());
+        expect(after).toEqual({ ok: true });
     });
 
     it('calls ctx.log methods', async () => {

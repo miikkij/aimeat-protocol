@@ -10,9 +10,10 @@
  *   v1.1.0 -- 2026-03-15 -- Add memory access tracking (MemoryAccessLog + trackMemoryAccess)
  *   v2.0.0 -- 2026-04-29 -- Replace isolated-vm with quickjs-emscripten (pure WASM, no C++ build tools)
  *   v2.1.0 -- 2026-07-07 -- Await/abort in-flight host calls before disposing the runtime; fixes JS_FreeRuntime gc assertion abort when a script rejects with sibling async calls still pending (e.g. multi-feed fetch, one feed fails)
+ *   v2.2.0 -- 2026-07-08 -- Self-heal a poisoned WASM engine: detect an emscripten abort and rebuild the module singleton so one abort no longer fails every later run until a process restart
  */
-import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
-import type { QuickJSContext, QuickJSRuntime, QuickJSHandle } from 'quickjs-emscripten';
+import { getQuickJS, newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
+import type { QuickJSContext, QuickJSRuntime, QuickJSHandle, QuickJSWASMModule } from 'quickjs-emscripten';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 
 // ── Public interfaces (UNCHANGED) ──────────────────────────
@@ -246,10 +247,30 @@ export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; acces
 
 // ── Main entry point ─────────────────────────────────────────
 
-let quickJSPromise: ReturnType<typeof getQuickJS> | null = null;
-function getQuickJSSingleton() {
+let quickJSPromise: Promise<QuickJSWASMModule> | null = null;
+function getQuickJSSingleton(): Promise<QuickJSWASMModule> {
     if (!quickJSPromise) quickJSPromise = getQuickJS();
     return quickJSPromise;
+}
+
+/**
+ * True if `err` looks like an emscripten `abort()` — a hard WASM failure that
+ * poisons the whole engine instance (every later runtime created from it fails
+ * the same way). The canonical case is the JS_FreeRuntime gc assertion.
+ */
+export function isEngineAbort(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return msg.includes('Aborted(') || msg.includes('JS_FreeRuntime') || msg.includes('gc_obj_list');
+}
+
+/**
+ * Discard a poisoned engine so the NEXT execution instantiates a fresh WASM
+ * module instead of reusing the dead one. `getQuickJS()` hands back a shared
+ * singleton (still poisoned after an abort), so recovery must use a brand-new
+ * module instance via `newQuickJSWASMModule()`.
+ */
+function resetQuickJSSingleton(): void {
+    quickJSPromise = newQuickJSWASMModule();
 }
 
 export async function executeExtensionAction(
@@ -439,16 +460,23 @@ export async function executeExtensionAction(
         // a guest microtask that starts another host call, so loop until drained
         // -- bounded by maxApiCalls, and by teardown making new fetches fail fast.
         teardown.abort();
-        while (inflight.size > 0) {
-            await Promise.allSettled([...inflight]);
-            // Let the .settled -> executePendingJobs microtasks run before we
-            // re-check, so guest reactions to the settlements are flushed.
-            await Promise.resolve();
-            if (runtime.alive) {
-                try { runtime.executePendingJobs(); } catch { /* runtime torn down mid-drain */ }
+        try {
+            while (inflight.size > 0) {
+                await Promise.allSettled([...inflight]);
+                // Let the .settled -> executePendingJobs microtasks run before we
+                // re-check, so guest reactions to the settlements are flushed.
+                await Promise.resolve();
+                if (runtime.alive) runtime.executePendingJobs();
             }
+            if (vm.alive) vm.dispose();
+            if (runtime.alive) runtime.dispose();
+        } catch (teardownErr) {
+            // A WASM abort here (should no longer happen for known triggers, but
+            // guard against any residual path) poisons the shared engine for the
+            // whole process. Rebuild it so the next execution gets a clean module
+            // instead of failing forever until a manual restart. Swallow the
+            // teardown error so it never masks the script's real result/error.
+            if (isEngineAbort(teardownErr)) resetQuickJSSingleton();
         }
-        if (vm.alive) vm.dispose();
-        if (runtime.alive) runtime.dispose();
     }
 }
