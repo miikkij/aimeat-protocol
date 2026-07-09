@@ -66,6 +66,12 @@
     v2.9.0 — 2026-07-07 — Copy protection (Phase 3): own server-app cards get a 🛡 button (🛡✓ when any
       flag is on) opening a protection modal with four opt-in toggles (obfuscate / domain-lock / watermark
       / no-raw-download) + honest-limits note; saveProtection PATCHes { protection }. All default off.
+    v2.9.1 — 2026-07-09 — Fix modals opening BEHIND the detail view: the shared overlay rule sat at
+      z-index 560, below #detail-view (600), so "Publish as v2" (and any modal) opened from the detail
+      view was fully hidden — clicking it did nothing visible. Raised the shared overlay rule to 650
+      (above #detail-view, below the context menu — same fix as #source-overlay v2.3.1) and added the
+      new #lineage-overlay + #protection-overlay to it (they were missing the overlay wrapper entirely,
+      so they rendered inline instead of as centered modals).
 -->
 <html lang="en">
 <head>
@@ -1411,10 +1417,15 @@
     #subdomain-overlay,
     #backup-overlay,
     #server-import-overlay,
-    #json-import-overlay {
+    #json-import-overlay,
+    #lineage-overlay,
+    #protection-overlay {
       position: fixed;
       inset: 0;
-      z-index: 560;
+      /* Above #detail-view (z-index 600) so a modal opened FROM the detail view
+         (e.g. "Publish as v2") is not hidden behind that opaque overlay — same fix
+         as #source-overlay (v2.3.1). Stays below the context menu. */
+      z-index: 650;
       background: rgba(0, 0, 0, .3);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -1429,7 +1440,9 @@
     #subdomain-overlay[hidden],
     #backup-overlay[hidden],
     #server-import-overlay[hidden],
-    #json-import-overlay[hidden] {
+    #json-import-overlay[hidden],
+    #lineage-overlay[hidden],
+    #protection-overlay[hidden] {
       display: none;
     }
 
