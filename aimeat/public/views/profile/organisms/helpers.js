@@ -7,6 +7,8 @@
  * @structure fmtDate, relTime, orgInitials, exportOrganismZip
  * @usage import { fmtDate, relTime, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
  * @version-history
+ *   v1.0.1 — 2026-07-10 — exportOrganismZip surfaces the server's error message (e.g. the access
+ *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { t, getLocale } from '/js/i18n.js';
@@ -51,7 +53,11 @@ export async function exportOrganismZip(org, showToast) {
   try {
     const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
     const res = await fetch(`/v1/organisms/${encodeURIComponent(org.id)}/export`, { headers: { Authorization: 'Bearer ' + jwt } });
-    if (!res.ok) throw new Error('Export failed');
+    if (!res.ok) {
+      // Surface the server's reason (e.g. an access denial) instead of a bare "Export failed".
+      const detail = await res.json().then(j => j?.error?.message).catch(() => null);
+      throw new Error(detail || 'Export failed');
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

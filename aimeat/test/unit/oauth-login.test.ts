@@ -308,6 +308,19 @@ describe('Multi-provider social login (oauth-login router)', () => {
     const claimer = await storage.getGHII(`claimer@${NODE_ID}`);
     expect(claimer!.googleSub).toBeUndefined();
     expect(await storage.getGHIIByExternalId('google', 'g-claim-1')).toBeNull();
+
+    // The pending explains the situation to the SPA: link_existing mode + a masked username hint…
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup')!;
+    const pending = await rawReq('GET', `${base}/v1/ghii/login/pending`, { cookie: pendingCookie });
+    const pdata = JSON.parse(pending.body).data;
+    expect(pdata.mode).toBe('link_existing');
+    expect(pdata.existing_hint).toBe('c***r');
+
+    // …and finalize refuses to mint a duplicate account claiming the same email.
+    const fin = await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, { cookie: pendingCookie, body: JSON.stringify({ username: 'claimer2' }) });
+    expect(fin.status).toBe(409);
+    expect(JSON.parse(fin.body).error.code).toBe('EMAIL_IN_USE');
+    expect(await storage.getOwner('claimer2')).toBeNull();
   });
 
   it('redirects with auth_error on an invalid state / missing code (Google error-code prefix preserved)', async () => {

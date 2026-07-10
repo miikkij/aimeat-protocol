@@ -6,6 +6,8 @@
  *   key) and the re-created image all come back, and the re-locked schema still validates writes.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: export → import round-trip.
+ *   v1.1.0 — 2026-07-10 — Tests 9-10: organism export by an active NON-creator member (aggregated
+ *     registry + member-read bounding, proven by an import round-trip) and non-member → 403.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-export-import
 
@@ -147,7 +149,51 @@ await test('8. organism import → a NEW organism with the workspace restored', 
     assert((r.body.data.objects?.item || []).some((o: any) => o.id === 'i1'), 'record restored in the new org');
 });
 
-await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });
+// ── Member (non-creator) organism export: the gate is any ACTIVE member, the per-creator registry
+// is aggregated, and the bundle carries the creator's records (which the member reads live) ──
+let memberToken = '', memberName = '';
+await test('9. an active MEMBER (not the creator) exports the organism — bundle contains the creator\'s workspace + records', async () => {
+    memberName = `wsexpm${Date.now()}`;
+    let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: memberName, display_name: 'WS Member', password: 'WsExp1234' }) });
+    for (let i = 0; reg.status === 429 && i < 8; i++) {
+        await new Promise(r => setTimeout(r, 1500));
+        reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: memberName, display_name: 'WS Member', password: 'WsExp1234' }) });
+    }
+    assert(reg.status === 201, `ghii ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: memberName, timestamp: ts, signature: await sign(reg.body.data.private_key, memberName + NODE_ID + ts) }) });
+    memberToken = tk.body.data.token;
+    const jr = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(memberToken), body: '{}' });
+    assert(jr.status < 300, `join ${jr.status}: ${JSON.stringify(jr.body.error)}`);
+
+    const res = await fetch(`${BASE}/v1/organisms/${orgId}/export`, { headers: auth(memberToken) });
+    assert(res.status === 200, `member export ${res.status}`);
+    const memberZip = Buffer.from(await res.arrayBuffer());
+    // ZIP entry names are stored uncompressed — the creator-made workspace must be in the bundle
+    // (the per-creator registry is aggregated; reading only the member's own registry gave []).
+    assert(memberZip.includes(`workspaces/${WS}/workspace.json`), 'member bundle contains the creator-made workspace');
+
+    // Round-trip: importing the member's bundle restores the creator's records — proof the export
+    // carries content the member can read live but does not own.
+    const imp = await fetch(`${BASE}/v1/organisms/import`, { method: 'POST', headers: { ...auth(memberToken), 'Content-Type': 'application/zip' }, body: memberZip });
+    const impBody = await imp.json() as any;
+    assert(imp.status === 201, `member import ${imp.status}: ${JSON.stringify(impBody.error)}`);
+    const wsId = impBody.data.workspaces?.[0]?.ws;
+    const r = await json(`/v1/organisms/${impBody.data.organism_id}/workspace?ws=${wsId}`, { headers: auth(memberToken) });
+    assert((r.body.data.objects?.item || []).some((o: any) => o.id === 'i1'), 'creator record present in the member round-trip');
+});
+
+await test('10. a NON-member cannot export the organism (403)', async () => {
+    const lv = await json(`/v1/organisms/${orgId}/leave`, { method: 'POST', headers: auth(memberToken), body: '{}' });
+    assert(lv.status === 200, `leave ${lv.status}: ${JSON.stringify(lv.body.error)}`);
+    const res = await fetch(`${BASE}/v1/organisms/${orgId}/export`, { headers: auth(memberToken) });
+    assert(res.status === 403, `expected 403, got ${res.status}`);
+});
+
+await test('Cleanup', async () => {
+    await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) });
+    if (memberName) await json(`/v1/owners/${memberName}`, { method: 'DELETE', headers: auth(memberToken) });
+});
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
 process.exit(failed > 0 ? 1 : 0);

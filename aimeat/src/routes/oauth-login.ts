@@ -28,6 +28,11 @@
  *     provider-parameterised routes, generic externalIdentities linking, per-provider claim mapping +
  *     Entra tenant gating, and a GET /v1/auth/providers discovery endpoint. Google routes/behaviour
  *     are unchanged (its id is 'google', so it emits the exact same paths + error codes).
+ *   v2.1.0 — 2026-07-10 — link_existing pending mode: when the IdP email matches an account whose
+ *     email was never locally verified, the callback no longer dead-ends the user in the generic
+ *     signup modal ("username taken", no explanation) — the pending carries mode+masked hint so the
+ *     SPA explains the password-sign-in-once path; finalize refuses it (409 EMAIL_IN_USE) so no
+ *     duplicate account can claim the same email. Anti-takeover no-link rule itself is unchanged.
  */
 
 import { Router } from 'express';
@@ -65,6 +70,18 @@ interface PendingSignup {
   displayName: string;
   suggested: string;
   redirect: string;
+  /** 'new' = first-time signup (username choice). 'link_existing' = an account already claims this
+   *  email but never verified it locally — linking is refused (anti-takeover), so the SPA explains
+   *  the password-sign-in-once path instead of offering to create a duplicate account. */
+  mode: 'new' | 'link_existing';
+  /** Masked username of the unverified-email account ('a***e') — enough for its real owner to
+   *  recognise it, not enough to disclose the name to a stranger who owns the email. */
+  existingHint: string | null;
+}
+
+/** Mask an owner name for the link_existing hint: first + last character survive. */
+function maskOwnerName(name: string): string {
+  return name.length <= 2 ? name[0] + '***' : name[0] + '***' + name[name.length - 1];
 }
 
 /** SHA-256 hex of a normalized email — matches the hashing used elsewhere for GHII.emailHash. */
@@ -96,6 +113,8 @@ async function signPendingToken(data: PendingSignup): Promise<string> {
     displayName: data.displayName,
     suggested: data.suggested,
     redirect: data.redirect,
+    mode: data.mode,
+    existingHint: data.existingHint,
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setIssuedAt()
@@ -117,6 +136,8 @@ async function verifyPendingToken(token: string): Promise<PendingSignup | null> 
       displayName: typeof payload.displayName === 'string' ? payload.displayName : 'AIMEAT User',
       suggested: typeof payload.suggested === 'string' ? payload.suggested : 'user',
       redirect: typeof payload.redirect === 'string' ? payload.redirect : '/',
+      mode: payload.mode === 'link_existing' ? 'link_existing' : 'new',
+      existingHint: typeof payload.existingHint === 'string' ? payload.existingHint : null,
     };
   } catch {
     return null;
@@ -336,6 +357,27 @@ export function oauthLoginRouter(
           const byEmail = await storage.getGHIIByEmailHash(emailHashOf(email));
           if (byEmail && byEmail.emailVerifiedAt) {
             ghiiRecord = await storage.updateGHII(byEmail.ghii, externalIdUpdate(byEmail, p.id, sub));
+          } else if (byEmail) {
+            // An account claims this email but never verified it locally. Linking here would allow
+            // takeover of a typo'd/squatted email, and the generic signup modal would dead-end the
+            // account's real owner at "username taken" with no explanation. Bounce to the SPA with a
+            // link_existing pending so the modal can explain: sign in with your password once (that
+            // verifies the email), after which this provider links automatically.
+            const token = await signPendingToken({
+              provider: p.id,
+              providerSub: sub,
+              email,
+              emailVerified,
+              displayName,
+              suggested: '',
+              redirect: postLoginPath,
+              mode: 'link_existing',
+              existingHint: maskOwnerName(byEmail.ownerName),
+            });
+            setPendingCookie(req, res, token);
+            const sep = postLoginPath.includes('?') ? '&' : '?';
+            res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+            return;
           }
         }
 
@@ -352,6 +394,8 @@ export function oauthLoginRouter(
             displayName,
             suggested,
             redirect: postLoginPath,
+            mode: 'new',
+            existingHint: null,
           });
           setPendingCookie(req, res, token);
           const sep = postLoginPath.includes('?') ? '&' : '?';
@@ -379,6 +423,12 @@ export function oauthLoginRouter(
           const pending = raw ? await verifyPendingToken(raw) : null;
           if (!pending || pending.provider !== p.id) {
             res.status(400).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending sign-up — start sign-in again'));
+            return;
+          }
+          if (pending.mode === 'link_existing') {
+            // Creating a fresh account here would mint a duplicate GHII claiming the same email.
+            res.status(409).json(error(config.nodeId, 'EMAIL_IN_USE',
+              'An existing account already uses this email — sign in with your username and password once to verify it, then this sign-in links automatically'));
             return;
           }
 
@@ -466,6 +516,8 @@ export function oauthLoginRouter(
       email: pending.email,
       displayName: pending.displayName,
       redirect: pending.redirect,
+      mode: pending.mode,
+      existing_hint: pending.existingHint,
     }));
   });
 

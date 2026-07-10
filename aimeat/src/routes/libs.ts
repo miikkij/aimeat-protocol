@@ -4,6 +4,12 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.33.0 - 2026-07-10 - aimeat-auth.js: first-social-login dead ends explained. The username-choice
+ *   modal handles the new pending mode 'link_existing' (an account claims the email but never verified
+ *   it — a notice explains the one-time password sign-in that verifies + links, instead of dead-ending
+ *   at "username taken"); an expired/missing pending (?aimeat_signup=1 with no cookie) shows a "click
+ *   Continue with Google again, no password needed" notice instead of silently falling to the password
+ *   form. New modal i18n keys: signupLinkTitle/Intro/Hint/SignInBtn, signupExpiredTitle/Body/OkBtn.
  * v1.32.0 - 2026-07-08 - aimeat-auth.js: recover legacy/unverified accounts during sign-in. api() now
  *   preserves error.code/error.details on thrown errors; the sign-in modal catches EMAIL_NOT_VERIFIED
  *   (correct password but no verified email) and opens a complete-account flow — enter/confirm an email
@@ -2161,8 +2167,58 @@ function cleanSignupParam() {
   } catch (e) {}
 }
 
+// Minimal notice modal sharing the signup modal's chrome — used when the username-choice step is
+// replaced by an explanation (existing unverified-email account; expired pending sign-up).
+function showSignupNoticeModal(i, opts) {
+  var old = document.getElementById('aimeat-modal');
+  if (old) old.remove();
+  var modal = document.createElement('div');
+  modal.id = 'aimeat-modal';
+  document.body.appendChild(modal);
+  modal.innerHTML = '<style>'
+    + '.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}'
+    + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
+    + '.aimeat-cancel:hover{background:#F3F4F6}'
+    + '</style>'
+    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
+    + '<div style="padding:28px 32px 24px">'
+    + '<h2 style="margin:0 0 8px;font-size:21px;font-weight:800;color:#1A1A2E">' + escHtml(opts.title || '') + '</h2>'
+    + '<p style="margin:0 0 18px;font-size:14px;color:#6B7280;line-height:1.55">' + escHtml(opts.body || '') + '</p>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-sn-primary" class="aimeat-go">' + escHtml(opts.primaryLabel || 'OK') + '</button>'
+    + (opts.showCancel ? '<button id="aimeat-sn-cancel" class="aimeat-cancel">' + escHtml(i.signupCancelBtn || 'Cancel') + '</button>' : '')
+    + '</div>'
+    + '</div></div></div>';
+  function close() { modal.remove(); cleanSignupParam(); }
+  document.getElementById('aimeat-sn-primary').addEventListener('click', function () {
+    close();
+    if (opts.onPrimary) opts.onPrimary();
+  });
+  var cancelEl = document.getElementById('aimeat-sn-cancel');
+  if (cancelEl) cancelEl.addEventListener('click', close);
+}
+
 function showGoogleSignupModal(pending, i) {
   i = i || {};
+
+  // An account already claims this email but never verified it locally — the server refuses to
+  // link (anti-takeover) AND to create a duplicate. Explain the one-time password sign-in path
+  // instead of dead-ending the user at "username taken".
+  if (pending && pending.mode === 'link_existing') {
+    var hint = pending.existing_hint
+      ? ' ' + fillTemplate(i.signupLinkHint || '(Username hint: {hint}.)', { hint: pending.existing_hint })
+      : '';
+    showSignupNoticeModal(i, {
+      title: i.signupLinkTitle || 'This email already has an account',
+      body: fillTemplate(i.signupLinkIntro || 'An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once — that verifies your email, and after that this sign-in connects to your account automatically.', { email: pending.email || '' }) + hint,
+      primaryLabel: i.signupLinkSignInBtn || 'Sign in with password',
+      showCancel: true,
+      onPrimary: function () { showLoginModal({ i18n: i }, function () {}); },
+    });
+    return;
+  }
+
   var old = document.getElementById('aimeat-modal');
   if (old) old.remove();
   var modal = document.createElement('div');
@@ -2281,21 +2337,34 @@ function showGoogleSignupModal(pending, i) {
   evaluate();
 }
 
-// On load, if the Google callback flagged a pending sign-up, fetch it and prompt. Best-effort:
-// if the signed cookie is missing/expired the pending fetch 404s and we simply do nothing.
+// On load, if the Google callback flagged a pending sign-up, fetch it and prompt. If the signed
+// cookie is missing/expired the pending fetch 404s — explain that (retry Google, no password
+// needed) instead of doing nothing: the silent path stranded users at the password sign-in form,
+// where they concluded Google requires setting a password.
 function maybeShowGoogleSignup() {
   var params;
   try { params = new URLSearchParams(location.search); } catch (e) { return; }
   if (params.get('aimeat_signup') !== '1') return;
+  function showExpired() {
+    function open(i) {
+      showSignupNoticeModal(i || {}, {
+        title: (i && i.signupExpiredTitle) || 'Sign-in session expired',
+        body: (i && i.signupExpiredBody) || 'Your sign-in session expired or was interrupted. No password is needed — just click “Continue with Google” again to restart.',
+        primaryLabel: (i && i.signupExpiredOkBtn) || 'OK',
+        showCancel: false,
+      });
+    }
+    loadModalI18n(currentModalLang()).then(open).catch(function () { open({}); });
+  }
   api('/v1/ghii/login/pending', { credentials: 'include' })
     .then(function (res) {
       var pending = res && res.data;
-      if (!pending) { cleanSignupParam(); return; }
+      if (!pending) { showExpired(); return; }
       loadModalI18n(currentModalLang())
         .then(function (i) { showGoogleSignupModal(pending, i || {}); })
         .catch(function () { showGoogleSignupModal(pending, {}); });
     })
-    .catch(function () { cleanSignupParam(); });
+    .catch(function () { showExpired(); });
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowGoogleSignup);

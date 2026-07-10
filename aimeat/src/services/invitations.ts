@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
  *   v1.1.0 — 2026-07-05 — Add INVITE_CODE_QUOTA_PER_MEMBER + type/provisionedOwner on the record (provisioned-code keys live in routes/organisms.ts).
+ *   v1.2.0 — 2026-07-10 — Add normalizeInviteeName(): shared trim/lowercase/@node-strip for name-invites
+ *     (REST + MCP) so memberships + notifications land on the identity the invitee actually signs in as.
  */
 import { randomBytes, createHash } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -67,6 +69,24 @@ export function invitePublic(inv: InvitationRecord) {
 
 export function normalizeOrgRole(role: unknown): 'member' | 'admin' {
   return role === 'admin' ? 'admin' : 'member';
+}
+
+/**
+ * Normalize a name-invite invitee the same way registration normalizes usernames (ghii.ts): trim,
+ * lowercase, and accept the full local GHII form by stripping a matching `@node-id` suffix.
+ * Membership rows and notifications are keyed by the bare lowercase owner name — an unnormalized
+ * invitee ("Alice", "alice ") would be written under an identity nobody authenticates as and the
+ * invitation would be permanently invisible to the invitee. Returns null for a remote identity
+ * (`someone@other-node`), which name-invites don't support.
+ */
+export function normalizeInviteeName(raw: string, nodeId: string): string | null {
+  let name = raw.trim().toLowerCase();
+  const atIdx = name.indexOf('@');
+  if (atIdx !== -1) {
+    if (name.substring(atIdx + 1) !== nodeId) return null;
+    name = name.substring(0, atIdx);
+  }
+  return name;
 }
 
 /** Normalize a raw workspaces input into de-duplicated { ws, role } grants. */

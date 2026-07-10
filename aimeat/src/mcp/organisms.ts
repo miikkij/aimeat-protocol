@@ -34,7 +34,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
 import { notify } from '../services/notify.js';
-import { createEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
+import { createEmailInvitation, invitePublic, normalizeInviteeName, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
 import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
@@ -424,13 +424,16 @@ export function registerOrganismsTools(
             invitee: z.string().describe('Bare owner name to invite'),
         },
         annotationsFor('aimeat_organism_invite'),
-        async ({ organism_id, invitee }) => {
+        async ({ organism_id, invitee: inviteeRaw }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
             if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
                 return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can invite members' }], isError: true };
             }
+            const invitee = normalizeInviteeName(inviteeRaw, config.nodeId);
+            if (!invitee) return { content: [{ type: 'text' as const, text: 'Invitee belongs to another node — name-invites work for local owners only' }], isError: true };
+            if (!(await storage.getOwner(invitee))) return { content: [{ type: 'text' as const, text: `No owner named "${invitee}" on this node` }], isError: true };
             const existing = await storage.getMembership(organism_id, invitee);
             if (existing && existing.status === 'active') return { content: [{ type: 'text' as const, text: 'That owner is already a member' }], isError: true };
             if (existing && existing.status === 'invited') return { content: [{ type: 'text' as const, text: 'That owner already has a pending invitation' }], isError: true };
@@ -443,6 +446,8 @@ export function registerOrganismsTools(
                 title: `${ownerName} invited you to join "${organism.name}"`,
                 link: '/v1/profile#organisms',
             });
+            emitChange('notifications', `${invitee}@${config.nodeId}`);
+            emitChange('organisms');
             return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', organism_id, invitee }, null, 2) }] };
         },
     );
@@ -803,8 +808,9 @@ export function registerOrganismsTools(
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = ownerOf();
             const m = await storage.getMembership(organism_id, ownerName);
-            const role = m && m.status === 'active' ? m.role : null;
-            if (role !== 'creator' && role !== 'admin') return { content: [{ type: 'text' as const, text: 'Only the organism creator or an admin can export.' }], isError: true };
+            // Any active member: the bundle holds only what the member reads live (gate matches the
+            // read model — the REST route applies the same policy).
+            if (!m || m.status !== 'active') return { content: [{ type: 'text' as const, text: 'Only an active member of the organism can export it.' }], isError: true };
             const { buffer, filename, workspaces } = await exportOrganism(storage, config, { orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
             if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64') }, null, 2) }] };

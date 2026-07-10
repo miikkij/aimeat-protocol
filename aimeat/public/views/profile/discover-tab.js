@@ -8,6 +8,9 @@
  * @structure DiscoverTab() — scope + query + type-facet state → /v1/discover → result list
  * @usage registered in profile.js TABS as id 'discover'
  * @version-history
+ *   v0.1.1 — 2026-07-10 — Route result clicks to each entry's real home (workspace deep-link /
+ *     public viewers / SPA tab) instead of navigating to the raw /v1/ fetch href, which needs a
+ *     Bearer header and rendered an auth-error JSON in the new tab.
  *   v0.1.0 — 2026-06-23 — Phase 4: human-facing master-directory browse (design doc 2026-06-23).
  */
 import { h } from 'preact';
@@ -56,6 +59,43 @@ export default function DiscoverTab() {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
+  // Open a result at its real home. The backend `href` is the canonical API *fetch* URL (for
+  // agents/MCP) — navigating a browser tab there has no Bearer header and shows an auth-error
+  // JSON, so clicks are routed by type instead (same handoff as notebook-tab's openHit).
+  const openEntry = useCallback((entry) => {
+    const id = String(entry.id || '');
+    const ws = id.match(/^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)\.([^.]+)/);
+    if (ws) {
+      const [, org, wsId, space, docId] = ws;
+      if (scope === 'public') {
+        window.open(
+          `/v1/publicworkspaceviewer?org=${encodeURIComponent(org)}&ws=${encodeURIComponent(wsId)}` +
+          `&type=${encodeURIComponent(space)}&id=${encodeURIComponent(docId)}`,
+          '_blank', 'noopener'
+        );
+        return;
+      }
+      try {
+        sessionStorage.setItem('aimeat.ws.openId', org);
+        sessionStorage.setItem('aimeat.ws.openWs', wsId);
+        sessionStorage.setItem(`aimeat.ws.${org}.${wsId}.openDoc`, JSON.stringify({ namespace: space, id: docId }));
+      } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
+      return;
+    }
+    const pkg = id.match(/^packages\/([^/]+)\//);
+    if (pkg) {
+      window.open(`/v1/publicknowledgeviewer?id=${encodeURIComponent(pkg[1])}`, '_blank', 'noopener');
+      return;
+    }
+    if (entry.type === 'app' && entry.href) {
+      window.open(entry.href, '_blank', 'noopener');
+      return;
+    }
+    const HOME_TAB = { capability: 'capabilities', workflow: 'workflows', organism: 'organisms', knowledge: 'knowledge' };
+    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: HOME_TAB[entry.type] || 'memory' } }));
+  }, [scope]);
+
   const facetTypes = data.facets?.types || [];
 
   return html`
@@ -99,7 +139,7 @@ export default function DiscoverTab() {
         ${!data.entries.length
           ? html`<div class="pf-empty">${t('discover.empty')}</div>`
           : data.entries.map(e => html`
-            <a class="dsc-item" href=${e.href || '#'} target="_blank" rel="noopener">
+            <a class="dsc-item" href="#" onClick=${ev => { ev.preventDefault(); openEntry(e); }}>
               <div class="dsc-item-head">
                 <span class="dsc-type-badge">${TYPE_ICONS[e.type] || ''} ${t('discover.type.' + e.type) || e.type}</span>
                 <strong class="dsc-item-title">${escHtml(e.title || e.id)}</strong>

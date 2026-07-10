@@ -14,6 +14,9 @@
  * @version-history
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP export (workspace.json + images/) reusing archiver.
  *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.1.0 -- 2026-07-10 -- An owner-level exporter with ACTIVE organism membership captures every
+ *     record (matching the live human-member read model); per-record consent bounding stays for
+ *     agent (GAII) exporters. Cross-member records used to vanish from every export silently.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -53,10 +56,21 @@ export async function collectWorkspace(
   const { orgId, ws, exporterGaii, exportedAt } = opts;
   const root = `organism.${orgId}.w.${ws}`;
 
+  // An owner-level exporter (GHII, no '#') who is an active member of the organism reads the whole
+  // workspace live (workspace-access middleware: a human owner session needs no consent), so the
+  // export includes the same — per-record consent bounding would silently drop records owned by
+  // OTHER members from every member's export, including the organism creator's. Agent exporters
+  // (GAII) keep the consent-bounded path, matching their live read rights.
+  let isActiveMemberOwner = false;
+  if (!exporterGaii.includes('#')) {
+    const m = await storage.getMembership(orgId, exporterGaii.split('@')[0]);
+    isActiveMemberOwner = !!m && m.status === 'active';
+  }
+
   const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
   const readable: MemoryRecord[] = [];
   for (const r of items) {
-    if (r.ownerGaii === exporterGaii) { readable.push(r); continue; }
+    if (isActiveMemberOwner || r.ownerGaii === exporterGaii) { readable.push(r); continue; }
     const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: exporterGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
     if (d.allowed) readable.push(r);
   }

@@ -6,6 +6,8 @@
  *   guardrails: the creator cannot be removed, and a non-admin cannot review or remove.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: join-request notify + review + remove-member (revoke) flow.
+ *   v1.1.0 — 2026-07-10 — Tests 25-27: invitee normalization/validation (nonexistent → 404, remote
+ *     identity → 400, UPPERCASE/@node/whitespace forms land on the real lowercase owner).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-membership
 
@@ -255,6 +257,29 @@ await test('24. ?member= lists private organisms ONLY for the member themself', 
     // A is this node's FIRST registered owner → an operator, and operators MAY enumerate memberships:
     const op = await json(`/v1/organisms?member=${B.name}`, { headers: auth(A.token) });
     assert((op.body.data.organisms || []).some((x: any) => x.id === org3), 'an operator may enumerate memberships');
+});
+
+// ── Invitee normalization + validation (unnormalized invites landed on an identity nobody
+// authenticates as → the invitation and its notification were permanently invisible) ──
+
+await test('25. Inviting a nonexistent owner is refused (404 OWNER_NOT_FOUND), not silently accepted', async () => {
+    const r = await json(`/v1/organisms/${org2}/invitations`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ invitee: `no-such-owner-${Date.now()}` }) });
+    assert(r.status === 404 && r.body.error?.code === 'OWNER_NOT_FOUND', `expected 404 OWNER_NOT_FOUND, got ${r.status} ${r.body.error?.code}`);
+});
+
+await test('26. Inviting a remote identity is refused (400)', async () => {
+    const r = await json(`/v1/organisms/${org2}/invitations`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ invitee: `${C.name}@some-other-node` }) });
+    assert(r.status === 400, `expected 400, got ${r.status} ${r.body.error?.code}`);
+});
+
+await test('27. Invitee is normalized (UPPERCASE + @node-id + whitespace) → invitation visible to the real owner', async () => {
+    const raw = ` ${C.name.toUpperCase()}@${NODE_ID} `;
+    const r = await json(`/v1/organisms/${org2}/invitations`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ invitee: raw }) });
+    assert(r.status === 201 && r.body.data.invitation?.ghii === C.name, `invite ${r.status}: ghii=${r.body.data?.invitation?.ghii}`);
+    const mine = await json('/v1/organisms/invitations/mine', { headers: auth(C.token) });
+    assert((mine.body.data.invitations || []).some((x: any) => x.organism.id === org2), 'C sees the normalized invitation in /invitations/mine');
+    const dec = await json(`/v1/organisms/${org2}/invitations/decline`, { method: 'POST', headers: auth(C.token), body: '{}' });
+    assert(dec.status === 200, `decline (cleanup) ${dec.status}`);
 });
 
 await test('25. members route lists each member\'s agents for an ACTIVE member (implicit access enumerable)', async () => {

@@ -4532,6 +4532,13 @@
     "signupCreateBtn": "Create my account",
     "signupCreating": "Creating account...",
     "signupCancelBtn": "Cancel",
+    "signupLinkTitle": "This email already has an account",
+    "signupLinkIntro": "An AIMEAT account already uses {email}, but its email has not been verified yet. Sign in with your username and password once — that verifies your email, and after that this sign-in connects to your account automatically.",
+    "signupLinkHint": "(Username hint: {hint}.)",
+    "signupLinkSignInBtn": "Sign in with password",
+    "signupExpiredTitle": "Sign-in session expired",
+    "signupExpiredBody": "Your sign-in session expired or was interrupted. No password is needed — just click “Continue with Google” again to restart.",
+    "signupExpiredOkBtn": "OK",
     "whyTitle": "✨ What do you get?",
     "whyGhii": "Your own digital identity. Only you control it",
     "whyPrivacy": "Your own private memory space, protected by your password",
@@ -8504,5 +8511,6 @@
   "invite.joining": "Joining…",
   "invite.acceptCta": "Accept & join",
   "invite.or": "OR",
-  "invite.signInInstead": "Already have an account or prefer Google? Sign in"
+  "invite.continueWith": "Continue with {label}",
+  "invite.signInInstead": "Already have an account? Sign in"
 }

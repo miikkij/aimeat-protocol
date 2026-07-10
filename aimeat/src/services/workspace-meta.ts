@@ -22,6 +22,9 @@
  *   v1.4.0 — 2026-07-02 — Workspace app bindings: optional `apps` (FULL replace, [] clears) pins
  *     published apps ({owner, filename}) to the workspace. Stored as its OWN meta record
  *     (`…meta.apps`, like the readme) so a manifest full-replace can never clobber the bindings.
+ *   v1.5.0 — 2026-07-10 — Add listOrganismWorkspaceEntries(): THE shared cross-member aggregation of
+ *     the per-creator workspace registry (dedupe by id). Organism export read only the exporter's own
+ *     registry record and produced empty bundles for promoted admins / transferred creators.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -62,6 +65,31 @@ export function normalizeObjectTypes(objectTypes: Array<Record<string, unknown>>
     if (!ot.mode && ot.kind === 'document') return { ...ot, mode: 'document' };
     return ot;
   });
+}
+
+/** One entry in the organism's workspace registry (`organism.{id}.meta.workspaces`). */
+export interface WorkspaceRegistryEntry { id: string; name?: string; createdBy?: string }
+
+/** List every workspace of an organism, aggregated across ALL members' registry records. Each
+ *  workspace is registered under its CREATOR's own GHII copy of `organism.{id}.meta.workspaces`,
+ *  so any consumer that reads only one identity's record sees only the workspaces that member
+ *  created (this exact bug produced empty workspace lists and empty organism exports). Dedupes by
+ *  workspace id, first record wins. */
+export async function listOrganismWorkspaceEntries(storage: Storage, orgId: string): Promise<WorkspaceRegistryEntry[]> {
+  const regKey = `organism.${orgId}.meta.workspaces`;
+  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+  const seen = new Set<string>();
+  const out: WorkspaceRegistryEntry[] = [];
+  for (const rec of items) {
+    if (rec.key !== regKey) continue;
+    const list = ((rec.value as { workspaces?: WorkspaceRegistryEntry[] } | null)?.workspaces) ?? [];
+    for (const w of list) {
+      if (!w || typeof w.id !== 'string' || seen.has(w.id)) continue;
+      seen.add(w.id);
+      out.push(w);
+    }
+  }
+  return out;
 }
 
 export interface UpdateWorkspaceOpts {
