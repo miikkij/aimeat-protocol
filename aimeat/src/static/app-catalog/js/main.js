@@ -9,6 +9,7 @@
  */
 import { I18N } from './i18n-data.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
+import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -58,34 +59,8 @@ import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwn
     try { mountLoginPill(); } catch (e) {}  // re-render the golden pill in the new language
   }
 
-  // ── IndexedDB wrapper ──────────────────────────────
-
-  const DB_NAME_GLOBAL = 'AppLauncherDB';
-  const DB_VERSION = 2;
-  const STORE_NAME = 'apps';
-
-  let dbInstance = null;
-  let currentDbMode = localStorage.getItem('appCatalogMode') || 'global';
-
-  function getDbName() {
-    if (currentDbMode === 'personal') {
-      var owner = null;
-      try {
-        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-          owner = window.AIMEAT.auth.getSession().owner || null;
-        }
-        if (!owner) {
-          var stored = localStorage.getItem('aimeat_session');
-          if (stored) owner = JSON.parse(stored).owner || null;
-        }
-      } catch(e) {}
-      if (owner) return DB_NAME_GLOBAL + '_' + owner;
-    }
-    return DB_NAME_GLOBAL;
-  }
-
   function switchDbMode(mode) {
-    if (mode === currentDbMode) return;
+    if (mode === getDbMode()) return;
     // Personal mode is per-account and meaningless without a session — it would silently show the
     // shared Global DB (the "my apps vanished when I changed browser" confusion). Require sign-in
     // first, keeping the toggle on the current mode until the user actually signs in.
@@ -94,12 +69,8 @@ import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwn
       requireSignInThen(function () { switchDbMode('personal'); });
       return;
     }
-    currentDbMode = mode;
-    localStorage.setItem('appCatalogMode', mode);
-    if (dbInstance) {
-      dbInstance.close();
-      dbInstance = null;
-    }
+    setDbMode(mode);
+    closeDbInstance();
     updateModeToggle();
     refreshAll();
   }
@@ -108,88 +79,12 @@ import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwn
     var globalBtn = document.getElementById('mode-global');
     var personalBtn = document.getElementById('mode-personal');
     if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle('active', currentDbMode === 'global');
-    personalBtn.classList.toggle('active', currentDbMode === 'personal');
+    globalBtn.classList.toggle('active', getDbMode() === 'global');
+    personalBtn.classList.toggle('active', getDbMode() === 'personal');
     // Personal needs a session — dim it and explain via the title when logged out.
     var signedIn = !!currentOwnerName();
     personalBtn.classList.toggle('mode-btn-locked', !signedIn);
     personalBtn.title = signedIn ? t('mode.personal.title') : t('mode.personal.needsLogin');
-  }
-
-  function openDB() {
-    var name = getDbName();
-    if (dbInstance && dbInstance.name === name) return Promise.resolve(dbInstance);
-    if (dbInstance) { dbInstance.close(); dbInstance = null; }
-    return new Promise(function (resolve, reject) {
-      const request = indexedDB.open(name, DB_VERSION);
-
-      request.onupgradeneeded = function (event) {
-        const db = event.target.result;
-        var store;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-          store.createIndex('tags', 'tags', { multiEntry: true });
-          store.createIndex('source', 'source', { unique: false });
-          store.createIndex('favorite', 'favorite', { unique: false });
-          store.createIndex('sortOrder', 'sortOrder', { unique: false });
-        } else {
-          store = event.target.transaction.objectStore(STORE_NAME);
-          if (!store.indexNames.contains('sortOrder')) {
-            store.createIndex('sortOrder', 'sortOrder', { unique: false });
-          }
-        }
-      };
-
-      request.onsuccess = function (event) {
-        dbInstance = event.target.result;
-        resolve(dbInstance);
-      };
-
-      request.onerror = function (event) {
-        reject(event.target.error);
-      };
-    });
-  }
-
-  function getAllApps() {
-    return openDB().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.getAll();
-
-        request.onsuccess = function () {
-          resolve(request.result);
-        };
-        request.onerror = function () {
-          reject(request.error);
-        };
-      });
-    });
-  }
-
-  function saveApp(app) {
-    return openDB().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put(app);
-        tx.oncomplete = function () { resolve(); };
-        tx.onerror = function () { reject(tx.error); };
-        tx.onabort = function () { reject(tx.error); };
-      });
-    });
-  }
-
-  function deleteApp(id) {
-    return openDB().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).delete(id);
-        tx.oncomplete = function () { resolve(); };
-        tx.onerror = function () { reject(tx.error); };
-        tx.onabort = function () { reject(tx.error); };
-      });
-    });
   }
 
   // ── Config (localStorage) ─────────────────────────
@@ -3372,13 +3267,12 @@ import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwn
   function onAuthChanged() {
     // Personal mode is per-account: if the user signed OUT while in it, fall back to Global — it
     // would otherwise silently show the shared Global DB.
-    if (currentDbMode === 'personal' && !currentOwnerName()) {
-      currentDbMode = 'global';
-      localStorage.setItem('appCatalogMode', 'global');
+    if (getDbMode() === 'personal' && !currentOwnerName()) {
+      setDbMode('global');
     }
     // The per-account IndexedDB changes with the signed-in owner, so re-open it and re-render the
     // LOCAL grid + tags too — not just the server sections (the stale-grid-after-login bug).
-    if (dbInstance) { try { dbInstance.close(); } catch (e) {} dbInstance = null; }
+    closeDbInstance();
     updateModeToggle();
     try { refreshAll(); } catch (e) { try { loadPublishedApps(); } catch (e2) {} }
     var sub = document.getElementById('publish-submit-btn');
