@@ -1956,4 +1956,28 @@
     }
     .view-empty p { margin: 0 0 6px; font-size: 1rem; font-weight: 600; color: var(--text); }
     .view-empty .view-empty-hint { font-size: .85rem; font-weight: 400; color: var(--text-muted); max-width: 460px; margin: 0 auto; line-height: 1.5; }
+
+    /* ── Unified app card: one card per app with a status badge ────────────────
+       Local + Published + Parked collapse into a single card; the badge says which. */
+    .app-status-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-size: .62rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+      max-width: calc(100% - 44px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .app-status-badge.st-published { color: #0e9f6e; border-color: #0e9f6e55; }
+    .app-status-badge.st-parked    { color: #d97706; border-color: #d9770655; }
+    .app-status-badge.st-server    { color: #3b82f6; border-color: #3b82f655; }
+    .app-card.server-only .app-icon { background: var(--bg-subtle); }
   
