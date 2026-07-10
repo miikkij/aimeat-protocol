@@ -5965,9 +5965,17 @@
   function detailLaunch() {
     var app = detailGetApp();
     if (!app) return;
-    if (app.published && app.publishedUrl) {
+    if (app.published && (app.publishedUrl || app.publishedFilename)) {
       var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
-      viewPublished(base + app.publishedUrl + "?mode=inline", app.name);
+      var url;
+      if (app.publishedUrl) {
+        url = base + app.publishedUrl;
+      } else {
+        var st = serverStateByFilename[app.publishedFilename] || {};
+        var owner = st.owner || currentOwnerName() || "";
+        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+      }
+      viewPublished(url + "?mode=inline", app.name);
     } else {
       launchApp(app.id, app.openMode || "tab");
     }
