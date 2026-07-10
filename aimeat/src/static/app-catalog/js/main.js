@@ -2065,6 +2065,30 @@ import { I18N } from './i18n-data.js';
     arrow.classList.toggle('open', parkedVisible);
   }
 
+  // ── Two views: Kirjasto (your apps: local + published + parked) / Yhteisö (community) ──
+  // Sections carry data-view; body[data-active-view] hides the inactive one via CSS.
+  function switchView(view) {
+    if (view !== 'community') view = 'library';
+    document.body.setAttribute('data-active-view', view);
+    var lib = document.getElementById('view-tab-library');
+    var com = document.getElementById('view-tab-community');
+    if (lib) lib.classList.toggle('active', view === 'library');
+    if (com) com.classList.toggle('active', view === 'community');
+    try { localStorage.setItem('appCatalogView', view); } catch (e) { /* private mode */ }
+    updateCommunityEmpty();
+  }
+
+  // Empty-state for the Community view: shown only when that view is active and has no apps
+  // (an empty tab reads as broken, so say why it's empty).
+  function updateCommunityEmpty() {
+    var empty = document.getElementById('community-empty');
+    if (!empty) return;
+    var grid = document.getElementById('community-grid');
+    var hasApps = !!grid && grid.children.length > 0;
+    var inCommunity = document.body.getAttribute('data-active-view') === 'community';
+    empty.style.display = (!hasApps && inCommunity) ? 'block' : 'none';
+  }
+
   // Owner-match: an app belongs to the logged-in user when the bare owner names
   // match, regardless of whether either side carries a `@node` suffix. Legacy
   // publish paths stored ownerName as the full GHII, so an exact string compare
@@ -2916,6 +2940,8 @@ import { I18N } from './i18n-data.js';
     if (!section || !grid || !countEl) return;
     if (serverApps.length === 0) {
       section.style.display = 'none';
+      grid.innerHTML = '';
+      updateCommunityEmpty();
       return;
     }
 
@@ -2960,6 +2986,7 @@ import { I18N } from './i18n-data.js';
         '</div>';
     }
     grid.innerHTML = html;
+    updateCommunityEmpty();
   }
 
   // Render the owner's PARKED apps in their own section. A parked app is hidden from
@@ -5171,6 +5198,7 @@ import { I18N } from './i18n-data.js';
     togglePublished: togglePublished,
     toggleCommunity: toggleCommunity,
     toggleParked: toggleParked,
+    switchView: switchView,
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
@@ -5272,6 +5300,10 @@ import { I18N } from './i18n-data.js';
       : ((loadConfig().language === 'fi') ? 'fi' : 'en');
     applyI18n();
     updateModeToggle();
+    // Restore the last-used view (Kirjasto / Yhteisö); defaults to Library.
+    var _savedView = 'library';
+    try { _savedView = localStorage.getItem('appCatalogView') || 'library'; } catch (e) { /* private mode */ }
+    switchView(_savedView);
     // Mount the shared golden login pill (loads aimeat-auth.js, restores session).
     mountLoginPill();
 
