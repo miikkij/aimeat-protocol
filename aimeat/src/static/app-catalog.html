@@ -79,6 +79,15 @@
       (no delete-then-reinstall window, reads the real response envelope); launchInIframe never frames a
       cross-origin URL and the postMessage auth bridge refuses non-same-origin frames (no owner-JWT
       leak); launchInTab runs local blob apps in the sandboxed iframe instead of top-level.
+    v2.11.0 — 2026-07-10 — TARGET-021 Aalto 1 (correctness): detailAiRun sends the FULL app source
+      to the AI (removed the 120k-char truncation that silently dropped a big app's tail); re-publish
+      no longer hardcodes category='utility'/uses_cortex=[] and now sends the icon (server carries
+      them forward); every server-error read uses error.message (the error_description/error_code
+      fields never existed → always "Unknown error"); extractZip parses the central directory so
+      data-descriptor zips (git archive / GitHub "Download ZIP") no longer extract to zero files;
+      loadPublishedApps pages through /v1/apps (limit 200 + offset) so accounts with >50 apps are not
+      truncated; URL apps always open TOP-LEVEL (apex ?mode=inline can't be framed — frame-ancestors
+      CSP — and cross-origin would leak the token), only local blobs are framed.
 -->
 <html lang="en">
 <head>
@@ -3250,18 +3259,40 @@
   async function extractZip(arrayBuffer) {
     var view = new DataView(arrayBuffer);
     var files = [];
-    var offset = 0;
 
-    while (offset < view.byteLength - 4) {
-      var sig = view.getUint32(offset, true);
-      if (sig !== 0x04034b50) break; // Not a local file header
+    // Parse via the CENTRAL DIRECTORY, not the local headers: when the data-descriptor bit
+    // (general-purpose flag bit 3) is set — git archive, GitHub "Download ZIP", streamed zips —
+    // the local header carries compressedSize 0 (the real size lives in a trailing descriptor),
+    // which used to truncate every file to zero bytes. The central directory always has the
+    // authoritative sizes.
+    // 1. Find the End Of Central Directory record (0x06054b50), scanning back from the end.
+    var eocd = -1;
+    for (var p = view.byteLength - 22; p >= 0; p--) {
+      if (view.getUint32(p, true) === 0x06054b50) { eocd = p; break; }
+    }
+    if (eocd === -1) throw new Error('Not a valid ZIP (no end-of-central-directory record)');
+    var cdCount = view.getUint16(eocd + 10, true);
+    var cdPos = view.getUint32(eocd + 16, true);
 
-      var compressionMethod = view.getUint16(offset + 8, true);
-      var compressedSize = view.getUint32(offset + 18, true);
-      var nameLen = view.getUint16(offset + 26, true);
-      var extraLen = view.getUint16(offset + 28, true);
-      var name = new TextDecoder().decode(new Uint8Array(arrayBuffer, offset + 30, nameLen));
-      var dataStart = offset + 30 + nameLen + extraLen;
+    for (var n = 0; n < cdCount && cdPos + 46 <= view.byteLength; n++) {
+      if (view.getUint32(cdPos, true) !== 0x02014b50) break; // central-directory file header
+      var compressionMethod = view.getUint16(cdPos + 10, true);
+      var compressedSize = view.getUint32(cdPos + 20, true);
+      var nameLen = view.getUint16(cdPos + 28, true);
+      var extraLen = view.getUint16(cdPos + 30, true);
+      var commentLen = view.getUint16(cdPos + 32, true);
+      var localOffset = view.getUint32(cdPos + 42, true);
+      var name = new TextDecoder().decode(new Uint8Array(arrayBuffer, cdPos + 46, nameLen));
+      cdPos += 46 + nameLen + extraLen + commentLen;
+
+      if (name.endsWith('/')) continue; // directory
+      if (view.getUint32(localOffset, true) !== 0x04034b50) continue; // not a local header
+
+      // The data starts after the LOCAL header's name + extra fields (its extra length can
+      // differ from the central directory's), but its SIZE comes from the central directory.
+      var lNameLen = view.getUint16(localOffset + 26, true);
+      var lExtraLen = view.getUint16(localOffset + 28, true);
+      var dataStart = localOffset + 30 + lNameLen + lExtraLen;
       var rawData = new Uint8Array(arrayBuffer, dataStart, compressedSize);
 
       var data;
@@ -3282,19 +3313,16 @@
         }
         var totalLen = chunks.reduce(function (s, c) { return s + c.length; }, 0);
         data = new Uint8Array(totalLen);
-        var pos = 0;
+        var dpos = 0;
         for (var ci = 0; ci < chunks.length; ci++) {
-          data.set(chunks[ci], pos);
-          pos += chunks[ci].length;
+          data.set(chunks[ci], dpos);
+          dpos += chunks[ci].length;
         }
       } else {
         throw new Error('Unsupported compression method: ' + compressionMethod);
       }
 
-      if (!name.endsWith('/')) { // Skip directories
-        files.push({ name: name, data: data });
-      }
-      offset = dataStart + compressedSize;
+      files.push({ name: name, data: data });
     }
 
     return files;
@@ -3881,16 +3909,13 @@
     iframe.dataset.appId = app.id;
 
     if (app.source === 'url' && app.url) {
-      // Never frame a cross-origin (third-party) URL: the postMessage auth bridge below would hand
-      // it the owner's session token. Cross-origin app URLs open TOP-LEVEL in a new tab instead
-      // (same as viewPublished). Only same-origin apex URLs (the node itself) are framed.
-      if (!isSameOriginUrl(app.url)) {
-        window.open(app.url, '_blank', 'noopener');
-        return;
-      }
-      iframe.removeAttribute('srcdoc');
-      iframe.src = app.url;
-      currentIframeUrl = app.url;
+      // URL apps are never framed. A cross-origin URL would leak the session token via the
+      // postMessage auth bridge below; an apex ?mode=inline URL is blocked by the served app's
+      // frame-ancestors CSP and shows "Sign in to continue" because the framed session never
+      // propagates. Open the app TOP-LEVEL instead — the server serves it inline (session
+      // inherited) or 301s to the isolated app origin, the same clean full page as viewPublished.
+      window.open(app.url, '_blank', 'noopener');
+      return;
     } else if (app.blob) {
       var html = decodeURIComponent(escape(atob(app.blob)));
       iframe.removeAttribute('src');
@@ -4896,16 +4921,18 @@
     statusEl.style.color = '#34d399';
     submitBtn.disabled = true;
 
+    // Omit category + uses_cortex: the server defaults them for a NEW app and now CARRIES THE
+    // EXISTING VALUES FORWARD on a re-publish. Hardcoding 'utility'/[] here used to reset the
+    // server manifest on every update. Send the icon so a re-publish keeps it.
     var body = {
       filename: filename,
       content: htmlContent,
       mime_type: 'text/html',
       name: app.name || filename.replace(/\.html?$/i, ''),
       description: app.description || '',
-      category: 'utility',
-      tags: app.tags || [],
-      uses_cortex: []
+      tags: app.tags || []
     };
+    if (app.icon) body.icon = app.icon;
     if (accessCode) body.access_code = accessCode;
 
     fetch(aimeatUrl + '/v1/apps', {
@@ -4932,7 +4959,7 @@
             loadPublishedApps();
           });
         } else {
-          statusEl.textContent = '\u2718 ' + (json.error_description || json.error_code || 'Publish failed');
+          statusEl.textContent = '\u2718 ' + ((json.error && json.error.message) || 'Publish failed');
           statusEl.style.color = 'var(--accent)';
           submitBtn.disabled = false;
         }
@@ -5631,6 +5658,26 @@
   // app's metadata (name, description, category, tags, icon) without a re-fetch.
   var serverAppManifests = {};
 
+  // Fetch ALL server apps across pages — the /v1/apps default limit is 50, so a single request
+  // silently dropped everything beyond the newest 50 (community apps + the owner's older apps,
+  // and the "not in this catalog" banner undercounted). Loop by offset until we have them all.
+  function fetchAllPublishedApps(aimeatUrl, headers) {
+    var LIMIT = 200; // the server caps limit at 200
+    var all = [];
+    function page(offset) {
+      return fetch(aimeatUrl + '/v1/apps?limit=' + LIMIT + '&offset=' + offset, { headers: headers })
+        .then(function(resp) { if (!resp.ok) throw new Error('Server returned ' + resp.status); return resp.json(); })
+        .then(function(json) {
+          var apps = (json.data && json.data.apps) || [];
+          all = all.concat(apps);
+          var total = (json.data && typeof json.data.total === 'number') ? json.data.total : all.length;
+          if (apps.length === LIMIT && all.length < total) return page(offset + LIMIT);
+          return { data: { apps: all, total: total } };
+        });
+    }
+    return page(0);
+  }
+
   function loadPublishedApps() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
@@ -5681,11 +5728,7 @@
       var listHeaders = {};
       var listTok = getCortexOwnerToken();
       if (listTok) listHeaders['Authorization'] = 'Bearer ' + listTok;
-      fetch(aimeatUrl + '/v1/apps', { headers: listHeaders })
-        .then(function(resp) {
-          if (!resp.ok) throw new Error('Server returned ' + resp.status);
-          return resp.json();
-        })
+      fetchAllPublishedApps(aimeatUrl, listHeaders)
         .then(function(json) {
           var serverApps = json.data && json.data.apps ? json.data.apps : [];
 
@@ -6008,7 +6051,7 @@
             loadPublishedApps();
           });
         } else {
-          alert('Failed to remove: ' + (json.error_description || 'Unknown error'));
+          alert('Failed to remove: ' + ((json.error && json.error.message) || 'Unknown error'));
         }
       })
       .catch(function(err) {
@@ -6705,11 +6748,8 @@
     var html = app.blob ? blobToHtml(app.blob) : '';
     if (!html) { statusEl.textContent = t('detail.urlCantEdit'); return; }
 
-    // Cap context to keep the request from blowing the model window; warn if cut.
-    var MAX = 120000;
-    var truncated = false;
-    if (html.length > MAX) { html = html.slice(0, MAX); truncated = true; }
-
+    // Send the FULL source — no truncation. Modern models take multi-MB context, and cutting the
+    // tail silently produced drafts missing the app's end (a big app like LOOM lost content).
     var systemPrompt = 'You are editing a single-file HTML web app that runs on the AIMEAT platform. '
       + 'You will be given the current full HTML source and a change request. '
       + 'Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. '
@@ -6735,7 +6775,7 @@
         runBtn.disabled = false;
         if (!json || !json.ok) {
           var code = (json && json.error && json.error.code) || '';
-          var msg = (json && json.error && (json.error.message)) || (json && json.error_description) || 'AI request failed';
+          var msg = (json && json.error && json.error.message) || 'AI request failed';
           statusEl.style.color = 'var(--accent)';
           statusEl.textContent = '✘ ' + (code ? '[' + code + '] ' : '') + msg;
           return;
@@ -6751,7 +6791,7 @@
         statusEl.style.color = '#34d399';
         var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== 'undefined'
           ? (' · ' + t('detail.aiUsage') + ': $' + Number(json.data.budget.spent_today_usd).toFixed(3)) : '';
-        statusEl.textContent = '✔ ' + t('detail.draftReady') + (truncated ? ' (' + t('detail.aiTruncated') + ')' : '') + usage;
+        statusEl.textContent = '✔ ' + t('detail.draftReady') + usage;
         renderDetailView();
         // renderDetailView rebuilds the status line; restore the success message after.
         var s2 = document.getElementById('detail-ai-status');
@@ -6998,7 +7038,7 @@
           loadPublishedApps();
           setTimeout(function() { document.getElementById('protection-overlay').hidden = true; }, 800);
         } else {
-          statusEl.textContent = '✘ ' + (json.error_description || (json.error && json.error.message) || 'Failed');
+          statusEl.textContent = '✘ ' + ((json.error && json.error.message) || 'Failed');
           statusEl.style.color = 'var(--accent)';
         }
       })
@@ -7097,7 +7137,7 @@
           loadPublishedApps();
           setTimeout(function() { showVersionsModal(owner, filename); }, 500);
         } else {
-          statusEl.textContent = '✘ ' + (json.error_description || (json.error && json.error.message) || 'Restore failed');
+          statusEl.textContent = '✘ ' + ((json.error && json.error.message) || 'Restore failed');
           statusEl.style.color = 'var(--accent)';
         }
       })
@@ -7143,7 +7183,7 @@
           else alert(msg);
           loadPublishedApps();
         } else {
-          var err = json.error_description || (json.error && json.error.message) || 'Fork failed';
+          var err = (json.error && json.error.message) || 'Fork failed';
           if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
           else alert((t('fork.failed') || 'Fork failed') + ': ' + err);
         }
