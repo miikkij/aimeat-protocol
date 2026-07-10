@@ -95,6 +95,16 @@
       light-theme CSS vars (--border-hover/--text-muted/--text-dim/--bg-subtle/--hover) get real
       values; the tag bar wraps so every tag is reachable (was an unreachable hidden-scrollbar row)
       with case-insensitive dedup ("Tools"=="tools"); the publish modal auto-closes on success.
+    v2.13.0 — 2026-07-10 — TARGET-021 Aalto 2 (rest): search + tag filter now cover EVERY section
+      (Published / Community / Parked carry a data-filter/data-tags attribute + applyServerFilter),
+      not just Local — a published app's name no longer returns "no matches"; the theme is unified on
+      the shared `aimeat-theme` key (setTheme writes it + config, getThemePref reads it first, a
+      MutationObserver + storage listener keep the header ☀️ in step with the login pill's ☾) — no
+      more data-theme=dark + aimeat-theme=light at once; the server-import ignore-list is keyed per
+      catalog DB (mode + owner) so tombstones no longer resurface the banner on a mode switch, import
+      failures are surfaced per-app (only successes clear their tombstone), and the modal has a
+      permanent entry in Settings; a "?" Help modal explains modes / where apps live / the two
+      "backup" meanings / standalone; the remaining native confirm() dialogs go through t().
 -->
 <html lang="en">
 <head>
@@ -786,6 +796,9 @@
       gap: 10px;
       justify-content: flex-end;
     }
+
+    .help-modal { max-width: 640px; }
+    .help-p { font-size: .85rem; color: var(--text-muted); line-height: 1.55; margin-top: 4px; }
 
     .modal-btn {
       padding: 10px 22px;
@@ -1929,6 +1942,7 @@
         <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
       </div>
       <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
+      <button class="icon-btn" id="help-btn" onclick="window._launcher.openHelp()" data-i18n-title="action.help" title="Help">?</button>
       <button class="icon-btn" id="settings-btn" data-i18n-title="action.settings" title="Settings">&#x2699;</button>
     </div>
   </header>
@@ -2148,6 +2162,35 @@
   </div>
 
   <!-- Settings Modal -->
+  <div id="help-overlay" hidden>
+    <div class="modal help-modal">
+      <h2 data-i18n="help.title">❓ How this catalog works</h2>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.modesTitle">Global vs Personal</div>
+        <p class="help-p" data-i18n="help.modes">Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.whereTitle">Where your apps live</div>
+        <p class="help-p" data-i18n="help.where">"Local Apps" live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, and then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.sectionsTitle">The sections</div>
+        <p class="help-p" data-i18n="help.sections">Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people's published apps. Local = apps only in this browser.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.backupTitle">"Backup" means two different things</div>
+        <p class="help-p" data-i18n="help.backup">The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.standaloneTitle">Run it against your own node</div>
+        <p class="help-p" data-i18n="help.standalone">Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn primary" onclick="window._launcher.closeHelp()" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-overlay" hidden>
     <div class="modal" id="settings-modal">
       <h2 data-i18n="settings.title">Settings</h2>
@@ -2194,6 +2237,7 @@
         <div class="settings-backup-actions">
           <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
           <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.settingsBtn">📥 Import from server…</button>
           <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
           <input type="file" id="import-file-input" accept=".json" hidden/>
         </div>
@@ -2431,9 +2475,29 @@
       'action.generate': 'Generate with AI',
       'action.homepage': 'Generate Homepage',
       'action.settings': 'Settings',
+      'action.help': 'Help',
+      'help.title': '❓ How this catalog works',
+      'help.modesTitle': 'Global vs Personal',
+      'help.modes': 'Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.',
+      'help.whereTitle': 'Where your apps live',
+      'help.where': '"Local Apps" live only in this browser (IndexedDB) — they don\'t follow you to another browser or device. Publish an app to put it on the server, then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.',
+      'help.sectionsTitle': 'The sections',
+      'help.sections': 'Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people\'s published apps. Local = apps only in this browser.',
+      'help.backupTitle': '"Backup" means two different things',
+      'help.backup': 'The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser\'s LOCAL catalog. They are separate.',
+      'help.standaloneTitle': 'Run it against your own node',
+      'help.standalone': 'Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.',
       'action.theme': 'Toggle light / dark',
       'lang.label': 'Language',
       'common.close': 'Close',
+      'confirm.deleteApp': 'Delete "{name}"?',
+      'confirm.clearAll1': 'Are you sure you want to clear all data? This cannot be undone.',
+      'confirm.clearAll2': 'This will delete ALL apps and reset settings. Continue?',
+      'confirm.removePublished': 'Remove this published app from the server?',
+      'confirm.deleteFromServer': 'Delete "{file}" from the server?',
+      'confirm.clearScreenshot': 'Clear the current screenshot? The node takes a fresh one on its next scheduled run.',
+      'confirm.restoreVersion': 'Restore version {version} of "{file}"?\n\nIt will be re-published as a new latest version. Older versions are kept.',
+      'confirm.unsavedClose': 'You have unsaved changes. Close anyway?',
       'common.cancel': 'Cancel',
       'common.save': 'Save',
       'common.or': 'or',
@@ -2665,6 +2729,9 @@
       'srvImport.desc': 'These apps are published under your account on the server but missing from this local catalog. Choose which ones to import — nothing is imported automatically.',
       'srvImport.import': 'Import selected',
       'srvImport.importing': 'Importing...',
+      'srvImport.someFailed': 'Some apps failed to import',
+      'srvImport.settingsBtn': '📥 Import from server…',
+      'srvImport.nothingMissing': 'All your published apps are already in this catalog.',
       'backup.menu': 'Backup',
       'backup.exportAll': '📦 Export all (.zip)',
       'backup.importFrom': '📥 Import from backup...',
@@ -2729,9 +2796,29 @@
       'action.generate': 'Luo tekoälyllä',
       'action.homepage': 'Luo kotisivu',
       'action.settings': 'Asetukset',
+      'action.help': 'Ohje',
+      'help.title': '❓ Miten tämä katalogi toimii',
+      'help.modesTitle': 'Global vs Henkilökohtainen',
+      'help.modes': 'Molemmat ovat TÄSSÄ selaimessa. Global-appit jaetaan kaikille tähän selaimeen kirjautuneille tileille; henkilökohtaiset appit ovat yksityisiä tilillesi. Henkilökohtainen vaatii sisäänkirjautumisen.',
+      'help.whereTitle': 'Missä appisi asuvat',
+      'help.where': '"Paikalliset sovellukset" asuvat vain tässä selaimessa (IndexedDB) — ne eivät seuraa toiseen selaimeen tai laitteeseen. Julkaise appi siirtääksesi sen palvelimelle, minkä jälkeen hallitset sitä mistä tahansa. Appin pitäminen vain paikallisena on pätevä valinta; se vain pysyy täällä.',
+      'help.sectionsTitle': 'Osiot',
+      'help.sections': 'Julkaistut = appisi palvelimella. Parkissa = palvelinappisi jotka on piilotettu julkisesta katalogista mutta ovat yhä käytettävissäsi. Yhteisö = muiden julkaisemat appit. Paikalliset = vain tässä selaimessa olevat appit.',
+      'help.backupTitle': '"Varmuuskopio" tarkoittaa kahta eri asiaa',
+      'help.backup': '💾-valikko (yläpalkki) vie/tuo PALVELIN-appisi + laajennukset .zip-tiedostona. Asetukset → Vie/Tuo JSON varmuuskopioi tämän selaimen PAIKALLISEN katalogin. Ne ovat erillisiä.',
+      'help.standaloneTitle': 'Aja omaa nodea vasten',
+      'help.standalone': 'Aseta Asetukset → Palvelin-URL osoittamaan mihin tahansa AIMEAT-nodeen (esim. omaan localhostiin tai federoituun nodeen). Tämä sivu on tarkoitettu käytettäväksi itsenäisesti valitsemaasi nodea vasten.',
       'action.theme': 'Vaihda vaalea / tumma',
       'lang.label': 'Kieli',
       'common.close': 'Sulje',
+      'confirm.deleteApp': 'Poistetaanko "{name}"?',
+      'confirm.clearAll1': 'Haluatko varmasti tyhjentää kaikki tiedot? Tätä ei voi perua.',
+      'confirm.clearAll2': 'Tämä poistaa KAIKKI appit ja nollaa asetukset. Jatketaanko?',
+      'confirm.removePublished': 'Poistetaanko tämä julkaistu appi palvelimelta?',
+      'confirm.deleteFromServer': 'Poistetaanko "{file}" palvelimelta?',
+      'confirm.clearScreenshot': 'Tyhjennetäänkö nykyinen kuvakaappaus? Node ottaa uuden seuraavalla ajastetulla ajolla.',
+      'confirm.restoreVersion': 'Palautetaanko versio {version} appista "{file}"?\n\nSe julkaistaan uudelleen uusimpana versiona. Vanhat versiot säilytetään.',
+      'confirm.unsavedClose': 'Sinulla on tallentamattomia muutoksia. Suljetaanko silti?',
       'common.cancel': 'Peruuta',
       'common.save': 'Tallenna',
       'common.or': 'tai',
@@ -2963,6 +3050,9 @@
       'srvImport.desc': 'Nämä appit on julkaistu tililläsi palvelimella mutta puuttuvat paikallisesta katalogista. Valitse mitkä tuodaan — mitään ei tuoda automaattisesti.',
       'srvImport.import': 'Tuo valitut',
       'srvImport.importing': 'Tuodaan...',
+      'srvImport.someFailed': 'Osaa appeista ei voitu tuoda',
+      'srvImport.settingsBtn': '📥 Tuo palvelimelta…',
+      'srvImport.nothingMissing': 'Kaikki julkaistut appisi ovat jo tässä katalogissa.',
       'backup.menu': 'Varmuuskopio',
       'backup.exportAll': '📦 Vie kaikki (.zip)',
       'backup.importFrom': '📥 Tuo varmuuskopiosta...',
@@ -3866,6 +3956,7 @@
   function filterByTag(tag) {
     activeTag = tag;
     renderApps();
+    applyServerFilter();
   }
 
   // ── Launch App ──────────────────────────────────
@@ -4222,7 +4313,7 @@
         break;
 
       case 'delete':
-        if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
+        if (confirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
           // Tombstone published apps so the server copy isn't re-imported as a
           // "new" AI-published app on the next load.
           if (app.publishedFilename) addImportIgnore(app.publishedFilename);
@@ -4377,15 +4468,33 @@
     if (btn) btn.textContent = dark ? '☀️' : '🌙';
   }
 
-  // Quick light/dark switch from the header (no need to open Settings).
+  // Quick light/dark switch from the header. Flips from the LIVE data-theme so it agrees with the
+  // login pill's ☾ (which may have changed the theme without touching the catalog's own config).
   function toggleTheme() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    setTheme(dark ? 'light' : 'dark');
+  }
+
+  // Single source of truth for the theme: the shared AIMEAT key `aimeat-theme` (what the login
+  // pill's ☾ and every generated app read) — kept in sync with the catalog's own config so the two
+  // toggles never disagree (the old split wrote config.theme here but aimeat-theme in the pill,
+  // leaving data-theme=dark and aimeat-theme=light at the same time).
+  function setTheme(theme) {
+    try { localStorage.setItem('aimeat-theme', theme); } catch (e) {}
     var config = loadConfig();
-    var next = (config.theme === 'dark') ? 'light' : 'dark';
-    config.theme = next;
+    config.theme = theme;
     saveConfig(config);
-    applyTheme(next);
+    applyTheme(theme);
     var sel = document.getElementById('setting-theme');
-    if (sel) sel.value = next;
+    if (sel) sel.value = theme;
+  }
+
+  function getThemePref() {
+    try { var t = localStorage.getItem('aimeat-theme'); if (t === 'dark' || t === 'light') return t; } catch (e) {}
+    var c = loadConfig().theme;
+    if (c === 'dark' || c === 'light') return c;
+    try { return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch (e) {}
+    return 'light';
   }
 
   // ── Settings ────────────────────────────────────
@@ -4405,6 +4514,7 @@
     config.defaultOpenMode = document.getElementById('setting-open-mode').value;
     config.aimeatUrl = document.getElementById('setting-aimeat-url').value.trim();
     saveConfig(config);
+    try { localStorage.setItem('aimeat-theme', config.theme); } catch (e) {}
     applyTheme(config.theme);
     document.getElementById('settings-overlay').hidden = true;
     // Sync config to server (best-effort)
@@ -4490,6 +4600,9 @@
   function closeSettings() {
     document.getElementById('settings-overlay').hidden = true;
   }
+
+  function openHelp() { document.getElementById('help-overlay').hidden = false; }
+  function closeHelp() { document.getElementById('help-overlay').hidden = true; }
 
   // ── Export / Import ─────────────────────────────
 
@@ -4659,8 +4772,8 @@
   // ── Clear All Data ──────────────────────────────
 
   function clearAllData() {
-    if (!confirm('Are you sure you want to clear all data? This cannot be undone.')) return;
-    if (!confirm('This will delete ALL apps and reset settings. Continue?')) return;
+    if (!confirm(t('confirm.clearAll1'))) return;
+    if (!confirm(t('confirm.clearAll2'))) return;
 
     openDB().then(function (db) {
       return new Promise(function (resolve, reject) {
@@ -5539,23 +5652,25 @@
   // deleted locally so the banner doesn't nag about them (they stay reachable
   // in the modal, unchecked).
 
-  var IMPORT_IGNORE_KEY = 'appCatalogImportIgnore';
+  // The import ignore-list ("Not now" tombstones) is keyed PER catalog DB (mode + owner), the same
+  // way the local catalog is — the old single shared key meant a tombstone set in Global re-surfaced
+  // the banner in Personal (and vice versa) on every mode switch.
+  function importIgnoreKey() { return 'appCatalogImportIgnore.' + getDbName(); }
 
   function getImportIgnore() {
-    try { return JSON.parse(localStorage.getItem(IMPORT_IGNORE_KEY) || '[]'); } catch (e) { return []; }
+    try { return JSON.parse(localStorage.getItem(importIgnoreKey()) || '[]'); } catch (e) { return []; }
   }
 
   function addImportIgnore(filename) {
     var list = getImportIgnore();
     if (list.indexOf(filename) === -1) {
       list.push(filename);
-      localStorage.setItem(IMPORT_IGNORE_KEY, JSON.stringify(list));
+      localStorage.setItem(importIgnoreKey(), JSON.stringify(list));
     }
   }
 
   function removeImportIgnore(filename) {
-    var list = getImportIgnore().filter(function (f) { return f !== filename; });
-    localStorage.setItem(IMPORT_IGNORE_KEY, JSON.stringify(list));
+    localStorage.setItem(importIgnoreKey(), JSON.stringify(getImportIgnore().filter(function (f) { return f !== filename; })));
   }
 
   // State for the review modal: own server apps with no local copy.
@@ -5589,9 +5704,17 @@
   }
 
   function showServerImportModal() {
-    var missing = serverImportState.missing;
+    var settingsOv = document.getElementById('settings-overlay');
+    if (settingsOv) settingsOv.hidden = true; // may be opened from Settings — don't stack overlays
+    var missing = serverImportState.missing || [];
     var body = document.getElementById('server-import-body');
     var ignore = getImportIgnore();
+    if (missing.length === 0) {
+      body.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted);padding:8px 0">' + t('srvImport.nothingMissing') + '</p>';
+      document.getElementById('server-import-status').textContent = '';
+      document.getElementById('server-import-overlay').hidden = false;
+      return;
+    }
     var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t('srvImport.desc') + '</p>' +
       '<div class="backup-toolbar-row"><div>' +
         '<button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
@@ -5634,12 +5757,21 @@
     }
     statusEl.style.color = 'var(--text-muted)';
     statusEl.textContent = t('srvImport.importing');
-    importServerApps(selected, serverImportState.aimeatUrl).then(function () {
-      // Importing an app the user once deleted is an explicit re-opt-in
-      selected.forEach(function (sa) { removeImportIgnore(sa.filename); });
-      document.getElementById('server-import-overlay').hidden = true;
+    importServerApps(selected, serverImportState.aimeatUrl).then(function (res) {
+      // Re-opt-in only the apps that ACTUALLY imported (clear their tombstone); keep the failed
+      // ones tombstoned so the user can retry, and tell them which failed instead of the old
+      // silent drop + "everything succeeded" close.
+      var failedNames = {};
+      res.failed.forEach(function (f) { failedNames[f.filename] = true; });
+      selected.forEach(function (sa) { if (!failedNames[sa.filename]) removeImportIgnore(sa.filename); });
       renderApps();
       loadPublishedApps();
+      if (res.failed.length) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = t('srvImport.someFailed') + ' (' + res.failed.length + '): ' + res.failed.map(function (f) { return f.filename; }).join(', ');
+      } else {
+        document.getElementById('server-import-overlay').hidden = true;
+      }
     }).catch(function (e) {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = e.message || String(e);
@@ -5647,7 +5779,8 @@
   }
 
   function importServerApps(toImport, aimeatUrl) {
-    if (toImport.length === 0) return Promise.resolve(false);
+    if (toImport.length === 0) return Promise.resolve({ imported: 0, failed: [] });
+    var failed = [];
     return Promise.all(toImport.map(function (sa) {
       // Fetch the RAW app source (no ?mode=inline). The inline form 301-redirects to
       // the isolated app origin (…apps.<host>) when H-2 app isolation is enabled, and
@@ -5683,8 +5816,8 @@
           };
           return saveApp(app);
         })
-        .catch(function () { return null; }); // protected/unreachable app — skip silently
-    })).then(function () { return true; });
+        .catch(function (err) { failed.push({ filename: sa.filename, error: (err && err.message) || String(err) }); return null; });
+    })).then(function () { return { imported: toImport.length - failed.length, failed: failed }; });
   }
 
   // Manifest cache keyed by "owner\nfilename" — lets Restore/Fork reuse the
@@ -5804,6 +5937,7 @@
             renderPublishedApps(currentOwner ? localForPublished : [], ownPublished, localByFilename, aimeatUrl, section, grid, countEl);
             renderParkedApps(ownParked, aimeatUrl, parkedSection, parkedGrid, parkedCountEl);
             renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
+            applyServerFilter(); // re-apply any active search/tag to the freshly-rendered server cards
             // Server-published own apps missing from the local catalog are
             // NEVER imported automatically — the banner offers a review modal
             // where the user picks exactly which ones to import. (Parked apps are
@@ -5816,6 +5950,47 @@
           if (communitySection) communitySection.style.display = 'none';
           if (parkedSection) parkedSection.style.display = 'none';
         });
+    });
+  }
+
+  // Build a data-filter/data-tags attribute pair so applyServerFilter() can match a server card
+  // against the search query (name + tags substring) and the active tag (exact) without a re-fetch.
+  function filterAttr(name, tags) {
+    tags = (tags || []).map(function (tg) { return String(tg).toLowerCase(); });
+    var searchable = escapeHtml((String(name || '') + ' ' + tags.join(' ')).toLowerCase());
+    return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(',')) + '"';
+  }
+
+  // Apply the current searchQuery + activeTag to the server sections too (Published / Community /
+  // Parked). Search used to filter ONLY the Local grid, so a published app's name returned "no
+  // matches" even though its card sat two sections up. Hides non-matching cards, updates the count,
+  // and hides a section whose cards all filtered out.
+  function applyServerFilter() {
+    var q = (searchQuery || '').toLowerCase();
+    var at = activeTag;
+    var filtering = !!(q || (at !== null));
+    [['published-grid', 'published-count', 'published-section'],
+     ['community-grid', 'community-count', 'community-section'],
+     ['parked-grid', 'parked-count', 'parked-section']].forEach(function (ids) {
+      var grid = document.getElementById(ids[0]);
+      if (!grid) return;
+      var cards = grid.querySelectorAll('.published-card');
+      if (!cards.length) return;
+      var shown = 0;
+      cards.forEach(function (card) {
+        var match = true;
+        if (at === '__favorites__') { match = false; } // favorites is a Local-only filter
+        else if (at !== null) {
+          match = (',' + (card.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
+        }
+        if (match && q) match = (card.getAttribute('data-filter') || '').indexOf(q) !== -1;
+        card.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      var countEl = document.getElementById(ids[1]);
+      if (countEl) countEl.textContent = '(' + shown + ')';
+      var sectionEl = document.getElementById(ids[2]);
+      if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
     });
   }
 
@@ -5839,7 +6014,7 @@
       var author = (sa.manifest && sa.manifest.authorDisplay) ? sa.manifest.authorDisplay : (sa.owner || '');
       var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
       html +=
-        '<div class="published-card">' +
+        '<div class="published-card"' + filterAttr(name, (sa.manifest && sa.manifest.tags) || []) + '>' +
           '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
           (description ? '<div class="published-card-desc">' + escapeHtml(description) + '</div>' : '') +
           '<div class="published-card-footer">' +
@@ -5889,7 +6064,7 @@
       var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
       var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
       html +=
-        '<div class="published-card parked">' +
+        '<div class="published-card parked"' + filterAttr(name, (sa.manifest && sa.manifest.tags) || []) + '>' +
           '<div class="published-card-name">' + escapeHtml(name) +
             ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(sa.owner || '') + '\', \'' + jsArg(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">✏️</button>' +
             (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
@@ -6018,7 +6193,7 @@
         : '';
 
       html +=
-        '<div class="published-card">' +
+        '<div class="published-card"' + filterAttr(app.name, app.tags || (app.manifest && app.manifest.tags) || []) + '>' +
           '<div class="published-card-name">' + escapeHtml(app.name) +
             ((app.isOwn && app.filename) ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(app.owner || '') + '\', \'' + jsArg(app.filename) + '\', \'' + jsArg(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">✏️</button>' : '') +
           '</div>' +
@@ -6053,7 +6228,7 @@
   }
 
   function unpublishApp(appId) {
-    if (!confirm('Remove this published app from the server?')) return;
+    if (!confirm(t('confirm.removePublished'))) return;
 
     var app = null;
     for (var i = 0; i < allApps.length; i++) {
@@ -6141,7 +6316,7 @@
   }
 
   function deleteServerApp(filename) {
-    if (!confirm('Delete "' + filename + '" from the server?')) return;
+    if (!confirm(t('confirm.deleteFromServer').replace('{file}', function () { return filename; }))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
@@ -6663,7 +6838,7 @@
     var token = getCortexOwnerToken();
     if (!owner || !filename) { alert('Publish the app first, then you can refresh its screenshot.'); return; }
     if (!token) { alert('Sign in to refresh the screenshot.'); return; }
-    if (!confirm('Clear the current screenshot? The node takes a fresh one on its next scheduled run.')) return;
+    if (!confirm(t('confirm.clearScreenshot'))) return;
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
     if (!aimeatUrl) { alert('No server configured.'); return; }
@@ -6892,7 +7067,7 @@
   function detailDelete() {
     var app = detailGetApp();
     if (!app) return;
-    if (!confirm('Delete "' + (app.name || 'this app') + '"?')) return;
+    if (!confirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) return;
     if (app.publishedFilename) addImportIgnore(app.publishedFilename);
     var id = app.id;
     deleteApp(id).then(function() {
@@ -7142,7 +7317,7 @@
   }
 
   function restoreVersion(owner, filename, version) {
-    if (!confirm('Restore version ' + version + ' of "' + filename + '"?\n\nIt will be re-published as a new latest version. Older versions are kept.')) return;
+    if (!confirm(t('confirm.restoreVersion').replace('{version}', String(version)).replace('{file}', function () { return filename; }))) return;
     var token = getCortexOwnerToken();
     if (!token) { alert('You must be logged in as the owner to restore a version. Sign in first.'); return; }
     var config = loadConfig();
@@ -8061,6 +8236,8 @@
     showModal: showModal,
     closeModal: closeModal,
     openSettings: openSettings,
+    openHelp: openHelp,
+    closeHelp: closeHelp,
     saveSettings: saveSettings,
     closeSettings: closeSettings,
     applyTheme: applyTheme,
@@ -8162,7 +8339,12 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     // ── Apply theme + language on load ──────────────
-    applyTheme(loadConfig().theme);
+    applyTheme(getThemePref());
+    // Keep the header ☀️ in sync when the login pill's ☾ (or another tab) changes the theme.
+    try {
+      new MutationObserver(updateThemeToggle).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      window.addEventListener('storage', function (ev) { if (ev.key === 'aimeat-theme' && (ev.newValue === 'dark' || ev.newValue === 'light')) applyTheme(ev.newValue); });
+    } catch (e) {}
     // A ?lang= override (e.g. the portal "Build an app" link passes the language the
     // user has selected) wins over saved config so the catalog opens in that language.
     var _params = new URLSearchParams(location.search);
@@ -8197,6 +8379,7 @@
     document.getElementById('search-input').addEventListener('input', function (e) {
       searchQuery = e.target.value.trim();
       renderApps();
+      applyServerFilter();
     });
 
     // ── Add App button ──────────────────────────────
@@ -8676,7 +8859,7 @@
     function closeSourceModal() {
       var saveBtn = document.getElementById('save-source-btn');
       if (!saveBtn.disabled) {
-        if (!confirm('You have unsaved changes. Close anyway?')) return;
+        if (!confirm(t('confirm.unsavedClose'))) return;
       }
       document.getElementById('source-overlay').hidden = true;
     }
