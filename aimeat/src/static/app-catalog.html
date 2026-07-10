@@ -3785,7 +3785,7 @@
   var loadPublishedApps;
   var renderApps;
   var updateModeToggle;
-  var getCortexOwnerToken;
+  var getCortexOwnerToken2;
   var launchApp;
   var viewPublished;
   var viewSource;
@@ -3801,7 +3801,7 @@
   var getOwnProtection;
   var setIframeUrl;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -3931,7 +3931,7 @@
     var sub = document.getElementById("publish-submit-btn");
     var st = document.getElementById("publish-status");
     if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
-      if (getCortexOwnerToken()) {
+      if (getCortexOwnerToken2()) {
         sub.disabled = false;
         if (st) st.textContent = "";
       } else {
@@ -4107,7 +4107,7 @@
       finishLocal();
       return;
     }
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -4148,7 +4148,7 @@
       if (m) filename = decodeURIComponent(m[1]);
     }
     var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!owner || !filename) {
       showNotice("Publish the app first, then you can set a screenshot.");
       return;
@@ -4209,7 +4209,7 @@
       if (m) filename = decodeURIComponent(m[1]);
     }
     var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!owner || !filename) {
       showNotice("Publish the app first, then you can refresh its screenshot.");
       return;
@@ -4246,12 +4246,12 @@
     return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
   }
   function detailAiUnavailableMsg() {
-    return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
+    return getCortexOwnerToken2() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
   }
   function detailCheckAiAvailability() {
     detailAiAvailable = false;
     var config = loadConfig();
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!config.aimeatUrl || !token) {
       renderDetailView();
       return;
@@ -4328,7 +4328,7 @@
       inputEl.focus();
       return;
     }
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       statusEl.textContent = t("detail.aiLoginNeeded");
       return;
@@ -4512,7 +4512,7 @@
   }
   function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
     var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     var headers = token ? { "Authorization": "Bearer " + token } : {};
     return fetch(url, { headers }).then(function(resp) {
       if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
@@ -4610,7 +4610,7 @@
   }
   function saveProtection() {
     if (!protectionTarget) return;
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in.");
       return;
@@ -4695,7 +4695,7 @@
     if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
       return filename;
     }))) return;
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in as the owner to restore a version. Sign in first.");
       return;
@@ -4743,7 +4743,7 @@
     });
   }
   function forkVersion(owner, filename, version) {
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
       return;
@@ -4910,7 +4910,7 @@
   var cortexEditorExtName = null;
   var cortexEditorWasActive = false;
   var cortexEditorLibCounter = 0;
-  function getCortexOwnerToken2() {
+  function getCortexOwnerToken3() {
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
         return window.AIMEAT.auth.getSession().jwt;
@@ -4927,7 +4927,7 @@
   function openCortexEditor(encodedName) {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice("You must be logged in as an owner to edit extensions.");
       return;
@@ -4996,7 +4996,7 @@
   function cortexEditorSave() {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice("No auth token available.");
       return;
@@ -5618,86 +5618,13 @@
     });
   }
 
-  // src/static/app-catalog/js/main.js
-  function setLanguage(lang) {
-    setLang(lang);
-    try {
-      var config = loadConfig();
-      config.language = getLang();
-      saveConfig(config);
-    } catch (e) {
-    }
-    applyI18n();
-    try {
-      renderApps3();
-    } catch (e) {
-    }
-    try {
-      renderTags();
-    } catch (e) {
-    }
-    try {
-      loadPublishedApps3();
-    } catch (e) {
-    }
-    try {
-      renderRecentlyOpened();
-    } catch (e) {
-    }
-    try {
-      loadCortexExtensions();
-    } catch (e) {
-    }
-    try {
-      mountLoginPill();
-    } catch (e) {
-    }
-  }
-  function switchDbMode(mode) {
-    if (mode === getDbMode()) return;
-    if (mode === "personal" && !currentOwnerName()) {
-      updateModeToggle2();
-      requireSignInThen(function() {
-        switchDbMode("personal");
-      });
-      return;
-    }
-    setDbMode(mode);
-    closeDbInstance();
-    updateModeToggle2();
-    refreshAll2();
-  }
-  function updateModeToggle2() {
-    var globalBtn = document.getElementById("mode-global");
-    var personalBtn = document.getElementById("mode-personal");
-    if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle("active", getDbMode() === "global");
-    personalBtn.classList.toggle("active", getDbMode() === "personal");
-    var signedIn = !!currentOwnerName();
-    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
-    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
-  }
-  function generateId3() {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === "x" ? r : r & 3 | 8;
-      return v.toString(16);
-    });
-  }
-  function readFileAsText(file) {
-    return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() {
-        resolve(reader.result);
-      };
-      reader.onerror = function() {
-        reject(reader.error);
-      };
-      reader.readAsText(file);
-    });
+  // src/static/app-catalog/js/apps-io.js
+  var generateId3;
+  var readFileAsText;
+  var renderApps3;
+  var getMainApps2;
+  function initAppsIo(deps) {
+    ({ generateId: generateId3, readFileAsText, renderApps: renderApps3, getMainApps: getMainApps2 } = deps);
   }
   async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
     var files = await extractZip(arrayBuffer);
@@ -5793,7 +5720,7 @@
     switchTab("url");
   }
   function requireSignInThen(next) {
-    if (getCortexOwnerToken2()) {
+    if (getCortexOwnerToken()) {
       next();
       return;
     }
@@ -5899,9 +5826,9 @@
     }).filter(Boolean) : [];
     if (editingAppId) {
       var app = null;
-      for (var i = 0; i < allApps.length; i++) {
-        if (allApps[i].id === editingAppId) {
-          app = allApps[i];
+      for (var i = 0; i < getMainApps2().length; i++) {
+        if (getMainApps2()[i].id === editingAppId) {
+          app = getMainApps2()[i];
           break;
         }
       }
@@ -5984,6 +5911,91 @@
       }
     }
   }
+  function setEditingAppId(v) {
+    editingAppId = v;
+  }
+
+  // src/static/app-catalog/js/main.js
+  function setLanguage(lang) {
+    setLang(lang);
+    try {
+      var config = loadConfig();
+      config.language = getLang();
+      saveConfig(config);
+    } catch (e) {
+    }
+    applyI18n();
+    try {
+      renderApps4();
+    } catch (e) {
+    }
+    try {
+      renderTags();
+    } catch (e) {
+    }
+    try {
+      loadPublishedApps3();
+    } catch (e) {
+    }
+    try {
+      renderRecentlyOpened();
+    } catch (e) {
+    }
+    try {
+      loadCortexExtensions();
+    } catch (e) {
+    }
+    try {
+      mountLoginPill();
+    } catch (e) {
+    }
+  }
+  function switchDbMode(mode) {
+    if (mode === getDbMode()) return;
+    if (mode === "personal" && !currentOwnerName()) {
+      updateModeToggle2();
+      requireSignInThen(function() {
+        switchDbMode("personal");
+      });
+      return;
+    }
+    setDbMode(mode);
+    closeDbInstance();
+    updateModeToggle2();
+    refreshAll2();
+  }
+  function updateModeToggle2() {
+    var globalBtn = document.getElementById("mode-global");
+    var personalBtn = document.getElementById("mode-personal");
+    if (!globalBtn || !personalBtn) return;
+    globalBtn.classList.toggle("active", getDbMode() === "global");
+    personalBtn.classList.toggle("active", getDbMode() === "personal");
+    var signedIn = !!currentOwnerName();
+    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
+    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
+  }
+  function generateId4() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function readFileAsText2(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        resolve(reader.result);
+      };
+      reader.onerror = function() {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
+  }
   var allApps = [];
   var activeTag = null;
   var searchQuery = "";
@@ -6019,7 +6031,7 @@
   }
   function filterByTag(tag) {
     activeTag = tag;
-    renderApps3();
+    renderApps4();
     applyServerFilter();
   }
   function launchApp2(id, mode) {
@@ -6189,7 +6201,7 @@
     }
     return entries;
   }
-  function renderApps3() {
+  function renderApps4() {
     getAllApps().then(function(apps) {
       allApps = apps;
       var entries = buildLibraryEntries(apps, ownServerApps);
@@ -6348,7 +6360,7 @@
         openDetailView(appId);
         break;
       case "edit":
-        editingAppId = appId;
+        setEditingAppId(appId);
         document.getElementById("modal-title").textContent = "Edit App";
         document.getElementById("app-name").value = app.name || "";
         document.getElementById("app-icon").value = app.icon || "";
@@ -6366,13 +6378,13 @@
       case "favorite":
         app.favorite = !app.favorite;
         saveApp(app).then(function() {
-          renderApps3();
+          renderApps4();
         });
         break;
       case "toggle-mode":
         app.openMode = app.openMode === "iframe" ? "tab" : "iframe";
         saveApp(app).then(function() {
-          renderApps3();
+          renderApps4();
         });
         break;
       case "view-source":
@@ -6384,7 +6396,7 @@
         }))) {
           if (app.publishedFilename) addImportIgnore2(app.publishedFilename);
           deleteApp(appId).then(function() {
-            renderApps3();
+            renderApps4();
             loadPublishedApps3();
           });
         }
@@ -6568,7 +6580,7 @@
             }).then(function(content) {
               var encoded = btoa(unescape(encodeURIComponent(content)));
               var record = {
-                id: generateId3(),
+                id: generateId4(),
                 name,
                 description: app.manifest && app.manifest.description ? app.manifest.description : "",
                 source: "aimeat",
@@ -6593,7 +6605,7 @@
     }
     Promise.all(promises).then(function() {
       document.getElementById("aimeat-import-overlay").hidden = true;
-      renderApps3();
+      renderApps4();
     }).catch(function(err) {
       showNotice("Import error: " + (err.message || err));
     });
@@ -6626,7 +6638,7 @@
     document.getElementById("publish-access-code").value = "";
     var pubStatus = document.getElementById("publish-status");
     var pubSubmit = document.getElementById("publish-submit-btn");
-    if (!getCortexOwnerToken2()) {
+    if (!getCortexOwnerToken3()) {
       pubStatus.textContent = t("publish.loginRequired");
       pubStatus.style.color = "var(--accent)";
       pubSubmit.disabled = true;
@@ -6681,7 +6693,7 @@
       statusEl.style.color = "var(--accent)";
       return;
     }
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       statusEl.textContent = t("publish.loginRequired");
       statusEl.style.color = "var(--accent)";
@@ -6770,7 +6782,7 @@
   }
   function getSessionRoles() {
     try {
-      var token = getCortexOwnerToken2();
+      var token = getCortexOwnerToken3();
       if (!token) return [];
       var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       return payload.roles || [];
@@ -6794,7 +6806,7 @@
       return Promise.resolve();
     }
     return fetch(aimeatUrl + "/v1/admin/subdomains", {
-      headers: { "Authorization": "Bearer " + getCortexOwnerToken2() }
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken3() }
     }).then(function(resp) {
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
@@ -6834,7 +6846,7 @@
     return fetch(aimeatUrl + path, {
       method,
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken2(),
+        "Authorization": "Bearer " + getCortexOwnerToken3(),
         "Content-Type": "application/json"
       },
       body: body ? JSON.stringify(body) : void 0
@@ -6982,7 +6994,7 @@
   }
   function exportBackupZip() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -7013,7 +7025,7 @@
   var backupInspectData = null;
   function importBackupPick() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -7033,7 +7045,7 @@
       return fetch(backupApiBase() + "/v1/apps/backup/inspect", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + getCortexOwnerToken2(),
+          "Authorization": "Bearer " + getCortexOwnerToken3(),
           "Content-Type": "application/zip"
         },
         body: buf
@@ -7159,7 +7171,7 @@
     fetch(backupApiBase() + "/v1/apps/backup/restore", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken2(),
+        "Authorization": "Bearer " + getCortexOwnerToken3(),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -7299,7 +7311,7 @@
       selected.forEach(function(sa) {
         if (!failedNames[sa.filename]) removeImportIgnore2(sa.filename);
       });
-      renderApps3();
+      renderApps4();
       loadPublishedApps3();
       if (res.failed.length) {
         statusEl.style.color = "#ef4444";
@@ -7321,7 +7333,7 @@
       return fetchAppContentBase64(aimeatUrl, sa.owner || "", sa.filename).then(function(b64) {
         var manifest = sa.manifest || {};
         var app = {
-          id: generateId3(),
+          id: generateId4(),
           name: manifest.name || sa.filename,
           description: manifest.description || "",
           source: "aimeat",
@@ -7400,12 +7412,12 @@
       }
       if (!aimeatUrl) {
         ownServerApps = [];
-        renderApps3();
+        renderApps4();
         if (communitySection) communitySection.style.display = "none";
         return;
       }
       var listHeaders = {};
-      var listTok = getCortexOwnerToken2();
+      var listTok = getCortexOwnerToken3();
       if (listTok) listHeaders["Authorization"] = "Bearer " + listTok;
       fetchAllPublishedApps(aimeatUrl, listHeaders).then(function(json) {
         var serverApps = json.data && json.data.apps ? json.data.apps : [];
@@ -7425,14 +7437,14 @@
         });
         return loadSubdomainSites().then(function() {
           ownServerApps = currentOwner ? ownApps : [];
-          renderApps3();
+          renderApps4();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           applyServerFilter();
           updateServerImportState(ownPublished, localByFilename, aimeatUrl);
         });
       }).catch(function() {
         ownServerApps = [];
-        renderApps3();
+        renderApps4();
         if (communitySection) communitySection.style.display = "none";
       });
     });
@@ -7500,7 +7512,7 @@
     if (!app || !app.publishedFilename) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7532,7 +7544,7 @@
   function toggleParkApp(filename, parked) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7558,7 +7570,7 @@
   function toggleForkApp(filename, forkable) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7587,7 +7599,7 @@
     }))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken3();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7658,7 +7670,7 @@
       cards[k].classList.remove("drag-over", "dragging");
     }
     Promise.all(saves).then(function() {
-      renderApps3();
+      renderApps4();
     });
   }
   window._launcher = {
@@ -7668,7 +7680,7 @@
     deleteApp,
     loadConfig,
     saveConfig,
-    renderApps: renderApps3,
+    renderApps: renderApps4,
     renderTags,
     filterByTag,
     launchApp: launchApp2,
@@ -7683,8 +7695,8 @@
     showContextMenu,
     hideContextMenu,
     handleContextAction,
-    generateId: generateId3,
-    readFileAsText,
+    generateId: generateId4,
+    readFileAsText: readFileAsText2,
     addAppFromUrl,
     addAppFromFile,
     addAppFromSource,
@@ -7784,7 +7796,7 @@
   window.cortexCopy = cortexCopy;
   function refreshAll2() {
     allApps = [];
-    renderApps3();
+    renderApps4();
     loadPublishedApps3();
     renderRecentlyOpened();
   }
@@ -7792,13 +7804,13 @@
     initDetail({
       refreshAll: refreshAll2,
       loadPublishedApps: loadPublishedApps3,
-      renderApps: renderApps3,
+      renderApps: renderApps4,
       updateModeToggle: updateModeToggle2,
-      getCortexOwnerToken: getCortexOwnerToken2,
+      getCortexOwnerToken: getCortexOwnerToken3,
       launchApp: launchApp2,
       viewPublished: viewPublished2,
       viewSource: viewSource2,
-      generateId: generateId3,
+      generateId: generateId4,
       generateSharePrompt: generateSharePrompt2,
       openPromptBuilder: openPromptBuilder2,
       showPublishModal: showPublishModal2,
@@ -7820,7 +7832,10 @@
         currentIframeUrl = v;
       }
     });
-    initSettings({ generateId: generateId3, renderApps: renderApps3, loadPublishedApps: loadPublishedApps3 });
+    initSettings({ generateId: generateId4, renderApps: renderApps4, loadPublishedApps: loadPublishedApps3 });
+    initAppsIo({ generateId: generateId4, readFileAsText: readFileAsText2, renderApps: renderApps4, getMainApps: function() {
+      return allApps;
+    } });
     applyTheme(getThemePref());
     try {
       new MutationObserver(updateThemeToggle).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -7846,7 +7861,7 @@
       if (_homeLabel && location.host) _homeLabel.textContent = location.host.replace(/^apps\./, "");
     } catch (e) {
     }
-    renderApps3();
+    renderApps4();
     loadPublishedApps3();
     loadCortexExtensions();
     loadConfigFromServer();
@@ -7867,7 +7882,7 @@
     }
     document.getElementById("search-input").addEventListener("input", function(e) {
       searchQuery = e.target.value.trim();
-      renderApps3();
+      renderApps4();
       applyServerFilter();
     });
     document.getElementById("add-btn").addEventListener("click", function() {
@@ -8185,7 +8200,7 @@
           btn.textContent = "Save Changes";
           btn.disabled = true;
         }, 1500);
-        renderApps3();
+        renderApps4();
       }).catch(function(err) {
         btn.textContent = "Save Changes";
         btn.disabled = false;
