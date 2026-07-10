@@ -31,6 +31,9 @@
  *     app_quotas throttles a single app below it when wanted. Removed DEFAULT_APP_DAILY_USD.
  *   v1.5.0 — 2026-07-05 — Add getUsageHistory(): reads back the retained per-day usage records
  *     (never surfaced before) as a series + 24h/7d/30d rollups for the AI-spend charts.
+ *   v1.6.0 — 2026-07-10 — Enforce config.aiProviderAllowlist: on a public node, a decrypted AI key
+ *     may only be sent to an allowlisted provider host, so a poisoned owner/app baseUrl can't
+ *     exfiltrate it. Empty allowlist = any host (unchanged default).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -246,6 +249,20 @@ export async function completeForOwner(
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
   const provider = (prefs.provider as ProviderType) || 'openrouter';
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+
+  // ── Provider host allowlist (protects the decrypted key from a poisoned baseUrl) ──
+  // On a public multi-tenant node, config.aiProviderAllowlist restricts which HOST a decrypted AI
+  // key may be sent to, so an owner- (or app-) supplied baseUrl can't exfiltrate it. Empty = any
+  // host (local dev / self-hosted models). See docs/coding-guidelines/security-development-dna.md.
+  if (config.aiProviderAllowlist.length > 0) {
+    let providerHost: string;
+    try { providerHost = new URL(baseUrl).hostname.toLowerCase(); }
+    catch { throw new AiCompletionError('INVALID_BASE_URL', 400, `Invalid AI provider baseUrl: ${baseUrl}`); }
+    if (!config.aiProviderAllowlist.includes(providerHost)) {
+      throw new AiCompletionError('PROVIDER_NOT_ALLOWED', 403,
+        `AI provider host "${providerHost}" is not in this node's allowlist. Ask the operator to allow it.`);
+    }
+  }
 
   // ── App allowlist (only when an appId is supplied / configured) ──
   const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;

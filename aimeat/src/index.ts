@@ -12,6 +12,7 @@
  * @version-history v1.9.9 — 2026-05-28 — Allow connector fallback flags through top-level parsing.
  * @version-history v1.9.10 — 2026-05-28 — Narrow permissive parseArgs values before applying node CLI string flags.
  * @version-history v1.25.1 — 2026-06-18 — Self-heal scaffolded assets on start after a package upgrade; read update version from package.json.
+ * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -19,7 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { createServer } from './server.js';
-import { loadConfig } from './config.js';
+import { loadConfig, securityPostureWarnings } from './config.js';
 import { logger } from './utils/logger.js';
 
 process.on('unhandledRejection', (reason) => {
@@ -811,6 +812,13 @@ if (subcommand === 'config') {
     }
     if (process.platform === 'win32' && !process.env.AIMEAT_KEY_PASSPHRASE) {
       logger.warn('SECURITY: Node key is stored unencrypted. Windows does not enforce Unix file permissions. Set AIMEAT_KEY_PASSPHRASE to encrypt.');
+    }
+    // Posture self-check: on a `public`-profile node, warn loudly on unsafe combinations so being
+    // insecure on the internet is a conscious choice. Warn-only. See security-development-dna.md.
+    const postureWarnings = securityPostureWarnings(config);
+    if (postureWarnings.length > 0) {
+      logger.warn(`SECURITY: public-profile node has ${postureWarnings.length} risky setting(s) — override deliberately or harden:`);
+      for (const msg of postureWarnings) logger.warn(`  • ${msg}`);
     }
 
     // Log active service extensions and their instances

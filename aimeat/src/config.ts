@@ -18,6 +18,9 @@
  *     privacy policy template substitution per CLAUDE.md self-host architecture.
  *   v1.1.1 -- 2026-06-02 -- Raise default taskStallThresholdMinutes 30 -> 120 so
  *     long-running orchestrated tasks aren't falsely marked stalled.
+ *   v1.2.0 -- 2026-07-10 -- Security posture: resolve securityProfile (local|public) + the
+ *     allowPrivateEgress / aiProviderAllowlist knobs from env, normalise AIMEAT_ALLOW_PRIVATE_EGRESS
+ *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
  */
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
@@ -150,6 +153,17 @@ export interface AimeatConfig {
   devMode: boolean;
   testMode: boolean;
   anonymousMode: boolean;
+  /** Security posture: `local` (localhost-flexible) or `public` (hardened). Sets safe DEFAULTS for
+   *  the egress + AI-allowlist knobs below; any explicit AIMEAT_* var overrides. Resolved from
+   *  AIMEAT_SECURITY_PROFILE, else the baseUrl host / nodeType. See security-development-dna.md. */
+  securityProfile: 'local' | 'public';
+  /** May a server-side fetch of a principal-influenced URL target loopback (127.0.0.1/::1)?
+   *  Default: profile==='local'. Consumed by url-validator via AIMEAT_ALLOW_PRIVATE_EGRESS.
+   *  (RFC1918/link-local/cloud-metadata stay blocked server-side regardless.) */
+  allowPrivateEgress: boolean;
+  /** Host allowlist an AI `baseUrl` may point at before a decrypted key is sent (openrouter.ai,
+   *  api.openai.com, …). Empty = any host (local dev / self-hosted). Enforced in ai-completion. */
+  aiProviderAllowlist: string[];
   /** Node auto-generates thumbnails for published apps that have none (needs a headless browser). */
   screenshotAutoCapture: boolean;
   /** Minutes between auto-screenshot scans (default 15). */
@@ -536,6 +550,23 @@ export interface LoadConfigResult {
 }
 
 /**
+ * True if `baseUrl` points at localhost / loopback / RFC1918 / link-local / IPv6-ULA — i.e. NOT a
+ * public host. Drives the default security profile (private host → `local`, public host → `public`).
+ * A host-less or unparseable baseUrl is treated as private (fail safe toward localhost-flexible dev).
+ */
+function isPrivateHost(baseUrl: string): boolean {
+  let host: string;
+  try { host = new URL(baseUrl).hostname.toLowerCase(); } catch { return true; }
+  if (!host || host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1' || host === '::') return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+  if (/^169\.254\./.test(host)) return true;      // link-local (incl. cloud metadata)
+  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique-local
+  return false;
+}
+
+/**
  * Derive the app-origin host (`apps.<apexHost>`) from a baseUrl. Returns '' for
  * localhost / IP / host-less baseUrls where a public app subdomain makes no sense
  * (the operator can still set AIMEAT_APP_HOST explicitly, e.g. for local testing).
@@ -551,6 +582,24 @@ function deriveAppHost(baseUrl: string): string {
 function derivePortfolioHost(baseUrl: string): string {
   const appHost = deriveAppHost(baseUrl);
   return appHost ? appHost.replace(/^apps\./, 'portfolio.') : '';
+}
+
+/**
+ * Startup posture self-check. When the resolved security profile is `public`, return a list of
+ * unsafe-combination warnings so being insecure on the internet is a conscious operator choice,
+ * not an accident. Warn-only by contract (the caller logs them) — never throws, so an operator can
+ * still run any combination deliberately. Empty list on a `local` node. See security-development-dna.md.
+ */
+export function securityPostureWarnings(config: AimeatConfig): string[] {
+  const w: string[] = [];
+  if (config.securityProfile !== 'public') return w;
+  if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
+  if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');
+  if (config.federationOpenJoin) w.push('AIMEAT_FEDERATION_OPEN_JOIN=true — any peer can federate without operator approval.');
+  if (!config.encryptionKey) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
+  if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
+  if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
+  return w;
 }
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
@@ -615,6 +664,26 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const rlCatalogue = Math.max(1, parseInt(process.env.AIMEAT_RL_CATALOGUE ?? String(rlGlobal), 10));
   const rlAuthChallenge = Math.max(1, parseInt(process.env.AIMEAT_RL_AUTH_CHALLENGE ?? String(rlGlobal), 10));
 
+  // ── Security posture (localhost-flexible → public-strict) ──
+  // The profile sets safe DEFAULTS; any explicit AIMEAT_* var overrides it. Full rationale + the
+  // ten security invariants: docs/coding-guidelines/security-development-dna.md
+  const resolvedBaseUrl = (process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, '');
+  const securityProfile: 'local' | 'public' =
+    ['local', 'public'].includes(process.env.AIMEAT_SECURITY_PROFILE ?? '')
+      ? (process.env.AIMEAT_SECURITY_PROFILE as 'local' | 'public')
+      : ((isPrivateHost(resolvedBaseUrl) || nodeType === 'personal') ? 'local' : 'public');
+  const allowPrivateEgress = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS !== undefined
+    ? process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true'
+    : securityProfile === 'local';
+  // url-validator is a leaf util that reads AIMEAT_ALLOW_PRIVATE_EGRESS at call time (importing
+  // config there would risk a cycle). Normalise the env to the resolved default so the profile
+  // actually governs loopback egress even when the operator left the var unset.
+  if (process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === undefined) {
+    process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = String(allowPrivateEgress);
+  }
+  const aiProviderAllowlist = (process.env.AIMEAT_AI_PROVIDER_ALLOWLIST ?? '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
   const config: AimeatConfig = {
     port,
     baseUrl: (process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, ''),
@@ -638,6 +707,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
     testMode: process.env.AIMEAT_TEST_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
+    securityProfile,
+    allowPrivateEgress,
+    aiProviderAllowlist,
     screenshotAutoCapture: process.env.AIMEAT_SCREENSHOT_AUTO === 'true',
     screenshotIntervalMin: parseInt(process.env.AIMEAT_SCREENSHOT_INTERVAL_MIN ?? '15', 10),
     screenshotSettleMs: parseInt(process.env.AIMEAT_SCREENSHOT_SETTLE_MS ?? '6000', 10),
