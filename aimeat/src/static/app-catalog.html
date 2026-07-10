@@ -3389,6 +3389,28 @@
     }
     return null;
   }
+  function generateId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function readFileAsText(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        resolve(reader.result);
+      };
+      reader.onerror = function() {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
+  }
 
   // src/static/app-catalog/js/db.js
   var DB_NAME_GLOBAL = "AppLauncherDB";
@@ -3789,7 +3811,7 @@
   var launchApp;
   var viewPublished;
   var viewSource;
-  var generateId;
+  var generateId2;
   var generateSharePrompt;
   var openPromptBuilder;
   var showPublishModal;
@@ -3801,7 +3823,7 @@
   var getOwnProtection;
   var setIframeUrl;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -4476,7 +4498,7 @@
     var meta = getServerManifests()[owner + "\n" + filename] || {};
     fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
       var app = {
-        id: generateId(),
+        id: generateId2(),
         name: meta.name || filename.replace(/\.html?$/i, ""),
         description: meta.description || "",
         category: meta.category || "utility",
@@ -5302,11 +5324,11 @@
   }
 
   // src/static/app-catalog/js/settings.js
-  var generateId2;
+  var generateId3;
   var renderApps2;
   var loadPublishedApps2;
   function initSettings(deps) {
-    ({ generateId: generateId2, renderApps: renderApps2, loadPublishedApps: loadPublishedApps2 } = deps);
+    ({ generateId: generateId3, renderApps: renderApps2, loadPublishedApps: loadPublishedApps2 } = deps);
   }
   function applyTheme(theme) {
     if (theme === "dark") {
@@ -5554,7 +5576,7 @@
     }
     Promise.all(selected.map(function(a) {
       var app = Object.assign({}, a);
-      app.id = generateId2();
+      app.id = generateId3();
       return saveApp(app);
     })).then(function() {
       statusEl.style.color = "#34d399";
@@ -5619,19 +5641,19 @@
   }
 
   // src/static/app-catalog/js/apps-io.js
-  var generateId3;
-  var readFileAsText;
+  var generateId4;
+  var readFileAsText2;
   var renderApps3;
   var getMainApps2;
   function initAppsIo(deps) {
-    ({ generateId: generateId3, readFileAsText, renderApps: renderApps3, getMainApps: getMainApps2 } = deps);
+    ({ generateId: generateId4, readFileAsText: readFileAsText2, renderApps: renderApps3, getMainApps: getMainApps2 } = deps);
   }
   async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
     var files = await extractZip(arrayBuffer);
     var bundledHtml = await bundleZip(files);
     var encoded = btoa(unescape(encodeURIComponent(bundledHtml)));
     var app = {
-      id: generateId3(),
+      id: generateId4(),
       name,
       description: "",
       source: "zip",
@@ -5650,7 +5672,7 @@
   }
   function addAppFromUrl(name, url, icon, tags, openMode) {
     var app = {
-      id: generateId3(),
+      id: generateId4(),
       name,
       description: "",
       source: "url",
@@ -5669,10 +5691,10 @@
     });
   }
   function addAppFromFile(name, file, icon, tags, openMode) {
-    return readFileAsText(file).then(function(content) {
+    return readFileAsText2(file).then(function(content) {
       var encoded = btoa(unescape(encodeURIComponent(content)));
       var app = {
-        id: generateId3(),
+        id: generateId4(),
         name,
         description: "",
         source: "local",
@@ -5694,7 +5716,7 @@
   function addAppFromSource(name, sourceCode, icon, tags, openMode) {
     var encoded = btoa(unescape(encodeURIComponent(sourceCode)));
     var app = {
-      id: generateId3(),
+      id: generateId4(),
       name,
       description: parseAppMeta(sourceCode).description || "",
       source: "local",
@@ -5924,11 +5946,11 @@
   var setOwnServerApps;
   var getActiveTag;
   var getSearchQuery;
-  var generateId4;
+  var generateId5;
   var renderApps4;
   var refreshAll2;
   function initServerIo(deps) {
-    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests2, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId4, renderApps: renderApps4, refreshAll: refreshAll2 } = deps);
+    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests2, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId5, renderApps: renderApps4, refreshAll: refreshAll2 } = deps);
   }
   var aimeatAppsCache = [];
   function formatFileSize(bytes) {
@@ -6023,7 +6045,7 @@
             }).then(function(content) {
               var encoded = btoa(unescape(encodeURIComponent(content)));
               var record = {
-                id: generateId4(),
+                id: generateId5(),
                 name,
                 description: app.manifest && app.manifest.description ? app.manifest.description : "",
                 source: "aimeat",
@@ -6776,7 +6798,7 @@
       return fetchAppContentBase64(aimeatUrl, sa.owner || "", sa.filename).then(function(b64) {
         var manifest = sa.manifest || {};
         var app = {
-          id: generateId4(),
+          id: generateId5(),
           name: manifest.name || sa.filename,
           description: manifest.description || "",
           source: "aimeat",
@@ -7570,6 +7592,59 @@
     overlay.dataset.appName = "Homepage";
     overlay.hidden = false;
   }
+  var dragSourceId = null;
+  function onCardDragStart(e) {
+    var card = e.target.closest(".app-card");
+    if (!card) return;
+    dragSourceId = card.dataset.id;
+    card.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragSourceId);
+  }
+  function onCardDragEnd(e) {
+    var card = e.target.closest(".app-card");
+    if (card) card.classList.remove("dragging");
+    var cards = document.querySelectorAll(".app-card.drag-over");
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
+    dragSourceId = null;
+  }
+  function onCardDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    var card = e.target.closest(".app-card");
+    if (!card || card.dataset.id === dragSourceId) return;
+    var cards = document.querySelectorAll(".app-card.drag-over");
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
+    card.classList.add("drag-over");
+  }
+  function onCardDrop(e) {
+    e.preventDefault();
+    var targetCard = e.target.closest(".app-card");
+    if (!targetCard) return;
+    var targetId = targetCard.dataset.id;
+    if (!dragSourceId || dragSourceId === targetId) return;
+    var srcIdx = -1, tgtIdx = -1;
+    for (var i = 0; i < getMainApps4().length; i++) {
+      if (getMainApps4()[i].id === dragSourceId) srcIdx = i;
+      if (getMainApps4()[i].id === targetId) tgtIdx = i;
+    }
+    if (srcIdx === -1 || tgtIdx === -1) return;
+    var moved = getMainApps4().splice(srcIdx, 1)[0];
+    getMainApps4().splice(tgtIdx, 0, moved);
+    var saves = [];
+    for (var j = 0; j < getMainApps4().length; j++) {
+      getMainApps4()[j].sortOrder = j;
+      saves.push(saveApp(getMainApps4()[j]));
+    }
+    var grid = document.getElementById("app-grid");
+    var cards = grid.querySelectorAll(".app-card");
+    for (var k = 0; k < cards.length; k++) {
+      cards[k].classList.remove("drag-over", "dragging");
+    }
+    Promise.all(saves).then(function() {
+      renderApps5();
+    });
+  }
 
   // src/static/app-catalog/js/main.js
   function setLanguage(lang) {
@@ -7630,84 +7705,9 @@
     personalBtn.classList.toggle("mode-btn-locked", !signedIn);
     personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
   }
-  function generateId5() {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === "x" ? r : r & 3 | 8;
-      return v.toString(16);
-    });
-  }
-  function readFileAsText2(file) {
-    return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() {
-        resolve(reader.result);
-      };
-      reader.onerror = function() {
-        reject(reader.error);
-      };
-      reader.readAsText(file);
-    });
-  }
   var allApps = [];
   var activeTag = null;
   var searchQuery = "";
-  var dragSourceId = null;
-  function onCardDragStart(e) {
-    var card = e.target.closest(".app-card");
-    if (!card) return;
-    dragSourceId = card.dataset.id;
-    card.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", dragSourceId);
-  }
-  function onCardDragEnd(e) {
-    var card = e.target.closest(".app-card");
-    if (card) card.classList.remove("dragging");
-    var cards = document.querySelectorAll(".app-card.drag-over");
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
-    dragSourceId = null;
-  }
-  function onCardDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    var card = e.target.closest(".app-card");
-    if (!card || card.dataset.id === dragSourceId) return;
-    var cards = document.querySelectorAll(".app-card.drag-over");
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
-    card.classList.add("drag-over");
-  }
-  function onCardDrop(e) {
-    e.preventDefault();
-    var targetCard = e.target.closest(".app-card");
-    if (!targetCard) return;
-    var targetId = targetCard.dataset.id;
-    if (!dragSourceId || dragSourceId === targetId) return;
-    var srcIdx = -1, tgtIdx = -1;
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].id === dragSourceId) srcIdx = i;
-      if (allApps[i].id === targetId) tgtIdx = i;
-    }
-    if (srcIdx === -1 || tgtIdx === -1) return;
-    var moved = allApps.splice(srcIdx, 1)[0];
-    allApps.splice(tgtIdx, 0, moved);
-    var saves = [];
-    for (var j = 0; j < allApps.length; j++) {
-      allApps[j].sortOrder = j;
-      saves.push(saveApp(allApps[j]));
-    }
-    var grid = document.getElementById("app-grid");
-    var cards = grid.querySelectorAll(".app-card");
-    for (var k = 0; k < cards.length; k++) {
-      cards[k].classList.remove("drag-over", "dragging");
-    }
-    Promise.all(saves).then(function() {
-      renderApps5();
-    });
-  }
   window._launcher = {
     openDB,
     getAllApps,
@@ -7730,8 +7730,8 @@
     showContextMenu,
     hideContextMenu,
     handleContextAction,
-    generateId: generateId5,
-    readFileAsText: readFileAsText2,
+    generateId,
+    readFileAsText,
     addAppFromUrl,
     addAppFromFile,
     addAppFromSource,
@@ -7845,7 +7845,7 @@
       launchApp: launchApp2,
       viewPublished: viewPublished2,
       viewSource: viewSource2,
-      generateId: generateId5,
+      generateId,
       generateSharePrompt: generateSharePrompt2,
       openPromptBuilder: openPromptBuilder2,
       showPublishModal: showPublishModal2,
@@ -7865,8 +7865,8 @@
       },
       setIframeUrl: setIframeUrl2
     });
-    initSettings({ generateId: generateId5, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
-    initAppsIo({ generateId: generateId5, readFileAsText: readFileAsText2, renderApps: renderApps5, getMainApps: function() {
+    initSettings({ generateId, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
+    initAppsIo({ generateId, readFileAsText, renderApps: renderApps5, getMainApps: function() {
       return allApps;
     } });
     initServerIo({
@@ -7890,7 +7890,7 @@
       getSearchQuery: function() {
         return searchQuery;
       },
-      generateId: generateId5,
+      generateId,
       renderApps: renderApps5,
       refreshAll: refreshAll3
     });

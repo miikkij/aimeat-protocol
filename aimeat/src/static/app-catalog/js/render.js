@@ -689,7 +689,82 @@ function generateHomepagePrompt() {
   overlay.hidden = false;
 }
 
+// ── Drag & Drop Reordering (card reorder) ─────────
+
+var dragSourceId = null;
+
+function onCardDragStart(e) {
+  var card = e.target.closest('.app-card');
+  if (!card) return;
+  dragSourceId = card.dataset.id;
+  card.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSourceId);
+}
+
+function onCardDragEnd(e) {
+  var card = e.target.closest('.app-card');
+  if (card) card.classList.remove('dragging');
+  // Remove all drag-over highlights
+  var cards = document.querySelectorAll('.app-card.drag-over');
+  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+  dragSourceId = null;
+}
+
+function onCardDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var card = e.target.closest('.app-card');
+  if (!card || card.dataset.id === dragSourceId) return;
+  // Remove highlight from others
+  var cards = document.querySelectorAll('.app-card.drag-over');
+  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+  card.classList.add('drag-over');
+}
+
+function onCardDrop(e) {
+  e.preventDefault();
+  var targetCard = e.target.closest('.app-card');
+  if (!targetCard) return;
+  var targetId = targetCard.dataset.id;
+  if (!dragSourceId || dragSourceId === targetId) return;
+
+  // Find indexes in the currently rendered/sorted getMainApps()
+  var srcIdx = -1, tgtIdx = -1;
+  for (var i = 0; i < getMainApps().length; i++) {
+    if (getMainApps()[i].id === dragSourceId) srcIdx = i;
+    if (getMainApps()[i].id === targetId) tgtIdx = i;
+  }
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  // Move the source app to the target position
+  var moved = getMainApps().splice(srcIdx, 1)[0];
+  getMainApps().splice(tgtIdx, 0, moved);
+
+  // Assign sortOrder values based on new positions
+  var saves = [];
+  for (var j = 0; j < getMainApps().length; j++) {
+    getMainApps()[j].sortOrder = j;
+    saves.push(saveApp(getMainApps()[j]));
+  }
+
+  // Re-render immediately (no animation delay for reorder)
+  var grid = document.getElementById('app-grid');
+  var cards = grid.querySelectorAll('.app-card');
+  for (var k = 0; k < cards.length; k++) {
+    cards[k].classList.remove('drag-over', 'dragging');
+  }
+
+  Promise.all(saves).then(function () {
+    renderApps();
+  });
+}
+
 export {
+  onCardDragStart,
+  onCardDragEnd,
+  onCardDragOver,
+  onCardDrop,
   renderTags,
   filterByTag,
   launchApp,

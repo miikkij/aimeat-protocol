@@ -8,7 +8,7 @@
  * @usage  built, not loaded raw: pnpm build:app-catalog
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
-import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName } from './util.js';
+import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
 import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
@@ -18,7 +18,7 @@ import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken,
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp, exportBackup, handleImportBackup, jsonImportSelectAll, submitJsonImport, removeDuplicateApps, clearAllData } from './settings.js';
 import { initAppsIo, setEditingAppId, addAppFromZip, addAppFromUrl, addAppFromFile, addAppFromSource, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, addImportIgnore, removeImportIgnore, dismissServerImportBanner, showServerImportModal, serverImportSelectAll, submitServerImport, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
-import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
+import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt, onCardDragStart, onCardDragEnd, onCardDragOver, onCardDrop } from './render.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -71,34 +71,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
 
   // ── Config → config.js (loadConfig / saveConfig, imported above) ──
 
-  // ── ID Generator ─────────────────────────────────
-
-  function generateId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    // Fallback for older browsers
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
-
-  // ── File Reading Helper ─────────────────────────
-
-  function readFileAsText(file) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function () {
-        resolve(reader.result);
-      };
-      reader.onerror = function () {
-        reject(reader.error);
-      };
-      reader.readAsText(file);
-    });
-  }
+  // ── generateId / readFileAsText → util.js (imported above) ──
 
   // ── ZIP subsystem → zip.js (extractZip / bundleZip, imported above) ──
 
@@ -125,76 +98,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
 
   // ── Cortex (bar + editor + prompt builder) → cortex.js (imported at top) ──
 
-  // ── Drag & Drop Reordering ─────────────────────
-
-  var dragSourceId = null;
-
-  function onCardDragStart(e) {
-    var card = e.target.closest('.app-card');
-    if (!card) return;
-    dragSourceId = card.dataset.id;
-    card.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', dragSourceId);
-  }
-
-  function onCardDragEnd(e) {
-    var card = e.target.closest('.app-card');
-    if (card) card.classList.remove('dragging');
-    // Remove all drag-over highlights
-    var cards = document.querySelectorAll('.app-card.drag-over');
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
-    dragSourceId = null;
-  }
-
-  function onCardDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    var card = e.target.closest('.app-card');
-    if (!card || card.dataset.id === dragSourceId) return;
-    // Remove highlight from others
-    var cards = document.querySelectorAll('.app-card.drag-over');
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
-    card.classList.add('drag-over');
-  }
-
-  function onCardDrop(e) {
-    e.preventDefault();
-    var targetCard = e.target.closest('.app-card');
-    if (!targetCard) return;
-    var targetId = targetCard.dataset.id;
-    if (!dragSourceId || dragSourceId === targetId) return;
-
-    // Find indexes in the currently rendered/sorted allApps
-    var srcIdx = -1, tgtIdx = -1;
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].id === dragSourceId) srcIdx = i;
-      if (allApps[i].id === targetId) tgtIdx = i;
-    }
-    if (srcIdx === -1 || tgtIdx === -1) return;
-
-    // Move the source app to the target position
-    var moved = allApps.splice(srcIdx, 1)[0];
-    allApps.splice(tgtIdx, 0, moved);
-
-    // Assign sortOrder values based on new positions
-    var saves = [];
-    for (var j = 0; j < allApps.length; j++) {
-      allApps[j].sortOrder = j;
-      saves.push(saveApp(allApps[j]));
-    }
-
-    // Re-render immediately (no animation delay for reorder)
-    var grid = document.getElementById('app-grid');
-    var cards = grid.querySelectorAll('.app-card');
-    for (var k = 0; k < cards.length; k++) {
-      cards[k].classList.remove('drag-over', 'dragging');
-    }
-
-    Promise.all(saves).then(function () {
-      renderApps();
-    });
-  }
+  // ── Drag & Drop → render.js (onCardDrag*, imported) ──
 
   // ── Public API ────────────────────────────────────
 
