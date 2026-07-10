@@ -105,6 +105,12 @@
       failures are surfaced per-app (only successes clear their tombstone), and the modal has a
       permanent entry in Settings; a "?" Help modal explains modes / where apps live / the two
       "backup" meanings / standalone; the remaining native confirm() dialogs go through t().
+    v2.14.0 — 2026-07-10 — TARGET-021: RETIRE the standalone/downloadable story. The catalog is
+      node-served and always talks to its serving origin (loadConfig forces aimeatUrl =
+      location.origin; the Settings Server URL is now read-only + explains it). localhost /
+      aimeat-desktop / federation all keep working because each node serves its OWN catalog
+      same-origin — no foreign-origin auth-lib break, no Private/Local-Network-Access block. CORS
+      stays `*` for now (external agents/apps need cross-origin); tightening it is tracked separately.
 -->
 <html lang="en">
 <head>
@@ -2230,7 +2236,7 @@
         <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
         <div class="settings-row">
           <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
-          <input type="url" id="setting-aimeat-url" class="modal-input" placeholder="http://localhost:40050" autocomplete="off"/>
+          <input type="url" id="setting-aimeat-url" class="modal-input" readonly autocomplete="off" data-i18n-title="settings.serverUrlHint" title="This catalog talks to the node that served it (same-origin)."/>
         </div>
       </div>
 
@@ -2560,6 +2566,7 @@
       'settings.defaultOpenMode': 'Default open mode',
       'settings.server': 'AIMEAT Server',
       'settings.serverUrl': 'Server URL',
+      'settings.serverUrlHint': 'This catalog talks to the node that served it (same-origin).',
       'settings.backup': 'Backup & Restore',
       'settings.exportJson': 'Export JSON',
       'settings.importJson': 'Import JSON',
@@ -2881,6 +2888,7 @@
       'settings.defaultOpenMode': 'Oletusavaustapa',
       'settings.server': 'AIMEAT-palvelin',
       'settings.serverUrl': 'Palvelimen URL',
+      'settings.serverUrlHint': 'Tämä katalogi puhuu sille nodelle joka sen tarjoili (same-origin).',
       'settings.backup': 'Varmuuskopiointi & palautus',
       'settings.exportJson': 'Vie JSON',
       'settings.importJson': 'Tuo JSON',
@@ -3293,11 +3301,19 @@
   };
 
   function loadConfig() {
+    var cfg;
     try {
-      return Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem('appLauncherConfig') || '{}'));
+      cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem('appLauncherConfig') || '{}'));
     } catch (e) {
-      return Object.assign({}, DEFAULT_CONFIG);
+      cfg = Object.assign({}, DEFAULT_CONFIG);
     }
+    // The catalog is SERVED BY its node and talks to it same-origin. The old "download it and point
+    // it at any node" standalone story is retired: it forced CORS `*`, could never sign in from a
+    // foreign origin (auth-lib loads same-origin), and is increasingly blocked by browsers' Private/
+    // Local Network Access. localhost / aimeat-desktop / federation all work because each node serves
+    // its OWN catalog same-origin. Always use the serving origin as the node URL.
+    cfg.aimeatUrl = window.location.origin;
+    return cfg;
   }
 
   function saveConfig(config) {
