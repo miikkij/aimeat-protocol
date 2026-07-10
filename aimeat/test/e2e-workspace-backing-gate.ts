@@ -164,11 +164,13 @@ await test('5. write + publish → the document is visible in MCP workspace_read
     assert(!mcpErr(w), `write failed: ${mcpText(w)}`);
     const p = await A.client.call('aimeat_workspace_publish', { organism_id: orgId, ws: wsId, namespace: 'design.doc', id: 'vision-and-pillars' }, 205);
     assert(!mcpErr(p), `publish failed: ${mcpText(p)}`);
-    // MCP read — the surface that returned objects:{} for a month in the incident.
+    // MCP read — the surface that returned objects:{} for a month in the incident. Since v1.13.0 the
+    // default read is INDEX-first: the per-space listing (id/title/published/…) lives under `index`,
+    // not `objects` (pass `ids:[…]` to fetch bodies). Visibility of a published doc = it appears here.
     const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: wsId }, 206);
     const data = mcpData(rd);
-    const docs = data.objects?.['design-doc'] || [];
-    assert(docs.some((d: any) => d.id === 'vision-and-pillars'), `MCP read must list the published doc: ${JSON.stringify(Object.keys(data.objects || {}))}`);
+    const docs = data.index?.['design-doc'] || [];
+    assert(docs.some((d: any) => d.id === 'vision-and-pillars'), `MCP read must list the published doc: ${JSON.stringify(Object.keys(data.index || {}))}`);
     // REST read — what the UI consumes.
     const rest = await json(`/v1/organisms/${orgId}/workspace?ws=${wsId}`, { headers: authH() });
     const restDocs = rest.body.data.objects?.['design-doc'] || [];
