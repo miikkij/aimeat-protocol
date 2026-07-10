@@ -14571,6 +14571,18 @@ paths:
                           redirect:
                             type: string
                             description: Same-site path to return to after finalize
+                          mode:
+                            type: string
+                            enum: [new, link_existing]
+                            description: |
+                              'new' = first-time signup (username choice). 'link_existing' = an
+                              existing account claims this email but never verified it locally —
+                              finalize is refused (409 EMAIL_IN_USE); the SPA explains the one-time
+                              password sign-in that verifies the email and links the provider.
+                          existing_hint:
+                            type: string
+                            nullable: true
+                            description: Masked username of the unverified-email account (link_existing only)
         '404':
           description: No pending Google sign-up (cookie absent or expired)
           content:
@@ -14674,7 +14686,10 @@ paths:
         '400':
           description: No pending sign-up, or invalid username
         '409':
-          description: Username already taken
+          description: |
+            Username already taken (NAME_TAKEN), or the pending sign-up is in link_existing mode —
+            an existing account claims this email but never verified it, so creating a duplicate
+            account is refused (EMAIL_IN_USE; sign in with the password once to verify + link).
           content:
             application/json:
               schema:
@@ -14826,7 +14841,7 @@ paths:
         '400':
           description: No pending sign-up, or invalid username
         '409':
-          description: Username already taken
+          description: Username already taken (NAME_TAKEN) or link_existing pending refused (EMAIL_IN_USE)
 
   /v1/ghii/login/entra:
     get:
@@ -14934,7 +14949,7 @@ paths:
         '400':
           description: No pending sign-up, or invalid username
         '409':
-          description: Username already taken
+          description: Username already taken (NAME_TAKEN) or link_existing pending refused (EMAIL_IN_USE)
 
   # ============================================================
   # Phase 1.4: Directories
@@ -16807,8 +16822,9 @@ paths:
       summary: Download a ZIP backup of a whole organism
       description: |
         Exports the organism's settings + every workspace the caller can read (each under
-        workspaces/{ws}/) as one ZIP. Organism creator/admin only. `?format=base64` returns a
-        size-capped base64 JSON payload instead of the binary. Membership/board are not exported.
+        workspaces/{ws}/) as one ZIP. Any ACTIVE MEMBER may export — the bundle contains only what
+        the member can already read live. `?format=base64` returns a size-capped base64 JSON
+        payload instead of the binary. Membership/board are not exported.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -20974,7 +20990,7 @@ paths:
     post:
       operationId: inviteOrganismMember
       summary: Invite an owner to an organism
-      description: Creator/admin invites an owner by bare name. Creates a membership with status 'invited' + invitedBy, and notifies the invitee. Works for any join policy (the path to populate invite_only organisms).
+      description: Creator/admin invites an owner by bare name (normalized like registration — trimmed, lowercased, a matching '@node-id' suffix stripped; a remote identity is a 400, an unknown owner a 404 OWNER_NOT_FOUND). Creates a membership with status 'invited' + invitedBy, and notifies the invitee. Works for any join policy (the path to populate invite_only organisms).
       tags: [Organisms]
       security:
         - BearerAuth: []

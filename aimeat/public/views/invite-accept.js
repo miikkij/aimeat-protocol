@@ -15,6 +15,9 @@
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
  *   v1.0.1 — 2026-07-04 — React to the auth 'logout' event too, so an in-page logout flips back to
  *     the register form instead of leaving the stale accept-as-me button.
+ *   v1.1.0 — 2026-07-10 — Social sign-in providers (GET /v1/auth/providers) rendered as co-equal
+ *     "Continue with X" buttons: Google was hidden behind a text link, so invited first-timers
+ *     concluded a password was mandatory.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -33,6 +36,24 @@ export default function InviteAccept() {
   const [form, setForm] = useState({ username: '', password: '', display_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [providers, setProviders] = useState([]);
+
+  // Social sign-in providers, rendered as co-equal buttons — an invited first-timer should not
+  // conclude a password is mandatory when the node offers Google & co.
+  useEffect(() => {
+    let live = true;
+    api('/v1/auth/providers')
+      .then((res) => { if (live) setProviders(res?.data?.providers || []); })
+      .catch(() => { /* no providers — password form stands alone */ });
+    return () => { live = false; };
+  }, []);
+
+  // Full-page navigation to the provider's OIDC start; the callback redirects back here logged-in
+  // (or with the one-time username-choice step), after which "Accept & join" joins as that account.
+  function socialSignIn(p) {
+    const back = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = (p.loginUrl || `/v1/ghii/login/${p.id}`) + '?redirect=' + back;
+  }
 
   // Become reactive to an in-place login/logout (username/password via the shared modal, or a
   // logout on this page) so the view flips between the accept-as-me button and the register form.
@@ -171,8 +192,12 @@ export default function InviteAccept() {
         </div>
 
         <div class="inv-or">${tr('invite.or', 'OR')}</div>
+        ${providers.map((p) => html`
+          <button key=${p.id} class="btn-outline inv-btn inv-signin" onClick=${() => socialSignIn(p)}>
+            ${tr('invite.continueWith', 'Continue with {label}').replace('{label}', p.label || p.id)}
+          </button>`)}
         <button class="btn-outline inv-btn inv-signin" onClick=${signInInstead}>
-          ${tr('invite.signInInstead', 'Already have an account or prefer Google? Sign in')}
+          ${tr('invite.signInInstead', 'Already have an account? Sign in')}
         </button>
       </div>
     </div>`;

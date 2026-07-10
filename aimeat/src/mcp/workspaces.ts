@@ -81,7 +81,7 @@ import { exportWorkspace } from '../services/workspace-export.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
@@ -245,26 +245,9 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_list'),
         async ({ organism_id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            // Each workspace is registered under its CREATOR's own GHII registry record, so a member who
-            // didn't create a given workspace would see an empty list if we only read our own registry.
-            // Aggregate every member's `organism.{id}.meta.workspaces` record (consistent with
-            // findWsEntry / workspace_read, which already aggregate across member identities).
-            const regKey = `organism.${organism_id}.meta.workspaces`;
-            const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-            const seen = new Set<string>();
-            const workspaces: unknown[] = [];
-            for (const rec of items) {
-                if (rec.key !== regKey) continue;
-                const list = (rec.value as { workspaces?: Array<{ id?: string }> } | null)?.workspaces ?? [];
-                for (const w of list) {
-                    const id = w?.id;
-                    if (typeof id === 'string') {
-                        if (seen.has(id)) continue;
-                        seen.add(id);
-                    }
-                    workspaces.push(w);
-                }
-            }
+            // Each workspace is registered under its CREATOR's own GHII registry record — aggregate
+            // across all members via the shared helper (also used by organism export).
+            const workspaces = await listOrganismWorkspaceEntries(storage, organism_id);
             return ok({ organism_id, workspaces });
         });
 

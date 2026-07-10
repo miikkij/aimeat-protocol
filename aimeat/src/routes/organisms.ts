@@ -126,7 +126,7 @@ import { archiveTarget, unarchiveTarget, isKeyArchived, type ArchiveLevel } from
 import { getOrganismReadme, setOrganismReadme } from '../services/organism-readme.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
-import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../services/invitations.js';
+import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeInviteeName, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../services/invitations.js';
 import { getActiveEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 
@@ -962,9 +962,14 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   router.post('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const { invitee } = req.body ?? {};
-    if (!invitee || typeof invitee !== 'string') {
+    const { invitee: inviteeRaw } = req.body ?? {};
+    if (!inviteeRaw || typeof inviteeRaw !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "invitee" (an owner name) is required'));
+      return;
+    }
+    const invitee = normalizeInviteeName(inviteeRaw, config.nodeId);
+    if (!invitee) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invitee belongs to another node — name-invites work for local owners only'));
       return;
     }
 
@@ -975,6 +980,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can invite members'));
+      return;
+    }
+    if (!(await storage.getOwner(invitee))) {
+      res.status(404).json(error(config.nodeId, 'OWNER_NOT_FOUND', `No owner named "${invitee}" on this node`));
       return;
     }
 
@@ -1007,7 +1016,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       title: `${callerGhii} invited you to join "${organism.name}"`,
       link: '/v1/profile#organisms',
     });
-    emitChange('notifications');
+    emitChange('notifications', `${invitee}@${config.nodeId}`);
 
     res.status(201).json(success(config.nodeId, { invitation: membership, status: 'invited' }));
     emitChange('organisms');
@@ -3147,14 +3156,20 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /* ── GET /v1/organisms/:id/export — download a ZIP backup of the WHOLE organism (settings + all
-   * its workspaces). Creator/admin only. ?format=base64 for a size-capped JSON payload. ── */
+   * its workspaces). Any ACTIVE MEMBER (membership keyed by the bare owner name — org agents in
+   * agentGaiis don't qualify): the bundle contains only what the member can already read live, so
+   * the gate matches the read model instead of silently 403ing members the UI shows the button to.
+   * ?format=base64 for a size-capped JSON payload. ── */
   router.get('/v1/organisms/:id/export', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const role = await memberRole(req, organism, id);
-    if (role !== 'creator' && role !== 'admin') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the organism creator or an admin can export the organism')); return; }
-    const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString() });
+    const ownerName = req.auth!.owner as string | undefined;
+    const m = ownerName ? await storage.getMembership(id, ownerName) : null;
+    if (!m || m.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it')); return; }
+    // Export as the member's owner GHII — a member reads the whole organism live, and the per-creator
+    // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
+    const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
     if (req.query.format === 'base64') {
       if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'Organism too large for inline (base64) export — use the UI/REST binary download.')); return; }
       res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));

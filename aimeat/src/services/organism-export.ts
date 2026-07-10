@@ -13,11 +13,15 @@
  *     Default behaviour (full bundle, no template.json) is unchanged.
  *   v1.0.0 -- 2026-06-09 -- Initial: organism bundle export (settings + all workspaces).
  *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.2.0 -- 2026-07-10 -- Aggregate the per-creator workspace registry across all members
+ *     (listOrganismWorkspaceEntries) — reading only the exporter's own record made exports empty
+ *     for any exporter who didn't personally create the workspaces.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectWorkspace } from './workspace-export.js';
+import { listOrganismWorkspaceEntries } from './workspace-meta.js';
 
 export const ORG_EXPORT_VERSION = '1.0';
 
@@ -30,8 +34,9 @@ export async function exportOrganism(
   const org = await storage.getOrganism(orgId);
   if (!org) throw new Error('Organism not found');
 
-  const reg = await storage.getMemory(exporterGaii, `organism.${orgId}.meta.workspaces`);
-  const wss = ((reg?.value as { workspaces?: Array<{ id: string; name?: string }> } | undefined)?.workspaces) ?? [];
+  // The registry is per-creator (one record per member who created workspaces) — aggregate across
+  // all members, or a promoted admin / transferred creator exports an empty bundle.
+  const wss = await listOrganismWorkspaceEntries(storage, orgId);
 
   const orgJson: Record<string, unknown> = {
     aimeatOrganismExport: ORG_EXPORT_VERSION,

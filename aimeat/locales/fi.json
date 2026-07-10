@@ -4532,6 +4532,13 @@
     "signupCreateBtn": "Luo tilini",
     "signupCreating": "Luodaan tiliä...",
     "signupCancelBtn": "Peruuta",
+    "signupLinkTitle": "Tällä sähköpostilla on jo tili",
+    "signupLinkIntro": "AIMEAT-tili käyttää jo osoitetta {email}, mutta sähköpostia ei ole vielä vahvistettu. Kirjaudu kerran käyttäjätunnuksella ja salasanalla — se vahvistaa sähköpostisi, ja sen jälkeen tämä kirjautumistapa yhdistyy tiliisi automaattisesti.",
+    "signupLinkHint": "(Vihje käyttäjätunnuksesta: {hint}.)",
+    "signupLinkSignInBtn": "Kirjaudu salasanalla",
+    "signupExpiredTitle": "Kirjautumisistunto vanheni",
+    "signupExpiredBody": "Kirjautumisistuntosi vanheni tai keskeytyi. Salasanaa ei tarvita — napsauta ”Jatka Googlella” uudelleen aloittaaksesi alusta.",
+    "signupExpiredOkBtn": "OK",
     "whyTitle": "✨ Mitä saat?",
     "whyGhii": "Oma digitaalinen identiteetti. Vain sinä hallitset sitä",
     "whyPrivacy": "Oman yksityisen muistitilan, suojattuna salasanallasi",
@@ -8504,5 +8511,6 @@
   "invite.joining": "Liitytään…",
   "invite.acceptCta": "Hyväksy ja liity",
   "invite.or": "TAI",
-  "invite.signInInstead": "Onko sinulla jo tili tai käytätkö Googlea? Kirjaudu"
+  "invite.continueWith": "Jatka palvelulla {label}",
+  "invite.signInInstead": "Onko sinulla jo tili? Kirjaudu"
 }
