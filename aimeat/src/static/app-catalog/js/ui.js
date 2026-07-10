@@ -9,7 +9,9 @@
  * @usage import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js'
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 3).
+ *   v1.1.0 — 2026-07-10 — Add dtlBtn() detail-view button builder (phase 3b: dtl-btn dedup).
  */
+import { escapeHtml } from './util.js';
 
 // In-page confirm dialog (replaces native confirm()). Promise-based so call sites stay linear:
 //   if (!(await showConfirm(msg))) return;   (make the enclosing handler `async`).
@@ -59,4 +61,22 @@ export function dismissNotice(el) {
   el.classList.remove('show');
   el.classList.add('hide');
   setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 250);
+}
+
+/**
+ * Detail-view button (`.dtl-btn`), the markup the detail sections repeated ~20×. `onclick` is the
+ * raw handler expression the caller builds (single-quoted args stay intact inside the double-quoted
+ * attribute); `label` is already-built inner HTML (t(), emoji prefix, escapeHtml — caller's call).
+ * opts: { variant: 'primary'|'danger'|'success', id, title (escaped here), disabled }. Attribute
+ * order (class, id, onclick, title, disabled) is fixed and DOM-equivalent to the old hand-written
+ * strings regardless of their original order.
+ */
+export function dtlBtn(label, onclick, opts) {
+  opts = opts || {};
+  return '<button class="dtl-btn' + (opts.variant ? ' ' + opts.variant : '') + '"'
+    + (opts.id ? ' id="' + opts.id + '"' : '')
+    + ' onclick="' + onclick + '"'
+    + (opts.title != null ? ' title="' + escapeHtml(opts.title) + '"' : '')
+    + (opts.disabled ? ' disabled' : '')
+    + '>' + label + '</button>';
 }
