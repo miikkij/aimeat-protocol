@@ -8,7 +8,7 @@
  * @usage  built, not loaded raw: pnpm build:app-catalog
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
-import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
+import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName } from './util.js';
 import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
@@ -2917,16 +2917,6 @@ import { extractZip, bundleZip } from './zip.js';
     }
   }
 
-  function currentOwnerName() {
-    try {
-      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-        return window.AIMEAT.auth.getSession().owner || null;
-      }
-      var stored = localStorage.getItem('aimeat_session');
-      if (stored) return JSON.parse(stored).owner || null;
-    } catch (e) {}
-    return null;
-  }
 
   // ── Sign-in control (top bar) — the shared golden login pill ──────────────
   // Reuses /v1/libs/aimeat-auth.js (the SAME login pill the SPA + standalone
