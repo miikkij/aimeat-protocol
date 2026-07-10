@@ -1464,6 +1464,7 @@
     #server-import-overlay,
     #json-import-overlay,
     #lineage-overlay,
+    #confirm-overlay,
     #protection-overlay {
       position: fixed;
       inset: 0;
@@ -1488,9 +1489,15 @@
     #server-import-overlay[hidden],
     #json-import-overlay[hidden],
     #lineage-overlay[hidden],
+    #confirm-overlay[hidden],
     #protection-overlay[hidden] {
       display: none;
     }
+
+    /* Confirm sits above any modal it may be triggered from (e.g. Remove-from-server in detail). */
+    #confirm-overlay { z-index: 900; }
+    .confirm-modal { max-width: 440px; }
+    .confirm-message { font-size: .95rem; line-height: 1.5; color: var(--text); margin: 0 0 20px; }
 
     /* ── Published Apps Section ──────────────────────── */
 
@@ -2263,6 +2270,18 @@
     </div>
   </div>
 
+  <!-- Generic in-page confirm dialog — replaces native confirm() so every destructive action
+       uses a real modal (wired in bootstrap; showConfirm(message, onConfirm)). -->
+  <div id="confirm-overlay" hidden>
+    <div class="modal confirm-modal">
+      <p id="confirm-message" class="confirm-message"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="confirm-ok-btn" data-i18n="common.confirm">OK</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-overlay" hidden>
     <div class="modal" id="settings-modal">
       <h2 data-i18n="settings.title">Settings</h2>
@@ -2565,6 +2584,7 @@
       "confirm.restoreVersion": 'Restore version {version} of "{file}"?\n\nIt will be re-published as a new latest version. Older versions are kept.',
       "confirm.unsavedClose": "You have unsaved changes. Close anyway?",
       "common.cancel": "Cancel",
+      "common.confirm": "OK",
       "common.save": "Save",
       "common.or": "or",
       "common.toggle": "toggle",
@@ -2901,6 +2921,7 @@
       "confirm.restoreVersion": 'Palautetaanko versio {version} appista "{file}"?\n\nSe julkaistaan uudelleen uusimpana versiona. Vanhat versiot säilytetään.',
       "confirm.unsavedClose": "Sinulla on tallentamattomia muutoksia. Suljetaanko silti?",
       "common.cancel": "Peruuta",
+      "common.confirm": "OK",
       "common.save": "Tallenna",
       "common.or": "tai",
       "common.toggle": "näytä/piilota",
@@ -4212,7 +4233,7 @@
   function libraryCardHtml(e, i) {
     var idAttr = e.hasLocal ? escapeHtml(e.localId) : "srv:" + escapeHtml(e.filename);
     var detailCall = e.filename ? "window._launcher.openPublishedDetail('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename) + "', '" + jsArg(e.hasLocal ? e.localId : "") + "', " + (e.versionNumber || 0) + ")" : "window._launcher.openDetailView('" + jsArg(e.localId) + "')";
-    var openCall = e.hasLocal ? "window._launcher.launchApp('" + jsArg(e.localId) + "', '" + jsArg(e.openMode || "tab") + "')" : e.viewUrl ? "window._launcher.viewPublished('" + jsArg(e.viewUrl) + "?mode=inline', '" + jsArg(e.name) + "')" : detailCall;
+    var openCall = (e.published || e.parked || e.serverOnly) && e.viewUrl ? "window._launcher.viewPublished('" + jsArg(e.viewUrl) + "?mode=inline', '" + jsArg(e.name) + "')" : e.hasLocal ? "window._launcher.launchApp('" + jsArg(e.localId) + "', '" + jsArg(e.openMode || "tab") + "')" : detailCall;
     var st = libStatus(e);
     var dragAttrs = e.hasLocal ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"' : "";
     var menuBtn = e.hasLocal ? `<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')" title="` + escapeHtml(t("common.menu")) + '">⋮</button>' : "";
@@ -4279,7 +4300,7 @@
     menu.hidden = true;
     contextAppId = null;
   }
-  function handleContextAction(action) {
+  async function handleContextAction(action) {
     if (!contextAppId) return;
     var appId = contextAppId;
     hideContextMenu();
@@ -4327,7 +4348,7 @@
         viewSource(app);
         break;
       case "delete":
-        if (confirm(t("confirm.deleteApp").replace("{name}", function() {
+        if (await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
           return app.name || "this app";
         }))) {
           if (app.publishedFilename) addImportIgnore(app.publishedFilename);
@@ -4570,6 +4591,20 @@
   function closeHelp() {
     document.getElementById("help-overlay").hidden = true;
   }
+  var _confirmResolve = null;
+  function showConfirm(message) {
+    return new Promise(function(resolve) {
+      _confirmResolve = resolve;
+      document.getElementById("confirm-message").textContent = message;
+      document.getElementById("confirm-overlay").hidden = false;
+    });
+  }
+  function closeConfirm(result) {
+    document.getElementById("confirm-overlay").hidden = true;
+    var r = _confirmResolve;
+    _confirmResolve = null;
+    if (r) r(!!result);
+  }
   function exportBackup() {
     getAllApps().then(function(apps) {
       var config = loadConfig();
@@ -4680,7 +4715,7 @@
     });
   }
   function removeDuplicateApps() {
-    getAllApps().then(function(apps) {
+    getAllApps().then(async function(apps) {
       var groups = {};
       apps.forEach(function(a) {
         var k = localAppKey(a);
@@ -4700,7 +4735,7 @@
         alert(t("dedup.none"));
         return;
       }
-      if (!confirm(t("dedup.confirm") + " " + toDelete.length)) return;
+      if (!await showConfirm(t("dedup.confirm") + " " + toDelete.length)) return;
       Promise.all(toDelete.map(function(a) {
         return deleteApp(a.id);
       })).then(function() {
@@ -4710,9 +4745,9 @@
       });
     });
   }
-  function clearAllData() {
-    if (!confirm(t("confirm.clearAll1"))) return;
-    if (!confirm(t("confirm.clearAll2"))) return;
+  async function clearAllData() {
+    if (!await showConfirm(t("confirm.clearAll1"))) return;
+    if (!await showConfirm(t("confirm.clearAll2"))) return;
     openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(STORE_NAME, "readwrite");
@@ -5739,8 +5774,8 @@
     grid.innerHTML = html;
     updateCommunityEmpty();
   }
-  function unpublishApp(appId) {
-    if (!confirm(t("confirm.removePublished"))) return;
+  async function unpublishApp(appId) {
+    if (!await showConfirm(t("confirm.removePublished"))) return;
     var app = null;
     for (var i = 0; i < allApps.length; i++) {
       if (allApps[i].id === appId) {
@@ -5796,7 +5831,9 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
+        if (serverStateByFilename[filename]) serverStateByFilename[filename].parked = !!parked;
         loadPublishedApps();
+        refreshDetailIfOpen();
       } else {
         alert("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
@@ -5820,7 +5857,9 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
+        if (serverStateByFilename[filename]) serverStateByFilename[filename].forkable = !!forkable;
         loadPublishedApps();
+        refreshDetailIfOpen();
       } else {
         alert("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
@@ -5828,8 +5867,8 @@
       alert("Error: " + (err.message || err));
     });
   }
-  function deleteServerApp(filename) {
-    if (!confirm(t("confirm.deleteFromServer").replace("{file}", function() {
+  async function deleteServerApp(filename) {
+    if (!await showConfirm(t("confirm.deleteFromServer").replace("{file}", function() {
       return filename;
     }))) return;
     var config = loadConfig();
@@ -5889,6 +5928,10 @@
   function htmlToBlob(html) {
     return btoa(unescape(encodeURIComponent(html)));
   }
+  function refreshDetailIfOpen() {
+    var dv = document.getElementById("detail-view");
+    if (detailAppId && dv && !dv.hasAttribute("hidden")) openDetailView(detailAppId);
+  }
   function openDetailView(appId) {
     detailAppId = appId;
     detailDraftBlob = null;
@@ -5921,7 +5964,13 @@
   }
   function detailLaunch() {
     var app = detailGetApp();
-    if (app) launchApp(app.id, app.openMode || "tab");
+    if (!app) return;
+    if (app.published && app.publishedUrl) {
+      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      viewPublished(base + app.publishedUrl + "?mode=inline", app.name);
+    } else {
+      launchApp(app.id, app.openMode || "tab");
+    }
   }
   function currentOwnerName() {
     try {
@@ -6248,7 +6297,7 @@
     };
     input.click();
   }
-  function detailRefreshScreenshot() {
+  async function detailRefreshScreenshot() {
     var app = detailGetApp();
     if (!app) return;
     var filename = app.publishedFilename || "";
@@ -6267,7 +6316,7 @@
       alert("Sign in to refresh the screenshot.");
       return;
     }
-    if (!confirm(t("confirm.clearScreenshot"))) return;
+    if (!await showConfirm(t("confirm.clearScreenshot"))) return;
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
     if (!aimeatUrl) {
@@ -6495,10 +6544,10 @@
   function detailPublish() {
     if (detailAppId) showPublishModal(detailAppId);
   }
-  function detailDelete() {
+  async function detailDelete() {
     var app = detailGetApp();
     if (!app) return;
-    if (!confirm(t("confirm.deleteApp").replace("{name}", function() {
+    if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
       return app.name || "this app";
     }))) return;
     if (app.publishedFilename) addImportIgnore(app.publishedFilename);
@@ -6745,8 +6794,8 @@
       statusEl.style.color = "var(--accent)";
     });
   }
-  function restoreVersion(owner, filename, version) {
-    if (!confirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
+  async function restoreVersion(owner, filename, version) {
+    if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
       return filename;
     }))) return;
     var token = getCortexOwnerToken();
@@ -7560,6 +7609,15 @@
     loadPublishedApps();
     loadCortexExtensions();
     loadConfigFromServer();
+    document.getElementById("confirm-ok-btn").addEventListener("click", function() {
+      closeConfirm(true);
+    });
+    document.getElementById("confirm-cancel-btn").addEventListener("click", function() {
+      closeConfirm(false);
+    });
+    document.getElementById("confirm-overlay").addEventListener("click", function(e) {
+      if (e.target === this) closeConfirm(false);
+    });
     if (_params.get("create") === "1") {
       try {
         openPromptBuilder(null);
@@ -7892,10 +7950,10 @@
         alert("Failed to save: " + (err.message || err));
       });
     });
-    function closeSourceModal() {
+    async function closeSourceModal() {
       var saveBtn = document.getElementById("save-source-btn");
       if (!saveBtn.disabled) {
-        if (!confirm(t("confirm.unsavedClose"))) return;
+        if (!await showConfirm(t("confirm.unsavedClose"))) return;
       }
       document.getElementById("source-overlay").hidden = true;
     }

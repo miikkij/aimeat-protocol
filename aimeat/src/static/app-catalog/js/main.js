@@ -1168,9 +1168,15 @@ import { I18N } from './i18n-data.js';
     var detailCall = (e.filename)
       ? 'window._launcher.openPublishedDetail(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename) + '\', \'' + jsArg(e.hasLocal ? e.localId : '') + '\', ' + (e.versionNumber || 0) + ')'
       : 'window._launcher.openDetailView(\'' + jsArg(e.localId) + '\')';
-    var openCall = e.hasLocal
-      ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
-      : (e.viewUrl ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')' : detailCall);
+    // Open: a PUBLISHED/PARKED/server app opens TOP-LEVEL on its served URL (clean full page on the
+    // app origin) — like the old "View". Launching its local blob (a materialized twin) in the apex
+    // sandbox iframe breaks app-origin apps (frame-ancestors CSP). Only a purely-local app launches
+    // its local copy.
+    var openCall = ((e.published || e.parked || e.serverOnly) && e.viewUrl)
+      ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')'
+      : (e.hasLocal
+          ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
+          : detailCall);
     var st = libStatus(e);
     var dragAttrs = e.hasLocal
       ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"'
@@ -1290,7 +1296,7 @@ import { I18N } from './i18n-data.js';
     contextAppId = null;
   }
 
-  function handleContextAction(action) {
+  async function handleContextAction(action) {
     if (!contextAppId) return;
     var appId = contextAppId;
     hideContextMenu();
@@ -1346,7 +1352,7 @@ import { I18N } from './i18n-data.js';
         break;
 
       case 'delete':
-        if (confirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
+        if (await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
           // Tombstone published apps so the server copy isn't re-imported as a
           // "new" AI-published app on the next load.
           if (app.publishedFilename) addImportIgnore(app.publishedFilename);
@@ -1637,6 +1643,23 @@ import { I18N } from './i18n-data.js';
   function openHelp() { document.getElementById('help-overlay').hidden = false; }
   function closeHelp() { document.getElementById('help-overlay').hidden = true; }
 
+  // In-page confirm dialog (replaces native confirm()). Promise-based so call sites stay linear:
+  //   if (!(await showConfirm(msg))) return;   (make the enclosing handler `async`).
+  // OK resolves true, Cancel/backdrop resolves false. Wired in bootstrap.
+  var _confirmResolve = null;
+  function showConfirm(message) {
+    return new Promise(function (resolve) {
+      _confirmResolve = resolve;
+      document.getElementById('confirm-message').textContent = message;
+      document.getElementById('confirm-overlay').hidden = false;
+    });
+  }
+  function closeConfirm(result) {
+    document.getElementById('confirm-overlay').hidden = true;
+    var r = _confirmResolve; _confirmResolve = null;
+    if (r) r(!!result);
+  }
+
   // ── Export / Import ─────────────────────────────
 
   function exportBackup() {
@@ -1775,7 +1798,7 @@ import { I18N } from './i18n-data.js';
   // ── Remove duplicate apps (cleanup after legacy blind imports) ──
 
   function removeDuplicateApps() {
-    getAllApps().then(function (apps) {
+    getAllApps().then(async function (apps) {
       var groups = {};
       apps.forEach(function (a) {
         var k = localAppKey(a);
@@ -1793,7 +1816,7 @@ import { I18N } from './i18n-data.js';
         toDelete = toDelete.concat(g.slice(1));
       });
       if (toDelete.length === 0) { alert(t('dedup.none')); return; }
-      if (!confirm(t('dedup.confirm') + ' ' + toDelete.length)) return;
+      if (!(await showConfirm(t('dedup.confirm') + ' ' + toDelete.length))) return;
       Promise.all(toDelete.map(function (a) { return deleteApp(a.id); })).then(function () {
         renderApps();
         loadPublishedApps();
@@ -1804,9 +1827,9 @@ import { I18N } from './i18n-data.js';
 
   // ── Clear All Data ──────────────────────────────
 
-  function clearAllData() {
-    if (!confirm(t('confirm.clearAll1'))) return;
-    if (!confirm(t('confirm.clearAll2'))) return;
+  async function clearAllData() {
+    if (!(await showConfirm(t('confirm.clearAll1')))) return;
+    if (!(await showConfirm(t('confirm.clearAll2')))) return;
 
     openDB().then(function (db) {
       return new Promise(function (resolve, reject) {
@@ -3062,8 +3085,8 @@ import { I18N } from './i18n-data.js';
   // Render the owner's PARKED apps in their own section. A parked app is hidden from
   // the public catalogue but stays fully usable by the owner; the primary action here
   // is Publish (unpark), which moves it back into Published Apps.
-  function unpublishApp(appId) {
-    if (!confirm(t('confirm.removePublished'))) return;
+  async function unpublishApp(appId) {
+    if (!(await showConfirm(t('confirm.removePublished')))) return;
 
     var app = null;
     for (var i = 0; i < allApps.length; i++) {
@@ -3118,7 +3141,10 @@ import { I18N } from './i18n-data.js';
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
+          // Optimistically flip the cached state so the open detail re-renders correctly now.
+          if (serverStateByFilename[filename]) serverStateByFilename[filename].parked = !!parked;
           loadPublishedApps();
+          refreshDetailIfOpen();
         } else {
           alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
@@ -3142,7 +3168,9 @@ import { I18N } from './i18n-data.js';
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
+          if (serverStateByFilename[filename]) serverStateByFilename[filename].forkable = !!forkable;
           loadPublishedApps();
+          refreshDetailIfOpen();
         } else {
           alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
@@ -3150,8 +3178,8 @@ import { I18N } from './i18n-data.js';
       .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
-  function deleteServerApp(filename) {
-    if (!confirm(t('confirm.deleteFromServer').replace('{file}', function () { return filename; }))) return;
+  async function deleteServerApp(filename) {
+    if (!(await showConfirm(t('confirm.deleteFromServer').replace('{file}', function () { return filename; })))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
@@ -3217,6 +3245,13 @@ import { I18N } from './i18n-data.js';
     return btoa(unescape(encodeURIComponent(html)));
   }
 
+  // Re-render the detail view in place if it is currently open (e.g. after a park/fork toggle
+  // changed the server state, so the "Manage on server" buttons reflect the new state).
+  function refreshDetailIfOpen() {
+    var dv = document.getElementById('detail-view');
+    if (detailAppId && dv && !dv.hasAttribute('hidden')) openDetailView(detailAppId);
+  }
+
   function openDetailView(appId) {
     detailAppId = appId;
     detailDraftBlob = null;
@@ -3256,7 +3291,15 @@ import { I18N } from './i18n-data.js';
 
   function detailLaunch() {
     var app = detailGetApp();
-    if (app) launchApp(app.id, app.openMode || 'tab');
+    if (!app) return;
+    // A published app opens TOP-LEVEL on its served URL (clean full page on the app origin), like
+    // the old "View" — launching the local blob in the sandbox iframe breaks app-origin apps.
+    if (app.published && app.publishedUrl) {
+      var base = (loadConfig().aimeatUrl || '').replace(/\/+$/, '');
+      viewPublished(base + app.publishedUrl + '?mode=inline', app.name);
+    } else {
+      launchApp(app.id, app.openMode || 'tab');
+    }
   }
 
   function currentOwnerName() {
@@ -3687,7 +3730,7 @@ import { I18N } from './i18n-data.js';
 
   // System-side refresh: clear the current screenshot so the node's scheduled batch job re-takes it
   // on its next run. Clearing is cheap (no on-demand render), which is what keeps this DoS-safe.
-  function detailRefreshScreenshot() {
+  async function detailRefreshScreenshot() {
     var app = detailGetApp();
     if (!app) return;
     var filename = app.publishedFilename || '';
@@ -3700,7 +3743,7 @@ import { I18N } from './i18n-data.js';
     var token = getCortexOwnerToken();
     if (!owner || !filename) { alert('Publish the app first, then you can refresh its screenshot.'); return; }
     if (!token) { alert('Sign in to refresh the screenshot.'); return; }
-    if (!confirm(t('confirm.clearScreenshot'))) return;
+    if (!(await showConfirm(t('confirm.clearScreenshot')))) return;
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
     if (!aimeatUrl) { alert('No server configured.'); return; }
@@ -3926,10 +3969,10 @@ import { I18N } from './i18n-data.js';
   function detailImproveExternal() { var app = detailGetApp(); if (app) openPromptBuilder(app); }
   function detailSharePrompt() { var app = detailGetApp(); if (app) generateSharePrompt(app); }
   function detailPublish() { if (detailAppId) showPublishModal(detailAppId); }
-  function detailDelete() {
+  async function detailDelete() {
     var app = detailGetApp();
     if (!app) return;
-    if (!confirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) return;
+    if (!(await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; })))) return;
     if (app.publishedFilename) addImportIgnore(app.publishedFilename);
     var id = app.id;
     deleteApp(id).then(function() {
@@ -4178,8 +4221,8 @@ import { I18N } from './i18n-data.js';
       });
   }
 
-  function restoreVersion(owner, filename, version) {
-    if (!confirm(t('confirm.restoreVersion').replace('{version}', String(version)).replace('{file}', function () { return filename; }))) return;
+  async function restoreVersion(owner, filename, version) {
+    if (!(await showConfirm(t('confirm.restoreVersion').replace('{version}', String(version)).replace('{file}', function () { return filename; })))) return;
     var token = getCortexOwnerToken();
     if (!token) { alert('You must be logged in as the owner to restore a version. Sign in first.'); return; }
     var config = loadConfig();
@@ -5235,6 +5278,13 @@ import { I18N } from './i18n-data.js';
     loadCortexExtensions();
     loadConfigFromServer();
 
+    // Wire the in-page confirm dialog (OK resolves true; Cancel/backdrop resolve false).
+    document.getElementById('confirm-ok-btn').addEventListener('click', function () { closeConfirm(true); });
+    document.getElementById('confirm-cancel-btn').addEventListener('click', function () { closeConfirm(false); });
+    document.getElementById('confirm-overlay').addEventListener('click', function (e) {
+      if (e.target === this) closeConfirm(false);
+    });
+
     // Deep link ?create=1 — open the AI prompt builder ("Build an app") right away.
     if (_params.get('create') === '1') {
       try { openPromptBuilder(null); } catch (e) { /* prompt builder optional */ }
@@ -5721,10 +5771,10 @@ import { I18N } from './i18n-data.js';
     });
 
     // ── Close source modal helper ─────────────────────
-    function closeSourceModal() {
+    async function closeSourceModal() {
       var saveBtn = document.getElementById('save-source-btn');
       if (!saveBtn.disabled) {
-        if (!confirm(t('confirm.unsavedClose'))) return;
+        if (!(await showConfirm(t('confirm.unsavedClose')))) return;
       }
       document.getElementById('source-overlay').hidden = true;
     }
