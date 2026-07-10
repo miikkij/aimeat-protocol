@@ -3294,9 +3294,19 @@ import { I18N } from './i18n-data.js';
     if (!app) return;
     // A published app opens TOP-LEVEL on its served URL (clean full page on the app origin), like
     // the old "View" — launching the local blob in the sandbox iframe breaks app-origin apps.
-    if (app.published && app.publishedUrl) {
+    // Prefer the stored publishedUrl; a materialized server app may only have the filename, so
+    // fall back to constructing /v1/apps/<owner>/<filename> from the cached server state.
+    if (app.published && (app.publishedUrl || app.publishedFilename)) {
       var base = (loadConfig().aimeatUrl || '').replace(/\/+$/, '');
-      viewPublished(base + app.publishedUrl + '?mode=inline', app.name);
+      var url;
+      if (app.publishedUrl) {
+        url = base + app.publishedUrl;
+      } else {
+        var st = serverStateByFilename[app.publishedFilename] || {};
+        var owner = st.owner || currentOwnerName() || '';
+        url = base + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(app.publishedFilename);
+      }
+      viewPublished(url + '?mode=inline', app.name);
     } else {
       launchApp(app.id, app.openMode || 'tab');
     }
