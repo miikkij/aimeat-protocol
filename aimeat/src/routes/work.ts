@@ -14,7 +14,7 @@ import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchem
 import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { createTaskFromWork } from '../services/work-task-bridge.js';
 
@@ -50,58 +50,44 @@ function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: 
   const event = (payload.event as string) ?? 'unknown';
   const trackingCode = (payload.tracking_code as string) ?? '';
   const doFetch = (attempt: number) => {
-    // SSRF validation: block requests to private/reserved IPs
-    validateOutboundUrl(url).then(urlCheck => {
-      if (!urlCheck.valid) {
-        logger.warn(`Blocked webhook to ${url}: ${urlCheck.reason}`);
-        const entry: WebhookLogEntry = {
-          url, trackingCode, event, attempt,
-          status: 'failed',
-          error: `SSRF blocked: ${urlCheck.reason}`,
-          timestamp: new Date().toISOString(),
-        };
-        webhookLog.push(entry);
-        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-        return;
+    // safeFetch validates the URL AND re-validates every redirect hop (throws `Fetch blocked: …` on a
+    // blocked host/hop), so a caller-supplied webhook URL cannot 3xx-bounce to an internal target.
+    // A blocked URL surfaces in the .catch below alongside network errors (both = a failed delivery).
+    safeFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    }).then(resp => {
+      const entry: WebhookLogEntry = {
+        url, trackingCode, event, attempt,
+        status: resp.ok ? 'success' : 'failed',
+        httpStatus: resp.status,
+        timestamp: new Date().toISOString(),
+      };
+      if (!resp.ok && attempt < maxRetries) {
+        entry.status = 'retrying';
       }
-      return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal: AbortSignal.timeout(10_000),
-      }).then(resp => {
-        const entry: WebhookLogEntry = {
-          url, trackingCode, event, attempt,
-          status: resp.ok ? 'success' : 'failed',
-          httpStatus: resp.status,
-          timestamp: new Date().toISOString(),
-        };
-        if (!resp.ok && attempt < maxRetries) {
-          entry.status = 'retrying';
-        }
-        webhookLog.push(entry);
-        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-        if (!resp.ok && attempt < maxRetries) {
-          const delay = Math.pow(2, attempt - 1) * 1000;
-          setTimeout(() => doFetch(attempt + 1), delay);
-        }
-      }).catch(err => {
-        const entry: WebhookLogEntry = {
-          url, trackingCode, event, attempt,
-          status: attempt < maxRetries ? 'retrying' : 'failed',
-          error: String(err),
-          timestamp: new Date().toISOString(),
-        };
-        webhookLog.push(entry);
-        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-        logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
-        if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt - 1) * 1000;
-          setTimeout(() => doFetch(attempt + 1), delay);
-        }
-      });
+      webhookLog.push(entry);
+      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+      if (!resp.ok && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        setTimeout(() => doFetch(attempt + 1), delay);
+      }
     }).catch(err => {
-      logger.warn(`Webhook URL validation failed for ${url}`, { error: String(err) });
+      const entry: WebhookLogEntry = {
+        url, trackingCode, event, attempt,
+        status: attempt < maxRetries ? 'retrying' : 'failed',
+        error: String(err),
+        timestamp: new Date().toISOString(),
+      };
+      webhookLog.push(entry);
+      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+      logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        setTimeout(() => doFetch(attempt + 1), delay);
+      }
     });
   };
   doFetch(1);
