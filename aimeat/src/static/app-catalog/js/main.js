@@ -963,20 +963,104 @@ import { I18N } from './i18n-data.js';
 
   // ── Rendering ─────────────────────────────────────
 
+  // Cached own server apps (published + parked), refreshed by loadPublishedApps().
+  // renderApps() merges these with the local apps so each app shows as ONE unified card
+  // in the Kirjasto grid (no more Local + Published + Parked triplicate cards).
+  var ownServerApps = [];
+
+  // Status of a unified entry, for its badge.
+  function libStatus(e) {
+    if (e.parked) return 'parked';
+    if (e.serverOnly) return 'server';
+    if (e.published) return 'published';
+    return 'local';
+  }
+  function libStatusLabel(e) {
+    switch (libStatus(e)) {
+      case 'parked':    return t('status.parked');
+      case 'server':    return t('status.serverOnly');
+      case 'published': return t('status.published') + (e.versionNumber ? ' v' + e.versionNumber : '');
+      default:          return t('status.local');
+    }
+  }
+
+  // Merge local apps with the owner's server apps into ONE entry per app (deduped by the
+  // published filename). Local apps own favorites/drag-drop/openMode; the server copy supplies
+  // the authoritative published/parked/version state; a server app with no local twin becomes a
+  // read-only "server-only" entry.
+  function buildLibraryEntries(localApps, serverApps) {
+    var base = (loadConfig().aimeatUrl || '').replace(/\/+$/, '');
+    var byFilename = {};
+    var entries = [];
+    for (var i = 0; i < localApps.length; i++) {
+      var la = localApps[i];
+      var e = {
+        hasLocal: true, localId: la.id,
+        name: la.name || la.filename || 'Untitled',
+        icon: la.icon || '\u{1F4DD}',
+        description: la.description || '',
+        tags: la.tags || [],
+        favorite: !!la.favorite, sortOrder: la.sortOrder, openMode: la.openMode || 'tab',
+        source: la.source, origin: la.origin,
+        aimeatOwner: la.aimeatOwner || null, aimeatFilename: la.aimeatFilename || null,
+        addedAt: la.addedAt, lastOpenedAt: la.lastOpenedAt, blob: la.blob,
+        published: !!la.published, parked: false, serverOnly: false,
+        filename: la.publishedFilename || null, owner: null,
+        versionNumber: la.publishedVersionNumber || null,
+        viewUrl: la.publishedUrl ? (base + la.publishedUrl) : '',
+        forkable: false, forks: 0
+      };
+      entries.push(e);
+      if (e.filename) byFilename[e.filename] = e;
+    }
+    for (var s = 0; s < serverApps.length; s++) {
+      var sa = serverApps[s];
+      var fn = sa.filename || '';
+      var m = fn ? byFilename[fn] : null;
+      if (m) {
+        m.parked = !!sa.parked;
+        m.published = !sa.parked;
+        m.owner = sa.owner || m.owner;
+        m.versionNumber = sa.version_number || m.versionNumber;
+        m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
+        if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
+      } else {
+        var se = {
+          hasLocal: false, localId: null,
+          name: (sa.manifest && sa.manifest.name) || fn,
+          icon: '\u{1F310}',
+          description: (sa.manifest && sa.manifest.description) || '',
+          tags: (sa.manifest && sa.manifest.tags) || [],
+          favorite: false, sortOrder: undefined, openMode: 'tab',
+          source: 'server', origin: null,
+          aimeatOwner: sa.owner || null, aimeatFilename: fn,
+          published: !sa.parked, parked: !!sa.parked, serverOnly: true,
+          filename: fn, owner: sa.owner || '',
+          versionNumber: sa.version_number || null,
+          viewUrl: (base && fn) ? (base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn)) : '',
+          forkable: !!sa.forkable, forks: sa.forks || 0
+        };
+        entries.push(se);
+        if (fn) byFilename[fn] = se;
+      }
+    }
+    return entries;
+  }
+
   function renderApps() {
     getAllApps().then(function (apps) {
-      allApps = apps;
+      allApps = apps; // keep the raw local list (openPublishedDetail et al. read allApps)
 
-      // Sort: favorites first, then by sortOrder (if set), then by date
-      allApps.sort(function (a, b) {
-        // Favorites first
+      // Unified library list: one entry per app (local + own-server, deduped by filename).
+      var entries = buildLibraryEntries(apps, ownServerApps);
+
+      // Sort: favorites first, then by explicit sortOrder, then most-recent.
+      entries.sort(function (a, b) {
         if (a.favorite && !b.favorite) return -1;
         if (!a.favorite && b.favorite) return 1;
-        // Then by explicit sortOrder if present
         var oA = typeof a.sortOrder === 'number' ? a.sortOrder : Infinity;
         var oB = typeof b.sortOrder === 'number' ? b.sortOrder : Infinity;
         if (oA !== oB) return oA - oB;
-        // Then by most recently used/added
         var dateA = a.lastOpenedAt || a.addedAt || '';
         var dateB = b.lastOpenedAt || b.addedAt || '';
         if (dateA > dateB) return -1;
@@ -985,12 +1069,12 @@ import { I18N } from './i18n-data.js';
       });
 
       // Filter by activeTag
-      var filtered = allApps;
+      var filtered = entries;
       if (activeTag === '__favorites__') {
-        filtered = allApps.filter(function (app) { return app.favorite; });
+        filtered = entries.filter(function (app) { return app.favorite; });
       } else if (activeTag !== null) {
         var at = activeTag.toLowerCase();
-        filtered = allApps.filter(function (app) {
+        filtered = entries.filter(function (app) {
           return app.tags && app.tags.some(function (tg) { return String(tg).toLowerCase() === at; });
         });
       }
@@ -1002,7 +1086,7 @@ import { I18N } from './i18n-data.js';
           if (app.name && app.name.toLowerCase().indexOf(q) !== -1) return true;
           if (app.tags) {
             for (var i = 0; i < app.tags.length; i++) {
-              if (app.tags[i].toLowerCase().indexOf(q) !== -1) return true;
+              if (String(app.tags[i]).toLowerCase().indexOf(q) !== -1) return true;
             }
           }
           return false;
@@ -1013,13 +1097,12 @@ import { I18N } from './i18n-data.js';
       var localHeader = document.getElementById('local-apps-header');
       var localCount = document.getElementById('local-apps-count');
       if (localHeader) {
-        localHeader.style.display = allApps.length > 0 ? '' : 'none';
-        if (localCount) localCount.textContent = '(' + allApps.length + ')';
+        localHeader.style.display = entries.length > 0 ? '' : 'none';
+        if (localCount) localCount.textContent = '(' + entries.length + ')';
       }
 
       if (filtered.length === 0) {
-        if (!activeTag && !searchQuery && allApps.length === 0) {
-          // No apps at all — show helpful empty state
+        if (!activeTag && !searchQuery && entries.length === 0) {
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F680}</div>' +
@@ -1028,7 +1111,6 @@ import { I18N } from './i18n-data.js';
               '<span class="empty-formats">' + t('empty.formats') + '</span>' +
             '</div>';
         } else {
-          // Filters active but no matches
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F50D}</div>' +
@@ -1038,50 +1120,67 @@ import { I18N } from './i18n-data.js';
         }
       } else {
         var html = '';
-        for (var i = 0; i < filtered.length; i++) {
-          var app = filtered[i];
-          var iconDisplay = app.icon || '\u{1F4DD}';
-          html +=
-            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.openDetailView(\'' + escapeHtml(app.id) + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
-              '<button class="card-quick-launch" onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" title="Launch">\u25B6</button>' +
-              '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
-              '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
-              '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
-              '<div class="app-source">' + sourceLabel(app.source) +
-                (app.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') + '</div>' +
-              '<div class="app-actions">' +
-                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'tab\')" title="Open in tab">\u25B6 Tab</button>' +
-                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
-                // Consents: only for a catalogue app (has owner/filename) \u2014 manage the grant you gave it.
-                ((app.aimeatOwner && app.aimeatFilename)
-                  ? '<button onclick="event.stopPropagation(); window._launcher.openConsents(\'' + jsArg(app.aimeatOwner) + '\', \'' + jsArg(app.aimeatFilename) + '\', \'' + jsArg(app.name) + '\')" title="' + escapeHtml(t('consents.title')) + '">\uD83D\uDD11</button>'
-                  : '') +
-              '</div>' +
-              (app.favorite ? '<span class="fav-star visible">\u2B50</span>' : '') +
-            '</div>';
+        for (var j = 0; j < filtered.length; j++) {
+          html += libraryCardHtml(filtered[j], j);
         }
         grid.innerHTML = html;
       }
 
-      // Update stats
+      // Stats: count + total local blob size (server-only apps have no local footprint).
       var statsEl = document.getElementById('stats');
       var totalSize = 0;
-      for (var s = 0; s < allApps.length; s++) {
-        if (allApps[s].blob) {
-          totalSize += allApps[s].blob.length;
-        }
+      for (var sz = 0; sz < entries.length; sz++) {
+        if (entries[sz].blob) totalSize += entries[sz].blob.length;
       }
       var sizeLabel = totalSize < 1024 ? totalSize + ' B'
         : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB'
         : (totalSize / 1048576).toFixed(1) + ' MB';
-      statsEl.textContent = allApps.length + ' ' + t('stats.apps') + ' \u00B7 ' + sizeLabel + ' ' + t('stats.stored');
+      statsEl.textContent = entries.length + ' ' + t('stats.apps') + ' · ' + sizeLabel + ' ' + t('stats.stored');
 
-      // Render tag bar
       renderTags();
-
-      // Render recently opened strip
       renderRecentlyOpened();
     });
+  }
+
+  // One unified card. hasLocal entries keep favorites/drag-drop/menu; server-only entries are
+  // read-only (open the published copy). Management (publish, park, fork, protect, versions,
+  // remove, consents) lives in the detail view — the card face stays to a status badge + two
+  // buttons (Open, Details).
+  function libraryCardHtml(e, i) {
+    var idAttr = e.hasLocal ? escapeHtml(e.localId) : ('srv:' + escapeHtml(e.filename));
+    // Detail routing: openPublishedDetail resolves a local twin itself; local-only -> openDetailView.
+    var detailCall = (e.filename)
+      ? 'window._launcher.openPublishedDetail(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename) + '\', \'' + jsArg(e.hasLocal ? e.localId : '') + '\', ' + (e.versionNumber || 0) + ')'
+      : 'window._launcher.openDetailView(\'' + jsArg(e.localId) + '\')';
+    var openCall = e.hasLocal
+      ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
+      : (e.viewUrl ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')' : detailCall);
+    var st = libStatus(e);
+    var dragAttrs = e.hasLocal
+      ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"'
+      : '';
+    var menuBtn = e.hasLocal
+      ? '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + jsArg(e.localId) + '\')" title="' + escapeHtml(t('common.menu')) + '">⋮</button>'
+      : '';
+    return '<div class="app-card' + (e.hasLocal ? '' : ' server-only') + '" data-id="' + idAttr + '"' + dragAttrs +
+        filterAttr(e.name, e.tags) +
+        ' onclick="' + detailCall + '"' +
+        (e.hasLocal ? ' oncontextmenu="window._launcher.showContextMenu(event, \'' + jsArg(e.localId) + '\')"' : '') +
+        ' style="animation-delay:' + (i * 0.04) + 's">' +
+        '<span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + '</span>' +
+        menuBtn +
+        '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
+        '<div class="app-name">' + escapeHtml(e.name) +
+          (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') + '</div>' +
+        (e.description
+          ? '<div class="app-source">' + escapeHtml(e.description) + '</div>'
+          : '<div class="app-source">' + sourceLabel(e.source) + '</div>') +
+        '<div class="app-actions">' +
+          '<button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t('card.openHint')) + '">▶ ' + escapeHtml(t('card.open')) + '</button>' +
+          '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t('ctx.details')) + '</button>' +
+        '</div>' +
+        (e.favorite ? '<span class="fav-star visible">⭐</span>' : '') +
+      '</div>';
   }
 
   function renderRecentlyOpened() {
@@ -2824,9 +2923,9 @@ import { I18N } from './i18n-data.js';
       }
 
       if (!aimeatUrl) {
-        renderPublishedApps(currentOwner ? localPublished : [], [], localByFilename, aimeatUrl, section, grid, countEl);
+        ownServerApps = [];
+        renderApps();
         if (communitySection) communitySection.style.display = 'none';
-        if (parkedSection) parkedSection.style.display = 'none';
         return;
       }
 
@@ -2854,43 +2953,27 @@ import { I18N } from './i18n-data.js';
             ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
             : serverApps;
 
-          // Parked apps live in their OWN section, not in Published Apps. Split the
-          // owner's server apps so a parked app moves out of Published and into Parked.
+          // ownPublished (for the import banner) vs ownParked — both feed the unified grid.
           var ownPublished = ownApps.filter(function(a) { return !a.parked; });
-          var ownParked = ownApps.filter(function(a) { return !!a.parked; });
-
-          // A parked app published via BOTH portal + MCP also has a local (IndexedDB)
-          // twin. renderPublishedApps re-adds any local-only entry once its server copy
-          // is filtered out, which would resurrect the parked app in Published. Drop the
-          // local twin of every parked app so it shows ONLY in the Parked section.
-          var parkedFilenames = {};
-          for (var pk = 0; pk < ownParked.length; pk++) {
-            if (ownParked[pk].filename) parkedFilenames[ownParked[pk].filename] = true;
-          }
-          var localForPublished = localPublished.filter(function(lp) {
-            return !(lp.publishedFilename && parkedFilenames[lp.publishedFilename]);
-          });
 
           return loadSubdomainSites().then(function () {
-            // "Published Apps" is the signed-in owner's own apps (with owner-only
-            // controls). When logged out we pass no local entries so the section
-            // hides — a logged-out visitor browses everything under Community Apps
-            // instead and never sees non-functional Park/Remove/Subdomain controls.
-            renderPublishedApps(currentOwner ? localForPublished : [], ownPublished, localByFilename, aimeatUrl, section, grid, countEl);
-            renderParkedApps(ownParked, aimeatUrl, parkedSection, parkedGrid, parkedCountEl);
+            // Unified Kirjasto grid: cache the owner's server apps (published + parked) so
+            // renderApps() merges them with local apps into ONE card per app (deduped by
+            // filename; buildLibraryEntries handles the parked/published state). Logged out →
+            // no owner server apps (a visitor browses everything under Community).
+            ownServerApps = currentOwner ? ownApps : [];
+            renderApps();
             renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
-            applyServerFilter(); // re-apply any active search/tag to the freshly-rendered server cards
-            // Server-published own apps missing from the local catalog are
-            // NEVER imported automatically — the banner offers a review modal
-            // where the user picks exactly which ones to import. (Parked apps are
-            // already on the server, so they never trigger the import banner.)
+            applyServerFilter(); // re-apply any active search/tag to the community cards
+            // Server-published own apps missing from the local catalog are NEVER imported
+            // automatically — the banner offers a review modal to pick which ones to import.
             updateServerImportState(ownPublished, localByFilename, aimeatUrl);
           });
         })
         .catch(function() {
-          renderPublishedApps(currentOwner ? localPublished : [], [], localByFilename, aimeatUrl, section, grid, countEl);
+          ownServerApps = [];
+          renderApps();
           if (communitySection) communitySection.style.display = 'none';
-          if (parkedSection) parkedSection.style.display = 'none';
         });
     });
   }
