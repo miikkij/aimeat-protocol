@@ -1622,14 +1622,17 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                 <label class="pj-share-row">
                   <input type="radio" name="pj-share-access" checked=${share.access === 'open'} disabled=${shareBusy}
                     onChange=${() => patchShare({ access: 'open' })} />
-                  <span>${t('organisms.shareAccessOpen') || 'Anyone with the link'}</span>
+                  <span>${t('organisms.shareAccessOpen') || 'Anyone with the link (default)'}</span>
                 </label>
                 <label class="pj-share-row">
                   <input type="radio" name="pj-share-access" checked=${share.access === 'password'} disabled=${shareBusy}
-                    onChange=${() => {
+                    onChange=${(e) => {
                       if (share.has_password) { patchShare({ access: 'password' }); return; }
                       if (sharePw.trim().length >= 4) { patchShare({ access: 'password', password: sharePw.trim() }); setSharePw(''); return; }
-                      showToast(t('organisms.sharePasswordMissing') || 'Type a password (at least 4 characters) below first');
+                      // No password yet: don't error out — keep the current mode, point at the field instead.
+                      e.target.checked = share.access === 'password';
+                      showToast(t('organisms.sharePasswordMissing') || 'Type a password (at least 4 characters) below — setting it turns password protection on');
+                      const inp = document.getElementById('pj-share-pw-input'); if (inp) inp.focus();
                     }} />
                   <span>${t('organisms.shareAccessPassword') || 'Anyone with the link and the password'}</span>
                 </label>
@@ -1637,7 +1640,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                   <span class="pj-share-pw-state">${share.has_password
                     ? (t('organisms.sharePasswordSet') || '🔑 A password is set')
                     : (t('organisms.sharePasswordUnset') || 'No password set')}</span>
-                  <input type="password" class="pj-share-pw-input" autocomplete="new-password"
+                  <input type="password" id="pj-share-pw-input" class="pj-share-pw-input" autocomplete="new-password"
                     placeholder=${t('organisms.sharePasswordPlaceholder') || 'Share password (4–128 chars)'}
                     value=${sharePw} disabled=${shareBusy}
                     onInput=${e => setSharePw(e.target.value)} />
@@ -1654,9 +1657,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                 <label class="pj-share-row">
                   <input type="radio" name="pj-share-access" checked=${share.access === 'account'} disabled=${shareBusy}
                     onChange=${() => patchShare({ access: 'account' })} />
-                  <span>${t('organisms.shareAccessAccount') || 'Signed-in users only (any account on this node)'}</span>
+                  <span>${t('organisms.shareAccessAccount') || 'Signed-in users only — any account on this node, not just members'}</span>
                 </label>
-                <div class="pj-share-access-note">${t('organisms.shareAccessNote') || 'Workspace members always keep their normal access. The choice above only gates the public link.'}</div>
+                <div class="pj-share-access-note">${t('organisms.shareAccessNote') || "Default: anyone with the link. Workspace members always see these pages through their membership regardless of this choice — it only gates the public link. If you don't want outsiders at all, simply don't share."}</div>
               </div>` : null}
             ${anythingPublic() ? html`
               <div class="pj-share-actions">
