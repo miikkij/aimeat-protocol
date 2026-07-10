@@ -7063,96 +7063,30 @@
     });
   }
 
-  // src/static/app-catalog/js/main.js
-  function setLanguage(lang) {
-    setLang(lang);
-    try {
-      var config = loadConfig();
-      config.language = getLang();
-      saveConfig(config);
-    } catch (e) {
-    }
-    applyI18n();
-    try {
-      renderApps5();
-    } catch (e) {
-    }
-    try {
-      renderTags();
-    } catch (e) {
-    }
-    try {
-      loadPublishedApps3();
-    } catch (e) {
-    }
-    try {
-      renderRecentlyOpened();
-    } catch (e) {
-    }
-    try {
-      loadCortexExtensions();
-    } catch (e) {
-    }
-    try {
-      mountLoginPill();
-    } catch (e) {
-    }
+  // src/static/app-catalog/js/render.js
+  var getMainApps4;
+  var setAllApps;
+  var getActiveTag2;
+  var setActiveTag;
+  var getSearchQuery2;
+  function initRender(deps) {
+    ({ getMainApps: getMainApps4, setAllApps, getActiveTag: getActiveTag2, setActiveTag, getSearchQuery: getSearchQuery2 } = deps);
   }
-  function switchDbMode(mode) {
-    if (mode === getDbMode()) return;
-    if (mode === "personal" && !currentOwnerName()) {
-      updateModeToggle2();
-      requireSignInThen(function() {
-        switchDbMode("personal");
-      });
-      return;
-    }
-    setDbMode(mode);
-    closeDbInstance();
-    updateModeToggle2();
-    refreshAll3();
+  function setServerManifests2(v) {
+    serverAppManifests = v;
   }
-  function updateModeToggle2() {
-    var globalBtn = document.getElementById("mode-global");
-    var personalBtn = document.getElementById("mode-personal");
-    if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle("active", getDbMode() === "global");
-    personalBtn.classList.toggle("active", getDbMode() === "personal");
-    var signedIn = !!currentOwnerName();
-    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
-    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
+  function setOwnServerApps2(v) {
+    ownServerApps = v;
   }
-  function generateId5() {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === "x" ? r : r & 3 | 8;
-      return v.toString(16);
-    });
+  function setIframeUrl2(v) {
+    currentIframeUrl = v;
   }
-  function readFileAsText2(file) {
-    return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() {
-        resolve(reader.result);
-      };
-      reader.onerror = function() {
-        reject(reader.error);
-      };
-      reader.readAsText(file);
-    });
-  }
-  var allApps = [];
-  var activeTag = null;
-  var searchQuery = "";
   function renderTags() {
     var tagBar = document.getElementById("tag-bar");
     var tagSet = {};
     var hasFavorites = false;
-    for (var i = 0; i < allApps.length; i++) {
-      var app = allApps[i];
+    for (var i = 0; i < getMainApps4().length; i++) {
+      var app = getMainApps4()[i];
       if (app.favorite) hasFavorites = true;
       if (app.tags && app.tags.length) {
         for (var j = 0; j < app.tags.length; j++) {
@@ -7167,26 +7101,26 @@
       return a.toLowerCase().localeCompare(b.toLowerCase());
     });
     var html = "";
-    html += '<button class="tag' + (activeTag === null ? " active" : "") + '" onclick="window._launcher.filterByTag(null)">' + t("tag.all") + "</button>";
+    html += '<button class="tag' + (getActiveTag2() === null ? " active" : "") + '" onclick="window._launcher.filterByTag(null)">' + t("tag.all") + "</button>";
     if (hasFavorites) {
-      html += '<button class="tag' + (activeTag === "__favorites__" ? " active" : "") + `" onclick="window._launcher.filterByTag('__favorites__')">` + t("tag.favorites") + "</button>";
+      html += '<button class="tag' + (getActiveTag2() === "__favorites__" ? " active" : "") + `" onclick="window._launcher.filterByTag('__favorites__')">` + t("tag.favorites") + "</button>";
     }
     for (var k = 0; k < uniqueTags.length; k++) {
       var tag = uniqueTags[k];
-      html += '<button class="tag' + (activeTag === tag ? " active" : "") + `" onclick="window._launcher.filterByTag('` + jsArg(tag) + `')">` + escapeHtml(tag) + "</button>";
+      html += '<button class="tag' + (getActiveTag2() === tag ? " active" : "") + `" onclick="window._launcher.filterByTag('` + jsArg(tag) + `')">` + escapeHtml(tag) + "</button>";
     }
     tagBar.innerHTML = html;
   }
   function filterByTag(tag) {
-    activeTag = tag;
+    setActiveTag(tag);
     renderApps5();
     applyServerFilter();
   }
   function launchApp2(id, mode) {
     var app = null;
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].id === id) {
-        app = allApps[i];
+    for (var i = 0; i < getMainApps4().length; i++) {
+      if (getMainApps4()[i].id === id) {
+        app = getMainApps4()[i];
         break;
       }
     }
@@ -7352,7 +7286,7 @@
   }
   function renderApps5() {
     getAllApps().then(function(apps) {
-      allApps = apps;
+      setAllApps(apps);
       var entries = buildLibraryEntries(apps, ownServerApps);
       entries.sort(function(a, b) {
         if (a.favorite && !b.favorite) return -1;
@@ -7367,20 +7301,20 @@
         return 0;
       });
       var filtered = entries;
-      if (activeTag === "__favorites__") {
+      if (getActiveTag2() === "__favorites__") {
         filtered = entries.filter(function(app) {
           return app.favorite;
         });
-      } else if (activeTag !== null) {
-        var at = activeTag.toLowerCase();
+      } else if (getActiveTag2() !== null) {
+        var at = getActiveTag2().toLowerCase();
         filtered = entries.filter(function(app) {
           return app.tags && app.tags.some(function(tg) {
             return String(tg).toLowerCase() === at;
           });
         });
       }
-      if (searchQuery) {
-        var q = searchQuery.toLowerCase();
+      if (getSearchQuery2()) {
+        var q = getSearchQuery2().toLowerCase();
         filtered = filtered.filter(function(app) {
           if (app.name && app.name.toLowerCase().indexOf(q) !== -1) return true;
           if (app.tags) {
@@ -7399,7 +7333,7 @@
         if (localCount) localCount.textContent = "(" + entries.length + ")";
       }
       if (filtered.length === 0) {
-        if (!activeTag && !searchQuery && entries.length === 0) {
+        if (!getActiveTag2() && !getSearchQuery2() && entries.length === 0) {
           grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🚀</div><h3>' + t("empty.noApps") + "</h3><p>" + t("empty.noAppsDesc") + '</p><span class="empty-formats">' + t("empty.formats") + "</span></div>";
         } else {
           grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><h3>' + t("empty.noMatch") + "</h3><p>" + t("empty.noMatchDesc") + "</p></div>";
@@ -7434,7 +7368,7 @@
   function renderRecentlyOpened() {
     var section = document.getElementById("recent-section");
     var strip = document.getElementById("recent-strip");
-    var recent = allApps.filter(function(a) {
+    var recent = getMainApps4().filter(function(a) {
       return a.lastOpenedAt;
     }).sort(function(a, b) {
       return (b.lastOpenedAt || "") > (a.lastOpenedAt || "") ? 1 : -1;
@@ -7497,9 +7431,9 @@
     var appId = contextAppId;
     hideContextMenu();
     var app = null;
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].id === appId) {
-        app = allApps[i];
+    for (var i = 0; i < getMainApps4().length; i++) {
+      if (getMainApps4()[i].id === appId) {
+        app = getMainApps4()[i];
         break;
       }
     }
@@ -7614,11 +7548,11 @@
     });
   }
   function generateHomepagePrompt() {
-    if (allApps.length === 0) {
+    if (getMainApps4().length === 0) {
       showNotice("Add some apps first before generating a homepage.");
       return;
     }
-    var appList = allApps.map(function(app) {
+    var appList = getMainApps4().map(function(app) {
       var launchInfo = "";
       if (app.url) {
         launchInfo = "URL: " + app.url;
@@ -7636,6 +7570,91 @@
     overlay.dataset.appName = "Homepage";
     overlay.hidden = false;
   }
+
+  // src/static/app-catalog/js/main.js
+  function setLanguage(lang) {
+    setLang(lang);
+    try {
+      var config = loadConfig();
+      config.language = getLang();
+      saveConfig(config);
+    } catch (e) {
+    }
+    applyI18n();
+    try {
+      renderApps5();
+    } catch (e) {
+    }
+    try {
+      renderTags();
+    } catch (e) {
+    }
+    try {
+      loadPublishedApps3();
+    } catch (e) {
+    }
+    try {
+      renderRecentlyOpened();
+    } catch (e) {
+    }
+    try {
+      loadCortexExtensions();
+    } catch (e) {
+    }
+    try {
+      mountLoginPill();
+    } catch (e) {
+    }
+  }
+  function switchDbMode(mode) {
+    if (mode === getDbMode()) return;
+    if (mode === "personal" && !currentOwnerName()) {
+      updateModeToggle2();
+      requireSignInThen(function() {
+        switchDbMode("personal");
+      });
+      return;
+    }
+    setDbMode(mode);
+    closeDbInstance();
+    updateModeToggle2();
+    refreshAll3();
+  }
+  function updateModeToggle2() {
+    var globalBtn = document.getElementById("mode-global");
+    var personalBtn = document.getElementById("mode-personal");
+    if (!globalBtn || !personalBtn) return;
+    globalBtn.classList.toggle("active", getDbMode() === "global");
+    personalBtn.classList.toggle("active", getDbMode() === "personal");
+    var signedIn = !!currentOwnerName();
+    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
+    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
+  }
+  function generateId5() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function readFileAsText2(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        resolve(reader.result);
+      };
+      reader.onerror = function() {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
+  }
+  var allApps = [];
+  var activeTag = null;
+  var searchQuery = "";
   var dragSourceId = null;
   function onCardDragStart(e) {
     var card = e.target.closest(".app-card");
@@ -7706,7 +7725,7 @@
     closeIframe,
     openExternal,
     setCurrentIframeUrl: function(url) {
-      currentIframeUrl = url;
+      setIframeUrl2(url);
     },
     showContextMenu,
     hideContextMenu,
@@ -7844,9 +7863,7 @@
       getOwnProtection: function() {
         return ownAppProtection;
       },
-      setIframeUrl: function(v) {
-        currentIframeUrl = v;
-      }
+      setIframeUrl: setIframeUrl2
     });
     initSettings({ generateId: generateId5, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
     initAppsIo({ generateId: generateId5, readFileAsText: readFileAsText2, renderApps: renderApps5, getMainApps: function() {
@@ -7862,15 +7879,11 @@
       getServerManifests: function() {
         return serverAppManifests;
       },
-      setServerManifests: function(v) {
-        serverAppManifests = v;
-      },
+      setServerManifests: setServerManifests2,
       getOwnServerApps: function() {
         return ownServerApps;
       },
-      setOwnServerApps: function(v) {
-        ownServerApps = v;
-      },
+      setOwnServerApps: setOwnServerApps2,
       getActiveTag: function() {
         return activeTag;
       },
@@ -7880,6 +7893,23 @@
       generateId: generateId5,
       renderApps: renderApps5,
       refreshAll: refreshAll3
+    });
+    initRender({
+      getMainApps: function() {
+        return allApps;
+      },
+      setAllApps: function(v) {
+        allApps = v;
+      },
+      getActiveTag: function() {
+        return activeTag;
+      },
+      setActiveTag: function(v) {
+        activeTag = v;
+      },
+      getSearchQuery: function() {
+        return searchQuery;
+      }
     });
     applyTheme(getThemePref());
     try {
