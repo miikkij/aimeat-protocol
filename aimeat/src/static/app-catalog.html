@@ -3378,6 +3378,17 @@
       return false;
     }
   }
+  function currentOwnerName() {
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        return window.AIMEAT.auth.getSession().owner || null;
+      }
+      var stored = localStorage.getItem("aimeat_session");
+      if (stored) return JSON.parse(stored).owner || null;
+    } catch (e) {
+    }
+    return null;
+  }
 
   // src/static/app-catalog/js/db.js
   var DB_NAME_GLOBAL = "AppLauncherDB";
@@ -6163,17 +6174,6 @@
     } else {
       launchApp(app.id, app.openMode || "tab");
     }
-  }
-  function currentOwnerName() {
-    try {
-      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-        return window.AIMEAT.auth.getSession().owner || null;
-      }
-      var stored = localStorage.getItem("aimeat_session");
-      if (stored) return JSON.parse(stored).owner || null;
-    } catch (e) {
-    }
-    return null;
   }
   function loadScriptOnce(src) {
     return new Promise(function(resolve, reject) {

@@ -79,3 +79,19 @@ export function isSameOriginUrl(url) {
   try { return new URL(url, window.location.href).origin === window.location.origin; }
   catch (e) { return false; }
 }
+
+/**
+ * The signed-in owner's bare name, from the aimeat-auth SDK session (or the persisted session
+ * fallback), or null. Pure read of window.AIMEAT / localStorage — shared by main + the detail
+ * module so neither has to reach into the other.
+ */
+export function currentOwnerName() {
+  try {
+    if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+      return window.AIMEAT.auth.getSession().owner || null;
+    }
+    var stored = localStorage.getItem('aimeat_session');
+    if (stored) return JSON.parse(stored).owner || null;
+  } catch (e) {}
+  return null;
+}
