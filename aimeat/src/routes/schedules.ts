@@ -126,6 +126,20 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     if (!VALID_KINDS.includes(kind)) {
       return { status: 400, code: 'INVALID_KIND', message: `kind must be one of: ${VALID_KINDS.join(', ')}` };
     }
+    // Per-kind scope enforcement (SECURITY): owner sessions act for all their agents (scope bypass),
+    // but a scoped principal (an H-2 app grant, or a narrowly-scoped agent) must hold the scope for the
+    // capability the schedule DRIVES — otherwise a memory:write-only app could cron the owner's AI
+    // budget (kind:'ai') or materialise tasks into the owner's agent queues (kind:'agent_task').
+    const kindScope: Partial<Record<ScheduleKind, string>> = { ai: 'ai:use', agent_task: 'task:write' };
+    const needScope = kindScope[kind];
+    if (needScope && !isOwnerSession(req)) {
+      const scopes = req.auth!.scopes ?? [];
+      const domain = needScope.split(':')[0];
+      const hasScope = scopes.includes('*') || scopes.includes(needScope) || scopes.includes(`${domain}:*`);
+      if (!hasScope) {
+        return { status: 403, code: 'SCOPE_DENIED', message: `Creating a "${kind}" schedule requires the "${needScope}" scope.` };
+      }
+    }
     const cron = typeof body.cron === 'string' ? body.cron : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
     if (!cron || !isValidCron(cron, timezone)) {
