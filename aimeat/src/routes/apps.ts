@@ -84,6 +84,9 @@
  *     noRawDownload is set (owner/operator exempt); POST /v1/admin/apps/watermark/decode traces a
  *     leaked fingerprint. Phase 4: GET /v1/admin/apps/similar flags unattributed copies (high
  *     similarity with no fork link) + watermark hits.
+ *   v1.18.0 -- 2026-07-10 -- Re-publish carries category, usesCortex and icon forward when the
+ *     caller omits them (matching description/protection), so an update never silently resets the
+ *     manifest to category 'utility' + empty cortex refs + no icon (TARGET-021 Aalto 1).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -898,6 +901,12 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // Copy-protection flags survive a re-publish too (an update never silently
         // drops the owner's protection), unless the update explicitly sends `protection`.
         let protectionState: AppProtection | undefined;
+        // Category, cortex refs and icon must ALSO survive a re-publish — otherwise every update
+        // silently reset them (category → 'utility', usesCortex → [], icon dropped). Carry them
+        // forward when the caller omits them, matching description/protection above.
+        let carriedCategory: string | undefined;
+        let carriedUsesCortex: string[] | undefined;
+        let carriedIcon: string | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -907,6 +916,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             operatorHiddenAt = existingApp?.operatorHiddenAt;
             operatorHideReason = existingApp?.operatorHideReason;
             protectionState = existingApp?.manifest?.protection;
+            carriedCategory = existingApp?.manifest?.category;
+            carriedUsesCortex = existingApp?.manifest?.usesCortex;
+            carriedIcon = existingApp?.manifest?.icon;
         }
 
         const now = new Date().toISOString();
@@ -914,12 +926,13 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             name: typeof name === 'string' ? name : filename.replace(/\.html?$/i, ''),
             description: effectiveDescription,
             version: typeof semver === 'string' ? semver : `1.0.${newVersion - 1}`,
-            category: typeof category === 'string' ? category : 'utility',
+            category: typeof category === 'string' ? category : (carriedCategory ?? 'utility'),
             tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : [],
             authorDisplay: owner,
-            usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : [],
+            usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : (carriedUsesCortex ?? []),
         };
         if (typeof icon === 'string') manifest.icon = icon;
+        else if (carriedIcon) manifest.icon = carriedIcon;
         if (typeof price_morsels === 'number' && price_morsels > 0) manifest.priceMorsels = price_morsels;
         if (license_type === 'single' || license_type === 'lifetime') manifest.licenseType = license_type;
         // Opt-in copy-protection: use the body's `protection` when provided, else carry
