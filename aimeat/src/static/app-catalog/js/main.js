@@ -8,6 +8,7 @@
  * @usage  built, not loaded raw: pnpm build:app-catalog
  */
 import { I18N } from './i18n-data.js';
+import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -796,38 +797,8 @@ import { I18N } from './i18n-data.js';
 
   // ── Helpers ────────────────────────────────────────
 
-  function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
 
-  // Escape a user-controlled string for use as a single-quoted JS argument INSIDE a
-  // double-quoted HTML on* attribute (e.g. onclick="window._launcher.foo('<here>')").
-  // escapeHtml only handles < > & — an apostrophe like in "Fatalii's" would otherwise
-  // terminate the JS string and throw "missing ) after argument list", breaking the
-  // button. JS-escape the backslash + single quote; HTML-escape the attribute/markup
-  // delimiters (they decode back to plain chars before the JS engine sees them).
-  function jsArg(str) {
-    return String(str == null ? '' : str)
-      .replace(/&/g, '&amp;')
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/[\r\n]+/g, ' ');
-  }
 
-  function sourceLabel(source) {
-    switch (source) {
-      case 'local': return '\u{1F4C4} local';
-      case 'url':   return '\u{1F310} url';
-      case 'aimeat': return '\u{1F4E6} aimeat';
-      case 'zip':   return '\u{1F4E6} zip';
-      default:      return source || 'unknown';
-    }
-  }
 
   // ── Tag Rendering ─────────────────────────────────
 
@@ -896,14 +867,6 @@ import { I18N } from './i18n-data.js';
     });
   }
 
-  // True only for URLs on the apex SPA origin (this page). Such URLs — and blob: URLs,
-  // which inherit the creator's origin — must NEVER run app HTML top-level: that is the
-  // H-2 cross-user session-theft vector. Genuinely external URLs are already cross-origin
-  // and safe to open in a new tab. See docs/internal/2026-06-20-app-origin-isolation-*.
-  function isSameOriginUrl(url) {
-    try { return new URL(url, window.location.href).origin === window.location.origin; }
-    catch (e) { return false; }
-  }
 
   function launchInTab(app) {
     if (app.source === 'url' && app.url) {
@@ -2243,14 +2206,6 @@ import { I18N } from './i18n-data.js';
   // match, regardless of whether either side carries a `@node` suffix. Legacy
   // publish paths stored ownerName as the full GHII, so an exact string compare
   // wrongly dumped the user's own apps into "Community".
-  function bareOwnerName(name) {
-    return (name || '').split('@')[0].toLowerCase();
-  }
-  function sameOwner(appOwner, sessionOwner) {
-    if (!sessionOwner) return false;
-    var a = bareOwnerName(appOwner);
-    return !!a && a === bareOwnerName(sessionOwner);
-  }
 
   // ── Operator subdomain mappings ─────────────────
   // Operators can map a subdomain to a published app (served at the subdomain
@@ -3047,11 +3002,6 @@ import { I18N } from './i18n-data.js';
 
   // Build a data-filter/data-tags attribute pair so applyServerFilter() can match a server card
   // against the search query (name + tags substring) and the active tag (exact) without a re-fetch.
-  function filterAttr(name, tags) {
-    tags = (tags || []).map(function (tg) { return String(tg).toLowerCase(); });
-    var searchable = escapeHtml((String(name || '') + ' ' + tags.join(' ')).toLowerCase());
-    return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(',')) + '"';
-  }
 
   // Apply the current searchQuery + activeTag to the Community grid. (Your own apps live in the
   // unified #app-grid, which renderApps() filters directly; Community is the one server section
@@ -3834,10 +3784,6 @@ import { I18N } from './i18n-data.js';
       '<div class="dtl-meta-val">' + escapeHtml(val || '—') + '</div></div>';
   }
 
-  function sourceLabelText(src) {
-    var map = { url: 'URL', file: 'File', paste: 'Paste', aimeat: 'AIMEAT', zip: 'ZIP' };
-    return map[src] || (src || '—');
-  }
 
   function detailAiUnavailableMsg() {
     return getCortexOwnerToken() ? t('detail.aiUnavailable') : t('detail.aiLoginNeeded');

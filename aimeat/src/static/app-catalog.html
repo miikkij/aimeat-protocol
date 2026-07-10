@@ -3270,6 +3270,56 @@
     }
   };
 
+  // src/static/app-catalog/js/util.js
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function jsArg(str) {
+    return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/[\r\n]+/g, " ");
+  }
+  function sourceLabel(source) {
+    switch (source) {
+      case "local":
+        return "📄 local";
+      case "url":
+        return "🌐 url";
+      case "aimeat":
+        return "📦 aimeat";
+      case "zip":
+        return "📦 zip";
+      default:
+        return source || "unknown";
+    }
+  }
+  function sourceLabelText(src) {
+    var map = { url: "URL", file: "File", paste: "Paste", aimeat: "AIMEAT", zip: "ZIP" };
+    return map[src] || (src || "—");
+  }
+  function bareOwnerName(name) {
+    return (name || "").split("@")[0].toLowerCase();
+  }
+  function sameOwner(appOwner, sessionOwner) {
+    if (!sessionOwner) return false;
+    var a = bareOwnerName(appOwner);
+    return !!a && a === bareOwnerName(sessionOwner);
+  }
+  function filterAttr(name, tags) {
+    tags = (tags || []).map(function(tg) {
+      return String(tg).toLowerCase();
+    });
+    var searchable = escapeHtml((String(name || "") + " " + tags.join(" ")).toLowerCase());
+    return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(",")) + '"';
+  }
+  function isSameOriginUrl(url) {
+    try {
+      return new URL(url, window.location.href).origin === window.location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // src/static/app-catalog/js/main.js
   var currentLang = "en";
   function t(key) {
@@ -3977,28 +4027,6 @@
   var allApps = [];
   var activeTag = null;
   var searchQuery = "";
-  function escapeHtml(str) {
-    var div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-  function jsArg(str) {
-    return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/[\r\n]+/g, " ");
-  }
-  function sourceLabel(source) {
-    switch (source) {
-      case "local":
-        return "📄 local";
-      case "url":
-        return "🌐 url";
-      case "aimeat":
-        return "📦 aimeat";
-      case "zip":
-        return "📦 zip";
-      default:
-        return source || "unknown";
-    }
-  }
   function renderTags() {
     var tagBar = document.getElementById("tag-bar");
     var tagSet = {};
@@ -4051,13 +4079,6 @@
         launchInIframe(app);
       }
     });
-  }
-  function isSameOriginUrl(url) {
-    try {
-      return new URL(url, window.location.href).origin === window.location.origin;
-    } catch (e) {
-      return false;
-    }
   }
   function launchInTab(app) {
     if (app.source === "url" && app.url) {
@@ -5145,14 +5166,6 @@
     var inCommunity = document.body.getAttribute("data-active-view") === "community";
     empty.style.display = !hasApps && inCommunity ? "block" : "none";
   }
-  function bareOwnerName(name) {
-    return (name || "").split("@")[0].toLowerCase();
-  }
-  function sameOwner(appOwner, sessionOwner) {
-    if (!sessionOwner) return false;
-    var a = bareOwnerName(appOwner);
-    return !!a && a === bareOwnerName(sessionOwner);
-  }
   function getSessionRoles() {
     try {
       var token = getCortexOwnerToken();
@@ -5822,13 +5835,6 @@
       });
     });
   }
-  function filterAttr(name, tags) {
-    tags = (tags || []).map(function(tg) {
-      return String(tg).toLowerCase();
-    });
-    var searchable = escapeHtml((String(name || "") + " " + tags.join(" ")).toLowerCase());
-    return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(",")) + '"';
-  }
   function applyServerFilter() {
     var q = (searchQuery || "").toLowerCase();
     var at = activeTag;
@@ -6459,10 +6465,6 @@
   }
   function metaItem(label, val) {
     return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
-  }
-  function sourceLabelText(src) {
-    var map = { url: "URL", file: "File", paste: "Paste", aimeat: "AIMEAT", zip: "ZIP" };
-    return map[src] || (src || "—");
   }
   function detailAiUnavailableMsg() {
     return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
