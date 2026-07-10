@@ -1,0 +1,1917 @@
+ theme; markup; large inline <script> exposing window._launcher.
+  @usage Served at GET /app-catalog.html (relaxed CSP) from server-bootstrap/static-files.ts.
+  @version-history
+    v1.1.0 — 2026-06-20 — H-2: route all in-SPA app launches through the sandboxed iframe;
+      remove apex top-level window.open(...?mode=inline) links (viewPublished + isSameOriginUrl).
+    v1.2.0 — 2026-06-20 — H-2: when the app origin is live (window.__APP_ORIGIN_ENABLED), open
+      published apps top-level on apps.<domain> (clean full page, no toolbar/X); sandbox is the fallback.
+    v2.0.0 — 2026-06-20 — Always open apps TOP-LEVEL (no opaque sandbox — it gave apps origin `null`
+      and forced a re-login). Server decides isolation: app origin OFF → inline on apex (session
+      inherited, apps "logged in"); ON → 301 to the isolated app origin.
+    v2.1.0 — 2026-06-20 — Add Park/Unpark to own published-app cards (+ PARKED badge/hint, dimmed
+      card). Parking hides an app from the public catalogue while keeping it usable by its owner;
+      toggleParkApp PATCHes /v1/apps/:filename { parked }.
+    v2.2.0 — 2026-06-20 — Parked apps now live in their OWN "Parked Apps" section (peer of Published /
+      Community / Local), not as a badge inside Published. Park moves an app out of Published into
+      Parked; the Parked card's primary action is Publish (unpark). The /v1/apps fetch now sends the
+      owner token so the server returns the caller's own parked apps for that section.
+    v2.3.0 — 2026-06-20 — Detail screenshot actions (set/refresh) and the thumbnail <img> now resolve
+      the owner via detailServerOwner() instead of the owner baked into the stored publishedUrl, which
+      goes stale for apps re-owned away from the "anonymous" bucket (screenshot calls 404'd as
+      "not found for owner anonymous"). Signed-in owner wins for own/anonymous-bucket apps; the stored
+      owner is kept only when browsing another user's published app.
+    v2.3.1 — 2026-06-24 — Fix "View / Edit Source" appearing to do nothing when opened from the
+      detail view: #source-overlay (z-index 500) sat BEHIND the opaque #detail-view (600) and was
+      fully hidden. Raised #source-overlay to z-index 650 (above detail-view, below context-menu).
+    v2.4.0 — 2026-06-24 — Discoverability/virality: add a node-branded "back home" link in the page
+      header (aimeat-home-link, label set from location.host) and a "Publish your own app" CTA in the
+      iframe app-viewer toolbar (.aimeat-cta). Pairs with the inline-app badge injected server-side
+      (apps.ts injectAimeatBadge) so visitors who open a shared app always have a way home + a publish hint.
+    v2.5.0 — 2026-06-26 — Add inline name + description editing in the Detail view's About section
+      (detailAboutEdit/Cancel/Save): edit in place where the details are shown, save PATCHes
+      /v1/apps/:filename { name, description } when published (and persists the local record) — the
+      app link (owner/filename) is unchanged, no re-publish and no new version.
+    v2.5.1 — 2026-06-26 — Fix: app names containing an apostrophe (e.g. "Fatalii's …") or other JS/HTML
+      delimiters broke the View/Fork buttons ("missing ) after argument list") because escapeHtml does
+      not escape quotes for an onclick JS-string context. Add jsArg() and use it for the name/filename
+      arguments interpolated into on* attributes.
+    v2.5.2 — 2026-06-26 — Add a pencil (✏️) next to the app name — on the detail-view title and on the
+      owner's own published + parked cards — that opens the inline name/description editor right where
+      the name is shown (editAppDetails opens the detail view with the About editor pre-opened).
+    v2.6.0 — 2026-07-02 — Build-prompt library list: add aimeat-organism.js + aimeat-editor.js; reword
+      the aimeat-markdown line so generated apps use render(text, target)/renderToString (render
+      returns an Element — assigning it to innerHTML shows "[object HTMLDivElement]") and mention
+      renderRich (task lists, footnotes, highlighting, Mermaid).
+    v2.6.1 — 2026-07-05 — Fix "Review & import" (server → local) silently importing nothing on a local
+      dev server: importServerApps fetched with ?mode=inline, which 301-redirects to the isolated app
+      origin (…apps.<host>) under H-2, and this page's connect-src CSP does not cover
+      http://*.apps.localhost:* so every fetch was blocked (prod worked only via the blanket `https:`).
+      Now reuses fetchAppContentBase64 (raw same-origin fetch + owner token + byte-accurate base64),
+      matching the Restore-local-twin flow.
+    v2.7.0 — 2026-07-07 — Fork control + provenance: the community-app Fork button shows only when the
+      app is flagged forkable; forkVersion now calls the server-side POST /v1/apps/:owner/:filename/fork
+      (which enforces the forkable/paid gates and records provenance) instead of read+republish; own
+      published cards get an "Allow forking" toggle (toggleForkApp → PATCH { forkable }); the detail
+      About panel credits the source app when manifest.forkedFrom is set.
+    v2.8.0 — 2026-07-07 — Fork stats + lineage (Phase 2): cards show a "⑂ N" fork-count chip (own cards
+      always, community cards when N>0) that opens a lineage modal; showLineageModal fetches
+      GET /v1/apps/:owner/:filename/lineage and renders the cross-owner fork tree (ancestry + descendants)
+      with each node's live status (public/parked/hidden/deleted) and fork date.
+    v2.9.0 — 2026-07-07 — Copy protection (Phase 3): own server-app cards get a 🛡 button (🛡✓ when any
+      flag is on) opening a protection modal with four opt-in toggles (obfuscate / domain-lock / watermark
+      / no-raw-download) + honest-limits note; saveProtection PATCHes { protection }. All default off.
+    v2.9.1 — 2026-07-09 — Fix modals opening BEHIND the detail view: the shared overlay rule sat at
+      z-index 560, below #detail-view (600), so "Publish as v2" (and any modal) opened from the detail
+      view was fully hidden — clicking it did nothing visible. Raised the shared overlay rule to 650
+      (above #detail-view, below the context menu — same fix as #source-overlay v2.3.1) and added the
+      new #lineage-overlay + #protection-overlay to it (they were missing the overlay wrapper entirely,
+      so they rendered inline instead of as centered modals).
+    v2.10.0 — 2026-07-10 — Security (TARGET-020): escape onclick args with jsArg/cortexArg (tag filter,
+      consents, revokeConsent, cortex-popup Copy — '&' escaped first, closing an entity-smuggling XSS);
+      the cortex strip fetches visibility=public (private extensions no longer leak into the anon strip);
+      "Edit Extension" is shown only to the extension's owner; the cortex editor saves via an atomic PUT
+      (no delete-then-reinstall window, reads the real response envelope); launchInIframe never frames a
+      cross-origin URL and the postMessage auth bridge refuses non-same-origin frames (no owner-JWT
+      leak); launchInTab runs local blob apps in the sandboxed iframe instead of top-level.
+    v2.11.0 — 2026-07-10 — TARGET-021 Aalto 1 (correctness): detailAiRun sends the FULL app source
+      to the AI (removed the 120k-char truncation that silently dropped a big app's tail); re-publish
+      no longer hardcodes category='utility'/uses_cortex=[] and now sends the icon (server carries
+      them forward); every server-error read uses error.message (the error_description/error_code
+      fields never existed → always "Unknown error"); extractZip parses the central directory so
+      data-descriptor zips (git archive / GitHub "Download ZIP") no longer extract to zero files;
+      loadPublishedApps pages through /v1/apps (limit 200 + offset) so accounts with >50 apps are not
+      truncated; URL apps always open TOP-LEVEL (apex ?mode=inline can't be framed — frame-ancestors
+      CSP — and cross-origin would leak the token), only local blobs are framed.
+    v2.12.0 — 2026-07-10 — TARGET-021 Aalto 2 (clarity, partial): Personal mode requires a session —
+      switching to it while signed out prompts sign-in (was a silent fall-back to the shared Global
+      DB), the toggle dims + explains when logged out, and an auth change re-opens the per-account DB
+      and re-renders the local grid (fixes "my apps vanished after login"); the 5 self-referential
+      light-theme CSS vars (--border-hover/--text-muted/--text-dim/--bg-subtle/--hover) get real
+      values; the tag bar wraps so every tag is reachable (was an unreachable hidden-scrollbar row)
+      with case-insensitive dedup ("Tools"=="tools"); the publish modal auto-closes on success.
+    v2.13.0 — 2026-07-10 — TARGET-021 Aalto 2 (rest): search + tag filter now cover EVERY section
+      (Published / Community / Parked carry a data-filter/data-tags attribute + applyServerFilter),
+      not just Local — a published app's name no longer returns "no matches"; the theme is unified on
+      the shared `aimeat-theme` key (setTheme writes it + config, getThemePref reads it first, a
+      MutationObserver + storage listener keep the header ☀️ in step with the login pill's ☾) — no
+      more data-theme=dark + aimeat-theme=light at once; the server-import ignore-list is keyed per
+      catalog DB (mode + owner) so tombstones no longer resurface the banner on a mode switch, import
+      failures are surfaced per-app (only successes clear their tombstone), and the modal has a
+      permanent entry in Settings; a "?" Help modal explains modes / where apps live / the two
+      "backup" meanings / standalone; the remaining native confirm() dialogs go through t().
+    v2.14.0 — 2026-07-10 — TARGET-021: RETIRE the standalone/downloadable story. The catalog is
+      node-served and always talks to its serving origin (loadConfig forces aimeatUrl =
+      location.origin; the Settings Server URL is now read-only + explains it). localhost /
+      aimeat-desktop / federation all keep working because each node serves its OWN catalog
+      same-origin — no foreign-origin auth-lib break, no Private/Local-Network-Access block. CORS
+      stays `*` for now (external agents/apps need cross-origin); tightening it is tracked separately.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#FAFAF8"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <title>My Apps — AIMEAT</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #FAFAF8;
+      --surface: #FFFFFF;
+      --text: #1A1A2E;
+      --accent: #E8564A;
+      --accent2: #F3E8E6;
+      --surface-glass: rgba(255, 255, 255, .85);
+      --border-subtle: #E5E7EB;
+      --border-hover: #D1D5DB;
+      --text-muted: #6B7280;
+      --text-dim: #9CA3AF;
+      --bg-subtle: #F3F4F6;
+      --hover: #F0F1F3;
+      --on-accent: #FFFFFF;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --transition: .25s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    /* ── Dark theme ── overrides every token + native controls. Surfaces that
+       hardcode light colors are converted to these vars throughout the CSS. */
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #14141C;
+      --surface: #1E1E2A;
+      --text: #ECECF4;
+      --accent: #F0685C;
+      --accent2: #3A2A28;
+      --surface-glass: rgba(28, 28, 40, .85);
+      --border-subtle: #2E2E40;
+      --border-hover: #45455E;
+      --text-muted: #9AA0AD;
+      --text-dim: #717784;
+      --bg-subtle: #242432;
+      --hover: #2A2A3A;
+      --on-accent: #FFFFFF;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(232, 86, 74, .04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(232, 86, 74, .03) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(243, 232, 230, .15) 0%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface-glass);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    #search-input {
+      flex: 1;
+      min-width: 160px;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: .9rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    #search-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    #search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(232, 86, 74, .12);
+    }
+
+    .mode-toggle {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .mode-btn {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: var(--hover);
+    }
+
+    /* Personal mode needs a session — dimmed until the user signs in (title explains why). */
+    .mode-btn-locked:not(.active) {
+      opacity: .45;
+    }
+
+    .lang-toggle {
+      display: flex;
+      gap: 1px;
+      align-items: center;
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .lang-btn {
+      padding: 6px 8px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .lang-btn.active {
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+
+    .lang-btn:hover:not(.active) {
+      background: var(--hover);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: border-color var(--transition), transform var(--transition),
+                  box-shadow var(--transition), background var(--transition);
+      user-select: none;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
+      background: var(--hover);
+    }
+
+    .icon-btn:active {
+      transform: translateY(0);
+    }
+
+    #add-btn {
+      background: #E8564A;
+      border-color: transparent;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.4rem;
+    }
+
+    /* Mount point for the shared golden login pill (/v1/libs/aimeat-auth.js).
+       The pill carries its own inline styles; this just keeps it inline in the bar. */
+    .header-auth-pill { display: inline-flex; align-items: center; }
+
+    #add-btn:hover {
+      box-shadow: 0 4px 20px rgba(232, 86, 74, .25);
+      border-color: transparent;
+      background: #D64A3F;
+    }
+
+    /* ── Tag Bar ────────────────────────────────────── */
+
+    #tag-bar {
+      position: relative;
+      z-index: 1;
+      padding: 12px 24px;
+      display: flex;
+      gap: 8px;
+      /* Wrap so every tag is reachable — the old overflow-x:auto + hidden scrollbar left tags past
+         the edge unreachable (no wheel/drag handler). Case-insensitive dedup keeps the list short. */
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--transition);
+      user-select: none;
+    }
+
+    .tag:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+    }
+
+    .tag.active {
+      background: #E8564A;
+      border-color: transparent;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* ── Local Apps block ───────────────────────────────
+       A distinct indigo-tinted panel so browser-local apps are visually set apart
+       from the server-backed Published / Community sections above. */
+    .local-apps-block {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      margin: 8px 24px 0;
+      padding: 14px 18px 18px;
+      background: rgba(99, 102, 241, .05);
+      border: 1px dashed rgba(99, 102, 241, .30);
+      border-radius: 14px;
+    }
+    .local-apps-block #local-apps-header { margin: 0 0 6px; }
+    .local-apps-note {
+      margin: 4px 0 0;
+      font-size: .78rem;
+      color: var(--text-muted);
+    }
+    .local-apps-hint {
+      margin: 6px 0 0;
+      font-size: .78rem;
+      color: var(--text-dim);
+    }
+
+    /* ── App Grid ───────────────────────────────────── */
+
+    #app-grid {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      padding: 8px 0 6px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      align-content: start;
+    }
+
+    .app-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color var(--transition), transform var(--transition),
+                  box-shadow var(--transition);
+      position: relative;
+      text-align: center;
+      animation: cardIn .5s cubic-bezier(.16, 1, .3, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px) scale(.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .app-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+    }
+
+    .app-card:active {
+      transform: translateY(-1px);
+    }
+
+    .app-card.dragging {
+      opacity: .35;
+      transform: scale(.95);
+      box-shadow: none;
+    }
+
+    .app-card.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .app-card .app-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      background: #F3E8E6;
+      border: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    .app-card .app-name {
+      font-size: .85rem;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .app-card .app-source {
+      font-size: .7rem;
+      color: var(--text-dim);
+    }
+
+    .app-card .app-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .app-card:hover .app-actions {
+      opacity: 1;
+    }
+
+    .app-card .app-actions button {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .app-card .app-actions button:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(232, 86, 74, .08);
+    }
+
+    .app-card .fav-star {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: .85rem;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .app-card:hover .fav-star,
+    .app-card .fav-star.visible {
+      opacity: 1;
+    }
+
+    /* ── Card Menu Button ─────────────────────────────── */
+
+    .card-menu-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 2;
+    }
+    .app-card:hover .card-menu-btn,
+    .card-menu-btn:focus { opacity: 1; }
+    .card-menu-btn:hover { background: var(--accent); }
+
+    /* ── Empty State ────────────────────────────────── */
+
+    .empty-state {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 72px 24px;
+      text-align: center;
+      color: var(--text-dim);
+    }
+
+    .empty-state .empty-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: .6;
+      filter: drop-shadow(0 4px 12px rgba(232, 86, 74, .10));
+    }
+
+    .empty-state h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: .9rem;
+      line-height: 1.6;
+      max-width: 340px;
+      margin-bottom: 6px;
+    }
+
+    .empty-state .empty-formats {
+      font-size: .78rem;
+      color: var(--text-dim);
+      opacity: .7;
+      margin-top: 4px;
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+
+    footer {
+      position: relative;
+      z-index: 1;
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #stats {
+      font-size: .75rem;
+      color: var(--text-dim);
+      letter-spacing: .04em;
+    }
+
+    .footer-brand {
+      font-size: .7rem;
+      color: var(--text-dim);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      opacity: .6;
+    }
+
+    /* ── Modal Overlay ──────────────────────────────── */
+
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0, 0, 0, .3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #modal-overlay[hidden] {
+      display: none;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, .12);
+      animation: cardIn .4s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    .modal h2 {
+      font-size: 1.15rem;
+      margin-bottom: 20px;
+      color: var(--text);
+    }
+
+    /* ── Modal Form Elements ──────────────────────────── */
+
+    .modal-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .modal-tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: .85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .modal-tab:not(:last-child) {
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .modal-tab:hover {
+      color: var(--text);
+      background: var(--bg-subtle);
+    }
+
+    .modal-tab.active {
+      background: #E8564A;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .modal-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .label-hint {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-dim);
+    }
+
+    .modal-input {
+      width: 100%;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: .88rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-input::placeholder {
+      color: var(--text-dim);
+      font-style: italic;
+      opacity: .7;
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(232, 86, 74, .12);
+    }
+
+    select.modal-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236B7280' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+
+    select.modal-input option {
+      background: var(--surface);
+      color: var(--text);
+    }
+    .pb-template-select { margin-bottom: 8px; }
+
+    .modal-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .modal-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .help-modal { max-width: 640px; }
+    .help-p { font-size: .85rem; color: var(--text-muted); line-height: 1.55; margin-top: 4px; }
+
+    .modal-btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-btn.secondary {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .modal-btn.secondary:hover {
+      color: var(--text);
+      border-color: var(--border-hover);
+    }
+
+    .modal-btn.primary {
+      background: #E8564A;
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .modal-btn.primary:hover:not(:disabled) {
+      box-shadow: 0 4px 20px rgba(232, 86, 74, .25);
+      background: #D64A3F;
+    }
+
+    .modal-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Drop Zone ──────────────────────────────────── */
+
+    .drop-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 28px 20px;
+      text-align: center;
+      transition: border-color var(--transition), background var(--transition);
+      cursor: pointer;
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(232, 86, 74, .04);
+    }
+
+    .drop-zone-icon {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      opacity: .5;
+    }
+
+    .drop-zone-text {
+      font-size: .85rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .drop-zone-hint {
+      font-size: .75rem;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .browse-btn {
+      padding: 7px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text);
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .browse-btn:hover {
+      border-color: var(--border-hover);
+      background: var(--hover);
+    }
+
+    .drop-zone-selected {
+      margin-top: 10px;
+      font-size: .8rem;
+      color: var(--accent);
+      font-weight: 500;
+      min-height: 1.2em;
+    }
+
+    /* ── Iframe View ────────────────────────────────── */
+
+    #iframe-view {
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #iframe-view[hidden] {
+      display: none;
+    }
+
+    #iframe-view .iframe-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--surface-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    #iframe-view .iframe-toolbar .iframe-title {
+      flex: 1;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #iframe-view iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+    }
+
+    /* Shared "publish your own app" call-to-action (iframe toolbar + page header). */
+    .aimeat-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: .8rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      white-space: nowrap;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+    .aimeat-cta:hover { border-color: var(--accent); color: var(--accent); }
+    .aimeat-cta-spark { color: #E8564A; }
+
+    /* ── App Detail View (full-screen overlay, reuses iframe-view chrome) ── */
+
+    #detail-view {
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #detail-view[hidden] { display: none; }
+
+    #detail-view .dtl-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--surface-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    #detail-view .dtl-toolbar .dtl-toolbar-title {
+      flex: 1;
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #detail-view .dtl-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .dtl-section {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm, 12px);
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+
+    .dtl-section h3 {
+      margin: 0 0 12px;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: .02em;
+    }
+
+    .dtl-status-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 8px; }
+    .dtl-stat { display: flex; flex-direction: column; gap: 2px; }
+    .dtl-stat .dtl-stat-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .dtl-stat .dtl-stat-val { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+    .dtl-sync { font-size: .82rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; display: inline-block; }
+    .dtl-sync.ok { background: rgba(52,211,153,.12); color: #34d399; }
+    .dtl-sync.diff { background: rgba(245,158,11,.14); color: #f59e0b; }
+    .dtl-sync.none { background: var(--bg-subtle); color: var(--text-muted); }
+
+    .dtl-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .dtl-meta-item .dtl-meta-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }
+    .dtl-desc { font-size: .9rem; color: var(--text); line-height: 1.5; margin: 0 0 14px; }
+
+    .dtl-ai-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+    #detail-ai-input {
+      flex: 1; min-width: 240px; min-height: 64px; resize: vertical;
+      background: var(--bg-subtle); color: var(--text);
+      border: 1px solid var(--border-subtle); border-radius: 10px;
+      padding: 10px 12px; font-size: .9rem; font-family: inherit;
+    }
+    .dtl-ai-status { font-size: .82rem; margin-top: 10px; min-height: 1.1em; color: var(--text-muted); }
+    .dtl-ai-draft { margin-top: 12px; padding: 12px; border: 1px dashed var(--border-hover, var(--border-subtle)); border-radius: 10px; }
+    .dtl-ai-draft[hidden] { display: none; }
+
+    .dtl-btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .dtl-btn {
+      padding: 8px 14px; border-radius: 9px; border: 1px solid var(--border-subtle);
+      background: var(--bg-subtle); color: var(--text); cursor: pointer;
+      font-size: .85rem; font-weight: 600; transition: all .15s;
+    }
+    .dtl-btn:hover { border-color: var(--border-hover, var(--accent)); }
+    .dtl-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .dtl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .dtl-btn.success { background: #34d399; border-color: #34d399; color: #04231a; }
+    .dtl-btn.danger { color: #E8564A; border-color: rgba(232,86,74,.3); }
+
+    .dtl-version-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+    .dtl-version-row:last-child { border-bottom: none; }
+
+    /* Card quick-launch (▶) shown on hover — preserves launch-on-click muscle memory */
+    .app-card .card-quick-launch {
+      position: absolute; top: 8px; left: 8px; z-index: 3;
+      width: 26px; height: 26px; border-radius: 7px;
+      border: 1px solid var(--border-subtle); background: var(--surface-glass);
+      color: var(--text); cursor: pointer; font-size: .8rem; line-height: 1;
+      opacity: 0; transition: opacity .15s;
+    }
+    .app-card:hover .card-quick-launch { opacity: 1; }
+    .app-card .card-quick-launch:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Context Menu ──────────────────────────────── */
+
+    #context-menu {
+      position: fixed;
+      z-index: 700;
+      background: var(--surface-glass);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 0;
+      min-width: 180px;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .12);
+      animation: cardIn .2s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    #context-menu[hidden] {
+      display: none;
+    }
+
+    #context-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: .84rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition);
+      text-align: left;
+    }
+
+    #context-menu button:hover {
+      background: var(--hover);
+    }
+
+    #context-menu button.danger {
+      color: var(--accent);
+    }
+
+    #context-menu button.danger:hover {
+      background: rgba(232, 86, 74, .08);
+    }
+
+    #context-menu hr {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: 4px 0;
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+
+    @media (max-width: 480px) {
+      header {
+        padding: 12px 16px;
+        gap: 10px;
+      }
+
+      header h1 {
+        font-size: 1.1rem;
+      }
+
+      #search-input {
+        min-width: 0;
+        order: 3;
+        flex-basis: 100%;
+      }
+
+      #tag-bar {
+        padding: 10px 16px;
+      }
+
+      #app-grid {
+        padding: 8px 16px 20px;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      footer {
+        padding: 12px 16px;
+      }
+    }
+
+    /* Theme tokens live in :root (light) and [data-theme="dark"] above. */
+
+    /* ── Source Modal ──────────────────────────────── */
+
+    #source-overlay {
+      position: fixed;
+      inset: 0;
+      /* Above #detail-view (600): View/Edit Source is opened from inside the detail
+         view, whose opaque background would otherwise fully hide a 500-level overlay. */
+      z-index: 650;
+      background: rgba(0, 0, 0, .3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #source-overlay[hidden] {
+      display: none;
+    }
+
+    .source-modal { max-width: 800px; width: 95vw; }
+    #source-code {
+      width: 100%;
+      min-height: 400px;
+      max-height: 60vh;
+      background: var(--bg-subtle);
+      color: var(--text);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+      tab-size: 2;
+    }
+
+    /* ── Settings Modal ──────────────────────────────── */
+
+    #settings-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0, 0, 0, .3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #settings-overlay[hidden] {
+      display: none;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section-title {
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .settings-row label {
+      flex: 0 0 130px;
+      font-size: .84rem;
+      color: var(--text-muted);
+    }
+
+    .settings-row .modal-input {
+      flex: 1;
+    }
+
+    .settings-backup-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .modal-btn.danger {
+      background: transparent;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .modal-btn.danger:hover {
+      background: rgba(232, 86, 74, .08);
+    }
+
+    /* ── AIMEAT Import Dialog ─────────────────────────── */
+
+    #aimeat-import-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 550;
+      background: rgba(0, 0, 0, .3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #aimeat-import-overlay[hidden] {
+      display: none;
+    }
+
+    .aimeat-app-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .aimeat-app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: border-color var(--transition);
+    }
+
+    .aimeat-app-item:hover {
+      border-color: var(--border-hover);
+    }
+
+    .aimeat-app-item input[type="checkbox"] {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .aimeat-app-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .aimeat-app-name {
+      font-size: .85rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .aimeat-app-size {
+      font-size: .72rem;
+      color: var(--text-dim);
+    }
+
+    .aimeat-app-item select {
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: .78rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .aimeat-app-item select option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* ── Publish Modal ──────────────────────────────── */
+
+    /* ── Backup menu + import modal ─────────────────── */
+
+    .backup-menu-wrap { position: relative; }
+
+    .backup-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 600;
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .backup-menu[hidden] { display: none; }
+
+    .backup-menu button {
+      background: none;
+      border: none;
+      color: var(--text);
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+
+    .backup-menu button:hover { background: var(--hover); }
+
+    #backup-modal { max-height: 84vh; display: flex; flex-direction: column; }
+    #backup-import-body { overflow-y: auto; flex: 1; min-height: 0; }
+
+    .backup-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .backup-table th {
+      text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .backup-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+    .backup-table .mono-cell { font-family: monospace; font-size: .78rem; color: var(--text-muted); }
+
+    .backup-versions-toggle {
+      background: none; border: none; color: var(--accent); cursor: pointer;
+      font-size: .78rem; padding: 0; text-decoration: underline;
+    }
+    .backup-version-list { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .backup-version-list label { font-size: .78rem; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+
+    .backup-conflict-select {
+      background: var(--bg-subtle); color: var(--text); border: 1px solid var(--border-subtle);
+      border-radius: 6px; padding: 4px 6px; font-size: .78rem;
+    }
+
+    .backup-status-badge {
+      display: inline-block; font-size: .62rem; font-weight: 600; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .backup-status-new { background: rgba(52, 211, 153, .12); color: #34d399; border: 1px solid rgba(52, 211, 153, .3); }
+    .backup-status-exists { background: rgba(245, 158, 11, .10); color: #d97706; border: 1px solid rgba(245, 158, 11, .25); }
+
+    .backup-toolbar-row {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; margin: 8px 0; flex-wrap: wrap;
+    }
+    .backup-summary-line { font-size: .82rem; color: var(--text-muted); }
+    .backup-link-btn {
+      background: none; border: none; color: var(--accent); cursor: pointer;
+      font-size: .8rem; padding: 0 4px; text-decoration: underline;
+    }
+    .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
+    .backup-result-errors { color: #ef4444; }
+
+    .server-import-banner {
+      margin: 0 24px 1rem;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: .85rem;
+      position: relative;
+      z-index: 1;
+    }
+    .server-import-banner-actions { display: flex; gap: 8px; }
+
+    #help-overlay,
+    #publish-overlay,
+    #versions-overlay,
+    #subdomain-overlay,
+    #backup-overlay,
+    #server-import-overlay,
+    #json-import-overlay,
+    #lineage-overlay,
+    #protection-overlay {
+      position: fixed;
+      inset: 0;
+      /* Above #detail-view (z-index 600) so a modal opened FROM the detail view
+         (e.g. "Publish as v2") is not hidden behind that opaque overlay — same fix
+         as #source-overlay (v2.3.1). Stays below the context menu. */
+      z-index: 650;
+      background: rgba(0, 0, 0, .3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #help-overlay[hidden],
+    #publish-overlay[hidden],
+    #versions-overlay[hidden],
+    #subdomain-overlay[hidden],
+    #backup-overlay[hidden],
+    #server-import-overlay[hidden],
+    #json-import-overlay[hidden],
+    #lineage-overlay[hidden],
+    #protection-overlay[hidden] {
+      display: none;
+    }
+
+    /* ── Published Apps Section ──────────────────────── */
+
+    #published-section,
+    #parked-section,
+    #community-section {
+      margin: 0 24px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .published-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .published-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .published-header .arrow {
+      transition: transform var(--transition);
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    .published-header .arrow.open {
+      transform: rotate(180deg);
+    }
+
+    .published-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .published-card {
+      background: var(--surface-glass);
+      border: 1px solid rgba(52, 211, 153, .25);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .published-card:hover {
+      border-color: rgba(52, 211, 153, .5);
+      box-shadow: 0 4px 20px rgba(52, 211, 153, .08);
+    }
+
+    .published-card-name {
+      font-weight: 600;
+      font-size: .88rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Small inline pencil shown next to an editable app name (own cards + the detail
+       title). Pressing it opens the name/description editor where the name shows. */
+    .rename-pencil {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: .8rem;
+      opacity: .5;
+      padding: 0 2px;
+      line-height: 1;
+      vertical-align: middle;
+      transition: opacity var(--transition);
+    }
+    .rename-pencil:hover { opacity: 1; }
+
+    .published-card-meta {
+      font-size: .72rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* "About" line right after the title — the app's description, clamped to 2
+       lines so every card's top block is the same shape. */
+    .published-card-desc {
+      font-size: .75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Operator-moderation note sits just under the title (off the title line). */
+    .published-card-modnote { margin: -2px 0 2px; }
+
+    /* Secondary meta (owner/filename + date) lives in the footer, single line. */
+    .published-card-metaline {
+      font-size: .7rem;
+      color: var(--text-dim);
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .published-card-metaline .pcm-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .published-card-metaline .pcm-date { flex: 0 0 auto; white-space: nowrap; }
+
+    /* Footer groups secondary meta + the subdomain chip + the action grid and
+       pins them to the card bottom, so they line up across cards (chip optional). */
+    .published-card-footer {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 6px;
+    }
+    .published-card-footer .subdomain-chip-row { display: flex; }
+
+    /* Very-bottom row: source badge pinned bottom-left, version bottom-right —
+       keeping the title line clean (title only). */
+    .published-card-badgerow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 18px;
+    }
+    .published-card-badgerow .pcb-version {
+      margin-left: auto;
+      font-size: .72rem;
+      color: var(--text-dim);
+      flex: 0 0 auto;
+    }
+    /* Fork-count chip on a card — click to open the lineage modal. */
+    .published-card-badgerow .pcb-forks {
+      font-size: .72rem;
+      color: var(--text-muted);
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
+    .published-card-badgerow .pcb-forks:hover { color: var(--accent); }
+    /* Fork lineage tree (in #lineage-tree) */
+    .lineage-node { padding: 3px 0; white-space: nowrap; }
+    .lineage-node.self { font-weight: 700; }
+    .lineage-status {
+      font-size: .68rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 6px;
+      background: var(--bg-dim);
+    }
+    .lineage-status.public { color: #34d399; }
+    .lineage-status.parked { color: var(--text-muted); }
+    .lineage-status.hidden { color: #fbbf24; }
+    .lineage-status.deleted { color: var(--accent); text-decoration: line-through; }
+    .lineage-when { color: var(--text-muted); font-size: .72rem; margin-left: 6px; }
+    /* Copy-protection modal rows */
+    .protect-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: .82rem;
+      line-height: 1.35;
+      cursor: pointer;
+    }
+    .protect-row input[type="checkbox"] { margin-top: 3px; flex: 0 0 auto; }
+    .protect-row span { color: var(--text-muted); }
+    .protect-row b { color: var(--text); }
+
+    /* Even 2-up button grid, pushed to the card bottom (margin-top:auto) so the
+       action block lines up across cards regardless of how many buttons / chips
+       a card has — no more ragged wrapping. */
+    .published-card-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 6px;
+    }
+
+    .published-card-actions button {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text);
+      font-size: .72rem;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .published-card-actions button:hover {
+      border-color: var(--border-hover);
+      background: var(--hover);
+    }
+
+    .published-card-actions button.danger:hover {
+      border-color: var(--accent);
+      background: rgba(232, 86, 74, .08);
+      color: var(--accent);
+    }
+
+    .published-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: .85rem;
+    }
+
+    /* ── Versions modal rows ── */
+    .version-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .version-row:last-child { border-bottom: none; }
+    .version-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .version-num { font-weight: 600; font-size: .85rem; color: var(--text); }
+    .version-current {
+      font-weight: 600;
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #15803d;
+      background: rgba(34, 197, 94, .12);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin-left: 4px;
+    }
+    .version-sub { font-size: .72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .version-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .version-actions button {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 9px;
+      color: var(--text);
+      font-size: .72rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .version-actions button:hover { border-color: var(--border-hover); background: var(--hover); }
+
+    .published-source-badge {
+      display: inline-block;
+      font-size: .62rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .published-source-badge.local {
+      background: rgba(52, 211, 153, .12);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, .3);
+    }
+
+    .published-source-badge.server {
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
+    }
+
+    .published-source-badge.both {
+      background: rgba(245, 158, 11, .10);
+      color: #d97706;
+      border: 1px solid rgba(245, 158, 11, .25);
+    }
+
+    .published-source-badge.parked {
+      background: rgba(148, 163, 184, .12);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, .3);
+    }
+
+    .published-source-badge.operator-hidden {
+      background: rgba(239, 68, 68, .14);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, .35);
+    }
+
+    /* A parked app is hidden from the public catalogue — dim its card to signal that. */
+    .published-card.parked {
+      opacity: .82;
+      border-style: dashed;
+    }
+
+    .parked-blurb {
+      margin: 0 0 10px;
+      font-size: .82rem;
+      color: var(--text-muted);
+      opacity: .85;
+    }
+
+    /* Operator-only subdomain chip on own published cards */
+    .subdomain-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
+      margin-top: 4px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .subdomain-chip:hover { background: rgba(99, 102, 241, .2); }
+
+    /* AI-published origin badge on local grid cards */
+    .ai-origin-badge {
+      display: inline-block;
+      font-size: .6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 4px;
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
+    }
+
+    /* ── Cortex Extensions Bar ──────────────────────── */
+
+    .cortex-mini-card{background:var(--surface);border:1px solid var(--border-subtle);border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
+    .cortex-mini-card:hover{background:var(--bg-subtle);border-color:var(--border-hover)}
+    .cortex-mini-name{font-weight:600;font-size:.85rem;margin-bottom:.25rem;white-space:nowrap}
+    .cortex-mini-meta{font-size:.7rem;color:var(--text-muted)}
+
+    /* ── Prompt Builder Panel ──────────────────────── */
+    #prompt-builder-overlay {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(0,0,0,.3); backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center; padding: 24px;
+    }
+    .prompt-builder-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle); border-radius: 16px;
+      padding: 28px; max-width: 720px; width: 96vw; max-height: 90vh;
+      display: flex; flex-direction: column; overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,.12);
+    }
+    .prompt-builder-modal h2 { margin: 0 0 16px; font-size: 1.1rem; }
+    .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
+    .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
+    .pb-mode-radio input { accent-color: #E8564A; }
+    .pb-desc-area {
+      width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
+      font-family: inherit; line-height: 1.5; margin-bottom: 14px;
+    }
+    .pb-desc-area:focus { outline: none; border-color: #E8564A; }
+    .pb-ext-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .85rem; margin-bottom: 10px; }
+    .pb-ext-toggle input { accent-color: #E8564A; }
+    .pb-ext-list {
+      display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 10px; max-height: 160px; overflow-y: auto;
+    }
+    .pb-ext-list.open { display: flex; }
+    .pb-ext-chip {
+      display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 8px; cursor: pointer; font-size: .8rem; transition: all .15s;
+    }
+    .pb-ext-chip:hover { background: var(--hover); }
+    .pb-ext-chip.selected { background: rgba(232,86,74,.08); border-color: rgba(232,86,74,.35); }
+    .pb-ext-chip input { accent-color: #E8564A; pointer-events: none; }
+    .pb-preview {
+      min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 10px; font-family: 'Consolas','Monaco','Courier New',monospace;
+      font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+      color: var(--text-muted);
+    }
+    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
+    /* Guided-steps layout for "Generate App with AI" */
+    .pb-intro { font-size: .82rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 18px; }
+    .pb-step { border-top: 1px solid var(--border-subtle); padding-top: 16px; margin-bottom: 16px; }
+    .pb-step:first-of-type { border-top: none; padding-top: 0; }
+    .pb-step-head { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: .98rem; margin-bottom: 12px; }
+    .pb-step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
+      background: #E8564A; color: #fff; font-size: .82rem; font-weight: 700;
+    }
+    .pb-step-hint { font-size: .8rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 12px; }
+    .pb-improving { font-size: .85rem; font-weight: 600; color: #E8564A; margin: 0 0 12px; }
+    .pb-step-btn { width: 100%; justify-content: center; }
+  

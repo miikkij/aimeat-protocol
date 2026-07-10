@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<!--
+  @file src/static/app-catalog.html
+  @description Self-contained "My Apps" launcher SPA (IndexedDB-backed) for installing,
+    publishing, and running user apps. Runs published app HTML only inside a sandboxed,
+    opaque-origin iframe — never as a top-level document on the apex origin (H-2).
+  @structure Inline <style>__APP_CATALOG_STYLES__</style>
+</head>
+<body>
+
+  <header>
+    <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
+    <h1 data-i18n="header.title">My Apps</h1>
+    <div class="mode-toggle">
+      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Global</button>
+      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Personal</button>
+    </div>
+    <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+    <div class="header-actions">
+      <span id="headerAuth" class="header-auth-pill"></span>
+      <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
+      <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
+      <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
+      <div class="backup-menu-wrap">
+        <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
+        <div id="backup-menu" class="backup-menu" hidden>
+          <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
+          <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
+        </div>
+      </div>
+      <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+      <div class="lang-toggle" id="lang-toggle" title="Language / Kieli">
+        <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
+        <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
+      </div>
+      <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
+      <button class="icon-btn" id="help-btn" onclick="window._launcher.openHelp()" data-i18n-title="action.help" title="Help">?</button>
+      <button class="icon-btn" id="settings-btn" data-i18n-title="action.settings" title="Settings">&#x2699;</button>
+    </div>
+  </header>
+
+  <nav id="tag-bar"></nav>
+
+  <!-- Server-published apps missing locally — import is ALWAYS user-selected -->
+  <div id="server-import-banner" class="server-import-banner" style="display:none">
+    <span>&#x1F4E5; <strong id="server-import-count">0</strong> <span data-i18n="srvImport.bannerText">published apps from your account are not in this catalog.</span></span>
+    <div class="server-import-banner-actions">
+      <button class="modal-btn primary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.review">Review &amp; import...</button>
+      <button class="modal-btn secondary" onclick="window._launcher.dismissServerImportBanner()" data-i18n="srvImport.dismiss">Not now</button>
+    </div>
+  </div>
+
+  <!-- Active Extensions Bar -->
+  <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
+      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem">&#x25BC; <span data-i18n="common.toggle">toggle</span></button>
+    </div>
+    <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+  </div>
+
+  <!-- Extension Popup Overlay -->
+  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+      <div id="cortex-popup-content"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cortex Extension Editor Overlay -->
+  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+      <h2 style="margin-top:0;font-size:1.1rem" data-i18n="cortex.editorTitle">&#x1F6E0;&#xFE0F; Extension Editor</h2>
+      <p id="cortex-editor-name" style="color:var(--text-muted);font-size:.85rem;margin-top:-.5rem"></p>
+      <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem" data-i18n="cortex.manifest">Manifest (YAML)</label>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+      </div>
+      <div id="cortex-editor-libs"></div>
+      <div style="margin-bottom:1.5rem">
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.addLib">+ Add Lib File</button>
+      </div>
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.exportFiles">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:#E8564A;color:#fff;font-weight:600;cursor:pointer" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Published Apps Section (own) -->
+  <div id="published-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.togglePublished()">
+      <h2><span data-i18n="sec.published">&#x1F680; Published Apps</span> <span id="published-count"></span></h2>
+      <span class="arrow open" id="published-arrow">&#x25BC;</span>
+    </div>
+    <div id="published-grid" class="published-grid"></div>
+  </div>
+
+  <!-- Parked Apps Section (own, hidden from the public catalogue) -->
+  <div id="parked-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.toggleParked()">
+      <h2><span data-i18n="sec.parked">&#x1F17F;&#xFE0F; Parked Apps</span> <span id="parked-count"></span></h2>
+      <span class="arrow open" id="parked-arrow">&#x25BC;</span>
+    </div>
+    <div class="parked-blurb" data-i18n="sec.parkedBlurb">Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.</div>
+    <div id="parked-grid" class="published-grid"></div>
+  </div>
+
+  <!-- Community Apps Section (other users) -->
+  <div id="community-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.toggleCommunity()">
+      <h2><span data-i18n="sec.community">&#x1F30D; Community Apps</span> <span id="community-count"></span></h2>
+      <span class="arrow open" id="community-arrow">&#x25BC;</span>
+    </div>
+    <div id="community-grid" class="published-grid"></div>
+  </div>
+
+  <!-- Recently Opened Strip -->
+  <div id="recent-section" style="display:none;margin:0 24px 1rem">
+    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted)" data-i18n="sec.recent">&#x1F552; Recently Opened</h3>
+    <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+  </div>
+
+  <div id="local-apps-block" class="local-apps-block">
+    <div id="local-apps-header" style="display:none">
+      <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4BE; Local Apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
+      <p class="local-apps-note" data-i18n="sec.localNote">(these apps live in your browser, not on the server — they won't show up on another browser or device)</p>
+      <p class="local-apps-hint" data-i18n="sec.localHint">&#x1F4A1; Publish an app from here to put it on the server — then you can manage it from anywhere.</p>
+    </div>
+    <main id="app-grid"></main>
+  </div>
+
+  <footer>
+    <span id="stats">0 apps</span>
+    <span class="footer-brand">AIMEAT</span>
+  </footer>
+
+  <div id="modal-overlay" hidden>
+    <div class="modal" id="add-app-modal">
+      <h2 id="modal-title" data-i18n="addModal.title">Add App</h2>
+
+      <!-- Source tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="url" data-i18n="tab.url">URL</button>
+        <button class="modal-tab" data-tab="file" data-i18n="tab.file">File</button>
+        <button class="modal-tab" data-tab="paste" data-i18n="tab.paste">Paste</button>
+        <button class="modal-tab" data-tab="aimeat" data-i18n="tab.aimeat">AIMEAT</button>
+      </div>
+
+      <!-- URL tab content -->
+      <div class="tab-content active" id="tab-url">
+        <label class="modal-label" for="app-url" data-i18n="addModal.url">App URL</label>
+        <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
+      </div>
+
+      <!-- File tab content -->
+      <div class="tab-content" id="tab-file">
+        <label class="modal-label" data-i18n="addModal.htmlFile">HTML File</label>
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-zone-icon">&#x1F4C4;</div>
+          <p class="drop-zone-text" data-i18n="addModal.drop">Drag &amp; drop an HTML file here</p>
+          <p class="drop-zone-hint" data-i18n="common.or">or</p>
+          <button type="button" class="browse-btn" id="browse-btn" data-i18n="addModal.browse">Browse files</button>
+          <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
+          <p class="drop-zone-selected" id="selected-file-name"></p>
+        </div>
+      </div>
+
+      <!-- Paste tab content -->
+      <div class="tab-content" id="tab-paste">
+        <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
+        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
+      </div>
+
+      <!-- AIMEAT tab content -->
+      <div class="tab-content" id="tab-aimeat">
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5" data-i18n="addModal.aimeatHelp">
+          Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
+        </p>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%" data-i18n="addModal.fetch">
+          Fetch Available Apps
+        </button>
+      </div>
+
+      <!-- Common fields -->
+      <div class="modal-fields">
+        <div class="modal-row">
+          <div class="modal-field" style="flex:1">
+            <label class="modal-label" for="app-name" data-i18n="addModal.name">App Name</label>
+            <input type="text" id="app-name" class="modal-input" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
+          </div>
+          <div class="modal-field" style="width:72px">
+            <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
+            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
+          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-open-mode" data-i18n="addModal.openMode">Open Mode</label>
+          <select id="app-open-mode" class="modal-input">
+            <option value="tab" data-i18n="openMode.tab">New Tab</option>
+            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="iframe-view" hidden>
+    <div class="iframe-toolbar">
+      <button class="icon-btn" onclick="window._launcher.closeIframe()" title="Close">&#x2715;</button>
+      <span class="iframe-title" id="iframe-title"></span>
+      <a class="aimeat-cta" href="/" target="_blank" rel="noopener" data-i18n-title="cta.publishOwn" title="Publish your own app — free"><span class="aimeat-cta-spark">⚡</span><span data-i18n="cta.publishOwn">Publish your own app</span></a>
+      <button class="icon-btn" id="iframe-external-btn" onclick="window._launcher.openExternal()" title="Open in new tab" style="display:none">&#x2197;</button>
+    </div>
+    <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
+  </div>
+
+  <!-- App Detail View — unified single-app overlay -->
+  <div id="detail-view" hidden>
+    <div class="dtl-toolbar">
+      <button class="icon-btn" onclick="window._launcher.closeDetailView()" title="Close">&#x2715;</button>
+      <span class="dtl-toolbar-title" id="detail-title"></span>
+      <button class="dtl-btn primary" id="detail-launch-btn" onclick="window._launcher.detailLaunch()" data-i18n="detail.launch">&#x25B6; Launch</button>
+    </div>
+    <div class="dtl-body" id="detail-body"></div>
+  </div>
+
+  <div id="context-menu" hidden>
+    <button data-action="details" data-i18n="ctx.details">&#x1F50E; Details</button>
+    <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
+    <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
+    <button data-action="toggle-mode" data-i18n="ctx.toggleMode">&#x1F504; Switch open mode</button>
+    <button data-action="view-source" data-i18n="ctx.viewSource">&#x1F441; View / Edit Source</button>
+    <button data-action="improve-ai" data-i18n="ctx.improveAi">&#x2728; Improve with AI</button>
+    <button data-action="share-prompt" data-i18n="ctx.sharePrompt">&#x1F4E4; Share as Prompt</button>
+    <hr>
+    <button data-action="publish" data-i18n="ctx.publish">&#x1F680; Publish to server</button>
+    <hr>
+    <button data-action="delete" class="danger" data-i18n="ctx.delete">&#x1F5D1;&#xFE0F; Delete</button>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="help-overlay" hidden>
+    <div class="modal help-modal">
+      <h2 data-i18n="help.title">❓ How this catalog works</h2>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.modesTitle">Global vs Personal</div>
+        <p class="help-p" data-i18n="help.modes">Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.whereTitle">Where your apps live</div>
+        <p class="help-p" data-i18n="help.where">"Local Apps" live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, and then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.sectionsTitle">The sections</div>
+        <p class="help-p" data-i18n="help.sections">Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people's published apps. Local = apps only in this browser.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.backupTitle">"Backup" means two different things</div>
+        <p class="help-p" data-i18n="help.backup">The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.</p>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="help.standaloneTitle">Run it against your own node</div>
+        <p class="help-p" data-i18n="help.standalone">Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn primary" onclick="window._launcher.closeHelp()" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-overlay" hidden>
+    <div class="modal" id="settings-modal">
+      <h2 data-i18n="settings.title">Settings</h2>
+
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="settings.appearance">Appearance</div>
+        <div class="settings-row">
+          <label for="setting-theme" data-i18n="settings.theme">Theme</label>
+          <select id="setting-theme" class="modal-input">
+            <option value="dark" data-i18n="theme.dark">Dark</option>
+            <option value="light" data-i18n="theme.light">Light</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label for="setting-language" data-i18n="settings.language">Language</label>
+          <select id="setting-language" class="modal-input" onchange="window._launcher.setLanguage(this.value)">
+            <option value="en">English</option>
+            <option value="fi">Suomi</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="settings.defaults">Defaults</div>
+        <div class="settings-row">
+          <label for="setting-open-mode" data-i18n="settings.defaultOpenMode">Default open mode</label>
+          <select id="setting-open-mode" class="modal-input">
+            <option value="tab" data-i18n="openMode.tab">New Tab</option>
+            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
+        <div class="settings-row">
+          <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
+          <input type="url" id="setting-aimeat-url" class="modal-input" readonly autocomplete="off" data-i18n-title="settings.serverUrlHint" title="This catalog talks to the node that served it (same-origin)."/>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="settings.backup">Backup &amp; Restore</div>
+        <div class="settings-backup-actions">
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.settingsBtn">📥 Import from server…</button>
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
+          <input type="file" id="import-file-input" accept=".json" hidden/>
+        </div>
+      </div>
+
+      <div class="settings-section" style="margin-bottom:0">
+        <div class="settings-section-title" data-i18n="settings.danger">Danger Zone</div>
+        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()" data-i18n="settings.clearAll">Clear All Data</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:24px">
+        <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Source Modal -->
+  <div id="source-overlay" hidden>
+    <div class="modal source-modal">
+      <h2 id="source-title">View Source</h2>
+      <textarea id="source-code"></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
+        <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
+        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save Changes</button>
+        <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIMEAT Import Dialog (dynamically populated) -->
+  <div id="aimeat-import-overlay" hidden>
+    <div class="modal" id="aimeat-import-modal">
+      <h2 data-i18n="import.title">Import from AIMEAT</h2>
+      <div class="aimeat-app-list" id="aimeat-app-list"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()" data-i18n="import.selected">Import Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Publish Modal -->
+  <div id="publish-overlay" hidden>
+    <div class="modal" id="publish-modal">
+      <h2 data-i18n="publish.title">&#x1F680; Publish App</h2>
+      <div class="form-group">
+        <label for="publish-filename" data-i18n="publish.filename">Filename</label>
+        <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.filenameHint">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
+      </div>
+      <div class="form-group">
+        <label for="publish-description" data-i18n="publish.description">Description</label>
+        <textarea id="publish-description" class="modal-input" rows="2" placeholder="What does this app do? 1-2 sentences (your AI can write it)" data-i18n-ph="publish.descriptionPh" autocomplete="off"></textarea>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.descriptionHint">Shown in the catalogue and on the landing wall. Required for a new app.</div>
+      </div>
+      <div class="form-group">
+        <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
+        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
+      </div>
+      <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSON Backup Import Modal (user-selected, duplicate-aware) -->
+  <div id="json-import-overlay" hidden>
+    <div class="modal" id="json-import-modal">
+      <h2 data-i18n="jsonImport.title">&#x1F4E5; Import JSON backup</h2>
+      <div id="json-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="json-import-body" style="overflow-y:auto;max-height:55vh"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('json-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="json-import-btn" onclick="window._launcher.submitJsonImport()" data-i18n="srvImport.import">Import selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Server Apps Import Modal (user-selected) -->
+  <div id="server-import-overlay" hidden>
+    <div class="modal" id="server-import-modal">
+      <h2 data-i18n="srvImport.title">&#x1F4E5; Import published apps</h2>
+      <div id="server-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="server-import-body" style="overflow-y:auto;max-height:55vh"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('server-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.submitServerImport()" data-i18n="srvImport.import">Import selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup Import Modal -->
+  <div id="backup-overlay" hidden>
+    <div class="modal" id="backup-modal">
+      <h2 data-i18n="backup.title">&#x1F4E5; Import from backup</h2>
+      <div id="backup-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="backup-import-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('backup-overlay').hidden = true" data-i18n="common.close">Close</button>
+        <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subdomain Assign Modal (operator only) -->
+  <div id="subdomain-overlay" hidden>
+    <div class="modal" id="subdomain-modal">
+      <h2 data-i18n="subModal.title">&#x1F310; Assign Subdomain</h2>
+      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px" id="subdomain-app-label"></div>
+      <div class="form-group">
+        <label for="subdomain-input" data-i18n="subModal.label">Subdomain</label>
+        <input type="text" id="subdomain-input" class="modal-input" placeholder="e.g. sanomat" data-i18n-ph="subModal.ph" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</div>
+      </div>
+      <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('subdomain-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button>
+        <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Versions Modal -->
+  <div id="versions-overlay" hidden>
+    <div class="modal" id="versions-modal">
+      <h2>&#x1F551; <span id="versions-title">App Versions</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
+      <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="versions-list" style="max-height:48vh;overflow-y:auto"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('versions-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
+  <div id="lineage-overlay" hidden>
+    <div class="modal" id="lineage-modal">
+      <h2>&#x2942; <span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
+      <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
+      <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="lineage-tree" style="max-height:52vh;overflow-y:auto;font-size:.85rem"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('lineage-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
+  <div id="protection-overlay" hidden>
+    <div class="modal" id="protection-modal">
+      <h2>&#x1F6E1;&#xFE0F; <span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
+      <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-watermark"> <span><b data-i18n="protect.watermark">Watermark</b> — <span data-i18n="protect.watermarkHint">embed an invisible fingerprint so a leaked copy traces back to who was served it.</span></span></label>
+      <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
+      <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('protection-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate App with AI — guided steps -->
+  <div id="prompt-builder-overlay">
+    <div class="prompt-builder-modal">
+      <h2 id="pb-title" data-i18n="pb.title">&#x2728; Generate App with AI</h2>
+      <p class="pb-intro" data-i18n="pb.intro">No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.</p>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">1</span><span data-i18n="pb.step1">Describe your app</span></div>
+        <!-- Mode is implicit (new vs improve) — radios kept hidden for state; an "Improving:" note shows instead. -->
+        <div class="pb-mode-row" id="pb-mode-row" style="display:none">
+          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
+          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
+        </div>
+        <div id="pb-improving" class="pb-improving" style="display:none"></div>
+        <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
+        <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; <span data-i18n="pb.template">Start from a template (optional)</span></span></label>
+        <select id="pb-template" class="modal-input pb-template-select"><option value="">(none &#x2014; build from scratch)</option></select>
+      </div>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">2</span><span data-i18n="pb.step2">Copy the prompt &amp; paste it into your AI</span></div>
+        <p class="pb-step-hint" data-i18n="pb.step2hint">Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.</p>
+        <div class="pb-preview-label" data-i18n="pb.promptPreview">Prompt preview</div>
+        <div class="pb-preview" id="pb-preview"></div>
+        <button class="modal-btn primary pb-step-btn" id="pb-copy-btn" data-i18n="pb.copy">&#x1F4CB; Copy Prompt</button>
+      </div>
+
+      <div class="pb-step">
+        <div class="pb-step-head"><span class="pb-step-num">3</span><span data-i18n="pb.step3">Add &amp; publish your app</span></div>
+        <p class="pb-step-hint" data-i18n="pb.step3hint">Got the HTML file from the AI? Add it here — it goes live on your node and you get a link to share.</p>
+        <button class="modal-btn pb-step-btn" id="pb-add-btn" data-i18n="pb.addBtn">&#x2795; I have my app file — add it</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Published Apps Section (inserted before grid, toggled) -->
+
+<script>__APP_CATALOG_BUNDLE__</script>
+</body>
+</html>
