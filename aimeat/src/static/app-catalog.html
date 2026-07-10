@@ -3629,7 +3629,7 @@
       if (compressionMethod === 0) {
         data = rawData;
       } else if (compressionMethod === 8) {
-        var ds = new DecompressionStream("raw");
+        var ds = new DecompressionStream("deflate-raw");
         var writer = ds.writable.getWriter();
         writer.write(rawData);
         writer.close();

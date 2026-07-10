@@ -90,8 +90,10 @@ export async function extractZip(arrayBuffer) {
     if (compressionMethod === 0) {
       data = rawData; // Stored (no compression)
     } else if (compressionMethod === 8) {
-      // Deflate — use browser's DecompressionStream
-      var ds = new DecompressionStream('raw');
+      // Deflate — ZIP stores RAW deflate (no zlib header), so the WHATWG format is 'deflate-raw'.
+      // (Was 'raw' — an invalid format name that threw "Unsupported compression format" on every
+      // DEFLATE-compressed bundle; STORED zips happened to skip this path. Fixed during extraction.)
+      var ds = new DecompressionStream('deflate-raw');
       var writer = ds.writable.getWriter();
       writer.write(rawData);
       writer.close();
