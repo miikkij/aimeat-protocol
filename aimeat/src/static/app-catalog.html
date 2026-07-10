@@ -4199,6 +4199,7 @@
         m.forkable = !!sa.forkable;
         m.forks = sa.forks || 0;
         m.protection = prot;
+        m.viewUrl = base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {

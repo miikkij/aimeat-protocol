@@ -889,6 +889,10 @@ import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode
         m.versionNumber = sa.version_number || m.versionNumber;
         m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
         m.protection = prot;
+        // EXACTLY what the old "View" used: the CONSTRUCTED served URL (aimeatUrl/v1/apps/<owner>/<file>),
+        // NOT the local publishedUrl — so Open opens the app top-level on its origin (and it SSOs)
+        // identically to the old published card's View button.
+        m.viewUrl = base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
