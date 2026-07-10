@@ -72,6 +72,13 @@
       (above #detail-view, below the context menu — same fix as #source-overlay v2.3.1) and added the
       new #lineage-overlay + #protection-overlay to it (they were missing the overlay wrapper entirely,
       so they rendered inline instead of as centered modals).
+    v2.10.0 — 2026-07-10 — Security (TARGET-020): escape onclick args with jsArg/cortexArg (tag filter,
+      consents, revokeConsent, cortex-popup Copy — '&' escaped first, closing an entity-smuggling XSS);
+      the cortex strip fetches visibility=public (private extensions no longer leak into the anon strip);
+      "Edit Extension" is shown only to the extension's owner; the cortex editor saves via an atomic PUT
+      (no delete-then-reinstall window, reads the real response envelope); launchInIframe never frames a
+      cross-origin URL and the postMessage auth bridge refuses non-same-origin frames (no owner-JWT
+      leak); launchInTab runs local blob apps in the sandboxed iframe instead of top-level.
 -->
 <html lang="en">
 <head>
@@ -3795,7 +3802,7 @@
     // One button per unique tag
     for (var k = 0; k < uniqueTags.length; k++) {
       var tag = uniqueTags[k];
-      html += '<button class="tag' + (activeTag === tag ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'' + escapeHtml(tag.replace(/'/g, "\\'")) + '\')">' + escapeHtml(tag) + '</button>';
+      html += '<button class="tag' + (activeTag === tag ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'' + jsArg(tag) + '\')">' + escapeHtml(tag) + '</button>';
     }
 
     tagBar.innerHTML = html;
@@ -3842,11 +3849,11 @@
       // isolated app origin. Either way it opens TOP-LEVEL as a clean full page.
       window.open(app.url, '_blank', 'noopener');
     } else if (app.blob) {
-      var html = decodeURIComponent(escape(atob(app.blob)));
-      var blob = new Blob([html], { type: 'text/html' });
-      var blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank', 'noopener');
-      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 5000);
+      // A local blob app opened top-level would run on THIS origin (blob: URLs carry the creator's
+      // origin) with full read access to our localStorage session — the H-2 vector the
+      // isSameOriginUrl comment warns about. Run it in the sandboxed iframe (opaque origin) instead,
+      // where it only gets what the postMessage bridge chooses to hand it.
+      launchInIframe(app);
     }
   }
 
@@ -3874,6 +3881,13 @@
     iframe.dataset.appId = app.id;
 
     if (app.source === 'url' && app.url) {
+      // Never frame a cross-origin (third-party) URL: the postMessage auth bridge below would hand
+      // it the owner's session token. Cross-origin app URLs open TOP-LEVEL in a new tab instead
+      // (same as viewPublished). Only same-origin apex URLs (the node itself) are framed.
+      if (!isSameOriginUrl(app.url)) {
+        window.open(app.url, '_blank', 'noopener');
+        return;
+      }
       iframe.removeAttribute('srcdoc');
       iframe.src = app.url;
       currentIframeUrl = app.url;
@@ -3980,7 +3994,7 @@
                 '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
                 // Consents: only for a catalogue app (has owner/filename) \u2014 manage the grant you gave it.
                 ((app.aimeatOwner && app.aimeatFilename)
-                  ? '<button onclick="event.stopPropagation(); window._launcher.openConsents(\'' + escapeHtml(app.aimeatOwner) + '\', \'' + escapeHtml(app.aimeatFilename) + '\', \'' + escapeHtml(app.name) + '\')" title="' + escapeHtml(t('consents.title')) + '">\uD83D\uDD11</button>'
+                  ? '<button onclick="event.stopPropagation(); window._launcher.openConsents(\'' + jsArg(app.aimeatOwner) + '\', \'' + jsArg(app.aimeatFilename) + '\', \'' + jsArg(app.name) + '\')" title="' + escapeHtml(t('consents.title')) + '">\uD83D\uDD11</button>'
                   : '') +
               '</div>' +
               (app.favorite ? '<span class="fav-star visible">\u2B50</span>' : '') +
@@ -5147,7 +5161,7 @@
         + '<ul style="margin:0 0 14px;padding-left:18px">'
         + g.scopes.map(function (s) { return '<li><code>' + escapeHtml(s) + '</code></li>'; }).join('')
         + '</ul>'
-        + '<button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent(\'' + escapeHtml(g.grant_id) + '\')">' + t('consents.revoke') + '</button>';
+        + '<button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent(\'' + jsArg(g.grant_id) + '\')">' + t('consents.revoke') + '</button>';
     }).catch(function (e) {
       var body = document.getElementById('consents-body');
       if (body) { body.style.color = '#ef4444'; body.textContent = e.message || String(e); }
@@ -7151,6 +7165,21 @@
     return div.innerHTML;
   }
 
+  // Escape extension content for a single-quoted JS arg inside a double-quoted onclick, the same
+  // as jsArg but preserving newlines as a literal \n (cortexCopy restores them). Escaping '&'
+  // FIRST is the security-critical bit: without it a payload like &#39; survives into the
+  // attribute, the HTML parser decodes it to ' and breaks out of the JS string (entity smuggling).
+  function cortexArg(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\r?\n/g, '\\n');
+  }
+
   function loadCortexExtensions() {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
@@ -7163,7 +7192,10 @@
         var token = authData.data && authData.data.token;
         if (!token) return;
         cortexToken = token;
-        return fetch(url + '/v1/cortex?status=active', {
+        // visibility=public: the strip loads via an anonymous token and is a shared showcase.
+        // Without this filter the list returns private extensions too, leaking their name/
+        // description/lib refs to anyone (the libs are then fetchable). Public-only is correct here.
+        return fetch(url + '/v1/cortex?status=active&visibility=public', {
           headers: { 'Authorization': 'Bearer ' + token }
         });
       })
@@ -7215,11 +7247,11 @@
           html += '<div style="margin-bottom:1rem">'
             + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
             + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
-            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>';
+            + '<button onclick="cortexCopy(\'' + cortexArg(tag) + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>';
           if (lib.api_surface) {
             html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
               + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
-              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy API</button>';
+              + '<button onclick="cortexCopy(\'' + cortexArg(lib.api_surface) + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy API</button>';
           }
           html += '</div>';
         });
@@ -7235,14 +7267,15 @@
           html += '<div style="margin-bottom:.5rem">'
             + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
             + '<div style="font-size:.75rem;color:var(--text-muted)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
-            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy Prompt</button>'
+            + '<button onclick="cortexCopy(\'' + cortexArg(p.content) + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy Prompt</button>'
             + '</div>';
         });
 
-        // Edit button (only if owner session available)
-        var hasSession = false;
-        try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
-        if (hasSession) {
+        // Edit button — only for the OWNER of this extension. The backend export/DELETE/PUT
+        // routes enforce ownership too; this just hides a button that would 403 for everyone else.
+        var isOwner = false;
+        try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
+        if (isOwner) {
           html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border-subtle)">'
             + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
             + '</div>';
@@ -7374,60 +7407,40 @@
     var libs = cortexEditorCollectLibs();
     var statusEl = document.getElementById('cortex-editor-status');
     var saveBtn = document.getElementById('cortex-editor-save-btn');
-    var oldName = cortexEditorExtName;
-    var wasActive = cortexEditorWasActive;
+    var name = cortexEditorExtName;
 
-    statusEl.textContent = 'Deleting old extension...';
+    statusEl.textContent = 'Saving...';
     statusEl.style.color = '#34d399';
     saveBtn.disabled = true;
 
-    // Step 1: Delete old extension
-    fetch(url + '/v1/cortex/' + encodeURIComponent(oldName), {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token }
+    // Atomic in-place replace: PUT swaps the manifest + libs and PRESERVES lifecycle fields
+    // (status, installedBy), so an active extension stays active with no delete-then-reinstall
+    // window, and the server enforces owner + namespace. Replaces the old DELETE -> POST ->
+    // activate dance, which could DESTROY the extension if the reinstall failed — and which
+    // misread the response envelope (`data.status`, a field that does not exist) as a failure
+    // on every success. The name is the identity; editing it in the manifest is a NAME_MISMATCH.
+    fetch(url + '/v1/cortex/' + encodeURIComponent(name), {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manifest: manifest, libs: libs })
     })
-    .then(function(r) {
-      if (!r.ok && r.status !== 404) throw new Error('Delete failed: ' + r.status);
-      statusEl.textContent = 'Installing updated extension...';
-      // Step 2: Install new
-      return fetch(url + '/v1/cortex', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manifest: manifest, libs: libs })
-      });
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.status !== 'ok') {
-        var errMsg = data.error || 'Install failed';
-        if (data.details && data.details.errors) errMsg += ': ' + data.details.errors.join('; ');
-        throw new Error(errMsg);
-      }
-      var newName = data.data.name;
-      cortexEditorExtName = newName;
-
-      // Step 3: Activate if was active before
-      if (wasActive) {
-        statusEl.textContent = 'Activating...';
-        return fetch(url + '/v1/cortex/' + encodeURIComponent(newName) + '/activate', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + token }
-        }).then(function(r) { return r.json(); });
-      }
-      return null;
-    })
-    .then(function(activateData) {
+    .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(res) {
       saveBtn.disabled = false;
-      if (activateData && activateData.status !== 'ok') {
-        statusEl.textContent = 'Installed but activation failed: ' + (activateData.error || 'unknown');
-        statusEl.style.color = 'orange';
-      } else {
-        statusEl.textContent = 'Saved and re-installed successfully!';
-        statusEl.style.color = '#34d399';
-        cortexEditorWasActive = wasActive; // preserve
-        // Refresh the cortex bar
-        loadCortexExtensions();
+      var data = res.data || {};
+      if (!res.ok || data.ok === false) {
+        var err = data.error || {};
+        var msg = err.message || err.code || 'Save failed';
+        if (err.details && err.details.errors) msg += ': ' + err.details.errors.join('; ');
+        statusEl.textContent = 'Error: ' + msg;
+        statusEl.style.color = '#E8564A';
+        return;
       }
+      if (data.data && data.data.name) cortexEditorExtName = data.data.name;
+      statusEl.textContent = 'Saved successfully!';
+      statusEl.style.color = '#34d399';
+      // Refresh the cortex bar
+      loadCortexExtensions();
     })
     .catch(function(e) {
       saveBtn.disabled = false;
@@ -8304,6 +8317,11 @@
       // Only respond to messages from our iframe
       if (e.source !== iframe.contentWindow) return;
       if (!e.data || e.data.type !== 'aimeat-request-auth') return;
+
+      // Defense in depth: never hand the session token to a cross-origin framed page. After the
+      // launchInIframe guard, currentIframeUrl is only ever empty (our own srcdoc blob) or a
+      // same-origin apex URL — re-check here so a stray external frame can never receive it.
+      if (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) return;
 
       // Get JWT from aimeat-auth library if available, else from localStorage
       var jwt = null;

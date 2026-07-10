@@ -214,6 +214,38 @@ await test('GET /v1/extensions/test-echo \u2014 verify status is active', async 
     assert(body.data?.extension?.activatedAt, 'has activatedAt timestamp');
 });
 
+// ─── Cross-owner authorization (TARGET-020) ───
+// Owner sessions bypass requireScope, so the canManageInstalledExt guard on activate/deactivate
+// is what stops a second owner from toggling the first owner's extension. test-echo is active
+// under ownerName here; a second owner must get 403 and change nothing.
+await test('Second owner CANNOT deactivate/activate first owner\'s extension (403)', async () => {
+    const otherName = `extother${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(reg.body.data.private_key, otherName + NODE_ID + timestamp);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: otherName, timestamp, signature }) });
+    assert(tok.body.ok === true, `token ok: ${JSON.stringify(tok.body.error)}`);
+    const otherToken = tok.body.data.token;
+
+    const deact = await json('/v1/extensions/test-echo/deactivate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherToken}` },
+    });
+    assert(deact.status === 403, `deactivate status ${deact.status}: ${JSON.stringify(deact.body)}`);
+
+    const act = await json('/v1/extensions/test-echo/activate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherToken}` },
+    });
+    assert(act.status === 403, `activate status ${act.status}: ${JSON.stringify(act.body)}`);
+
+    const chk = await json('/v1/extensions/test-echo');
+    assert(chk.body.data?.extension?.status === 'active', 'test-echo still active after blocked cross-owner calls');
+
+    await json(`/v1/owners/${otherName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` } });
+});
+
 // ─── Phase 3: Action Execution ───
 console.log('Phase 3 \u2014 Action Execution');
 

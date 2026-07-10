@@ -7,6 +7,9 @@
  * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.2.0 — 2026-07-10 — Security (TARGET-020): per-resource ownership guard on activate,
+ *     deactivate, DELETE and export — owner sessions bypass requireScope, so without it any signed-in
+ *     owner could destroy (or, in the community namespace, replace) another owner's extension.
  *   v1.1.0 — 2026-06-05 — Add PUT /v1/cortex/:name idempotent upsert: redeploy in place with no
  *     live gap (libs swapped, never deleted-then-recreated), re-runs init on an active cortex,
  *     and never consumes a quota slot when updating an existing cortex.
@@ -429,6 +432,13 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Ownership: owner sessions bypass requireScope, so this per-resource check is what stops
+    // a non-owner from uninstalling someone else's extension (see also PUT/visibility).
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+      return;
+    }
+
     // Deactivate first if active
     if (ext.status === 'active') {
       await deactivateExtension(ext, storage, req.auth!.sub);
@@ -465,6 +475,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     if (!ext) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+      return;
+    }
+
+    // Ownership: only the installing owner (or an operator) may (de)activate their extension.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
     }
 
@@ -510,6 +526,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     if (!ext) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+      return;
+    }
+
+    // Ownership: only the installing owner (or an operator) may (de)activate their extension.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
     }
 
@@ -659,6 +681,14 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     if (!ext) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+      return;
+    }
+
+    // Ownership: export returns full source (manifest + libs) for editing — only the installing
+    // owner (or an operator) may read it, so a non-owner cannot load someone else's extension
+    // into the editor to overwrite or destroy it.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
     }
 
