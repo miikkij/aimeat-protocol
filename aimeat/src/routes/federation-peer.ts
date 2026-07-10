@@ -1065,15 +1065,18 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         // Find or auto-add the sender as a peer (bidirectional peering)
         let peer = [...peers.values()].find(p => p.nodeId === node_id);
         if (!peer || (peer.status !== 'active' && peer.status !== 'approved')) {
-            // Auto-add if sender is our genesis node, or we have an approved peering request from them
+            // Auto-add ONLY when there is an operator-approved peering request from this node.
+            // SECURITY (F1): never derive admission/trust from the request BODY (e.g. node_url ===
+            // config.genesisUrl) — an unauthenticated caller could otherwise self-admit as an active
+            // peer with an attacker-controlled key and then mint via /settle. A genesis/peer is
+            // established through the signed introduce → operator-approval flow like any other peer.
             const senderUrl = node_url as string | undefined;
-            const isGenesis = config.genesisUrl && senderUrl && config.genesisUrl.replace(/\/+$/, '') === senderUrl.replace(/\/+$/, '');
             const requests = await storage.listPeeringRequests();
             const hasApprovedRequest = requests.some(r => r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'));
 
-            if ((isGenesis || hasApprovedRequest) && senderUrl) {
+            if (hasApprovedRequest && senderUrl) {
                 const now = new Date().toISOString();
-                const tier: PeerTier = isGenesis ? 'genesis' : 'member';
+                const tier: PeerTier = 'member';
                 const newPeer: PeerInfo = {
                     nodeId: node_id,
                     url: senderUrl,
@@ -1087,10 +1090,27 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 peers.set(node_id, newPeer);
                 await storage.saveFederationPeer(newPeer);
                 peer = newPeer;
-                logger.info(`Auto-added peer ${node_id} during key exchange (reciprocal peering)`);
+                logger.info(`Auto-added peer ${node_id} during key exchange (operator-approved request)`);
             } else {
                 res.status(403).json(error(config.nodeId, 'FORBIDDEN',
                     `Node ${node_id} is not a recognized peer`));
+                return;
+            }
+        }
+
+        // Key continuity (SECURITY F1): once a peer's signing key is established, a CHANGE to it is a
+        // rotation that MUST be authorized by a signature from the CURRENT key (proof of possession).
+        // Without this, an unauthenticated caller could replace a trusted peer's key and then have
+        // attacker-signed settlements/replication verify against it. Newly auto-added peers set their
+        // key just above (no change), so this only bites an EXISTING peer presenting a different key.
+        // A legitimate key rotation is re-established via the operator introduce/approval flow.
+        if (peer.publicKey && node_public_key !== peer.publicKey) {
+            const sig = (req.body?.signature as string | undefined) ?? '';
+            const rotationPayload = `${node_id}:${node_public_key}:${timestamp ?? ''}`;
+            const rotationOk = sig.length > 0 && await verify(peer.publicKey, rotationPayload, sig);
+            if (!rotationOk) {
+                res.status(409).json(error(config.nodeId, 'KEY_ROTATION_DENIED',
+                    'Changing an established peer key requires a signature from the current key. Re-establish the peer via the operator introduce/approval flow to rotate.'));
                 return;
             }
         }

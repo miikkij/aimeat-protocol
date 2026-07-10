@@ -9,6 +9,9 @@
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
+ *   v1.1.0 — 2026-07-10 — Add Phase 2c: reserved-key guard — a granted app with memory:write cannot
+ *     write server-trusted owner keys (openrouter.*, ai-usage.*, profile.*) on POST/PUT/import; the
+ *     owner is unaffected (guard is app-scoped). Closes the C-2 app-grant key-exfil class.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -47,6 +50,25 @@ let grantId = '';
 // PKCE
 const codeVerifier = randomBytes(32).toString('base64url');
 const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+
+/** Run the full authorize→consent→token flow and return a scoped app access token (role 'app'). */
+async function grantAppToken(scope: string): Promise<string> {
+    const q = new URLSearchParams({
+        app: `${owner}/${FILENAME}`, response_type: 'code', scope,
+        redirect_uri: REDIRECT, code_challenge: codeChallenge, code_challenge_method: 'S256',
+    });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')![1]);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ request_id: rid }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: REDIRECT }),
+    });
+    return tok.body.data.access_token as string;
+}
 
 async function main() {
     console.log('\n=== App Grants (scoped, user-approved) E2E ===\n');
@@ -190,6 +212,53 @@ async function main() {
         });
         assert(tok.status === 200 && tok.body.ok, `token: ${tok.status} ${JSON.stringify(tok.body)}`);
         assert(tok.body.data.scope === 'storage:read', `granted subset only (storage:read), got "${tok.body.data.scope}"`);
+    });
+
+    console.log('\nPhase 2c: Reserved-key guard (a granted app cannot poison server-trusted owner keys)');
+    let writeToken = '';
+    await test('mint an app token WITH memory:write', async () => {
+        writeToken = await grantAppToken('memory:write');
+        assert(!!writeToken, 'memory:write app token minted');
+    });
+    await test('app with memory:write CAN write a normal (non-reserved) key', async () => {
+        const r = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${writeToken}` },
+            body: JSON.stringify({ key: 'grantapp.data', value: { a: 1 } }),
+        });
+        assert(r.status === 201, `normal write should pass (201 Created), got ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    for (const rk of ['openrouter.settings', 'openrouter.apikey', 'ai-usage.2026-01-01', 'profile.x.directory_listed']) {
+        await test(`app CANNOT write reserved key "${rk}" via POST (403 RESERVED_KEY)`, async () => {
+            const r = await json('/v1/memory', {
+                method: 'POST', headers: { Authorization: `Bearer ${writeToken}` },
+                body: JSON.stringify({ key: rk, value: { provider: 'custom', baseUrl: 'https://attacker.example/v1' } }),
+            });
+            assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
+            assert(r.body?.error?.code === 'RESERVED_KEY', `expected RESERVED_KEY, got ${r.body?.error?.code}`);
+        });
+    }
+    await test('reserved-key block also covers PUT /v1/memory/:key', async () => {
+        const r = await json(`/v1/memory/${encodeURIComponent('openrouter.settings')}`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${writeToken}` },
+            body: JSON.stringify({ value: { baseUrl: 'https://attacker.example/v1' }, version: 1 }),
+        });
+        assert(r.status === 403 && r.body?.error?.code === 'RESERVED_KEY', `PUT expected 403 RESERVED_KEY, got ${r.status} ${r.body?.error?.code}`);
+    });
+    await test('reserved-key block also covers POST /v1/memory/import (per-entry)', async () => {
+        const r = await json('/v1/memory/import', {
+            method: 'POST', headers: { Authorization: `Bearer ${writeToken}` },
+            body: JSON.stringify({ entries: [{ key: 'openrouter.apikey', value: { encrypted: 'x' } }, { key: 'grantapp.ok', value: { a: 1 } }] }),
+        });
+        assert(r.status === 200, `import status ${r.status}`);
+        const failed = (r.body?.data?.failed ?? []) as { key: string; reason: string }[];
+        assert(failed.some((f) => f.key === 'openrouter.apikey' && /reserved/i.test(f.reason)), `import should reject the reserved key, got ${JSON.stringify(failed)}`);
+    });
+    await test('guard is app-scoped: the OWNER is NOT blocked from a reserved key', async () => {
+        const r = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: 'ai-usage.e2e-owner-marker', value: { total_cost_usd: 0 } }),
+        });
+        assert(r.body?.error?.code !== 'RESERVED_KEY', `owner must not be RESERVED_KEY-blocked, got ${r.status} ${JSON.stringify(r.body)}`);
     });
 
     console.log('\nPhase 3: Refresh + manage + revoke');

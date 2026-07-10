@@ -55,6 +55,7 @@ import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../services/ecosystem-access.js';
+import { appMayWriteKey } from '../utils/reserved-keys.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
 import { isKeyArchived } from '../services/archive.js';
 
@@ -103,6 +104,16 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         res.status(403).json(error(config.nodeId, 'DATA_AREA_DENIED', `Write to "${key}" is not permitted by this app's data-area allowlist`));
         return;
       }
+    }
+
+    // Reserved-key guard (DNA invariant #2): a role-'app' token (H-2 app grant) has sub = the owner's
+    // GHII, so its memory:write lands in the owner's namespace — where the server reads openrouter.*
+    // (the URL a decrypted AI key is sent to), ai-usage.* (the daily spend cap), and profile.* (public
+    // directory + match inputs). A granted app must not poison those; the owner manages them via the
+    // owner-only routes (/v1/openrouter/settings, /v1/ghii).
+    if (typeof key === 'string' && !appMayWriteKey(req.auth!.roles, key)) {
+      res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
+      return;
     }
 
     const vis = visibility ?? 'private';
@@ -550,6 +561,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     for (const entry of entries) {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { summary.failed.push({ key: String(key), reason: 'missing key' }); continue; }
+      // Reserved-key guard (DNA invariant #2): apps may not import server-trusted owner keys.
+      if (!appMayWriteKey(req.auth!.roles, key)) { summary.failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
       try {
         if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
           summary.failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue;
@@ -1616,6 +1629,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // Ecosystem (GEAI) data-area allowlist: an organism deposit needs an owner-granted area.
     if (req.auth!.roles.includes('ecosystem') && !(await ecoMayWriteKey(storage, req.auth!.sub, key))) {
       res.status(403).json(error(config.nodeId, 'DATA_AREA_DENIED', `Write to "${key}" is not permitted by this app's data-area allowlist`));
+      return;
+    }
+
+    // Reserved-key guard (DNA invariant #2): apps may not overwrite server-trusted owner keys
+    // (openrouter.*/ai-usage.*/profile.*). See utils/reserved-keys.ts.
+    if (!appMayWriteKey(req.auth!.roles, key)) {
+      res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
       return;
     }
 

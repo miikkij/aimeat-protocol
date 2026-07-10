@@ -261,6 +261,49 @@ await test('10. Update peer info', async () => {
     assert(body.data.status === 'active', `status: ${body.data.status}`);
 });
 
+// ─── F1: key-exchange hardening (peer-key continuity + no body-based auto-admission) ───
+await test('F1: key-exchange from an UNKNOWN node (no approved request) is rejected (403)', async () => {
+    const { status, body } = await json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: `aimeat-attacker-${Date.now()}`,
+            node_url: 'http://localhost:9996',
+            node_public_key: directPeerPubKeyB64,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(status === 403, `unknown-node key-exchange should be 403 (no body-based auto-admission), got ${status} ${JSON.stringify(body)}`);
+});
+
+await test('F1: key-exchange cannot OVERWRITE an active peer key without a current-key signature (409)', async () => {
+    const attackerPub = Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64');
+    const { status, body } = await json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: directPeerNodeId,
+            node_url: directPeerUrl,
+            node_public_key: attackerPub,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(status === 409, `unsigned key overwrite should be 409, got ${status} ${JSON.stringify(body)}`);
+    assert(body?.error?.code === 'KEY_ROTATION_DENIED', `expected KEY_ROTATION_DENIED, got ${body?.error?.code}`);
+});
+
+await test('F1: key-exchange with the SAME established key still succeeds (steady-state refresh unbroken)', async () => {
+    const { status, body } = await json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: directPeerNodeId,
+            node_url: directPeerUrl,
+            node_public_key: directPeerPubKeyB64,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(status === 200, `same-key key-exchange should pass, got ${status} ${JSON.stringify(body)}`);
+    assert(body?.data?.accepted === true, `expected accepted:true, got ${JSON.stringify(body?.data)}`);
+});
+
 await test('11. Heartbeat', async () => {
     const { body } = await json('/v1/federation/heartbeat', {
         method: 'POST',
