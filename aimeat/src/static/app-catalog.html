@@ -2081,24 +2081,8 @@
     </div>
   </div>
 
-  <!-- Published Apps Section (own) -->
-  <div id="published-section" data-view="library" style="display:none">
-    <div class="published-header" onclick="window._launcher.togglePublished()">
-      <h2><span data-i18n="sec.published">&#x1F680; Published Apps</span> <span id="published-count"></span></h2>
-      <span class="arrow open" id="published-arrow">&#x25BC;</span>
-    </div>
-    <div id="published-grid" class="published-grid"></div>
-  </div>
-
-  <!-- Parked Apps Section (own, hidden from the public catalogue) -->
-  <div id="parked-section" data-view="library" style="display:none">
-    <div class="published-header" onclick="window._launcher.toggleParked()">
-      <h2><span data-i18n="sec.parked">&#x1F17F;&#xFE0F; Parked Apps</span> <span id="parked-count"></span></h2>
-      <span class="arrow open" id="parked-arrow">&#x25BC;</span>
-    </div>
-    <div class="parked-blurb" data-i18n="sec.parkedBlurb">Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.</div>
-    <div id="parked-grid" class="published-grid"></div>
-  </div>
+  <!-- Published + Parked apps are now merged into the unified #app-grid below (status badges);
+       their standalone sections were removed with the old renderers (TARGET-021 Aalto 3). -->
 
   <!-- Community Apps Section (other users) -->
   <div id="community-section" data-view="community" style="display:none">
@@ -2729,6 +2713,9 @@
       "lineage.status.hidden": "hidden",
       "lineage.status.deleted": "deleted",
       "card.protectHint": "Copy-protection options (obfuscate, domain-lock, watermark, no raw download)",
+      "card.protect": "🛡 Protection",
+      "card.removeServer": "🗑 Remove from server",
+      "detail.serverMgmt": "Manage on server",
       "protect.title": "Copy protection",
       "protect.help": "Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.",
       "protect.obfuscate": "Obfuscate",
@@ -3062,6 +3049,9 @@
       "lineage.status.hidden": "piilotettu",
       "lineage.status.deleted": "poistettu",
       "card.protectHint": "Kopiosuojausasetukset (obfuskointi, domain-lukko, vesileima, ei raakalatausta)",
+      "card.protect": "🛡 Suojaus",
+      "card.removeServer": "🗑 Poista palvelimelta",
+      "detail.serverMgmt": "Hallinta palvelimella",
       "protect.title": "Kopiosuojaus",
       "protect.help": "Valinnainen, sovelluskohtainen. Nämä nostavat satunnaisen kopioinnin kustannusta ja tekevät vuodoista jäljitettäviä — ne eivät estä sovelluksen näkevää kopioimasta sen HTML:ää. Suojataksesi logiikan tai datan aidosti, siirrä se palvelinpuolen laajennukseen.",
       "protect.obfuscate": "Obfuskoi",
@@ -4034,6 +4024,7 @@
     view.hidden = false;
   }
   var ownServerApps = [];
+  var serverStateByFilename = {};
   function libStatus(e) {
     if (e.parked) return "parked";
     if (e.serverOnly) return "server";
@@ -4056,6 +4047,7 @@
     var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
     var byFilename = {};
     var entries = [];
+    serverStateByFilename = {};
     for (var i = 0; i < localApps.length; i++) {
       var la = localApps[i];
       var e = {
@@ -4091,6 +4083,7 @@
     for (var s = 0; s < serverApps.length; s++) {
       var sa = serverApps[s];
       var fn = sa.filename || "";
+      var prot = sa.manifest && sa.manifest.protection || {};
       var m = fn ? byFilename[fn] : null;
       if (m) {
         m.parked = !!sa.parked;
@@ -4099,6 +4092,7 @@
         m.versionNumber = sa.version_number || m.versionNumber;
         m.forkable = !!sa.forkable;
         m.forks = sa.forks || 0;
+        m.protection = prot;
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
@@ -4123,10 +4117,22 @@
           versionNumber: sa.version_number || null,
           viewUrl: base && fn ? base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
           forkable: !!sa.forkable,
-          forks: sa.forks || 0
+          forks: sa.forks || 0,
+          protection: prot
         };
         entries.push(se);
         if (fn) byFilename[fn] = se;
+      }
+      if (fn) {
+        serverStateByFilename[fn] = {
+          parked: !!sa.parked,
+          forkable: !!sa.forkable,
+          forks: sa.forks || 0,
+          owner: sa.owner || "",
+          versionNumber: sa.version_number || null,
+          protection: prot
+        };
+        ownAppProtection[fn] = prot;
       }
     }
     return entries;
@@ -4990,14 +4996,6 @@
       submitBtn.disabled = false;
     });
   }
-  var publishedVisible = true;
-  function togglePublished() {
-    publishedVisible = !publishedVisible;
-    var grid = document.getElementById("published-grid");
-    var arrow = document.getElementById("published-arrow");
-    grid.style.display = publishedVisible ? "" : "none";
-    arrow.classList.toggle("open", publishedVisible);
-  }
   var communityVisible = true;
   function toggleCommunity() {
     communityVisible = !communityVisible;
@@ -5005,14 +5003,6 @@
     var arrow = document.getElementById("community-arrow");
     grid.style.display = communityVisible ? "" : "none";
     arrow.classList.toggle("open", communityVisible);
-  }
-  var parkedVisible = true;
-  function toggleParked() {
-    parkedVisible = !parkedVisible;
-    var grid = document.getElementById("parked-grid");
-    var arrow = document.getElementById("parked-arrow");
-    grid.style.display = parkedVisible ? "" : "none";
-    arrow.classList.toggle("open", parkedVisible);
   }
   function switchView(view) {
     if (view !== "community") view = "library";
@@ -5625,15 +5615,9 @@
   function loadPublishedApps() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    var section = document.getElementById("published-section");
-    var grid = document.getElementById("published-grid");
-    var countEl = document.getElementById("published-count");
     var communitySection = document.getElementById("community-section");
     var communityGrid = document.getElementById("community-grid");
     var communityCountEl = document.getElementById("community-count");
-    var parkedSection = document.getElementById("parked-section");
-    var parkedGrid = document.getElementById("parked-grid");
-    var parkedCountEl = document.getElementById("parked-count");
     var currentOwner = null;
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
@@ -5708,32 +5692,26 @@
     var q = (searchQuery || "").toLowerCase();
     var at = activeTag;
     var filtering = !!(q || at !== null);
-    [
-      ["published-grid", "published-count", "published-section"],
-      ["community-grid", "community-count", "community-section"],
-      ["parked-grid", "parked-count", "parked-section"]
-    ].forEach(function(ids) {
-      var grid = document.getElementById(ids[0]);
-      if (!grid) return;
-      var cards = grid.querySelectorAll(".published-card");
-      if (!cards.length) return;
-      var shown = 0;
-      cards.forEach(function(card) {
-        var match = true;
-        if (at === "__favorites__") {
-          match = false;
-        } else if (at !== null) {
-          match = ("," + (card.getAttribute("data-tags") || "") + ",").indexOf("," + at.toLowerCase() + ",") !== -1;
-        }
-        if (match && q) match = (card.getAttribute("data-filter") || "").indexOf(q) !== -1;
-        card.style.display = match ? "" : "none";
-        if (match) shown++;
-      });
-      var countEl = document.getElementById(ids[1]);
-      if (countEl) countEl.textContent = "(" + shown + ")";
-      var sectionEl = document.getElementById(ids[2]);
-      if (sectionEl) sectionEl.style.display = filtering && shown === 0 ? "none" : "";
+    var grid = document.getElementById("community-grid");
+    if (!grid) return;
+    var cards = grid.querySelectorAll(".published-card");
+    if (!cards.length) return;
+    var shown = 0;
+    cards.forEach(function(card) {
+      var match = true;
+      if (at === "__favorites__") {
+        match = false;
+      } else if (at !== null) {
+        match = ("," + (card.getAttribute("data-tags") || "") + ",").indexOf("," + at.toLowerCase() + ",") !== -1;
+      }
+      if (match && q) match = (card.getAttribute("data-filter") || "").indexOf(q) !== -1;
+      card.style.display = match ? "" : "none";
+      if (match) shown++;
     });
+    var countEl = document.getElementById("community-count");
+    if (countEl) countEl.textContent = "(" + shown + ")";
+    var sectionEl = document.getElementById("community-section");
+    if (sectionEl) sectionEl.style.display = filtering && shown === 0 ? "none" : "";
   }
   function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
     if (!section || !grid || !countEl) return;
@@ -6083,11 +6061,20 @@
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
     var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : '<button class="dtl-btn" onclick="window._launcher.detailEditSource()">' + t("ctx.viewSource") + "</button>") + (isUrlApp ? "" : '<button class="dtl-btn" onclick="window._launcher.detailImproveExternal()">' + t("ctx.improveAi") + "</button>") + '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t("ctx.sharePrompt") + "</button>" + (isUrlApp ? "" : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + "</button>") + (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailSetScreenshot()" title="Upload a custom thumbnail for this app">📷 ' + t("detail.setScreenshot") + "</button>" : "") + (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailRefreshScreenshot()" title="Clear the screenshot; the node re-takes it on its next scheduled run">🔄 ' + t("detail.refreshScreenshot") + "</button>" : "") + '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t("ctx.delete") + "</button></div></div>";
+    var mgmtHtml = "";
+    var svrState = app.publishedFilename && serverStateByFilename[app.publishedFilename] || null;
+    if (app.published && app.publishedFilename && svrState && !isUrlApp) {
+      var fnArg = jsArg(app.publishedFilename);
+      var ownerArg2 = jsArg(svrState.owner || "");
+      var p = svrState.protection || {};
+      var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+      mgmtHtml = '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', false)" title="` + escapeHtml(t("card.unparkHint")) + '">' + t("card.unpark") + "</button>" : `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', true)" title="` + escapeHtml(t("card.parkHint")) + '">' + t("card.park") + "</button>") + `<button class="dtl-btn" onclick="window._launcher.toggleForkApp('` + fnArg + "', " + (svrState.forkable ? "false" : "true") + ')" title="' + escapeHtml(t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint")) + '">' + t(svrState.forkable ? "card.forkableOn" : "card.forkableOff") + `</button><button class="dtl-btn" onclick="window._launcher.showProtectionModal('` + fnArg + `')" title="` + escapeHtml(t("card.protectHint")) + '">' + (anyProt ? "🛡✓ " + t("card.protect") : t("card.protect")) + `</button><button class="dtl-btn" onclick="window._launcher.showVersionsModal('` + ownerArg2 + "', '" + fnArg + `')">` + t("card.versions") + `</button><button class="dtl-btn danger" onclick="window._launcher.deleteServerApp('` + fnArg + `')">` + t("card.removeServer") + "</button></div></div>";
+    }
     var skillsHtml = "";
     if (app.published) {
       skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div></div>";
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
   }
   function detailLoadSkills(owner, filename) {
     var config = loadConfig();
@@ -7463,9 +7450,7 @@
     showPublishModal,
     submitPublish,
     loadPublishedApps,
-    togglePublished,
     toggleCommunity,
-    toggleParked,
     switchView,
     switchDbMode,
     unpublishApp,
