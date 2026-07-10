@@ -3270,6 +3270,39 @@
     }
   };
 
+  // src/static/app-catalog/js/i18n.js
+  var currentLang = "en";
+  function getLang() {
+    return currentLang;
+  }
+  function setLang(lang) {
+    currentLang = lang === "fi" ? "fi" : "en";
+  }
+  function t(key) {
+    var table = I18N[currentLang] || I18N.en;
+    if (table[key] != null) return table[key];
+    if (I18N.en[key] != null) return I18N.en[key];
+    return key;
+  }
+  function applyI18n() {
+    var i, nodes;
+    nodes = document.querySelectorAll("[data-i18n]");
+    for (i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute("data-i18n"));
+    nodes = document.querySelectorAll("[data-i18n-ph]");
+    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute("placeholder", t(nodes[i].getAttribute("data-i18n-ph")));
+    nodes = document.querySelectorAll("[data-i18n-title]");
+    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute("title", t(nodes[i].getAttribute("data-i18n-title")));
+    document.documentElement.lang = currentLang;
+    document.title = t("header.title") + " — AIMEAT";
+    updateLangToggle();
+  }
+  function updateLangToggle() {
+    var btns = document.querySelectorAll("#lang-toggle .lang-btn");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle("active", btns[i].getAttribute("data-lang") === currentLang);
+    }
+  }
+
   // src/static/app-catalog/js/util.js
   function escapeHtml(str) {
     var div = document.createElement("div");
@@ -3503,36 +3536,11 @@
   }
 
   // src/static/app-catalog/js/main.js
-  var currentLang = "en";
-  function t(key) {
-    var table = I18N[currentLang] || I18N.en;
-    if (table[key] != null) return table[key];
-    if (I18N.en[key] != null) return I18N.en[key];
-    return key;
-  }
-  function applyI18n() {
-    var i, nodes;
-    nodes = document.querySelectorAll("[data-i18n]");
-    for (i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute("data-i18n"));
-    nodes = document.querySelectorAll("[data-i18n-ph]");
-    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute("placeholder", t(nodes[i].getAttribute("data-i18n-ph")));
-    nodes = document.querySelectorAll("[data-i18n-title]");
-    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute("title", t(nodes[i].getAttribute("data-i18n-title")));
-    document.documentElement.lang = currentLang;
-    document.title = t("header.title") + " — AIMEAT";
-    updateLangToggle();
-  }
-  function updateLangToggle() {
-    var btns = document.querySelectorAll("#lang-toggle .lang-btn");
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle("active", btns[i].getAttribute("data-lang") === currentLang);
-    }
-  }
   function setLanguage(lang) {
-    currentLang = lang === "fi" ? "fi" : "en";
+    setLang(lang);
     try {
       var config = loadConfig();
-      config.language = currentLang;
+      config.language = getLang();
       saveConfig(config);
     } catch (e) {
     }
@@ -4635,7 +4643,7 @@
   function openSettings() {
     var config = loadConfig();
     document.getElementById("setting-theme").value = config.theme || "light";
-    document.getElementById("setting-language").value = currentLang;
+    document.getElementById("setting-language").value = getLang();
     document.getElementById("setting-open-mode").value = config.defaultOpenMode || "tab";
     document.getElementById("setting-aimeat-url").value = config.aimeatUrl || "";
     document.getElementById("settings-overlay").hidden = false;
@@ -7339,7 +7347,7 @@
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var base = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base + "/v1/app-templates?lang=" + encodeURIComponent(currentLang)).then(function(r) {
+    fetch(base + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var list = (d.data && d.data.templates || []).filter(function(t2) {
@@ -7382,7 +7390,7 @@
     var description = document.getElementById("pb-description").value.trim();
     var prompt2 = "";
     var PB_LANGS = { en: "English", fi: "Finnish (Suomi)" };
-    var pbLang = PB_LANGS[currentLang] || "English";
+    var pbLang = PB_LANGS[getLang()] || "English";
     prompt2 += "Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in " + pbLang + ". These build instructions are in English, but converse with me and build the app interface in " + pbLang + ".\n\n";
     var isImprove = mode === "improve" && pbSourceApp;
     if (isImprove) {
@@ -7727,7 +7735,7 @@
     }
     var _params = new URLSearchParams(location.search);
     var _urlLang = _params.get("lang");
-    currentLang = _urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en";
+    setLang(_urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en");
     applyI18n();
     updateModeToggle();
     var _savedView = "library";
