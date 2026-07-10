@@ -6,7 +6,7 @@
     opaque-origin iframe — never as a top-level document on the apex origin (H-2).
   @structure Inline <style>__APP_CATALOG_STYLES__</style>
 </head>
-<body>
+<body data-active-view="library">
 
   <header>
     <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
@@ -39,10 +39,17 @@
     </div>
   </header>
 
+  <!-- Two views: Kirjasto (your apps: local + published + parked) vs Yhteisö (community).
+       Sections carry data-view; body[data-active-view] hides the inactive one via CSS. -->
+  <nav id="view-tabs" class="view-tabs" role="tablist">
+    <button id="view-tab-library" class="view-tab active" role="tab" onclick="window._launcher.switchView('library')" data-i18n="view.library">&#x1F4DA; Library</button>
+    <button id="view-tab-community" class="view-tab" role="tab" onclick="window._launcher.switchView('community')" data-i18n="view.community">&#x1F30D; Community</button>
+  </nav>
+
   <nav id="tag-bar"></nav>
 
   <!-- Server-published apps missing locally — import is ALWAYS user-selected -->
-  <div id="server-import-banner" class="server-import-banner" style="display:none">
+  <div id="server-import-banner" class="server-import-banner" data-view="library" style="display:none">
     <span>&#x1F4E5; <strong id="server-import-count">0</strong> <span data-i18n="srvImport.bannerText">published apps from your account are not in this catalog.</span></span>
     <div class="server-import-banner-actions">
       <button class="modal-btn primary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.review">Review &amp; import...</button>
@@ -51,7 +58,7 @@
   </div>
 
   <!-- Active Extensions Bar -->
-  <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
+  <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
       <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem">&#x25BC; <span data-i18n="common.toggle">toggle</span></button>
@@ -92,7 +99,7 @@
   </div>
 
   <!-- Published Apps Section (own) -->
-  <div id="published-section" style="display:none">
+  <div id="published-section" data-view="library" style="display:none">
     <div class="published-header" onclick="window._launcher.togglePublished()">
       <h2><span data-i18n="sec.published">&#x1F680; Published Apps</span> <span id="published-count"></span></h2>
       <span class="arrow open" id="published-arrow">&#x25BC;</span>
@@ -101,7 +108,7 @@
   </div>
 
   <!-- Parked Apps Section (own, hidden from the public catalogue) -->
-  <div id="parked-section" style="display:none">
+  <div id="parked-section" data-view="library" style="display:none">
     <div class="published-header" onclick="window._launcher.toggleParked()">
       <h2><span data-i18n="sec.parked">&#x1F17F;&#xFE0F; Parked Apps</span> <span id="parked-count"></span></h2>
       <span class="arrow open" id="parked-arrow">&#x25BC;</span>
@@ -111,7 +118,7 @@
   </div>
 
   <!-- Community Apps Section (other users) -->
-  <div id="community-section" style="display:none">
+  <div id="community-section" data-view="community" style="display:none">
     <div class="published-header" onclick="window._launcher.toggleCommunity()">
       <h2><span data-i18n="sec.community">&#x1F30D; Community Apps</span> <span id="community-count"></span></h2>
       <span class="arrow open" id="community-arrow">&#x25BC;</span>
@@ -119,13 +126,19 @@
     <div id="community-grid" class="published-grid"></div>
   </div>
 
+  <!-- Empty state for the Community view (shown only when the community view is active and has no apps) -->
+  <div id="community-empty" data-view="community" class="view-empty" style="display:none">
+    <p data-i18n="view.communityEmpty">No community apps on this node yet.</p>
+    <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
+  </div>
+
   <!-- Recently Opened Strip -->
-  <div id="recent-section" style="display:none;margin:0 24px 1rem">
+  <div id="recent-section" data-view="library" style="display:none;margin:0 24px 1rem">
     <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted)" data-i18n="sec.recent">&#x1F552; Recently Opened</h3>
     <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
-  <div id="local-apps-block" class="local-apps-block">
+  <div id="local-apps-block" class="local-apps-block" data-view="library">
     <div id="local-apps-header" style="display:none">
       <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4BE; Local Apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
       <p class="local-apps-note" data-i18n="sec.localNote">(these apps live in your browser, not on the server — they won't show up on another browser or device)</p>

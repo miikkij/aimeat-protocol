@@ -1914,4 +1914,46 @@
     .pb-step-hint { font-size: .8rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 12px; }
     .pb-improving { font-size: .85rem; font-weight: 600; color: #E8564A; margin: 0 0 12px; }
     .pb-step-btn { width: 100%; justify-content: center; }
+
+    /* ── Two-view tabs: Kirjasto (your apps) / Yhteisö (community) ──────────────
+       Sections carry data-view; body[data-active-view] hides the inactive one.
+       Fixed-position modals/overlays have no data-view, so they are never hidden. */
+    .view-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 16px 24px 4px;
+      position: relative;
+      z-index: 1;
+    }
+    .view-tab {
+      appearance: none;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      color: var(--text-muted);
+      font: inherit;
+      font-weight: 600;
+      font-size: .9rem;
+      padding: 8px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .view-tab:hover { background: var(--hover); color: var(--text); }
+    .view-tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    body[data-active-view="community"] [data-view="library"] { display: none !important; }
+    body[data-active-view="library"]   [data-view="community"] { display: none !important; }
+    .view-empty {
+      margin: 8px 24px 24px;
+      padding: 40px 24px;
+      text-align: center;
+      background: var(--bg-subtle);
+      border: 1px dashed var(--border-subtle);
+      border-radius: 14px;
+    }
+    .view-empty p { margin: 0 0 6px; font-size: 1rem; font-weight: 600; color: var(--text); }
+    .view-empty .view-empty-hint { font-size: .85rem; font-weight: 400; color: var(--text-muted); max-width: 460px; margin: 0 auto; line-height: 1.5; }
   
