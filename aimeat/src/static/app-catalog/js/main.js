@@ -2446,7 +2446,29 @@ import { I18N } from './i18n-data.js';
   function toggleBackupMenu(event) {
     if (event && event.stopPropagation) event.stopPropagation();
     var menu = document.getElementById('backup-menu');
+    var create = document.getElementById('create-menu');
+    if (create) create.hidden = true;
     menu.hidden = !menu.hidden;
+  }
+
+  // Create menu (Add app / Generate with AI / Generate homepage grouped under one +).
+  function toggleCreateMenu(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    var menu = document.getElementById('create-menu');
+    var backup = document.getElementById('backup-menu');
+    if (backup) backup.hidden = true;
+    menu.hidden = !menu.hidden;
+  }
+  function closeCreateMenu() { var m = document.getElementById('create-menu'); if (m) m.hidden = true; }
+
+  // Active Extensions bar: collapsed by default, expand/collapse the chip grid (declutters Library).
+  function toggleCortexBar() {
+    var grid = document.getElementById('cortex-bar-grid');
+    var arrow = document.getElementById('cortex-bar-arrow');
+    if (!grid) return;
+    var open = grid.style.display === 'none';
+    grid.style.display = open ? 'flex' : 'none';
+    if (arrow) arrow.innerHTML = open ? '▼' : '▶';
   }
 
   function backupApiBase() {
@@ -5220,6 +5242,8 @@ import { I18N } from './i18n-data.js';
     serverImportSelectAll: serverImportSelectAll,
     submitServerImport: submitServerImport,
     toggleBackupMenu: toggleBackupMenu,
+    toggleCreateMenu: toggleCreateMenu,
+    toggleCortexBar: toggleCortexBar,
     exportBackupZip: exportBackupZip,
     importBackupPick: importBackupPick,
     backupSelectAll: backupSelectAll,
@@ -5340,11 +5364,13 @@ import { I18N } from './i18n-data.js';
     // ── Add App button ──────────────────────────────
     // Step 0: not signed in → open the sign-in/register dialog first, then the Add dialog.
     document.getElementById('add-btn').addEventListener('click', function () {
+      closeCreateMenu();
       requireSignInThen(showModal);
     });
 
     // ── Generate with AI button ─────────────────────
     document.getElementById('generate-btn').addEventListener('click', function () {
+      closeCreateMenu();
       openPromptBuilder(null);
     });
 
@@ -5429,6 +5455,10 @@ import { I18N } from './i18n-data.js';
       var menu = document.getElementById('backup-menu');
       if (!menu.hidden && !menu.contains(e.target) && e.target.id !== 'backup-btn') {
         menu.hidden = true;
+      }
+      var cmenu = document.getElementById('create-menu');
+      if (cmenu && !cmenu.hidden && !cmenu.contains(e.target) && e.target.id !== 'create-btn') {
+        cmenu.hidden = true;
       }
     });
 
@@ -5828,7 +5858,7 @@ import { I18N } from './i18n-data.js';
     document.getElementById('close-source-btn').addEventListener('click', closeSourceModal);
 
     // ── Homepage button ──────────────────────────────
-    document.getElementById('homepage-btn').addEventListener('click', generateHomepagePrompt);
+    document.getElementById('homepage-btn').addEventListener('click', function () { closeCreateMenu(); generateHomepagePrompt(); });
 
     // ── Prompt Builder event listeners ───────────────
     document.getElementById('pb-cancel-btn').addEventListener('click', closePbPanel);
