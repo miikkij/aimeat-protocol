@@ -3780,6 +3780,1023 @@
     return html;
   }
 
+  // src/static/app-catalog/js/detail.js
+  var refreshAll;
+  var loadPublishedApps;
+  var renderApps;
+  var updateModeToggle;
+  var getCortexOwnerToken;
+  var launchApp;
+  var viewPublished;
+  var viewSource;
+  var generateId;
+  var generateSharePrompt;
+  var openPromptBuilder;
+  var showPublishModal;
+  var addImportIgnore;
+  var removeImportIgnore;
+  var getMainApps;
+  var getServerState;
+  var getServerManifests;
+  var getOwnProtection;
+  var setIframeUrl;
+  function initDetail(deps) {
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+  }
+  var detailAppId = null;
+  var detailDraftBlob = null;
+  var detailAiAvailable = false;
+  var detailVersionsHtml = null;
+  var detailSkillsHtml = null;
+  var detailEditingAbout = false;
+  var detailEditAboutOnOpen = false;
+  function detailGetApp() {
+    for (var i = 0; i < getMainApps().length; i++) {
+      if (getMainApps()[i].id === detailAppId) return getMainApps()[i];
+    }
+    return null;
+  }
+  function detailServerOwner(app) {
+    var sess = currentOwnerName();
+    var stored = app && app.aimeatOwner || "";
+    if (!stored) {
+      var pu = app && (app.publishedUrl || app.viewUrl) || "";
+      var mm = pu.match(/\/v1\/apps\/([^/]+)\//);
+      stored = mm ? decodeURIComponent(mm[1]) : "";
+    }
+    if (sess && (!stored || stored === "anonymous" || stored === sess)) return sess;
+    return stored;
+  }
+  function blobToHtml(blob) {
+    try {
+      return decodeURIComponent(escape(atob(blob)));
+    } catch (e) {
+      return "";
+    }
+  }
+  function htmlToBlob(html) {
+    return btoa(unescape(encodeURIComponent(html)));
+  }
+  function serverMgmtInner(app) {
+    if (!app) return "";
+    var isUrlApp = app.source === "url" && !app.blob;
+    var svrState = app.publishedFilename && getServerState()[app.publishedFilename] || null;
+    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return "";
+    var fnArg = jsArg(app.publishedFilename);
+    var ownerArg2 = jsArg(svrState.owner || "");
+    var p = svrState.protection || {};
+    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div></div>";
+  }
+  function refreshServerMgmt() {
+    var c = document.getElementById("detail-server-mgmt");
+    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
+  }
+  function openDetailView(appId) {
+    detailAppId = appId;
+    detailDraftBlob = null;
+    detailVersionsHtml = null;
+    detailSkillsHtml = null;
+    detailEditingAbout = false;
+    var app = detailGetApp();
+    if (!app) return;
+    document.getElementById("detail-view").hidden = false;
+    renderDetailView();
+    detailCheckAiAvailability();
+    var owner = currentOwnerName();
+    if (app.published && app.publishedFilename && owner) {
+      detailLoadVersions(owner, app.publishedFilename);
+      detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
+    }
+    if (detailEditAboutOnOpen) {
+      detailEditAboutOnOpen = false;
+      detailAboutEdit();
+    }
+  }
+  function editAppDetails(owner, filename, localId, versionNumber) {
+    detailEditAboutOnOpen = true;
+    openPublishedDetail(owner, filename, localId, versionNumber);
+  }
+  function closeDetailView() {
+    document.getElementById("detail-view").hidden = true;
+    detailAppId = null;
+    detailDraftBlob = null;
+  }
+  function detailLaunch() {
+    var app = detailGetApp();
+    if (!app) return;
+    if (app.published && (app.publishedUrl || app.publishedFilename)) {
+      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      var url;
+      if (app.publishedUrl) {
+        url = base + app.publishedUrl;
+      } else {
+        var st = getServerState()[app.publishedFilename] || {};
+        var owner = st.owner || currentOwnerName() || "";
+        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+      }
+      viewPublished(url + "?mode=inline", app.name);
+    } else {
+      launchApp(app.id, app.openMode || "tab");
+    }
+  }
+  function loadScriptOnce(src) {
+    return new Promise(function(resolve, reject) {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function() {
+        resolve();
+      };
+      s.onerror = function() {
+        reject(new Error("failed to load " + src));
+      };
+      document.head.appendChild(s);
+    });
+  }
+  function onAuthChanged() {
+    if (getDbMode() === "personal" && !currentOwnerName()) {
+      setDbMode("global");
+    }
+    closeDbInstance();
+    updateModeToggle();
+    try {
+      refreshAll();
+    } catch (e) {
+      try {
+        loadPublishedApps();
+      } catch (e2) {
+      }
+    }
+    var sub = document.getElementById("publish-submit-btn");
+    var st = document.getElementById("publish-status");
+    if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
+      if (getCortexOwnerToken()) {
+        sub.disabled = false;
+        if (st) st.textContent = "";
+      } else {
+        sub.disabled = true;
+        if (st) {
+          st.textContent = t("publish.loginRequired");
+          st.style.color = "var(--accent)";
+        }
+      }
+    }
+  }
+  async function mountLoginPill() {
+    try {
+      await loadScriptOnce("/v1/libs/aimeat-auth.js");
+      if (window.AIMEAT && window.AIMEAT.auth) {
+        try {
+          await window.AIMEAT.auth.login();
+        } catch (e) {
+        }
+        if (window.AIMEAT.auth.mountLoginButton) {
+          window.AIMEAT.auth.mountLoginButton("#headerAuth", {
+            onLogin: onAuthChanged,
+            onLogout: onAuthChanged,
+            i18n: {
+              loggedIn: t("auth.loggedIn"),
+              signInBtn: t("auth.signIn"),
+              logoutBtn: t("auth.logout")
+            }
+          });
+        }
+      }
+    } catch (e) {
+    }
+  }
+  function fmtSize(bytes) {
+    if (!bytes) return "—";
+    return bytes < 1024 ? bytes + " B" : bytes < 1048576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1048576).toFixed(1) + " MB";
+  }
+  function renderDetailView() {
+    var app = detailGetApp();
+    if (!app) return;
+    var config = loadConfig();
+    var hasServer = !!config.aimeatUrl;
+    var icon = app.icon || "📝";
+    var isUrlApp = app.source === "url" && !app.blob;
+    var canEditAbout = !!app.id && !isUrlApp;
+    document.getElementById("detail-title").innerHTML = '<span style="font-size:1.3rem">' + escapeHtml(icon) + "</span> " + escapeHtml(app.name || "App") + (canEditAbout && !detailEditingAbout ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t("detail.editDetails")) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : "");
+    var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0;
+    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : app.published ? "v?" : t("detail.notPublished");
+    var syncClass, syncText;
+    if (!app.published) {
+      syncClass = "none";
+      syncText = t("detail.notPublished");
+    } else if (detailDraftBlob) {
+      syncClass = "diff";
+      syncText = t("detail.localNewer");
+    } else {
+      syncClass = "ok";
+      syncText = t("detail.inSync");
+    }
+    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    var shotOwner = detailServerOwner(app);
+    var shotFile = app.publishedFilename || "";
+    var shotUrl = app.published && shotOwner && shotFile && aimeatBase ? aimeatBase + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
+    var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
+    var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
+    var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
+    var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
+    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
+    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + "</span>" + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</h3>";
+    var aboutBody;
+    if (detailEditingAbout) {
+      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
+    } else {
+      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.openModeLabel"), app.openMode || "tab") + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
+      (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
+    }
+    var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
+    var aiHtml = '<div class="dtl-section"><h3>' + t("detail.editAi") + '</h3><p class="dtl-desc">' + t("detail.editAiHint") + "</p>";
+    if (isUrlApp) {
+      aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
+    } else {
+      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.test"), "window._launcher.detailAiTest()") + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()", { variant: "success" }) + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
+    }
+    aiHtml += "</div>";
+    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
+    var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
+    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
+    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
+    var skillsHtml = "";
+    if (app.published) {
+      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div></div>";
+    }
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
+  }
+  function detailLoadSkills(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t("detail.noSkills") || "No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.") + "</span>";
+    var skillHeaders = {};
+    try {
+      var jwt = window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt || JSON.parse(localStorage.getItem("aimeat_session") || "{}").jwt;
+      if (jwt) skillHeaders["Authorization"] = "Bearer " + jwt;
+    } catch (e) {
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/skills", { headers: skillHeaders }).then(function(resp) {
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var listEl = document.getElementById("detail-skills-list");
+      var skills = json.data && json.data.skills ? json.data.skills : [];
+      if (skills.length === 0) {
+        detailSkillsHtml = noneHtml;
+        if (listEl) listEl.innerHTML = detailSkillsHtml;
+        return;
+      }
+      var out = "";
+      for (var i = 0; i < skills.length; i++) {
+        var s = skills[i];
+        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + '</span><div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
+      }
+      detailSkillsHtml = out;
+      if (listEl) listEl.innerHTML = detailSkillsHtml;
+    }).catch(function() {
+      detailSkillsHtml = noneHtml;
+      var listEl = document.getElementById("detail-skills-list");
+      if (listEl) listEl.innerHTML = detailSkillsHtml;
+    });
+  }
+  function detailAboutEdit() {
+    if (!detailGetApp()) return;
+    detailEditingAbout = true;
+    renderDetailView();
+    var nameEl = document.getElementById("detail-name-input");
+    if (nameEl) {
+      nameEl.focus();
+      nameEl.select();
+    }
+  }
+  function detailAboutCancel() {
+    detailEditingAbout = false;
+    renderDetailView();
+  }
+  function detailAboutSave() {
+    var app = detailGetApp();
+    if (!app) return;
+    var nameEl = document.getElementById("detail-name-input");
+    var descEl = document.getElementById("detail-desc-input");
+    var newName = nameEl ? nameEl.value.trim() : "";
+    var newDesc = descEl ? descEl.value.trim() : "";
+    if (!newName) {
+      showNotice(t("detail.nameRequired") || "Name cannot be empty.");
+      if (nameEl) nameEl.focus();
+      return;
+    }
+    if (app.published && !newDesc) {
+      showNotice(t("detail.descRequired") || "Description cannot be empty.");
+      if (descEl) descEl.focus();
+      return;
+    }
+    function finishLocal() {
+      app.name = newName;
+      app.description = newDesc;
+      saveApp(app).then(function() {
+        detailEditingAbout = false;
+        renderApps();
+        loadPublishedApps();
+        renderDetailView();
+      });
+    }
+    if (!app.published || !app.publishedFilename) {
+      finishLocal();
+      return;
+    }
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName, description: newDesc })
+    }).then(function(resp) {
+      return resp.json().then(function(j) {
+        return { ok: resp.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok && res.j && res.j.ok !== false) {
+        var key = owner + "\n" + filename;
+        getServerManifests()[key] = getServerManifests()[key] || {};
+        getServerManifests()[key].name = newName;
+        getServerManifests()[key].description = newDesc;
+        finishLocal();
+      } else {
+        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
+      }
+    }).catch(function(err) {
+      showNotice("Error: " + (err.message || err));
+    });
+  }
+  function detailSetScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || "";
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || "";
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
+    }
+    var owner = detailServerOwner(app);
+    var token = getCortexOwnerToken();
+    if (!owner || !filename) {
+      showNotice("Publish the app first, then you can set a screenshot.");
+      return;
+    }
+    if (!token) {
+      showNotice("Sign in to set a screenshot.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    if (!aimeatUrl) {
+      showNotice("No server configured.");
+      return;
+    }
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = function() {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showNotice("Image too large (max 2 MB).");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function() {
+        var s = String(reader.result);
+        var base64 = s.indexOf(",") >= 0 ? s.slice(s.indexOf(",") + 1) : s;
+        fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ screenshot: base64, screenshot_mime_type: file.type || "image/png" })
+        }).then(function(r) {
+          return r.json().then(function(j) {
+            return { ok: r.ok, j };
+          });
+        }).then(function(res) {
+          if (res.ok) {
+            showNotice("Screenshot set. It will show in the catalogue and on the landing wall.");
+          } else {
+            showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
+          }
+        }).catch(function(e) {
+          showNotice("Failed: " + e.message);
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+  async function detailRefreshScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || "";
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || "";
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
+    }
+    var owner = detailServerOwner(app);
+    var token = getCortexOwnerToken();
+    if (!owner || !filename) {
+      showNotice("Publish the app first, then you can refresh its screenshot.");
+      return;
+    }
+    if (!token) {
+      showNotice("Sign in to refresh the screenshot.");
+      return;
+    }
+    if (!await showConfirm(t("confirm.clearScreenshot"))) return;
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    if (!aimeatUrl) {
+      showNotice("No server configured.");
+      return;
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        return { ok: r.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok) {
+        showNotice(res.j.data && res.j.data.note || "Screenshot cleared. A fresh one will be taken on the next scheduled run.");
+      } else {
+        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
+      }
+    }).catch(function(e) {
+      showNotice("Failed: " + e.message);
+    });
+  }
+  function metaItem(label, val) {
+    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
+  }
+  function detailAiUnavailableMsg() {
+    return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
+  }
+  function detailCheckAiAvailability() {
+    detailAiAvailable = false;
+    var config = loadConfig();
+    var token = getCortexOwnerToken();
+    if (!config.aimeatUrl || !token) {
+      renderDetailView();
+      return;
+    }
+    var url = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(url + "/v1/openrouter/settings", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
+      if (detailAppId) renderDetailView();
+    }).catch(function() {
+      detailAiAvailable = false;
+      if (detailAppId) renderDetailView();
+    });
+  }
+  function detailLoadVersions(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var listEl = document.getElementById("detail-versions-list");
+      if (!listEl) return;
+      var versions = json.data && json.data.versions ? json.data.versions : [];
+      if (versions.length === 0) {
+        detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
+        listEl.innerHTML = detailVersionsHtml;
+        return;
+      }
+      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var html = "";
+      for (var i = 0; i < versions.length; i++) {
+        var v = versions[i];
+        var isLatest = i === 0;
+        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
+        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
+      }
+      detailVersionsHtml = html;
+      listEl.innerHTML = html;
+    }).catch(function() {
+      detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
+      var listEl = document.getElementById("detail-versions-list");
+      if (listEl) listEl.innerHTML = detailVersionsHtml;
+    });
+  }
+  function extractHtmlFromAi(content) {
+    if (!content) return null;
+    var text = String(content).trim();
+    var fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    if (fence && fence[1]) text = fence[1].trim();
+    var lower = text.toLowerCase();
+    var startDoc = lower.indexOf("<!doctype");
+    var startHtml = lower.indexOf("<html");
+    var start = startDoc !== -1 ? startDoc : startHtml;
+    if (start === -1) {
+      if (text.indexOf("<") !== -1 && text.indexOf(">") !== -1 && text.length > 30) return text;
+      return null;
+    }
+    return text.slice(start);
+  }
+  function detailAiRun() {
+    var app = detailGetApp();
+    if (!app) return;
+    var inputEl = document.getElementById("detail-ai-input");
+    var statusEl = document.getElementById("detail-ai-status");
+    var runBtn = document.getElementById("detail-ai-run");
+    var change = (inputEl.value || "").trim();
+    if (!change) {
+      inputEl.focus();
+      return;
+    }
+    var token = getCortexOwnerToken();
+    if (!token) {
+      statusEl.textContent = t("detail.aiLoginNeeded");
+      return;
+    }
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      statusEl.textContent = t("detail.aiUnavailable");
+      return;
+    }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var html = app.blob ? blobToHtml(app.blob) : "";
+    if (!html) {
+      statusEl.textContent = t("detail.urlCantEdit");
+      return;
+    }
+    var systemPrompt = "You are editing a single-file HTML web app that runs on the AIMEAT platform. You will be given the current full HTML source and a change request. Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. Preserve every existing AIMEAT integration (script tags loading /v1/libs/*, AIMEAT.* API calls, cortex extension scripts) unless the change specifically requires altering them. Keep the result a single self-contained file that supports both light and dark themes.";
+    var userPrompt = "Change request:\n" + change + "\n\nCurrent HTML source:\n" + html;
+    runBtn.disabled = true;
+    statusEl.style.color = "var(--text-muted)";
+    statusEl.textContent = t("detail.running");
+    fetch(aimeatUrl + "/v1/ai/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({
+        prompt: userPrompt,
+        systemPrompt,
+        app_id: "app-catalog"
+      })
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      runBtn.disabled = false;
+      if (!json || !json.ok) {
+        var code = json && json.error && json.error.code || "";
+        var msg = json && json.error && json.error.message || "AI request failed";
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (code ? "[" + code + "] " : "") + msg;
+        return;
+      }
+      var content = json.data && json.data.content ? json.data.content : "";
+      var newHtml = extractHtmlFromAi(content);
+      if (!newHtml) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.aiNoHtml");
+        return;
+      }
+      detailDraftBlob = htmlToBlob(newHtml);
+      statusEl.style.color = "#34d399";
+      var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== "undefined" ? " · " + t("detail.aiUsage") + ": $" + Number(json.data.budget.spent_today_usd).toFixed(3) : "";
+      statusEl.textContent = "✔ " + t("detail.draftReady") + usage;
+      renderDetailView();
+      var s2 = document.getElementById("detail-ai-status");
+      if (s2) {
+        s2.style.color = "#34d399";
+        s2.textContent = "✔ " + t("detail.draftReady") + usage;
+      }
+    }).catch(function(err) {
+      runBtn.disabled = false;
+      statusEl.style.color = "var(--accent)";
+      statusEl.textContent = "✘ " + (err.message || "AI request failed");
+    });
+  }
+  function detailAiTest() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    var view = document.getElementById("iframe-view");
+    var iframe = document.getElementById("app-iframe");
+    var title = document.getElementById("iframe-title");
+    title.textContent = (app.name || "App") + " (draft)";
+    iframe.removeAttribute("src");
+    iframe.srcdoc = blobToHtml(detailDraftBlob);
+    setIframeUrl("");
+    delete iframe.dataset.appId;
+    view.hidden = false;
+  }
+  function detailAiKeep() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    app.blob = detailDraftBlob;
+    app.source = app.source === "url" ? "paste" : app.source || "paste";
+    app.url = app.url || null;
+    detailDraftBlob = null;
+    saveApp(app).then(function() {
+      renderApps();
+      renderDetailView();
+      var s2 = document.getElementById("detail-ai-status");
+      if (s2) {
+        s2.style.color = "#34d399";
+        s2.textContent = "✔ " + t("detail.kept");
+      }
+    });
+  }
+  function detailAiDiscard() {
+    detailDraftBlob = null;
+    renderDetailView();
+    var s2 = document.getElementById("detail-ai-status");
+    if (s2) s2.textContent = t("detail.discarded");
+  }
+  function detailEditSource() {
+    var app = detailGetApp();
+    if (app) viewSource(app);
+  }
+  function detailImproveExternal() {
+    var app = detailGetApp();
+    if (app) openPromptBuilder(app);
+  }
+  function detailSharePrompt() {
+    var app = detailGetApp();
+    if (app) generateSharePrompt(app);
+  }
+  function detailPublish() {
+    if (detailAppId) showPublishModal(detailAppId);
+  }
+  async function detailDelete() {
+    var app = detailGetApp();
+    if (!app) return;
+    if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
+      return app.name || "this app";
+    }))) return;
+    if (app.publishedFilename) addImportIgnore(app.publishedFilename);
+    var id = app.id;
+    deleteApp(id).then(function() {
+      closeDetailView();
+      renderApps();
+      loadPublishedApps();
+    });
+  }
+  function openPublishedDetail(owner, filename, localId, versionNumber) {
+    if (localId) {
+      openDetailView(localId);
+      return;
+    }
+    for (var i = 0; i < getMainApps().length; i++) {
+      if (getMainApps()[i].publishedFilename === filename) {
+        openDetailView(getMainApps()[i].id);
+        return;
+      }
+    }
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      showNotice("Set the AIMEAT server URL in Settings first");
+      return;
+    }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
+      var app = {
+        id: generateId(),
+        name: meta.name || filename.replace(/\.html?$/i, ""),
+        description: meta.description || "",
+        category: meta.category || "utility",
+        tags: meta.tags || [],
+        usesCortex: meta.usesCortex || [],
+        forkedFrom: meta.forkedFrom || null,
+        icon: meta.icon || "📝",
+        source: "aimeat",
+        url: null,
+        blob: b64,
+        favorite: false,
+        openMode: "tab",
+        addedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastOpenedAt: null,
+        published: true,
+        publishedFilename: filename,
+        publishedUrl: "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename),
+        publishedVersionNumber: versionNumber || 1,
+        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        aimeatOwner: owner,
+        aimeatFilename: filename
+      };
+      removeImportIgnore(filename);
+      return saveApp(app).then(function() {
+        getMainApps().push(app);
+        renderApps();
+        loadPublishedApps();
+        openDetailView(app.id);
+      });
+    }).catch(function(err) {
+      showNotice("Could not load the published app: " + (err.message || err));
+    });
+  }
+  function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
+    var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
+    var token = getCortexOwnerToken();
+    var headers = token ? { "Authorization": "Bearer " + token } : {};
+    return fetch(url, { headers }).then(function(resp) {
+      if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
+      return resp.arrayBuffer();
+    }).then(function(buf) {
+      var bytes = new Uint8Array(buf);
+      var binary = "";
+      var chunk = 32768;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    });
+  }
+  function showLineageModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    if (!aimeatUrl) {
+      showNotice("Set AIMEAT server URL in Settings first");
+      return;
+    }
+    document.getElementById("lineage-title").textContent = filename;
+    var summaryEl = document.getElementById("lineage-summary");
+    var statusEl = document.getElementById("lineage-status");
+    var treeEl = document.getElementById("lineage-tree");
+    summaryEl.textContent = "";
+    statusEl.textContent = t("lineage.loading") || "Loading lineage…";
+    statusEl.style.color = "var(--text-muted)";
+    treeEl.innerHTML = "";
+    document.getElementById("lineage-overlay").hidden = false;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/lineage").then(function(resp) {
+      if (!resp.ok) throw new Error("Server returned " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var d = json.data || {};
+      var nodes = d.nodes || [], edges = d.edges || [];
+      statusEl.textContent = "";
+      summaryEl.textContent = (t("lineage.direct") || "Direct forks") + ": " + (d.directForkCount || 0) + " · " + (t("lineage.total") || "total descendants") + ": " + (d.descendantCount || 0);
+      if (nodes.length <= 1 && edges.length === 0) {
+        treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t("lineage.none") || "No forks yet — this app has not been forked.") + "</div>";
+        return;
+      }
+      treeEl.innerHTML = renderLineageTree(d);
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Failed to load lineage");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function renderLineageTree(d) {
+    var byId = {};
+    (d.nodes || []).forEach(function(n) {
+      byId[n.id] = n;
+    });
+    var children = {};
+    var hasParent = {};
+    (d.edges || []).forEach(function(e) {
+      (children[e.from] = children[e.from] || []).push(e.to);
+      hasParent[e.to] = true;
+    });
+    var roots = (d.nodes || []).filter(function(n) {
+      return !hasParent[n.id];
+    }).map(function(n) {
+      return n.id;
+    });
+    if (!roots.length && d.self) roots = [d.self];
+    var seen = {};
+    function renderNode(id, depth) {
+      if (seen[id]) return "";
+      seen[id] = true;
+      var n = byId[id];
+      if (!n) return "";
+      var isSelf = id === d.self;
+      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + "</span>" : "";
+      var statusTxt = t("lineage.status." + n.status) || n.status;
+      var line = '<div class="lineage-node' + (isSelf ? " self" : "") + '" style="margin-left:' + depth * 16 + 'px">' + (depth > 0 ? "↳ " : "") + escapeHtml(n.owner + "/" + n.filename) + (isSelf ? " ●" : "") + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + "</span>" + when + "</div>";
+      var kids = children[id] || [];
+      for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
+      return line;
+    }
+    var html = "";
+    for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
+    return html;
+  }
+  var protectionTarget = null;
+  function showProtectionModal(filename) {
+    protectionTarget = { filename };
+    var p = getOwnProtection()[filename] || {};
+    document.getElementById("protect-obfuscate").checked = !!p.obfuscate;
+    document.getElementById("protect-domainLock").checked = !!p.domainLock;
+    document.getElementById("protect-watermark").checked = !!p.watermark;
+    document.getElementById("protect-noRawDownload").checked = !!p.noRawDownload;
+    document.getElementById("protection-title").textContent = filename;
+    document.getElementById("protection-status").textContent = "";
+    document.getElementById("protection-overlay").hidden = false;
+  }
+  function saveProtection() {
+    if (!protectionTarget) return;
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in.");
+      return;
+    }
+    var protection = {
+      obfuscate: document.getElementById("protect-obfuscate").checked,
+      domainLock: document.getElementById("protect-domainLock").checked,
+      watermark: document.getElementById("protect-watermark").checked,
+      noRawDownload: document.getElementById("protect-noRawDownload").checked
+    };
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("protection-status");
+    statusEl.textContent = t("protect.saving") || "Saving…";
+    statusEl.style.color = "var(--text-muted)";
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(protectionTarget.filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ protection })
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        statusEl.textContent = "✔ " + (t("protect.saved") || "Saved");
+        statusEl.style.color = "#34d399";
+        loadPublishedApps();
+        setTimeout(function() {
+          document.getElementById("protection-overlay").hidden = true;
+        }, 800);
+      } else {
+        statusEl.textContent = "✘ " + (json.error && json.error.message || "Failed");
+        statusEl.style.color = "var(--accent)";
+      }
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Error");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function showVersionsModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    if (!aimeatUrl) {
+      showNotice("Set AIMEAT server URL in Settings first");
+      return;
+    }
+    document.getElementById("versions-title").textContent = filename;
+    var statusEl = document.getElementById("versions-status");
+    var listEl = document.getElementById("versions-list");
+    statusEl.textContent = "Loading versions…";
+    statusEl.style.color = "var(--text-muted)";
+    listEl.innerHTML = "";
+    document.getElementById("versions-overlay").hidden = false;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+      if (!resp.ok) throw new Error("Server returned " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var versions = json.data && json.data.versions ? json.data.versions : [];
+      if (versions.length === 0) {
+        statusEl.textContent = "No versions found.";
+        return;
+      }
+      statusEl.textContent = versions.length + " " + t("versions.stored");
+      statusEl.style.color = "var(--text-muted)";
+      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var html = "";
+      for (var i = 0; i < versions.length; i++) {
+        var v = versions[i];
+        var isLatest = i === 0;
+        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
+        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
+      }
+      listEl.innerHTML = html;
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Failed to load versions");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  async function restoreVersion(owner, filename, version) {
+    if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
+      return filename;
+    }))) return;
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice("You must be logged in as the owner to restore a version. Sign in first.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("versions-status");
+    statusEl.textContent = "Restoring version " + version + "…";
+    statusEl.style.color = "#34d399";
+    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename, version).then(function(b64) {
+      var body = {
+        filename,
+        content: b64,
+        mime_type: "text/html",
+        name: meta.name || filename.replace(/\.html?$/i, ""),
+        description: meta.description || "",
+        category: meta.category || "utility",
+        tags: meta.tags || [],
+        uses_cortex: meta.usesCortex || []
+      };
+      if (meta.icon) body.icon = meta.icon;
+      return fetch(aimeatUrl + "/v1/apps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(body)
+      });
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        statusEl.textContent = "✔ Restored — now published as v" + (json.data.version_number || "?");
+        statusEl.style.color = "#34d399";
+        loadPublishedApps();
+        setTimeout(function() {
+          showVersionsModal(owner, filename);
+        }, 500);
+      } else {
+        statusEl.textContent = "✘ " + (json.error && json.error.message || "Restore failed");
+        statusEl.style.color = "var(--accent)";
+      }
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Restore failed");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function forkVersion(owner, filename, version) {
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
+      return;
+    }
+    var base = (filename || "app").replace(/\.html?$/i, "");
+    var suggested = base + "-fork.html";
+    var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
+    if (!newName) return;
+    newName = newName.trim();
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
+      showNotice("Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("versions-status");
+    var inVersionsModal = !document.getElementById("versions-overlay").hidden;
+    if (inVersionsModal) {
+      statusEl.textContent = "Forking…";
+      statusEl.style.color = "#34d399";
+    }
+    var body = { new_filename: newName };
+    if (version) body.version = version;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(body)
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + newName + '"';
+        if (inVersionsModal) {
+          statusEl.textContent = msg;
+          statusEl.style.color = "#34d399";
+        } else showNotice(msg);
+        loadPublishedApps();
+      } else {
+        var err = json.error && json.error.message || "Fork failed";
+        if (inVersionsModal) {
+          statusEl.textContent = "✘ " + err;
+          statusEl.style.color = "var(--accent)";
+        } else showNotice((t("fork.failed") || "Fork failed") + ": " + err);
+      }
+    }).catch(function(err) {
+      var m = err.message || "Fork failed";
+      if (inVersionsModal) {
+        statusEl.textContent = "✘ " + m;
+        statusEl.style.color = "var(--accent)";
+      } else showNotice("Error: " + m);
+    });
+  }
+
   // src/static/app-catalog/js/main.js
   function setLanguage(lang) {
     setLang(lang);
@@ -3791,7 +4808,7 @@
     }
     applyI18n();
     try {
-      renderApps();
+      renderApps2();
     } catch (e) {
     }
     try {
@@ -3799,7 +4816,7 @@
     } catch (e) {
     }
     try {
-      loadPublishedApps();
+      loadPublishedApps2();
     } catch (e) {
     }
     try {
@@ -3818,7 +4835,7 @@
   function switchDbMode(mode) {
     if (mode === getDbMode()) return;
     if (mode === "personal" && !currentOwnerName()) {
-      updateModeToggle();
+      updateModeToggle2();
       requireSignInThen(function() {
         switchDbMode("personal");
       });
@@ -3826,10 +4843,10 @@
     }
     setDbMode(mode);
     closeDbInstance();
-    updateModeToggle();
-    refreshAll();
+    updateModeToggle2();
+    refreshAll2();
   }
-  function updateModeToggle() {
+  function updateModeToggle2() {
     var globalBtn = document.getElementById("mode-global");
     var personalBtn = document.getElementById("mode-personal");
     if (!globalBtn || !personalBtn) return;
@@ -3839,7 +4856,7 @@
     personalBtn.classList.toggle("mode-btn-locked", !signedIn);
     personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
   }
-  function generateId() {
+  function generateId2() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
@@ -3866,7 +4883,7 @@
     var bundledHtml = await bundleZip(files);
     var encoded = btoa(unescape(encodeURIComponent(bundledHtml)));
     var app = {
-      id: generateId(),
+      id: generateId2(),
       name,
       description: "",
       source: "zip",
@@ -3885,7 +4902,7 @@
   }
   function addAppFromUrl(name, url, icon, tags, openMode) {
     var app = {
-      id: generateId(),
+      id: generateId2(),
       name,
       description: "",
       source: "url",
@@ -3907,7 +4924,7 @@
     return readFileAsText(file).then(function(content) {
       var encoded = btoa(unescape(encodeURIComponent(content)));
       var app = {
-        id: generateId(),
+        id: generateId2(),
         name,
         description: "",
         source: "local",
@@ -3929,7 +4946,7 @@
   function addAppFromSource(name, sourceCode, icon, tags, openMode) {
     var encoded = btoa(unescape(encodeURIComponent(sourceCode)));
     var app = {
-      id: generateId(),
+      id: generateId2(),
       name,
       description: parseAppMeta(sourceCode).description || "",
       source: "local",
@@ -3955,7 +4972,7 @@
     switchTab("url");
   }
   function requireSignInThen(next) {
-    if (getCortexOwnerToken()) {
+    if (getCortexOwnerToken2()) {
       next();
       return;
     }
@@ -4081,7 +5098,7 @@
       app.openMode = openMode;
       saveApp(app).then(function() {
         closeModal();
-        renderApps();
+        renderApps2();
       });
       return;
     }
@@ -4102,7 +5119,7 @@
       }
       addAppFromUrl(name, url, icon, tags, openMode).then(function() {
         closeModal();
-        renderApps();
+        renderApps2();
       });
     } else if (tabName === "paste") {
       var pastedCode = document.getElementById("app-paste-code").value.trim();
@@ -4116,7 +5133,7 @@
       }
       addAppFromSource(name, pastedCode, icon, tags, openMode).then(function() {
         closeModal();
-        renderApps();
+        renderApps2();
       });
     } else if (tabName === "file") {
       if (!selectedFile) {
@@ -4131,7 +5148,7 @@
           return addAppFromZip(name, arrayBuffer, icon, tags, openMode);
         }).then(function() {
           closeModal();
-          renderApps();
+          renderApps2();
         }).catch(function(err) {
           showNotice("ZIP import failed: " + (err.message || err));
         });
@@ -4141,7 +5158,7 @@
         }
         addAppFromFile(name, selectedFile, icon, tags, openMode).then(function() {
           closeModal();
-          renderApps();
+          renderApps2();
         });
       }
     }
@@ -4181,10 +5198,10 @@
   }
   function filterByTag(tag) {
     activeTag = tag;
-    renderApps();
+    renderApps2();
     applyServerFilter();
   }
-  function launchApp(id, mode) {
+  function launchApp2(id, mode) {
     var app = null;
     for (var i = 0; i < allApps.length; i++) {
       if (allApps[i].id === id) {
@@ -4209,7 +5226,7 @@
       launchInIframe(app);
     }
   }
-  function viewPublished(url, name) {
+  function viewPublished2(url, name) {
     window.open(url, "_blank", "noopener");
   }
   function updateOpenExternalBtn() {
@@ -4237,6 +5254,7 @@
   }
   var ownServerApps = [];
   var serverStateByFilename = {};
+  var ownAppProtection = {};
   function libStatus(e) {
     if (e.parked) return "parked";
     if (e.serverOnly) return "server";
@@ -4350,7 +5368,7 @@
     }
     return entries;
   }
-  function renderApps() {
+  function renderApps2() {
     getAllApps().then(function(apps) {
       allApps = apps;
       var entries = buildLibraryEntries(apps, ownServerApps);
@@ -4527,41 +5545,41 @@
       case "favorite":
         app.favorite = !app.favorite;
         saveApp(app).then(function() {
-          renderApps();
+          renderApps2();
         });
         break;
       case "toggle-mode":
         app.openMode = app.openMode === "iframe" ? "tab" : "iframe";
         saveApp(app).then(function() {
-          renderApps();
+          renderApps2();
         });
         break;
       case "view-source":
-        viewSource(app);
+        viewSource2(app);
         break;
       case "delete":
         if (await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
           return app.name || "this app";
         }))) {
-          if (app.publishedFilename) addImportIgnore(app.publishedFilename);
+          if (app.publishedFilename) addImportIgnore2(app.publishedFilename);
           deleteApp(appId).then(function() {
-            renderApps();
-            loadPublishedApps();
+            renderApps2();
+            loadPublishedApps2();
           });
         }
         break;
       case "publish":
-        showPublishModal(appId);
+        showPublishModal2(appId);
         break;
       case "improve-ai":
-        openPromptBuilder(app);
+        openPromptBuilder2(app);
         break;
       case "share-prompt":
-        generateSharePrompt(app);
+        generateSharePrompt2(app);
         break;
     }
   }
-  function viewSource(app) {
+  function viewSource2(app) {
     var overlay = document.getElementById("source-overlay");
     var textarea = document.getElementById("source-code");
     var title = document.getElementById("source-title");
@@ -4583,7 +5601,7 @@
     overlay.dataset.appId = app.id || "";
     overlay.dataset.originalSource = textarea.value;
   }
-  function generateSharePrompt(app) {
+  function generateSharePrompt2(app) {
     if (!app || !app.blob) {
       showNotice("Only local HTML apps can be shared as prompts.");
       return;
@@ -4882,14 +5900,14 @@
     }
     Promise.all(selected.map(function(a) {
       var app = Object.assign({}, a);
-      app.id = generateId();
+      app.id = generateId2();
       return saveApp(app);
     })).then(function() {
       statusEl.style.color = "#34d399";
       statusEl.textContent = "✔ " + t("jsonImport.done") + ": " + selected.length;
       document.getElementById("json-import-btn").style.display = "none";
-      renderApps();
-      loadPublishedApps();
+      renderApps2();
+      loadPublishedApps2();
     });
   }
   function removeDuplicateApps() {
@@ -4917,8 +5935,8 @@
       Promise.all(toDelete.map(function(a) {
         return deleteApp(a.id);
       })).then(function() {
-        renderApps();
-        loadPublishedApps();
+        renderApps2();
+        loadPublishedApps2();
         showNotice(t("dedup.done") + ": " + toDelete.length);
       });
     });
@@ -4940,7 +5958,7 @@
     }).then(function() {
       localStorage.removeItem("appLauncherConfig");
       applyTheme("dark");
-      renderApps();
+      renderApps2();
       document.getElementById("settings-overlay").hidden = true;
       showNotice("All data cleared");
     });
@@ -5038,7 +6056,7 @@
             }).then(function(content) {
               var encoded = btoa(unescape(encodeURIComponent(content)));
               var record = {
-                id: generateId(),
+                id: generateId2(),
                 name,
                 description: app.manifest && app.manifest.description ? app.manifest.description : "",
                 source: "aimeat",
@@ -5063,13 +6081,13 @@
     }
     Promise.all(promises).then(function() {
       document.getElementById("aimeat-import-overlay").hidden = true;
-      renderApps();
+      renderApps2();
     }).catch(function(err) {
       showNotice("Import error: " + (err.message || err));
     });
   }
   var publishAppId = null;
-  function showPublishModal(appId) {
+  function showPublishModal2(appId) {
     var app = null;
     for (var i = 0; i < allApps.length; i++) {
       if (allApps[i].id === appId) {
@@ -5096,7 +6114,7 @@
     document.getElementById("publish-access-code").value = "";
     var pubStatus = document.getElementById("publish-status");
     var pubSubmit = document.getElementById("publish-submit-btn");
-    if (!getCortexOwnerToken()) {
+    if (!getCortexOwnerToken2()) {
       pubStatus.textContent = t("publish.loginRequired");
       pubStatus.style.color = "var(--accent)";
       pubSubmit.disabled = true;
@@ -5151,7 +6169,7 @@
       statusEl.style.color = "var(--accent)";
       return;
     }
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       statusEl.textContent = t("publish.loginRequired");
       statusEl.style.color = "var(--accent)";
@@ -5191,7 +6209,7 @@
         app.publishedVersionNumber = json.data.version_number || 1;
         app.publishedVersionsUrl = json.data.versions_url || null;
         saveApp(app).then(function() {
-          loadPublishedApps();
+          loadPublishedApps2();
           setTimeout(function() {
             var ov = document.getElementById("publish-overlay");
             if (ov) ov.hidden = true;
@@ -5240,7 +6258,7 @@
   }
   function getSessionRoles() {
     try {
-      var token = getCortexOwnerToken();
+      var token = getCortexOwnerToken2();
       if (!token) return [];
       var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       return payload.roles || [];
@@ -5264,7 +6282,7 @@
       return Promise.resolve();
     }
     return fetch(aimeatUrl + "/v1/admin/subdomains", {
-      headers: { "Authorization": "Bearer " + getCortexOwnerToken() }
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken2() }
     }).then(function(resp) {
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
@@ -5304,7 +6322,7 @@
     return fetch(aimeatUrl + path, {
       method,
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken(),
+        "Authorization": "Bearer " + getCortexOwnerToken2(),
         "Content-Type": "application/json"
       },
       body: body ? JSON.stringify(body) : void 0
@@ -5345,7 +6363,7 @@
       statusEl.textContent = "✔ " + t("subModal.assigned") + " — " + sub + "." + apexHostLabel();
       return loadSubdomainSites();
     }).then(function() {
-      loadPublishedApps();
+      loadPublishedApps2();
     }).catch(function(err) {
       statusEl.style.color = "#ef4444";
       statusEl.textContent = err.message || String(err);
@@ -5363,7 +6381,7 @@
       subdomainModalState.existingSub = null;
       return loadSubdomainSites();
     }).then(function() {
-      loadPublishedApps();
+      loadPublishedApps2();
     }).catch(function(err) {
       statusEl.style.color = "#ef4444";
       statusEl.textContent = err.message || String(err);
@@ -5452,7 +6470,7 @@
   }
   function exportBackupZip() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -5483,7 +6501,7 @@
   var backupInspectData = null;
   function importBackupPick() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -5503,7 +6521,7 @@
       return fetch(backupApiBase() + "/v1/apps/backup/inspect", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + getCortexOwnerToken(),
+          "Authorization": "Bearer " + getCortexOwnerToken2(),
           "Content-Type": "application/zip"
         },
         body: buf
@@ -5629,7 +6647,7 @@
     fetch(backupApiBase() + "/v1/apps/backup/restore", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken(),
+        "Authorization": "Bearer " + getCortexOwnerToken2(),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -5646,7 +6664,7 @@
       }
       statusEl.textContent = "";
       renderBackupResult(json.data);
-      refreshAll();
+      refreshAll2();
     }).catch(function(e) {
       statusEl.style.color = "#ef4444";
       statusEl.textContent = e.message || String(e);
@@ -5681,14 +6699,14 @@
       return [];
     }
   }
-  function addImportIgnore(filename) {
+  function addImportIgnore2(filename) {
     var list = getImportIgnore();
     if (list.indexOf(filename) === -1) {
       list.push(filename);
       localStorage.setItem(importIgnoreKey(), JSON.stringify(list));
     }
   }
-  function removeImportIgnore(filename) {
+  function removeImportIgnore2(filename) {
     localStorage.setItem(importIgnoreKey(), JSON.stringify(getImportIgnore().filter(function(f) {
       return f !== filename;
     })));
@@ -5767,10 +6785,10 @@
         failedNames[f.filename] = true;
       });
       selected.forEach(function(sa) {
-        if (!failedNames[sa.filename]) removeImportIgnore(sa.filename);
+        if (!failedNames[sa.filename]) removeImportIgnore2(sa.filename);
       });
-      renderApps();
-      loadPublishedApps();
+      renderApps2();
+      loadPublishedApps2();
       if (res.failed.length) {
         statusEl.style.color = "#ef4444";
         statusEl.textContent = t("srvImport.someFailed") + " (" + res.failed.length + "): " + res.failed.map(function(f) {
@@ -5791,7 +6809,7 @@
       return fetchAppContentBase64(aimeatUrl, sa.owner || "", sa.filename).then(function(b64) {
         var manifest = sa.manifest || {};
         var app = {
-          id: generateId(),
+          id: generateId2(),
           name: manifest.name || sa.filename,
           description: manifest.description || "",
           source: "aimeat",
@@ -5838,7 +6856,7 @@
     }
     return page(0);
   }
-  function loadPublishedApps() {
+  function loadPublishedApps2() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
     var communitySection = document.getElementById("community-section");
@@ -5870,12 +6888,12 @@
       }
       if (!aimeatUrl) {
         ownServerApps = [];
-        renderApps();
+        renderApps2();
         if (communitySection) communitySection.style.display = "none";
         return;
       }
       var listHeaders = {};
-      var listTok = getCortexOwnerToken();
+      var listTok = getCortexOwnerToken2();
       if (listTok) listHeaders["Authorization"] = "Bearer " + listTok;
       fetchAllPublishedApps(aimeatUrl, listHeaders).then(function(json) {
         var serverApps = json.data && json.data.apps ? json.data.apps : [];
@@ -5895,14 +6913,14 @@
         });
         return loadSubdomainSites().then(function() {
           ownServerApps = currentOwner ? ownApps : [];
-          renderApps();
+          renderApps2();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           applyServerFilter();
           updateServerImportState(ownPublished, localByFilename, aimeatUrl);
         });
       }).catch(function() {
         ownServerApps = [];
-        renderApps();
+        renderApps2();
         if (communitySection) communitySection.style.display = "none";
       });
     });
@@ -5970,7 +6988,7 @@
     if (!app || !app.publishedFilename) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -5982,7 +7000,7 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
-        removeImportIgnore(app.publishedFilename);
+        removeImportIgnore2(app.publishedFilename);
         app.published = false;
         delete app.publishedFilename;
         delete app.publishedAt;
@@ -5990,7 +7008,7 @@
         delete app.publishedVersionNumber;
         delete app.publishedVersionsUrl;
         saveApp(app).then(function() {
-          loadPublishedApps();
+          loadPublishedApps2();
         });
       } else {
         showNotice("Failed to remove: " + (json.error && json.error.message || "Unknown error"));
@@ -6002,7 +7020,7 @@
   function toggleParkApp(filename, parked) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -6016,7 +7034,7 @@
     }).then(function(json) {
       if (json.ok) {
         if (serverStateByFilename[filename]) serverStateByFilename[filename].parked = !!parked;
-        loadPublishedApps();
+        loadPublishedApps2();
         refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
@@ -6028,7 +7046,7 @@
   function toggleForkApp(filename, forkable) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -6042,7 +7060,7 @@
     }).then(function(json) {
       if (json.ok) {
         if (serverStateByFilename[filename]) serverStateByFilename[filename].forkable = !!forkable;
-        loadPublishedApps();
+        loadPublishedApps2();
         refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
@@ -6057,7 +7075,7 @@
     }))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -6069,1007 +7087,13 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
-        removeImportIgnore(filename);
-        loadPublishedApps();
+        removeImportIgnore2(filename);
+        loadPublishedApps2();
       } else {
         showNotice("Failed to delete: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
     }).catch(function(err) {
       showNotice("Error: " + (err.message || err));
-    });
-  }
-  var detailAppId = null;
-  var detailDraftBlob = null;
-  var detailAiAvailable = false;
-  var detailVersionsHtml = null;
-  var detailSkillsHtml = null;
-  var detailEditingAbout = false;
-  var detailEditAboutOnOpen = false;
-  function detailGetApp() {
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].id === detailAppId) return allApps[i];
-    }
-    return null;
-  }
-  function detailServerOwner(app) {
-    var sess = currentOwnerName();
-    var stored = app && app.aimeatOwner || "";
-    if (!stored) {
-      var pu = app && (app.publishedUrl || app.viewUrl) || "";
-      var mm = pu.match(/\/v1\/apps\/([^/]+)\//);
-      stored = mm ? decodeURIComponent(mm[1]) : "";
-    }
-    if (sess && (!stored || stored === "anonymous" || stored === sess)) return sess;
-    return stored;
-  }
-  function blobToHtml(blob) {
-    try {
-      return decodeURIComponent(escape(atob(blob)));
-    } catch (e) {
-      return "";
-    }
-  }
-  function htmlToBlob(html) {
-    return btoa(unescape(encodeURIComponent(html)));
-  }
-  function serverMgmtInner(app) {
-    if (!app) return "";
-    var isUrlApp = app.source === "url" && !app.blob;
-    var svrState = app.publishedFilename && serverStateByFilename[app.publishedFilename] || null;
-    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return "";
-    var fnArg = jsArg(app.publishedFilename);
-    var ownerArg2 = jsArg(svrState.owner || "");
-    var p = svrState.protection || {};
-    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div></div>";
-  }
-  function refreshServerMgmt() {
-    var c = document.getElementById("detail-server-mgmt");
-    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
-  }
-  function openDetailView(appId) {
-    detailAppId = appId;
-    detailDraftBlob = null;
-    detailVersionsHtml = null;
-    detailSkillsHtml = null;
-    detailEditingAbout = false;
-    var app = detailGetApp();
-    if (!app) return;
-    document.getElementById("detail-view").hidden = false;
-    renderDetailView();
-    detailCheckAiAvailability();
-    var owner = currentOwnerName();
-    if (app.published && app.publishedFilename && owner) {
-      detailLoadVersions(owner, app.publishedFilename);
-      detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
-    }
-    if (detailEditAboutOnOpen) {
-      detailEditAboutOnOpen = false;
-      detailAboutEdit();
-    }
-  }
-  function editAppDetails(owner, filename, localId, versionNumber) {
-    detailEditAboutOnOpen = true;
-    openPublishedDetail(owner, filename, localId, versionNumber);
-  }
-  function closeDetailView() {
-    document.getElementById("detail-view").hidden = true;
-    detailAppId = null;
-    detailDraftBlob = null;
-  }
-  function detailLaunch() {
-    var app = detailGetApp();
-    if (!app) return;
-    if (app.published && (app.publishedUrl || app.publishedFilename)) {
-      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
-      var url;
-      if (app.publishedUrl) {
-        url = base + app.publishedUrl;
-      } else {
-        var st = serverStateByFilename[app.publishedFilename] || {};
-        var owner = st.owner || currentOwnerName() || "";
-        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
-      }
-      viewPublished(url + "?mode=inline", app.name);
-    } else {
-      launchApp(app.id, app.openMode || "tab");
-    }
-  }
-  function loadScriptOnce(src) {
-    return new Promise(function(resolve, reject) {
-      if (document.querySelector('script[src="' + src + '"]')) return resolve();
-      var s = document.createElement("script");
-      s.src = src;
-      s.onload = function() {
-        resolve();
-      };
-      s.onerror = function() {
-        reject(new Error("failed to load " + src));
-      };
-      document.head.appendChild(s);
-    });
-  }
-  function onAuthChanged() {
-    if (getDbMode() === "personal" && !currentOwnerName()) {
-      setDbMode("global");
-    }
-    closeDbInstance();
-    updateModeToggle();
-    try {
-      refreshAll();
-    } catch (e) {
-      try {
-        loadPublishedApps();
-      } catch (e2) {
-      }
-    }
-    var sub = document.getElementById("publish-submit-btn");
-    var st = document.getElementById("publish-status");
-    if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
-      if (getCortexOwnerToken()) {
-        sub.disabled = false;
-        if (st) st.textContent = "";
-      } else {
-        sub.disabled = true;
-        if (st) {
-          st.textContent = t("publish.loginRequired");
-          st.style.color = "var(--accent)";
-        }
-      }
-    }
-  }
-  async function mountLoginPill() {
-    try {
-      await loadScriptOnce("/v1/libs/aimeat-auth.js");
-      if (window.AIMEAT && window.AIMEAT.auth) {
-        try {
-          await window.AIMEAT.auth.login();
-        } catch (e) {
-        }
-        if (window.AIMEAT.auth.mountLoginButton) {
-          window.AIMEAT.auth.mountLoginButton("#headerAuth", {
-            onLogin: onAuthChanged,
-            onLogout: onAuthChanged,
-            i18n: {
-              loggedIn: t("auth.loggedIn"),
-              signInBtn: t("auth.signIn"),
-              logoutBtn: t("auth.logout")
-            }
-          });
-        }
-      }
-    } catch (e) {
-    }
-  }
-  function fmtSize(bytes) {
-    if (!bytes) return "—";
-    return bytes < 1024 ? bytes + " B" : bytes < 1048576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1048576).toFixed(1) + " MB";
-  }
-  function renderDetailView() {
-    var app = detailGetApp();
-    if (!app) return;
-    var config = loadConfig();
-    var hasServer = !!config.aimeatUrl;
-    var icon = app.icon || "📝";
-    var isUrlApp = app.source === "url" && !app.blob;
-    var canEditAbout = !!app.id && !isUrlApp;
-    document.getElementById("detail-title").innerHTML = '<span style="font-size:1.3rem">' + escapeHtml(icon) + "</span> " + escapeHtml(app.name || "App") + (canEditAbout && !detailEditingAbout ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t("detail.editDetails")) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : "");
-    var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0;
-    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : app.published ? "v?" : t("detail.notPublished");
-    var syncClass, syncText;
-    if (!app.published) {
-      syncClass = "none";
-      syncText = t("detail.notPublished");
-    } else if (detailDraftBlob) {
-      syncClass = "diff";
-      syncText = t("detail.localNewer");
-    } else {
-      syncClass = "ok";
-      syncText = t("detail.inSync");
-    }
-    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    var shotOwner = detailServerOwner(app);
-    var shotFile = app.publishedFilename || "";
-    var shotUrl = app.published && shotOwner && shotFile && aimeatBase ? aimeatBase + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
-    var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
-    var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
-    var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
-    var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
-    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
-    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + "</span>" + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</h3>";
-    var aboutBody;
-    if (detailEditingAbout) {
-      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
-    } else {
-      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.openModeLabel"), app.openMode || "tab") + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
-      (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
-    }
-    var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
-    var aiHtml = '<div class="dtl-section"><h3>' + t("detail.editAi") + '</h3><p class="dtl-desc">' + t("detail.editAiHint") + "</p>";
-    if (isUrlApp) {
-      aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
-    } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.test"), "window._launcher.detailAiTest()") + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()", { variant: "success" }) + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
-    }
-    aiHtml += "</div>";
-    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
-    var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
-    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
-    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
-    var skillsHtml = "";
-    if (app.published) {
-      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div></div>";
-    }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
-  }
-  function detailLoadSkills(owner, filename) {
-    var config = loadConfig();
-    if (!config.aimeatUrl) return;
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t("detail.noSkills") || "No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.") + "</span>";
-    var skillHeaders = {};
-    try {
-      var jwt = window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt || JSON.parse(localStorage.getItem("aimeat_session") || "{}").jwt;
-      if (jwt) skillHeaders["Authorization"] = "Bearer " + jwt;
-    } catch (e) {
-    }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/skills", { headers: skillHeaders }).then(function(resp) {
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var listEl = document.getElementById("detail-skills-list");
-      var skills = json.data && json.data.skills ? json.data.skills : [];
-      if (skills.length === 0) {
-        detailSkillsHtml = noneHtml;
-        if (listEl) listEl.innerHTML = detailSkillsHtml;
-        return;
-      }
-      var out = "";
-      for (var i = 0; i < skills.length; i++) {
-        var s = skills[i];
-        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + '</span><div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
-      }
-      detailSkillsHtml = out;
-      if (listEl) listEl.innerHTML = detailSkillsHtml;
-    }).catch(function() {
-      detailSkillsHtml = noneHtml;
-      var listEl = document.getElementById("detail-skills-list");
-      if (listEl) listEl.innerHTML = detailSkillsHtml;
-    });
-  }
-  function detailAboutEdit() {
-    if (!detailGetApp()) return;
-    detailEditingAbout = true;
-    renderDetailView();
-    var nameEl = document.getElementById("detail-name-input");
-    if (nameEl) {
-      nameEl.focus();
-      nameEl.select();
-    }
-  }
-  function detailAboutCancel() {
-    detailEditingAbout = false;
-    renderDetailView();
-  }
-  function detailAboutSave() {
-    var app = detailGetApp();
-    if (!app) return;
-    var nameEl = document.getElementById("detail-name-input");
-    var descEl = document.getElementById("detail-desc-input");
-    var newName = nameEl ? nameEl.value.trim() : "";
-    var newDesc = descEl ? descEl.value.trim() : "";
-    if (!newName) {
-      showNotice(t("detail.nameRequired") || "Name cannot be empty.");
-      if (nameEl) nameEl.focus();
-      return;
-    }
-    if (app.published && !newDesc) {
-      showNotice(t("detail.descRequired") || "Description cannot be empty.");
-      if (descEl) descEl.focus();
-      return;
-    }
-    function finishLocal() {
-      app.name = newName;
-      app.description = newDesc;
-      saveApp(app).then(function() {
-        detailEditingAbout = false;
-        renderApps();
-        loadPublishedApps();
-        renderDetailView();
-      });
-    }
-    if (!app.published || !app.publishedFilename) {
-      finishLocal();
-      return;
-    }
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
-      method: "PATCH",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, description: newDesc })
-    }).then(function(resp) {
-      return resp.json().then(function(j) {
-        return { ok: resp.ok, j };
-      });
-    }).then(function(res) {
-      if (res.ok && res.j && res.j.ok !== false) {
-        var key = owner + "\n" + filename;
-        serverAppManifests[key] = serverAppManifests[key] || {};
-        serverAppManifests[key].name = newName;
-        serverAppManifests[key].description = newDesc;
-        finishLocal();
-      } else {
-        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
-      }
-    }).catch(function(err) {
-      showNotice("Error: " + (err.message || err));
-    });
-  }
-  function detailSetScreenshot() {
-    var app = detailGetApp();
-    if (!app) return;
-    var filename = app.publishedFilename || "";
-    if (!filename) {
-      var pu = app.publishedUrl || app.viewUrl || "";
-      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
-      if (m) filename = decodeURIComponent(m[1]);
-    }
-    var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
-    if (!owner || !filename) {
-      showNotice("Publish the app first, then you can set a screenshot.");
-      return;
-    }
-    if (!token) {
-      showNotice("Sign in to set a screenshot.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    if (!aimeatUrl) {
-      showNotice("No server configured.");
-      return;
-    }
-    var input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = function() {
-      var file = input.files && input.files[0];
-      if (!file) return;
-      if (file.size > 2 * 1024 * 1024) {
-        showNotice("Image too large (max 2 MB).");
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function() {
-        var s = String(reader.result);
-        var base64 = s.indexOf(",") >= 0 ? s.slice(s.indexOf(",") + 1) : s;
-        fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-          body: JSON.stringify({ screenshot: base64, screenshot_mime_type: file.type || "image/png" })
-        }).then(function(r) {
-          return r.json().then(function(j) {
-            return { ok: r.ok, j };
-          });
-        }).then(function(res) {
-          if (res.ok) {
-            showNotice("Screenshot set. It will show in the catalogue and on the landing wall.");
-          } else {
-            showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
-          }
-        }).catch(function(e) {
-          showNotice("Failed: " + e.message);
-        });
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  }
-  async function detailRefreshScreenshot() {
-    var app = detailGetApp();
-    if (!app) return;
-    var filename = app.publishedFilename || "";
-    if (!filename) {
-      var pu = app.publishedUrl || app.viewUrl || "";
-      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
-      if (m) filename = decodeURIComponent(m[1]);
-    }
-    var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
-    if (!owner || !filename) {
-      showNotice("Publish the app first, then you can refresh its screenshot.");
-      return;
-    }
-    if (!token) {
-      showNotice("Sign in to refresh the screenshot.");
-      return;
-    }
-    if (!await showConfirm(t("confirm.clearScreenshot"))) return;
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    if (!aimeatUrl) {
-      showNotice("No server configured.");
-      return;
-    }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
-      method: "DELETE",
-      headers: { "Authorization": "Bearer " + token }
-    }).then(function(r) {
-      return r.json().then(function(j) {
-        return { ok: r.ok, j };
-      });
-    }).then(function(res) {
-      if (res.ok) {
-        showNotice(res.j.data && res.j.data.note || "Screenshot cleared. A fresh one will be taken on the next scheduled run.");
-      } else {
-        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
-      }
-    }).catch(function(e) {
-      showNotice("Failed: " + e.message);
-    });
-  }
-  function metaItem(label, val) {
-    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
-  }
-  function detailAiUnavailableMsg() {
-    return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
-  }
-  function detailCheckAiAvailability() {
-    detailAiAvailable = false;
-    var config = loadConfig();
-    var token = getCortexOwnerToken();
-    if (!config.aimeatUrl || !token) {
-      renderDetailView();
-      return;
-    }
-    var url = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(url + "/v1/openrouter/settings", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
-      return r.json();
-    }).then(function(j) {
-      detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
-      if (detailAppId) renderDetailView();
-    }).catch(function() {
-      detailAiAvailable = false;
-      if (detailAppId) renderDetailView();
-    });
-  }
-  function detailLoadVersions(owner, filename) {
-    var config = loadConfig();
-    if (!config.aimeatUrl) return;
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var listEl = document.getElementById("detail-versions-list");
-      if (!listEl) return;
-      var versions = json.data && json.data.versions ? json.data.versions : [];
-      if (versions.length === 0) {
-        detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
-        listEl.innerHTML = detailVersionsHtml;
-        return;
-      }
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
-      var html = "";
-      for (var i = 0; i < versions.length; i++) {
-        var v = versions[i];
-        var isLatest = i === 0;
-        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
-        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
-      }
-      detailVersionsHtml = html;
-      listEl.innerHTML = html;
-    }).catch(function() {
-      detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
-      var listEl = document.getElementById("detail-versions-list");
-      if (listEl) listEl.innerHTML = detailVersionsHtml;
-    });
-  }
-  function extractHtmlFromAi(content) {
-    if (!content) return null;
-    var text = String(content).trim();
-    var fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
-    if (fence && fence[1]) text = fence[1].trim();
-    var lower = text.toLowerCase();
-    var startDoc = lower.indexOf("<!doctype");
-    var startHtml = lower.indexOf("<html");
-    var start = startDoc !== -1 ? startDoc : startHtml;
-    if (start === -1) {
-      if (text.indexOf("<") !== -1 && text.indexOf(">") !== -1 && text.length > 30) return text;
-      return null;
-    }
-    return text.slice(start);
-  }
-  function detailAiRun() {
-    var app = detailGetApp();
-    if (!app) return;
-    var inputEl = document.getElementById("detail-ai-input");
-    var statusEl = document.getElementById("detail-ai-status");
-    var runBtn = document.getElementById("detail-ai-run");
-    var change = (inputEl.value || "").trim();
-    if (!change) {
-      inputEl.focus();
-      return;
-    }
-    var token = getCortexOwnerToken();
-    if (!token) {
-      statusEl.textContent = t("detail.aiLoginNeeded");
-      return;
-    }
-    var config = loadConfig();
-    if (!config.aimeatUrl) {
-      statusEl.textContent = t("detail.aiUnavailable");
-      return;
-    }
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var html = app.blob ? blobToHtml(app.blob) : "";
-    if (!html) {
-      statusEl.textContent = t("detail.urlCantEdit");
-      return;
-    }
-    var systemPrompt = "You are editing a single-file HTML web app that runs on the AIMEAT platform. You will be given the current full HTML source and a change request. Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. Preserve every existing AIMEAT integration (script tags loading /v1/libs/*, AIMEAT.* API calls, cortex extension scripts) unless the change specifically requires altering them. Keep the result a single self-contained file that supports both light and dark themes.";
-    var userPrompt = "Change request:\n" + change + "\n\nCurrent HTML source:\n" + html;
-    runBtn.disabled = true;
-    statusEl.style.color = "var(--text-muted)";
-    statusEl.textContent = t("detail.running");
-    fetch(aimeatUrl + "/v1/ai/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify({
-        prompt: userPrompt,
-        systemPrompt,
-        app_id: "app-catalog"
-      })
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      runBtn.disabled = false;
-      if (!json || !json.ok) {
-        var code = json && json.error && json.error.code || "";
-        var msg = json && json.error && json.error.message || "AI request failed";
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + (code ? "[" + code + "] " : "") + msg;
-        return;
-      }
-      var content = json.data && json.data.content ? json.data.content : "";
-      var newHtml = extractHtmlFromAi(content);
-      if (!newHtml) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + t("detail.aiNoHtml");
-        return;
-      }
-      detailDraftBlob = htmlToBlob(newHtml);
-      statusEl.style.color = "#34d399";
-      var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== "undefined" ? " · " + t("detail.aiUsage") + ": $" + Number(json.data.budget.spent_today_usd).toFixed(3) : "";
-      statusEl.textContent = "✔ " + t("detail.draftReady") + usage;
-      renderDetailView();
-      var s2 = document.getElementById("detail-ai-status");
-      if (s2) {
-        s2.style.color = "#34d399";
-        s2.textContent = "✔ " + t("detail.draftReady") + usage;
-      }
-    }).catch(function(err) {
-      runBtn.disabled = false;
-      statusEl.style.color = "var(--accent)";
-      statusEl.textContent = "✘ " + (err.message || "AI request failed");
-    });
-  }
-  function detailAiTest() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    var view = document.getElementById("iframe-view");
-    var iframe = document.getElementById("app-iframe");
-    var title = document.getElementById("iframe-title");
-    title.textContent = (app.name || "App") + " (draft)";
-    iframe.removeAttribute("src");
-    iframe.srcdoc = blobToHtml(detailDraftBlob);
-    currentIframeUrl = "";
-    delete iframe.dataset.appId;
-    view.hidden = false;
-  }
-  function detailAiKeep() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    app.blob = detailDraftBlob;
-    app.source = app.source === "url" ? "paste" : app.source || "paste";
-    app.url = app.url || null;
-    detailDraftBlob = null;
-    saveApp(app).then(function() {
-      renderApps();
-      renderDetailView();
-      var s2 = document.getElementById("detail-ai-status");
-      if (s2) {
-        s2.style.color = "#34d399";
-        s2.textContent = "✔ " + t("detail.kept");
-      }
-    });
-  }
-  function detailAiDiscard() {
-    detailDraftBlob = null;
-    renderDetailView();
-    var s2 = document.getElementById("detail-ai-status");
-    if (s2) s2.textContent = t("detail.discarded");
-  }
-  function detailEditSource() {
-    var app = detailGetApp();
-    if (app) viewSource(app);
-  }
-  function detailImproveExternal() {
-    var app = detailGetApp();
-    if (app) openPromptBuilder(app);
-  }
-  function detailSharePrompt() {
-    var app = detailGetApp();
-    if (app) generateSharePrompt(app);
-  }
-  function detailPublish() {
-    if (detailAppId) showPublishModal(detailAppId);
-  }
-  async function detailDelete() {
-    var app = detailGetApp();
-    if (!app) return;
-    if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
-      return app.name || "this app";
-    }))) return;
-    if (app.publishedFilename) addImportIgnore(app.publishedFilename);
-    var id = app.id;
-    deleteApp(id).then(function() {
-      closeDetailView();
-      renderApps();
-      loadPublishedApps();
-    });
-  }
-  function openPublishedDetail(owner, filename, localId, versionNumber) {
-    if (localId) {
-      openDetailView(localId);
-      return;
-    }
-    for (var i = 0; i < allApps.length; i++) {
-      if (allApps[i].publishedFilename === filename) {
-        openDetailView(allApps[i].id);
-        return;
-      }
-    }
-    var config = loadConfig();
-    if (!config.aimeatUrl) {
-      showNotice("Set the AIMEAT server URL in Settings first");
-      return;
-    }
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var meta = serverAppManifests[owner + "\n" + filename] || {};
-    fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
-      var app = {
-        id: generateId(),
-        name: meta.name || filename.replace(/\.html?$/i, ""),
-        description: meta.description || "",
-        category: meta.category || "utility",
-        tags: meta.tags || [],
-        usesCortex: meta.usesCortex || [],
-        forkedFrom: meta.forkedFrom || null,
-        icon: meta.icon || "📝",
-        source: "aimeat",
-        url: null,
-        blob: b64,
-        favorite: false,
-        openMode: "tab",
-        addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        lastOpenedAt: null,
-        published: true,
-        publishedFilename: filename,
-        publishedUrl: "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename),
-        publishedVersionNumber: versionNumber || 1,
-        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        aimeatOwner: owner,
-        aimeatFilename: filename
-      };
-      removeImportIgnore(filename);
-      return saveApp(app).then(function() {
-        allApps.push(app);
-        renderApps();
-        loadPublishedApps();
-        openDetailView(app.id);
-      });
-    }).catch(function(err) {
-      showNotice("Could not load the published app: " + (err.message || err));
-    });
-  }
-  function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
-    var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
-    var token = getCortexOwnerToken();
-    var headers = token ? { "Authorization": "Bearer " + token } : {};
-    return fetch(url, { headers }).then(function(resp) {
-      if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
-      return resp.arrayBuffer();
-    }).then(function(buf) {
-      var bytes = new Uint8Array(buf);
-      var binary = "";
-      var chunk = 32768;
-      for (var i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-      }
-      return btoa(binary);
-    });
-  }
-  function showLineageModal(owner, filename) {
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    if (!aimeatUrl) {
-      showNotice("Set AIMEAT server URL in Settings first");
-      return;
-    }
-    document.getElementById("lineage-title").textContent = filename;
-    var summaryEl = document.getElementById("lineage-summary");
-    var statusEl = document.getElementById("lineage-status");
-    var treeEl = document.getElementById("lineage-tree");
-    summaryEl.textContent = "";
-    statusEl.textContent = t("lineage.loading") || "Loading lineage…";
-    statusEl.style.color = "var(--text-muted)";
-    treeEl.innerHTML = "";
-    document.getElementById("lineage-overlay").hidden = false;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/lineage").then(function(resp) {
-      if (!resp.ok) throw new Error("Server returned " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var d = json.data || {};
-      var nodes = d.nodes || [], edges = d.edges || [];
-      statusEl.textContent = "";
-      summaryEl.textContent = (t("lineage.direct") || "Direct forks") + ": " + (d.directForkCount || 0) + " · " + (t("lineage.total") || "total descendants") + ": " + (d.descendantCount || 0);
-      if (nodes.length <= 1 && edges.length === 0) {
-        treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t("lineage.none") || "No forks yet — this app has not been forked.") + "</div>";
-        return;
-      }
-      treeEl.innerHTML = renderLineageTree(d);
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Failed to load lineage");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function renderLineageTree(d) {
-    var byId = {};
-    (d.nodes || []).forEach(function(n) {
-      byId[n.id] = n;
-    });
-    var children = {};
-    var hasParent = {};
-    (d.edges || []).forEach(function(e) {
-      (children[e.from] = children[e.from] || []).push(e.to);
-      hasParent[e.to] = true;
-    });
-    var roots = (d.nodes || []).filter(function(n) {
-      return !hasParent[n.id];
-    }).map(function(n) {
-      return n.id;
-    });
-    if (!roots.length && d.self) roots = [d.self];
-    var seen = {};
-    function renderNode(id, depth) {
-      if (seen[id]) return "";
-      seen[id] = true;
-      var n = byId[id];
-      if (!n) return "";
-      var isSelf = id === d.self;
-      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + "</span>" : "";
-      var statusTxt = t("lineage.status." + n.status) || n.status;
-      var line = '<div class="lineage-node' + (isSelf ? " self" : "") + '" style="margin-left:' + depth * 16 + 'px">' + (depth > 0 ? "↳ " : "") + escapeHtml(n.owner + "/" + n.filename) + (isSelf ? " ●" : "") + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + "</span>" + when + "</div>";
-      var kids = children[id] || [];
-      for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
-      return line;
-    }
-    var html = "";
-    for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
-    return html;
-  }
-  var ownAppProtection = {};
-  var protectionTarget = null;
-  function showProtectionModal(filename) {
-    protectionTarget = { filename };
-    var p = ownAppProtection[filename] || {};
-    document.getElementById("protect-obfuscate").checked = !!p.obfuscate;
-    document.getElementById("protect-domainLock").checked = !!p.domainLock;
-    document.getElementById("protect-watermark").checked = !!p.watermark;
-    document.getElementById("protect-noRawDownload").checked = !!p.noRawDownload;
-    document.getElementById("protection-title").textContent = filename;
-    document.getElementById("protection-status").textContent = "";
-    document.getElementById("protection-overlay").hidden = false;
-  }
-  function saveProtection() {
-    if (!protectionTarget) return;
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in.");
-      return;
-    }
-    var protection = {
-      obfuscate: document.getElementById("protect-obfuscate").checked,
-      domainLock: document.getElementById("protect-domainLock").checked,
-      watermark: document.getElementById("protect-watermark").checked,
-      noRawDownload: document.getElementById("protect-noRawDownload").checked
-    };
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("protection-status");
-    statusEl.textContent = t("protect.saving") || "Saving…";
-    statusEl.style.color = "var(--text-muted)";
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(protectionTarget.filename), {
-      method: "PATCH",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ protection })
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        statusEl.textContent = "✔ " + (t("protect.saved") || "Saved");
-        statusEl.style.color = "#34d399";
-        loadPublishedApps();
-        setTimeout(function() {
-          document.getElementById("protection-overlay").hidden = true;
-        }, 800);
-      } else {
-        statusEl.textContent = "✘ " + (json.error && json.error.message || "Failed");
-        statusEl.style.color = "var(--accent)";
-      }
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Error");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function showVersionsModal(owner, filename) {
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    if (!aimeatUrl) {
-      showNotice("Set AIMEAT server URL in Settings first");
-      return;
-    }
-    document.getElementById("versions-title").textContent = filename;
-    var statusEl = document.getElementById("versions-status");
-    var listEl = document.getElementById("versions-list");
-    statusEl.textContent = "Loading versions…";
-    statusEl.style.color = "var(--text-muted)";
-    listEl.innerHTML = "";
-    document.getElementById("versions-overlay").hidden = false;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
-      if (!resp.ok) throw new Error("Server returned " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var versions = json.data && json.data.versions ? json.data.versions : [];
-      if (versions.length === 0) {
-        statusEl.textContent = "No versions found.";
-        return;
-      }
-      statusEl.textContent = versions.length + " " + t("versions.stored");
-      statusEl.style.color = "var(--text-muted)";
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
-      var html = "";
-      for (var i = 0; i < versions.length; i++) {
-        var v = versions[i];
-        var isLatest = i === 0;
-        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
-        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
-      }
-      listEl.innerHTML = html;
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Failed to load versions");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  async function restoreVersion(owner, filename, version) {
-    if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
-      return filename;
-    }))) return;
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice("You must be logged in as the owner to restore a version. Sign in first.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("versions-status");
-    statusEl.textContent = "Restoring version " + version + "…";
-    statusEl.style.color = "#34d399";
-    var meta = serverAppManifests[owner + "\n" + filename] || {};
-    fetchAppContentBase64(aimeatUrl, owner, filename, version).then(function(b64) {
-      var body = {
-        filename,
-        content: b64,
-        mime_type: "text/html",
-        name: meta.name || filename.replace(/\.html?$/i, ""),
-        description: meta.description || "",
-        category: meta.category || "utility",
-        tags: meta.tags || [],
-        uses_cortex: meta.usesCortex || []
-      };
-      if (meta.icon) body.icon = meta.icon;
-      return fetch(aimeatUrl + "/v1/apps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-        body: JSON.stringify(body)
-      });
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        statusEl.textContent = "✔ Restored — now published as v" + (json.data.version_number || "?");
-        statusEl.style.color = "#34d399";
-        loadPublishedApps();
-        setTimeout(function() {
-          showVersionsModal(owner, filename);
-        }, 500);
-      } else {
-        statusEl.textContent = "✘ " + (json.error && json.error.message || "Restore failed");
-        statusEl.style.color = "var(--accent)";
-      }
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Restore failed");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function forkVersion(owner, filename, version) {
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
-      return;
-    }
-    var base = (filename || "app").replace(/\.html?$/i, "");
-    var suggested = base + "-fork.html";
-    var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
-    if (!newName) return;
-    newName = newName.trim();
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
-      showNotice("Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("versions-status");
-    var inVersionsModal = !document.getElementById("versions-overlay").hidden;
-    if (inVersionsModal) {
-      statusEl.textContent = "Forking…";
-      statusEl.style.color = "#34d399";
-    }
-    var body = { new_filename: newName };
-    if (version) body.version = version;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify(body)
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + newName + '"';
-        if (inVersionsModal) {
-          statusEl.textContent = msg;
-          statusEl.style.color = "#34d399";
-        } else showNotice(msg);
-        loadPublishedApps();
-      } else {
-        var err = json.error && json.error.message || "Fork failed";
-        if (inVersionsModal) {
-          statusEl.textContent = "✘ " + err;
-          statusEl.style.color = "var(--accent)";
-        } else showNotice((t("fork.failed") || "Fork failed") + ": " + err);
-      }
-    }).catch(function(err) {
-      var m = err.message || "Fork failed";
-      if (inVersionsModal) {
-        statusEl.textContent = "✘ " + m;
-        statusEl.style.color = "var(--accent)";
-      } else showNotice("Error: " + m);
     });
   }
   var cortexToken = null;
@@ -7184,7 +7208,7 @@
   var cortexEditorExtName = null;
   var cortexEditorWasActive = false;
   var cortexEditorLibCounter = 0;
-  function getCortexOwnerToken() {
+  function getCortexOwnerToken2() {
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
         return window.AIMEAT.auth.getSession().jwt;
@@ -7201,7 +7225,7 @@
   function openCortexEditor(encodedName) {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in as an owner to edit extensions.");
       return;
@@ -7270,7 +7294,7 @@
   function cortexEditorSave() {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("No auth token available.");
       return;
@@ -7341,7 +7365,7 @@
     cortexEditorExtName = null;
   }
   var pbSourceApp = null;
-  function openPromptBuilder(app) {
+  function openPromptBuilder2(app) {
     pbSourceApp = app || null;
     var overlay = document.getElementById("prompt-builder-overlay");
     var desc = document.getElementById("pb-description");
@@ -7624,7 +7648,7 @@
       cards[k].classList.remove("drag-over", "dragging");
     }
     Promise.all(saves).then(function() {
-      renderApps();
+      renderApps2();
     });
   }
   window._launcher = {
@@ -7634,13 +7658,13 @@
     deleteApp,
     loadConfig,
     saveConfig,
-    renderApps,
+    renderApps: renderApps2,
     renderTags,
     filterByTag,
-    launchApp,
+    launchApp: launchApp2,
     launchInTab,
     launchInIframe,
-    viewPublished,
+    viewPublished: viewPublished2,
     closeIframe,
     openExternal,
     setCurrentIframeUrl: function(url) {
@@ -7649,7 +7673,7 @@
     showContextMenu,
     hideContextMenu,
     handleContextAction,
-    generateId,
+    generateId: generateId2,
     readFileAsText,
     addAppFromUrl,
     addAppFromFile,
@@ -7667,11 +7691,11 @@
     clearAllData,
     importFromAimeat,
     processAimeatImport,
-    viewSource,
+    viewSource: viewSource2,
     generateHomepagePrompt,
-    showPublishModal,
+    showPublishModal: showPublishModal2,
     submitPublish,
-    loadPublishedApps,
+    loadPublishedApps: loadPublishedApps2,
     toggleCommunity,
     switchView,
     switchDbMode,
@@ -7734,7 +7758,7 @@
     cortexEditorAddLib,
     cortexEditorSave,
     cortexEditorExport,
-    openPromptBuilder,
+    openPromptBuilder: openPromptBuilder2,
     closePbPanel,
     onCardDragStart,
     onCardDragEnd,
@@ -7748,13 +7772,44 @@
   };
   window.showCortexPopup = showCortexPopup;
   window.cortexCopy = cortexCopy;
-  function refreshAll() {
+  function refreshAll2() {
     allApps = [];
-    renderApps();
-    loadPublishedApps();
+    renderApps2();
+    loadPublishedApps2();
     renderRecentlyOpened();
   }
   document.addEventListener("DOMContentLoaded", function() {
+    initDetail({
+      refreshAll: refreshAll2,
+      loadPublishedApps: loadPublishedApps2,
+      renderApps: renderApps2,
+      updateModeToggle: updateModeToggle2,
+      getCortexOwnerToken: getCortexOwnerToken2,
+      launchApp: launchApp2,
+      viewPublished: viewPublished2,
+      viewSource: viewSource2,
+      generateId: generateId2,
+      generateSharePrompt: generateSharePrompt2,
+      openPromptBuilder: openPromptBuilder2,
+      showPublishModal: showPublishModal2,
+      addImportIgnore: addImportIgnore2,
+      removeImportIgnore: removeImportIgnore2,
+      getMainApps: function() {
+        return allApps;
+      },
+      getServerState: function() {
+        return serverStateByFilename;
+      },
+      getServerManifests: function() {
+        return serverAppManifests;
+      },
+      getOwnProtection: function() {
+        return ownAppProtection;
+      },
+      setIframeUrl: function(v) {
+        currentIframeUrl = v;
+      }
+    });
     applyTheme(getThemePref());
     try {
       new MutationObserver(updateThemeToggle).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -7767,7 +7822,7 @@
     var _urlLang = _params.get("lang");
     setLang(_urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en");
     applyI18n();
-    updateModeToggle();
+    updateModeToggle2();
     var _savedView = "library";
     try {
       _savedView = localStorage.getItem("appCatalogView") || "library";
@@ -7780,8 +7835,8 @@
       if (_homeLabel && location.host) _homeLabel.textContent = location.host.replace(/^apps\./, "");
     } catch (e) {
     }
-    renderApps();
-    loadPublishedApps();
+    renderApps2();
+    loadPublishedApps2();
     loadCortexExtensions();
     loadConfigFromServer();
     document.getElementById("confirm-ok-btn").addEventListener("click", function() {
@@ -7795,13 +7850,13 @@
     });
     if (_params.get("create") === "1") {
       try {
-        openPromptBuilder(null);
+        openPromptBuilder2(null);
       } catch (e) {
       }
     }
     document.getElementById("search-input").addEventListener("input", function(e) {
       searchQuery = e.target.value.trim();
-      renderApps();
+      renderApps2();
       applyServerFilter();
     });
     document.getElementById("add-btn").addEventListener("click", function() {
@@ -7810,7 +7865,7 @@
     });
     document.getElementById("generate-btn").addEventListener("click", function() {
       closeCreateMenu();
-      openPromptBuilder(null);
+      openPromptBuilder2(null);
     });
     document.getElementById("settings-btn").addEventListener("click", function() {
       openSettings();
@@ -8079,7 +8134,7 @@
           break;
         }
       }
-      openPromptBuilder(app);
+      openPromptBuilder2(app);
     });
     document.getElementById("source-code").addEventListener("input", function() {
       var overlay = document.getElementById("source-overlay");
@@ -8119,7 +8174,7 @@
           btn.textContent = "Save Changes";
           btn.disabled = true;
         }, 1500);
-        renderApps();
+        renderApps2();
       }).catch(function(err) {
         btn.textContent = "Save Changes";
         btn.disabled = false;

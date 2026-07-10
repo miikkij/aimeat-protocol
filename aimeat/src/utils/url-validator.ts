@@ -12,6 +12,9 @@
  *   v2.0.0 — 2026-06-20 — Security (H-3): block-all-resolved-records, CGNAT +
  *     IPv4-mapped-IPv6 + alt-encoding coverage, and add redirect-revalidating
  *     safeFetch to close the redirect/DNS-rebind SSRF bypass.
+ *   v2.1.0 — 2026-07-10 — Loopback egress now gated by AIMEAT_ALLOW_PRIVATE_EGRESS (config resolves
+ *     it from the security profile; AIMEAT_DEV_MODE kept as a back-compat alias). RFC1918/link-local
+ *     stay blocked regardless.
  */
 import { URL } from 'node:url';
 import { lookup } from 'node:dns/promises';
@@ -78,9 +81,12 @@ export async function validateOutboundUrl(urlStr: string): Promise<{ valid: bool
 
   const hostname = parsed.hostname.toLowerCase();
 
-  // In dev mode, allow loopback for local webhook/hook testing.
-  const devMode = process.env.AIMEAT_DEV_MODE === 'true';
-  if (devMode && (hostname === 'localhost' || hostname === '::1' || /^127\./.test(hostname))) {
+  // Loopback egress is allowed only when private egress is permitted. config.ts normalises
+  // AIMEAT_ALLOW_PRIVATE_EGRESS from the security profile at boot (`local` default true so a dev
+  // node can reach a local Ollama / webhook; `public` default false); AIMEAT_DEV_MODE stays a
+  // back-compat alias. RFC1918/link-local/cloud-metadata remain blocked below regardless.
+  const allowPrivate = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true' || process.env.AIMEAT_DEV_MODE === 'true';
+  if (allowPrivate && (hostname === 'localhost' || hostname === '::1' || /^127\./.test(hostname))) {
     return { valid: true };
   }
 
