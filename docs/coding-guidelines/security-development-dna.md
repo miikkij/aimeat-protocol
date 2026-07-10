@@ -48,7 +48,7 @@ budget counter, a public-listing flag), that key must be **unreachable by a scop
 accepted patterns: (a) store it under a **synthetic system identity** the way network policy / site
 templates do (`__network_policy__`, `SITE_OWNER_GAII`) so no owner-scoped principal can address it; or
 (b) enforce a **reserved-key denylist** on `POST/PUT /v1/memory` for non-owner-session principals
-(`openrouter.*`, `secretary.*`, `specialist.*`, `ai-usage.*`, `profile.*.directory_listed`, …).
+(`openrouter.*`, `ai-usage.*`, `profile.*`, …).
 *Why:* an app the owner granted `memory:write` can otherwise poison the owner's own config (e.g. redirect
 where the AI key is sent). **Never mix user-data and security-load-bearing config in the same free-write namespace.**
 
