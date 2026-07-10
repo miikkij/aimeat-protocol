@@ -6466,6 +6466,7 @@ export class SqliteStorage implements Storage {
 
     if (filters.ownerGhii) { query += ' AND ownerGhii = ?'; params.push(filters.ownerGhii); }
     if (filters.visibility) { query += ' AND visibility = ?'; params.push(filters.visibility); }
+    if (filters.publicOrOwner) { query += ' AND (visibility = ? OR ownerGhii = ?)'; params.push('public', filters.publicOrOwner); }
     if (filters.status) { query += ' AND status = ?'; params.push(filters.status); }
     if (filters.sourceType) { query += ' AND sourceType = ?'; params.push(filters.sourceType); }
     if (filters.authRequired) { query += ' AND authRequired = ?'; params.push(filters.authRequired); }
