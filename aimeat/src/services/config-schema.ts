@@ -150,9 +150,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Service Generator (mutable) ──
   { key: 'generatorEnabled', dotPath: 'generator.enabled', envVar: 'AIMEAT_GENERATOR_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Service Generator in profile view' },
 
-  // ── Secretary + specialist agents (mutable; OFF by default) ──
-  { key: 'secretaryEnabled', dotPath: 'secretary.enabled', envVar: 'AIMEAT_SECRETARY_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable the Secretary + specialist agents (nav, routes, tick)' },
-
   // ── Push Notifications (Phase 3.1, mutable) ──
   { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },
 

@@ -32,11 +32,11 @@ function fmtTime(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute:
 
 /** Schedule kind → the CSS/colour suffix used by .sch-cal-ev--* and .sch-badge--*. */
 function kindClass(type) {
-  return ({ ai: 'ai', agent_task: 'agent', extension: 'ext', 'eco-capability': 'eco', secretary: 'sec' })[type] || 'core';
+  return ({ ai: 'ai', agent_task: 'agent', extension: 'ext', 'eco-capability': 'eco' })[type] || 'core';
 }
 /** i18n label key for a schedule kind (falls back to the raw type). */
 function kindLabel(type) {
-  const known = { ai: 'ai', agent_task: 'agent_task', extension: 'extension', 'eco-capability': 'eco-capability', secretary: 'secretary', core: 'core' };
+  const known = { ai: 'ai', agent_task: 'agent_task', extension: 'extension', 'eco-capability': 'eco-capability', core: 'core' };
   return known[type] ? 'profile.scheduler.kind.' + known[type] : null;
 }
 
@@ -143,7 +143,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
 
   const legend = kindsPresent.length ? html`<div class="sch-cal-legend">
     ${kindsPresent.map((k) => {
-      const type = { ai: 'ai', agent: 'agent_task', ext: 'extension', eco: 'eco-capability', sec: 'secretary', core: 'core' }[k];
+      const type = { ai: 'ai', agent: 'agent_task', ext: 'extension', eco: 'eco-capability', core: 'core' }[k];
       const lk = kindLabel(type);
       return html`<span class="sch-cal-legend-item" key=${k}><span class="sch-cal-swatch sch-cal-ev--${k}"></span>${lk ? t(lk) : type}</span>`;
     })}

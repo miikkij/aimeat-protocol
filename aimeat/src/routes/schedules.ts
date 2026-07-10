@@ -50,8 +50,8 @@ import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
 
-type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'secretary';
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'secretary'];
+type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability';
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. */
 function isValidCron(cron: string, timezone?: string): boolean {

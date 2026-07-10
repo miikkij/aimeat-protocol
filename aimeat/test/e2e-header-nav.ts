@@ -9,6 +9,8 @@
  *   v1.1.0 — 2026-07-01 — Assert the `features` map (features.secretary) the SPA shell reads to gate
  *            optional surfaces. The shared runner pins AIMEAT_SECRETARY_ENABLED=on, so it is true here;
  *            the off path is covered by e2e-secretary-disabled.ts (self-spawns a flag-off server).
+ *   v1.2.0 — 2026-07-10 — Drop the features.secretary assertion; the Secretary feature was removed
+ *            (the `features` map is now empty). Generic header-nav tests unchanged.
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -120,12 +122,6 @@ await test('GET /v1/site/header-nav — public, returns all links visible in def
     assert(body.data.order.length === KNOWN.length, `order length ${body.data.order.length}`);
     assert(KNOWN.every(id => body.data.order.includes(id)), 'order should contain all known ids');
     assert(body.data.hidden.length === 0, 'hidden should be empty by default');
-});
-
-await test('GET /v1/site/header-nav — exposes features.secretary (on, pinned by the runner)', async () => {
-    const { body } = await json('/v1/site/header-nav');
-    assert(body.data.features && typeof body.data.features === 'object', 'features should be an object');
-    assert(body.data.features.secretary === true, `features.secretary should be true on the shared server, got ${JSON.stringify(body.data.features)}`);
 });
 
 // ─── Auth guards ───

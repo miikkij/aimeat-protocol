@@ -38,12 +38,10 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
-import type { EnterpriseProvider } from '../enterprise/provider.js';
-import { resolveEnterpriseDirectiveLayer, dropEnterpriseDuplicates } from '../services/secretary.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher, enterprise?: EnterpriseProvider): Router {
+export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
 
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
@@ -89,28 +87,12 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
       source: 'agent' as const,
     }));
 
-    // Layer 2.5: Enterprise (edition-locked) rules — ONLY for a company Secretary, sourced live from
-    // the Enterprise edition seam (never persisted, so the edition can swap a company's brain and it
-    // takes effect at once, and each company's secretary resolves its OWN org's brain — multi-company
-    // safe). Ranked above owner/agent and read-only: the owner/agent layers below it stay editable, so
-    // a locked enterprise brain and per-owner customization can coexist. Community (the stub omits
-    // secretaryDirectives) yields an empty layer, so every other agent — and every Community node — is
-    // unaffected. The brain is never editable here: PUT only writes the agent layer.
-    const enterpriseLayer = resolveEnterpriseDirectiveLayer(agent.tags, enterprise, config.nodeId);
-
-    // G1: collapse any stale persisted brain copy. A company Secretary provisioned before the brain
-    // became seam-sourced (≤ v0.2.0) still holds the locked brain in its agent/owner layer; without this
-    // it would render a second time next to the live enterprise overlay. dropEnterpriseDuplicates is a
-    // no-op when there is no enterprise layer, so Community and non-company agents are untouched.
-    const ownerRulesShown = dropEnterpriseDuplicates(ownerRules, enterpriseLayer.rules);
-    const agentRulesShown = dropEnterpriseDuplicates(agentRules, enterpriseLayer.rules);
-
-    // Merge: system + enterprise (locked) + owner + agent
-    const mergedRules = [...systemRules, ...enterpriseLayer.rules, ...ownerRulesShown, ...agentRulesShown];
+    // Merge: system + owner + agent
+    const mergedRules = [...systemRules, ...ownerRules, ...agentRules];
 
     const responseData: Record<string, unknown> = {
-      purpose: enterpriseLayer.purpose || (agentDirectives?.purpose ?? ''),
-      enterprise_locked: enterpriseLayer.rules.length > 0,
+      purpose: agentDirectives?.purpose ?? '',
+      enterprise_locked: false,
       rules: mergedRules,
       memory_areas: (agentDirectives?.memoryAreas ?? []).map(ma => ({
         key_prefix: ma.keyPrefix,
