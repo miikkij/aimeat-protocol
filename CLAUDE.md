@@ -142,6 +142,12 @@ Workspaces: **Development** (`ws-mq664uyfz21`), **Handbook** (`ws-mq6653ry24h`),
 
 Rule 9 still holds: never add a `known-gap` on your own.
 
+### LOOM roadmap work (MACHINE ROOM WARP/FABRIC) — reference resolution
+
+When creating/editing `room.target` records in the MACHINE ROOM workspace (org `e8617051-...`, ws `ws-mr48730nq0b`), LOOM's `resolveDocRef` resolves `born_from.docs` / event `refs` from ONLY three places: (1) the MACHINE ROOM **`room.design`** space (the YARN rule: design docs come only from there), (2) a librarian full-text search, (3) fallback: the dev organism's **Development** workspace (`ws-mq664uyfz21`). A doc anywhere else — DESIGN STUDIO (`ws-mr5mauol7vk`), `room.outbox`, any other workspace — renders as a red "ei saatavilla" chip.
+
+**Rule: when a target is born from a DESIGN STUDIO session doc (SESSIO NNN), mirror that doc into `room.design` with the SAME doc id** (note the canonical location at the top of the mirror) before or when publishing the target. Same for any other referenced doc living outside the three resolvable places. FABRIC cards/releases follow the same ref rule. Also: `room.target_event` and `room.release` are **append-only** (a publish over an existing id is refused); `room.target` and `room.card` are updatable but require `expected_version`. Write proper Finnish (ä/ö) in every record field — the node is fully UTF-8; append-only namespaces make orthography mistakes permanent.
+
 ## Architecture
 
 - **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
