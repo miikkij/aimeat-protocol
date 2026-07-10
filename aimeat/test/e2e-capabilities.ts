@@ -569,6 +569,77 @@ await test('Cleanup private cap', async () => {
     });
 });
 
+// ─── Phase 10: Cross-owner PRIVATE list isolation (B5 regression) ───
+// A registered non-operator must NEVER see ANOTHER owner's PRIVATE capability via the discovery list.
+// Before the fix, GET /v1/capabilities forced visibility=public ONLY for anonymous callers, so every
+// logged-in user saw all owners' private rows (ownerGhii + webhookUrl). Here the operator owns a
+// private + a public cap; a freshly-registered non-operator (B) must be blind to the private one but
+// still see the public one (guards against over-restricting the public directory).
+console.log('\nPhase 10 — Cross-owner PRIVATE list isolation (B5)');
+
+const opPrivCap = 'op-priv-' + Math.random().toString(36).slice(2, 8);
+const opPubCap = 'op-pub-' + Math.random().toString(36).slice(2, 8);
+const nonOp = 'capb-' + Math.random().toString(36).slice(2, 8);
+let nonOpToken = '';
+
+await test('Operator creates a PRIVATE + a PUBLIC capability', async () => {
+    for (const [id, visibility] of [[opPrivCap, 'private'], [opPubCap, 'public']] as const) {
+        const { status, body } = await json('/v1/capabilities', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${ownerToken}` },
+            body: JSON.stringify({
+                id, name: `${visibility} cap`, summary: `operator ${visibility} capability`,
+                source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+                callable: true, authRequired: 'registered', visibility, status: 'active',
+            }),
+        });
+        assert(status === 201, `create ${visibility}: ${status} ${JSON.stringify(body)}`);
+    }
+});
+
+await test('Register a non-operator owner (B)', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: nonOp, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `register ${nonOp}: ${status} ${JSON.stringify(body)}`);
+    const priv = body.data.private_key;
+    const ts = new Date().toISOString();
+    const sig = await signMsg(priv, nonOp + NODE_ID + ts);
+    const { body: tb } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: nonOp, timestamp: ts, signature: sig }),
+    });
+    assert(tb.ok === true, `auth ${nonOp}: ${JSON.stringify(tb.error)}`);
+    assert(!(tb.data.roles ?? []).includes('operator'), 'B must NOT be an operator');
+    nonOpToken = tb.data.token;
+});
+
+await test('Non-operator B does NOT see the operator PRIVATE capability (LEAK closed)', async () => {
+    const { status, body } = await json('/v1/capabilities?per_page=200', {
+        headers: { 'Authorization': `Bearer ${nonOpToken}` },
+    });
+    assert(status === 200, `list status ${status}`);
+    const ids = (body.data?.capabilities ?? []).map((c: any) => c.id);
+    assert(!ids.includes(opPrivCap), 'B must NOT see another owner private cap (LEAK!)');
+});
+
+await test('Non-operator B DOES still see the operator PUBLIC capability', async () => {
+    const { status, body } = await json('/v1/capabilities?per_page=200', {
+        headers: { 'Authorization': `Bearer ${nonOpToken}` },
+    });
+    assert(status === 200, `list status ${status}`);
+    const ids = (body.data?.capabilities ?? []).map((c: any) => c.id);
+    assert(ids.includes(opPubCap), 'B must still see public caps (not over-restricted)');
+});
+
+await test('Cleanup B + operator caps', async () => {
+    await json(`/v1/owners/${nonOp}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${nonOpToken}` } });
+    for (const id of [opPrivCap, opPubCap]) {
+        await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${ownerToken}` } });
+    }
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Delete test owner (cascade)', async () => {

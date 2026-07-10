@@ -6648,6 +6648,7 @@ export class PrismaStorage implements Storage {
         const where: any = {};
         if (filters.ownerGhii) where.ownerGhii = filters.ownerGhii;
         if (filters.visibility) where.visibility = filters.visibility;
+        if (filters.publicOrOwner) where.AND = [{ OR: [{ visibility: 'public' }, { ownerGhii: filters.publicOrOwner }] }];
         if (filters.status) where.status = filters.status;
         if (filters.sourceType) where.sourceType = filters.sourceType;
         if (filters.authRequired) where.authRequired = filters.authRequired;

@@ -55,6 +55,11 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     if (!req.auth || req.auth.anonymous) {
       filters.visibility = 'public';
       if (!filters.status) filters.status = 'active';
+    } else if (!(req.auth.roles ?? []).includes('operator')) {
+      // Registered non-operator: PUBLIC capabilities + your OWN (any visibility). Never another owner's
+      // private rows (which carry webhookUrl / ownerGhii). Mirrors the anonymous restriction above — the
+      // anon path was gated, but registered users previously saw every owner's private capabilities.
+      filters.publicOrOwner = resolve(req);
     }
 
     const result = await storage.listCapabilities(filters);
