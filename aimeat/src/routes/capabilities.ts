@@ -207,6 +207,11 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
 
     const callerGhii = resolve(req);
+    // Ownership (SECURITY): a PRIVATE capability may only be invoked by its owner (or an operator) — the
+    // read route hides private caps from non-owners, so invoke must too (404, don't confirm existence).
+    if (cap.visibility === 'private' && callerGhii !== cap.ownerGhii && !req.auth!.roles.includes('operator')) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+    }
     const jwt = (req.headers.authorization || '').replace('Bearer ', '');
     const mode = (req.query.mode as string) === 'raw' ? 'raw' as const : 'normal' as const;
     const input = req.body.input || {};

@@ -370,6 +370,14 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const manifestKey = `packages/${packageId}/manifest`;
+    // Ownership (SECURITY): only the package owner may delete its links. Mirror the POST /link guard —
+    // resolve the caller's identity and require the manifest to exist in THEIR namespace (else 404).
+    const ownerGaii = resolve(req);
+    const manifest = await storage.getMemory(ownerGaii, manifestKey);
+    if (!manifest) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
+      return;
+    }
     const deleted = await storage.deleteLink(manifestKey, target);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Link not found'));

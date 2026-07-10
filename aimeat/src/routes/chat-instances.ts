@@ -92,6 +92,13 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
+    // Ownership (SECURITY): a chat instance's economy (morsel balance, trust score) is private to its
+    // owner. Only the same owner or an operator may read it — 404 (not 403) so existence isn't confirmed.
+    if (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
+      return;
+    }
+
     // Resolve GHII for economy data
     const ghiiRecord = await storage.getGHII(record.ghii);
 
@@ -123,6 +130,12 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
+    // Ownership (SECURITY): only the same owner or an operator may update this instance.
+    if (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
+      return;
+    }
+
     const updated = await storage.updateChatInstance(id, {
       lastSeen: new Date().toISOString(),
     });
@@ -139,13 +152,16 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   // DELETE /v1/chat-instances/:id — End chat session
   router.delete('/v1/chat-instances/:id', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
-    const deleted = await storage.deleteChatInstance(id);
+    const record = await storage.getChatInstance(id);
 
-    if (!deleted) {
+    // Ownership (SECURITY): fetch first and verify the caller owns it — only the same owner or an
+    // operator may delete this instance (previously deleted by id with no ownership check).
+    if (!record || (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator'))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
 
+    await storage.deleteChatInstance(id);
     res.json(success(config.nodeId, { deleted: true, id }));
     emitChange('chat');
   });
