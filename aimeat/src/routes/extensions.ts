@@ -8,6 +8,9 @@
  *   manifest→record validator used by both POST and PUT.
  * @usage app.use(extensionsRouter(config, storage, scheduler, emailService)) in server.ts
  * @version-history
+ *   v1.3.0 — 2026-07-10 — Security (TARGET-020): ownership guard (canManageInstalledExt) on
+ *     activate/deactivate — owner sessions bypass requireScope, so a second owner could toggle another
+ *     owner's extension (DELETE/PUT/instances were already guarded).
  *   v1.2.0 — 2026-06-24 — Secretary P5 (S-C / §18): config fields marked `type: secret` (manifest
  *     `config:` or per-instance `config_per_instance`) are encrypted at rest (AES-256-GCM, node key)
  *     on install/update + instance create/update, decrypted only just before the sandbox VM, and
@@ -710,6 +713,13 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
+      // Ownership: owner sessions bypass requireScope, so guard activate the same way as
+      // update/delete — only the installing owner (or an operator) may toggle it.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
+      }
+
       const updated = await storage.updateExtension(name, {
         status: 'active',
         activatedAt: new Date().toISOString(),
@@ -769,6 +779,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       const ext = await storage.getExtension(name);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+
+      // Ownership: only the installing owner (or an operator) may deactivate it.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
 

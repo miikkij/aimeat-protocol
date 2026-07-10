@@ -702,8 +702,80 @@ await test('Activate non-existent returns 404', async () => {
   assert(body.error?.code === 'NOT_FOUND', `code: ${body.error?.code}`);
 });
 
+// ─── Cross-owner authorization (TARGET-020) ───
+// Owner sessions bypass requireScope, so the per-resource `installedBy` guards on
+// export/activate/deactivate/delete are the ONLY thing stopping a second owner from reading or
+// destroying the first owner's extension. Verify each returns 403 and the extension survives.
+console.log('\nCross-owner authorization');
+
+const otherOwnerName = `cortexother${Date.now()}`;
+let otherToken = '';
+
+await test('Register second owner + token', async () => {
+  const reg = await json('/v1/owners', {
+    method: 'POST',
+    body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }),
+  });
+  assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const otherPriv = reg.body.data.private_key;
+  const timestamp = new Date().toISOString();
+  const signature = await signMsg(otherPriv, otherOwnerName + NODE_ID + timestamp);
+  const tok = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ owner: otherOwnerName, timestamp, signature }),
+  });
+  assert(tok.body.ok === true, `token ok: ${JSON.stringify(tok.body.error)}`);
+  otherToken = tok.body.data?.token;
+  assert(typeof otherToken === 'string', 'got second owner token');
+});
+
+await test('Second owner CANNOT export first owner\'s extension (403)', async () => {
+  const { status, body } = await json(`/v1/cortex/${RECIPE_ENC}/export`, {
+    headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(status === 403, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('Second owner CANNOT deactivate first owner\'s extension (403)', async () => {
+  const { status, body } = await json(`/v1/cortex/${RECIPE_ENC}/deactivate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(status === 403, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('Second owner CANNOT activate first owner\'s extension (403)', async () => {
+  const { status, body } = await json(`/v1/cortex/${RECIPE_ENC}/activate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(status === 403, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('Second owner CANNOT delete first owner\'s extension (403); it survives', async () => {
+  const del = await json(`/v1/cortex/${RECIPE_ENC}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(del.status === 403, `delete status ${del.status}: ${JSON.stringify(del.body)}`);
+  assert(del.body.error?.code === 'FORBIDDEN', `code: ${del.body.error?.code}`);
+  const get = await json(`/v1/cortex/${RECIPE_ENC}`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(get.status === 200, `owner can still read it after blocked delete: ${get.status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
+
+// Delete the second owner
+await json(`/v1/owners/${otherOwnerName}`, {
+  method: 'DELETE',
+  headers: { Authorization: `Bearer ${otherToken}` },
+});
 
 // Remove all test extensions
 for (const name of [RECIPE_EXT, PROJECT_EXT, IOT_EXT]) {

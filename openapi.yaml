@@ -20934,6 +20934,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -20953,6 +20955,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/cortex/{name}/deactivate:
     post:
@@ -20970,6 +20974,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/cortex/{name}/visibility:
     post:
@@ -21072,6 +21078,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/cortex/{name}/libs/{libFile}:
     get:
