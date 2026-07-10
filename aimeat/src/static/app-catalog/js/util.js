@@ -95,3 +95,25 @@ export function currentOwnerName() {
   } catch (e) {}
   return null;
 }
+
+/** A UUID (crypto.randomUUID with an older-browser fallback). Pure — shared by every module that mints app ids. */
+export function generateId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0;
+    var v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/** Read a File/Blob as a UTF-8 string (Promise). Pure FileReader helper. */
+export function readFileAsText(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function () { resolve(reader.result); };
+    reader.onerror = function () { reject(reader.error); };
+    reader.readAsText(file);
+  });
+}
