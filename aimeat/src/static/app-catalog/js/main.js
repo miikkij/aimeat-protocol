@@ -11,6 +11,7 @@ import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
+import { loadConfig, saveConfig } from './config.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -61,34 +62,7 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
     personalBtn.title = signedIn ? t('mode.personal.title') : t('mode.personal.needsLogin');
   }
 
-  // ── Config (localStorage) ─────────────────────────
-
-  const DEFAULT_CONFIG = {
-    theme: 'light',
-    defaultOpenMode: 'tab',
-    aimeatUrl: window.location.origin,
-    language: 'en'
-  };
-
-  function loadConfig() {
-    var cfg;
-    try {
-      cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem('appLauncherConfig') || '{}'));
-    } catch (e) {
-      cfg = Object.assign({}, DEFAULT_CONFIG);
-    }
-    // The catalog is SERVED BY its node and talks to it same-origin. The old "download it and point
-    // it at any node" standalone story is retired: it forced CORS `*`, could never sign in from a
-    // foreign origin (auth-lib loads same-origin), and is increasingly blocked by browsers' Private/
-    // Local Network Access. localhost / aimeat-desktop / federation all work because each node serves
-    // its OWN catalog same-origin. Always use the serving origin as the node URL.
-    cfg.aimeatUrl = window.location.origin;
-    return cfg;
-  }
-
-  function saveConfig(config) {
-    localStorage.setItem('appLauncherConfig', JSON.stringify(config));
-  }
+  // ── Config → config.js (loadConfig / saveConfig, imported above) ──
 
   // ── ID Generator ─────────────────────────────────
 
