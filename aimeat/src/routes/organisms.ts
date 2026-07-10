@@ -13,6 +13,10 @@
  *     mint, emailed code = its password; per-inviter quota; app-origin callable via organism:invite scope)
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   v1.x -- 2026-07-11 -- Referential-integrity scan: GET /:id/workspace/dangling-refs flags reference
+ *     fields (must_read/refs/born_from.docs/parent_id/target_id/card_id/release_id) + document prose
+ *     mentions that point to a missing or archived id in the SAME workspace — read-only, never blocks a
+ *     write (the anomaly-watch pattern). See services/dangling-refs.ts.
  *   v1.x -- 2026-07-05 -- Provisioned-code invitations: POST/GET/cancel /:id/invitations/code. A member
  *     provisions a numbered guest account whose emailed code IS its password; per-inviter quota
  *     (INVITE_CODE_QUOTA_PER_MEMBER, org creator/admin unlimited); cancel while un-activated deletes the
@@ -114,6 +118,7 @@ import { importWorkspace } from '../services/workspace-import.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
 import { searchOrganismContent } from '../services/organism-search.js';
+import { scanOrganismDanglingRefs } from '../services/dangling-refs.js';
 import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, type WorkspaceComment } from '../services/organism-comments.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -1420,6 +1425,29 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const node = await collectWorkspaceGraph(storage, config, { orgId: id, ws, viewerGaii });
     res.json(success(config.nodeId, { graph: node }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/dangling-refs — referential-integrity scan ──
+   * Read-only: finds reference fields (must_read, refs, born_from.docs, parent_id, target_id,
+   * card_id, release_id) and document prose mentions that point to an id which is missing — or only
+   * archived — in the SAME workspace. The anomaliavahti pattern (TARGET-009 family): it flags, it
+   * never blocks a write. Optional ?ws=<id> limits the scan to one workspace; otherwise every
+   * registered workspace the caller can read. Same membership + manifest read gate as GET
+   * /:id/workspace. Generic across every organism (peer of /overview, /graph, /search). */
+  router.get('/v1/organisms/:id/workspace/dangling-refs', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const onlyWs = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const { findings, scannedWorkspaces, truncated } = await scanOrganismDanglingRefs(storage, config, organism, callerGaii, onlyWs);
+    res.json(success(config.nodeId, { findings, total: findings.length, scannedWorkspaces, truncated }));
   });
 
   /* ── GET /v1/organisms/:id/structure/history — the structure TIMELINE ──

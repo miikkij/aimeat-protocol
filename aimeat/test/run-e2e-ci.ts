@@ -95,6 +95,7 @@ const ALL_SUITES = [
     'test/e2e-organism-member-visibility.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
+    'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',
     'test/e2e-discover.ts',
     'test/e2e-notebook-plan.ts',
