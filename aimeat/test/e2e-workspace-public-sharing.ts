@@ -6,6 +6,10 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   v1.1.0 — 2026-07-10 — TARGET-025 share access modes: password mode (unlock → X-Share-Token,
+ *     wrong password generic 401, per-IP rate limit 429, member bypass), account mode
+ *     (anon → 401 SHARE_ACCOUNT_REQUIRED, any authenticated account → 200), hash redaction
+ *     (has_password only — the scrypt hash never appears in any response), PUT validation.
  *   v1.0.0 — 2026-06-09 — Initial: slice 1 (backend) of the workspace public-sharing plan.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-workspace-public-sharing
@@ -167,6 +171,91 @@ await test('11. unknown ws / unknown org → 404 (no disclosure)', async () => {
 await test('12. PUT validation: a non-boolean spaces map is rejected (400)', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ spaces: { page: 'yes' } }) });
     assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
+// ── TARGET-025: access modes (open / password / account) ──
+const SHARE_PW = 'sesame-4242';
+
+await test('13. PUT validation: bad access value → 400; access password without a password → 400', async () => {
+    const bad = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'vip' }) });
+    assert(bad.status === 400, `bad access expected 400, got ${bad.status}`);
+    const noPw = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'password' }) });
+    assert(noPw.status === 400, `password mode without password expected 400, got ${noPw.status}`);
+    const shortPw = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'password', password: 'ab' }) });
+    assert(shortPw.status === 400, `too-short password expected 400, got ${shortPw.status}`);
+});
+
+await test('14. set access password + password; response/GET carry has_password, NEVER the hash', async () => {
+    const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'password', password: SHARE_PW }) });
+    assert(put.status === 200, `put ${put.status}: ${JSON.stringify(put.body.error || put.body)}`);
+    assert(put.body.data.share.access === 'password' && put.body.data.share.has_password === true, `redacted share state: ${JSON.stringify(put.body.data.share)}`);
+    const get = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { headers: AH() });
+    assert(get.body.data.share.access === 'password' && get.body.data.share.has_password === true, 'GET reflects access + has_password');
+    const dumped = JSON.stringify(put.body) + JSON.stringify(get.body);
+    assert(!dumped.includes('passwordHash') && !dumped.includes('v2:'), 'the scrypt hash must never appear in any response');
+});
+
+await test('15. password mode: anonymous public reads → 401 SHARE_PASSWORD_REQUIRED (list, single, md)', async () => {
+    const list = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`);
+    assert(list.status === 401 && list.body.error.code === 'SHARE_PASSWORD_REQUIRED', `list: ${list.status} ${JSON.stringify(list.body.error)}`);
+    const one = await json(`/v1/organisms/${orgId}/workspace/public/document?ws=${WS}&type=page&id=rules`);
+    assert(one.status === 401 && one.body.error.code === 'SHARE_PASSWORD_REQUIRED', `single: ${one.status}`);
+    const md = await raw(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}&format=md`);
+    assert(md.status === 401, `md: ${md.status}`);
+});
+
+await test('16. unlock with the wrong password → generic 401 INVALID_PASSWORD', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/share/unlock`, { method: 'POST', body: JSON.stringify({ ws: WS, password: 'wrong-password' }) });
+    assert(r.status === 401 && r.body.error.code === 'INVALID_PASSWORD', `${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+let shareToken = '';
+await test('17. unlock with the right password → share token; X-Share-Token opens the reads', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/share/unlock`, { method: 'POST', body: JSON.stringify({ ws: WS, password: SHARE_PW }) });
+    assert(r.status === 200 && typeof r.body.data.share_token === 'string', `unlock: ${r.status} ${JSON.stringify(r.body.error || {})}`);
+    shareToken = r.body.data.share_token;
+    const list = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { 'X-Share-Token': shareToken } });
+    assert(list.status === 200, `tokened list: ${list.status}`);
+    const ids = (list.body.data.documents || []).map((d: any) => d.id);
+    assert(JSON.stringify(ids) === JSON.stringify(['rules']), `share flags still apply under token, got ${JSON.stringify(ids)}`);
+    const md = await raw(`/v1/organisms/${orgId}/workspace/public/document?ws=${WS}&type=page&id=rules&format=md`, { headers: { 'X-Share-Token': shareToken } });
+    assert(md.status === 200 && md.text.includes('# House Rules'), `tokened md: ${md.status}`);
+});
+
+await test('18. a tampered/garbage token does not open the reads', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { 'X-Share-Token': shareToken.slice(0, -4) + 'AAAA' } });
+    assert(r.status === 401 && r.body.error.code === 'SHARE_PASSWORD_REQUIRED', `${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('19. an authenticated org member (creator A) passes the password gate without a token', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: AH() });
+    assert(r.status === 200, `member read: ${r.status}`);
+});
+
+await test('20. unlock brute force hits the per-IP rate limit (429)', async () => {
+    let got429 = false;
+    for (let i = 0; i < 12; i++) {
+        const r = await json(`/v1/organisms/${orgId}/workspace/share/unlock`, { method: 'POST', body: JSON.stringify({ ws: WS, password: `nope-${i}` }) });
+        if (r.status === 429) { got429 = true; break; }
+        assert(r.status === 401, `attempt ${i}: expected 401/429, got ${r.status}`);
+    }
+    assert(got429, 'expected a 429 within 12 rapid attempts (limit 10 / 15 min per IP)');
+});
+
+await test('21. account mode: anonymous → 401 SHARE_ACCOUNT_REQUIRED; any signed-in account (non-member B) → 200', async () => {
+    const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'account' }) });
+    assert(put.status === 200 && put.body.data.share.access === 'account', `put ${put.status}`);
+    const anon = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`);
+    assert(anon.status === 401 && anon.body.error.code === 'SHARE_ACCOUNT_REQUIRED', `anon: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const b = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { Authorization: `Bearer ${B.ownerToken}` } });
+    assert(b.status === 200, `signed-in non-member: ${b.status}`);
+});
+
+await test('22. back to open + password cleared: anonymous reads work again, has_password=false', async () => {
+    const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'open', password: null }) });
+    assert(put.status === 200 && put.body.data.share.access === 'open' && put.body.data.share.has_password === false, `put: ${JSON.stringify(put.body.data?.share)}`);
+    const r = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`);
+    assert(r.status === 200, `open read: ${r.status}`);
 });
 
 await test('Cleanup owner A', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: AH() }); assert(r.status === 200, `del ${r.status}`); });

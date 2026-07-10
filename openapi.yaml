@@ -16899,9 +16899,12 @@ paths:
       summary: Read a workspace's document-space public-sharing state
       description: |
         Returns the `meta.share` record for a workspace —
-        `{ public, spaces: { [typeName]: boolean }, docs: { [`${typeName}/${id}`]: boolean } }` —
-        which controls what document-space content is served by the no-auth public endpoints. Any
-        active member may read it. Absent record → the empty default (nothing public).
+        `{ public, spaces: { [typeName]: boolean }, docs: { [`${typeName}/${id}`]: boolean },
+        access: 'open'|'password'|'account', has_password: boolean }` —
+        which controls what document-space content is served by the no-auth public endpoints and how
+        that public read path is gated. The stored password hash is never returned — only
+        `has_password`. Any active member may read it. Absent record → the empty default
+        (nothing public, access `open`).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -16916,10 +16919,16 @@ paths:
       operationId: setWorkspaceShare
       summary: Set a workspace's document-space public-sharing state
       description: |
-        Merges `{ public?, spaces?, docs? }` into the workspace's `meta.share` record. Resolution for
-        "is doc D in space S public?": `docs["S/D"]` if set, else `spaces[S]` if set, else `public`.
-        Only the workspace creator or an org admin may write. The record is stored under the workspace
-        creator's GHII so there is exactly one canonical share record per workspace.
+        Merges `{ public?, spaces?, docs?, access?, password? }` into the workspace's `meta.share`
+        record. Resolution for "is doc D in space S public?": `docs["S/D"]` if set, else `spaces[S]`
+        if set, else `public`. `access` gates the no-auth public read path: `open` (default, link
+        only), `password` (visitors exchange the share password for a token via
+        `POST /workspace/share/unlock`), `account` (any authenticated session on this node).
+        `password` as a string (4–128 chars) sets a new share password (stored as a scrypt hash,
+        never returned), `null` clears it, absent keeps the previous one; `access: 'password'`
+        requires a password to be set. Only the workspace creator or an org admin may write. The
+        record is stored under the workspace creator's GHII so there is exactly one canonical share
+        record per workspace.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -16941,11 +16950,51 @@ paths:
                   type: object
                   additionalProperties: { type: boolean }
                   description: Per-doc override, key is `${typeName}/${id}`
+                access:
+                  type: string
+                  enum: [open, password, account]
+                  description: How the no-auth public read path is gated (default open)
+                password:
+                  type: string
+                  nullable: true
+                  minLength: 4
+                  maxLength: 128
+                  description: Set (string) or clear (null) the share password; absent keeps the previous one
       responses:
-        '200': { description: The merged share state }
+        '200': { description: The merged share state (redacted — has_password, never the hash) }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace/share/unlock:
+    post:
+      operationId: unlockWorkspaceShare
+      summary: Exchange a share password for a share token (NO AUTH)
+      description: |
+        For a workspace whose share `access` is `password`: verifies the share password and returns a
+        short-lived (24 h) share token. The client presents the token on the no-auth public-document
+        reads via the `X-Share-Token` header — the password itself travels only once. Tightly
+        rate-limited per client IP. Any failure (wrong password, no password configured, unknown
+        workspace) is the same generic 401 INVALID_PASSWORD, with a timing-uniform verification, so
+        the endpoint discloses nothing.
+      tags: [Organisms]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, password]
+              properties:
+                ws: { type: string, description: Workspace id }
+                password: { type: string, description: The share password }
+      responses:
+        '200': { description: '`{ share_token, expires_in }` — send as X-Share-Token on the public reads' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid password (generic — no disclosure) }
+        '429': { description: Too many attempts (per-IP rate limit) }
 
   /v1/organisms/{id}/workspace/public/documents:
     get:
@@ -16955,15 +17004,19 @@ paths:
         Returns the PUBLISHED (`.latest`) document-space pages a workspace has marked public via
         `meta.share`. No authentication. Drafts are never served. `?space=` limits to one document
         space; `?format=md` returns a single concatenated markdown document (text/markdown) instead of
-        JSON. Returns 404 (no disclosure) when nothing is public.
+        JSON. Returns 404 (no disclosure) when nothing is public. When the share's `access` mode gates
+        the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock
+        endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
         - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one document-space (objectType name) }
         - { name: format, in: query, required: false, schema: { type: string, enum: [md] }, description: Return concatenated markdown instead of JSON }
+        - { name: X-Share-Token, in: header, required: false, schema: { type: string }, description: Share token from POST /workspace/share/unlock (password access mode) }
       responses:
         '200': { description: The public documents (JSON) or concatenated markdown }
+        '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/organisms/{id}/workspace/public/document:
@@ -16973,7 +17026,9 @@ paths:
       description: |
         Returns one PUBLISHED + public document-space page. No authentication. `?format=md` returns its
         raw markdown (text/markdown) instead of JSON. Returns 404 if the page is missing, a draft only,
-        or not marked public.
+        or not marked public. When the share's `access` mode gates the read, returns 401
+        `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock endpoint) or 401
+        `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -16981,8 +17036,10 @@ paths:
         - { name: type, in: query, required: true, schema: { type: string }, description: Document-space (objectType) name }
         - { name: id, in: query, required: true, schema: { type: string }, description: Document id }
         - { name: format, in: query, required: false, schema: { type: string, enum: [md] }, description: Return raw markdown instead of JSON }
+        - { name: X-Share-Token, in: header, required: false, schema: { type: string }, description: Share token from POST /workspace/share/unlock (password access mode) }
       responses:
         '200': { description: The document (JSON) or its markdown }
+        '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/organisms/{id}/export:

@@ -12,6 +12,11 @@
  * @structure PublicWorkspaceViewer (default export)
  * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>]
  * @version-history
+ *   v1.2.0 — 2026-07-10 — TARGET-025 share access modes: a 401 SHARE_PASSWORD_REQUIRED renders a
+ *     password prompt (unlock → X-Share-Token kept in sessionStorage per org+ws, sent on reads);
+ *     SHARE_ACCOUNT_REQUIRED renders a sign-in-required state (the read retries with the shell
+ *     session's JWT once signed in). The load fetch now attaches the SPA session JWT when present
+ *     so members/signed-in visitors pass the gate without a token.
  *   v1.0.0 — 2026-06-09 — Initial: slice 2 of the workspace public-sharing plan.
  *   v1.1.0 — 2026-06-09 — Continuous whole-space render (all pages stacked → print captures everything)
  *     with scroll-spy TOC; "Copy AI link" button exposing the ?format=md Markdown-bundle API URL.
@@ -38,22 +43,45 @@ function parseParams() {
   return { org: p.get('org') || '', ws: p.get('ws') || '', type: p.get('type') || '', id: p.get('id') || '' };
 }
 
+// sessionStorage key for the share token of one workspace (password access mode).
+const shareTokenKey = (org, ws) => `aimeat.pwv.st.${org}.${ws}`;
+
 export default function PublicWorkspaceViewer() {
   useViewCSS('/css/views/public-workspace-viewer.css');
   const { org, ws, type, id } = parseParams();
   const [docs, setDocs] = useState(undefined); // undefined = loading, [] = none/unavailable, array = loaded
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
+  const [gate, setGate] = useState(null);      // null | 'password' | 'account' — 401 gate from the share's access mode
+  const [pw, setPw] = useState('');
+  const [unlockErr, setUnlockErr] = useState(null);
+  const [unlockBusy, setUnlockBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!org || !ws) { setDocs([]); return; }
     setError(null);
     try {
-      const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}`);
-      if (res.status === 404) { setDocs([]); return; }
+      // Attach the SPA session JWT when signed in (members + account-mode visitors pass the gate)
+      // and the stored share token when this workspace was unlocked with a password.
+      const headers = /** @type {Record<string, string>} */ ({});
+      const session = window.AIMEAT?.auth?.getSession?.();
+      if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+      let st = null;
+      try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }
+      if (st) headers['X-Share-Token'] = st;
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}`, { headers });
+      if (res.status === 404) { setDocs([]); setGate(null); return; }
+      if (res.status === 401) {
+        const body = await res.json().catch(() => null);
+        const code = body?.error?.code;
+        setGate(code === 'SHARE_ACCOUNT_REQUIRED' ? 'account' : 'password');
+        setDocs([]);
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       const list = Array.isArray(body?.data?.documents) ? body.data.documents : [];
+      setGate(null);
       setDocs(list);
       const want = type && id ? `${type}/${id}` : null;
       setSelected(
@@ -65,6 +93,29 @@ export default function PublicWorkspaceViewer() {
       setDocs([]);
     }
   }, [org, ws, type, id]);
+
+  // Exchange the typed password for a share token (kept per org+ws in sessionStorage), then reload.
+  const unlock = useCallback(async (e) => {
+    if (e) e.preventDefault();
+    if (!pw || unlockBusy) return;
+    setUnlockBusy(true); setUnlockErr(null);
+    try {
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/share/unlock`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ws, password: pw }),
+      });
+      if (res.status === 429) { setUnlockErr(t('pwv.passwordTooMany') || 'Too many attempts — try again in a few minutes.'); return; }
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.data?.share_token) { setUnlockErr(t('pwv.passwordWrong') || 'Wrong password.'); return; }
+      try { sessionStorage.setItem(shareTokenKey(org, ws), body.data.share_token); } catch { /* storage unavailable */ }
+      setPw(''); setDocs(undefined); setGate(null);
+      await load();
+    } catch {
+      setUnlockErr(t('pwv.passwordWrong') || 'Wrong password.');
+    } finally {
+      setUnlockBusy(false);
+    }
+  }, [org, ws, pw, unlockBusy, load]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -147,6 +198,43 @@ export default function PublicWorkspaceViewer() {
 
   if (error) {
     return html`<div class="pwv-container"><div class="pwv-state pwv-error">${error}</div></div>`;
+  }
+
+  if (gate === 'password') {
+    return html`
+      <div class="pwv-container">
+        <div class="pwv-empty pwv-gate">
+          <div class="pwv-empty-icon">🔑</div>
+          <h2>${t('pwv.passwordTitle') || 'This share is password-protected'}</h2>
+          <p>${t('pwv.passwordDesc') || 'Enter the password you received to open the shared documents.'}</p>
+          <form class="pwv-gate-form" onSubmit=${unlock}>
+            <input type="password" class="pwv-gate-input" autocomplete="off" autofocus
+              placeholder=${t('pwv.passwordPlaceholder') || 'Password'}
+              value=${pw} disabled=${unlockBusy}
+              onInput=${e => setPw(e.target.value)} />
+            <button type="submit" class="btn-primary btn-sm" disabled=${unlockBusy || !pw}>
+              ${unlockBusy ? (t('pwv.passwordOpening') || 'Opening…') : (t('pwv.passwordOpen') || 'Open')}
+            </button>
+          </form>
+          ${unlockErr ? html`<p class="pwv-gate-err">${unlockErr}</p>` : null}
+        </div>
+      </div>
+    `;
+  }
+
+  if (gate === 'account') {
+    return html`
+      <div class="pwv-container">
+        <div class="pwv-empty pwv-gate">
+          <div class="pwv-empty-icon">👤</div>
+          <h2>${t('pwv.accountTitle') || 'Sign in to view this share'}</h2>
+          <p>${t('pwv.accountDesc') || 'The owner shares these documents with signed-in users only. Sign in from the top-right corner of this page, then try again.'}</p>
+          <button class="btn-primary btn-sm" onClick=${() => { setDocs(undefined); setGate(null); load(); }}>
+            ${t('pwv.accountRetry') || 'I signed in — try again'}
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   if (!org || !ws || docs.length === 0) {

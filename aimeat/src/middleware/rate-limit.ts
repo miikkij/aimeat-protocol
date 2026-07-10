@@ -5,6 +5,9 @@
  *   can't mint fresh buckets). Role-based multipliers widen limits for owners/operators.
  * @usage app.use(rateLimit({ windowMs, max }, roleMultipliers))
  * @version-history
+ *   v1.2.0 — 2026-07-10 — keyBy:'ip' option: always key by client IP, never by GAII.
+ *     Needed for no-auth brute-forceable endpoints (share-password unlock) where anonymous
+ *     mode would otherwise collapse every visitor into one shared anonymous-GAII bucket.
  *   v1.1.0 — 2026-06-20 — Security (H-6): aggregate IPv6 keys to /64. NOTE: the
  *     bucket store is still per-process — needs a shared store before multi-replica deploy.
  */
@@ -36,9 +39,10 @@ function ipRateKey(ip: string | undefined): string {
     return full.slice(0, 4).map(g => g || '0').join(':') + '::/64';
 }
 
-export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: RoleMultipliers) {
+export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip' } = {}, roleMultipliers?: RoleMultipliers) {
     const windowMs = opts.windowMs ?? 60_000;
     const baseMax = opts.max ?? 100;
+    const keyBy = opts.keyBy ?? 'auto';
 
     // Each rate limiter instance has its own bucket store
     const buckets = new Map<string, RateBucket>();
@@ -53,11 +57,14 @@ export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: R
     cleanup.unref();
 
     return (req: Request, res: Response, next: NextFunction) => {
-        // Key by GAII if authenticated, otherwise by IP (IPv6 aggregated to /64)
+        // Key by GAII if authenticated, otherwise by IP (IPv6 aggregated to /64).
+        // keyBy:'ip' skips the GAII path entirely — anonymous mode injects one shared
+        // identity for every visitor, which would collapse a brute-force limiter into
+        // a single global bucket.
         const rawIp = req.ip ?? req.socket.remoteAddress;
-        const resolvedKey = req.auth?.sub ?? ipRateKey(rawIp);
+        const resolvedKey = keyBy === 'ip' ? ipRateKey(rawIp) : (req.auth?.sub ?? ipRateKey(rawIp));
         const key = resolvedKey || 'unknown';
-        if (!req.auth?.sub && !rawIp) getStats()?.increment('rate_limit.unknown_key');
+        if ((keyBy === 'ip' || !req.auth?.sub) && !rawIp) getStats()?.increment('rate_limit.unknown_key');
         const now = Date.now();
 
         // Determine role-based multiplier
