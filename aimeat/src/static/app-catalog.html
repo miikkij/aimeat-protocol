@@ -3535,6 +3535,27 @@
     return '<button class="dtl-btn' + (opts.variant ? " " + opts.variant : "") + '"' + (opts.id ? ' id="' + opts.id + '"' : "") + ' onclick="' + onclick + '"' + (opts.title != null ? ' title="' + escapeHtml(opts.title) + '"' : "") + (opts.disabled ? " disabled" : "") + ">" + label + "</button>";
   }
 
+  // src/static/app-catalog/js/config.js
+  var DEFAULT_CONFIG = {
+    theme: "light",
+    defaultOpenMode: "tab",
+    aimeatUrl: window.location.origin,
+    language: "en"
+  };
+  function loadConfig() {
+    var cfg;
+    try {
+      cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem("appLauncherConfig") || "{}"));
+    } catch (e) {
+      cfg = Object.assign({}, DEFAULT_CONFIG);
+    }
+    cfg.aimeatUrl = window.location.origin;
+    return cfg;
+  }
+  function saveConfig(config) {
+    localStorage.setItem("appLauncherConfig", JSON.stringify(config));
+  }
+
   // src/static/app-catalog/js/main.js
   function setLanguage(lang) {
     setLang(lang);
@@ -3593,25 +3614,6 @@
     var signedIn = !!currentOwnerName();
     personalBtn.classList.toggle("mode-btn-locked", !signedIn);
     personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
-  }
-  var DEFAULT_CONFIG = {
-    theme: "light",
-    defaultOpenMode: "tab",
-    aimeatUrl: window.location.origin,
-    language: "en"
-  };
-  function loadConfig() {
-    var cfg;
-    try {
-      cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem("appLauncherConfig") || "{}"));
-    } catch (e) {
-      cfg = Object.assign({}, DEFAULT_CONFIG);
-    }
-    cfg.aimeatUrl = window.location.origin;
-    return cfg;
-  }
-  function saveConfig(config) {
-    localStorage.setItem("appLauncherConfig", JSON.stringify(config));
   }
   function generateId() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
