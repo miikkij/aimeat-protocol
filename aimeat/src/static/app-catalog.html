@@ -2043,9 +2043,16 @@
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <span id="headerAuth" class="header-auth-pill"></span>
-      <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
-      <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
-      <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
+      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one + -->
+      <div class="backup-menu-wrap">
+        <button class="icon-btn" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+</button>
+        <div id="create-menu" class="backup-menu" hidden>
+          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
+          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
+          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
+        </div>
+      </div>
+      <!-- Data menu: backups + imports -->
       <div class="backup-menu-wrap">
         <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
         <div id="backup-menu" class="backup-menu" hidden>
@@ -2086,9 +2093,10 @@
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
-      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem">&#x25BC; <span data-i18n="common.toggle">toggle</span></button>
+      <button id="cortex-bar-toggle" onclick="window._launcher.toggleCortexBar()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem"><span id="cortex-bar-arrow">&#x25B6;</span> <span data-i18n="common.toggle">toggle</span></button>
     </div>
-    <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+    <!-- Collapsed by default (declutters the Library) — expand via the toggle. -->
+    <div id="cortex-bar-grid" style="display:none;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
   <!-- Extension Popup Overlay -->
@@ -2594,9 +2602,10 @@
       "mode.personal.title": "Private to your account",
       "mode.personal.needsLogin": "Sign in to use your Personal apps",
       "search.ph": "Search apps...",
-      "action.add": "Add app",
-      "action.generate": "Generate with AI",
-      "action.homepage": "Generate Homepage",
+      "action.add": "➕ Add app",
+      "action.create": "Create",
+      "action.generate": "✨ Generate with AI",
+      "action.homepage": "🏠 Generate homepage",
       "action.settings": "Settings",
       "action.help": "Help",
       "help.title": "❓ How this catalog works",
@@ -2931,9 +2940,10 @@
       "mode.personal.title": "Yksityinen tilillesi",
       "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi henkilökohtaisia appejasi",
       "search.ph": "Etsi sovelluksia...",
-      "action.add": "Lisää sovellus",
-      "action.generate": "Luo tekoälyllä",
-      "action.homepage": "Luo kotisivu",
+      "action.add": "➕ Lisää sovellus",
+      "action.create": "Luo",
+      "action.generate": "✨ Luo tekoälyllä",
+      "action.homepage": "🏠 Luo kotisivu",
       "action.settings": "Asetukset",
       "action.help": "Ohje",
       "help.title": "❓ Miten tämä katalogi toimii",
@@ -5328,7 +5338,28 @@
   function toggleBackupMenu(event) {
     if (event && event.stopPropagation) event.stopPropagation();
     var menu = document.getElementById("backup-menu");
+    var create = document.getElementById("create-menu");
+    if (create) create.hidden = true;
     menu.hidden = !menu.hidden;
+  }
+  function toggleCreateMenu(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    var menu = document.getElementById("create-menu");
+    var backup = document.getElementById("backup-menu");
+    if (backup) backup.hidden = true;
+    menu.hidden = !menu.hidden;
+  }
+  function closeCreateMenu() {
+    var m = document.getElementById("create-menu");
+    if (m) m.hidden = true;
+  }
+  function toggleCortexBar() {
+    var grid = document.getElementById("cortex-bar-grid");
+    var arrow = document.getElementById("cortex-bar-arrow");
+    if (!grid) return;
+    var open = grid.style.display === "none";
+    grid.style.display = open ? "flex" : "none";
+    if (arrow) arrow.innerHTML = open ? "▼" : "▶";
   }
   function backupApiBase() {
     var config = loadConfig();
@@ -7607,6 +7638,8 @@
     serverImportSelectAll,
     submitServerImport,
     toggleBackupMenu,
+    toggleCreateMenu,
+    toggleCortexBar,
     exportBackupZip,
     importBackupPick,
     backupSelectAll,
@@ -7713,9 +7746,11 @@
       applyServerFilter();
     });
     document.getElementById("add-btn").addEventListener("click", function() {
+      closeCreateMenu();
       requireSignInThen(showModal);
     });
     document.getElementById("generate-btn").addEventListener("click", function() {
+      closeCreateMenu();
       openPromptBuilder(null);
     });
     document.getElementById("settings-btn").addEventListener("click", function() {
@@ -7781,6 +7816,10 @@
       var menu = document.getElementById("backup-menu");
       if (!menu.hidden && !menu.contains(e.target) && e.target.id !== "backup-btn") {
         menu.hidden = true;
+      }
+      var cmenu = document.getElementById("create-menu");
+      if (cmenu && !cmenu.hidden && !cmenu.contains(e.target) && e.target.id !== "create-btn") {
+        cmenu.hidden = true;
       }
     });
     document.getElementById("cortex-popup-overlay").addEventListener("click", function(e) {
@@ -8044,7 +8083,10 @@
       if (e.target === this) closeSourceModal();
     });
     document.getElementById("close-source-btn").addEventListener("click", closeSourceModal);
-    document.getElementById("homepage-btn").addEventListener("click", generateHomepagePrompt);
+    document.getElementById("homepage-btn").addEventListener("click", function() {
+      closeCreateMenu();
+      generateHomepagePrompt();
+    });
     document.getElementById("pb-cancel-btn").addEventListener("click", closePbPanel);
     document.getElementById("pb-copy-btn").addEventListener("click", function() {
       var prompt2 = buildPromptFromBuilder();

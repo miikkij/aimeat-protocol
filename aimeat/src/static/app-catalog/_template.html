@@ -18,9 +18,16 @@
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <span id="headerAuth" class="header-auth-pill"></span>
-      <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
-      <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
-      <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
+      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one + -->
+      <div class="backup-menu-wrap">
+        <button class="icon-btn" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+</button>
+        <div id="create-menu" class="backup-menu" hidden>
+          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
+          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
+          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
+        </div>
+      </div>
+      <!-- Data menu: backups + imports -->
       <div class="backup-menu-wrap">
         <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
         <div id="backup-menu" class="backup-menu" hidden>
@@ -61,9 +68,10 @@
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
-      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem">&#x25BC; <span data-i18n="common.toggle">toggle</span></button>
+      <button id="cortex-bar-toggle" onclick="window._launcher.toggleCortexBar()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem"><span id="cortex-bar-arrow">&#x25B6;</span> <span data-i18n="common.toggle">toggle</span></button>
     </div>
-    <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+    <!-- Collapsed by default (declutters the Library) — expand via the toggle. -->
+    <div id="cortex-bar-grid" style="display:none;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
   <!-- Extension Popup Overlay -->
