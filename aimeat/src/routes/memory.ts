@@ -298,12 +298,17 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // Optional ?agent=GAII — owner can view any of their own agents' memory
   // Optional ?owner_scope=true — list keys across the owner's GHII and agents
   // Owner sessions automatically use owner_scope (see all agents' memory)
-  router.get('/v1/memory', requireAuth(), async (req, res) => {
+  router.get('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
     // Owner sessions (human user) automatically see all their agents' memory
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    const ownerScope = isOwnerSession || req.query.owner_scope === 'true';
+    // Owner-scope broadening (GHII + all agents + eco apps) is the same-owner-access invariant for the
+    // owner and their own agents/app-grants. An ECOSYSTEM app must NOT broaden to the owner's entire
+    // keyspace — it reads its own eco: namespace and only the owner areas its data-area grants cover
+    // (enforced per-key on the single-key route). Without this, ?owner_scope=true would hand a
+    // restricted GEAI the whole owner keyspace, bypassing its data-area allowlist.
+    const ownerScope = (isOwnerSession || req.query.owner_scope === 'true') && !req.auth!.roles.includes('ecosystem');
 
     // Allow owner to view another of their agents' memory
     if (agentParam && agentParam !== gaii) {

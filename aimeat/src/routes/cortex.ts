@@ -439,6 +439,13 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Ownership: only the installing owner (or an operator) may uninstall — a non-owner must never be
+    // able to delete someone else's extension (and its seed-data memory). Mirrors the update/export guards.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+      return;
+    }
+
     // Deactivate first if active
     if (ext.status === 'active') {
       await deactivateExtension(ext, storage, req.auth!.sub);
@@ -479,6 +486,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Ownership: only the installing owner (or an operator) may (de)activate their extension.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+      return;
+    }
+
+    // Ownership: only the installing owner (or an operator) may activate someone's extension.
     if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
@@ -530,6 +543,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Ownership: only the installing owner (or an operator) may (de)activate their extension.
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+      return;
+    }
+
+    // Ownership: only the installing owner (or an operator) may deactivate someone's extension.
     if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
