@@ -72,6 +72,16 @@ All frontend work must follow `docs/frontend-development-guide.md`. Key mandator
 
 `docs/known_gaps.md` tracks deferred gaps. **Never add entries on your own** — inform the developer, they decide. Every entry needs all fields (ID, Discovered, Related to, Description, Impact, Severity+justification, What needs doing, Why deferred, Revisit when). Remove entries when fixed (don't mark "done"). "Why deferred" must be a real reason, not "low priority."
 
+### Rule 10: Security Is Part of the DNA
+
+Every change to `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, federation, extensions, or an AI path MUST preserve the ten security invariants and use the per-change checklist in `docs/coding-guidelines/security-development-dna.md`. Non-negotiable core: (1) authorize against `resolveIdentity(req.auth!, …)`, never a client-supplied id; (2) never put server-trusted config/secrets in a principal-writable namespace; (3) all non-constant outbound HTTP goes through `safeFetch`; (4) every mutation has a `requireScope`/`requireRole` gate; (5) federation verifies an Ed25519 signature **unconditionally** from an approved peer. **Security is posture-driven config, not a code fork:** the same node runs wide-open on localhost and hardened on the public internet — anything whose safe value differs goes in `.env.example` with a safe *public* default and a documented local override (never hardcode permissive, never remove functionality). New identity-touching features ship with cross-owner and cross-scope "→403" E2E tests (Rule 1).
+
+Full guide: `docs/coding-guidelines/security-development-dna.md`
+
+### Rule 11: Design Specs & Roadmaps Live in AIMEAT, Not Repo Directories
+
+Author **new design specs, plans, and roadmap items as documents/records in the relevant AIMEAT organism on aimeat.io** (appdev/AIMEAT MCP) — **not** in repo `docs/`. This is deliberate dogfooding: we run our own knowledge work on our own product, surface what works and what breaks, and keep the data in the service we own. Route to the organism where that product's roadmap is tracked (each MACHINE ROOM app → its own organism/FABRIC; the AIMEAT platform itself, incl. `app-catalog`, → the FABRIC roadmap hub). Publishing such a record is a **gate** — draft freely, publish only on the developer's explicit go-ahead in this session (dogfood rituals below; cf. Rule 9). **Canonical in the repo, unchanged:** `openapi.yaml`, the RFC sections + coding-guideline references under `docs/`, `CLAUDE.md`, and `docs/known_gaps.md`.
+
 ---
 
 ## Coding Guidelines Reference
@@ -87,6 +97,7 @@ All standards live in `docs/coding-guidelines/`:
 | [Architecture](docs/coding-guidelines/architecture.md) | System design, storage layer, SSR-removal history |
 | [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII full reference, aggregation pattern, morsel economy |
 | [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
+| [Security Development DNA](docs/coding-guidelines/security-development-dna.md) | **Rule 10** — trust model, 10 invariants, localhost-flexible/public-strict posture, per-change checklist |
 | [Getting Started](docs/coding-guidelines/getting-started.md) | Install, setup, dev workflow |
 | [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, licenses, audits |
 | [Environment Configs](docs/coding-guidelines/environment-configs.md) | Node type configs (full, personal, relay, mirror) |
@@ -117,7 +128,7 @@ AIMEAT's core interaction pattern: the app generates ready-made prompts, the use
 
 ## AIMEAT Development Organism (dogfood) — session rituals
 
-AIMEAT's development is tracked in an **AIMEAT organism** on aimeat.io (id `fbb51de5-56d5-4143-9871-b998a1187655`) via the **appdev MCP** (`mcp__claude_ai_AIMEAT_APPDEV__*`) — source of truth for **coordination + working context**; the repo stays source of truth for **code + spec**. Full design: `docs/internal/aimeat-dev-organism-plan.md`.
+AIMEAT's development is tracked in an **AIMEAT organism** on aimeat.io (id `fbb51de5-56d5-4143-9871-b998a1187655`) via the **appdev MCP** (`mcp__claude_ai_AIMEAT_APPDEV__*`) — source of truth for **coordination + working context** (and for new design specs / roadmaps — see **Rule 11**); the repo stays source of truth for **code + the canonical protocol contract** (`openapi.yaml`, RFC). Full design: `docs/internal/aimeat-dev-organism-plan.md`.
 
 **These rituals apply ONLY when the appdev MCP is connected.** If not, skip silently.
 
