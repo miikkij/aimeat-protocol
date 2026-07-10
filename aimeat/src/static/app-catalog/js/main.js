@@ -675,7 +675,7 @@ import { I18N } from './i18n-data.js';
       return;
     }
     if (!file.name.match(/\.html?$/i)) {
-      alert('Please select an HTML or ZIP file (.html, .htm, or .zip)');
+      showNotice('Please select an HTML or ZIP file (.html, .htm, or .zip)');
       return;
     }
     selectedFile = file;
@@ -706,7 +706,7 @@ import { I18N } from './i18n-data.js';
         return;
       }
       if (!name) {
-        alert('Please enter a name');
+        showNotice('Please enter a name');
         return;
       }
       app.name = name;
@@ -727,7 +727,7 @@ import { I18N } from './i18n-data.js';
     if (tabName === 'url') {
       var url = document.getElementById('app-url').value.trim();
       if (!url) {
-        alert('Please enter a URL');
+        showNotice('Please enter a URL');
         return;
       }
       if (!name) {
@@ -745,7 +745,7 @@ import { I18N } from './i18n-data.js';
     } else if (tabName === 'paste') {
       var pastedCode = document.getElementById('app-paste-code').value.trim();
       if (!pastedCode) {
-        alert('Please paste your HTML source code');
+        showNotice('Please paste your HTML source code');
         return;
       }
       if (!name) {
@@ -759,7 +759,7 @@ import { I18N } from './i18n-data.js';
       });
     } else if (tabName === 'file') {
       if (!selectedFile) {
-        alert('Please select a file');
+        showNotice('Please select a file');
         return;
       }
       if (selectedFile.name.toLowerCase().endsWith('.zip')) {
@@ -773,7 +773,7 @@ import { I18N } from './i18n-data.js';
           closeModal();
           renderApps();
         }).catch(function (err) {
-          alert('ZIP import failed: ' + (err.message || err));
+          showNotice('ZIP import failed: ' + (err.message || err));
         });
       } else {
         // HTML file
@@ -1410,7 +1410,7 @@ import { I18N } from './i18n-data.js';
 
   function generateSharePrompt(app) {
     if (!app || !app.blob) {
-      alert('Only local HTML apps can be shared as prompts.');
+      showNotice('Only local HTML apps can be shared as prompts.');
       return;
     }
 
@@ -1425,7 +1425,7 @@ import { I18N } from './i18n-data.js';
     prompt += '--- Source Code ---\n' + source;
 
     navigator.clipboard.writeText(prompt).then(function() {
-      alert('Share prompt copied! Paste it into any AI chat to recreate this app.');
+      showNotice('Share prompt copied! Paste it into any AI chat to recreate this app.');
     }).catch(function() {
       // Fallback: show in source overlay
       var overlay = document.getElementById('source-overlay');
@@ -1446,7 +1446,7 @@ import { I18N } from './i18n-data.js';
 
   function generateHomepagePrompt() {
     if (allApps.length === 0) {
-      alert('Add some apps first before generating a homepage.');
+      showNotice('Add some apps first before generating a homepage.');
       return;
     }
 
@@ -1660,6 +1660,36 @@ import { I18N } from './i18n-data.js';
     if (r) r(!!result);
   }
 
+  // In-page toast notice — replaces showNotice() (no native boxes). Non-blocking, auto-dismisses
+  // (errors linger), click to close. Type is auto-detected from the message when omitted.
+  function showNotice(message, type) {
+    message = String(message == null ? '' : message);
+    if (!type) {
+      if (/\b(fail|failed|error|invalid|denied|unable|not found|wrong|expired)\b/i.test(message)) type = 'error';
+      else if (/\b(copied|done|success|saved|cleared|removed|imported|updated|added)\b/i.test(message)) type = 'success';
+      else type = 'info';
+    }
+    var stack = document.getElementById('notice-stack');
+    if (!stack) { return; }
+    var el = document.createElement('div');
+    el.className = 'notice notice-' + type;
+    el.setAttribute('role', 'status');
+    el.textContent = message;
+    el.addEventListener('click', function () { dismissNotice(el); });
+    stack.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('show'); });
+    el._timer = setTimeout(function () { dismissNotice(el); }, type === 'error' ? 6500 : 3500);
+    return el;
+  }
+  function dismissNotice(el) {
+    if (!el || el._dismissed) return;
+    el._dismissed = true;
+    if (el._timer) clearTimeout(el._timer);
+    el.classList.remove('show');
+    el.classList.add('hide');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 250);
+  }
+
   // ── Export / Import ─────────────────────────────
 
   function exportBackup() {
@@ -1702,11 +1732,11 @@ import { I18N } from './i18n-data.js';
       try {
         backup = JSON.parse(reader.result);
       } catch (e) {
-        alert('Failed to parse backup file: ' + (e.message || e));
+        showNotice('Failed to parse backup file: ' + (e.message || e));
         return;
       }
       if (!backup.apps || !Array.isArray(backup.apps)) {
-        alert('Invalid backup file: missing apps array');
+        showNotice('Invalid backup file: missing apps array');
         return;
       }
       // Inspect-before-write: compare against the current catalog and let the
@@ -1815,12 +1845,12 @@ import { I18N } from './i18n-data.js';
         });
         toDelete = toDelete.concat(g.slice(1));
       });
-      if (toDelete.length === 0) { alert(t('dedup.none')); return; }
+      if (toDelete.length === 0) { showNotice(t('dedup.none')); return; }
       if (!(await showConfirm(t('dedup.confirm') + ' ' + toDelete.length))) return;
       Promise.all(toDelete.map(function (a) { return deleteApp(a.id); })).then(function () {
         renderApps();
         loadPublishedApps();
-        alert(t('dedup.done') + ': ' + toDelete.length);
+        showNotice(t('dedup.done') + ': ' + toDelete.length);
       });
     });
   }
@@ -1843,7 +1873,7 @@ import { I18N } from './i18n-data.js';
       applyTheme('dark');
       renderApps();
       document.getElementById('settings-overlay').hidden = true;
-      alert('All data cleared');
+      showNotice('All data cleared');
     });
   }
 
@@ -1860,7 +1890,7 @@ import { I18N } from './i18n-data.js';
   function importFromAimeat() {
     var config = loadConfig();
     if (!config.aimeatUrl) {
-      alert('Set AIMEAT server URL in Settings first');
+      showNotice('Set AIMEAT server URL in Settings first');
       return;
     }
 
@@ -1881,7 +1911,7 @@ import { I18N } from './i18n-data.js';
         }
         var allFetched = apps.concat(peerApps);
         if (allFetched.length === 0) {
-          alert('No apps found on the AIMEAT server');
+          showNotice('No apps found on the AIMEAT server');
           return;
         }
         aimeatAppsCache = allFetched;
@@ -1892,7 +1922,7 @@ import { I18N } from './i18n-data.js';
         if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
           msg += '\n\nIf the launcher is opened via file://, CORS will block the request. Open it from the AIMEAT server instead.';
         }
-        alert(msg);
+        showNotice(msg);
       });
   }
 
@@ -1945,7 +1975,7 @@ import { I18N } from './i18n-data.js';
     }
 
     if (toImport.length === 0) {
-      alert('No apps selected');
+      showNotice('No apps selected');
       return;
     }
 
@@ -2002,7 +2032,7 @@ import { I18N } from './i18n-data.js';
       document.getElementById('aimeat-import-overlay').hidden = true;
       renderApps();
     }).catch(function (err) {
-      alert('Import error: ' + (err.message || err));
+      showNotice('Import error: ' + (err.message || err));
     });
   }
 
@@ -2019,7 +2049,7 @@ import { I18N } from './i18n-data.js';
 
     var config = loadConfig();
     if (!config.aimeatUrl) {
-      alert('Set AIMEAT server URL in Settings first');
+      showNotice('Set AIMEAT server URL in Settings first');
       return;
     }
 
@@ -2427,7 +2457,7 @@ import { I18N } from './i18n-data.js';
   function exportBackupZip() {
     document.getElementById('backup-menu').hidden = true;
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('backup.loginRequired')); return; }
+    if (!token) { showNotice(t('backup.loginRequired')); return; }
     var btn = document.getElementById('backup-btn');
     btn.disabled = true;
     fetch(backupApiBase() + '/v1/apps/backup', { headers: { 'Authorization': 'Bearer ' + token } })
@@ -2444,7 +2474,7 @@ import { I18N } from './i18n-data.js';
         a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
       })
-      .catch(function (e) { alert('Export failed: ' + (e.message || e)); })
+      .catch(function (e) { showNotice('Export failed: ' + (e.message || e)); })
       .finally(function () { btn.disabled = false; });
   }
 
@@ -2453,7 +2483,7 @@ import { I18N } from './i18n-data.js';
   function importBackupPick() {
     document.getElementById('backup-menu').hidden = true;
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('backup.loginRequired')); return; }
+    if (!token) { showNotice(t('backup.loginRequired')); return; }
     document.getElementById('backup-file-input').click();
   }
 
@@ -3098,7 +3128,7 @@ import { I18N } from './i18n-data.js';
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
 
     var token = getCortexOwnerToken();
-    if (!token) { alert('You must be logged in to delete apps. Sign in first.'); return; }
+    if (!token) { showNotice('You must be logged in to delete apps. Sign in first.'); return; }
     fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(app.publishedFilename), {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + token }
@@ -3117,11 +3147,11 @@ import { I18N } from './i18n-data.js';
             loadPublishedApps();
           });
         } else {
-          alert('Failed to remove: ' + ((json.error && json.error.message) || 'Unknown error'));
+          showNotice('Failed to remove: ' + ((json.error && json.error.message) || 'Unknown error'));
         }
       })
       .catch(function(err) {
-        alert('Error: ' + (err.message || err));
+        showNotice('Error: ' + (err.message || err));
       });
   }
 
@@ -3132,7 +3162,7 @@ import { I18N } from './i18n-data.js';
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
     fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -3146,10 +3176,10 @@ import { I18N } from './i18n-data.js';
           loadPublishedApps();
           refreshDetailIfOpen();
         } else {
-          alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+          showNotice('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Error: ' + (err.message || err)); });
+      .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
   }
 
   // Allow / disallow others forking a server-published app. When forkable, any user
@@ -3159,7 +3189,7 @@ import { I18N } from './i18n-data.js';
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
     fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -3172,10 +3202,10 @@ import { I18N } from './i18n-data.js';
           loadPublishedApps();
           refreshDetailIfOpen();
         } else {
-          alert('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+          showNotice('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Error: ' + (err.message || err)); });
+      .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
   }
 
   async function deleteServerApp(filename) {
@@ -3183,7 +3213,7 @@ import { I18N } from './i18n-data.js';
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
-    if (!token) { alert('You must be logged in to delete apps. Sign in first.'); return; }
+    if (!token) { showNotice('You must be logged in to delete apps. Sign in first.'); return; }
     fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + token }
@@ -3194,10 +3224,10 @@ import { I18N } from './i18n-data.js';
           removeImportIgnore(filename); // a future republish should import again
           loadPublishedApps();
         } else {
-          alert('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+          showNotice('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Error: ' + (err.message || err)); });
+      .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
   }
 
   // ── App Detail View ───────────────────────────────
@@ -3647,8 +3677,8 @@ import { I18N } from './i18n-data.js';
     var descEl = document.getElementById('detail-desc-input');
     var newName = nameEl ? nameEl.value.trim() : '';
     var newDesc = descEl ? descEl.value.trim() : '';
-    if (!newName) { alert(t('detail.nameRequired') || 'Name cannot be empty.'); if (nameEl) nameEl.focus(); return; }
-    if (app.published && !newDesc) { alert(t('detail.descRequired') || 'Description cannot be empty.'); if (descEl) descEl.focus(); return; }
+    if (!newName) { showNotice(t('detail.nameRequired') || 'Name cannot be empty.'); if (nameEl) nameEl.focus(); return; }
+    if (app.published && !newDesc) { showNotice(t('detail.descRequired') || 'Description cannot be empty.'); if (descEl) descEl.focus(); return; }
 
     function finishLocal() {
       app.name = newName;
@@ -3665,7 +3695,7 @@ import { I18N } from './i18n-data.js';
     if (!app.published || !app.publishedFilename) { finishLocal(); return; }
 
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+    if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
     var owner = detailServerOwner(app);
@@ -3685,10 +3715,10 @@ import { I18N } from './i18n-data.js';
           serverAppManifests[key].description = newDesc;
           finishLocal();
         } else {
-          alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'Unknown error'));
+          showNotice('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'Unknown error'));
         }
       })
-      .catch(function(err) { alert('Error: ' + (err.message || err)); });
+      .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
   }
 
   // Manual override: upload a custom image as this published app's thumbnail. (Bulk auto-capture is
@@ -3705,18 +3735,18 @@ import { I18N } from './i18n-data.js';
     }
     var owner = detailServerOwner(app);
     var token = getCortexOwnerToken();
-    if (!owner || !filename) { alert('Publish the app first, then you can set a screenshot.'); return; }
-    if (!token) { alert('Sign in to set a screenshot.'); return; }
+    if (!owner || !filename) { showNotice('Publish the app first, then you can set a screenshot.'); return; }
+    if (!token) { showNotice('Sign in to set a screenshot.'); return; }
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
-    if (!aimeatUrl) { alert('No server configured.'); return; }
+    if (!aimeatUrl) { showNotice('No server configured.'); return; }
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.onchange = function() {
       var file = input.files && input.files[0];
       if (!file) return;
-      if (file.size > 2 * 1024 * 1024) { alert('Image too large (max 2 MB).'); return; }
+      if (file.size > 2 * 1024 * 1024) { showNotice('Image too large (max 2 MB).'); return; }
       var reader = new FileReader();
       reader.onload = function() {
         var s = String(reader.result);
@@ -3728,10 +3758,10 @@ import { I18N } from './i18n-data.js';
         })
           .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
           .then(function(res) {
-            if (res.ok) { alert('Screenshot set. It will show in the catalogue and on the landing wall.'); }
-            else { alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || ('HTTP error'))); }
+            if (res.ok) { showNotice('Screenshot set. It will show in the catalogue and on the landing wall.'); }
+            else { showNotice('Failed: ' + ((res.j && res.j.error && res.j.error.message) || ('HTTP error'))); }
           })
-          .catch(function(e) { alert('Failed: ' + e.message); });
+          .catch(function(e) { showNotice('Failed: ' + e.message); });
       };
       reader.readAsDataURL(file);
     };
@@ -3751,22 +3781,22 @@ import { I18N } from './i18n-data.js';
     }
     var owner = detailServerOwner(app);
     var token = getCortexOwnerToken();
-    if (!owner || !filename) { alert('Publish the app first, then you can refresh its screenshot.'); return; }
-    if (!token) { alert('Sign in to refresh the screenshot.'); return; }
+    if (!owner || !filename) { showNotice('Publish the app first, then you can refresh its screenshot.'); return; }
+    if (!token) { showNotice('Sign in to refresh the screenshot.'); return; }
     if (!(await showConfirm(t('confirm.clearScreenshot')))) return;
     var config = loadConfig();
     var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
-    if (!aimeatUrl) { alert('No server configured.'); return; }
+    if (!aimeatUrl) { showNotice('No server configured.'); return; }
     fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/screenshot', {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + token }
     })
       .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
       .then(function(res) {
-        if (res.ok) { alert((res.j.data && res.j.data.note) || 'Screenshot cleared. A fresh one will be taken on the next scheduled run.'); }
-        else { alert('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'HTTP error')); }
+        if (res.ok) { showNotice((res.j.data && res.j.data.note) || 'Screenshot cleared. A fresh one will be taken on the next scheduled run.'); }
+        else { showNotice('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'HTTP error')); }
       })
-      .catch(function(e) { alert('Failed: ' + e.message); });
+      .catch(function(e) { showNotice('Failed: ' + e.message); });
   }
 
   function metaItem(label, val) {
@@ -4004,7 +4034,7 @@ import { I18N } from './i18n-data.js';
       if (allApps[i].publishedFilename === filename) { openDetailView(allApps[i].id); return; }
     }
     var config = loadConfig();
-    if (!config.aimeatUrl) { alert('Set the AIMEAT server URL in Settings first'); return; }
+    if (!config.aimeatUrl) { showNotice('Set the AIMEAT server URL in Settings first'); return; }
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var meta = serverAppManifests[owner + '\n' + filename] || {};
 
@@ -4042,7 +4072,7 @@ import { I18N } from './i18n-data.js';
           openDetailView(app.id);
         });
       })
-      .catch(function(err) { alert('Could not load the published app: ' + (err.message || err)); });
+      .catch(function(err) { showNotice('Could not load the published app: ' + (err.message || err)); });
   }
 
   // ── App Versions / Restore / Fork ─────────────────
@@ -4071,7 +4101,7 @@ import { I18N } from './i18n-data.js';
   function showLineageModal(owner, filename) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
-    if (!aimeatUrl) { alert('Set AIMEAT server URL in Settings first'); return; }
+    if (!aimeatUrl) { showNotice('Set AIMEAT server URL in Settings first'); return; }
     document.getElementById('lineage-title').textContent = filename;
     var summaryEl = document.getElementById('lineage-summary');
     var statusEl = document.getElementById('lineage-status');
@@ -4145,7 +4175,7 @@ import { I18N } from './i18n-data.js';
   function saveProtection() {
     if (!protectionTarget) return;
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('common.loginRequired') || 'You must be logged in.'); return; }
+    if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in.'); return; }
     var protection = {
       obfuscate: document.getElementById('protect-obfuscate').checked,
       domainLock: document.getElementById('protect-domainLock').checked,
@@ -4180,7 +4210,7 @@ import { I18N } from './i18n-data.js';
   function showVersionsModal(owner, filename) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
-    if (!aimeatUrl) { alert('Set AIMEAT server URL in Settings first'); return; }
+    if (!aimeatUrl) { showNotice('Set AIMEAT server URL in Settings first'); return; }
 
     document.getElementById('versions-title').textContent = filename;
     var statusEl = document.getElementById('versions-status');
@@ -4234,7 +4264,7 @@ import { I18N } from './i18n-data.js';
   async function restoreVersion(owner, filename, version) {
     if (!(await showConfirm(t('confirm.restoreVersion').replace('{version}', String(version)).replace('{file}', function () { return filename; })))) return;
     var token = getCortexOwnerToken();
-    if (!token) { alert('You must be logged in as the owner to restore a version. Sign in first.'); return; }
+    if (!token) { showNotice('You must be logged in as the owner to restore a version. Sign in first.'); return; }
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
     var statusEl = document.getElementById('versions-status');
@@ -4281,14 +4311,14 @@ import { I18N } from './i18n-data.js';
 
   function forkVersion(owner, filename, version) {
     var token = getCortexOwnerToken();
-    if (!token) { alert(t('common.loginRequired') || 'You must be logged in to fork an app into your own catalogue. Sign in first.'); return; }
+    if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in to fork an app into your own catalogue. Sign in first.'); return; }
     var base = (filename || 'app').replace(/\.html?$/i, '');
     var suggested = base + '-fork.html';
     var newName = prompt(t('fork.prompt') || ('Fork "' + filename + '" into a new app.\n\nNew filename:'), suggested);
     if (!newName) return;
     newName = newName.trim();
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
-      alert('Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).');
+      showNotice('Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).');
       return;
     }
     var config = loadConfig();
@@ -4312,18 +4342,18 @@ import { I18N } from './i18n-data.js';
         if (json.ok) {
           var msg = '✔ ' + (t('fork.success') || 'Forked to') + ' "' + newName + '"';
           if (inVersionsModal) { statusEl.textContent = msg; statusEl.style.color = '#34d399'; }
-          else alert(msg);
+          else showNotice(msg);
           loadPublishedApps();
         } else {
           var err = (json.error && json.error.message) || 'Fork failed';
           if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
-          else alert((t('fork.failed') || 'Fork failed') + ': ' + err);
+          else showNotice((t('fork.failed') || 'Fork failed') + ': ' + err);
         }
       })
       .catch(function(err) {
         var m = err.message || 'Fork failed';
         if (inVersionsModal) { statusEl.textContent = '✘ ' + m; statusEl.style.color = 'var(--accent)'; }
-        else alert('Error: ' + m);
+        else showNotice('Error: ' + m);
       });
   }
 
@@ -4492,7 +4522,7 @@ import { I18N } from './i18n-data.js';
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
-    if (!token) { alert('You must be logged in as an owner to edit extensions.'); return; }
+    if (!token) { showNotice('You must be logged in as an owner to edit extensions.'); return; }
 
     var statusEl = document.getElementById('cortex-editor-status');
     statusEl.textContent = 'Loading extension data...';
@@ -4571,10 +4601,10 @@ import { I18N } from './i18n-data.js';
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, '');
     var token = getCortexOwnerToken();
-    if (!token) { alert('No auth token available.'); return; }
+    if (!token) { showNotice('No auth token available.'); return; }
 
     var manifest = document.getElementById('cortex-editor-manifest').value;
-    if (!manifest.trim()) { alert('Manifest cannot be empty.'); return; }
+    if (!manifest.trim()) { showNotice('Manifest cannot be empty.'); return; }
 
     var libs = cortexEditorCollectLibs();
     var statusEl = document.getElementById('cortex-editor-status');
@@ -5739,7 +5769,7 @@ import { I18N } from './i18n-data.js';
       var btn = this;
 
       if (!appId) {
-        alert('Cannot save: no app ID found.');
+        showNotice('Cannot save: no app ID found.');
         return;
       }
 
@@ -5757,7 +5787,7 @@ import { I18N } from './i18n-data.js';
       }
 
       if (!app) {
-        alert('App not found in library.');
+        showNotice('App not found in library.');
         return;
       }
 
@@ -5776,7 +5806,7 @@ import { I18N } from './i18n-data.js';
       }).catch(function(err) {
         btn.textContent = 'Save Changes';
         btn.disabled = false;
-        alert('Failed to save: ' + (err.message || err));
+        showNotice('Failed to save: ' + (err.message || err));
       });
     });
 
