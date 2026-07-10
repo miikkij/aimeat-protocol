@@ -11,9 +11,12 @@
   <header>
     <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
     <h1 data-i18n="header.title">My Apps</h1>
-    <div class="mode-toggle">
-      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Global</button>
-      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Personal</button>
+    <div class="mode-toggle-wrap">
+      <span class="mode-caption" data-i18n="mode.caption" data-i18n-title="mode.caption.title" title="These toggle which browser-local apps you see — not server visibility">Local apps</span>
+      <div class="mode-toggle">
+        <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Shared</button>
+        <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Mine</button>
+      </div>
     </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
