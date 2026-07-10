@@ -3196,7 +3196,7 @@ import { I18N } from './i18n-data.js';
           // Optimistically flip the cached state so the open detail re-renders correctly now.
           if (serverStateByFilename[filename]) serverStateByFilename[filename].parked = !!parked;
           loadPublishedApps();
-          refreshDetailIfOpen();
+          refreshServerMgmt();
         } else {
           showNotice('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
@@ -3222,7 +3222,7 @@ import { I18N } from './i18n-data.js';
         if (json.ok) {
           if (serverStateByFilename[filename]) serverStateByFilename[filename].forkable = !!forkable;
           loadPublishedApps();
-          refreshDetailIfOpen();
+          refreshServerMgmt();
         } else {
           showNotice('Failed: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
         }
@@ -3297,11 +3297,37 @@ import { I18N } from './i18n-data.js';
     return btoa(unescape(encodeURIComponent(html)));
   }
 
-  // Re-render the detail view in place if it is currently open (e.g. after a park/fork toggle
-  // changed the server state, so the "Manage on server" buttons reflect the new state).
-  function refreshDetailIfOpen() {
-    var dv = document.getElementById('detail-view');
-    if (detailAppId && dv && !dv.hasAttribute('hidden')) openDetailView(detailAppId);
+  // The "Manage on server" buttons as inner HTML (empty when the app isn't an own server app).
+  // Kept separate so a park/fork toggle can re-render JUST these buttons in place — no full detail
+  // re-render (which would rebuild the whole version list and jump the scroll).
+  function serverMgmtInner(app) {
+    if (!app) return '';
+    var isUrlApp = (app.source === 'url' && !app.blob);
+    var svrState = (app.publishedFilename && serverStateByFilename[app.publishedFilename]) || null;
+    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return '';
+    var fnArg = jsArg(app.publishedFilename);
+    var ownerArg2 = jsArg(svrState.owner || '');
+    var p = svrState.protection || {};
+    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+    return '<div class="dtl-section">' +
+        '<h3>' + t('detail.serverMgmt') + '</h3>' +
+        '<div class="dtl-btn-row">' +
+          (svrState.parked
+            ? '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>'
+            : '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>') +
+          '<button class="dtl-btn" onclick="window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>' +
+          '<button class="dtl-btn" onclick="window._launcher.showProtectionModal(\'' + fnArg + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')) + '</button>' +
+          '<button class="dtl-btn" onclick="window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')">' + t('card.versions') + '</button>' +
+          '<button class="dtl-btn danger" onclick="window._launcher.deleteServerApp(\'' + fnArg + '\')">' + t('card.removeServer') + '</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Re-render ONLY the "Manage on server" buttons in place after a park/fork toggle — the rest of
+  // the open detail (version list, scroll position, screenshot) is left untouched.
+  function refreshServerMgmt() {
+    var c = document.getElementById('detail-server-mgmt');
+    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
   }
 
   function openDetailView(appId) {
@@ -3596,27 +3622,9 @@ import { I18N } from './i18n-data.js';
     // live on the published card; the unified card now shows only Open + Details, so these move
     // here (req: "card buttons 2-3, the rest in detail"). serverStateByFilename is populated by
     // buildLibraryEntries from the authoritative server list.
-    var mgmtHtml = '';
-    var svrState = (app.publishedFilename && serverStateByFilename[app.publishedFilename]) || null;
-    if (app.published && app.publishedFilename && svrState && !isUrlApp) {
-      var fnArg = jsArg(app.publishedFilename);
-      var ownerArg2 = jsArg(svrState.owner || '');
-      var p = svrState.protection || {};
-      var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-      mgmtHtml =
-        '<div class="dtl-section">' +
-          '<h3>' + t('detail.serverMgmt') + '</h3>' +
-          '<div class="dtl-btn-row">' +
-            (svrState.parked
-              ? '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>'
-              : '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>') +
-            '<button class="dtl-btn" onclick="window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>' +
-            '<button class="dtl-btn" onclick="window._launcher.showProtectionModal(\'' + fnArg + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')) + '</button>' +
-            '<button class="dtl-btn" onclick="window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')">' + t('card.versions') + '</button>' +
-            '<button class="dtl-btn danger" onclick="window._launcher.deleteServerApp(\'' + fnArg + '\')">' + t('card.removeServer') + '</button>' +
-          '</div>' +
-        '</div>';
-    }
+    // Stable container so a park/fork toggle can re-render JUST these buttons (refreshServerMgmt)
+    // instead of rebuilding the whole detail.
+    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + '</div>';
 
     // ── SKILLS (skills registry, 2d) — expertise that teaches agents this app ──
     var skillsHtml = '';

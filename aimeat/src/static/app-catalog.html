@@ -5939,7 +5939,7 @@
       if (json.ok) {
         if (serverStateByFilename[filename]) serverStateByFilename[filename].parked = !!parked;
         loadPublishedApps();
-        refreshDetailIfOpen();
+        refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
@@ -5965,7 +5965,7 @@
       if (json.ok) {
         if (serverStateByFilename[filename]) serverStateByFilename[filename].forkable = !!forkable;
         loadPublishedApps();
-        refreshDetailIfOpen();
+        refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
@@ -6034,9 +6034,20 @@
   function htmlToBlob(html) {
     return btoa(unescape(encodeURIComponent(html)));
   }
-  function refreshDetailIfOpen() {
-    var dv = document.getElementById("detail-view");
-    if (detailAppId && dv && !dv.hasAttribute("hidden")) openDetailView(detailAppId);
+  function serverMgmtInner(app) {
+    if (!app) return "";
+    var isUrlApp = app.source === "url" && !app.blob;
+    var svrState = app.publishedFilename && serverStateByFilename[app.publishedFilename] || null;
+    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return "";
+    var fnArg = jsArg(app.publishedFilename);
+    var ownerArg2 = jsArg(svrState.owner || "");
+    var p = svrState.protection || {};
+    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', false)" title="` + escapeHtml(t("card.unparkHint")) + '">' + t("card.unpark") + "</button>" : `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', true)" title="` + escapeHtml(t("card.parkHint")) + '">' + t("card.park") + "</button>") + `<button class="dtl-btn" onclick="window._launcher.toggleForkApp('` + fnArg + "', " + (svrState.forkable ? "false" : "true") + ')" title="' + escapeHtml(t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint")) + '">' + t(svrState.forkable ? "card.forkableOn" : "card.forkableOff") + `</button><button class="dtl-btn" onclick="window._launcher.showProtectionModal('` + fnArg + `')" title="` + escapeHtml(t("card.protectHint")) + '">' + (anyProt ? "🛡✓ " + t("card.protect") : t("card.protect")) + `</button><button class="dtl-btn" onclick="window._launcher.showVersionsModal('` + ownerArg2 + "', '" + fnArg + `')">` + t("card.versions") + `</button><button class="dtl-btn danger" onclick="window._launcher.deleteServerApp('` + fnArg + `')">` + t("card.removeServer") + "</button></div></div>";
+  }
+  function refreshServerMgmt() {
+    var c = document.getElementById("detail-server-mgmt");
+    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
   }
   function openDetailView(appId) {
     detailAppId = appId;
@@ -6224,15 +6235,7 @@
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
     var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : '<button class="dtl-btn" onclick="window._launcher.detailEditSource()">' + t("ctx.viewSource") + "</button>") + (isUrlApp ? "" : '<button class="dtl-btn" onclick="window._launcher.detailImproveExternal()">' + t("ctx.improveAi") + "</button>") + '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t("ctx.sharePrompt") + "</button>" + (isUrlApp ? "" : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + "</button>") + (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailSetScreenshot()" title="Upload a custom thumbnail for this app">📷 ' + t("detail.setScreenshot") + "</button>" : "") + (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailRefreshScreenshot()" title="Clear the screenshot; the node re-takes it on its next scheduled run">🔄 ' + t("detail.refreshScreenshot") + "</button>" : "") + '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t("ctx.delete") + "</button></div></div>";
-    var mgmtHtml = "";
-    var svrState = app.publishedFilename && serverStateByFilename[app.publishedFilename] || null;
-    if (app.published && app.publishedFilename && svrState && !isUrlApp) {
-      var fnArg = jsArg(app.publishedFilename);
-      var ownerArg2 = jsArg(svrState.owner || "");
-      var p = svrState.protection || {};
-      var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-      mgmtHtml = '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', false)" title="` + escapeHtml(t("card.unparkHint")) + '">' + t("card.unpark") + "</button>" : `<button class="dtl-btn" onclick="window._launcher.toggleParkApp('` + fnArg + `', true)" title="` + escapeHtml(t("card.parkHint")) + '">' + t("card.park") + "</button>") + `<button class="dtl-btn" onclick="window._launcher.toggleForkApp('` + fnArg + "', " + (svrState.forkable ? "false" : "true") + ')" title="' + escapeHtml(t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint")) + '">' + t(svrState.forkable ? "card.forkableOn" : "card.forkableOff") + `</button><button class="dtl-btn" onclick="window._launcher.showProtectionModal('` + fnArg + `')" title="` + escapeHtml(t("card.protectHint")) + '">' + (anyProt ? "🛡✓ " + t("card.protect") : t("card.protect")) + `</button><button class="dtl-btn" onclick="window._launcher.showVersionsModal('` + ownerArg2 + "', '" + fnArg + `')">` + t("card.versions") + `</button><button class="dtl-btn danger" onclick="window._launcher.deleteServerApp('` + fnArg + `')">` + t("card.removeServer") + "</button></div></div>";
-    }
+    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
     var skillsHtml = "";
     if (app.published) {
       skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div></div>";
