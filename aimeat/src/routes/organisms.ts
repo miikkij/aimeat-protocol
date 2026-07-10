@@ -79,6 +79,13 @@
  *     returns { skipped:true } (consumes the draft, no new .version.N, no decision/structure churn)
  *     instead of appending a byte-identical version; publish honours the objectType's `versioned`
  *     flag (default true) so a `versioned:false` space keeps only .latest. Mirrors mcp/workspaces.ts.
+ *   v1.20.0 -- 2026-07-10 -- TARGET-025: share access modes. meta.share gains access
+ *     ('open'|'password'|'account', default open) + a server-only scrypt passwordHash; the NO-AUTH
+ *     public-document reads gate on it (401 SHARE_PASSWORD_REQUIRED / SHARE_ACCOUNT_REQUIRED with an
+ *     explicit anonymous!==true check — anonymous mode injects a truthy req.auth). New NO-AUTH
+ *     POST /:id/workspace/share/unlock (per-IP rate-limited, timing-uniform) exchanges the password
+ *     for a 24 h EdDSA share token carried in X-Share-Token. GET/PUT share responses are redacted
+ *     (has_password, never the hash). Member reads via authenticated routes are unaffected.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -87,7 +94,8 @@ import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } fro
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { hashPassword } from '../services/password.js';
+import { hashPassword, verifyPassword } from '../services/password.js';
+import { generateShareToken, verifyShareToken, SHARE_TOKEN_TTL_SECONDS } from '../services/share-token.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
 import { provisionOwner } from '../services/owner-provisioning.js';
 import { establishOwnerSession } from '../services/owner-session.js';
@@ -1836,19 +1844,68 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   /* ══ Document-space public sharing (meta.share) ══
    * A workspace's document-space content can be shared read-only without login. The single source of
    * truth is one record per workspace, organism.{id}.w.{ws}.meta.share, with shape
-   *   { public?: boolean, spaces?: { [typeName]: boolean }, docs?: { [`${typeName}/${id}`]: boolean } }.
+   *   { public?: boolean, spaces?: { [typeName]: boolean }, docs?: { [`${typeName}/${id}`]: boolean },
+   *     access?: 'open'|'password'|'account', passwordHash?: string|null }.
    * Resolution for "is doc D in space S public?": docs[`${S}/${D}`] if set, else spaces[S] if set,
-   * else public. Only PUBLISHED (.latest) docs are ever served publicly — drafts never leak. */
-  type ShareMeta = { public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean> };
+   * else public. Only PUBLISHED (.latest) docs are ever served publicly — drafts never leak.
+   * `access` gates the whole shared set of the workspace on the NO-AUTH public read path:
+   * 'open' (default, link only), 'password' (unlock endpoint mints an X-Share-Token JWT), 'account'
+   * (any authenticated NON-ANONYMOUS session — anonymous mode injects a truthy req.auth, so the
+   * check must be `req.auth.anonymous !== true`, never `if (req.auth)`). Member/owner reads via the
+   * authenticated workspace routes are never affected. passwordHash (scrypt, services/password.ts)
+   * never leaves the server — API responses carry only `has_password`. */
+  type ShareAccess = 'open' | 'password' | 'account';
+  type ShareMeta = {
+    public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>;
+    access?: ShareAccess; passwordHash?: string | null;
+  };
+  type ResolvedShare = {
+    public: boolean; spaces: Record<string, boolean>; docs: Record<string, boolean>;
+    access: ShareAccess; passwordHash: string | null;
+  };
 
-  const readShareMeta = async (id: string, ws: string): Promise<Required<ShareMeta>> => {
+  const readShareMeta = async (id: string, ws: string): Promise<ResolvedShare> => {
     const key = `organism.${id}.w.${ws}.meta.share`;
     const { items } = await storage.listAllMemory({ prefix: key, limit: 10 });
     const v = (items.find(r => r.key === key)?.value as ShareMeta | undefined) ?? {};
-    return { public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {} };
+    const access: ShareAccess = v.access === 'password' || v.access === 'account' ? v.access : 'open';
+    return {
+      public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {},
+      access, passwordHash: typeof v.passwordHash === 'string' ? v.passwordHash : null,
+    };
   };
 
-  const isDocPublic = (share: Required<ShareMeta>, typeName: string, docId: string): boolean => {
+  /** The share state as the API is allowed to show it — the password hash NEVER leaves the server. */
+  const redactShare = (share: ResolvedShare): Record<string, unknown> => ({
+    public: share.public, spaces: share.spaces, docs: share.docs,
+    access: share.access, has_password: !!share.passwordHash,
+  });
+
+  /** Gate the NO-AUTH public read path by the share's access mode. Returns null when allowed,
+   *  else the 401 error code + message the caller should send. Assumes the caller has already
+   *  established that something IS shared (404 no-disclosure runs first). */
+  const shareGateDenied = async (
+    req: Request, organism: { agentGaiis: string[] }, id: string, ws: string, share: ResolvedShare,
+  ): Promise<{ code: string; message: string } | null> => {
+    if (share.access === 'open') return null;
+    const authed = !!req.auth && req.auth.anonymous !== true;
+    if (share.access === 'account') {
+      return authed ? null : { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
+    }
+    // access === 'password': a valid share token for THIS org+ws, or an authenticated org member.
+    const rawToken = req.headers['x-share-token'];
+    const token = typeof rawToken === 'string' ? rawToken : undefined;
+    if (token) {
+      try {
+        const v = await verifyShareToken(token);
+        if (v.org === id && v.ws === ws) return null;
+      } catch { /* invalid/expired token falls through to the 401 */ }
+    }
+    if (authed && await memberRole(req, organism, id)) return null;
+    return { code: 'SHARE_PASSWORD_REQUIRED', message: 'This share is password-protected' };
+  };
+
+  const isDocPublic = (share: ResolvedShare, typeName: string, docId: string): boolean => {
     const docKey = `${typeName}/${docId}`;
     if (docKey in share.docs) return !!share.docs[docKey];
     if (typeName in share.spaces) return !!share.spaces[typeName];
@@ -1866,7 +1923,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   /** Collect the PUBLISHED (.latest) document-space pages that the share meta marks public. An optional
    *  filter narrows to one {type,id}. Drafts/versions are never included. */
   const collectPublicDocs = async (
-    id: string, ws: string, share: Required<ShareMeta>, filter?: { type: string; id: string },
+    id: string, ws: string, share: ResolvedShare, filter?: { type: string; id: string },
   ): Promise<PublicDoc[]> => {
     const manifest = await readWsManifestValue(id, ws);
     if (!manifest) return [];
@@ -2883,6 +2940,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     let docs = await collectPublicDocs(id, ws, share);
     if (space) docs = docs.filter(d => d.type === space);
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
+    const denied = await shareGateDenied(req, organism, id, ws, share);
+    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     if (req.query.format === 'md') {
       const entry = await findWsEntry(id, ws);
       res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
@@ -2903,6 +2962,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const share = await readShareMeta(id, ws);
     const docs = await collectPublicDocs(id, ws, share, { type, id: docId });
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
+    const denied = await shareGateDenied(req, organism, id, ws, share);
+    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const doc = docs[0];
     if (req.query.format === 'md') {
       res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
@@ -2912,8 +2973,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /* ── GET /v1/organisms/:id/workspace/share?ws= — the current share state (for the UI toggles).
-   * Any active member may read it. ── */
-  router.get('/v1/organisms/:id/workspace/share', requireAuth(), async (req, res) => {
+   * Any active member may read it. Owner sessions bypass scopes; app/agent tokens need memory:read
+   * (sharing lives in a memory record — without this gate ANY app grant could read/flip it). ── */
+  router.get('/v1/organisms/:id/workspace/share', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     const organism = await storage.getOrganism(id);
@@ -2921,13 +2983,13 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
     const role = await memberRole(req, organism, id);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-    res.json(success(config.nodeId, { organism_id: id, ws, share: await readShareMeta(id, ws) }));
+    res.json(success(config.nodeId, { organism_id: id, ws, share: redactShare(await readShareMeta(id, ws)) }));
   });
 
   /* ── PUT /v1/organisms/:id/workspace/share?ws= — set the share state. Body { public?, spaces?, docs? }
    * is MERGED into the existing meta.share. The workspace creator or an org admin only. The record is
    * stored under the workspace creator's GHII so there is exactly one canonical share record. ── */
-  router.put('/v1/organisms/:id/workspace/share', requireAuth(), async (req, res) => {
+  router.put('/v1/organisms/:id/workspace/share', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     const organism = await storage.getOrganism(id);
@@ -2941,17 +3003,34 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can change sharing')); return;
     }
-    const body = (req.body ?? {}) as ShareMeta;
+    const body = (req.body ?? {}) as ShareMeta & { password?: string | null };
     const isBoolMap = (m: unknown): m is Record<string, boolean> =>
       !!m && typeof m === 'object' && !Array.isArray(m) && Object.values(m).every(v => typeof v === 'boolean');
     if (body.spaces !== undefined && !isBoolMap(body.spaces)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'spaces must be a map of name → boolean')); return; }
     if (body.docs !== undefined && !isBoolMap(body.docs)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'docs must be a map of key → boolean')); return; }
+    if (body.access !== undefined && body.access !== 'open' && body.access !== 'password' && body.access !== 'account') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access must be 'open', 'password' or 'account'")); return;
+    }
+    if (body.password !== undefined && body.password !== null && typeof body.password !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password must be a string (set) or null (clear)')); return;
+    }
+    if (typeof body.password === 'string' && (body.password.length < 4 || body.password.length > 128)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password must be 4–128 characters')); return;
+    }
     const prev = await readShareMeta(id, ws);
-    const next: Required<ShareMeta> = {
+    // password: string sets a new scrypt hash, null clears it, absent keeps the previous one.
+    const nextHash = typeof body.password === 'string' ? await hashPassword(body.password)
+      : body.password === null ? null : prev.passwordHash;
+    const next: ResolvedShare = {
       public: typeof body.public === 'boolean' ? body.public : prev.public,
       spaces: { ...prev.spaces, ...(body.spaces ?? {}) },
       docs: { ...prev.docs, ...(body.docs ?? {}) },
+      access: body.access ?? prev.access,
+      passwordHash: nextHash,
     };
+    if (next.access === 'password' && !next.passwordHash) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access 'password' requires a password to be set")); return;
+    }
     const key = `organism.${id}.w.${ws}.meta.share`;
     const existing = (await storage.listAllMemory({ prefix: key, limit: 10 })).items.find(r => r.key === key);
     const now = new Date().toISOString();
@@ -2960,7 +3039,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     emitChange('organisms');
-    res.json(success(config.nodeId, { organism_id: id, ws, share: next }));
+    res.json(success(config.nodeId, { organism_id: id, ws, share: redactShare(next) }));
     // Public landing feed — fire once on the FIRST public edge of this PUT: the whole
     // workspace, any space, or any document transitioning private→public ("publish to feed").
     const newlyPublic = (
@@ -2978,6 +3057,32 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       }).catch(() => { /* feed is best-effort */ });
     }
   });
+
+  /* ── POST /v1/organisms/:id/workspace/share/unlock — NO AUTH. Exchange the share password for a
+   * short-lived share token (X-Share-Token on the public reads). Body { ws, password }. Tightly
+   * rate-limited PER IP (keyBy:'ip' — anonymous mode would otherwise share one bucket) and
+   * timing-uniform: a workspace without a password verifies against a dummy hash so the response
+   * time does not disclose whether password mode is even configured. Always a generic 401 on
+   * failure — no hints. ── */
+  const SHARE_UNLOCK_DUMMY_HASH = 'v2:' + '0'.repeat(32) + ':' + '0'.repeat(128);
+  router.post('/v1/organisms/:id/workspace/share/unlock',
+    rateLimit({ windowMs: 15 * 60_000, max: 10, keyBy: 'ip' }),
+    async (req, res) => {
+      const id = req.params.id as string;
+      const body = (req.body ?? {}) as { ws?: unknown; password?: unknown };
+      const ws = typeof body.ws === 'string' ? body.ws : '';
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (!ws || !password) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws and password are required')); return; }
+      const organism = await storage.getOrganism(id);
+      const share = organism ? await readShareMeta(id, ws) : null;
+      const usable = !!share && share.access === 'password' && !!share.passwordHash;
+      const ok = await verifyPassword(password, usable ? share!.passwordHash! : SHARE_UNLOCK_DUMMY_HASH);
+      if (!usable || !ok) { res.status(401).json(error(config.nodeId, 'INVALID_PASSWORD', 'Invalid password')); return; }
+      const shareToken = await generateShareToken({ org: id, ws });
+      res.json(success(config.nodeId, {
+        organism_id: id, ws, share_token: shareToken, expires_in: SHARE_TOKEN_TTL_SECONDS,
+      }, [{ description: 'Read the shared documents (send the token as X-Share-Token)', method: 'GET', url: `/v1/organisms/${id}/workspace/public/documents?ws=${ws}` }]));
+    });
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
    * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */

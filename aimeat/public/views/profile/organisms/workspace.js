@@ -8,6 +8,9 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   v1.x — 2026-07-10 — TARGET-025: Share tab gains the access-mode picker (open / password /
+ *     account) + share-password set/change/clear controls (server stores only a hash; the UI sees
+ *     has_password). Members' own access is never affected — the choice gates the public link only.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — Add the free-form README panel + the interactive workspace mindmap; rename
  *     the structure overview to "table of contents" (Osa A/C).
@@ -164,8 +167,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [expandedSeries, setExpandedSeries] = useState({});   // { "type:base": true } — a multi-part doc series expanded in the index
   const [showSpaces, setShowSpaces] = useState(false);        // inline add-space form at the workspace top
   const [showFlow, setShowFlow] = useState(true);             // the manifest-defined edit-flow chart (first item)
-  const [share, setShare] = useState(null);                   // { public, spaces, docs } — lazy-loaded when Settings opens
+  const [share, setShare] = useState(null);                   // { public, spaces, docs, access, has_password } — lazy-loaded when Settings opens
   const [shareBusy, setShareBusy] = useState(false);
+  const [sharePw, setSharePw] = useState('');                 // share-password input (never stored beyond the PUT)
   const [wsEvents, setWsEvents] = useState([]);               // activity events — Overview strip + per-tab unseen badges
   const [ovOpen, setOvOpen] = useState({});                   // Overview accordion: { spaceName: bool } (mobile starts collapsed)
   const [ovDoc, setOvDoc] = useState(null);                   // Overview inline document (mobile): { type, id, mode }
@@ -1612,6 +1616,48 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
                       </div>`}
                 </div>`;
             }) : null}
+            ${share ? html`
+              <div class="pj-share-access">
+                <div class="card-h3">${t('organisms.shareAccessTitle') || 'Who can open the shared pages'}</div>
+                <label class="pj-share-row">
+                  <input type="radio" name="pj-share-access" checked=${share.access === 'open'} disabled=${shareBusy}
+                    onChange=${() => patchShare({ access: 'open' })} />
+                  <span>${t('organisms.shareAccessOpen') || 'Anyone with the link'}</span>
+                </label>
+                <label class="pj-share-row">
+                  <input type="radio" name="pj-share-access" checked=${share.access === 'password'} disabled=${shareBusy}
+                    onChange=${() => {
+                      if (share.has_password) { patchShare({ access: 'password' }); return; }
+                      if (sharePw.trim().length >= 4) { patchShare({ access: 'password', password: sharePw.trim() }); setSharePw(''); return; }
+                      showToast(t('organisms.sharePasswordMissing') || 'Type a password (at least 4 characters) below first');
+                    }} />
+                  <span>${t('organisms.shareAccessPassword') || 'Anyone with the link and the password'}</span>
+                </label>
+                <div class="pj-share-pw">
+                  <span class="pj-share-pw-state">${share.has_password
+                    ? (t('organisms.sharePasswordSet') || '🔑 A password is set')
+                    : (t('organisms.sharePasswordUnset') || 'No password set')}</span>
+                  <input type="password" class="pj-share-pw-input" autocomplete="new-password"
+                    placeholder=${t('organisms.sharePasswordPlaceholder') || 'Share password (4–128 chars)'}
+                    value=${sharePw} disabled=${shareBusy}
+                    onInput=${e => setSharePw(e.target.value)} />
+                  <button class="btn-outline btn-sm" disabled=${shareBusy || sharePw.trim().length < 4}
+                    onClick=${() => { patchShare({ access: 'password', password: sharePw.trim() }); setSharePw(''); }}>
+                    ${share.has_password ? (t('organisms.sharePasswordChange') || 'Change password') : (t('organisms.sharePasswordSave') || 'Set password')}
+                  </button>
+                  ${share.has_password ? html`
+                    <button class="btn-ghost btn-sm" disabled=${shareBusy}
+                      onClick=${() => { if (window.confirm(t('organisms.sharePasswordClearConfirm') || 'Remove the share password? The shared pages become link-only.')) patchShare({ access: 'open', password: null }); }}>
+                      ${t('organisms.sharePasswordClear') || 'Remove password'}
+                    </button>` : null}
+                </div>
+                <label class="pj-share-row">
+                  <input type="radio" name="pj-share-access" checked=${share.access === 'account'} disabled=${shareBusy}
+                    onChange=${() => patchShare({ access: 'account' })} />
+                  <span>${t('organisms.shareAccessAccount') || 'Signed-in users only (any account on this node)'}</span>
+                </label>
+                <div class="pj-share-access-note">${t('organisms.shareAccessNote') || 'Workspace members always keep their normal access. The choice above only gates the public link.'}</div>
+              </div>` : null}
             ${anythingPublic() ? html`
               <div class="pj-share-actions">
                 <a class="btn-outline btn-sm" href=${orgService.publicViewerUrl(orgId, wsId)} target="_blank" rel="noopener">${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}</a>

@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-06-09 — Initial: slice 2 of the workspace public-sharing plan.
  *   v1.1.0 — 2026-06-09 — Continuous stacked-page layout (scroll-margin + per-page spacing so every
  *     shared page prints in one go); action-button group for "Copy AI link" + "Print".
+ *   v1.2.0 — 2026-07-10 — TARGET-025: access-gate states (password form + sign-in required).
  */
 
 .pwv-container {
@@ -185,6 +186,30 @@
   color: var(--text);
   font-size: 1.25rem;
   margin: 0 0 0.5rem;
+}
+
+/* ── Access gate (password / sign-in required) — TARGET-025 ── */
+.pwv-gate-form {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.pwv-gate-input {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  min-width: 14rem;
+}
+
+.pwv-gate-err {
+  color: var(--danger, #E8564A);
+  margin-top: 0.7rem;
 }
 
 /* ── Responsive: stack the TOC above the content on narrow screens ── */

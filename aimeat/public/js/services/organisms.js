@@ -762,20 +762,27 @@ export async function retireEngagement(orgId, ws, agent, contract) {
  * Independent of the access roles above: this controls what PUBLISHED document-space pages are
  * readable by ANYONE with the public viewer link (no login). Creator/admin manages it. ── */
 
-/** Current public-sharing state: { public, spaces: {name:bool}, docs: {"type/id":bool} }. */
+const normalizeShare = (s) => ({
+  public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {},
+  access: s.access === 'password' || s.access === 'account' ? s.access : 'open',
+  has_password: !!s.has_password,
+});
+
+/** Current public-sharing state:
+ *  { public, spaces: {name:bool}, docs: {"type/id":bool}, access: 'open'|'password'|'account', has_password }. */
 export async function getWorkspaceShare(orgId, ws) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/share?ws=${encodeURIComponent(ws)}`);
-    const s = resp?.data?.share || {};
-    return { public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {} };
-  } catch { return { public: false, spaces: {}, docs: {} }; }
+    return normalizeShare(resp?.data?.share || {});
+  } catch { return normalizeShare({}); }
 }
 
-/** Merge a patch ({ public?, spaces?, docs? }) into the workspace's public-sharing state. */
+/** Merge a patch ({ public?, spaces?, docs?, access?, password? }) into the workspace's public-sharing
+ *  state. `password` string sets a new share password (the server stores only a scrypt hash and
+ *  responses carry only has_password), null clears it, absent keeps the previous one. */
 export async function setWorkspaceShare(orgId, ws, patch) {
   const resp = await apiPut(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/share?ws=${encodeURIComponent(ws)}`, patch);
-  const s = resp?.data?.share || {};
-  return { public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {} };
+  return normalizeShare(resp?.data?.share || {});
 }
 
 /** The public, no-login viewer URL for a workspace (whole space) or a single document. */
