@@ -280,6 +280,18 @@
     </div>
   </div>
 
+  <!-- Generic in-page confirm dialog — replaces native confirm() so every destructive action
+       uses a real modal (wired in bootstrap; showConfirm(message, onConfirm)). -->
+  <div id="confirm-overlay" hidden>
+    <div class="modal confirm-modal">
+      <p id="confirm-message" class="confirm-message"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="confirm-ok-btn" data-i18n="common.confirm">OK</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-overlay" hidden>
     <div class="modal" id="settings-modal">
       <h2 data-i18n="settings.title">Settings</h2>
