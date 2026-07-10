@@ -55,6 +55,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:no-max-tokens
 
+      - name: app-catalog.html in sync with its sources
+        working-directory: aimeat
+        run: pnpm check:app-catalog
+
       - name: Build
         working-directory: aimeat
         run: pnpm build

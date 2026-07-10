@@ -1,0 +1,6 @@
+# The app-catalog page is built (esbuild) from the modular sources under
+# aimeat/src/static/app-catalog/ into a single artifact. Pin LF on the build output and
+# its sources so `pnpm check:app-catalog` (freshness gate) round-trips byte-identically on
+# every platform, regardless of a contributor's core.autocrlf setting.
+aimeat/src/static/app-catalog.html      text eol=lf
+aimeat/src/static/app-catalog/**        text eol=lf
