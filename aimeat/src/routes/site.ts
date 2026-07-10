@@ -194,7 +194,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         const data = await site.getHeaderNav();
         res.json(success(config.nodeId, {
             ...data,
-            features: { secretary: config.secretaryEnabled },
+            features: {},
         }, [
             { description: 'Update header navigation (operator)', method: 'PUT', url: '/v1/site/header-nav' },
         ]));

@@ -73,20 +73,6 @@ export async function deleteAgent(name) {
   return apiDelete(`/v1/agents/${encodeURIComponent(name)}`);
 }
 
-/**
- * Provision a SPECIALIST agent (POST /v1/specialists). When `approvedScopes` is omitted the specialist is
- * provisioned conservatively and the response carries `requestable_extras` (scope + plain-language
- * description) so the UI can present a consent checklist; pass `approvedScopes` (a subset of those extras)
- * to grant them on the owner's explicit consent. Returns the raw `success()` envelope.
- * @param {{ name: string, role?: string, displayName?: string, approvedScopes?: string[] }} opts
- */
-export async function createSpecialist({ name, role, displayName, approvedScopes }) {
-  const body = { name, role };
-  if (displayName) body.display_name = displayName;
-  if (Array.isArray(approvedScopes)) body.approved_scopes = approvedScopes;
-  return apiPost('/v1/specialists', body);
-}
-
 /** Update agent scopes. */
 export async function updateAgentScopes(name, scopes) {
   return api(`/v1/agents/${encodeURIComponent(name)}/scopes`, {

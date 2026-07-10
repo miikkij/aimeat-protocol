@@ -44,7 +44,6 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { systemAgentLiveness } from './system-agent.js';
 import { logger } from '../utils/logger.js';
 
 export type RawStatus = 'available' | 'busy' | 'away' | 'offline';
@@ -283,15 +282,6 @@ export class PresenceTracker {
 
     // A live tunnel socket is the strongest "running right now" signal (in-memory, no DB).
     if (getActiveConnectTunnelManager()?.isConnected(gaii)) return { ghii: gaii, status: 'available', since: null };
-
-    // Node-run system agents (Secretary / company Secretary / specialist) never open a tunnel and don't
-    // refresh lastSeen — the node executes them in-process. Their liveness is their OWN usability:
-    // available when the owner has AI configured + spending isn't paused, away when paused, offline when
-    // no AI key (it cannot act). Without this they'd read perpetually 'offline' despite being reachable.
-    if (this.storage) {
-      const live = await systemAgentLiveness(this.storage, this.config, gaii);
-      if (live.isSystemAgent) return { ghii: gaii, status: live.status, since: null };
-    }
 
     // No socket: recently-seen (last heartbeat/activity) → away; otherwise offline.
     const lastSeen = await this.getAgentLastSeen(gaii);

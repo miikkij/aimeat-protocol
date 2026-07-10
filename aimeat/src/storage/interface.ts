@@ -1275,7 +1275,7 @@ export interface ScheduledJobRecord {
    * the connect-tunnel on each fire — its `input` is
    * `{ app: string; capability_id: string; input?: Record<string,unknown> }`.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'secretary';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -1318,7 +1318,7 @@ export interface ExecutionLogEntry {
   id: string;
   jobId: string;
   jobName: string;
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'secretary';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';

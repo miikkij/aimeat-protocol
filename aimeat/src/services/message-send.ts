@@ -28,7 +28,6 @@ import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
-import { logger } from '../utils/logger.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -208,17 +207,6 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
           interactive: interactive?.role ?? null,
         },
       });
-
-      // Node-run system agents (Secretary / specialist) have NO tunnel to wake, so they'd otherwise only
-      // react on their scheduler tick. When the owner messages their OWN such agent, hand off to the live
-      // responder so it replies in real time. Fire-and-forget (don't block the send) + dynamic import (the
-      // responder imports message-send for its own replies — a static import would be a cycle). The
-      // responder cheaply bails if the recipient isn't a node-run system agent (e.g. an external agent).
-      if (isSameOwner(senderGhii, recipientGhii)) {
-        import('./system-agent-responder.js')
-          .then(m => m.handleInboundToSystemAgent(ctx, { agentGaii: recipientGhii, ownerGhii: deliveryGhii, conversationId, messageId: id }))
-          .catch(err => logger.warn('[message-send] system-agent responder dispatch failed', { error: (err as Error).message }));
-      }
     }
   } else {
     // Cross-node: attempt federation delivery now; if the peer is unreachable it stays queued and the

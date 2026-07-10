@@ -1570,13 +1570,6 @@
   color: var(--success, #10b981);
 }
 
-/* Specialist badge -- marks a specialist agent type (Secretary P5 / S-A) */
-.pf .pf-agd-badge--specialist {
-  background: var(--bg-dim, rgba(99, 102, 241, 0.12));
-  color: var(--accent, #6366f1);
-  font-weight: 600;
-}
-
 /* Mode badge -- distinguishes how the agent is used (added 2026-05-29) */
 .pf .pf-agd-badge--mode {
   text-transform: uppercase;

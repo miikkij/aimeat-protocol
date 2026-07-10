@@ -5,7 +5,7 @@
  *   Reuses collectWorkspace() so a workspace is captured identically whether exported alone or in a
  *   bundle. Membership (members/board) is NOT exported — only the organism's settings; on import the
  *   importer becomes the new organism's creator.
- * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, exportedAt, skeleton?, templateJson? })
+ * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, exportedAt })
  * @version-history
  *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): add `skeleton` mode (strip every workspace's objects +
  *     images, keeping only schema/purpose/structure — content-free, safe to publish) and an optional
@@ -24,9 +24,9 @@ export const ORG_EXPORT_VERSION = '1.0';
 export async function exportOrganism(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; exporterGaii: string; exportedAt: string; skeleton?: boolean; templateJson?: Record<string, unknown> },
+  opts: { orgId: string; exporterGaii: string; exportedAt: string },
 ): Promise<{ buffer: Buffer; filename: string; workspaces: number }> {
-  const { orgId, exporterGaii, exportedAt, skeleton, templateJson } = opts;
+  const { orgId, exporterGaii, exportedAt } = opts;
   const org = await storage.getOrganism(orgId);
   if (!org) throw new Error('Organism not found');
 
@@ -57,28 +57,17 @@ export async function exportOrganism(
     try {
       const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt });
       const folder = `workspaces/${w.id}`;
-      // Skeleton mode: a use-case template keeps the STRUCTURE (manifest/purpose/locked schemas/document
-      // sections) but drops all content — object records + image binaries — so it round-trips content-free
-      // and is safe to publish. Full mode embeds everything (the original backup behaviour).
-      if (skeleton) {
-        json.objects = [];
-        json.images = [];
-      } else {
-        for (const [name, data] of images) archive.append(data, { name: `${folder}/${name}` });
-      }
+      for (const [name, data] of images) archive.append(data, { name: `${folder}/${name}` });
       archive.append(JSON.stringify(json, null, 2), { name: `${folder}/workspace.json` });
       (orgJson.workspaces as Array<{ ws: string; name: string; folder: string }>).push({ ws: w.id, name: json.name, folder });
       count++;
     } catch { /* skip a workspace the exporter can't read */ }
   }
 
-  if (skeleton) orgJson.skeleton = true;
   archive.append(JSON.stringify(orgJson, null, 2), { name: 'organism.json' });
-  // A use-case template carries its specialist directives + extension deps + scope presets in template.json.
-  if (templateJson) archive.append(JSON.stringify(templateJson, null, 2), { name: 'template.json' });
   archive.finalize();
   const buffer = await done;
   const safe = String(org.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'organism';
-  const prefix = templateJson ? 'template' : 'organism';
+  const prefix = 'organism';
   return { buffer, filename: `${prefix}-${safe}.zip`, workspaces: count };
 }

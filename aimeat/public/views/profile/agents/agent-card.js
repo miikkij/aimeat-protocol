@@ -215,7 +215,6 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             <!-- Mode/platform/readiness badges live in the expanded detail only — repeated
                  identically on every row they were noise, not information. -->
             <div class="pf-agd-collapsed-badges">
-              ${renderSpecialistBadge(agent)}
               ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
             </div>
             ${renderPopOut(onPopOut, agent)}
@@ -241,7 +240,6 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
           </div>
           <div class="pf-agd-zone1-badges">
-            ${renderSpecialistBadge(agent)}
             ${renderModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
             ${renderReadinessBadge(state, onboarding)}
@@ -464,7 +462,7 @@ function renderCollapsedStats(state, agent, onboarding) {
 function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
   switch (state) {
     case 'system':
-      // Internal agents (Secretary / company Secretary / specialists) skip the Hello Integration banner.
+      // Internal (auto-provisioned) agents skip the Hello Integration banner.
       return null;
     case 'new':
       return html`
@@ -535,17 +533,6 @@ function renderModeBadge(agent) {
   const mode = agent.mode || 'interactive';
   const label = t(`profile.agents.mode.${mode}`) || mode;
   return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
-}
-
-// Specialist badge — a specialist agent (Secretary P5 / S-A) is tagged `system:specialist` + `role:<role>`.
-// Shows "Specialist · <role>" so the owner can tell it apart from ordinary agents and the secretaries.
-function renderSpecialistBadge(agent) {
-  const tags = agent.tags || [];
-  if (!tags.includes('system:specialist')) return null;
-  const roleTag = tags.find(tag => String(tag).startsWith('role:'));
-  const role = roleTag ? roleTag.slice('role:'.length) : 'specialist';
-  const label = t('profile.agents.specialistBadge') || 'Specialist';
-  return html`<span class="pf-agd-badge pf-agd-badge--specialist" title=${label}>${label}${role && role !== 'specialist' ? ` · ${role}` : ''}</span>`;
 }
 
 // Editable tag strip shown in the expanded card header. The same owner-managed

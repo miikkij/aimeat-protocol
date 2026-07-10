@@ -11,6 +11,9 @@
  *   v1.1.0 -- 2026-07-01 -- Pin AIMEAT_SECRETARY_ENABLED=true on the shared server (feature is off by
  *            default in prod) so the secretary/specialist/organism-template suites keep exercising it;
  *            add e2e-secretary-disabled.ts (self-spawns a flag-off server) for the hidden-by-default path.
+ *   v1.2.0 -- 2026-07-10 -- Remove the deleted Secretary/Specialists/use-case-Template suites
+ *            (e2e-secretary, e2e-secretary-disabled, e2e-specialists, e2e-organism-templates,
+ *            e2e-b2b-sales-hub-template) and the AIMEAT_SECRETARY_ENABLED env pin.
  */
 
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
@@ -57,9 +60,6 @@ const ALL_SUITES = [
     'test/e2e-extensions.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
-    'test/e2e-specialists.ts',
-    'test/e2e-organism-templates.ts',
-    'test/e2e-b2b-sales-hub-template.ts',
     'test/e2e-upsert.ts',
     'test/e2e-federation.ts',
     'test/e2e-presence.ts',
@@ -128,10 +128,6 @@ const ALL_SUITES = [
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-connect-serve-loopback.ts',
     'test/e2e-phase0.ts',
-    'test/e2e-secretary.ts',
-    // Self-spawns its own server with the Secretary feature OFF (the shared server pins it ON),
-    // verifying the hidden-by-default path: routes 404 + header-nav features.secretary=false.
-    'test/e2e-secretary-disabled.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',
@@ -301,11 +297,6 @@ async function startServer(): Promise<ChildProcess> {
         // its own flag-ON server.
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
         AIMEAT_PORTFOLIO_HOST: '',
-        // Secretary + specialist agents are opt-in and OFF by default in prod. Pin them ON for the shared
-        // server so the secretary/specialist/organism-template suites keep exercising the feature. The
-        // .env.test.* files are gitignored, so CI relies on this default. e2e-secretary-disabled.ts
-        // self-spawns its own flag-OFF server to cover the hidden path.
-        AIMEAT_SECRETARY_ENABLED: process.env.AIMEAT_SECRETARY_ENABLED ?? 'true',
         // Open-core test suite runs in Community edition (no proprietary ee/ module): force the
         // enterprise stub even when an ee/ directory exists in the local working tree, so the
         // ENTERPRISE_REQUIRED behavior is deterministic in both CI and local. The ee/ module has

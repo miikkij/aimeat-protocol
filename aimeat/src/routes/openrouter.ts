@@ -38,7 +38,6 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { complete, listModels } from '../services/openrouter.js';
-import { ensureSecretary } from '../services/secretary.js';
 
 function validateProviderUrl(url: string): string | null {
   try {
@@ -176,19 +175,6 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
       await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
 
-      // Auto-provision the owner's Secretary whenever OpenRouter is configured (idempotent; see
-      // docs/plans/2026-06-23-secretary-feature.md Phase 0). Gated on the key actually being present
-      // — so it covers both "key just set" and "existing-key owner tweaks settings", but never an
-      // lmstudio/custom save with no key. Best-effort: provisioning must not block saving settings.
-      try {
-        const keyRec = await storage.getMemory(gaii, 'openrouter.apikey');
-        const hasKey = !!((keyRec?.value as { encrypted?: string } | undefined)?.encrypted);
-        // Only auto-provision the Secretary when the feature is enabled (AIMEAT_SECRETARY_ENABLED).
-        if (hasKey && config.secretaryEnabled) await ensureSecretary(storage, config, req.auth!.owner as string);
-      } catch (err) {
-        logger.warn('[secretary] auto-provision on settings save failed', { error: String(err) });
-      }
-
       res.json(success(config.nodeId, { saved: true }));
     });
 
@@ -204,16 +190,6 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       ]);
 
       const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
-
-      // Backfill: provision the owner's Secretary whenever a key is configured. ensureSecretary on PUT
-      // only fires on save, so owners who set OpenRouter up BEFORE the Secretary feature shipped never
-      // got an agent (the Secretary page then wrongly said "configure OpenRouter"). This GET runs on
-      // every SPA load (the header Secretary-button check), so it backfills them transparently.
-      // Best-effort + idempotent — never block reading settings.
-      if (config.secretaryEnabled && (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted) {
-        try { await ensureSecretary(storage, config, req.auth!.owner as string); }
-        catch (err) { logger.warn('[secretary] provision-on-settings-read failed', { error: String(err) }); }
-      }
 
       res.json(success(config.nodeId, {
         hasApiKey: !!(apiKeyRecord?.value as { encrypted?: string })?.encrypted,

@@ -3556,87 +3556,7 @@
     localStorage.setItem("appLauncherConfig", JSON.stringify(config));
   }
 
-  // src/static/app-catalog/js/main.js
-  function setLanguage(lang) {
-    setLang(lang);
-    try {
-      var config = loadConfig();
-      config.language = getLang();
-      saveConfig(config);
-    } catch (e) {
-    }
-    applyI18n();
-    try {
-      renderApps();
-    } catch (e) {
-    }
-    try {
-      renderTags();
-    } catch (e) {
-    }
-    try {
-      loadPublishedApps();
-    } catch (e) {
-    }
-    try {
-      renderRecentlyOpened();
-    } catch (e) {
-    }
-    try {
-      loadCortexExtensions();
-    } catch (e) {
-    }
-    try {
-      mountLoginPill();
-    } catch (e) {
-    }
-  }
-  function switchDbMode(mode) {
-    if (mode === getDbMode()) return;
-    if (mode === "personal" && !currentOwnerName()) {
-      updateModeToggle();
-      requireSignInThen(function() {
-        switchDbMode("personal");
-      });
-      return;
-    }
-    setDbMode(mode);
-    closeDbInstance();
-    updateModeToggle();
-    refreshAll();
-  }
-  function updateModeToggle() {
-    var globalBtn = document.getElementById("mode-global");
-    var personalBtn = document.getElementById("mode-personal");
-    if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle("active", getDbMode() === "global");
-    personalBtn.classList.toggle("active", getDbMode() === "personal");
-    var signedIn = !!currentOwnerName();
-    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
-    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
-  }
-  function generateId() {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0;
-      var v = c === "x" ? r : r & 3 | 8;
-      return v.toString(16);
-    });
-  }
-  function readFileAsText(file) {
-    return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() {
-        resolve(reader.result);
-      };
-      reader.onerror = function() {
-        reject(reader.error);
-      };
-      reader.readAsText(file);
-    });
-  }
+  // src/static/app-catalog/js/zip.js
   function mimeFromExtension(name) {
     var ext = (name.split(".").pop() || "").toLowerCase();
     var map = {
@@ -3821,6 +3741,88 @@
       });
     }
     return html;
+  }
+
+  // src/static/app-catalog/js/main.js
+  function setLanguage(lang) {
+    setLang(lang);
+    try {
+      var config = loadConfig();
+      config.language = getLang();
+      saveConfig(config);
+    } catch (e) {
+    }
+    applyI18n();
+    try {
+      renderApps();
+    } catch (e) {
+    }
+    try {
+      renderTags();
+    } catch (e) {
+    }
+    try {
+      loadPublishedApps();
+    } catch (e) {
+    }
+    try {
+      renderRecentlyOpened();
+    } catch (e) {
+    }
+    try {
+      loadCortexExtensions();
+    } catch (e) {
+    }
+    try {
+      mountLoginPill();
+    } catch (e) {
+    }
+  }
+  function switchDbMode(mode) {
+    if (mode === getDbMode()) return;
+    if (mode === "personal" && !currentOwnerName()) {
+      updateModeToggle();
+      requireSignInThen(function() {
+        switchDbMode("personal");
+      });
+      return;
+    }
+    setDbMode(mode);
+    closeDbInstance();
+    updateModeToggle();
+    refreshAll();
+  }
+  function updateModeToggle() {
+    var globalBtn = document.getElementById("mode-global");
+    var personalBtn = document.getElementById("mode-personal");
+    if (!globalBtn || !personalBtn) return;
+    globalBtn.classList.toggle("active", getDbMode() === "global");
+    personalBtn.classList.toggle("active", getDbMode() === "personal");
+    var signedIn = !!currentOwnerName();
+    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
+    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
+  }
+  function generateId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function readFileAsText(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        resolve(reader.result);
+      };
+      reader.onerror = function() {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
   }
   async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
     var files = await extractZip(arrayBuffer);

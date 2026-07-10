@@ -314,43 +314,6 @@
   margin: 0 0 0.75rem;
 }
 
-/* ── Company Secretary panel (Phase 6 slice 3) ── */
-.mc-sec { display: flex; flex-direction: column; gap: 1rem; }
-.mc-sec-id { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.mc-sec-id code { font-size: 0.78rem; color: var(--text-dim); }
-.mc-sec-brain { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; }
-.mc-lock-chip { font-size: 0.74rem; font-weight: 600; color: var(--text-dim); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 0.15rem 0.6rem; white-space: nowrap; }
-.mc-sec-purpose { color: var(--text); font-size: 0.9rem; margin: 0.4rem 0 0.6rem; white-space: pre-wrap; }
-.mc-sec-rules { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; }
-.mc-sec-rules li { color: var(--text); font-size: 0.86rem; }
-.mc-sec-cap-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.mc-sec-cap-list li { padding: 0.4rem 0; border-top: 1px solid var(--border); }
-.mc-sec-scopes { font-size: 0.84rem; color: var(--text-dim); }
-.mc-sec-scopes summary { cursor: pointer; }
-.mc-sec-scope-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
-.mc-err { color: var(--danger); font-size: 0.85rem; margin: 0.5rem 0 0; }
-
-/* ── Governance / cost & ROI (Phase 6 slice 2) ── */
-.mc-gov { display: flex; flex-direction: column; gap: 1rem; }
-.mc-gov-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.6rem; }
-.mc-gov-kpi { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.7rem 0.85rem; }
-.mc-gov-kpi-value { font-size: 1.25rem; font-weight: 700; color: var(--text); }
-.mc-gov-kpi-label { font-size: 0.74rem; color: var(--text-dim); margin-top: 0.2rem; }
-.mc-gov-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-.mc-gov-table th, .mc-gov-table td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); }
-.mc-gov-table th { color: var(--text-dim); font-weight: 600; font-size: 0.76rem; }
-.mc-gov-table td:nth-child(n+2), .mc-gov-table th:nth-child(n+2) { text-align: right; }
-.mc-gov-levers { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.mc-gov-note { font-size: 0.8rem; color: var(--text-dim); border-left: 2px solid var(--border); padding-left: 0.7rem; margin: 0; }
-
-/* ── Company model (Phase 6 slice 1) ── */
-.mc-model { display: flex; flex-direction: column; gap: 1rem; }
-.mc-model-build { display: flex; flex-direction: column; gap: 0.5rem; }
+/* Shared full-width form input for My Company forms (Settings / Portfolio / create-company);
+   overrides the base .mc-input above with full-width + border-box sizing. */
 .mc-input { width: 100%; padding: 0.5rem 0.6rem; background: var(--bg-dim); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; box-sizing: border-box; font-family: inherit; }
-.mc-model-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.mc-model-paste { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; }
-.mc-model-review { display: flex; align-items: center; gap: 0.5rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
-.mc-model-view { display: flex; flex-direction: column; gap: 0.9rem; }
-.mc-model-view section { border-top: 1px solid var(--border); padding-top: 0.6rem; }
-.mc-model-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
-.mc-model-list li { color: var(--text); font-size: 0.88rem; }
