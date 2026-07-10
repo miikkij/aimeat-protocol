@@ -14,7 +14,7 @@
  */
 import { getQuickJS, newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSRuntime, QuickJSHandle, QuickJSWASMModule } from 'quickjs-emscripten';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { safeFetch } from '../utils/url-validator.js';
 
 // ── Public interfaces (UNCHANGED) ──────────────────────────
 
@@ -332,14 +332,13 @@ export async function executeExtensionAction(
         // ── Fetch API ─────────────────────────────────────────
         registerAsyncHostFn(vm, '__fetch',
             async (url, optsJson) => {
-                const ssrfCheck = await validateOutboundUrl(url);
-                if (!ssrfCheck.valid) {
-                    throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
-                }
                 const opts = JSON.parse(optsJson || '{}') as {
                     method?: string; headers?: Record<string, string>; body?: string;
                 };
-                const resp = await fetch(url, {
+                // safeFetch validates the URL AND re-validates every redirect hop (redirect:'manual'),
+                // so an allowed host cannot 3xx-bounce the guest's request to an internal target.
+                // Throws `Fetch blocked: <reason>` on a blocked URL/hop (surfaced to the guest as an error).
+                const resp = await safeFetch(url, {
                     method: opts.method || 'GET',
                     headers: opts.headers,
                     body: opts.body,

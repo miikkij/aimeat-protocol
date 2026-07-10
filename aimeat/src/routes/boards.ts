@@ -9,7 +9,7 @@ import { executeHooks } from '../services/hooks.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 
@@ -28,25 +28,21 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         if (sub.filters?.tags?.length && !sub.filters.tags.some(t => post.tags.includes(t))) continue;
         if (!sub.callbackUrl) continue;
         // SSRF validation: block requests to private/reserved IPs
-        validateOutboundUrl(sub.callbackUrl).then(urlCheck => {
-          if (!urlCheck.valid) {
-            logger.warn(`Blocked board notification to ${sub.callbackUrl}: ${urlCheck.reason}`);
-            return;
-          }
-          return fetch(sub.callbackUrl!, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              event: 'board.new_post',
-              board_id: boardId,
-              post_id: post.id,
-              author_gaii: post.authorGaii,
-              title: post.title,
-              category: post.category,
-              timestamp: new Date().toISOString(),
-            }),
-            signal: AbortSignal.timeout(10_000),
-          });
+        // safeFetch validates the URL + re-validates redirects (throws `Fetch blocked: …`), closing the
+        // redirect-bounce SSRF on the subscriber-supplied callbackUrl.
+        safeFetch(sub.callbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'board.new_post',
+            board_id: boardId,
+            post_id: post.id,
+            author_gaii: post.authorGaii,
+            title: post.title,
+            category: post.category,
+            timestamp: new Date().toISOString(),
+          }),
+          signal: AbortSignal.timeout(10_000),
         }).catch(err => {
           logger.warn('Board subscription notification failed', { boardId, gaii: sub.gaii, error: String(err) });
         });

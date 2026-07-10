@@ -20,6 +20,7 @@ import { sign } from '../auth/keypair.js';
 import { checkStorageQuota } from './quota.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { safeFetch } from '../utils/url-validator.js';
 
 export interface AttachmentCtx {
   config: AimeatConfig;
@@ -67,7 +68,10 @@ export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMes
   };
   try {
     const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
-    const resp = await fetch(`${peer.url}/v1/federation/storage/grant`, {
+    // safeFetch validates + re-validates every redirect hop. The grant POST targets the peer-registry
+    // URL; the download targets a URL the PEER returns in its JSON response (fully peer-controlled) —
+    // safeFetch stops a malicious/compromised peer from pointing it at an internal/metadata address.
+    const resp = await safeFetch(`${peer.url}/v1/federation/storage/grant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': ctx.config.nodeId },
       body: JSON.stringify({ ...payload, signature }),
@@ -77,7 +81,7 @@ export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMes
     const data = await resp.json() as { data?: { download_url?: string } };
     const url = data?.data?.download_url;
     if (!url) return null;
-    const dl = await fetch(url, { signal: AbortSignal.timeout(ctx.config.federationTimeoutMs) });
+    const dl = await safeFetch(url, { signal: AbortSignal.timeout(ctx.config.federationTimeoutMs) });
     if (!dl.ok) return null;
     return Buffer.from(await dl.arrayBuffer());
   } catch (err) {

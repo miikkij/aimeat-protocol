@@ -8,7 +8,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { safeFetch } from '../utils/url-validator.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 
@@ -75,17 +75,13 @@ export async function invokeCapability(
         throw Object.assign(new Error('Webhook URL not configured'), { statusCode: 500, code: 'NO_WEBHOOK' });
       }
 
-      // Webhook security: validate URL (includes DNS resolution check)
-      const ssrfCheck = await validateOutboundUrl(capability.webhookUrl);
-      if (!ssrfCheck.valid) {
-        throw Object.assign(new Error(`Webhook URL blocked: ${ssrfCheck.reason}`), { statusCode: 400, code: 'INVALID_WEBHOOK' });
-      }
-
+      // safeFetch validates the URL AND re-validates every redirect hop (throws `Fetch blocked: …`),
+      // closing the redirect-bounce SSRF on the owner-configured webhookUrl.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
 
       try {
-        const response = await fetch(capability.webhookUrl, {
+        const response = await safeFetch(capability.webhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
