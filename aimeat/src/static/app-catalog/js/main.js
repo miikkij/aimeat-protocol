@@ -968,6 +968,11 @@ import { I18N } from './i18n-data.js';
   // in the Kirjasto grid (no more Local + Published + Parked triplicate cards).
   var ownServerApps = [];
 
+  // filename -> authoritative server state { parked, forkable, forks, owner, versionNumber,
+  // protection }. Populated by buildLibraryEntries so the DETAIL view can offer the owner's
+  // server management (park/fork/protect/remove) that used to sit on the published card.
+  var serverStateByFilename = {};
+
   // Status of a unified entry, for its badge.
   function libStatus(e) {
     if (e.parked) return 'parked';
@@ -992,6 +997,7 @@ import { I18N } from './i18n-data.js';
     var base = (loadConfig().aimeatUrl || '').replace(/\/+$/, '');
     var byFilename = {};
     var entries = [];
+    serverStateByFilename = {}; // rebuilt fresh each render
     for (var i = 0; i < localApps.length; i++) {
       var la = localApps[i];
       var e = {
@@ -1016,6 +1022,7 @@ import { I18N } from './i18n-data.js';
     for (var s = 0; s < serverApps.length; s++) {
       var sa = serverApps[s];
       var fn = sa.filename || '';
+      var prot = (sa.manifest && sa.manifest.protection) || {};
       var m = fn ? byFilename[fn] : null;
       if (m) {
         m.parked = !!sa.parked;
@@ -1023,6 +1030,7 @@ import { I18N } from './i18n-data.js';
         m.owner = sa.owner || m.owner;
         m.versionNumber = sa.version_number || m.versionNumber;
         m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
+        m.protection = prot;
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
@@ -1038,10 +1046,18 @@ import { I18N } from './i18n-data.js';
           filename: fn, owner: sa.owner || '',
           versionNumber: sa.version_number || null,
           viewUrl: (base && fn) ? (base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn)) : '',
-          forkable: !!sa.forkable, forks: sa.forks || 0
+          forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot
         };
         entries.push(se);
         if (fn) byFilename[fn] = se;
+      }
+      // Record authoritative server state so the detail view can manage this app.
+      if (fn) {
+        serverStateByFilename[fn] = {
+          parked: !!sa.parked, forkable: !!sa.forkable, forks: sa.forks || 0,
+          owner: sa.owner || '', versionNumber: sa.version_number || null, protection: prot
+        };
+        ownAppProtection[fn] = prot;
       }
     }
     return entries;
@@ -2136,16 +2152,7 @@ import { I18N } from './i18n-data.js';
 
   // ── Published Apps Section ──────────────────────
 
-  var publishedVisible = true;
-
-  function togglePublished() {
-    publishedVisible = !publishedVisible;
-    var grid = document.getElementById('published-grid');
-    var arrow = document.getElementById('published-arrow');
-    grid.style.display = publishedVisible ? '' : 'none';
-    arrow.classList.toggle('open', publishedVisible);
-  }
-
+  // Community section keeps its own collapse toggle (Published/Parked merged into #app-grid).
   var communityVisible = true;
   function toggleCommunity() {
     communityVisible = !communityVisible;
@@ -2153,15 +2160,6 @@ import { I18N } from './i18n-data.js';
     var arrow = document.getElementById('community-arrow');
     grid.style.display = communityVisible ? '' : 'none';
     arrow.classList.toggle('open', communityVisible);
-  }
-
-  var parkedVisible = true;
-  function toggleParked() {
-    parkedVisible = !parkedVisible;
-    var grid = document.getElementById('parked-grid');
-    var arrow = document.getElementById('parked-arrow');
-    grid.style.display = parkedVisible ? '' : 'none';
-    arrow.classList.toggle('open', parkedVisible);
   }
 
   // ── Two views: Kirjasto (your apps: local + published + parked) / Yhteisö (community) ──
@@ -2888,15 +2886,9 @@ import { I18N } from './i18n-data.js';
   function loadPublishedApps() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
-    var section = document.getElementById('published-section');
-    var grid = document.getElementById('published-grid');
-    var countEl = document.getElementById('published-count');
     var communitySection = document.getElementById('community-section');
     var communityGrid = document.getElementById('community-grid');
     var communityCountEl = document.getElementById('community-count');
-    var parkedSection = document.getElementById('parked-section');
-    var parkedGrid = document.getElementById('parked-grid');
-    var parkedCountEl = document.getElementById('parked-count');
 
     var currentOwner = null;
     try {
@@ -2986,37 +2978,32 @@ import { I18N } from './i18n-data.js';
     return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(',')) + '"';
   }
 
-  // Apply the current searchQuery + activeTag to the server sections too (Published / Community /
-  // Parked). Search used to filter ONLY the Local grid, so a published app's name returned "no
-  // matches" even though its card sat two sections up. Hides non-matching cards, updates the count,
-  // and hides a section whose cards all filtered out.
+  // Apply the current searchQuery + activeTag to the Community grid. (Your own apps live in the
+  // unified #app-grid, which renderApps() filters directly; Community is the one server section
+  // left, so its cards still need this pass so a search matches community apps too.)
   function applyServerFilter() {
     var q = (searchQuery || '').toLowerCase();
     var at = activeTag;
     var filtering = !!(q || (at !== null));
-    [['published-grid', 'published-count', 'published-section'],
-     ['community-grid', 'community-count', 'community-section'],
-     ['parked-grid', 'parked-count', 'parked-section']].forEach(function (ids) {
-      var grid = document.getElementById(ids[0]);
-      if (!grid) return;
-      var cards = grid.querySelectorAll('.published-card');
-      if (!cards.length) return;
-      var shown = 0;
-      cards.forEach(function (card) {
-        var match = true;
-        if (at === '__favorites__') { match = false; } // favorites is a Local-only filter
-        else if (at !== null) {
-          match = (',' + (card.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
-        }
-        if (match && q) match = (card.getAttribute('data-filter') || '').indexOf(q) !== -1;
-        card.style.display = match ? '' : 'none';
-        if (match) shown++;
-      });
-      var countEl = document.getElementById(ids[1]);
-      if (countEl) countEl.textContent = '(' + shown + ')';
-      var sectionEl = document.getElementById(ids[2]);
-      if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
+    var grid = document.getElementById('community-grid');
+    if (!grid) return;
+    var cards = grid.querySelectorAll('.published-card');
+    if (!cards.length) return;
+    var shown = 0;
+    cards.forEach(function (card) {
+      var match = true;
+      if (at === '__favorites__') { match = false; } // favorites is a Local-only filter
+      else if (at !== null) {
+        match = (',' + (card.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
+      }
+      if (match && q) match = (card.getAttribute('data-filter') || '').indexOf(q) !== -1;
+      card.style.display = match ? '' : 'none';
+      if (match) shown++;
     });
+    var countEl = document.getElementById('community-count');
+    if (countEl) countEl.textContent = '(' + shown + ')';
+    var sectionEl = document.getElementById('community-section');
+    if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
   }
 
   function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
@@ -3075,186 +3062,6 @@ import { I18N } from './i18n-data.js';
   // Render the owner's PARKED apps in their own section. A parked app is hidden from
   // the public catalogue but stays fully usable by the owner; the primary action here
   // is Publish (unpark), which moves it back into Published Apps.
-  function renderParkedApps(parkedApps, aimeatUrl, section, grid, countEl) {
-    if (!section || !grid || !countEl) return;
-    if (!parkedApps || parkedApps.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
-    section.style.display = '';
-    countEl.textContent = '(' + parkedApps.length + ')';
-
-    var html = '';
-    for (var i = 0; i < parkedApps.length; i++) {
-      var sa = parkedApps[i];
-      var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : (sa.filename || '');
-      var version = sa.version_number ? 'v' + sa.version_number : '';
-      var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
-      var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
-      html +=
-        '<div class="published-card parked"' + filterAttr(name, (sa.manifest && sa.manifest.tags) || []) + '>' +
-          '<div class="published-card-name">' + escapeHtml(name) +
-            ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(sa.owner || '') + '\', \'' + jsArg(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">✏️</button>' +
-            (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
-            ' <span class="published-source-badge parked">' + t('card.parkedBadge') + '</span>' +
-          '</div>' +
-          '<div class="published-card-meta">' +
-            '<span>' + escapeHtml(sa.filename || '') + '</span>' +
-            '<span>' + date + '</span>' +
-          '</div>' +
-          '<div class="published-card-actions">' +
-            '<button class="primary" onclick="window._launcher.toggleParkApp(\'' + escapeHtml(sa.filename || '') + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>' +
-            '<button onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', \'\', ' + (sa.version_number || 0) + ')">' + t('ctx.details') + '</button>' +
-            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
-            '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">' + t('card.versions') + '</button>' +
-            '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(sa.filename || '') + '\')" class="danger">' + t('card.remove') + '</button>' +
-          '</div>' +
-        '</div>';
-    }
-    grid.innerHTML = html;
-  }
-
-  function renderPublishedApps(localPublished, serverApps, localByFilename, aimeatUrl, section, grid, countEl) {
-    // Merge: build a combined list. Server apps take priority for display data,
-    // but we note which source(s) each app comes from.
-    var merged = [];
-    var seenFilenames = {};
-
-    // Add server apps first
-    for (var s = 0; s < serverApps.length; s++) {
-      var sa = serverApps[s];
-      var filename = sa.filename || '';
-      var localMatch = localByFilename[filename] || null;
-      var source = localMatch ? 'both' : 'server';
-      seenFilenames[filename] = true;
-      merged.push({
-        name: (sa.manifest && sa.manifest.name) ? sa.manifest.name : filename,
-        description: (sa.manifest && sa.manifest.description) ? sa.manifest.description : '',
-        filename: filename,
-        owner: sa.owner || '',
-        version: sa.version_number ? 'v' + sa.version_number : '',
-        date: sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '',
-        viewUrl: aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(filename),
-        source: source,
-        localId: localMatch ? localMatch.id : null,
-        versionNumber: sa.version_number || null,
-        parked: !!sa.parked,
-        forkable: !!sa.forkable,
-        forks: sa.forks || 0,
-        protection: (sa.manifest && sa.manifest.protection) || {},
-        operatorHidden: !!sa.operator_hidden,
-        operatorHideReason: sa.operator_hide_reason || '',
-        isOwn: true
-      });
-    }
-
-    // Add local-only apps (not already seen from server)
-    for (var l = 0; l < localPublished.length; l++) {
-      var lp = localPublished[l];
-      var lpFilename = lp.publishedFilename || '';
-      if (lpFilename && seenFilenames[lpFilename]) continue;
-      var lpUrl = lp.publishedUrl ? (aimeatUrl + lp.publishedUrl) : '';
-      merged.push({
-        name: lp.name || lpFilename || 'Untitled',
-        description: lp.description || '',
-        filename: lpFilename,
-        version: lp.publishedVersionNumber ? 'v' + lp.publishedVersionNumber : '',
-        date: lp.publishedAt ? new Date(lp.publishedAt).toLocaleDateString() : '',
-        viewUrl: lpUrl,
-        source: 'local',
-        localId: lp.id,
-        versionNumber: lp.publishedVersionNumber || null,
-        isOwn: true
-      });
-    }
-
-    if (merged.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
-
-    section.style.display = '';
-    countEl.textContent = '(' + merged.length + ')';
-
-    // Operator-only: subdomain chip/assign controls on own server-published cards
-    var showSubdomainControls = !!subdomainsByTarget && isOperatorSession();
-
-    var html = '';
-    for (var i = 0; i < merged.length; i++) {
-      var app = merged[i];
-      var badgeClass = app.source === 'both' ? 'both' : (app.source === 'server' ? 'server' : 'local');
-      var badgeLabel = app.source === 'both' ? 'PORTAL + MCP' : (app.source === 'server' ? 'MCP' : 'PORTAL');
-
-      var subChipHtml = '';
-      var subBtnHtml = '';
-      if (showSubdomainControls && app.isOwn && app.filename) {
-        var targetKey = bareOwnerName(app.owner) + '/' + app.filename;
-        var mapping = subdomainsByTarget[targetKey] || null;
-        var openModal = 'window._launcher.showSubdomainModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')';
-        if (mapping) {
-          subChipHtml = '<div class="subdomain-chip-row"><span class="subdomain-chip" onclick="' + openModal + '" title="' + t('subModal.title') + '">&#x1F310; ' +
-            escapeHtml(mapping.subdomain + '.' + apexHostLabel()) + '</span></div>';
-        } else {
-          subBtnHtml = '<button onclick="' + openModal + '">' + t('card.subdomain') + '</button>';
-        }
-      }
-
-      // Park is only meaningful for an app that actually exists on the server
-      // (source 'server' or 'both'); a purely-local published entry has nothing to hide.
-      // Parking moves the app into the separate Parked Apps section (it is filtered out
-      // of this Published list), so this button always parks.
-      var onServer = app.isOwn && app.filename && (app.source === 'server' || app.source === 'both');
-      var parkBtnHtml = onServer
-        ? '<button onclick="window._launcher.toggleParkApp(\'' + escapeHtml(app.filename) + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>'
-        : '';
-      // Fork permission toggle: let outsiders fork this app, or restrict to you + your
-      // agents. Only meaningful for an app that exists on the server.
-      var forkBtnHtml = onServer
-        ? '<button onclick="window._launcher.toggleForkApp(\'' + escapeHtml(app.filename) + '\', ' + (app.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(app.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(app.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>'
-        : '';
-      // Copy-protection (opt-in). Stash current flags for the modal; badge the button
-      // when any protection is on so the owner sees at a glance which apps are hardened.
-      if (onServer) ownAppProtection[app.filename] = app.protection || {};
-      var anyProtect = onServer && app.protection && (app.protection.obfuscate || app.protection.domainLock || app.protection.watermark || app.protection.noRawDownload);
-      var protectBtnHtml = onServer
-        ? '<button onclick="window._launcher.showProtectionModal(\'' + escapeHtml(app.filename) + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProtect ? '🛡✓' : '🛡') + '</button>'
-        : '';
-
-      html +=
-        '<div class="published-card"' + filterAttr(app.name, app.tags || (app.manifest && app.manifest.tags) || []) + '>' +
-          '<div class="published-card-name">' + escapeHtml(app.name) +
-            ((app.isOwn && app.filename) ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.editAppDetails(\'' + jsArg(app.owner || '') + '\', \'' + jsArg(app.filename) + '\', \'' + jsArg(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">✏️</button>' : '') +
-          '</div>' +
-          (app.operatorHidden ? '<div class="published-card-modnote"><span class="published-source-badge operator-hidden" title="' + escapeHtml(app.operatorHideReason || '') + '">' + t('card.operatorHidden') + '</span></div>' : '') +
-          (app.description ? '<div class="published-card-desc">' + escapeHtml(app.description) + '</div>' : '') +
-          '<div class="published-card-footer">' +
-            subChipHtml +
-            '<div class="published-card-metaline">' +
-              '<span class="pcm-main" title="' + escapeHtml(app.filename) + '">' + escapeHtml(app.filename) + '</span>' +
-              (app.date ? '<span class="pcm-date">' + app.date + '</span>' : '') +
-            '</div>' +
-            '<div class="published-card-actions">' +
-              (app.isOwn && app.filename ? '<button class="primary" onclick="window._launcher.openPublishedDetail(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\', \'' + escapeHtml(app.localId || '') + '\', ' + (app.versionNumber || 0) + ')">' + t('ctx.details') + '</button>' : '') +
-              (app.viewUrl ? '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'' + jsArg(app.name) + '\')">' + t('card.view') + '</button>' : '') +
-              (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
-              parkBtnHtml +
-              forkBtnHtml +
-              protectBtnHtml +
-              subBtnHtml +
-              (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
-               app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
-            '</div>' +
-            '<div class="published-card-badgerow">' +
-              '<span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
-              (onServer ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">⑂ ' + (app.forks || 0) + '</span>' : '') +
-              (app.version ? '<span class="pcb-version">' + escapeHtml(app.version) + '</span>' : '') +
-            '</div>' +
-          '</div>' +
-        '</div>';
-    }
-    grid.innerHTML = html;
-  }
-
   function unpublishApp(appId) {
     if (!confirm(t('confirm.removePublished'))) return;
 
@@ -3679,6 +3486,33 @@ import { I18N } from './i18n-data.js';
         '</div>' +
       '</div>';
 
+    // ── SERVER MANAGEMENT (own published/parked apps) ──
+    // Park/Unpark, fork permission, copy-protection, versions and remove-from-server used to
+    // live on the published card; the unified card now shows only Open + Details, so these move
+    // here (req: "card buttons 2-3, the rest in detail"). serverStateByFilename is populated by
+    // buildLibraryEntries from the authoritative server list.
+    var mgmtHtml = '';
+    var svrState = (app.publishedFilename && serverStateByFilename[app.publishedFilename]) || null;
+    if (app.published && app.publishedFilename && svrState && !isUrlApp) {
+      var fnArg = jsArg(app.publishedFilename);
+      var ownerArg2 = jsArg(svrState.owner || '');
+      var p = svrState.protection || {};
+      var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+      mgmtHtml =
+        '<div class="dtl-section">' +
+          '<h3>' + t('detail.serverMgmt') + '</h3>' +
+          '<div class="dtl-btn-row">' +
+            (svrState.parked
+              ? '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>'
+              : '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>') +
+            '<button class="dtl-btn" onclick="window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>' +
+            '<button class="dtl-btn" onclick="window._launcher.showProtectionModal(\'' + fnArg + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')) + '</button>' +
+            '<button class="dtl-btn" onclick="window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')">' + t('card.versions') + '</button>' +
+            '<button class="dtl-btn danger" onclick="window._launcher.deleteServerApp(\'' + fnArg + '\')">' + t('card.removeServer') + '</button>' +
+          '</div>' +
+        '</div>';
+    }
+
     // ── SKILLS (skills registry, 2d) — expertise that teaches agents this app ──
     var skillsHtml = '';
     if (app.published) {
@@ -3693,7 +3527,7 @@ import { I18N } from './i18n-data.js';
     }
 
     document.getElementById('detail-body').innerHTML =
-      statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + actionsHtml;
+      statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
   }
 
   // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.
@@ -5278,9 +5112,7 @@ import { I18N } from './i18n-data.js';
     showPublishModal: showPublishModal,
     submitPublish: submitPublish,
     loadPublishedApps: loadPublishedApps,
-    togglePublished: togglePublished,
     toggleCommunity: toggleCommunity,
-    toggleParked: toggleParked,
     switchView: switchView,
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,

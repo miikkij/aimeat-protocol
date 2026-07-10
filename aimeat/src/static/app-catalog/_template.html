@@ -98,24 +98,8 @@
     </div>
   </div>
 
-  <!-- Published Apps Section (own) -->
-  <div id="published-section" data-view="library" style="display:none">
-    <div class="published-header" onclick="window._launcher.togglePublished()">
-      <h2><span data-i18n="sec.published">&#x1F680; Published Apps</span> <span id="published-count"></span></h2>
-      <span class="arrow open" id="published-arrow">&#x25BC;</span>
-    </div>
-    <div id="published-grid" class="published-grid"></div>
-  </div>
-
-  <!-- Parked Apps Section (own, hidden from the public catalogue) -->
-  <div id="parked-section" data-view="library" style="display:none">
-    <div class="published-header" onclick="window._launcher.toggleParked()">
-      <h2><span data-i18n="sec.parked">&#x1F17F;&#xFE0F; Parked Apps</span> <span id="parked-count"></span></h2>
-      <span class="arrow open" id="parked-arrow">&#x25BC;</span>
-    </div>
-    <div class="parked-blurb" data-i18n="sec.parkedBlurb">Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.</div>
-    <div id="parked-grid" class="published-grid"></div>
-  </div>
+  <!-- Published + Parked apps are now merged into the unified #app-grid below (status badges);
+       their standalone sections were removed with the old renderers (TARGET-021 Aalto 3). -->
 
   <!-- Community Apps Section (other users) -->
   <div id="community-section" data-view="community" style="display:none">
