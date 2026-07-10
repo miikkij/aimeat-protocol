@@ -10,7 +10,7 @@
 import { I18N } from './i18n-data.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
-import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
+import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -3119,12 +3119,12 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
         '<h3>' + t('detail.serverMgmt') + '</h3>' +
         '<div class="dtl-btn-row">' +
           (svrState.parked
-            ? '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', false)" title="' + escapeHtml(t('card.unparkHint')) + '">' + t('card.unpark') + '</button>'
-            : '<button class="dtl-btn" onclick="window._launcher.toggleParkApp(\'' + fnArg + '\', true)" title="' + escapeHtml(t('card.parkHint')) + '">' + t('card.park') + '</button>') +
-          '<button class="dtl-btn" onclick="window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')" title="' + escapeHtml(t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')) + '">' + t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff') + '</button>' +
-          '<button class="dtl-btn" onclick="window._launcher.showProtectionModal(\'' + fnArg + '\')" title="' + escapeHtml(t('card.protectHint')) + '">' + (anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')) + '</button>' +
-          '<button class="dtl-btn" onclick="window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')">' + t('card.versions') + '</button>' +
-          '<button class="dtl-btn danger" onclick="window._launcher.deleteServerApp(\'' + fnArg + '\')">' + t('card.removeServer') + '</button>' +
+            ? dtlBtn(t('card.unpark'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', false)', {title: t('card.unparkHint')})
+            : dtlBtn(t('card.park'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', true)', {title: t('card.parkHint')})) +
+          dtlBtn(t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff'), 'window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')', {title: t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}) +
+          dtlBtn((anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')), 'window._launcher.showProtectionModal(\'' + fnArg + '\')', {title: t('card.protectHint')}) +
+          dtlBtn(t('card.versions'), 'window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')') +
+          dtlBtn(t('card.removeServer'), 'window._launcher.deleteServerApp(\'' + fnArg + '\')', {variant:'danger'}) +
         '</div>' +
       '</div>';
   }
@@ -3333,7 +3333,7 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
     var aboutHeader =
       '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
         '<span>' + t('detail.about') + '</span>' +
-        ((canEditAbout && !detailEditingAbout) ? '<button class="dtl-btn" onclick="window._launcher.detailAboutEdit()">' + t('detail.editDetails') + '</button>' : '') +
+        ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
       '</h3>';
     var aboutBody;
     if (detailEditingAbout) {
@@ -3344,8 +3344,8 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
         '<textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || '') + '</textarea>' +
         '<div class="dtl-sync none" style="margin:0 0 10px">' + t('detail.renameHint') + '</div>' +
         '<div class="dtl-btn-row">' +
-          '<button class="dtl-btn primary" onclick="window._launcher.detailAboutSave()">' + t('detail.saveDetails') + '</button>' +
-          '<button class="dtl-btn" onclick="window._launcher.detailAboutCancel()">' + t('detail.cancelEdit') + '</button>' +
+          dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAboutSave()', {variant:'primary'}) +
+          dtlBtn(t('detail.cancelEdit'), 'window._launcher.detailAboutCancel()') +
         '</div>';
     } else {
       aboutBody =
@@ -3378,15 +3378,15 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
       aiHtml +=
         '<div class="dtl-ai-row">' +
           '<textarea id="detail-ai-input" placeholder="' + escapeHtml(t('detail.editAiPh')) + '"' + (detailAiAvailable ? '' : ' disabled') + '></textarea>' +
-          '<button class="dtl-btn primary" id="detail-ai-run" onclick="window._launcher.detailAiRun()"' + (detailAiAvailable ? '' : ' disabled') + '>' + t('detail.run') + '</button>' +
+          dtlBtn(t('detail.run'), 'window._launcher.detailAiRun()', {variant:'primary', id:'detail-ai-run', disabled: !detailAiAvailable}) +
         '</div>' +
         '<div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? '' : escapeHtml(detailAiUnavailableMsg())) + '</div>' +
         '<div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? '' : ' hidden') + '>' +
           '<div class="dtl-ai-status" style="margin:0 0 8px">' + t('detail.draftReady') + '</div>' +
           '<div class="dtl-btn-row">' +
-            '<button class="dtl-btn" onclick="window._launcher.detailAiTest()">' + t('detail.test') + '</button>' +
-            '<button class="dtl-btn success" onclick="window._launcher.detailAiKeep()">' + t('detail.keep') + '</button>' +
-            '<button class="dtl-btn" onclick="window._launcher.detailAiDiscard()">' + t('detail.discard') + '</button>' +
+            dtlBtn(t('detail.test'), 'window._launcher.detailAiTest()') +
+            dtlBtn(t('detail.keep'), 'window._launcher.detailAiKeep()', {variant:'success'}) +
+            dtlBtn(t('detail.discard'), 'window._launcher.detailAiDiscard()') +
           '</div>' +
         '</div>';
     }
@@ -3412,13 +3412,13 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
       '<div class="dtl-section">' +
         '<h3>' + t('detail.actions') + '</h3>' +
         '<div class="dtl-btn-row">' +
-          (isUrlApp ? '' : '<button class="dtl-btn" onclick="window._launcher.detailEditSource()">' + t('ctx.viewSource') + '</button>') +
-          (isUrlApp ? '' : '<button class="dtl-btn" onclick="window._launcher.detailImproveExternal()">' + t('ctx.improveAi') + '</button>') +
-          '<button class="dtl-btn" onclick="window._launcher.detailSharePrompt()">' + t('ctx.sharePrompt') + '</button>' +
-          (isUrlApp ? '' : '<button class="dtl-btn primary" onclick="window._launcher.detailPublish()">' + escapeHtml(publishLabel) + '</button>') +
-          (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailSetScreenshot()" title="Upload a custom thumbnail for this app">📷 ' + t('detail.setScreenshot') + '</button>' : '') +
-          (app.published && !isUrlApp ? '<button class="dtl-btn" onclick="window._launcher.detailRefreshScreenshot()" title="Clear the screenshot; the node re-takes it on its next scheduled run">🔄 ' + t('detail.refreshScreenshot') + '</button>' : '') +
-          '<button class="dtl-btn danger" onclick="window._launcher.detailDelete()">' + t('ctx.delete') + '</button>' +
+          (isUrlApp ? '' : dtlBtn(t('ctx.viewSource'), 'window._launcher.detailEditSource()')) +
+          (isUrlApp ? '' : dtlBtn(t('ctx.improveAi'), 'window._launcher.detailImproveExternal()')) +
+          dtlBtn(t('ctx.sharePrompt'), 'window._launcher.detailSharePrompt()') +
+          (isUrlApp ? '' : dtlBtn(escapeHtml(publishLabel), 'window._launcher.detailPublish()', {variant:'primary'})) +
+          (app.published && !isUrlApp ? dtlBtn('📷 ' + t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
+          (app.published && !isUrlApp ? dtlBtn('🔄 ' + t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
+          dtlBtn(t('ctx.delete'), 'window._launcher.detailDelete()', {variant:'danger'}) +
         '</div>' +
       '</div>';
 
@@ -3685,9 +3685,9 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
               '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
                 '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + '</span></div>' +
               '<div class="dtl-btn-row">' +
-                '<button class="dtl-btn" onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
-                (isLatest ? '' : '<button class="dtl-btn" onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.restore') + '</button>') +
-                '<button class="dtl-btn" onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')">' + t('card.fork') + '</button>' +
+                dtlBtn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')') +
+                (isLatest ? '' : dtlBtn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')')) +
+                dtlBtn(t('card.fork'), 'window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')') +
               '</div>' +
             '</div>';
         }
