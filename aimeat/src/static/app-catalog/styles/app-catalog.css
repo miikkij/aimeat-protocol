@@ -226,6 +226,25 @@
       box-shadow: 0 0 0 3px rgba(232, 86, 74, .12);
     }
 
+    /* Caption + toggle grouped so the "Local apps" label makes clear the toggle scopes
+       browser-local storage, not server visibility (the Global/Personal confusion). */
+    .mode-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .mode-caption {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      cursor: default;
+    }
+
     .mode-toggle {
       display: flex;
       gap: 2px;

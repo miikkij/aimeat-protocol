@@ -233,6 +233,25 @@
       box-shadow: 0 0 0 3px rgba(232, 86, 74, .12);
     }
 
+    /* Caption + toggle grouped so the "Local apps" label makes clear the toggle scopes
+       browser-local storage, not server visibility (the Global/Personal confusion). */
+    .mode-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .mode-caption {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      cursor: default;
+    }
+
     .mode-toggle {
       display: flex;
       gap: 2px;
@@ -2036,9 +2055,12 @@
   <header>
     <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
     <h1 data-i18n="header.title">My Apps</h1>
-    <div class="mode-toggle">
-      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Global</button>
-      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Personal</button>
+    <div class="mode-toggle-wrap">
+      <span class="mode-caption" data-i18n="mode.caption" data-i18n-title="mode.caption.title" title="These toggle which browser-local apps you see — not server visibility">Local apps</span>
+      <div class="mode-toggle">
+        <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Shared</button>
+        <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Mine</button>
+      </div>
     </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
@@ -2596,11 +2618,13 @@
       "header.title": "My Apps",
       "cta.backHome": "Back to home",
       "cta.publishOwn": "Publish your own app",
-      "mode.global": "🌐 Global",
-      "mode.global.title": "Shared across all accounts on this browser",
-      "mode.personal": "👤 Personal",
-      "mode.personal.title": "Private to your account",
-      "mode.personal.needsLogin": "Sign in to use your Personal apps",
+      "mode.global": "🌐 Shared",
+      "mode.global.title": "Browser-local apps shared across all accounts on this browser",
+      "mode.personal": "👤 Mine",
+      "mode.personal.title": "Browser-local apps private to your account",
+      "mode.personal.needsLogin": "Sign in to use your account's local apps",
+      "mode.caption": "Local apps",
+      "mode.caption.title": "These toggle which browser-local apps you see — not server visibility",
       "search.ph": "Search apps...",
       "action.add": "➕ Add app",
       "action.create": "Create",
@@ -2609,8 +2633,8 @@
       "action.settings": "Settings",
       "action.help": "Help",
       "help.title": "❓ How this catalog works",
-      "help.modesTitle": "Global vs Personal",
-      "help.modes": "Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.",
+      "help.modesTitle": "Shared vs Mine (browser-local apps)",
+      "help.modes": 'The header toggle picks which BROWSER-LOCAL apps you see — it is NOT about server visibility. "Shared" = local apps visible to every account signed in on this browser; "Mine" = local apps private to your account (needs you to be signed in). Your published/server apps are unaffected either way.',
       "help.whereTitle": "Where your apps live",
       "help.where": "Local apps live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, then you can manage it from anywhere. Each app shows as ONE card with a badge saying where it lives.",
       "help.sectionsTitle": "The two views",
@@ -2934,11 +2958,13 @@
       "header.title": "Omat sovellukset",
       "cta.backHome": "Takaisin etusivulle",
       "cta.publishOwn": "Julkaise oma sovelluksesi",
-      "mode.global": "🌐 Globaali",
-      "mode.global.title": "Jaettu kaikille tämän selaimen tileille",
-      "mode.personal": "👤 Henkilökohtainen",
-      "mode.personal.title": "Yksityinen tilillesi",
-      "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi henkilökohtaisia appejasi",
+      "mode.global": "🌐 Jaetut",
+      "mode.global.title": "Selain-paikalliset appit jaettu kaikille tämän selaimen tileille",
+      "mode.personal": "👤 Omat",
+      "mode.personal.title": "Selain-paikalliset appit yksityisiä tilillesi",
+      "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi tilisi paikallisia appeja",
+      "mode.caption": "Paikalliset appit",
+      "mode.caption.title": "Nämä valitsevat mitkä selain-paikalliset appit näet — ei server-näkyvyyttä",
       "search.ph": "Etsi sovelluksia...",
       "action.add": "➕ Lisää sovellus",
       "action.create": "Luo",
@@ -2947,8 +2973,8 @@
       "action.settings": "Asetukset",
       "action.help": "Ohje",
       "help.title": "❓ Miten tämä katalogi toimii",
-      "help.modesTitle": "Global vs Henkilökohtainen",
-      "help.modes": "Molemmat ovat TÄSSÄ selaimessa. Global-appit jaetaan kaikille tähän selaimeen kirjautuneille tileille; henkilökohtaiset appit ovat yksityisiä tilillesi. Henkilökohtainen vaatii sisäänkirjautumisen.",
+      "help.modesTitle": "Jaetut vs Omat (selain-paikalliset appit)",
+      "help.modes": 'Yläpalkin valitsin päättää mitkä SELAIN-PAIKALLISET appit näet — se EI liity server-näkyvyyteen. "Jaetut" = paikalliset appit näkyvät kaikille tähän selaimeen kirjautuneille tileille; "Omat" = paikalliset appit yksityisiä tilillesi (vaatii sisäänkirjautumisen). Julkaistut/server-appisi eivät muutu kummassakaan.',
       "help.whereTitle": "Missä appisi asuvat",
       "help.where": "Paikalliset appit asuvat vain tässä selaimessa (IndexedDB) — ne eivät seuraa toiseen selaimeen tai laitteeseen. Julkaise appi siirtääksesi sen palvelimelle, minkä jälkeen hallitset sitä mistä tahansa. Jokainen appi näkyy YHTENÄ korttina, jonka merkki kertoo missä se sijaitsee.",
       "help.sectionsTitle": "Kaksi näkymää",
