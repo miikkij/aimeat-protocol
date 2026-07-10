@@ -7,7 +7,7 @@
  * @structure  imports (i18n data) → state → db → api → render → actions → window._launcher → init
  * @usage  built, not loaded raw: pnpm build:app-catalog
  */
-import { I18N } from './i18n-data.js';
+import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
@@ -18,38 +18,11 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
   // of the SPA. Static chrome is annotated with data-i18n / data-i18n-ph /
   // data-i18n-title; JS-rendered strings use t(). Dynamic app data (names,
   // tags) is user content and stays as-is.
-  var currentLang = 'en';
-
-  function t(key) {
-    var table = I18N[currentLang] || I18N.en;
-    if (table[key] != null) return table[key];
-    if (I18N.en[key] != null) return I18N.en[key];
-    return key;
-  }
-
-  function applyI18n() {
-    var i, nodes;
-    nodes = document.querySelectorAll('[data-i18n]');
-    for (i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
-    nodes = document.querySelectorAll('[data-i18n-ph]');
-    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute('placeholder', t(nodes[i].getAttribute('data-i18n-ph')));
-    nodes = document.querySelectorAll('[data-i18n-title]');
-    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute('title', t(nodes[i].getAttribute('data-i18n-title')));
-    document.documentElement.lang = currentLang;
-    document.title = t('header.title') + ' — AIMEAT';
-    updateLangToggle();
-  }
-
-  function updateLangToggle() {
-    var btns = document.querySelectorAll('#lang-toggle .lang-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('active', btns[i].getAttribute('data-lang') === currentLang);
-    }
-  }
-
+  // t() / getLang / setLang / applyI18n live in i18n.js (imported above). setLanguage stays here
+  // because it also persists the choice to config and re-renders every dynamic section.
   function setLanguage(lang) {
-    currentLang = (lang === 'fi') ? 'fi' : 'en';
-    try { var config = loadConfig(); config.language = currentLang; saveConfig(config); } catch (e) {}
+    setLang(lang);
+    try { var config = loadConfig(); config.language = getLang(); saveConfig(config); } catch (e) {}
     applyI18n();
     // Re-render dynamic sections so JS-built strings pick up the new language.
     try { renderApps(); } catch (e) {}
@@ -1404,7 +1377,7 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
   function openSettings() {
     var config = loadConfig();
     document.getElementById('setting-theme').value = config.theme || 'light';
-    document.getElementById('setting-language').value = currentLang;
+    document.getElementById('setting-language').value = getLang();
     document.getElementById('setting-open-mode').value = config.defaultOpenMode || 'tab';
     document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
     document.getElementById('settings-overlay').hidden = false;
@@ -4565,7 +4538,7 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var base = config.aimeatUrl.replace(/\/+$/, '');
-    fetch(base + '/v1/app-templates?lang=' + encodeURIComponent(currentLang))
+    fetch(base + '/v1/app-templates?lang=' + encodeURIComponent(getLang()))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
@@ -4605,7 +4578,7 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
     // Converse + build the UI in the language the user is browsing in (the build
     // instructions below stay in English, but the conversation + app text should match).
     var PB_LANGS = { en: 'English', fi: 'Finnish (Suomi)' };
-    var pbLang = PB_LANGS[currentLang] || 'English';
+    var pbLang = PB_LANGS[getLang()] || 'English';
     prompt += 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + pbLang + '. These build instructions are in English, but converse with me and build the app interface in ' + pbLang + '.\n\n';
 
     // Header
@@ -5004,9 +4977,9 @@ import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './
     // user has selected) wins over saved config so the catalog opens in that language.
     var _params = new URLSearchParams(location.search);
     var _urlLang = _params.get('lang');
-    currentLang = (_urlLang === 'fi' || _urlLang === 'en')
+    setLang((_urlLang === 'fi' || _urlLang === 'en')
       ? _urlLang
-      : ((loadConfig().language === 'fi') ? 'fi' : 'en');
+      : ((loadConfig().language === 'fi') ? 'fi' : 'en'));
     applyI18n();
     updateModeToggle();
     // Restore the last-used view (Kirjasto / Yhteisö); defaults to Library.
