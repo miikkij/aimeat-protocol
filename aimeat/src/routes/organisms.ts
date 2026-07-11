@@ -90,6 +90,9 @@
  *     POST /:id/workspace/share/unlock (per-IP rate-limited, timing-uniform) exchanges the password
  *     for a 24 h EdDSA share token carried in X-Share-Token. GET/PUT share responses are redacted
  *     (has_password, never the hash). Member reads via authenticated routes are unaffected.
+ *   v1.21.0 -- 2026-07-11 -- publishDraft normalizes embedded document image URLs (raw /v1/storage →
+ *     owner-addressed /v1/pub) and scopes those files to the workspace (members-only) via
+ *     services/doc-images, so a published doc's images load for members without going public.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -105,6 +108,7 @@ import { provisionOwner } from '../services/owner-provisioning.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
+import { normalizeDocValueImages } from '../services/doc-images.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, isGEAI, validateOwnerName } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { ecoMayReadKey } from '../services/ecosystem-access.js';
@@ -1708,7 +1712,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
     if (!draft) return { ok: false, code: 'NO_DRAFT' };
 
-    const validation = await validateMemoryWrite(`${base}.latest`, draft.value, storage, { viaPublish: true, expectedVersion });
+    // Scope embedded document images to this workspace (members-only) + rewrite to /v1/pub before the
+    // draft becomes the published copy — so a shared doc's images load for members without going public.
+    const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
+
+    const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
     let maxN = 0;
@@ -1727,7 +1735,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
     // .latest or firing the Tracked-Response side effect.
-    if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draft.value)) {
+    if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
       await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
       return { ok: true, version: maxN, skipped: true };
     }
@@ -1740,7 +1748,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const n = maxN + 1;
 
     if (versioned) await storage.setMemory({
-      key: `${base}.version.${n}`, ownerGaii: publisher, value: draft.value,
+      key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue,
       visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
     // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
@@ -1750,7 +1758,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     // copy of .latest left under another identity.
     const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
     await storage.setMemory({
-      key: `${base}.latest`, ownerGaii: latestOwner, value: draft.value,
+      key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue,
       visibility: vis, tags, ttlHours: null,
       version: (existingLatest?.version ?? 0) + 1,
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,

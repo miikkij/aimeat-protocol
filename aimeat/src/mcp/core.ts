@@ -29,6 +29,8 @@
  *     REST POST /v1/memory path — the MCP tool was a validation bypass: any agent could write past
  *     strict record schemas and the manifest-format schema (found while verifying the workspace
  *     backing gate: a knowledge-backed manifest sailed through MCP while REST returned 422).
+ *   v1.9.0 -- 2026-07-11 -- aimeat_storage_upload inline result carries owner_gaii + embed_url/
+ *     embed_markdown so an agent embeds images with the /v1/pub form, not a raw /v1/storage path.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -40,6 +42,7 @@ import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { generateDownloadToken } from '../services/download-token.js';
+import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -661,7 +664,14 @@ export function registerCoreTools(
             emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
             emitResourceListChanged(agentGaii);
             return {
-                content: [{ type: 'text' as const, text: JSON.stringify({ mode: 'inline', key: file.key, size: file.size, uploaded: true }, null, 2) }],
+                content: [{ type: 'text' as const, text: JSON.stringify({
+                    mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, uploaded: true,
+                    // To embed this image in a workspace document, use embed_markdown / embed_url — NOT the raw
+                    // /v1/storage/<key> path. Saving it into a document scopes the file to that workspace's
+                    // members (visibility:'workspace'); it is never exposed to the public internet.
+                    embed_url: pubEmbedUrl(file.ownerGaii, file.key),
+                    embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
+                }, null, 2) }],
             };
         },
     );
