@@ -3807,7 +3807,7 @@
   var loadPublishedApps;
   var renderApps;
   var updateModeToggle;
-  var getCortexOwnerToken2;
+  var getCortexOwnerToken;
   var launchApp;
   var viewPublished;
   var viewSource;
@@ -3823,7 +3823,7 @@
   var getOwnProtection;
   var setIframeUrl;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -3953,7 +3953,7 @@
     var sub = document.getElementById("publish-submit-btn");
     var st = document.getElementById("publish-status");
     if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
-      if (getCortexOwnerToken2()) {
+      if (getCortexOwnerToken()) {
         sub.disabled = false;
         if (st) st.textContent = "";
       } else {
@@ -4129,7 +4129,7 @@
       finishLocal();
       return;
     }
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -4170,7 +4170,7 @@
       if (m) filename = decodeURIComponent(m[1]);
     }
     var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!owner || !filename) {
       showNotice("Publish the app first, then you can set a screenshot.");
       return;
@@ -4231,7 +4231,7 @@
       if (m) filename = decodeURIComponent(m[1]);
     }
     var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!owner || !filename) {
       showNotice("Publish the app first, then you can refresh its screenshot.");
       return;
@@ -4268,12 +4268,12 @@
     return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
   }
   function detailAiUnavailableMsg() {
-    return getCortexOwnerToken2() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
+    return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
   }
   function detailCheckAiAvailability() {
     detailAiAvailable = false;
     var config = loadConfig();
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!config.aimeatUrl || !token) {
       renderDetailView();
       return;
@@ -4350,7 +4350,7 @@
       inputEl.focus();
       return;
     }
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       statusEl.textContent = t("detail.aiLoginNeeded");
       return;
@@ -4534,7 +4534,7 @@
   }
   function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
     var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     var headers = token ? { "Authorization": "Bearer " + token } : {};
     return fetch(url, { headers }).then(function(resp) {
       if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
@@ -4632,7 +4632,7 @@
   }
   function saveProtection() {
     if (!protectionTarget) return;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in.");
       return;
@@ -4717,7 +4717,7 @@
     if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
       return filename;
     }))) return;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice("You must be logged in as the owner to restore a version. Sign in first.");
       return;
@@ -4765,7 +4765,7 @@
     });
   }
   function forkVersion(owner, filename, version) {
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
       return;
@@ -4932,7 +4932,7 @@
   var cortexEditorExtName = null;
   var cortexEditorWasActive = false;
   var cortexEditorLibCounter = 0;
-  function getCortexOwnerToken3() {
+  function getCortexOwnerToken2() {
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
         return window.AIMEAT.auth.getSession().jwt;
@@ -4949,7 +4949,7 @@
   function openCortexEditor(encodedName) {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in as an owner to edit extensions.");
       return;
@@ -5018,7 +5018,7 @@
   function cortexEditorSave() {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("No auth token available.");
       return;
@@ -5742,7 +5742,7 @@
     switchTab("url");
   }
   function requireSignInThen(next) {
-    if (getCortexOwnerToken()) {
+    if (getCortexOwnerToken2()) {
       next();
       return;
     }
@@ -6103,7 +6103,7 @@
     document.getElementById("publish-access-code").value = "";
     var pubStatus = document.getElementById("publish-status");
     var pubSubmit = document.getElementById("publish-submit-btn");
-    if (!getCortexOwnerToken3()) {
+    if (!getCortexOwnerToken2()) {
       pubStatus.textContent = t("publish.loginRequired");
       pubStatus.style.color = "var(--accent)";
       pubSubmit.disabled = true;
@@ -6158,7 +6158,7 @@
       statusEl.style.color = "var(--accent)";
       return;
     }
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       statusEl.textContent = t("publish.loginRequired");
       statusEl.style.color = "var(--accent)";
@@ -6247,7 +6247,7 @@
   }
   function getSessionRoles() {
     try {
-      var token = getCortexOwnerToken3();
+      var token = getCortexOwnerToken2();
       if (!token) return [];
       var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       return payload.roles || [];
@@ -6271,7 +6271,7 @@
       return Promise.resolve();
     }
     return fetch(aimeatUrl + "/v1/admin/subdomains", {
-      headers: { "Authorization": "Bearer " + getCortexOwnerToken3() }
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken2() }
     }).then(function(resp) {
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
@@ -6311,7 +6311,7 @@
     return fetch(aimeatUrl + path, {
       method,
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken3(),
+        "Authorization": "Bearer " + getCortexOwnerToken2(),
         "Content-Type": "application/json"
       },
       body: body ? JSON.stringify(body) : void 0
@@ -6459,7 +6459,7 @@
   }
   function exportBackupZip() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -6490,7 +6490,7 @@
   var backupInspectData = null;
   function importBackupPick() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -6510,7 +6510,7 @@
       return fetch(backupApiBase() + "/v1/apps/backup/inspect", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + getCortexOwnerToken3(),
+          "Authorization": "Bearer " + getCortexOwnerToken2(),
           "Content-Type": "application/zip"
         },
         body: buf
@@ -6636,7 +6636,7 @@
     fetch(backupApiBase() + "/v1/apps/backup/restore", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken3(),
+        "Authorization": "Bearer " + getCortexOwnerToken2(),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -6881,7 +6881,7 @@
         return;
       }
       var listHeaders = {};
-      var listTok = getCortexOwnerToken3();
+      var listTok = getCortexOwnerToken2();
       if (listTok) listHeaders["Authorization"] = "Bearer " + listTok;
       fetchAllPublishedApps(aimeatUrl, listHeaders).then(function(json) {
         var serverApps = json.data && json.data.apps ? json.data.apps : [];
@@ -6976,7 +6976,7 @@
     if (!app || !app.publishedFilename) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7008,7 +7008,7 @@
   function toggleParkApp(filename, parked) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7034,7 +7034,7 @@
   function toggleForkApp(filename, forkable) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7063,7 +7063,7 @@
     }))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken3();
+    var token = getCortexOwnerToken2();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7841,7 +7841,7 @@
       loadPublishedApps: loadPublishedApps3,
       renderApps: renderApps5,
       updateModeToggle: updateModeToggle2,
-      getCortexOwnerToken: getCortexOwnerToken3,
+      getCortexOwnerToken: getCortexOwnerToken2,
       launchApp: launchApp2,
       viewPublished: viewPublished2,
       viewSource: viewSource2,
