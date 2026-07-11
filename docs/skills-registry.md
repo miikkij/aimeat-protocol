@@ -142,6 +142,32 @@ the owner curates skills on the node (profile/admin/workspace UIs) and every age
 picks them up on its next build. Offline/unreachable node degrades loudly to repo-local
 skills only (the standard failure boundary).
 
+## Installing skills into Claude (Code / Desktop / claude.ai)
+
+The SKILL.md contract is the Anthropic agent-skill format, so a registry skill installs
+anywhere Claude reads skills — three ways:
+
+1. **CLI (Claude Code / Desktop Cowork):**
+   ```bash
+   aimeat skill install node:manage-my-agents                 # → ~/.claude/skills/
+   aimeat skill install user:alice/style@1.0.2 --project      # → ./.claude/skills/
+   aimeat skill install ws:ORG/WS/team-style --dir D:\skills  # explicit target
+   # auth: connector primary config by default; --agent <name>, or --node <url> --token <jwt>
+   ```
+   Provenance (`metadata.aimeat_ref` + `aimeat_node`) is stamped into the local SKILL.md,
+   so a re-run detects/installs updates.
+2. **ZIP (claude.ai chat):** `GET /v1/skills/{name}/zip` — the profile/workspace Skills tabs
+   have a **⤓ .zip** button. The ZIP is already in the `{name}/SKILL.md` layout claude.ai's
+   skill upload expects; it also unzips straight into `~/.claude/skills/`. `@semver` pins work.
+3. **Self-install by any connected Claude:** with the AIMEAT MCP connector, ask
+   "install the AIMEAT skill node:xyz locally" — `aimeat_skill_get` + write the files. The
+   seeded node runbook **`install-skills-locally`** teaches exactly this (paths per surface,
+   provenance, update check).
+
+Zero-install remains the native mode: a connected Claude can always `aimeat_skill_get` the
+expertise on demand — install only when the skill must work without the connector or should
+auto-trigger via Claude's native skill discovery.
+
 ## Where AI chats see skills (MCP)
 
 - `aimeat_skill_list` — `library` (node + user + workspace memberships), `linked`, `mine`,

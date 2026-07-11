@@ -77,8 +77,26 @@ async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean):
     return body.data.token;
 }
 
+async function rawFetch(path: string, opts: RequestInit = {}): Promise<Response> {
+    return fetch(`${BASE}${path}`, opts);
+}
+
 // ── ZIP builder (in-memory, for the presigned upload tests) ──
 import { ZipArchive } from 'archiver';
+import yauzl from 'yauzl';
+
+function listZipEntries(buffer: Buffer): Promise<string[]> {
+    return new Promise((resolvePromise, reject) => {
+        yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
+            if (err) return reject(err);
+            const entries: string[] = [];
+            zipfile!.readEntry();
+            zipfile!.on('entry', (entry: yauzl.Entry) => { entries.push(entry.fileName); zipfile!.readEntry(); });
+            zipfile!.on('end', () => resolvePromise(entries));
+            zipfile!.on('error', reject);
+        });
+    });
+}
 
 function makeZip(entries: Array<{ name: string; data: string; symlink?: boolean }>): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -849,6 +867,24 @@ metadata:
         body: JSON.stringify({ skill_md: withBad }),
     });
     assert(status === 422, `status ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('46b. Skill ZIP download is upload-ready ({name}/SKILL.md layout, pin supported)', async () => {
+    const res = await rawFetch(`/v1/skills/pinned-skill/zip`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(res.headers.get('content-type') === 'application/zip', `ct ${res.headers.get('content-type')}`);
+    assert(res.headers.get('x-skill-version') === '1.0.1', `version header ${res.headers.get('x-skill-version')}`);
+    const entries = await listZipEntries(Buffer.from(await res.arrayBuffer()));
+    assert(entries.includes('pinned-skill/SKILL.md'), `entries: ${entries}`);
+
+    // Pinned download returns the retained snapshot
+    const pinned = await rawFetch(`/v1/skills/${encodeURIComponent('pinned-skill@1.0.0')}/zip`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(pinned.status === 200 && pinned.headers.get('x-skill-version') === '1.0.0',
+        `pinned ${pinned.status} v${pinned.headers.get('x-skill-version')}`);
 });
 
 // ─── Phase 10: workflow propose-mode + operator AI config ───

@@ -70,6 +70,40 @@ export async function publishSkill({ skillMd, files, scope, visibility, organism
 }
 
 /**
+ * Download a skill as an upload-ready ZIP ({name}/SKILL.md …) — for claude.ai skill uploads
+ * and manual installs into ~/.claude/skills. Fetches with the session token (a plain link
+ * cannot carry the Bearer header) and triggers a browser download.
+ * @param {string} name  may carry an @semver pin
+ * @param {{ scope?: string, owner?: string, organism?: string, ws?: string }} [opts]
+ */
+export async function downloadSkillZip(name, { scope, owner, organism, ws } = {}) {
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', scope);
+  if (owner) params.set('owner', owner);
+  if (organism) params.set('organism', organism);
+  if (ws) params.set('ws', ws);
+  const qs = params.toString();
+  // Binary response — api() always JSON-parses, so fetch directly with the session token.
+  let jwt = '';
+  try {
+    jwt = (window.AIMEAT?.auth?.getSession()?.jwt)
+      || JSON.parse(localStorage.getItem('aimeat_session') || '{}').jwt || '';
+  } catch { /* anonymous */ }
+  const res = await fetch(`/v1/skills/${encodeURIComponent(name)}/zip${qs ? `?${qs}` : ''}`, {
+    headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+  });
+  if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name.split('@')[0]}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/**
  * Set or clear a skill's app binding (2d) by rewriting the SKILL.md frontmatter and republishing.
  * Textual rewrite (no YAML lib in the SPA): handles the three shapes the contract allows.
  * @param {string} name  skill name (user scope)
