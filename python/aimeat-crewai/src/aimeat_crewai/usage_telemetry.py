@@ -10,10 +10,18 @@ append-only usage row (extractUsageFields -> recordUsageEvent) so the owner sees
 `/v1/ledger/usage`. Cost is NOT computed here (litellm is optional and often absent): we
 send model + tokens and let the node price it from its own table.
 
-`run_id` is stamped from a ContextVar the daemon sets around each `crew.kickoff()`, so
-each usage row is attributed to the AIMEAT task that caused it. The daemon calls
-`install_usage_telemetry(agent_name, base_url=...)` once at startup and wraps every
-kickoff with `usage_run(task_id)`.
+`run_id` (the AIMEAT task) AND `agent_name` (which AIMEAT agent) are both stamped from
+ContextVars the daemon sets around each `crew.kickoff()` (see `usage_run`), so each usage
+row is attributed to the task that caused it AND the agent that emitted it. The agent
+matters because crewfive's prod runtime (fleet host) runs the whole fleet as THREADS in ONE
+process sharing one CrewAI event bus and one loopback serve daemon -- a single install-time
+agent would collapse everyone's spend onto the first-started agent. The listener installs
+once (idempotent), but the per-call agent comes from the ContextVar, and a fleet-aware sender
+POSTs each call to the EMITTING agent's telemetry route so the shared serve daemon (which
+holds every agent's token) authenticates it as that agent.
+
+The daemon calls `install_usage_telemetry(agent_name, base_url=...)` once at startup and wraps
+every kickoff with `usage_run(task_id, agent_name)`.
 
 Everything here is best-effort: metering never blocks a crew (a background thread does the
 HTTP) and never raises into crew code (all failures are swallowed). If the installed crewai
@@ -26,6 +34,10 @@ Changelog:
   0.16.0 -- New: deterministic per-LLM-call usage telemetry feeding the node ledger
     (LEDGER TARGET-016). Adds install_usage_telemetry() + usage_run() + build_llm_call_payload().
     Requires an AIMEAT node with the ledger ingest (node >= 1.38).
+  0.16.1 -- Fix: per-agent attribution under a multi-agent single process (crewfive fleet
+    host). Adds a _current_agent_name ContextVar (set by usage_run alongside run_id) and a
+    fleet-aware sender that routes each call to the EMITTING agent's telemetry route, so usage
+    no longer all lands on the first-installed agent. run_id/task attribution is unchanged.
 """
 from __future__ import annotations
 
@@ -40,17 +52,26 @@ from typing import Any, Callable
 # to None -- the node accepts an llm_call telemetry event without a run_id (it groups as
 # unattributed), so liaison/onboarding LLM calls outside a task still get metered.
 _current_run_id: ContextVar[str | None] = ContextVar("aimeat_usage_run_id", default=None)
+# Which AIMEAT agent's kickoff is running on this context. Set by usage_run() alongside the
+# run id; read per LLM call so a fleet host (many agents, one process, one event bus) attributes
+# each call to the emitting agent instead of the first-installed one. None -> the handler falls
+# back to the install-time agent (direct kickoffs outside run_crew_daemon).
+_current_agent_name: ContextVar[str | None] = ContextVar("aimeat_usage_agent", default=None)
 
 
 @contextlib.contextmanager
-def usage_run(task_id: str | None):
-    """Bind the AIMEAT task id for the duration of a crew.kickoff() so per-LLM-call usage
-    events are stamped with run_id=task_id. Reset on exit (safe to nest)."""
-    token = _current_run_id.set(task_id)
+def usage_run(task_id: str | None, agent_name: str | None = None):
+    """Bind the AIMEAT task id and (in a fleet host) the emitting agent for the duration of a
+    crew.kickoff(), so per-LLM-call usage events are stamped with run_id=task_id and routed to
+    that agent. Both reset on exit (safe to nest). `agent_name` is optional: omit it for the
+    single-agent case and the handler uses the install-time agent."""
+    run_token = _current_run_id.set(task_id)
+    agent_token = _current_agent_name.set(agent_name)
     try:
         yield
     finally:
-        _current_run_id.reset(token)
+        _current_run_id.reset(run_token)
+        _current_agent_name.reset(agent_token)
 
 
 def _int(v: Any) -> int:
@@ -93,9 +114,16 @@ def build_llm_call_payload(model: str, usage: dict[str, Any], run_id: str | None
     return payload
 
 
-def _make_handler(enqueue: Callable[[dict[str, Any]], None]) -> Callable[[Any, Any], None]:
+def _make_handler(
+    enqueue: Callable[[str | None, dict[str, Any]], None],
+    default_agent: str | None = None,
+) -> Callable[[Any, Any], None]:
     """Build the `(source, event)` bus handler that turns a completed LLM call into a queued
-    telemetry payload. Filters out tool calls and model-less events; never raises."""
+    (agent, telemetry-payload) pair. The agent is the per-kickoff ContextVar (the AIMEAT agent
+    whose crew emitted the call), falling back to `default_agent` (the install-time agent) for
+    direct kickoffs outside run_crew_daemon. NB the event's own agent_role/agent_id are the
+    in-crew role, not the AIMEAT agent, so they can't drive attribution -- the ContextVar can.
+    Filters out tool calls and model-less events; never raises."""
 
     def _on_llm_completed(source: Any, event: Any) -> None:
         try:
@@ -108,7 +136,8 @@ def _make_handler(enqueue: Callable[[dict[str, Any]], None]) -> Callable[[Any, A
             if not model:
                 return  # no model -> the node can't price it; don't record a ledger row
             usage = getattr(event, "usage", None) or {}
-            enqueue(build_llm_call_payload(model, usage, _current_run_id.get()))
+            agent_name = _current_agent_name.get() or default_agent
+            enqueue(agent_name, build_llm_call_payload(model, usage, _current_run_id.get()))
         except Exception:
             # Best-effort: a malformed event must never break the crew's LLM call.
             pass
@@ -117,46 +146,54 @@ def _make_handler(enqueue: Callable[[dict[str, Any]], None]) -> Callable[[Any, A
 
 
 class _UsageSender:
-    """Single background daemon thread draining a bounded queue of llm_call payloads and
-    POSTing them to the node over the loopback serve daemon. Best-effort: full queue drops,
-    POST failures are swallowed, so metering never slows or breaks a crew."""
+    """Single background daemon thread draining a bounded queue of (agent, llm_call payload)
+    pairs and POSTing each to the EMITTING agent's telemetry route over the shared loopback
+    serve daemon. Fleet-aware: a per-agent serve_client cache (keyed by agent name) lets one
+    process meter every agent in the fleet to its own ledger. The cache is only touched on this
+    one thread, so no lock is needed. Best-effort: full queue drops, POST failures swallowed,
+    so metering never slows or breaks a crew."""
 
-    def __init__(self, agent_name: str, base_url: str | None) -> None:
-        self._agent_name = agent_name
+    def __init__(self, default_agent: str, base_url: str | None) -> None:
+        self._default_agent = default_agent
         self._base_url = base_url
-        self._q: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=1000)
-        self._client: Any = None
+        self._q: queue.Queue[tuple[str, dict[str, Any]] | None] = queue.Queue(maxsize=2000)
+        self._clients: dict[str, Any] = {}  # agent_name -> ServeClient (sender-thread-only)
         self._thread = threading.Thread(
-            target=self._run, name=f"aimeat-usage-{agent_name}", daemon=True
+            target=self._run, name="aimeat-usage-sender", daemon=True
         )
         self._thread.start()
 
-    def enqueue(self, payload: dict[str, Any]) -> None:
+    def enqueue(self, agent_name: str | None, payload: dict[str, Any]) -> None:
         try:
-            self._q.put_nowait(payload)
+            self._q.put_nowait((agent_name or self._default_agent, payload))
         except queue.Full:
             pass  # drop under backpressure -- telemetry is best-effort
 
-    def _client_or_none(self) -> Any:
-        if self._client is None:
+    def _client_for(self, agent_name: str) -> Any:
+        client = self._clients.get(agent_name)
+        if client is None:
             try:
                 from .messaging import serve_client  # local import: keep module crewai-free
-                self._client = serve_client(self._agent_name, base_url=self._base_url)
+                client = serve_client(agent_name, base_url=self._base_url)
+                self._clients[agent_name] = client
             except Exception:
                 return None
-        return self._client
+        return client
 
     def _run(self) -> None:
         while True:
-            payload = self._q.get()
-            if payload is None:  # sentinel (unused today; here for a clean shutdown hook)
+            item = self._q.get()
+            if item is None:  # sentinel (unused today; here for a clean shutdown hook)
                 return
-            client = self._client_or_none()
+            agent_name, payload = item
+            if not agent_name:
+                continue  # no agent to route to -- can't attribute, drop
+            client = self._client_for(agent_name)
             if client is None:
                 continue
             try:
                 client.post(
-                    f"/v1/agents/{self._agent_name}/telemetry",
+                    f"/v1/agents/{agent_name}/telemetry",
                     json=payload,
                     timeout=10,
                 )
@@ -177,12 +214,16 @@ def install_usage_telemetry(
     agent_name: str,
     base_url: str | None = None,
     *,
-    enqueue: Callable[[dict[str, Any]], None] | None = None,
+    enqueue: Callable[[str | None, dict[str, Any]], None] | None = None,
 ) -> bool:
-    """Install the per-LLM-call usage -> ledger telemetry hook. Idempotent (safe to call
-    once at daemon startup) and best-effort: returns True if active, False (logged no-op) if
-    the installed crewai lacks the event bus. Pass `base_url` to reuse the daemon's already
-    discovered loopback serve endpoint; pass `enqueue` to inject a sink (testing)."""
+    """Install the per-LLM-call usage -> ledger telemetry hook. Idempotent (safe to call once
+    per agent at daemon startup -- the FIRST call installs the single process-wide listener +
+    fleet-aware sender; later calls are no-ops, and every agent is still attributed correctly
+    because the per-call agent comes from the ContextVar, not this install). Best-effort:
+    returns True if active, False (logged no-op) if the installed crewai lacks the event bus.
+    `agent_name` becomes the fallback for calls with no ContextVar agent (direct kickoffs).
+    Pass `base_url` to reuse the daemon's discovered loopback serve endpoint; pass `enqueue`
+    (an `(agent, payload)` sink) to inject a collector for testing."""
     global _installed, _sender, _listener
     with _install_lock:
         if _installed:
@@ -198,7 +239,7 @@ def install_usage_telemetry(
             _sender = _UsageSender(agent_name, base_url)
             enqueue = _sender.enqueue
 
-        handler = _make_handler(enqueue)
+        handler = _make_handler(enqueue, default_agent=agent_name)
 
         class _UsageListener(BaseEventListener):
             def setup_listeners(self, crewai_event_bus: Any) -> None:
@@ -211,5 +252,8 @@ def install_usage_telemetry(
             return False
 
         _installed = True
-        print(f"[usage-telemetry] active for {agent_name} (per-LLM-call -> ledger)")
+        print(
+            f"[usage-telemetry] active (per-LLM-call -> ledger; fleet-aware, "
+            f"fallback agent {agent_name})"
+        )
         return True
