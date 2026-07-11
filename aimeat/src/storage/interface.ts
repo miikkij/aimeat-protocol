@@ -2212,6 +2212,17 @@ export interface UsageEventFilter {
   limit?: number;
 }
 
+/**
+ * Filter for the OPERATOR cross-owner daily aggregate — deliberately NOT owner-scoped.
+ * The route (`GET /v1/admin/ledger`) MUST gate this on the operator role; nothing here restricts
+ * the caller, so it must never be reachable by a non-operator.
+ */
+export interface AdminUsageDailyFilter {
+  /** Inclusive YYYY-MM-DD bounds. */
+  from?: string;
+  to?: string;
+}
+
 // ── Agent Messages (Phase 3) ──
 
 export interface AgentMessageRecord {

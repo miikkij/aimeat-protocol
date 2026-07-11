@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.14.0 — 2026-07-11 — .pf-ai-app-meta: muted compact tokens·calls column for the Home
+ *     AgentLedgerCard by-model breakdown rows (reuses the AiSpendCard .pf-ai-* card chrome).
  *   v2.13.0 — 2026-07-06 — Toast fixes: drop the dead .pf.toast-container rule (profile.js no longer
  *     wraps its toast — the fixed+transform wrapper was the containing block of the fixed .toast inside,
  *     collapsing it to a one-character-per-line sliver) and give .pj-doc-solo-toast the shared
@@ -2883,6 +2885,7 @@
 .pf-ai-app-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .pf-ai-app-cost { color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-ai-app-pct { width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-ai-app-meta { color: var(--muted); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pf-promo-dismiss { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
 .pf-promo-dismiss:hover { color: var(--text); }
 /* Edit profile / password dialogs */

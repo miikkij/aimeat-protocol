@@ -12,6 +12,7 @@ import type {
   AgentUsageDailyRecord,
   UsageDailyFilter,
   UsageEventFilter,
+  AdminUsageDailyFilter,
 } from '../../../interface.js';
 
 // ── Deserializers ──
@@ -130,6 +131,25 @@ export function queryUsageDaily(db: Database.Database, filter: UsageDailyFilter)
   const rows = db.prepare(
     `SELECT * FROM agent_usage_daily
      WHERE ${clauses.join(' AND ')}
+     ORDER BY date ASC`
+  ).all(...params) as Record<string, unknown>[];
+  return rows.map(deserializeDaily);
+}
+
+/**
+ * OPERATOR-ONLY: daily aggregates across ALL owners in a date range — no ownerGhii clause.
+ * The route must gate this on the operator role (see GET /v1/admin/ledger).
+ */
+export function queryUsageDailyAllOwners(db: Database.Database, filter: AdminUsageDailyFilter): AgentUsageDailyRecord[] {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filter.from) { clauses.push('date >= ?'); params.push(filter.from); }
+  if (filter.to) { clauses.push('date <= ?'); params.push(filter.to); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const rows = db.prepare(
+    `SELECT * FROM agent_usage_daily
+     ${where}
      ORDER BY date ASC`
   ).all(...params) as Record<string, unknown>[];
   return rows.map(deserializeDaily);

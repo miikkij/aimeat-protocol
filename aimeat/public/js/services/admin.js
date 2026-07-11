@@ -214,6 +214,21 @@ export const getAiUsage = (from, to) => {
   return apiGet('/v1/admin/ai-usage' + (qs ? '?' + qs : ''));
 };
 
+/**
+ * Operator-only node-wide agent LLM ledger (per-user + per-agent + per-model + per-day) over a
+ * date range. Distinct system from getAiUsage — the ledger counts priced agent LLM calls, never
+ * summed with AI-apps spend.
+ * @param {string} [from]
+ * @param {string} [to]
+ */
+export const getLedger = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return apiGet('/v1/admin/ledger' + (qs ? '?' + qs : ''));
+};
+
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);

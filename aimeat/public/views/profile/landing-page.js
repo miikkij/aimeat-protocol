@@ -15,6 +15,10 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.10.0 — 2026-07-11 — Home AgentLedgerCard: owner's agent LLM ledger (cost / tokens / LLM-calls
+ *     tiles + a top-5 by-model breakdown) backed by GET /v1/ledger/usage?group_by=model. A distinct
+ *     system from AiSpendCard (AI-apps spend) — the two are labeled and never summed. Hidden until
+ *     there is any agent LLM spend.
  *   v3.9.0 — 2026-07-05 — Home AiSpendCard: 24h/7d/30d AI token + cost tiles, a per-app stacked bar
  *     of the last 30 days, and a "where it went" top-apps breakdown, backed by GET
  *     /v1/ai/usage/history. Hidden until there is any AI-apps spend.
@@ -716,6 +720,52 @@ function AiSpendCard() {
     </div>`;
 }
 
+/* "Agent LLM usage" — the owner's own agent LLM ledger (priced per-call usage of the owner's
+ * agents), grouped by model. A DIFFERENT system from AiSpendCard (which shows AI-apps spend) — the
+ * two are never summed. Backed by the owner-scoped GET /v1/ledger/usage?group_by=model. Hidden
+ * until there is any agent LLM spend, so users who don't run agents never see an empty card. */
+function AgentLedgerCard() {
+  const [data, setData] = useState(null);
+  const load = useCallback(async () => {
+    try { const r = await apiGet('/v1/ledger/usage?group_by=model'); setData(r?.data || null); }
+    catch { setData(null); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => onLiveUpdate(['agents', 'agent-tasks'], () => liveRef.current()), []);
+
+  if (!data || !data.totals || data.totals.calls === 0) return null;
+
+  const { totals, groups = [] } = data;
+  const topModels = [...groups].sort((a, b) => (b.cost_usd || 0) - (a.cost_usd || 0)).slice(0, 5);
+
+  const tile = (label, value) => html`
+    <div class="pf-ai-win">
+      <span class="pf-ai-win-label">${label}</span>
+      <span class="pf-ai-win-cost">${value}</span>
+    </div>`;
+
+  return html`
+    <div class="pf-home-card pf-ai-card">
+      <div class="pf-home-card-title">${t('profile.landing.agentLedgerTitle') || 'Agent LLM usage'}</div>
+      <div class="pf-ai-windows">
+        ${tile(t('profile.landing.agentLedgerCost') || 'Cost', fmtUsd(totals.cost_usd))}
+        ${tile(t('profile.landing.agentLedgerTokens') || 'Tokens', fmtCompact(totals.total_tokens))}
+        ${tile(t('profile.landing.agentLedgerCalls') || 'LLM calls', fmtCompact(totals.calls))}
+      </div>
+      ${topModels.length > 0 && html`
+        <div class="pf-ai-apps">
+          <div class="pf-ai-apps-head">${t('profile.landing.agentLedgerByModel') || 'By model'}</div>
+          ${topModels.map((g) => html`
+            <div class="pf-ai-app-row" key=${g.key}>
+              <span class="pf-ai-app-name">${g.key}</span>
+              <span class="pf-ai-app-meta">${fmtCompact(g.total_tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'} · ${fmtCompact(g.calls)}</span>
+              <span class="pf-ai-app-cost">${fmtUsd(g.cost_usd)}</span>
+            </div>`)}
+        </div>`}
+    </div>`;
+}
+
 /* "Presence" — the owner's own availability control. Lives as a compact status
  * pill in the ProfileCard header (<PresencePill>); clicking it opens the settings
  * <PresenceDialog>. The dot the pill shows is the same <PresenceDot> rendered next
@@ -1346,6 +1396,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           <div class="pf-home-grid">
             <${UsageCard} switchTab=${(id) => open(id, 'main')} />
             <${AiSpendCard} />
+            <${AgentLedgerCard} />
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
           </div>

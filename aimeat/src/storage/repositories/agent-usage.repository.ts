@@ -20,6 +20,7 @@ import type {
   AgentUsageDailyRecord,
   UsageDailyFilter,
   UsageEventFilter,
+  AdminUsageDailyFilter,
 } from '../interface.js';
 
 export interface AgentUsageRepository {
@@ -27,4 +28,9 @@ export interface AgentUsageRepository {
   incrementUsageDaily(delta: AgentUsageDailyRecord): Promise<void>;
   queryUsageDaily(filter: UsageDailyFilter): Promise<AgentUsageDailyRecord[]>;
   listUsageEvents(filter: UsageEventFilter): Promise<AgentUsageEvent[]>;
+  /**
+   * OPERATOR-ONLY: daily aggregates across ALL owners in a date range (not owner-scoped).
+   * The calling route MUST enforce the operator role — this method applies no caller restriction.
+   */
+  queryUsageDailyAllOwners(filter: AdminUsageDailyFilter): Promise<AgentUsageDailyRecord[]>;
 }

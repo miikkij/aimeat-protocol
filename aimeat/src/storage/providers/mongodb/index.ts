@@ -116,7 +116,7 @@ import type {
     AgentDirectivesRecord, OwnerAgentDefaults,
     SharingGroupRecord,
     AgentActivityRecord,
-    AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter,
+    AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter, AdminUsageDailyFilter,
     AgentMessageRecord,
     DirectMessageRecord,
     ContactConsentRecord,
@@ -7491,6 +7491,33 @@ export class PrismaStorage implements Storage {
         if (filter.agentGaii) where.agentGaii = filter.agentGaii;
         if (filter.organismId !== undefined) where.organismId = filter.organismId;
         if (filter.workspaceId !== undefined) where.workspaceId = filter.workspaceId;
+        if (filter.from || filter.to) {
+            where.date = {};
+            if (filter.from) where.date.gte = filter.from;
+            if (filter.to) where.date.lte = filter.to;
+        }
+        const rows = await this.prisma.agentUsageDaily.findMany({ where, orderBy: { date: 'asc' } });
+        return rows.map((r: any) => ({
+            date: r.date,
+            agentGaii: r.agentGaii,
+            ownerGhii: r.ownerGhii,
+            apiKeyScope: r.apiKeyScope,
+            model: r.model,
+            provider: r.provider,
+            organismId: r.organismId ?? '',
+            workspaceId: r.workspaceId ?? '',
+            promptTokens: r.promptTokens,
+            completionTokens: r.completionTokens,
+            costUsd: r.costUsd,
+            calls: r.calls,
+            unpricedCalls: r.unpricedCalls,
+        }));
+    }
+
+    async queryUsageDailyAllOwners(filter: AdminUsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
+        this.ensureReady();
+        // OPERATOR-ONLY: no ownerGhii filter — the route gates on the operator role.
+        const where: any = {};
         if (filter.from || filter.to) {
             where.date = {};
             if (filter.from) where.date.gte = filter.from;
