@@ -105,6 +105,10 @@
       aimeat-desktop / federation all keep working because each node serves its OWN catalog
       same-origin — no foreign-origin auth-lib break, no Private/Local-Network-Access block. CORS
       stays `*` for now (external agents/apps need cross-origin); tightening it is tracked separately.
+    v2.14.1 — 2026-07-11 — Card description (.app-card .app-source) now justifies to both edges
+      (text-align: justify + text-align-last: center) so a wrapped description reads flush instead
+      of showing the ragged "sahalaita" the centered card produced; short single-line sources stay
+      centered. Adds overflow-wrap/hyphens so long words no longer spill past the card edge.
 -->
 <html lang="en">
 <head>
@@ -514,6 +518,13 @@
     .app-card .app-source {
       font-size: .7rem;
       color: var(--text-dim);
+      /* Justify the wrapped description so both edges are flush (no ragged
+         "sahalaita" from the card's centered text), but keep the final line
+         centered so short single-line sources stay symmetric with the card. */
+      text-align: justify;
+      text-align-last: center;
+      overflow-wrap: break-word;
+      hyphens: auto;
     }
 
     .app-card .app-actions {
