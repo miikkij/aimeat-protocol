@@ -256,6 +256,24 @@ To queue work for the daemon from elsewhere:
 
 See [`examples/crew_daemon.py`](examples/crew_daemon.py) for a runnable starter.
 
+## Usage telemetry → ledger (0.16.0+)
+
+The daemon automatically meters every LLM call your crew makes and reports it to the node's
+usage ledger, so the owner sees per-agent / per-model spend at `GET /v1/ledger/usage` (and
+per-run token drill-down at `/v1/ledger/usage/runs`). It works by subscribing once to CrewAI's
+event bus (`LLMCallCompletedEvent`, provider-agnostic — native providers and litellm both emit
+it) and POSTing a `type="llm_call"` telemetry event per call over the loopback serve daemon,
+attributed to the AIMEAT task that triggered the run. No configuration and no LLM round-trip:
+it's deterministic, runs on a background thread (never slows a crew), and is fully best-effort
+(a node/tunnel hiccup is dropped silently). If the installed CrewAI lacks the event bus, the
+hook is a logged no-op and crews run unchanged.
+
+Cost is priced **on the node** from its own model table — the hook sends `model` +
+`prompt_tokens` + `completion_tokens` (+ a provider hint), so no pricing config lives in the
+crew. Requires an AIMEAT node with ledger ingest (1.38+). `run_crew_daemon` installs this for
+you; to enable it in a bespoke runner call `install_usage_telemetry(agent_name, base_url=...)`
+once and wrap each `crew.kickoff()` in `with usage_run(task_id):`.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
@@ -264,6 +282,7 @@ See [`examples/crew_daemon.py`](examples/crew_daemon.py) for a runnable starter.
 | 0.2.x | 1.13.5+ | 1.14+ (Skills); 0.80+ if `skill_path=None` |
 | 0.3.x | 1.14.0+ (for `aimeat_task_create`) | 0.80+ |
 | 0.4.x | 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the tunnel (degrades to direct HTTP on older nodes) | 0.80+ |
+| 0.16.x | 1.38.0+ for the usage ledger (older nodes accept the telemetry but record no ledger row) | 0.80+ |
 
 ## License
 
