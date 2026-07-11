@@ -6,7 +6,7 @@
  *   shared app-state lives in main and is read via injected getters / written via injected setters;
  *   main-local fns (+ closeModal/addAppFromUrl from apps-io) injected via initServerIo(deps). Carved
  *   from main.js.
- * @usage import { initServerIo, loadPublishedApps, importFromAimeat, showServerImportModal } from './server-io.js'; initServerIo({...})
+ * @usage import { initServerIo, loadPublishedApps, importFromAimeat } from './server-io.js'; initServerIo({...})
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 11).
  */
@@ -567,6 +567,7 @@ function openConsents(owner, filename, appName) {
       + '<ul style="margin:0 0 14px;padding-left:18px">'
       + g.scopes.map(function (s) { return '<li><code>' + escapeHtml(s) + '</code></li>'; }).join('')
       + '</ul>'
+      + '<div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + t('consents.hint') + '</div>'
       + '<button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent(\'' + jsArg(g.grant_id) + '\')">' + t('consents.revoke') + '</button>';
   }).catch(function (e) {
     var body = document.getElementById('consents-body');
@@ -897,183 +898,6 @@ function renderBackupResult(s) {
     (s.errors.length ? '<div class="backup-result-errors">' + section(t('backup.resErrors'), s.errors) + '</div>' : '');
 }
 
-// ── Server → local import (user-selected, NEVER automatic) ────
-// Apps published under this owner's account (e.g. via MCP) may exist only on
-// the server. Importing one into the local catalog gives it the exact same
-// management actions (edit, rename, tags, versions, delete) as locally
-// created apps. The import is ALWAYS user-initiated: a banner reports how
-// many published apps are missing locally, and a review modal lets the user
-// pick exactly which ones to import. The tombstone list marks apps the user
-// deleted locally so the banner doesn't nag about them (they stay reachable
-// in the modal, unchecked).
-
-// The import ignore-list ("Not now" tombstones) is keyed PER catalog DB (mode + owner), the same
-// way the local catalog is — the old single shared key meant a tombstone set in Global re-surfaced
-// the banner in Personal (and vice versa) on every mode switch.
-function importIgnoreKey() { return 'appCatalogImportIgnore.' + getDbName(); }
-
-function getImportIgnore() {
-  try { return JSON.parse(localStorage.getItem(importIgnoreKey()) || '[]'); } catch (e) { return []; }
-}
-
-function addImportIgnore(filename) {
-  var list = getImportIgnore();
-  if (list.indexOf(filename) === -1) {
-    list.push(filename);
-    localStorage.setItem(importIgnoreKey(), JSON.stringify(list));
-  }
-}
-
-function removeImportIgnore(filename) {
-  localStorage.setItem(importIgnoreKey(), JSON.stringify(getImportIgnore().filter(function (f) { return f !== filename; })));
-}
-
-// State for the review modal: own server apps with no local copy.
-var serverImportState = { missing: [], aimeatUrl: '' };
-
-function updateServerImportState(ownApps, localByFilename, aimeatUrl) {
-  serverImportState.missing = ownApps.filter(function (sa) {
-    return sa.filename && !localByFilename[sa.filename];
-  });
-  serverImportState.aimeatUrl = aimeatUrl;
-  renderServerImportBanner();
-}
-
-function renderServerImportBanner() {
-  var banner = document.getElementById('server-import-banner');
-  if (!banner) return;
-  var ignore = getImportIgnore();
-  // Tombstoned apps (deleted locally on purpose) don't count toward the nag
-  var fresh = serverImportState.missing.filter(function (sa) { return ignore.indexOf(sa.filename) === -1; });
-  if (fresh.length === 0 || sessionStorage.getItem('aimeatServerImportDismissed') === '1') {
-    banner.style.display = 'none';
-    return;
-  }
-  document.getElementById('server-import-count').textContent = fresh.length;
-  banner.style.display = '';
-}
-
-function dismissServerImportBanner() {
-  sessionStorage.setItem('aimeatServerImportDismissed', '1');
-  renderServerImportBanner();
-}
-
-function showServerImportModal() {
-  var settingsOv = document.getElementById('settings-overlay');
-  if (settingsOv) settingsOv.hidden = true; // may be opened from Settings — don't stack overlays
-  var missing = serverImportState.missing || [];
-  var body = document.getElementById('server-import-body');
-  var ignore = getImportIgnore();
-  if (missing.length === 0) {
-    body.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted);padding:8px 0">' + t('srvImport.nothingMissing') + '</p>';
-    document.getElementById('server-import-status').textContent = '';
-    document.getElementById('server-import-overlay').hidden = false;
-    return;
-  }
-  var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t('srvImport.desc') + '</p>' +
-    '<div class="backup-toolbar-row"><div>' +
-      '<button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
-      '<button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(false)">' + t('backup.selectNone') + '</button>' +
-    '</div></div>' +
-    '<table class="backup-table"><tbody>';
-  for (var i = 0; i < missing.length; i++) {
-    var sa = missing[i];
-    var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : sa.filename;
-    // Locally deleted (tombstoned) apps stay reachable here but default to unchecked
-    var checked = ignore.indexOf(sa.filename) === -1 ? ' checked' : '';
-    html +=
-      '<tr>' +
-        '<td><input type="checkbox" class="server-import-cb" data-i="' + i + '"' + checked + '/></td>' +
-        '<td>' + escapeHtml(name) + '<div class="mono-cell">' + escapeHtml(sa.filename) + '</div></td>' +
-        '<td>' + (sa.version_number ? 'v' + sa.version_number : '') + '</td>' +
-        '<td>' + (sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '') + '</td>' +
-      '</tr>';
-  }
-  html += '</tbody></table>';
-  body.innerHTML = html;
-  document.getElementById('server-import-status').textContent = '';
-  document.getElementById('server-import-overlay').hidden = false;
-}
-
-function serverImportSelectAll(checked) {
-  document.querySelectorAll('.server-import-cb').forEach(function (b) { b.checked = checked; });
-}
-
-function submitServerImport() {
-  var selected = [];
-  document.querySelectorAll('.server-import-cb').forEach(function (b) {
-    if (b.checked) selected.push(serverImportState.missing[parseInt(b.getAttribute('data-i'), 10)]);
-  });
-  var statusEl = document.getElementById('server-import-status');
-  if (selected.length === 0) {
-    statusEl.style.color = '#ef4444';
-    statusEl.textContent = t('backup.nothingSelected');
-    return;
-  }
-  statusEl.style.color = 'var(--text-muted)';
-  statusEl.textContent = t('srvImport.importing');
-  importServerApps(selected, serverImportState.aimeatUrl).then(function (res) {
-    // Re-opt-in only the apps that ACTUALLY imported (clear their tombstone); keep the failed
-    // ones tombstoned so the user can retry, and tell them which failed instead of the old
-    // silent drop + "everything succeeded" close.
-    var failedNames = {};
-    res.failed.forEach(function (f) { failedNames[f.filename] = true; });
-    selected.forEach(function (sa) { if (!failedNames[sa.filename]) removeImportIgnore(sa.filename); });
-    renderApps();
-    loadPublishedApps();
-    if (res.failed.length) {
-      statusEl.style.color = '#ef4444';
-      statusEl.textContent = t('srvImport.someFailed') + ' (' + res.failed.length + '): ' + res.failed.map(function (f) { return f.filename; }).join(', ');
-    } else {
-      document.getElementById('server-import-overlay').hidden = true;
-    }
-  }).catch(function (e) {
-    statusEl.style.color = '#ef4444';
-    statusEl.textContent = e.message || String(e);
-  });
-}
-
-function importServerApps(toImport, aimeatUrl) {
-  if (toImport.length === 0) return Promise.resolve({ imported: 0, failed: [] });
-  var failed = [];
-  return Promise.all(toImport.map(function (sa) {
-    // Fetch the RAW app source (no ?mode=inline). The inline form 301-redirects to
-    // the isolated app origin (…apps.<host>) when H-2 app isolation is enabled, and
-    // this page's connect-src CSP does not cover http://*.apps.localhost:* — so on a
-    // local dev server every import fetch was silently blocked and nothing imported
-    // (works on prod only because the CSP's blanket `https:` covers the app origin).
-    // The raw form is served same-origin from the apex on every deployment.
-    // fetchAppContentBase64 also sends the owner token (imports the owner's own
-    // protected/operator-hidden apps) and produces byte-accurate base64.
-    return fetchAppContentBase64(aimeatUrl, sa.owner || '', sa.filename)
-      .then(function (b64) {
-        var manifest = sa.manifest || {};
-        var app = {
-          id: generateId(),
-          name: manifest.name || sa.filename,
-          description: manifest.description || '',
-          source: 'aimeat',
-          origin: 'ai-published',
-          url: null,
-          blob: b64,
-          tags: manifest.tags || [],
-          openMode: 'tab',
-          icon: manifest.icon || '\u{1F916}',
-          screenshot: null,
-          favorite: false,
-          addedAt: sa.created_at || new Date().toISOString(),
-          lastOpenedAt: null,
-          published: true,
-          publishedFilename: sa.filename,
-          publishedAt: sa.created_at || new Date().toISOString(),
-          publishedUrl: '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename),
-          publishedVersionNumber: sa.version_number || 1
-        };
-        return saveApp(app);
-      })
-      .catch(function (err) { failed.push({ filename: sa.filename, error: (err && err.message) || String(err) }); return null; });
-  })).then(function () { return { imported: toImport.length - failed.length, failed: failed }; });
-}
 
 // Manifest cache keyed by "owner\nfilename" — lets Restore/Fork reuse the
 // app's metadata (name, description, category, tags, icon) without a re-fetch.
@@ -1118,17 +942,7 @@ function loadPublishedApps() {
     }
   } catch(e) {}
 
-  getAllApps().then(function(apps) {
-    var localPublished = apps.filter(function(a) { return a.published; });
-
-    var localByFilename = {};
-    for (var i = 0; i < localPublished.length; i++) {
-      var lp = localPublished[i];
-      if (lp.publishedFilename) {
-        localByFilename[lp.publishedFilename] = lp;
-      }
-    }
-
+  getAllApps().then(function() {
     if (!aimeatUrl) {
       setOwnServerApps([]);
       renderApps();
@@ -1160,9 +974,6 @@ function loadPublishedApps() {
           ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
           : serverApps;
 
-        // ownPublished (for the import banner) vs ownParked — both feed the unified grid.
-        var ownPublished = ownApps.filter(function(a) { return !a.parked; });
-
         return loadSubdomainSites().then(function () {
           // Unified Kirjasto grid: cache the owner's server apps (published + parked) so
           // renderApps() merges them with local apps into ONE card per app (deduped by
@@ -1172,9 +983,6 @@ function loadPublishedApps() {
           renderApps();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           applyServerFilter(); // re-apply any active search/tag to the community cards
-          // Server-published own apps missing from the local catalog are NEVER imported
-          // automatically — the banner offers a review modal to pick which ones to import.
-          updateServerImportState(ownPublished, localByFilename, aimeatUrl);
         });
       })
       .catch(function() {
@@ -1293,7 +1101,6 @@ async function unpublishApp(appId) {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        removeImportIgnore(app.publishedFilename);
         app.published = false;
         delete app.publishedFilename;
         delete app.publishedAt;
@@ -1378,7 +1185,6 @@ async function deleteServerApp(filename) {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        removeImportIgnore(filename); // a future republish should import again
         loadPublishedApps();
       } else {
         showNotice('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
@@ -1411,12 +1217,6 @@ export {
   backupUpdateSummary,
   backupSelectAll,
   submitBackupRestore,
-  addImportIgnore,
-  removeImportIgnore,
-  dismissServerImportBanner,
-  showServerImportModal,
-  serverImportSelectAll,
-  submitServerImport,
   loadPublishedApps,
   applyServerFilter,
   unpublishApp,

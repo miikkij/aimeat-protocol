@@ -1485,23 +1485,6 @@
     .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
     .backup-result-errors { color: #ef4444; }
 
-    .server-import-banner {
-      margin: 0 24px 1rem;
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      background: var(--surface-glass);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      font-size: .85rem;
-      position: relative;
-      z-index: 1;
-    }
-    .server-import-banner-actions { display: flex; gap: 8px; }
-
     #help-overlay,
     #publish-overlay,
     #versions-overlay,

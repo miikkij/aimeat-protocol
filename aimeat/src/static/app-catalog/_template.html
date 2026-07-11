@@ -58,15 +58,6 @@
 
   <nav id="tag-bar"></nav>
 
-  <!-- Server-published apps missing locally — import is ALWAYS user-selected -->
-  <div id="server-import-banner" class="server-import-banner" data-view="library" style="display:none">
-    <span>&#x1F4E5; <strong id="server-import-count">0</strong> <span data-i18n="srvImport.bannerText">published apps from your account are not in this catalog.</span></span>
-    <div class="server-import-banner-actions">
-      <button class="modal-btn primary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.review">Review &amp; import...</button>
-      <button class="modal-btn secondary" onclick="window._launcher.dismissServerImportBanner()" data-i18n="srvImport.dismiss">Not now</button>
-    </div>
-  </div>
-
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
@@ -333,7 +324,6 @@
         <div class="settings-backup-actions">
           <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
           <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.settingsBtn">📥 Import from server…</button>
           <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
           <input type="file" id="import-file-input" accept=".json" hidden/>
         </div>
@@ -422,18 +412,6 @@
     </div>
   </div>
 
-  <!-- Server Apps Import Modal (user-selected) -->
-  <div id="server-import-overlay" hidden>
-    <div class="modal" id="server-import-modal">
-      <h2 data-i18n="srvImport.title">&#x1F4E5; Import published apps</h2>
-      <div id="server-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="server-import-body" style="overflow-y:auto;max-height:55vh"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('server-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.submitServerImport()" data-i18n="srvImport.import">Import selected</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Backup Import Modal -->
   <div id="backup-overlay" hidden>

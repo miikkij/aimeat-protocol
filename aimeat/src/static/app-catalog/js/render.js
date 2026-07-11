@@ -19,7 +19,7 @@ import { t } from './i18n.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
-import { loadPublishedApps, showPublishModal, applyServerFilter, addImportIgnore } from './server-io.js';
+import { loadPublishedApps, showPublishModal, applyServerFilter } from './server-io.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -548,9 +548,6 @@ async function handleContextAction(action) {
 
     case 'delete':
       if (await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
-        // Tombstone published apps so the server copy isn't re-imported as a
-        // "new" AI-published app on the next load.
-        if (app.publishedFilename) addImportIgnore(app.publishedFilename);
         deleteApp(appId).then(function () {
           renderApps();
           loadPublishedApps();
