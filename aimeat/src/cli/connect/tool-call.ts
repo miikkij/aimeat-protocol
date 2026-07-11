@@ -32,6 +32,9 @@ import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition, type ToolInputF
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { AimeatClient as Client } from './api-client.js';
 import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.js';
+import { defineAppIam } from '../../services/iam/define-app-iam.js';
+import type { LevelDef } from '../../services/iam/model.js';
+import type { CommandDef } from '../../services/iam/app-commands.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -1227,6 +1230,43 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             const orgId = requiredString(input, 'organism_id');
             const ws = requiredString(input, 'ws');
             return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
+        },
+    },
+    {
+        name: 'aimeat_app_fork',
+        handler: ({ client }, input) => {
+            const owner = requiredString(input, 'owner');
+            const filename = requiredString(input, 'filename');
+            const body: JsonObject = { new_filename: requiredString(input, 'new_filename') };
+            const version = optionalNumber(input, 'version'); if (version !== undefined) body.version = version;
+            return client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/fork`, body);
+        },
+    },
+    {
+        // Pure local computation (validate + design an app IAM level/command schema) — no node round-trip.
+        // The design helper is a pure function shared with the MCP tool, so the shell result is identical.
+        name: 'aimeat_iam_define',
+        handler: async (_ctx, input) => {
+            const result = defineAppIam({
+                appId: optionalString(input, 'app_id'),
+                levels: requiredArray(input, 'levels') as LevelDef[],
+                commands: requiredArray(input, 'commands') as CommandDef[],
+            });
+            return result.ok === false
+                ? { ok: false as const, error: { code: 'IAM_INVALID', message: (result as { error: string }).error } }
+                : { ok: true as const, data: result as unknown as JsonObject };
+        },
+    },
+    {
+        name: 'aimeat_organism_archive',
+        handler: ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const action = requiredString(input, 'action') === 'unarchive' ? 'unarchive' : 'archive';
+            const body: JsonObject = { level: requiredString(input, 'level') };
+            const ws = optionalString(input, 'ws'); if (ws) body.ws = ws;
+            const namespace = optionalString(input, 'namespace'); if (namespace) body.namespace = namespace;
+            const key = optionalString(input, 'key'); if (key) body.key = key;
+            return client.post(`/v1/organisms/${encodeURIComponent(orgId)}/${action}`, body);
         },
     },
     {
