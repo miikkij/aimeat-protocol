@@ -18,9 +18,9 @@ import { t } from './i18n.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
-let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl;
+let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession;
 export function initDetail(deps) {
-  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
 }
 
 // ── App Detail View ───────────────────────────────
@@ -89,6 +89,13 @@ function serverMgmtInner(app) {
         dtlBtn(t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff'), 'window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')', {title: t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}) +
         dtlBtn((anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')), 'window._launcher.showProtectionModal(\'' + fnArg + '\')', {title: t('card.protectHint')}) +
         dtlBtn(t('card.versions'), 'window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')') +
+        // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
+        dtlBtn(t('card.consents'), 'window._launcher.openConsents(\'' + ownerArg2 + '\', \'' + fnArg + '\', \'' + jsArg(app.name || app.publishedFilename) + '\')', {title: t('card.consentsHint')}) +
+        // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
+        // everyone else, so only show this to operators.
+        ((isOperatorSession && isOperatorSession())
+          ? dtlBtn(t('card.subdomain'), 'window._launcher.showSubdomainModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')', {title: t('card.subdomainHint')})
+          : '') +
         dtlBtn(t('card.removeServer'), 'window._launcher.deleteServerApp(\'' + fnArg + '\')', {variant:'danger'}) +
       '</div>' +
     '</div>';
@@ -285,10 +292,17 @@ function renderDetailView() {
   var tags = (app.tags && app.tags.length) ? app.tags.join(', ') : '—';
   var cortex = (app.usesCortex && app.usesCortex.length) ? app.usesCortex.join(', ') : '—';
   var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
+  var favBtn = app.blob
+    ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? 'detail.unfavorite' : 'detail.favorite')) + '"'
+        + ' onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? '⭐' : '☆') + '</button>'
+    : '';
   var aboutHeader =
     '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
       '<span>' + t('detail.about') + '</span>' +
-      ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
+      '<span style="display:flex;align-items:center;gap:8px">' +
+        favBtn +
+        ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
+      '</span>' +
     '</h3>';
   var aboutBody;
   if (detailEditingAbout) {
@@ -297,6 +311,10 @@ function renderDetailView() {
       '<input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || '') + '" style="margin:4px 0 10px" />' +
       '<label class="dtl-stat-label" for="detail-desc-input">' + t('detail.descLabel') + '</label>' +
       '<textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || '') + '</textarea>' +
+      '<label class="dtl-stat-label" for="detail-icon-input">' + t('detail.iconLabel') + '</label>' +
+      '<input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || '') + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" />' +
+      '<label class="dtl-stat-label" for="detail-tags-input">' + t('detail.tagsLabel') + '</label>' +
+      '<input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(', ')) + '" placeholder="tools, productivity" style="margin:4px 0 8px" />' +
       '<div class="dtl-sync none" style="margin:0 0 10px">' + t('detail.renameHint') + '</div>' +
       '<div class="dtl-btn-row">' +
         dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAboutSave()', {variant:'primary'}) +
@@ -309,7 +327,6 @@ function renderDetailView() {
         metaItem(t('detail.category'), app.category || 'utility') +
         metaItem(t('detail.tags'), tags) +
         metaItem(t('detail.sourceLabel'), sourceLabelText(app.source)) +
-        metaItem(t('detail.openModeLabel'), app.openMode || 'tab') +
         metaItem(t('detail.size'), app.blob ? fmtSize(localBytes) : '—') +
         metaItem(t('detail.created'), created) +
         metaItem(t('detail.usesCortex'), cortex) +
@@ -339,11 +356,14 @@ function renderDetailView() {
       '<div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? '' : ' hidden') + '>' +
         '<div class="dtl-ai-status" style="margin:0 0 8px">' + t('detail.draftReady') + '</div>' +
         '<div class="dtl-btn-row">' +
-          dtlBtn(t('detail.test'), 'window._launcher.detailAiTest()') +
-          // Real-origin test + promote — only for a PUBLISHED app (needs a server draft slot).
-          (app.published ? dtlBtn(t('detail.testLive'), 'window._launcher.detailTestDraftLive()', {variant:'primary'}) : '') +
-          (app.published ? dtlBtn(t('detail.publishTested'), 'window._launcher.detailPublishTestedDraft()', {variant:'success'}) : '') +
-          dtlBtn(t('detail.keep'), 'window._launcher.detailAiKeep()', {variant:'success'}) +
+          // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
+          // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
+          // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
+          (app.published
+            ? dtlBtn(t('detail.testLive'), 'window._launcher.detailTestDraftLive()', {variant:'primary'}) +
+              dtlBtn(t('detail.publishTested'), 'window._launcher.detailPublishTestedDraft()', {variant:'success'})
+            : dtlBtn(t('detail.test'), 'window._launcher.detailAiTest()', {variant:'primary'})) +
+          dtlBtn(t('detail.keep'), 'window._launcher.detailAiKeep()') +
           dtlBtn(t('detail.discard'), 'window._launcher.detailAiDiscard()') +
         '</div>' +
       '</div>';
@@ -463,19 +483,40 @@ function detailAboutCancel() {
   renderDetailView();
 }
 
+// Favorite toggle in the detail view (parity with the context-menu "Toggle favorite").
+// Local metadata on the app record; re-renders the cards + the detail header star.
+function detailToggleFavorite() {
+  var app = detailGetApp();
+  if (!app) return;
+  app.favorite = !app.favorite;
+  saveApp(app).then(function () {
+    renderApps();
+    renderDetailView();
+  });
+}
+
 function detailAboutSave() {
   var app = detailGetApp();
   if (!app) return;
   var nameEl = document.getElementById('detail-name-input');
   var descEl = document.getElementById('detail-desc-input');
+  var iconEl = document.getElementById('detail-icon-input');
+  var tagsEl = document.getElementById('detail-tags-input');
   var newName = nameEl ? nameEl.value.trim() : '';
   var newDesc = descEl ? descEl.value.trim() : '';
+  // icon + tags are LOCAL metadata (same as the context-menu Edit modal) — no server round-trip.
+  var newIcon = iconEl ? iconEl.value.trim() : (app.icon || '');
+  var newTags = tagsEl
+    ? tagsEl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+    : (app.tags || []);
   if (!newName) { showNotice(t('detail.nameRequired') || 'Name cannot be empty.'); if (nameEl) nameEl.focus(); return; }
   if (app.published && !newDesc) { showNotice(t('detail.descRequired') || 'Description cannot be empty.'); if (descEl) descEl.focus(); return; }
 
   function finishLocal() {
     app.name = newName;
     app.description = newDesc;
+    app.icon = newIcon;
+    app.tags = newTags;
     saveApp(app).then(function() {
       detailEditingAbout = false;
       renderApps();
@@ -817,46 +858,110 @@ function draftApi(method, owner, filename, sub, body) {
   });
 }
 
-function detailTestDraftLive() {
-  var app = detailGetApp();
-  if (!app || !detailDraftBlob) return;
-  if (!app.published || !app.publishedFilename) { showNotice(t('detail.draftNeedsPublished')); return; }
-  if (!getCortexOwnerToken()) { showNotice(t('detail.draftNeedsSignin')); return; }
-  var owner = detailServerOwner(app);
-  var filename = app.publishedFilename;
-  var statusEl = document.getElementById('detail-ai-status');
+// Staging needs a PUBLISHED app (the server draft slot keys off owner/filename) and a
+// signed-in owner. Returns { owner, filename } or null (with a notice) if not eligible.
+function draftStageTarget(app, statusEl) {
+  if (!app || !app.published || !app.publishedFilename) {
+    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = t('detail.draftNeedsPublished'); }
+    else showNotice(t('detail.draftNeedsPublished'));
+    return null;
+  }
+  if (!getCortexOwnerToken()) {
+    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = t('detail.draftNeedsSignin'); }
+    else showNotice(t('detail.draftNeedsSignin'));
+    return null;
+  }
+  return { owner: detailServerOwner(app), filename: app.publishedFilename };
+}
+
+// PUT the CURRENT working bytes (base64) as the server draft, mint a preview URL, and open
+// it TOP-LEVEL on the real app origin (mic/camera work; the live app is untouched). One
+// path shared by the AI loop AND the source editor — whatever bytes you hand it get staged.
+function stageDraftAndPreview(app, contentB64, statusEl) {
+  var tgt = draftStageTarget(app, statusEl);
+  if (!tgt) return Promise.resolve(false);
   if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.draftUploading'); }
-  // Save the pending edit as the server draft (detailDraftBlob is already base64),
-  // then mint a preview URL and open it top-level.
-  draftApi('PUT', owner, filename, 'draft', { content: detailDraftBlob })
-    .then(function () { return draftApi('POST', owner, filename, 'draft/preview-token'); })
+  return draftApi('PUT', tgt.owner, tgt.filename, 'draft', { content: contentB64 })
+    .then(function () { return draftApi('POST', tgt.owner, tgt.filename, 'draft/preview-token'); })
     .then(function (data) {
       window.open(data.preview_url, '_blank', 'noopener');
       if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.draftOpened'); }
+      return true;
     })
     .catch(function (err) {
       if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Draft preview failed'); }
+      return false;
     });
 }
 
-function detailPublishTestedDraft() {
-  var app = detailGetApp();
-  if (!app || !app.published || !app.publishedFilename) return;
-  var owner = detailServerOwner(app);
-  var filename = app.publishedFilename;
-  var statusEl = document.getElementById('detail-ai-status');
+// PUT the CURRENT working bytes THEN publish-draft — always promotes exactly these bytes,
+// so there is no stale-slot window (you never publish an older staged version by accident).
+// Confirms first. onDone(data) runs on success.
+function publishDraftBytes(app, contentB64, statusEl, onDone) {
+  var tgt = draftStageTarget(app, statusEl);
+  if (!tgt) return;
   Promise.resolve(showConfirm(t('detail.draftPublishConfirm'))).then(function (ok) {
     if (!ok) return;
-    draftApi('POST', owner, filename, 'publish-draft')
+    if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.draftUploading'); }
+    draftApi('PUT', tgt.owner, tgt.filename, 'draft', { content: contentB64 })
+      .then(function () { return draftApi('POST', tgt.owner, tgt.filename, 'publish-draft'); })
       .then(function (data) {
-        detailDraftBlob = null;
         if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = t('detail.draftPublished').replace('{v}', data.version_number); }
-        refreshAll();
-        renderDetailView();
+        if (onDone) onDone(data);
       })
       .catch(function (err) {
         if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Publish failed'); }
       });
+  });
+}
+
+// ── AI-loop wrappers (stage the pending AI candidate `detailDraftBlob`) ──
+function detailTestDraftLive() {
+  var app = detailGetApp();
+  if (!app || !detailDraftBlob) return;
+  stageDraftAndPreview(app, detailDraftBlob, document.getElementById('detail-ai-status'));
+}
+function detailPublishTestedDraft() {
+  var app = detailGetApp();
+  if (!app || !detailDraftBlob) return;
+  publishDraftBytes(app, detailDraftBlob, document.getElementById('detail-ai-status'), function () {
+    detailDraftBlob = null;
+    refreshAll();
+    renderDetailView();
+  });
+}
+
+// ── Source-editor wrappers (stage the CURRENT textarea content) ──
+// The source editor is a global overlay opened from the context menu OR the detail view;
+// it carries the app id in its dataset, so these look the app up there (not via detailAppId).
+function sourceOverlayApp() {
+  var overlay = document.getElementById('source-overlay');
+  var id = overlay && overlay.dataset ? overlay.dataset.appId : '';
+  if (!id) return null;
+  var apps = getMainApps();
+  for (var i = 0; i < apps.length; i++) if (apps[i].id === id) return apps[i];
+  return null;
+}
+function sourceCurrentB64() {
+  var ta = document.getElementById('source-code');
+  if (!ta) return null;
+  try { return btoa(unescape(encodeURIComponent(ta.value))); } catch (e) { return null; }
+}
+function sourceTestDraftLive() {
+  var app = sourceOverlayApp();
+  var c = sourceCurrentB64();
+  if (!app || c == null) return;
+  stageDraftAndPreview(app, c, document.getElementById('source-draft-status'));
+}
+function sourcePublishTested() {
+  var app = sourceOverlayApp();
+  var c = sourceCurrentB64();
+  if (!app || c == null) return;
+  publishDraftBytes(app, c, document.getElementById('source-draft-status'), function () {
+    // Keep the local working copy in sync with what we just published.
+    app.blob = c;
+    saveApp(app);
+    refreshAll();
   });
 }
 
@@ -1223,6 +1328,7 @@ export {
   detailAboutEdit,
   detailAboutCancel,
   detailAboutSave,
+  detailToggleFavorite,
   detailSetScreenshot,
   detailRefreshScreenshot,
   detailAiRun,
@@ -1231,6 +1337,8 @@ export {
   detailAiDiscard,
   detailTestDraftLive,
   detailPublishTestedDraft,
+  sourceTestDraftLive,
+  sourcePublishTested,
   detailEditSource,
   detailImproveExternal,
   detailSharePrompt,

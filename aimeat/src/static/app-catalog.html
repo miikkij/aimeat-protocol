@@ -869,6 +869,29 @@
       background: #D64A3F;
     }
 
+    .dtl-fav-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+      padding: 2px 4px;
+      color: var(--text-muted);
+    }
+
+    .dtl-fav-btn:hover { transform: scale(1.15); }
+
+    .modal-btn.success {
+      background: #10b981;
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .modal-btn.success:hover:not(:disabled) {
+      box-shadow: 0 4px 20px rgba(16, 185, 129, .25);
+      background: #0ea371;
+    }
+
     .modal-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -2265,13 +2288,6 @@
           <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
           <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
         </div>
-        <div class="modal-field">
-          <label class="modal-label" for="app-open-mode" data-i18n="addModal.openMode">Open Mode</label>
-          <select id="app-open-mode" class="modal-input">
-            <option value="tab" data-i18n="openMode.tab">New Tab</option>
-            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
-          </select>
-        </div>
       </div>
 
       <!-- Actions -->
@@ -2306,7 +2322,6 @@
     <button data-action="details" data-i18n="ctx.details">&#x1F50E; Details</button>
     <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
     <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
-    <button data-action="toggle-mode" data-i18n="ctx.toggleMode">&#x1F504; Switch open mode</button>
     <button data-action="view-source" data-i18n="ctx.viewSource">&#x1F441; View / Edit Source</button>
     <button data-action="improve-ai" data-i18n="ctx.improveAi">&#x2728; Improve with AI</button>
     <button data-action="share-prompt" data-i18n="ctx.sharePrompt">&#x1F4E4; Share as Prompt</button>
@@ -2384,17 +2399,6 @@
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.defaults">Defaults</div>
-        <div class="settings-row">
-          <label for="setting-open-mode" data-i18n="settings.defaultOpenMode">Default open mode</label>
-          <select id="setting-open-mode" class="modal-input">
-            <option value="tab" data-i18n="openMode.tab">New Tab</option>
-            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="settings-section">
         <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
         <div class="settings-row">
           <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
@@ -2430,10 +2434,15 @@
     <div class="modal source-modal">
       <h2 id="source-title">View Source</h2>
       <textarea id="source-code"></textarea>
+      <div class="dtl-ai-status" id="source-draft-status"></div>
       <div class="modal-actions">
         <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
         <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
-        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save Changes</button>
+        <button class="modal-btn secondary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+        <!-- Real-origin staging (published apps only; toggled in viewSource). Same server-draft
+             path as the AI loop: test the edited source on a real origin, then publish it. -->
+        <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
+        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
       </div>
     </div>
@@ -2739,7 +2748,7 @@
       "source.title": "View Source",
       "source.copy": "Copy Source",
       "source.copyPrompt": "Copy with AI Prompt",
-      "source.save": "Save Changes",
+      "source.save": "Save working copy",
       "import.title": "Import from AIMEAT",
       "import.selected": "Import Selected",
       "publish.title": "🚀 Publish App",
@@ -2817,6 +2826,10 @@
       "card.protectHint": "Copy-protection options (obfuscate, domain-lock, watermark, no raw download)",
       "card.protect": "🛡 Protection",
       "card.removeServer": "🗑 Remove from server",
+      "card.consents": "🔑 App access",
+      "card.consentsHint": "See and revoke the scoped access you granted this app to your data (H-2 app grants).",
+      "card.subdomain": "🌐 Subdomain",
+      "card.subdomainHint": "Assign or change this app's subdomain (operator only).",
       "detail.serverMgmt": "Manage on server",
       "protect.title": "Copy protection",
       "protect.help": "Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.",
@@ -2832,7 +2845,11 @@
       "protect.saving": "Saving…",
       "protect.saved": "Saved",
       "detail.editDetails": "✏️ Edit",
+      "detail.favorite": "Add to favorites",
+      "detail.unfavorite": "Remove from favorites",
       "detail.nameLabel": "App name",
+      "detail.iconLabel": "Icon (emoji)",
+      "detail.tagsLabel": "Tags (comma separated)",
       "detail.descLabel": "Description",
       "detail.renameHint": "The app link stays the same — only the displayed name and description change.",
       "detail.nameRequired": "Name cannot be empty.",
@@ -3087,7 +3104,7 @@
       "source.title": "Näytä lähdekoodi",
       "source.copy": "Kopioi lähdekoodi",
       "source.copyPrompt": "Kopioi tekoälypromptilla",
-      "source.save": "Tallenna muutokset",
+      "source.save": "Tallenna paikallinen kopio",
       "import.title": "Tuo AIMEATista",
       "import.selected": "Tuo valitut",
       "publish.title": "🚀 Julkaise sovellus",
@@ -3165,6 +3182,10 @@
       "card.protectHint": "Kopiosuojausasetukset (obfuskointi, domain-lukko, vesileima, ei raakalatausta)",
       "card.protect": "🛡 Suojaus",
       "card.removeServer": "🗑 Poista palvelimelta",
+      "card.consents": "🔑 Sovelluksen pääsy",
+      "card.consentsHint": "Katso ja peru tälle sovellukselle antamasi rajattu pääsy tietoihisi (H-2 app-grantit).",
+      "card.subdomain": "🌐 Alidomain",
+      "card.subdomainHint": "Aseta tai vaihda tämän sovelluksen alidomain (vain operaattori).",
       "detail.serverMgmt": "Hallinta palvelimella",
       "protect.title": "Kopiosuojaus",
       "protect.help": "Valinnainen, sovelluskohtainen. Nämä nostavat satunnaisen kopioinnin kustannusta ja tekevät vuodoista jäljitettäviä — ne eivät estä sovelluksen näkevää kopioimasta sen HTML:ää. Suojataksesi logiikan tai datan aidosti, siirrä se palvelinpuolen laajennukseen.",
@@ -3180,7 +3201,11 @@
       "protect.saving": "Tallennetaan…",
       "protect.saved": "Tallennettu",
       "detail.editDetails": "✏️ Muokkaa",
+      "detail.favorite": "Lisää suosikkeihin",
+      "detail.unfavorite": "Poista suosikeista",
       "detail.nameLabel": "Sovelluksen nimi",
+      "detail.iconLabel": "Kuvake (emoji)",
+      "detail.tagsLabel": "Tunnisteet (pilkulla eroteltuna)",
       "detail.descLabel": "Kuvaus",
       "detail.renameHint": "Sovelluksen linkki pysyy samana — vain näytettävä nimi ja kuvaus muuttuvat.",
       "detail.nameRequired": "Nimi ei voi olla tyhjä.",
@@ -3849,8 +3874,9 @@
   var getServerManifests;
   var getOwnProtection;
   var setIframeUrl;
+  var isOperatorSession;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -3895,7 +3921,10 @@
     var ownerArg2 = jsArg(svrState.owner || "");
     var p = svrState.protection || {};
     var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div></div>";
+    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
+    dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
+    // everyone else, so only show this to operators.
+    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div></div>";
   }
   function refreshServerMgmt() {
     var c = document.getElementById("detail-server-mgmt");
@@ -4050,12 +4079,13 @@
     var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
     var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
-    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + "</span>" + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</h3>";
+    var favBtn = app.blob ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? "detail.unfavorite" : "detail.favorite")) + '" onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? "⭐" : "☆") + "</button>" : "";
+    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
     var aboutBody;
     if (detailEditingAbout) {
-      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
+      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
     } else {
-      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.openModeLabel"), app.openMode || "tab") + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
+      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
       (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
     }
     var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
@@ -4063,8 +4093,10 @@
     if (isUrlApp) {
       aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
     } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.test"), "window._launcher.detailAiTest()") + // Real-origin test + promote — only for a PUBLISHED app (needs a server draft slot).
-      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) : "") + (app.published ? dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : "") + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()", { variant: "success" }) + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
+      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
+      // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
+      // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
+      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) + dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("detail.test"), "window._launcher.detailAiTest()", { variant: "primary" })) + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()") + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
     }
     aiHtml += "</div>";
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
@@ -4126,13 +4158,28 @@
     detailEditingAbout = false;
     renderDetailView();
   }
+  function detailToggleFavorite() {
+    var app = detailGetApp();
+    if (!app) return;
+    app.favorite = !app.favorite;
+    saveApp(app).then(function() {
+      renderApps();
+      renderDetailView();
+    });
+  }
   function detailAboutSave() {
     var app = detailGetApp();
     if (!app) return;
     var nameEl = document.getElementById("detail-name-input");
     var descEl = document.getElementById("detail-desc-input");
+    var iconEl = document.getElementById("detail-icon-input");
+    var tagsEl = document.getElementById("detail-tags-input");
     var newName = nameEl ? nameEl.value.trim() : "";
     var newDesc = descEl ? descEl.value.trim() : "";
+    var newIcon = iconEl ? iconEl.value.trim() : app.icon || "";
+    var newTags = tagsEl ? tagsEl.value.split(",").map(function(s) {
+      return s.trim();
+    }).filter(Boolean) : app.tags || [];
     if (!newName) {
       showNotice(t("detail.nameRequired") || "Name cannot be empty.");
       if (nameEl) nameEl.focus();
@@ -4146,6 +4193,8 @@
     function finishLocal() {
       app.name = newName;
       app.description = newDesc;
+      app.icon = newIcon;
+      app.tags = newTags;
       saveApp(app).then(function() {
         detailEditingAbout = false;
         renderApps();
@@ -4493,61 +4542,117 @@
       });
     });
   }
-  function detailTestDraftLive() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    if (!app.published || !app.publishedFilename) {
-      showNotice(t("detail.draftNeedsPublished"));
-      return;
+  function draftStageTarget(app, statusEl) {
+    if (!app || !app.published || !app.publishedFilename) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = t("detail.draftNeedsPublished");
+      } else showNotice(t("detail.draftNeedsPublished"));
+      return null;
     }
     if (!getCortexOwnerToken()) {
-      showNotice(t("detail.draftNeedsSignin"));
-      return;
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = t("detail.draftNeedsSignin");
+      } else showNotice(t("detail.draftNeedsSignin"));
+      return null;
     }
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    var statusEl = document.getElementById("detail-ai-status");
+    return { owner: detailServerOwner(app), filename: app.publishedFilename };
+  }
+  function stageDraftAndPreview(app, contentB64, statusEl) {
+    var tgt = draftStageTarget(app, statusEl);
+    if (!tgt) return Promise.resolve(false);
     if (statusEl) {
       statusEl.style.color = "var(--text-muted)";
       statusEl.textContent = t("detail.draftUploading");
     }
-    draftApi("PUT", owner, filename, "draft", { content: detailDraftBlob }).then(function() {
-      return draftApi("POST", owner, filename, "draft/preview-token");
+    return draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
+      return draftApi("POST", tgt.owner, tgt.filename, "draft/preview-token");
     }).then(function(data) {
       window.open(data.preview_url, "_blank", "noopener");
       if (statusEl) {
         statusEl.style.color = "#34d399";
         statusEl.textContent = "✔ " + t("detail.draftOpened");
       }
+      return true;
     }).catch(function(err) {
       if (statusEl) {
         statusEl.style.color = "var(--accent)";
         statusEl.textContent = "✘ " + (err.message || "Draft preview failed");
       }
+      return false;
     });
   }
-  function detailPublishTestedDraft() {
-    var app = detailGetApp();
-    if (!app || !app.published || !app.publishedFilename) return;
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    var statusEl = document.getElementById("detail-ai-status");
+  function publishDraftBytes(app, contentB64, statusEl, onDone) {
+    var tgt = draftStageTarget(app, statusEl);
+    if (!tgt) return;
     Promise.resolve(showConfirm(t("detail.draftPublishConfirm"))).then(function(ok) {
       if (!ok) return;
-      draftApi("POST", owner, filename, "publish-draft").then(function(data) {
-        detailDraftBlob = null;
+      if (statusEl) {
+        statusEl.style.color = "var(--text-muted)";
+        statusEl.textContent = t("detail.draftUploading");
+      }
+      draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
+        return draftApi("POST", tgt.owner, tgt.filename, "publish-draft");
+      }).then(function(data) {
         if (statusEl) {
           statusEl.style.color = "#34d399";
           statusEl.textContent = t("detail.draftPublished").replace("{v}", data.version_number);
         }
-        refreshAll();
-        renderDetailView();
+        if (onDone) onDone(data);
       }).catch(function(err) {
         if (statusEl) {
           statusEl.style.color = "var(--accent)";
           statusEl.textContent = "✘ " + (err.message || "Publish failed");
         }
       });
+    });
+  }
+  function detailTestDraftLive() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    stageDraftAndPreview(app, detailDraftBlob, document.getElementById("detail-ai-status"));
+  }
+  function detailPublishTestedDraft() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    publishDraftBytes(app, detailDraftBlob, document.getElementById("detail-ai-status"), function() {
+      detailDraftBlob = null;
+      refreshAll();
+      renderDetailView();
+    });
+  }
+  function sourceOverlayApp() {
+    var overlay = document.getElementById("source-overlay");
+    var id = overlay && overlay.dataset ? overlay.dataset.appId : "";
+    if (!id) return null;
+    var apps = getMainApps();
+    for (var i = 0; i < apps.length; i++) if (apps[i].id === id) return apps[i];
+    return null;
+  }
+  function sourceCurrentB64() {
+    var ta = document.getElementById("source-code");
+    if (!ta) return null;
+    try {
+      return btoa(unescape(encodeURIComponent(ta.value)));
+    } catch (e) {
+      return null;
+    }
+  }
+  function sourceTestDraftLive() {
+    var app = sourceOverlayApp();
+    var c = sourceCurrentB64();
+    if (!app || c == null) return;
+    stageDraftAndPreview(app, c, document.getElementById("source-draft-status"));
+  }
+  function sourcePublishTested() {
+    var app = sourceOverlayApp();
+    var c = sourceCurrentB64();
+    if (!app || c == null) return;
+    publishDraftBytes(app, c, document.getElementById("source-draft-status"), function() {
+      app.blob = c;
+      saveApp(app);
+      refreshAll();
     });
   }
   function detailEditSource() {
@@ -5480,14 +5585,12 @@
     var config = loadConfig();
     document.getElementById("setting-theme").value = config.theme || "light";
     document.getElementById("setting-language").value = getLang();
-    document.getElementById("setting-open-mode").value = config.defaultOpenMode || "tab";
     document.getElementById("setting-aimeat-url").value = config.aimeatUrl || "";
     document.getElementById("settings-overlay").hidden = false;
   }
   function saveSettings() {
     var config = loadConfig();
     config.theme = document.getElementById("setting-theme").value;
-    config.defaultOpenMode = document.getElementById("setting-open-mode").value;
     config.aimeatUrl = document.getElementById("setting-aimeat-url").value.trim();
     saveConfig(config);
     try {
@@ -5892,7 +5995,6 @@
     document.getElementById("app-name").value = "";
     document.getElementById("app-icon").value = "";
     document.getElementById("app-tags").value = "";
-    document.getElementById("app-open-mode").value = "tab";
     document.getElementById("selected-file-name").textContent = "";
     document.getElementById("file-input").value = "";
     document.getElementById("app-paste-code").value = "";
@@ -5943,7 +6045,7 @@
     var name = document.getElementById("app-name").value.trim();
     var icon = document.getElementById("app-icon").value.trim();
     var tagsRaw = document.getElementById("app-tags").value.trim();
-    var openMode = document.getElementById("app-open-mode").value;
+    var openMode = "tab";
     var tags = tagsRaw ? tagsRaw.split(",").map(function(t2) {
       return t2.trim();
     }).filter(Boolean) : [];
@@ -6356,12 +6458,12 @@
       return [];
     }
   }
-  function isOperatorSession() {
+  function isOperatorSession2() {
     return getSessionRoles().indexOf("operator") !== -1;
   }
   var subdomainsByTarget = null;
   function loadSubdomainSites() {
-    if (!isOperatorSession()) {
+    if (!isOperatorSession2()) {
       subdomainsByTarget = null;
       return Promise.resolve();
     }
@@ -7571,7 +7673,6 @@
         document.getElementById("app-name").value = app.name || "";
         document.getElementById("app-icon").value = app.icon || "";
         document.getElementById("app-tags").value = (app.tags || []).join(", ");
-        document.getElementById("app-open-mode").value = app.openMode || "tab";
         if (app.source === "url") {
           switchTab("url");
           document.getElementById("app-url").value = app.url || "";
@@ -7583,12 +7684,6 @@
         break;
       case "favorite":
         app.favorite = !app.favorite;
-        saveApp(app).then(function() {
-          renderApps5();
-        });
-        break;
-      case "toggle-mode":
-        app.openMode = app.openMode === "iframe" ? "tab" : "iframe";
         saveApp(app).then(function() {
           renderApps5();
         });
@@ -7635,6 +7730,13 @@
     textarea.readOnly = !isEditable;
     saveBtn.disabled = true;
     saveBtn.style.display = isEditable ? "" : "none";
+    var canStage = isEditable && !!app.published;
+    var testLiveBtn = document.getElementById("source-test-live-btn");
+    var pubTestedBtn = document.getElementById("source-publish-tested-btn");
+    if (testLiveBtn) testLiveBtn.hidden = !canStage;
+    if (pubTestedBtn) pubTestedBtn.hidden = !canStage;
+    var stageStatus = document.getElementById("source-draft-status");
+    if (stageStatus) stageStatus.textContent = "";
     overlay.hidden = false;
     overlay.dataset.appName = app.name || "App";
     overlay.dataset.appId = app.id || "";
@@ -7864,6 +7966,7 @@
     detailAboutEdit,
     detailAboutCancel,
     detailAboutSave,
+    detailToggleFavorite,
     editAppDetails,
     showSubdomainModal,
     openConsents,
@@ -7966,7 +8069,8 @@
       getOwnProtection: function() {
         return ownAppProtection;
       },
-      setIframeUrl: setIframeUrl2
+      setIframeUrl: setIframeUrl2,
+      isOperatorSession: isOperatorSession2
     });
     initSettings({ generateId, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
     initAppsIo({ generateId, readFileAsText, renderApps: renderApps5, getMainApps: function() {
@@ -8394,6 +8498,12 @@
     }
     document.getElementById("source-overlay").addEventListener("click", function(e) {
       if (e.target === this) closeSourceModal();
+    });
+    document.getElementById("source-test-live-btn").addEventListener("click", function() {
+      sourceTestDraftLive();
+    });
+    document.getElementById("source-publish-tested-btn").addEventListener("click", function() {
+      sourcePublishTested();
     });
     document.getElementById("close-source-btn").addEventListener("click", closeSourceModal);
     document.getElementById("homepage-btn").addEventListener("click", function() {
