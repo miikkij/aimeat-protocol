@@ -1025,7 +1025,7 @@ def run_crew_daemon(
         print(f"[daemon:{agent_name}] {phase_label} task {task_id}: {title}")
         crew = builder(task, liaison)
         try:
-            with usage_run(task_id):
+            with usage_run(task_id, agent_name):
                 result = crew.kickoff()
             print(f"[daemon:{agent_name}] {phase_label} task {task_id} done; first 200 chars: {str(result)[:200]}")
             return True
@@ -1076,7 +1076,7 @@ def run_crew_daemon(
                     _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
                 crew = build_crew(task, worker_liaison)
-                with usage_run(task_id):
+                with usage_run(task_id, agent_name):
                     result = crew.kickoff()
                 print(f"[daemon:{agent_name}] EXECUTE task {task_id} done; first 200 chars: {str(result)[:200]}")
                 return (task_id, "ok")
@@ -1196,7 +1196,7 @@ def run_crew_daemon(
                 "_original": event,
             }
             try:
-                with usage_run(rid):
+                with usage_run(rid, agent_name):
                     build_crew(synthetic_task, liaison).kickoff()
             except Exception as inner:
                 print(f"[daemon:{agent_name}] record {rid} crashed: {inner}")
@@ -1235,7 +1235,7 @@ def run_crew_daemon(
                 "_original": event,
             }
             try:
-                with usage_run(did):
+                with usage_run(did, agent_name):
                     build_crew(synthetic_task, liaison).kickoff()
             except Exception as inner:
                 print(f"[daemon:{agent_name}] dm {did} crashed: {inner}")
@@ -1367,7 +1367,7 @@ def run_crew_daemon(
                         crew = build_crew(synthetic_task, liaison)
                         kickoff_ok = False
                         try:
-                            with usage_run(f"msg-{msg_id}"):
+                            with usage_run(f"msg-{msg_id}", agent_name):
                                 crew.kickoff()
                             kickoff_ok = True
                         except Exception as inner:

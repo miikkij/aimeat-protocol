@@ -272,7 +272,13 @@ Cost is priced **on the node** from its own model table — the hook sends `mode
 `prompt_tokens` + `completion_tokens` (+ a provider hint), so no pricing config lives in the
 crew. Requires an AIMEAT node with ledger ingest (1.38+). `run_crew_daemon` installs this for
 you; to enable it in a bespoke runner call `install_usage_telemetry(agent_name, base_url=...)`
-once and wrap each `crew.kickoff()` in `with usage_run(task_id):`.
+once and wrap each `crew.kickoff()` in `with usage_run(task_id, agent_name):`.
+
+**Fleet-aware (0.16.1+):** when many agents share one process (e.g. a fleet host running each
+crew as a thread), each LLM call is attributed to the agent whose kickoff emitted it — the
+agent is read from a per-kickoff ContextVar and the call is POSTed to that agent's own
+telemetry route, so per-agent ledger grouping stays correct instead of collapsing onto the
+first-started agent.
 
 ## Compatibility
 
