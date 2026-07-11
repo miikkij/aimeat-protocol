@@ -162,6 +162,7 @@ from typing import Any, Callable, Iterable
 from .liaison import create_liaison_agent, AimeatLiaisonError
 from .mcp_client import ensure_serve, serve_params
 from .paths import aimeat_home
+from .usage_telemetry import install_usage_telemetry, usage_run
 
 try:
     import requests
@@ -910,6 +911,12 @@ def run_crew_daemon(
     loopback_base = f"http://127.0.0.1:{discovery['port']}"
     api = _Api(loopback_base, agent_name)
 
+    # Per-LLM-call usage -> node ledger (LEDGER TARGET-016). Subscribes once to CrewAI's
+    # event bus and POSTs an llm_call telemetry event per call over this same loopback, so
+    # the owner sees spend at /v1/ledger/usage. Best-effort + graceful no-op if unavailable;
+    # each kickoff below is wrapped in usage_run(task_id) to attribute the run.
+    install_usage_telemetry(agent_name, base_url=loopback_base)
+
     # Push-driven idle wait when the serve daemon holds a live tunnel for this
     # agent: instead of sleeping a full poll interval, the daemon parks on the
     # serve long-poll and wakes the moment a task is delivered. Degraded
@@ -1018,7 +1025,8 @@ def run_crew_daemon(
         print(f"[daemon:{agent_name}] {phase_label} task {task_id}: {title}")
         crew = builder(task, liaison)
         try:
-            result = crew.kickoff()
+            with usage_run(task_id):
+                result = crew.kickoff()
             print(f"[daemon:{agent_name}] {phase_label} task {task_id} done; first 200 chars: {str(result)[:200]}")
             return True
         except Exception as inner:
@@ -1068,7 +1076,8 @@ def run_crew_daemon(
                     _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
                 crew = build_crew(task, worker_liaison)
-                result = crew.kickoff()
+                with usage_run(task_id):
+                    result = crew.kickoff()
                 print(f"[daemon:{agent_name}] EXECUTE task {task_id} done; first 200 chars: {str(result)[:200]}")
                 return (task_id, "ok")
         except Exception as inner:
@@ -1187,7 +1196,8 @@ def run_crew_daemon(
                 "_original": event,
             }
             try:
-                build_crew(synthetic_task, liaison).kickoff()
+                with usage_run(rid):
+                    build_crew(synthetic_task, liaison).kickoff()
             except Exception as inner:
                 print(f"[daemon:{agent_name}] record {rid} crashed: {inner}")
                 if on_error:
@@ -1225,7 +1235,8 @@ def run_crew_daemon(
                 "_original": event,
             }
             try:
-                build_crew(synthetic_task, liaison).kickoff()
+                with usage_run(did):
+                    build_crew(synthetic_task, liaison).kickoff()
             except Exception as inner:
                 print(f"[daemon:{agent_name}] dm {did} crashed: {inner}")
                 if on_error:
@@ -1356,7 +1367,8 @@ def run_crew_daemon(
                         crew = build_crew(synthetic_task, liaison)
                         kickoff_ok = False
                         try:
-                            crew.kickoff()
+                            with usage_run(f"msg-{msg_id}"):
+                                crew.kickoff()
                             kickoff_ok = True
                         except Exception as inner:
                             print(f"[daemon:{agent_name}] message {msg_id} crashed: {inner}")

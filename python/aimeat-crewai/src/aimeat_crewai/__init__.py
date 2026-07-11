@@ -75,8 +75,13 @@ from .messaging import (
     answers_from_dm,
     AimeatMessagingError,
 )
+from .usage_telemetry import (
+    install_usage_telemetry,
+    usage_run,
+    build_llm_call_payload,
+)
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 __all__ = [
     "__version__",
@@ -121,4 +126,8 @@ __all__ = [
     "read_answers",
     "answers_from_dm",
     "AimeatMessagingError",
+    # Usage telemetry — per-LLM-call -> node ledger (0.16.0)
+    "install_usage_telemetry",
+    "usage_run",
+    "build_llm_call_payload",
 ]
