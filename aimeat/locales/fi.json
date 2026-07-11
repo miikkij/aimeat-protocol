@@ -1872,11 +1872,24 @@
           "directives": "Ohjeistukset",
           "agent_config": "Agenttiasetukset",
           "activity": "Toiminta",
+          "usage": "Kulutus",
           "services": "Palvelut",
           "quality": "Laatu"
         },
         "changes": {
           "title": "Uutta sitten kun viimeksi katsoit"
+        },
+        "usage": {
+          "cost": "Kustannus (30 pv)",
+          "tokens": "Tokenit (30 pv)",
+          "calls": "LLM-kutsut",
+          "byModel": "Malleittain",
+          "recentRuns": "Viimeisimmät ajot",
+          "unpriced": "hinnoittelematon",
+          "tokensLc": "tokenia",
+          "callsLc": "kutsua",
+          "empty": "Mitattua LLM-kulutusta ei ole vielä kirjattu. Kulutus näkyy tässä, kun agentti tekee LLM-kutsuja jotka raportoivat tokeneita (pelkkä kuvatyö ei välttämättä näytä mitään).",
+          "help": "Per-LLM-call-kulutus noden ledgeristä. Kustannus hinnoitellaan nodessa mallitaulusta; kuva- ja muut ei-token-mallit voivat näyttää 0 tokenia."
         },
         "quality": {
           "performanceTitle": "Suorituskyky",
