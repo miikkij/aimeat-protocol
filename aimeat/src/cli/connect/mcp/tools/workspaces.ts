@@ -16,6 +16,8 @@
  *     response into a lightweight INDEX by default (per space: id/title/updated/version/bytes, no
  *     bodies), and returns full values only for the ids passed in `ids` — so the MCP payload stays
  *     small instead of dumping every object in one blob.
+ *   v1.3.0 -- 2026-07-11 -- TARGET-028: _member_grant / _member_revoke (multi-workspace, REST-wrapped) +
+ *     _members; _access decide passes an optional `role`. Parity with the server MCP surface.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -306,20 +308,23 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
   mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
     {
       organism_id: z.string(), ws: z.string(),
-      action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests · 'decide' = (creator/admin) approve/deny one"),
+      action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests + members · 'decide' = (creator/admin) approve/deny one"),
       message: z.string().optional().describe("action='request': a note to the creator"),
       requester: z.string().optional().describe("action='decide': the requester's owner name"),
       decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
+      role: z.enum(['viewer', 'contributor']).optional().describe("action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor)."),
     },
     annotationsFor('aimeat_workspace_access'),
-    async ({ organism_id, ws, action, message, requester, decision }) => {
+    async ({ organism_id, ws, action, message, requester, decision, role }) => {
       const orgPath = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access`;
       let resp;
       if (action === 'list') {
         resp = await client.get(`${orgPath}?ws=${encodeURIComponent(ws)}`);
       } else if (action === 'decide') {
         if (!requester) return text({ error: "action='decide' needs a requester." }, true);
-        resp = await client.post(`${orgPath}/decision`, { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' });
+        const body: Record<string, unknown> = { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' };
+        if (role) body.role = role;
+        resp = await client.post(`${orgPath}/decision`, body);
       } else if (action === 'request') {
         const body: Record<string, unknown> = { ws };
         if (message != null) body.message = message;
@@ -328,6 +333,69 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         return text({ error: "action must be 'request', 'list' or 'decide'." }, true);
       }
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
+  // Normalize a single `ws` and/or `workspaces` array into a de-duplicated list (order preserved).
+  const wsList = (ws?: string, workspaces?: string[]): string[] => {
+    const out: string[] = [];
+    for (const w of [...(ws ? [ws] : []), ...(Array.isArray(workspaces) ? workspaces : [])]) {
+      const t = String(w ?? '').trim();
+      if (t && !out.includes(t)) out.push(t);
+    }
+    return out;
+  };
+
+  mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
+    {
+      organism_id: z.string(),
+      ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
+      workspaces: z.array(z.string()).optional().describe('MANY workspace ids to grant in one call.'),
+      grantee: z.string().describe('Owner name, GHII, or GAII to grant (applies to the owner — agents inherit).'),
+      role: z.enum(['viewer', 'contributor']).describe("'viewer' (read) or 'contributor' (read+write)."),
+    },
+    annotationsFor('aimeat_workspace_member_grant'),
+    async ({ organism_id, ws, workspaces, grantee, role }) => {
+      const targets = wsList(ws, workspaces);
+      if (!targets.length) return text({ error: 'Provide `ws` and/or `workspaces`.' }, true);
+      const orgPath = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access/grant`;
+      const results: Array<{ ws: string; status: string; role?: string }> = [];
+      for (const w of targets) {
+        const r = await client.post(orgPath, { ws: w, grantee, role });
+        results.push(r.ok === false ? { ws: w, status: 'forbidden_or_not_found' } : { ws: w, status: 'granted', role });
+      }
+      return text({ grantee, role, granted: results.filter(r => r.status === 'granted').length, total: targets.length, results });
+    });
+
+  mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
+    {
+      organism_id: z.string(),
+      ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
+      workspaces: z.array(z.string()).optional().describe('MANY workspace ids to revoke in one call.'),
+      grantee: z.string().describe('Owner name, GHII, or GAII to revoke.'),
+    },
+    annotationsFor('aimeat_workspace_member_revoke'),
+    async ({ organism_id, ws, workspaces, grantee }) => {
+      const targets = wsList(ws, workspaces);
+      if (!targets.length) return text({ error: 'Provide `ws` and/or `workspaces`.' }, true);
+      const orgPath = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access/revoke`;
+      const results: Array<{ ws: string; status: string; revoked?: number }> = [];
+      for (const w of targets) {
+        const r = await client.post(orgPath, { ws: w, grantee });
+        if (r.ok === false) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
+        const n = Number((r.data as { revoked?: number } | undefined)?.revoked ?? 0);
+        results.push({ ws: w, status: n > 0 ? 'revoked' : 'not_a_member', revoked: n });
+      }
+      return text({ grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results });
+    });
+
+  mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
+    { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+    annotationsFor('aimeat_workspace_members'),
+    async ({ organism_id, ws }) => {
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access?ws=${encodeURIComponent(ws)}`);
+      if (resp.ok === false) return text(resp.error ?? resp, true);
+      const members = (resp.data as { members?: unknown[] } | undefined)?.members ?? [];
+      return text({ ws, members });
     });
 
   mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),

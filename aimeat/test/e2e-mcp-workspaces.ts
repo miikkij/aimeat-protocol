@@ -13,6 +13,9 @@
  *   v1.3.0 — 2026-07-11 — Tests 9a–9d: embedded-image URL normalization on write/publish (raw
  *     /v1/storage → owner-addressed /v1/pub + file scoped to the workspace; upload embed_url; missing
  *     file left unchanged).
+ *   v1.4.0 — 2026-07-11 — Tests 26–34 (TARGET-028): aimeat_workspace_member_grant/_revoke/_members over
+ *     MCP — grant/revoke, upgrade/downgrade, GHII+GAII grantee, multi-workspace grant, non-manager
+ *     authorization, decide's explicit `role` + contributor default, and the metadata `source` stamp.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -112,7 +115,7 @@ const root = () => `organism.${orgId}.w.${WS}`;
 await test('Tools appear in tools/list', async () => {
     const { body } = await A.client.rpc('tools/list', {}, 100);
     const names = body.result.tools.map((t: any) => t.name);
-    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_object_delete', 'aimeat_organism_overview', 'aimeat_workspace_overview'])
+    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_object_delete', 'aimeat_organism_overview', 'aimeat_workspace_overview', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members'])
         assert(names.includes(n), `has ${n}`);
 });
 
@@ -566,6 +569,94 @@ await test("25. workspace is SHARED — the creator sees a contributor's write (
     const data = JSON.parse(r.result.content[0].text);
     const itemIndex = (data.index?.item || []);
     assert(itemIndex.some((o: any) => o.id === 'b-contrib' && o.has_draft), `creator must see contributor B's draft in the index: ${JSON.stringify(itemIndex.map((o: any) => o.id))}`);
+});
+
+// ── TARGET-028: proactive member grant/revoke + members listing over MCP (aimeat_workspace_member_*) ──
+// Entering here (after test 24/25) B is a CONTRIBUTOR on bootWs, granted via the REST /grant path.
+const membersMcp = async (caller: typeof A, ws: string, id: number) =>
+    JSON.parse((await caller.client.call('aimeat_workspace_members', { organism_id: bootOrgId, ws }, id)).result.content[0].text);
+
+await test('26. aimeat_workspace_members (MCP) lists B as contributor with grant source', async () => {
+    const m = await A.client.call('aimeat_workspace_members', { organism_id: bootOrgId, ws: bootWs.id }, 126);
+    assert(m.result.isError !== true, `members: ${m.result.content?.[0]?.text}`);
+    const bRow = (JSON.parse(m.result.content[0].text).members || []).find((x: any) => x.owner === B.ownerName);
+    assert(bRow && bRow.role === 'contributor', `B is contributor: ${JSON.stringify(bRow)}`);
+    assert(bRow.source === 'grant', `grant source stamped (test 24 used REST /grant), got ${bRow.source}`);
+});
+
+await test('27. aimeat_workspace_member_revoke (MCP) removes B → B loses access; members drops B', async () => {
+    const rv = await A.client.call('aimeat_workspace_member_revoke', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName }, 127);
+    assert(rv.result.isError !== true, `revoke: ${rv.result.content?.[0]?.text}`);
+    const rvd = JSON.parse(rv.result.content[0].text);
+    assert(rvd.revoked === 1 && rvd.results[0].status === 'revoked', `revoked 1: ${JSON.stringify(rvd)}`);
+    assert((await bReadManifest()) === null, 'B read empty after MCP revoke');
+    assert(!(await membersMcp(A, bootWs.id, 1271)).members.some((x: any) => x.owner === B.ownerName), 'B removed from members list');
+});
+
+await test('28. aimeat_workspace_member_grant (MCP) adds B as VIEWER → reads, cannot write; source=grant, granted_by=A', async () => {
+    const g = await A.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName, role: 'viewer' }, 128);
+    assert(g.result.isError !== true, `grant: ${g.result.content?.[0]?.text}`);
+    const gd = JSON.parse(g.result.content[0].text);
+    assert(gd.granted === 1 && gd.results[0].status === 'granted', `granted 1: ${JSON.stringify(gd)}`);
+    assert((await bReadManifest())?.name === 'Bootstrapped', 'viewer B can read');
+    assert((await bWrite('b-viewer-mcp')).status === 403, 'viewer B write denied');
+    const bRow = (await membersMcp(A, bootWs.id, 1281)).members.find((x: any) => x.owner === B.ownerName);
+    assert(bRow?.role === 'viewer' && bRow?.source === 'grant', `B viewer via grant: ${JSON.stringify(bRow)}`);
+    assert(bRow?.granted_by === A.ownerName, `granted_by is A: ${JSON.stringify(bRow)}`);
+});
+
+await test('29. member_grant UPGRADES B viewer → contributor (B writes; exactly one role row, no dup)', async () => {
+    const g = await A.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName, role: 'contributor' }, 129);
+    assert(g.result.isError !== true, `upgrade: ${g.result.content?.[0]?.text}`);
+    const wr = await bWrite('b-contrib-mcp');
+    assert(wr.status === 200 || wr.status === 201, `contributor B writes, got ${wr.status}`);
+    const rows = (await membersMcp(A, bootWs.id, 1291)).members.filter((x: any) => x.owner === B.ownerName);
+    assert(rows.length === 1 && rows[0].role === 'contributor', `single contributor row (re-grant replaced prior): ${JSON.stringify(rows)}`);
+});
+
+await test('30. member_grant DOWNGRADES B contributor → viewer (write denied again)', async () => {
+    const g = await A.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName, role: 'viewer' }, 130);
+    assert(g.result.isError !== true, `downgrade: ${g.result.content?.[0]?.text}`);
+    assert((await bReadManifest())?.name === 'Bootstrapped', 'downgraded B still reads');
+    assert((await bWrite('b-downgraded')).status === 403, 'downgraded B write denied');
+});
+
+await test('31. member_grant accepts a GAII grantee → the grant applies to the OWNER (agents inherit)', async () => {
+    const g = await A.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.agentGaii, role: 'contributor' }, 131);
+    assert(g.result.isError !== true, `GAII grant: ${g.result.content?.[0]?.text}`);
+    assert(JSON.parse(g.result.content[0].text).grantee === B.ownerName, 'GAII resolved to owner');
+    assert((await membersMcp(A, bootWs.id, 1311)).members.some((x: any) => x.owner === B.ownerName && x.role === 'contributor'), 'owner-keyed member from GAII grant');
+});
+
+await test('32. a non-manager (B) cannot grant or list members (authorization)', async () => {
+    const g = await B.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: A.ownerName, role: 'viewer' }, 132);
+    const gd = JSON.parse(g.result.content[0].text);
+    assert(gd.granted === 0 && gd.results.every((r: any) => r.status === 'forbidden_or_not_found'), `B (member, not manager) grant refused per-ws: ${JSON.stringify(gd)}`);
+    const m = await B.client.call('aimeat_workspace_members', { organism_id: bootOrgId, ws: bootWs.id }, 1321);
+    assert(m.result.isError === true, 'B cannot list members (not creator/admin)');
+});
+
+await test('33. member_grant adds B to MANY workspaces in ONE call (workspaces:[...])', async () => {
+    const c = await A.client.call('aimeat_workspace_create', { organism_id: bootOrgId, name: 'Second',
+        manifest: { manifestVersion: '1.0', name: 'Second', kind: 'project', status: 'active', objectTypes: [{ name: 'item', schemaRef: 'schema:item@1', namespace: 'shared.items', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records' }] } }, 133);
+    assert(c.result.isError !== true, `create ws2: ${c.result.content?.[0]?.text}`);
+    const ws2 = JSON.parse(c.result.content[0].text).ws;
+    const g = await A.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, workspaces: [bootWs.id, ws2], grantee: B.ownerName, role: 'contributor' }, 1331);
+    const gd = JSON.parse(g.result.content[0].text);
+    assert(gd.granted === 2 && gd.total === 2, `granted to both workspaces: ${JSON.stringify(gd)}`);
+    assert((await membersMcp(A, ws2, 1332)).members.some((x: any) => x.owner === B.ownerName && x.role === 'contributor'), 'B is contributor on the second workspace');
+});
+
+await test('34. workspace_access decide honors an explicit role, defaults to contributor (back-compat)', async () => {
+    await A.client.call('aimeat_workspace_member_revoke', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName }, 134);
+    await B.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'request' }, 1341);
+    const ap = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'approve', role: 'viewer' }, 1342);
+    assert(JSON.parse(ap.result.content[0].text).role === 'viewer', 'decide granted the explicit viewer role');
+    assert((await bWrite('b-decide-viewer')).status === 403, 'decide-viewer B cannot write');
+    const bRow = (await membersMcp(A, bootWs.id, 1343)).members.find((x: any) => x.owner === B.ownerName);
+    assert(bRow?.role === 'viewer' && bRow?.source === 'request', `decide grant source=request: ${JSON.stringify(bRow)}`);
+    const ap2 = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'approve' }, 1344);
+    assert(JSON.parse(ap2.result.content[0].text).role === 'contributor', 'decide default (no role) stays contributor');
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
