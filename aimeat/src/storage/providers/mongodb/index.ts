@@ -116,6 +116,7 @@ import type {
     AgentDirectivesRecord, OwnerAgentDefaults,
     SharingGroupRecord,
     AgentActivityRecord,
+    AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter,
     AgentMessageRecord,
     DirectMessageRecord,
     ContactConsentRecord,
@@ -7363,6 +7364,141 @@ export class PrismaStorage implements Storage {
             orderBy: [{ date: 'asc' }, { hour: 'asc' }],
         });
         return rows.map((r: any) => this.toActivityRecord(r));
+    }
+
+    // ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+
+    async appendUsageEvent(event: AgentUsageEvent): Promise<void> {
+        this.ensureReady();
+        await this.prisma.agentUsageEvent.create({
+            data: {
+                id: event.id,
+                ts: event.ts,
+                agentGaii: event.agentGaii,
+                ownerGhii: event.ownerGhii,
+                runId: event.runId ?? null,
+                model: event.model,
+                provider: event.provider,
+                promptTokens: event.promptTokens,
+                completionTokens: event.completionTokens,
+                costUsd: event.costUsd,
+                priceRef: event.priceRef,
+                source: event.source,
+                apiKeyScope: event.apiKeyScope,
+                organismId: event.organismId ?? null,
+                workspaceId: event.workspaceId ?? null,
+                capabilityId: event.capabilityId ?? null,
+                consumerGhii: event.consumerGhii ?? null,
+            },
+        });
+    }
+
+    async incrementUsageDaily(d: AgentUsageDailyRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.agentUsageDaily.upsert({
+            where: {
+                date_agentGaii_ownerGhii_apiKeyScope_model_provider_organismId_workspaceId: {
+                    date: d.date,
+                    agentGaii: d.agentGaii,
+                    ownerGhii: d.ownerGhii,
+                    apiKeyScope: d.apiKeyScope,
+                    model: d.model,
+                    provider: d.provider,
+                    organismId: d.organismId,
+                    workspaceId: d.workspaceId,
+                },
+            },
+            create: {
+                date: d.date,
+                agentGaii: d.agentGaii,
+                ownerGhii: d.ownerGhii,
+                apiKeyScope: d.apiKeyScope,
+                model: d.model,
+                provider: d.provider,
+                organismId: d.organismId,
+                workspaceId: d.workspaceId,
+                promptTokens: d.promptTokens,
+                completionTokens: d.completionTokens,
+                costUsd: d.costUsd,
+                calls: d.calls,
+                unpricedCalls: d.unpricedCalls,
+            },
+            update: {
+                promptTokens: { increment: d.promptTokens },
+                completionTokens: { increment: d.completionTokens },
+                costUsd: { increment: d.costUsd },
+                calls: { increment: d.calls },
+                unpricedCalls: { increment: d.unpricedCalls },
+            },
+        });
+    }
+
+    async queryUsageDaily(filter: UsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
+        this.ensureReady();
+        const where: any = { ownerGhii: filter.ownerGhii };
+        if (filter.agentGaii) where.agentGaii = filter.agentGaii;
+        if (filter.organismId !== undefined) where.organismId = filter.organismId;
+        if (filter.workspaceId !== undefined) where.workspaceId = filter.workspaceId;
+        if (filter.from || filter.to) {
+            where.date = {};
+            if (filter.from) where.date.gte = filter.from;
+            if (filter.to) where.date.lte = filter.to;
+        }
+        const rows = await this.prisma.agentUsageDaily.findMany({ where, orderBy: { date: 'asc' } });
+        return rows.map((r: any) => ({
+            date: r.date,
+            agentGaii: r.agentGaii,
+            ownerGhii: r.ownerGhii,
+            apiKeyScope: r.apiKeyScope,
+            model: r.model,
+            provider: r.provider,
+            organismId: r.organismId ?? '',
+            workspaceId: r.workspaceId ?? '',
+            promptTokens: r.promptTokens,
+            completionTokens: r.completionTokens,
+            costUsd: r.costUsd,
+            calls: r.calls,
+            unpricedCalls: r.unpricedCalls,
+        }));
+    }
+
+    async listUsageEvents(filter: UsageEventFilter): Promise<AgentUsageEvent[]> {
+        this.ensureReady();
+        const where: any = { ownerGhii: filter.ownerGhii };
+        if (filter.agentGaii) where.agentGaii = filter.agentGaii;
+        if (filter.runId) where.runId = filter.runId;
+        if (filter.capabilityId) where.capabilityId = filter.capabilityId;
+        if (filter.hasCapability) where.capabilityId = { not: null };
+        if (filter.from || filter.to) {
+            where.ts = {};
+            if (filter.from) where.ts.gte = filter.from;
+            if (filter.to) where.ts.lte = filter.to;
+        }
+        const limit = Math.min(Math.max(filter.limit ?? 200, 1), 1000);
+        const rows = await this.prisma.agentUsageEvent.findMany({
+            where,
+            orderBy: { ts: 'desc' },
+            take: limit,
+        });
+        return rows.map((r: any) => ({
+            id: r.id,
+            ts: r.ts,
+            agentGaii: r.agentGaii,
+            ownerGhii: r.ownerGhii,
+            runId: r.runId ?? undefined,
+            model: r.model,
+            provider: r.provider,
+            promptTokens: r.promptTokens,
+            completionTokens: r.completionTokens,
+            costUsd: r.costUsd === null || r.costUsd === undefined ? null : r.costUsd,
+            priceRef: r.priceRef ?? null,
+            source: r.source,
+            apiKeyScope: r.apiKeyScope,
+            organismId: r.organismId ?? undefined,
+            workspaceId: r.workspaceId ?? undefined,
+            capabilityId: r.capabilityId ?? undefined,
+            consumerGhii: r.consumerGhii ?? undefined,
+        }));
     }
 
     // ── Agent Messages ──

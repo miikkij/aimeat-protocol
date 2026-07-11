@@ -2097,6 +2097,102 @@ export interface AgentActivityRecord {
   value: number;
 }
 
+// ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+
+/**
+ * One append-only usage event per agent LLM call. This is the ledger's source of
+ * truth — daily aggregates (AgentUsageDailyRecord) are derived from these and can be
+ * rebuilt. Retained for billing audit (TARGET-019), so writes are reliable, not
+ * best-effort like the telemetry-buffer counters.
+ *
+ * Cost is `null` (not 0) when no price was available — a missing price stays visible
+ * and is never guessed (see llm-pricing.ts). Context fields (organism/workspace/
+ * capability) are in the schema from v1 but only filled once TARGET-018 wires context
+ * through the run — nullable to avoid a later migration.
+ */
+export interface AgentUsageEvent {
+  id: string;
+  /** ISO timestamp the call was recorded. */
+  ts: string;
+  /** Who consumed — full GAII (or GHII for owner-direct calls). */
+  agentGaii: string;
+  /** Whose account pays (budget/billing key) — filled from v1 (TARGET-017/019). */
+  ownerGhii: string;
+  /** Run/task id, ties the call back to a deliverable (born_from chain). */
+  runId?: string;
+  model: string;
+  /** anthropic | openai | openrouter | local | ... */
+  provider: string;
+  promptTokens: number;
+  completionTokens: number;
+  /** Locked at record time; null = unpriced (never coerced to 0). */
+  costUsd: number | null;
+  /** Which price version produced costUsd (e.g. `provider:openrouter`, `poi003@2026-07-10`, `local`). */
+  priceRef: string | null;
+  /** Ingest source: crewaimeat | ai-complete | ... */
+  source: string;
+  /** self-host (owner's own key, not billed) vs hosted (node key, billed) — TARGET-019. */
+  apiKeyScope: 'own' | 'node';
+  /** Context — filled from TARGET-018. */
+  organismId?: string;
+  workspaceId?: string;
+  capabilityId?: string;
+  /** For capability calls (TARGET-018 double-entry): the GHII that INVOKED the capability
+   *  (the consumer). The producer is agentGaii/ownerGhii above. Lets the producer see who
+   *  called each capability and what the real compute cost, alongside the morsel escrow. */
+  consumerGhii?: string;
+}
+
+/**
+ * Daily rollup of usage, upsert-incremented per (date × agent × owner × keyscope ×
+ * model × provider × organism × workspace). Context dims are `''` (not null) when
+ * unattributed so the composite key stays NULL-free for ON CONFLICT upsert.
+ */
+export interface AgentUsageDailyRecord {
+  /** UTC date YYYY-MM-DD. */
+  date: string;
+  agentGaii: string;
+  ownerGhii: string;
+  apiKeyScope: string;
+  model: string;
+  provider: string;
+  /** '' = unattributed (filled from TARGET-018). */
+  organismId: string;
+  workspaceId: string;
+  promptTokens: number;
+  completionTokens: number;
+  /** Sum of priced calls only. */
+  costUsd: number;
+  calls: number;
+  /** Calls whose costUsd was null (unpriced) — keeps "missing price" visible. */
+  unpricedCalls: number;
+}
+
+/** Filter for reading daily usage aggregates. Always owner-scoped. */
+export interface UsageDailyFilter {
+  ownerGhii: string;
+  agentGaii?: string;
+  organismId?: string;
+  workspaceId?: string;
+  /** Inclusive YYYY-MM-DD bounds. */
+  from?: string;
+  to?: string;
+}
+
+/** Filter for reading raw usage events (per-run drill-down). Always owner-scoped. */
+export interface UsageEventFilter {
+  ownerGhii: string;
+  agentGaii?: string;
+  runId?: string;
+  /** Only events carrying a capabilityId (TARGET-018 capability view). */
+  hasCapability?: boolean;
+  capabilityId?: string;
+  /** Inclusive ISO bounds. */
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 // ── Agent Messages (Phase 3) ──
 
 export interface AgentMessageRecord {
@@ -2404,6 +2500,7 @@ import type { AgentTaskRepository } from './repositories/agent-task.repository.j
 import type { AgentDirectivesRepository } from './repositories/agent-directives.repository.js';
 import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
+import type { AgentUsageRepository } from './repositories/agent-usage.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
@@ -2429,6 +2526,7 @@ export interface Storage extends
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,
   CapabilityRepository,
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
+  AgentUsageRepository,
   AgentMessageRepository,
   DirectMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,

@@ -115,6 +115,7 @@ import { messagesRouter } from '../routes/messages.js';
 import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
+import { ledgerRouter } from '../routes/ledger.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { skillsRouter } from '../routes/skills.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
@@ -307,6 +308,7 @@ export async function mountRoutes(
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
+  app.use(ledgerRouter(config, storage));         // LEDGER (TARGET-016) — agent LLM usage/cost read API
   app.use(agentSkillBundleRouter(config, storage));
   app.use(skillsRouter(config, storage));  // Skills registry (dedicated system, Phase 2a)
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));

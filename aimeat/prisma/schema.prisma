@@ -1572,6 +1572,53 @@ model AgentActivity {
   @@index([agentGaii, date])
 }
 
+// ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+
+model AgentUsageEvent {
+  id               String  @id @map("_id")
+  ts               String
+  agentGaii        String
+  ownerGhii        String
+  runId            String?
+  model            String
+  provider         String
+  promptTokens     Int     @default(0)
+  completionTokens Int     @default(0)
+  costUsd          Float?
+  priceRef         String?
+  source           String
+  apiKeyScope      String  @default("own")
+  organismId       String?
+  workspaceId      String?
+  capabilityId     String?
+  consumerGhii     String?
+
+  @@index([ownerGhii, ts])
+  @@index([agentGaii, ts])
+  @@index([runId])
+}
+
+model AgentUsageDaily {
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  date             String
+  agentGaii        String
+  ownerGhii        String
+  apiKeyScope      String @default("own")
+  model            String
+  provider         String
+  organismId       String @default("")
+  workspaceId      String @default("")
+  promptTokens     Int    @default(0)
+  completionTokens Int    @default(0)
+  costUsd          Float  @default(0)
+  calls            Int    @default(0)
+  unpricedCalls    Int    @default(0)
+
+  @@unique([date, agentGaii, ownerGhii, apiKeyScope, model, provider, organismId, workspaceId])
+  @@index([ownerGhii, date])
+  @@index([organismId, date])
+}
+
 model TelemetryEvent {
   id        String   @id @map("_id")
   agentGaii String
