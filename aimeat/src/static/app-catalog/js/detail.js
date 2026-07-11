@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.1.0 — 2026-07-11 — Own-published apps: "Edit Access Code" in serverMgmtInner + "Attach skill"
+ *     in the Skills section (attach/detach one of the user's own skills; ports skills.js
+ *     setSkillBinding frontmatter rewrite so the standalone bundle needs no SPA service layer).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 7).
  */
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName } from './util.js';
@@ -36,6 +39,11 @@ var detailVersionsHtml = null; // cached rendered versions list, survives re-ren
 var detailSkillsHtml = null;   // cached rendered bound-skills list (skills registry, 2d)
 var detailEditingAbout = false; // true while the About name/description inline editor is open
 var detailEditAboutOnOpen = false; // when set, open the About editor as soon as the detail view renders
+var detailEditingAccessCode = false; // true while the access-code editor is open (own published apps)
+var detailSkillPickerOpen = false;   // true while the "attach a skill" picker is shown (own published apps)
+var detailMySkills = null;           // cached list of the user's own UNBOUND skills (attach options)
+var detailBoundSkills = [];          // refs of the skills currently bound to this app (filters the options)
+var detailSkillBusy = false;         // guards the Attach button while a bind/unbind republish is in flight
 
 function detailGetApp() {
   for (var i = 0; i < getMainApps().length; i++) {
@@ -61,6 +69,15 @@ function detailServerOwner(app) {
   return stored;
 }
 
+// True when the signed-in owner owns THIS published app. getServerState() is populated only from
+// the owner's own server apps (server-io filters by sameOwner), so its presence for this filename
+// is the ownership gate — a community/non-owned app never has an entry here. Used to decide whether
+// the "Edit Access Code" + "Attach skill" controls may be shown (own published apps only).
+function detailIsOwnPublished(app) {
+  return !!(app && app.published && app.publishedFilename
+    && getServerState()[app.publishedFilename] && currentOwnerName());
+}
+
 function blobToHtml(blob) {
   try { return decodeURIComponent(escape(atob(blob))); } catch (e) { return ''; }
 }
@@ -80,6 +97,21 @@ function serverMgmtInner(app) {
   var ownerArg2 = jsArg(svrState.owner || '');
   var p = svrState.protection || {};
   var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+  var acLabel = (svrState.accessCode ? '🔒 ' : '') + t('detail.editAccess');
+  // Inline access-code editor (opened by the button below). Empty on Save removes protection;
+  // a 4–64 char value sets it. Mirrors the About editor pattern used elsewhere in this view.
+  var acEditor = detailEditingAccessCode
+    ? '<div class="dtl-ac-editor" style="margin-top:10px">' +
+        '<label class="dtl-stat-label" for="detail-ac-input">' + t('detail.accessCodeLabel') + '</label>' +
+        '<input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t('detail.accessCodePh')) + '" style="margin:4px 0 6px" />' +
+        '<div class="dtl-sync none" style="margin:0 0 8px">' + t('detail.accessCodeRemoveHint') + '</div>' +
+        '<div class="dtl-btn-row">' +
+          dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAccessCodeSave()', {variant:'primary'}) +
+          dtlBtn(t('detail.cancelEdit'), 'window._launcher.detailAccessCodeCancel()') +
+        '</div>' +
+        '<div class="dtl-ai-status" id="detail-ac-status"></div>' +
+      '</div>'
+    : '';
   return '<div class="dtl-section">' +
       '<h3>' + t('detail.serverMgmt') + '</h3>' +
       '<div class="dtl-btn-row">' +
@@ -87,6 +119,7 @@ function serverMgmtInner(app) {
           ? dtlBtn(t('card.unpark'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', false)', {title: t('card.unparkHint')})
           : dtlBtn(t('card.park'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', true)', {title: t('card.parkHint')})) +
         dtlBtn(t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff'), 'window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')', {title: t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}) +
+        dtlBtn(acLabel, 'window._launcher.detailAccessCodeEdit()', {title: t('detail.accessCodeHint')}) +
         dtlBtn((anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')), 'window._launcher.showProtectionModal(\'' + fnArg + '\')', {title: t('card.protectHint')}) +
         dtlBtn(t('card.versions'), 'window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')') +
         // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
@@ -98,6 +131,7 @@ function serverMgmtInner(app) {
           : '') +
         dtlBtn(t('card.removeServer'), 'window._launcher.deleteServerApp(\'' + fnArg + '\')', {variant:'danger'}) +
       '</div>' +
+      acEditor +
     '</div>';
 }
 
@@ -114,6 +148,10 @@ function openDetailView(appId) {
   detailVersionsHtml = null;
   detailSkillsHtml = null;
   detailEditingAbout = false;
+  detailEditingAccessCode = false;
+  detailSkillPickerOpen = false;
+  detailMySkills = null;
+  detailBoundSkills = [];
   var app = detailGetApp();
   if (!app) return;
   document.getElementById('detail-view').hidden = false;
@@ -412,6 +450,7 @@ function renderDetailView() {
   // ── SKILLS (skills registry, 2d) — expertise that teaches agents this app ──
   var skillsHtml = '';
   if (app.published) {
+    var ownPub = detailIsOwnPublished(app);
     skillsHtml =
       '<div class="dtl-section">' +
         '<h3>' + (t('detail.skills') || 'Skills for this app') + '</h3>' +
@@ -419,6 +458,9 @@ function renderDetailView() {
           (detailSkillsHtml !== null ? detailSkillsHtml
             : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') +
         '</div>' +
+        // Own published app → offer attach/detach (a skill teaches agents this app). The detach ×
+        // on each user-scope skill is rendered by detailLoadSkills into the list above.
+        (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + '</div>' : '') +
       '</div>';
   }
 
@@ -446,13 +488,21 @@ function detailLoadSkills(owner, filename) {
     .then(function(json) {
       var listEl = document.getElementById('detail-skills-list');
       var skills = (json.data && json.data.skills) ? json.data.skills : [];
+      // Track bound refs so the attach picker can exclude already-bound skills (parity with profile).
+      detailBoundSkills = skills.map(function(s) { return s.ref; });
+      // Detach (×) is offered only on the owner's own published app AND only for user-scope skills
+      // (node/workspace skills are read-only here — you can't rewrite their frontmatter).
+      var ownPub = detailIsOwnPublished(detailGetApp());
       if (skills.length === 0) { detailSkillsHtml = noneHtml; if (listEl) listEl.innerHTML = detailSkillsHtml; return; }
       var out = '';
       for (var i = 0; i < skills.length; i++) {
         var s = skills[i];
+        var detach = (ownPub && s.scope === 'user')
+          ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.skillDetach')) + '" onclick="window._launcher.detailSkillDetach(\'' + jsArg(s.name) + '\')">×</button>'
+          : '';
         out += '<div style="margin-bottom:.4rem">' +
           '<code>' + escapeHtml(s.ref || s.name) + '</code>' +
-          ' <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || '')) + '</span>' +
+          ' <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || '')) + '</span>' + detach +
           '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || '') + '</div>' +
         '</div>';
       }
@@ -460,10 +510,232 @@ function detailLoadSkills(owner, filename) {
       if (listEl) listEl.innerHTML = detailSkillsHtml;
     })
     .catch(function() {
+      detailBoundSkills = [];
       detailSkillsHtml = noneHtml;
       var listEl = document.getElementById('detail-skills-list');
       if (listEl) listEl.innerHTML = detailSkillsHtml;
     });
+}
+
+// ── Access code (own published apps): set / clear the optional access code ──────
+// The published-app record only ever exposes a `protected` boolean (never the code itself), so the
+// editor never pre-fills — you type a NEW code to set one, or Save empty to remove protection.
+// PATCH /v1/apps/:filename { access_code: "<code>" | null } (server validates 4–64 chars).
+function detailAccessCodeEdit() {
+  var app = detailGetApp();
+  if (!detailIsOwnPublished(app)) return;
+  detailEditingAccessCode = true;
+  refreshServerMgmt();
+  var el = document.getElementById('detail-ac-input');
+  if (el) el.focus();
+}
+
+function detailAccessCodeCancel() {
+  detailEditingAccessCode = false;
+  refreshServerMgmt();
+}
+
+function detailAccessCodeSave() {
+  var app = detailGetApp();
+  if (!detailIsOwnPublished(app)) return;
+  var token = getCortexOwnerToken();
+  if (!token) { showNotice(t('common.loginRequired') || 'You must be logged in. Sign in first.'); return; }
+  var input = document.getElementById('detail-ac-input');
+  var statusEl = document.getElementById('detail-ac-status');
+  var code = input ? input.value.trim() : '';
+  if (code && (code.length < 4 || code.length > 64)) {
+    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.accessCodeLen'); }
+    return;
+  }
+  var config = loadConfig();
+  var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
+  var filename = app.publishedFilename;
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.savingAccess'); }
+  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(code ? { access_code: code } : { access_code: null })
+  })
+    .then(function(resp) { return resp.json().then(function(j) { return { ok: resp.ok, j: j }; }); })
+    .then(function(res) {
+      if (res.ok && res.j && res.j.ok !== false) {
+        // Reflect the new protection state in the cached server state so the button's 🔒 badge updates.
+        var st = getServerState()[filename];
+        if (st) st.accessCode = !!code;
+        detailEditingAccessCode = false;
+        loadPublishedApps();
+        refreshServerMgmt();
+        showNotice(code ? t('detail.accessCodeSet') : t('detail.accessCodeCleared'));
+      } else {
+        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + ((res.j && res.j.error && res.j.error.message) || 'Failed'); }
+      }
+    })
+    .catch(function(err) { if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Error'); } });
+}
+
+// ── Attach skill (own published apps): bind one of the user's own skills to this app ──────
+// The bound-skills list is read-only for everyone; the attach picker + detach × are shown only for
+// the owner's own published app. Binding lives in the SKILL's frontmatter (metadata.binding:
+// app:{owner}/{filename}); attach/detach rewrites it and republishes (skillSetBinding).
+function detailSkillAttachInner() {
+  var toggleBtn = dtlBtn('+ ' + t('detail.skillAttach'), 'window._launcher.detailSkillAttachToggle()');
+  if (!detailSkillPickerOpen) return toggleBtn;
+  var picker;
+  if (detailMySkills === null) {
+    picker = '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+  } else if (detailMySkills.length === 0) {
+    picker = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.skillNoneToAttach') + '</span>';
+  } else {
+    var opts = '';
+    for (var i = 0; i < detailMySkills.length; i++) {
+      var s = detailMySkills[i];
+      var desc = (s.description || '').slice(0, 50);
+      opts += '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + (desc ? ' — ' + escapeHtml(desc) : '') + '</option>';
+    }
+    picker = '<select id="detail-skill-select" class="modal-input" style="max-width:340px;margin:0">' + opts + '</select>' +
+      dtlBtn(t('detail.skillAttachConfirm'), 'window._launcher.detailSkillAttach()', {variant:'primary', disabled: detailSkillBusy});
+  }
+  return '<div class="dtl-btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">' + toggleBtn + picker + '</div>' +
+    '<div class="dtl-ai-status" id="detail-skill-status"></div>';
+}
+
+// Re-render ONLY the attach picker container (button + select) — leaves the bound list untouched.
+function refreshSkillAttach() {
+  var c = document.getElementById('detail-skill-attach');
+  if (c) c.innerHTML = detailSkillAttachInner();
+}
+
+function detailSkillAttachToggle() {
+  var app = detailGetApp();
+  if (!detailIsOwnPublished(app)) return;
+  detailSkillPickerOpen = !detailSkillPickerOpen;
+  if (detailSkillPickerOpen && detailMySkills === null) {
+    refreshSkillAttach(); // show the … placeholder while the list loads
+    skillListMine()
+      .then(function(mine) {
+        var bound = {};
+        for (var i = 0; i < detailBoundSkills.length; i++) bound[detailBoundSkills[i]] = true;
+        detailMySkills = mine.filter(function(s) { return !bound[s.ref]; });
+        refreshSkillAttach();
+      })
+      .catch(function() { detailMySkills = []; refreshSkillAttach(); });
+  } else {
+    refreshSkillAttach();
+  }
+}
+
+function detailSkillAttach() {
+  var app = detailGetApp();
+  if (!detailIsOwnPublished(app)) return;
+  var sel = document.getElementById('detail-skill-select');
+  var name = sel ? sel.value : '';
+  if (!name || detailSkillBusy) return;
+  var statusEl = document.getElementById('detail-skill-status');
+  var owner = detailServerOwner(app);
+  var filename = app.publishedFilename;
+  var binding = 'app:' + owner + '/' + filename;
+  detailSkillBusy = true;
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.skillAttaching'); }
+  skillSetBinding(name, binding)
+    .then(function() {
+      detailSkillBusy = false;
+      detailSkillPickerOpen = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t('detail.skillAttached'));
+    })
+    .catch(function(err) {
+      detailSkillBusy = false;
+      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.skillAttachError') + ': ' + (err.message || err); }
+    });
+}
+
+function detailSkillDetach(name) {
+  var app = detailGetApp();
+  if (!detailIsOwnPublished(app) || detailSkillBusy) return;
+  var owner = detailServerOwner(app);
+  var filename = app.publishedFilename;
+  detailSkillBusy = true;
+  skillSetBinding(name, null)
+    .then(function() {
+      detailSkillBusy = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t('detail.skillDetached'));
+    })
+    .catch(function(err) {
+      detailSkillBusy = false;
+      showNotice(t('detail.skillAttachError') + ': ' + (err.message || err));
+    });
+}
+
+// ── Skills registry API (authed, own user scope) ──────────────────────────────
+// Ported from public/js/services/skills.js so the standalone catalog (its own esbuild bundle, no
+// access to the SPA /js service layer) can bind/unbind a skill's app binding. The node schema wins
+// on any mismatch — keep skillSetBinding's frontmatter rewrite in step with the SPA service.
+function skillApiBase() {
+  var cfg = loadConfig();
+  return cfg.aimeatUrl ? cfg.aimeatUrl.replace(/\/+$/, '') : '';
+}
+function skillAuthHeaders(withJson) {
+  var h = {};
+  var tok = getCortexOwnerToken();
+  if (tok) h['Authorization'] = 'Bearer ' + tok;
+  if (withJson) h['Content-Type'] = 'application/json';
+  return h;
+}
+function skillListMine() {
+  var base = skillApiBase();
+  if (!base) return Promise.reject(new Error('No server configured'));
+  return fetch(base + '/v1/skills?scope=user', { headers: skillAuthHeaders(false) })
+    .then(function(r) { return r.json(); })
+    .then(function(j) { return (j.data && j.data.skills) ? j.data.skills : []; });
+}
+function skillGetMine(name) {
+  var base = skillApiBase();
+  return fetch(base + '/v1/skills/' + encodeURIComponent(name) + '?scope=user', { headers: skillAuthHeaders(false) })
+    .then(function(r) { return r.json(); })
+    .then(function(j) { return (j.data && j.data.skill) || null; });
+}
+function skillPublish(skillMd, files) {
+  var base = skillApiBase();
+  var body = { skill_md: skillMd };
+  if (files && Object.keys(files).length) body.files = files;
+  return fetch(base + '/v1/skills', { method: 'POST', headers: skillAuthHeaders(true), body: JSON.stringify(body) })
+    .then(function(r) { return r.json().then(function(j) {
+      if (!j.ok) throw new Error((j.error && (j.error.message || j.error.code)) || ('HTTP ' + r.status));
+      return (j.data && j.data.skill) || null;
+    }); });
+}
+// Set/clear a skill's app binding by rewriting the SKILL.md frontmatter and republishing.
+// Textual rewrite (no YAML lib): handles the three shapes the contract allows. Ported verbatim
+// from public/js/services/skills.js setSkillBinding.
+function skillSetBinding(name, binding) {
+  return skillGetMine(name).then(function(skill) {
+    if (!skill) throw new Error('Skill not found: ' + name);
+    var md = (skill.fileContents && skill.fileContents['SKILL.md']) || '';
+    var m = md.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/);
+    if (!m) throw new Error('SKILL.md has no frontmatter');
+    var fm = m[2];
+    var hasBindingLine = /^\s{2,}binding:.*$/m.test(fm);
+    var hasMetadata = /^metadata:\s*$/m.test(fm);
+    if (binding) {
+      if (hasBindingLine) fm = fm.replace(/^(\s{2,})binding:.*$/m, '$1binding: ' + binding);
+      else if (hasMetadata) fm = fm.replace(/^metadata:\s*$/m, 'metadata:\n  binding: ' + binding);
+      else fm = fm + '\nmetadata:\n  binding: ' + binding;
+    } else {
+      fm = fm.replace(/^\s{2,}binding:.*\r?\n?/m, '');
+      // An emptied metadata block would be YAML null (invalid per contract) — drop the header too.
+      if (/^metadata:\s*$/m.test(fm) && !/^metadata:\s*\r?\n\s{2,}\S/m.test(fm)) {
+        fm = fm.replace(/^metadata:\s*\r?\n?/m, '');
+      }
+    }
+    var files = Object.assign({}, skill.fileContents);
+    delete files['SKILL.md'];
+    return skillPublish(m[1] + fm + m[3] + m[4], files);
+  });
 }
 
 // ── About: inline name + description editing ──────
@@ -1327,6 +1599,12 @@ export {
   detailAboutCancel,
   detailAboutSave,
   detailToggleFavorite,
+  detailAccessCodeEdit,
+  detailAccessCodeCancel,
+  detailAccessCodeSave,
+  detailSkillAttachToggle,
+  detailSkillAttach,
+  detailSkillDetach,
   detailSetScreenshot,
   detailRefreshScreenshot,
   detailAiRun,
