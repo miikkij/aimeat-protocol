@@ -13,11 +13,11 @@ import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
 import { extractZip, bundleZip } from './zip.js';
-import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
+import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailToggleFavorite, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp, exportBackup, handleImportBackup, jsonImportSelectAll, submitJsonImport, removeDuplicateApps, clearAllData } from './settings.js';
 import { initAppsIo, setEditingAppId, addAppFromZip, addAppFromUrl, addAppFromFile, addAppFromSource, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
-import { initServerIo, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, addImportIgnore, removeImportIgnore, dismissServerImportBanner, showServerImportModal, serverImportSelectAll, submitServerImport, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { initServerIo, isOperatorSession, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, addImportIgnore, removeImportIgnore, dismissServerImportBanner, showServerImportModal, serverImportSelectAll, submitServerImport, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
 import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt, onCardDragStart, onCardDragEnd, onCardDragOver, onCardDrop } from './render.js';
 
 
@@ -155,6 +155,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
     detailAboutEdit: detailAboutEdit,
     detailAboutCancel: detailAboutCancel,
     detailAboutSave: detailAboutSave,
+    detailToggleFavorite: detailToggleFavorite,
     editAppDetails: editAppDetails,
     showSubdomainModal: showSubdomainModal,
     openConsents: openConsents,
@@ -248,7 +249,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
       getServerState: function () { return serverStateByFilename; },
       getServerManifests: function () { return serverAppManifests; },
       getOwnProtection: function () { return ownAppProtection; },
-      setIframeUrl: setIframeUrl
+      setIframeUrl: setIframeUrl, isOperatorSession: isOperatorSession
     });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });
     initAppsIo({ generateId: generateId, readFileAsText: readFileAsText, renderApps: renderApps, getMainApps: function () { return allApps; } });
@@ -738,6 +739,11 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
     document.getElementById('source-overlay').addEventListener('click', function(e) {
       if (e.target === this) closeSourceModal();
     });
+
+    // ── Source-editor real-origin staging (published apps): same server-draft path as the
+    //    AI loop, but from the edited textarea — test on a real origin, then publish. ──
+    document.getElementById('source-test-live-btn').addEventListener('click', function () { sourceTestDraftLive(); });
+    document.getElementById('source-publish-tested-btn').addEventListener('click', function () { sourcePublishTested(); });
 
     // ── Close button in source modal ─────────────────
     document.getElementById('close-source-btn').addEventListener('click', closeSourceModal);

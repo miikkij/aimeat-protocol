@@ -1388,6 +1388,7 @@ async function deleteServerApp(filename) {
 }
 
 export {
+  isOperatorSession,
   importFromAimeat,
   processAimeatImport,
   showPublishModal,

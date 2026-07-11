@@ -210,13 +210,6 @@
           <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
           <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
         </div>
-        <div class="modal-field">
-          <label class="modal-label" for="app-open-mode" data-i18n="addModal.openMode">Open Mode</label>
-          <select id="app-open-mode" class="modal-input">
-            <option value="tab" data-i18n="openMode.tab">New Tab</option>
-            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
-          </select>
-        </div>
       </div>
 
       <!-- Actions -->
@@ -251,7 +244,6 @@
     <button data-action="details" data-i18n="ctx.details">&#x1F50E; Details</button>
     <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
     <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
-    <button data-action="toggle-mode" data-i18n="ctx.toggleMode">&#x1F504; Switch open mode</button>
     <button data-action="view-source" data-i18n="ctx.viewSource">&#x1F441; View / Edit Source</button>
     <button data-action="improve-ai" data-i18n="ctx.improveAi">&#x2728; Improve with AI</button>
     <button data-action="share-prompt" data-i18n="ctx.sharePrompt">&#x1F4E4; Share as Prompt</button>
@@ -329,17 +321,6 @@
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.defaults">Defaults</div>
-        <div class="settings-row">
-          <label for="setting-open-mode" data-i18n="settings.defaultOpenMode">Default open mode</label>
-          <select id="setting-open-mode" class="modal-input">
-            <option value="tab" data-i18n="openMode.tab">New Tab</option>
-            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="settings-section">
         <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
         <div class="settings-row">
           <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
@@ -375,10 +356,15 @@
     <div class="modal source-modal">
       <h2 id="source-title">View Source</h2>
       <textarea id="source-code"></textarea>
+      <div class="dtl-ai-status" id="source-draft-status"></div>
       <div class="modal-actions">
         <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
         <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
-        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save Changes</button>
+        <button class="modal-btn secondary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+        <!-- Real-origin staging (published apps only; toggled in viewSource). Same server-draft
+             path as the AI loop: test the edited source on a real origin, then publish it. -->
+        <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
+        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
       </div>
     </div>

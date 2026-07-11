@@ -77,7 +77,6 @@ function openSettings() {
   var config = loadConfig();
   document.getElementById('setting-theme').value = config.theme || 'light';
   document.getElementById('setting-language').value = getLang();
-  document.getElementById('setting-open-mode').value = config.defaultOpenMode || 'tab';
   document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
   document.getElementById('settings-overlay').hidden = false;
 }
@@ -85,7 +84,6 @@ function openSettings() {
 function saveSettings() {
   var config = loadConfig();
   config.theme = document.getElementById('setting-theme').value;
-  config.defaultOpenMode = document.getElementById('setting-open-mode').value;
   config.aimeatUrl = document.getElementById('setting-aimeat-url').value.trim();
   saveConfig(config);
   try { localStorage.setItem('aimeat-theme', config.theme); } catch (e) {}

@@ -177,7 +177,6 @@ function closeModal() {
   document.getElementById('app-name').value = '';
   document.getElementById('app-icon').value = '';
   document.getElementById('app-tags').value = '';
-  document.getElementById('app-open-mode').value = 'tab';
   document.getElementById('selected-file-name').textContent = '';
   document.getElementById('file-input').value = '';
   document.getElementById('app-paste-code').value = '';
@@ -234,7 +233,9 @@ function handleSave() {
   var name = document.getElementById('app-name').value.trim();
   var icon = document.getElementById('app-icon').value.trim();
   var tagsRaw = document.getElementById('app-tags').value.trim();
-  var openMode = document.getElementById('app-open-mode').value;
+  // Apps open TOP-LEVEL on a real origin (published) or in the sandbox (local); there is no
+  // user-facing open-mode choice anymore, so new/edited apps default to 'tab'.
+  var openMode = 'tab';
 
   var tags = tagsRaw ? tagsRaw.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
 

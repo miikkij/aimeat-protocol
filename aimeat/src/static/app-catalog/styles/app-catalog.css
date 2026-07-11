@@ -862,6 +862,29 @@
       background: #D64A3F;
     }
 
+    .dtl-fav-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+      padding: 2px 4px;
+      color: var(--text-muted);
+    }
+
+    .dtl-fav-btn:hover { transform: scale(1.15); }
+
+    .modal-btn.success {
+      background: #10b981;
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .modal-btn.success:hover:not(:disabled) {
+      box-shadow: 0 4px 20px rgba(16, 185, 129, .25);
+      background: #0ea371;
+    }
+
     .modal-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;

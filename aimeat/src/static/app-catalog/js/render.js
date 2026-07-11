@@ -522,7 +522,6 @@ async function handleContextAction(action) {
       document.getElementById('app-name').value = app.name || '';
       document.getElementById('app-icon').value = app.icon || '';
       document.getElementById('app-tags').value = (app.tags || []).join(', ');
-      document.getElementById('app-open-mode').value = app.openMode || 'tab';
 
       // Set the correct source tab
       if (app.source === 'url') {
@@ -538,13 +537,6 @@ async function handleContextAction(action) {
 
     case 'favorite':
       app.favorite = !app.favorite;
-      saveApp(app).then(function () {
-        renderApps();
-      });
-      break;
-
-    case 'toggle-mode':
-      app.openMode = app.openMode === 'iframe' ? 'tab' : 'iframe';
       saveApp(app).then(function () {
         renderApps();
       });
@@ -602,6 +594,15 @@ function viewSource(app) {
   textarea.readOnly = !isEditable;
   saveBtn.disabled = true;
   saveBtn.style.display = isEditable ? '' : 'none';
+  // Real-origin staging (Test on real origin / Publish tested version) needs a PUBLISHED
+  // app (server draft slot). Show those buttons only then; hide for local-only / URL apps.
+  var canStage = isEditable && !!app.published;
+  var testLiveBtn = document.getElementById('source-test-live-btn');
+  var pubTestedBtn = document.getElementById('source-publish-tested-btn');
+  if (testLiveBtn) testLiveBtn.hidden = !canStage;
+  if (pubTestedBtn) pubTestedBtn.hidden = !canStage;
+  var stageStatus = document.getElementById('source-draft-status');
+  if (stageStatus) stageStatus.textContent = '';
   overlay.hidden = false;
   // Store app metadata for save and prompt
   overlay.dataset.appName = app.name || 'App';
