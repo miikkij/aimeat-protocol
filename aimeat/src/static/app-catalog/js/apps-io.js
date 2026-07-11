@@ -13,6 +13,7 @@ import { saveApp } from './db.js';
 import { showNotice } from './ui.js';
 import { t } from './i18n.js';
 import { extractZip, bundleZip } from './zip.js';
+import { getCortexOwnerToken } from './cortex.js';   // sign-in gate in requireSignInThen (runtime-only call, no import cycle)
 
 // Injected once at bootstrap by main.js (main-local fns + the live allApps getter).
 let generateId, readFileAsText, renderApps, getMainApps;
