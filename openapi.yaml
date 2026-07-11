@@ -7567,6 +7567,41 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/admin/ledger:
+    get:
+      operationId: adminLedger
+      summary: Operator-only node-wide agent LLM ledger aggregate (per-user + per-agent)
+      description: >
+        Operator-only. Aggregates the agent LLM usage ledger (LEDGER / TARGET-016) across every
+        owner over a date range: node-wide totals, a per-day series (summed across users), per-user
+        "top spenders", per-agent, and per-model breakdowns — backing the admin dashboard usage view.
+        Distinct from `/v1/admin/ai-usage` (node-brokered AIMEAT.ai.complete spend): this counts
+        agents' own external LLM calls reported via telemetry. Do not sum the two. Response `data`:
+        `{ from, to, totals, days, per_user, per_agent, per_model }`.
+      tags: [Stats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Inclusive start date (YYYY-MM-DD, UTC). Defaults to 30 days ago.
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Inclusive end date (YYYY-MM-DD, UTC). Defaults to today.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/librarian/search:
     get:
       operationId: librarianSearch
