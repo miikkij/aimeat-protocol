@@ -138,11 +138,14 @@ export default function AppsTab({ session, showToast, onStats }) {
     } catch { setMyApps([]); setAllApps([]); }
   }
 
-  async function handleUpload(file, screenshot, accessCode) {
+  async function handleUpload(file, description, screenshot, accessCode) {
     if (!file) { showToast(t('profile.apps.selectFile'), true); return; }
+    // A description is required for a NEW app (server enforces it, apps.ts); guard here so the user
+    // gets a clear inline prompt instead of a raw 400.
+    if (!description || !description.trim()) { showToast(t('profile.apps.descriptionRequired'), true); return; }
     const readFile = (f) => new Promise(res => { const r = new FileReader(); r.onload = () => res(/** @type {string} */ (r.result).split(',')[1]); r.readAsDataURL(f); });
     const contentBase64 = await readFile(file);
-    const opts = {};
+    const opts = { description: description.trim() };
     if (accessCode) opts.accessCode = accessCode;
     if (screenshot) {
       opts.screenshotBase64 = await readFile(screenshot);
@@ -347,13 +350,15 @@ function AppUploadForm({ onUpload, onCancel }) {
   const fileRef = useRef(null);
   const ssRef = useRef(null);
   const [code, setCode] = useState('');
+  const [desc, setDesc] = useState('');
   return html`
     <div class="create-form">
       <div class="form-row"><label>${t('profile.apps.fileLabel')}</label><input type="file" ref=${fileRef} class="input-field" accept=".html,.htm" /></div>
+      <div class="form-row"><label>${t('profile.apps.descriptionLabel')}</label><textarea class="input-field" rows="2" placeholder=${t('profile.apps.descriptionPlaceholder')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea></div>
       <div class="form-row"><label>${t('profile.apps.screenshotLabel')}</label><input type="file" ref=${ssRef} class="input-field" accept="image/*" /></div>
       <div class="form-row"><label>${t('profile.apps.accessCodeLabel')}</label><input class="input-field" placeholder=${t('profile.apps.accessCodePlaceholder')} value=${code} onInput=${e => setCode(e.target.value)} /></div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => onUpload(fileRef.current?.files?.[0], ssRef.current?.files?.[0], code)}>${t('profile.apps.uploadSaveBtn')}</button>
+        <button class="btn-primary" onClick=${() => onUpload(fileRef.current?.files?.[0], desc, ssRef.current?.files?.[0], code)}>${t('profile.apps.uploadSaveBtn')}</button>
         <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
       </div>
     </div>`;
