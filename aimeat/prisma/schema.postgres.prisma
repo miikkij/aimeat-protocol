@@ -77,14 +77,21 @@ model Memory {
   flagCount  Int      @default(0)
   allowedOrigins String[]
   groupId    String?
+  // Workspace-scoped visibility tier: "<org>/<ws>" whose members may read this record when
+  // visibility === 'workspace'. Gated by the shared authorizeRead()/canReadWorkspace() core.
+  workspaceRef String?
   // Flattened searchable text (key + string leaves of value + tags), maintained on every write.
-  // A MongoDB `$text` index on this field is created at startup (see MongoStorage.init) — Tier-1
-  // librarian full-text search. SQLite indexes the value directly via FTS5, so this field is
-  // MongoDB/Postgres-only. See docs/internal/design-organism-notebook-and-librarian.md §4.
+  // Tier-1 librarian full-text search queries this with a per-token `contains` (substring/regex)
+  // scan — there is NO MongoDB `$text` index on it (none is created at startup). SQLite indexes the
+  // value directly via FTS5, so this field is MongoDB/Postgres-only. A real `$text` (or Atlas
+  // Search) index is a possible future scalability upgrade. See design-organism-notebook-and-librarian.md §4.
   searchBlob String?
-  // Opt-in version tracking: previous value archived to MemoryVersion on overwrite. Default false.
+  // Opt-in version tracking: when true, the previous value is archived to MemoryVersion on overwrite
+  // (latest stays here, history queried on demand). Default false → no change for existing keys.
   trackable  Boolean  @default(false)
-  // Organism archive — read-only soft-archive flag (excluded from bulk reads/search by default).
+  // Organism archive — read-only soft-archive flag. Archived rows are excluded from the bulk read/
+  // search primitives by default (drop out of AI materials) yet stay resolvable by key. archivedRoot
+  // records WHICH container's archival flagged the row, so unarchiving it restores only its cascade.
   archived     Boolean @default(false)
   archivedAt   DateTime?
   archivedBy   String?
@@ -98,7 +105,8 @@ model Memory {
   @@index([archivedRoot])
 }
 
-// Archived prior versions of TRACKABLE memory keys. Append-only; latest value lives in Memory.
+// Archived prior versions of TRACKABLE memory keys. Append-only; the latest value always lives in
+// Memory. Keeps the Memory collection light while history is queried on demand (organism timeline).
 model MemoryVersion {
   id         String   @id @default(cuid())
   ownerGaii  String
@@ -273,6 +281,9 @@ model StorageFile {
   tags       String[] @default([])
   federate   Boolean  @default(false)
   groupId    String?
+  // Workspace-scoped visibility tier (parity with Memory): "<org>/<ws>" whose members may read this
+  // file when visibility === 'workspace'. Gated by the shared authorizeRead()/canReadWorkspace() core.
+  workspaceRef String?
   createdAt  DateTime @default(now())
 
   @@unique([ownerGaii, key])
@@ -1011,7 +1022,7 @@ model AppDownload {
 }
 
 model AppFork {
-  id              String   @id @default(cuid())
+  id              String   @id
   sourceOwnerGaii String
   sourceOwnerName String
   sourceFilename  String
@@ -1561,6 +1572,53 @@ model AgentActivity {
 
   @@unique([agentGaii, date, hour, metric])
   @@index([agentGaii, date])
+}
+
+// ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+
+model AgentUsageEvent {
+  id               String  @id
+  ts               String
+  agentGaii        String
+  ownerGhii        String
+  runId            String?
+  model            String
+  provider         String
+  promptTokens     Int     @default(0)
+  completionTokens Int     @default(0)
+  costUsd          Float?
+  priceRef         String?
+  source           String
+  apiKeyScope      String  @default("own")
+  organismId       String?
+  workspaceId      String?
+  capabilityId     String?
+  consumerGhii     String?
+
+  @@index([ownerGhii, ts])
+  @@index([agentGaii, ts])
+  @@index([runId])
+}
+
+model AgentUsageDaily {
+  id               String @id @default(cuid())
+  date             String
+  agentGaii        String
+  ownerGhii        String
+  apiKeyScope      String @default("own")
+  model            String
+  provider         String
+  organismId       String @default("")
+  workspaceId      String @default("")
+  promptTokens     Int    @default(0)
+  completionTokens Int    @default(0)
+  costUsd          Float  @default(0)
+  calls            Int    @default(0)
+  unpricedCalls    Int    @default(0)
+
+  @@unique([date, agentGaii, ownerGhii, apiKeyScope, model, provider, organismId, workspaceId])
+  @@index([ownerGhii, date])
+  @@index([organismId, date])
 }
 
 model TelemetryEvent {

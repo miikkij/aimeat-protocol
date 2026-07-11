@@ -7347,6 +7347,192 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ledger/usage:
+    get:
+      operationId: ledgerUsage
+      summary: Agent LLM usage/cost aggregates (LEDGER / TARGET-016)
+      description: >
+        Scoped to the owner behind the session (owner session, the owner's agent, or an app-grant
+        token like AGENCY on the app origin), strictly cross-owner. Reads the daily usage rollup
+        (append-only usage events aggregated per day) and groups it by a chosen dimension. Backs the AGENCY FLEET
+        COST/USAGE tab. Cost is locked at record time with a `price_ref`; unpriced calls (no rate,
+        no provider-reported cost) are counted separately and never coerced to a $0 cost.
+        Response `data`: `{ from, to, group_by, agent, groups: [{ key, prompt_tokens,
+        completion_tokens, total_tokens, cost_usd, calls, unpriced_calls }], totals: {…same fields…} }`.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: agent
+          in: query
+          schema: { type: string }
+          description: Restrict to one agent GAII (e.g. `claude#alice@node`). Omit for all the owner's agents.
+        - name: from
+          in: query
+          schema: { type: string }
+          description: Inclusive start date (YYYY-MM-DD, UTC). Default 30 days ago.
+        - name: to
+          in: query
+          schema: { type: string }
+          description: Inclusive end date (YYYY-MM-DD, UTC). Default today.
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [day, agent, model, provider, organism, workspace, scope]
+            default: day
+          description: Dimension to group the aggregate rows by.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ledger/usage/runs:
+    get:
+      operationId: ledgerUsageRuns
+      summary: Agent LLM usage grouped by run (drill to a deliverable)
+      description: >
+        Scoped to the owner behind the session (owner/agent/app-grant). Reads raw usage events and groups them by `run_id`,
+        so a run's total token/cost cost can be traced to its deliverable (born_from chain).
+        Response `data`: `{ count, runs: [{ run_id, prompt_tokens, completion_tokens, total_tokens,
+        cost_usd, unpriced_calls, calls, models, first_ts, last_ts }] }`, newest run first.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: agent
+          in: query
+          schema: { type: string }
+          description: Restrict to one agent GAII.
+        - name: run_id
+          in: query
+          schema: { type: string }
+          description: Restrict to a single run/task id.
+        - name: from
+          in: query
+          schema: { type: string }
+          description: Inclusive start timestamp (ISO 8601).
+        - name: to
+          in: query
+          schema: { type: string }
+          description: Inclusive end timestamp (ISO 8601).
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+          description: Max raw events to scan (most recent first).
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ledger/usage/capabilities:
+    get:
+      operationId: ledgerUsageCapabilities
+      summary: Agent LLM usage grouped by capability (LEDGER / TARGET-018 double-entry)
+      description: >
+        Scoped to the owner behind the session (owner/agent/app-grant), producer-scoped. Groups usage events that carry a `capability_id`
+        by capability, so the owner sees — for each capability they provide — who invoked it
+        (consumers) and the real compute cost that sits alongside the morsel escrow. Response
+        `data`: `{ count, capabilities: [{ capability_id, cost_usd, total_tokens, calls,
+        unpriced_calls, producers: [agent_gaii…], consumers: [ghii…], last_ts }] }`.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: capability_id
+          in: query
+          schema: { type: string }
+          description: Restrict to one capability id.
+        - name: from
+          in: query
+          schema: { type: string }
+          description: Inclusive start timestamp (ISO 8601).
+        - name: to
+          in: query
+          schema: { type: string }
+          description: Inclusive end timestamp (ISO 8601).
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+          description: Max raw events to scan (most recent first).
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ledger/budget:
+    get:
+      operationId: ledgerBudget
+      summary: Owner LLM spend vs daily budget + per-agent breakdown (LEDGER / TARGET-017)
+      description: >
+        Scoped to the owner behind the session (owner/agent/app-grant). Computes the owner's actual LLM spend for a UTC day from the ledger daily
+        aggregates and compares it to `daily_budget_usd`, returning a status (`ok` / `warn` at
+        ≥80% / `over` at ≥100%, thresholds configurable via prefs) with the biggest consuming
+        agents. V1 reports only — it does not hard-stop runs at the limit. Response `data`:
+        `{ date, daily_budget_usd, spent_usd, remaining_usd, ratio, level, thresholds: { warn, over },
+        per_agent: [{ agent_gaii, cost_usd, calls }], top_consumers: [...] }`.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string }
+          description: UTC day (YYYY-MM-DD) to evaluate. Default today.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ledger/billing:
+    get:
+      operationId: ledgerBilling
+      summary: Owner monthly LLM billing rollup, self-host/hosted split (LEDGER / TARGET-019)
+      description: >
+        Owner-only. Rolls the caller's usage up to a calendar month, split by api_key_scope —
+        `own` (the owner's own key, NOT billed) vs `node` (the node's key, billable hosted usage) —
+        and broken down per model. The technical basis for hosted-subscription billing; meters
+        only, makes no pricing decision. `?format=csv` streams an invoice-attachable CSV; default
+        JSON `data`: `{ month, owner_ghii, totals, billable, self_host, by_model: [{ model, provider,
+        api_key_scope, cost_usd, prompt_tokens, completion_tokens, total_tokens, calls,
+        unpriced_calls }], margin_ratio, audit }`. Every figure is traceable to a per-event
+        `price_ref` via /v1/ledger/usage/runs.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema: { type: string }
+          description: Calendar month YYYY-MM (UTC). Default current month.
+        - name: format
+          in: query
+          schema: { type: string, enum: [json, csv], default: json }
+          description: Response format. `csv` returns an invoice-attachable attachment.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/admin/ai-usage:
     get:
       operationId: adminAiUsage
@@ -16373,6 +16559,72 @@ paths:
                             $ref: '#/components/schemas/WorkspaceGraphNode'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/workspace/dangling-refs:
+    get:
+      operationId: scanWorkspaceDanglingRefs
+      summary: Referential-integrity scan (dangling reference detection)
+      description: |
+        Read-only scan that flags reference fields — `must_read`, `refs`, `born_from.docs` (arrays)
+        and `parent_id`, `target_id`, `card_id`, `release_id` (scalars) — plus document prose mentions
+        that point to an id which is missing (`dangling`) or only archived (`archived`) in the SAME
+        workspace. It surfaces findings only; it NEVER blocks a write (the anomaly-watch / flag-don't-gate
+        pattern). Optional `?ws=<id>` limits the scan to one workspace; otherwise every registered
+        workspace the caller can read. Same membership + manifest read gate as
+        `GET /v1/organisms/{id}/workspace`.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: ws
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 'Limit the scan to a single workspace id (default: every readable workspace)'
+      responses:
+        '200':
+          description: The dangling-reference findings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          findings:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                ws: { type: string }
+                                wsName: { type: string }
+                                space: { type: string, description: 'objectType (space) holding the source record' }
+                                namespace: { type: string }
+                                instance: { type: string, description: "the source record's instance id" }
+                                title: { type: string }
+                                field: { type: string, description: 'field/path that carried the ref (e.g. must_read, born_from.docs, markdown)' }
+                                kind: { type: string, enum: [ref, mention], description: 'structured pointer vs prose mention' }
+                                refId: { type: string, description: 'the referenced id that failed to resolve' }
+                                state: { type: string, enum: [dangling, archived] }
+                          total: { type: integer }
+                          scannedWorkspaces:
+                            type: array
+                            items: { type: string }
+                          truncated: { type: boolean }
         '403':
           description: Not an active member of this organism
         '404':

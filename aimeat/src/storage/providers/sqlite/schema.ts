@@ -1600,6 +1600,55 @@ export function initializeSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_telemetry_agent_created ON telemetry_events(agentGaii, createdAt);
 
+    -- ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+    -- Append-only per-call events = source of truth (billing audit, TARGET-019).
+    -- costUsd/priceRef are nullable: a missing price stays null (never coerced to 0).
+    -- Context cols (organism/workspace/capability) ship in the schema from v1 but are
+    -- filled only once TARGET-018 wires context through the run — no later migration.
+    CREATE TABLE IF NOT EXISTS agent_usage_event (
+      id               TEXT PRIMARY KEY,
+      ts               TEXT NOT NULL,
+      agentGaii        TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      runId            TEXT,
+      model            TEXT NOT NULL,
+      provider         TEXT NOT NULL,
+      promptTokens     INTEGER NOT NULL DEFAULT 0,
+      completionTokens INTEGER NOT NULL DEFAULT 0,
+      costUsd          REAL,
+      priceRef         TEXT,
+      source           TEXT NOT NULL,
+      apiKeyScope      TEXT NOT NULL DEFAULT 'own',
+      organismId       TEXT,
+      workspaceId      TEXT,
+      capabilityId     TEXT,
+      consumerGhii     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_event_owner ON agent_usage_event(ownerGhii, ts);
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_event_agent ON agent_usage_event(agentGaii, ts);
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_event_run ON agent_usage_event(runId);
+
+    -- Daily rollup, upsert-incremented. Context dims default to '' (not NULL) so the
+    -- composite PK stays NULL-free for ON CONFLICT upsert. UI reads this, not raw events.
+    CREATE TABLE IF NOT EXISTS agent_usage_daily (
+      date             TEXT NOT NULL,
+      agentGaii        TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      apiKeyScope      TEXT NOT NULL DEFAULT 'own',
+      model            TEXT NOT NULL,
+      provider         TEXT NOT NULL,
+      organismId       TEXT NOT NULL DEFAULT '',
+      workspaceId      TEXT NOT NULL DEFAULT '',
+      promptTokens     INTEGER NOT NULL DEFAULT 0,
+      completionTokens INTEGER NOT NULL DEFAULT 0,
+      costUsd          REAL NOT NULL DEFAULT 0,
+      calls            INTEGER NOT NULL DEFAULT 0,
+      unpricedCalls    INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, agentGaii, ownerGhii, apiKeyScope, model, provider, organismId, workspaceId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_daily_owner ON agent_usage_daily(ownerGhii, date);
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_daily_org ON agent_usage_daily(organismId, date);
+
     -- ── Webhook Delivery Log (Phase A push layer) ──
     CREATE TABLE IF NOT EXISTS webhook_delivery_log (
       id TEXT PRIMARY KEY,

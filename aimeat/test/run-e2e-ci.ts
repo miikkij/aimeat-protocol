@@ -159,6 +159,7 @@ const ALL_SUITES = [
     'test/e2e-integration-kit.ts',
     'test/e2e-inbox-cursor.ts',
     'test/e2e-agent-telemetry.ts',
+    'test/e2e-ledger.ts',
     'test/e2e-agent-webhook.ts',
     'test/e2e-agent-skill-bundle.ts',
     'test/e2e-skills.ts',

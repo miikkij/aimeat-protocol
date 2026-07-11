@@ -66,6 +66,7 @@ import type {
   AgentDirectivesRecord, OwnerAgentDefaults,
   SharingGroupRecord,
   AgentActivityRecord,
+  AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter,
   AgentMessageRecord,
   DirectMessageRecord,
   ContactConsentRecord,
@@ -85,6 +86,7 @@ import * as agentTaskRepo from './repos/agent-task.js';
 import * as sharingGroupRepo from './repos/sharing-group.js';
 import * as agentDirectivesRepo from './repos/agent-directives.js';
 import * as agentActivityRepo from './repos/agent-activity.js';
+import * as agentUsageRepo from './repos/agent-usage.js';
 import * as agentMessageRepo from './repos/agent-message.js';
 import * as directMessageRepo from './repos/direct-message.js';
 import * as ecosystemAppRepo from './repos/ecosystem-app.js';
@@ -6774,6 +6776,26 @@ export class SqliteStorage implements Storage {
 
   async getActivityHistory(agentGaii: string, opts?: { days?: number; granularity?: 'daily' | 'hourly' }): Promise<AgentActivityRecord[]> {
     return agentActivityRepo.getActivityHistory(this.db, agentGaii, opts);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
+  // ══════════════════════════════════════════════════════════
+
+  async appendUsageEvent(event: AgentUsageEvent): Promise<void> {
+    return agentUsageRepo.appendUsageEvent(this.db, event);
+  }
+
+  async incrementUsageDaily(delta: AgentUsageDailyRecord): Promise<void> {
+    return agentUsageRepo.incrementUsageDaily(this.db, delta);
+  }
+
+  async queryUsageDaily(filter: UsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
+    return agentUsageRepo.queryUsageDaily(this.db, filter);
+  }
+
+  async listUsageEvents(filter: UsageEventFilter): Promise<AgentUsageEvent[]> {
+    return agentUsageRepo.listUsageEvents(this.db, filter);
   }
 
   // ══════════════════════════════════════════════════════════

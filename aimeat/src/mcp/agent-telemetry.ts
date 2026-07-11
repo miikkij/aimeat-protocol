@@ -15,6 +15,8 @@
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 -- 2026-06-21 -- Route through the in-memory telemetry buffer (no per-call DB
  *                            write); also feed activity counters like the REST path.
+ *   v1.4.0 -- 2026-07-11 -- LEDGER (TARGET-016): an llm_call carrying a model also records a
+ *                            priced, append-only usage event via services/usage-metering.js.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -22,14 +24,16 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
+import { recordUsageEvent, extractUsageFields } from '../services/usage-metering.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
 export function registerAgentTelemetryTools(
     mcp: McpServer,
     storage: Storage,
-    _config: AimeatConfig,
+    config: AimeatConfig,
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
@@ -64,6 +68,27 @@ export function registerAgentTelemetryTools(
         // now shows up in the Activity tab consistently with the REST path.
         pushTelemetry(event);
         recordTelemetryActivity(agentGaii, { type, data: data ?? {} });
+
+        // LEDGER (TARGET-016): an llm_call carrying a model becomes a priced, append-only
+        // usage event. Backward compatible; a ledger failure never fails the report.
+        if (type === 'llm_call') {
+            const fields = extractUsageFields(data ?? {});
+            if (fields) {
+                try {
+                    await recordUsageEvent(storage, {
+                        ...fields,
+                        agentGaii,
+                        ownerGhii: `${agent.owner}@${config.nodeId}`,
+                        runId: fields.runId ?? task_id,
+                        source: 'telemetry',
+                    });
+                } catch (err) {
+                    logger.warn('ledger: usage event write failed (telemetry accepted)', {
+                        agentGaii, error: String(err),
+                    });
+                }
+            }
+        }
 
         return { content: [{ type: 'text' as const, text: JSON.stringify({ id: event.id }, null, 2) }] };
     });
