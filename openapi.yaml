@@ -20390,6 +20390,50 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/skills/{name}/zip:
+    get:
+      operationId: downloadSkillZip
+      summary: Download a skill as an upload-ready ZIP
+      description: >-
+        The skill's directory ({name}/SKILL.md plus scripts/, references/, assets/) as a ZIP —
+        the layout claude.ai's skill upload expects, and unzip-ready for ~/.claude/skills
+        (Claude Code / Desktop). Same addressing as the resolve route; the name segment may
+        carry an @semver pin. Response headers X-Skill-Ref and X-Skill-Version echo what was
+        packed.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [node, user, workspace]
+        - name: owner
+          in: query
+          schema:
+            type: string
+        - name: organism
+          in: query
+          schema:
+            type: string
+        - name: ws
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: application/zip attachment
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/apps/{owner}/{filename}/skills:
     get:
       operationId: getAppBoundSkills

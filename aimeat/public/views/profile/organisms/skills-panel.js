@@ -135,6 +135,14 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
                   <span class="pf-skl-name">${skill.name}</span>
                   <span class="pf-skl-version">v${skill.version}</span>
                   <span class="pf-skl-actions">
+                    <button class="btn-ghost btn-sm" title=${t('skills.zipHint') || ''} onClick=${async () => {
+                      try {
+                        await skillsService.downloadSkillZip(skill.name, { scope: 'workspace', organism: orgId, ws: wsId });
+                        showToast(t('skills.zipDownloaded') || 'Skill ZIP downloaded');
+                      } catch (err) {
+                        showToast((t('skills.zipFailed') || 'Download failed') + ': ' + err.message, true);
+                      }
+                    }}>${t('skills.zipBtn') || '⤓ .zip'}</button>
                     <button class="btn-ghost btn-sm" onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}</button>
                     <button class="btn-ghost btn-sm" onClick=${() => handleToggleView(skill)}>
                       ${expanded === skill.ref ? (t('skills.hide') || 'Hide') : (t('skills.view') || 'View')}

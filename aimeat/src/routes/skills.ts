@@ -17,9 +17,12 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.1.0 -- 2026-07-06 -- GET /v1/skills/:name/zip — upload-ready skill ZIP ({name}/SKILL.md …)
+ *     for claude.ai skill uploads and manual installs into ~/.claude/skills; supports @semver pins.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry REST surface (node + user scopes).
  */
 import { Router, type Response } from 'express';
+import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -194,6 +197,68 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         }
       }
       sendSkillError(res, lastErr);
+    } catch (err) {
+      sendSkillError(res, err);
+    }
+  });
+
+  /* ── GET /v1/skills/:name/zip — download a skill as a ZIP (dir layout: {name}/SKILL.md …).
+   *    The ZIP is upload-ready for claude.ai's skill upload and for manual installs into
+   *    ~/.claude/skills. Same addressing as the resolve route; the :name segment may carry
+   *    an @semver pin ({name}@1.0.2 → the retained snapshot). ── */
+  router.get('/v1/skills/:name/zip', requireAuth(), async (req, res) => {
+    try {
+      const nameParam = req.params.name as string;
+      const accessor = accessorOf(req);
+      const scopeQ = req.query.scope as string | undefined;
+      const ownerQ = (req.query.owner as string | undefined) ?? accessor.ownerName ?? undefined;
+
+      const refs: string[] = [];
+      if (scopeQ === 'node') refs.push(`node:${nameParam}`);
+      else if (scopeQ === 'user') refs.push(`user:${ownerQ}/${nameParam}`);
+      else if (scopeQ === 'workspace') {
+        const org = req.query.organism as string | undefined;
+        const wsId = req.query.ws as string | undefined;
+        if (!org || !wsId) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'workspace scope requires organism and ws query params'));
+          return;
+        }
+        refs.push(`ws:${org}/${wsId}/${nameParam}`);
+      } else {
+        if (ownerQ) refs.push(`user:${ownerQ}/${nameParam}`);
+        refs.push(`node:${nameParam}`);
+      }
+
+      let skill = null;
+      let lastErr: unknown = new SkillAccessError('NOT_FOUND', `Skill not found: ${nameParam}`);
+      for (const ref of refs) {
+        try { skill = await resolveSkillRef(storage, config, ref, accessor); break; }
+        catch (err) { lastErr = err; }
+      }
+      if (!skill) { sendSkillError(res, lastErr); return; }
+
+      const bareName = skill.name;   // pin stripped — the wrapper dir must equal the skill name
+      const archive = new ZipArchive({ zlib: { level: 6 } });
+      const chunks: Buffer[] = [];
+      archive.on('data', (c: Buffer) => chunks.push(c));
+      archive.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        res.set({
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="${bareName}.zip"`,
+          'Content-Length': String(buffer.length),
+          'X-Skill-Ref': skill!.ref,
+          'X-Skill-Version': skill!.version,
+        });
+        res.send(buffer);
+      });
+      archive.on('error', (err: Error) => {
+        res.status(500).json(error(config.nodeId, 'ZIP_ERROR', `Failed to build skill ZIP: ${err.message}`));
+      });
+      for (const [path, content] of Object.entries(skill.fileContents)) {
+        archive.append(content, { name: `${bareName}/${path}` });
+      }
+      await archive.finalize();
     } catch (err) {
       sendSkillError(res, err);
     }

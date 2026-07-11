@@ -687,6 +687,30 @@ if (subcommand === 'config') {
     if (connectExitDelayMs > 0) await new Promise(resolve => setTimeout(resolve, connectExitDelayMs));
     process.exit(process.exitCode ?? 0);
   }
+} else if (subcommand === 'skill') {
+  // `aimeat skill install <ref>` — fetch a registry skill and materialize it as a local
+  // Anthropic agent skill (~/.claude/skills by default; --project / --dir override).
+  const skillAction = positionals[1];
+  const skillFlags: Record<string, string> = {};
+  const skillRawArgs = process.argv.slice(2);
+  for (let i = 0; i < skillRawArgs.length; i++) {
+    if (skillRawArgs[i].startsWith('--')) {
+      if (skillRawArgs[i + 1] && !skillRawArgs[i + 1].startsWith('--')) {
+        skillFlags[skillRawArgs[i].slice(2)] = skillRawArgs[++i];
+      } else {
+        skillFlags[skillRawArgs[i].slice(2)] = 'true';
+      }
+    }
+  }
+  if (skillAction === 'install') {
+    const { runSkillInstall } = await import('./cli/skill-install.js');
+    await runSkillInstall(positionals[2], skillFlags);
+  } else {
+    console.log('Usage: aimeat skill install <ref> [--dir <path>] [--project] [--agent <name>] [--node <url> [--token <jwt>]]');
+    console.log('  Installs a skills-registry skill as a local Claude agent skill (default: ~/.claude/skills).');
+    if (skillAction && skillAction !== 'help') process.exitCode = 1;
+  }
+  process.exit(process.exitCode ?? 0);
 } else if (subcommand === 'seed') {
   const baseUrl = `http://localhost:${config.port}`;
   const adminPw = config.adminPassword ?? '';

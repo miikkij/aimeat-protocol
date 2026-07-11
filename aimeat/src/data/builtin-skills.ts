@@ -249,6 +249,48 @@ the profile Apps tab. The app catalog shows bound skills on the app's detail pag
 `,
   },
   {
+    name: 'install-skills-locally',
+    skillMd: `---
+name: install-skills-locally
+description: How to install an AIMEAT registry skill into Claude Code, Claude Desktop/Cowork, or claude.ai — and how to check for updates. Use when the owner asks to "install" a skill from the node, or wants a registry skill available without the AIMEAT connector.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Install AIMEAT skills locally
+
+AIMEAT's SKILL.md contract IS the Anthropic agent-skill format, so installing = writing the
+skill's files where that Claude reads skills from. (With the AIMEAT connector attached you
+often need NO install: \`aimeat_skill_get\` loads expertise on demand. Install when the skill
+should work without the connector, or auto-trigger via Claude's native skill discovery.)
+
+## Claude Code / Claude Desktop Cowork (filesystem available)
+1. \`aimeat_skill_get\` with the ref (pin it: \`user:{owner}/{name}@{version}\` for stability).
+2. Write each file of \`fileContents\` under:
+   - personal (all projects): \`~/.claude/skills/{name}/\`
+   - project-scoped: \`{repo}/.claude/skills/{name}/\`
+3. Stamp provenance INTO the SKILL.md frontmatter metadata so updates are checkable:
+   \`aimeat_ref: {ref}@{version}\` and \`aimeat_node: {node url}\`.
+4. CLI alternative (no MCP needed): \`aimeat skill install {ref} [--dir <path>] [--project]\`.
+
+## claude.ai / Claude Desktop chat (no filesystem)
+- Zero-install: keep using \`aimeat_skill_get\` through the connector.
+- Real install: download \`GET /v1/skills/{name}/zip\` (the profile/workspace Skills tabs have
+  a ⤓ .zip button) and upload it in claude.ai Settings → Skills — the ZIP is already in the
+  expected \`{name}/SKILL.md\` layout.
+
+## Checking for updates
+1. Read the local SKILL.md's \`metadata.aimeat_ref\` (e.g. \`node:manage-my-agents@1.0.0\`).
+2. \`aimeat_skill_get\` with \`manifest_only: true\` on the UNPINNED ref — compare \`version\`.
+3. Newer? Re-fetch and overwrite the local directory (remove files not in the new index).
+
+## Principles
+- Always stamp provenance — an unstamped local skill cannot be updated or traced.
+- Prefer pinned installs for anything production-critical; latest for personal convenience.
+`,
+  },
+  {
     name: 'diagnose-a-workflow',
     skillMd: `---
 name: diagnose-a-workflow

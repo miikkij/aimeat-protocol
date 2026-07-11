@@ -124,6 +124,15 @@ export default function SkillsTab({ showToast }) {
     }
   };
 
+  const handleDownload = async (skill) => {
+    try {
+      await skillsService.downloadSkillZip(skill.name, { scope: skill.scope, owner: skill.owner ?? undefined, organism: skill.org, ws: skill.ws });
+      showToast(t('skills.zipDownloaded'));
+    } catch (err) {
+      showToast(t('skills.zipFailed') + ': ' + err.message, true);
+    }
+  };
+
   const renderRow = (skill, { editable }) => html`
     <div key=${skill.ref} class="pf-skl-row">
       <div class="pf-skl-row-main">
@@ -132,6 +141,7 @@ export default function SkillsTab({ showToast }) {
         <${VisibilityPill} visibility=${skill.visibility} />
         <span class="pf-skl-files">${skill.files?.length ?? 1} ${t('skills.filesLabel')}</span>
         <span class="pf-skl-actions">
+          <button class="btn-ghost btn-sm" title=${t('skills.zipHint')} onClick=${() => handleDownload(skill)}>${t('skills.zipBtn')}</button>
           <button class="btn-ghost btn-sm" onClick=${() => handleToggleView(skill)}>
             ${expanded === skill.ref ? t('skills.hide') : t('skills.view')}
           </button>
