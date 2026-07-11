@@ -2851,7 +2851,24 @@
       "detail.loadingVersions": "Loading versions…",
       "detail.noVersions": "No published versions yet.",
       "detail.skills": "Skills for this app",
-      "detail.noSkills": "No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.",
+      "detail.noSkills": "No skills bound to this app yet. A skill teaches agents how to use the app — attach one below.",
+      "detail.skillAttach": "Attach skill",
+      "detail.skillAttachConfirm": "Attach",
+      "detail.skillNoneToAttach": "No unbound skills — create one in your profile Skills tab first.",
+      "detail.skillAttaching": "Attaching…",
+      "detail.skillAttached": "Skill attached to this app.",
+      "detail.skillDetached": "Skill detached.",
+      "detail.skillDetach": "Detach",
+      "detail.skillAttachError": "Failed to attach skill",
+      "detail.editAccess": "Access code",
+      "detail.accessCodeHint": "Set or remove an optional code required to open this app.",
+      "detail.accessCodeLabel": "Access code",
+      "detail.accessCodePh": "Leave empty for public / removes protection",
+      "detail.accessCodeRemoveHint": "Enter a 4–64 character code to protect this app, or leave it empty and Save to make it public again.",
+      "detail.accessCodeLen": "Access code must be 4–64 characters.",
+      "detail.savingAccess": "Saving…",
+      "detail.accessCodeSet": "Access code set — this app now requires the code.",
+      "detail.accessCodeCleared": "Access code removed — this app is public again.",
       "detail.needServerVersions": "Set the AIMEAT server URL in Settings to see published versions.",
       "detail.editAi": "✨ Edit with AI",
       "detail.editAiHint": "Describe a change. The AI rewrites the app using your own OpenRouter key, saves a draft you can test, then keep or discard.",
@@ -3199,7 +3216,24 @@
       "detail.loadingVersions": "Ladataan versioita…",
       "detail.noVersions": "Ei vielä julkaistuja versioita.",
       "detail.skills": "Sovelluksen taidot",
-      "detail.noSkills": "Tähän sovellukseen ei ole vielä sidottu taitoja. Taito opettaa agenteille sovelluksen käytön — sido taito profiilin Sovellukset-välilehdeltä.",
+      "detail.noSkills": "Tähän sovellukseen ei ole vielä sidottu taitoja. Taito opettaa agenteille sovelluksen käytön — liitä taito alta.",
+      "detail.skillAttach": "Liitä taito",
+      "detail.skillAttachConfirm": "Liitä",
+      "detail.skillNoneToAttach": "Ei vapaita taitoja — luo taito ensin profiilin Taidot-välilehdellä.",
+      "detail.skillAttaching": "Liitetään…",
+      "detail.skillAttached": "Taito liitetty tähän sovellukseen.",
+      "detail.skillDetached": "Taito irrotettu.",
+      "detail.skillDetach": "Irrota",
+      "detail.skillAttachError": "Taidon liittäminen epäonnistui",
+      "detail.editAccess": "Pääsykoodi",
+      "detail.accessCodeHint": "Aseta tai poista valinnainen koodi, joka vaaditaan sovelluksen avaamiseen.",
+      "detail.accessCodeLabel": "Pääsykoodi",
+      "detail.accessCodePh": "Jätä tyhjäksi julkiseksi / poistaa suojauksen",
+      "detail.accessCodeRemoveHint": "Anna 4–64 merkin koodi suojataksesi sovelluksen, tai jätä tyhjäksi ja tallenna tehdäksesi siitä taas julkisen.",
+      "detail.accessCodeLen": "Pääsykoodin on oltava 4–64 merkkiä.",
+      "detail.savingAccess": "Tallennetaan…",
+      "detail.accessCodeSet": "Pääsykoodi asetettu — sovellus vaatii nyt koodin.",
+      "detail.accessCodeCleared": "Pääsykoodi poistettu — sovellus on taas julkinen.",
       "detail.needServerVersions": "Aseta AIMEAT-palvelimen osoite asetuksissa nähdäksesi julkaistut versiot.",
       "detail.editAi": "✨ Muokkaa tekoälyllä",
       "detail.editAiHint": "Kuvaile muutos. Tekoäly kirjoittaa sovelluksen uudelleen omalla OpenRouter-avaimellasi, tallentaa luonnoksen jota voit testata, ja sitten säilytät tai hylkäät sen.",
@@ -3828,6 +3862,11 @@
   var detailSkillsHtml = null;
   var detailEditingAbout = false;
   var detailEditAboutOnOpen = false;
+  var detailEditingAccessCode = false;
+  var detailSkillPickerOpen = false;
+  var detailMySkills = null;
+  var detailBoundSkills = [];
+  var detailSkillBusy = false;
   function detailGetApp() {
     for (var i = 0; i < getMainApps().length; i++) {
       if (getMainApps()[i].id === detailAppId) return getMainApps()[i];
@@ -3844,6 +3883,9 @@
     }
     if (sess && (!stored || stored === "anonymous" || stored === sess)) return sess;
     return stored;
+  }
+  function detailIsOwnPublished(app) {
+    return !!(app && app.published && app.publishedFilename && getServerState()[app.publishedFilename] && currentOwnerName());
   }
   function blobToHtml(blob) {
     try {
@@ -3864,10 +3906,12 @@
     var ownerArg2 = jsArg(svrState.owner || "");
     var p = svrState.protection || {};
     var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
+    var acLabel = (svrState.accessCode ? "🔒 " : "") + t("detail.editAccess");
+    var acEditor = detailEditingAccessCode ? '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="detail-ac-input">' + t("detail.accessCodeLabel") + '</label><input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t("detail.accessCodePh")) + '" style="margin:4px 0 6px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("detail.accessCodeRemoveHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAccessCodeSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAccessCodeCancel()") + '</div><div class="dtl-ai-status" id="detail-ac-status"></div></div>' : "";
+    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(acLabel, "window._launcher.detailAccessCodeEdit()", { title: t("detail.accessCodeHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
     dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
     // everyone else, so only show this to operators.
-    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div></div>";
+    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div>" + acEditor + "</div>";
   }
   function refreshServerMgmt() {
     var c = document.getElementById("detail-server-mgmt");
@@ -3879,6 +3923,10 @@
     detailVersionsHtml = null;
     detailSkillsHtml = null;
     detailEditingAbout = false;
+    detailEditingAccessCode = false;
+    detailSkillPickerOpen = false;
+    detailMySkills = null;
+    detailBoundSkills = [];
     var app = detailGetApp();
     if (!app) return;
     document.getElementById("detail-view").hidden = false;
@@ -4048,7 +4096,10 @@
     var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
     var skillsHtml = "";
     if (app.published) {
-      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div></div>";
+      var ownPub = detailIsOwnPublished(app);
+      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div>" + // Own published app → offer attach/detach (a skill teaches agents this app). The detach ×
+      // on each user-scope skill is rendered by detailLoadSkills into the list above.
+      (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
     }
     document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
   }
@@ -4069,6 +4120,10 @@
     }).then(function(json) {
       var listEl = document.getElementById("detail-skills-list");
       var skills = json.data && json.data.skills ? json.data.skills : [];
+      detailBoundSkills = skills.map(function(s2) {
+        return s2.ref;
+      });
+      var ownPub = detailIsOwnPublished(detailGetApp());
       if (skills.length === 0) {
         detailSkillsHtml = noneHtml;
         if (listEl) listEl.innerHTML = detailSkillsHtml;
@@ -4077,14 +4132,236 @@
       var out = "";
       for (var i = 0; i < skills.length; i++) {
         var s = skills[i];
-        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + '</span><div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
+        var detach = ownPub && s.scope === "user" ? ' <button class="rename-pencil" title="' + escapeHtml(t("detail.skillDetach")) + `" onclick="window._launcher.detailSkillDetach('` + jsArg(s.name) + `')">×</button>` : "";
+        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + "</span>" + detach + '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
       }
       detailSkillsHtml = out;
       if (listEl) listEl.innerHTML = detailSkillsHtml;
     }).catch(function() {
+      detailBoundSkills = [];
       detailSkillsHtml = noneHtml;
       var listEl = document.getElementById("detail-skills-list");
       if (listEl) listEl.innerHTML = detailSkillsHtml;
+    });
+  }
+  function detailAccessCodeEdit() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    detailEditingAccessCode = true;
+    refreshServerMgmt();
+    var el = document.getElementById("detail-ac-input");
+    if (el) el.focus();
+  }
+  function detailAccessCodeCancel() {
+    detailEditingAccessCode = false;
+    refreshServerMgmt();
+  }
+  function detailAccessCodeSave() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
+      return;
+    }
+    var input = document.getElementById("detail-ac-input");
+    var statusEl = document.getElementById("detail-ac-status");
+    var code = input ? input.value.trim() : "";
+    if (code && (code.length < 4 || code.length > 64)) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.accessCodeLen");
+      }
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    var filename = app.publishedFilename;
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.savingAccess");
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(code ? { access_code: code } : { access_code: null })
+    }).then(function(resp) {
+      return resp.json().then(function(j) {
+        return { ok: resp.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok && res.j && res.j.ok !== false) {
+        var st = getServerState()[filename];
+        if (st) st.accessCode = !!code;
+        detailEditingAccessCode = false;
+        loadPublishedApps();
+        refreshServerMgmt();
+        showNotice(code ? t("detail.accessCodeSet") : t("detail.accessCodeCleared"));
+      } else {
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + (res.j && res.j.error && res.j.error.message || "Failed");
+        }
+      }
+    }).catch(function(err) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err.message || "Error");
+      }
+    });
+  }
+  function detailSkillAttachInner() {
+    var toggleBtn = dtlBtn("+ " + t("detail.skillAttach"), "window._launcher.detailSkillAttachToggle()");
+    if (!detailSkillPickerOpen) return toggleBtn;
+    var picker;
+    if (detailMySkills === null) {
+      picker = '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+    } else if (detailMySkills.length === 0) {
+      picker = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.skillNoneToAttach") + "</span>";
+    } else {
+      var opts = "";
+      for (var i = 0; i < detailMySkills.length; i++) {
+        var s = detailMySkills[i];
+        var desc = (s.description || "").slice(0, 50);
+        opts += '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + (desc ? " — " + escapeHtml(desc) : "") + "</option>";
+      }
+      picker = '<select id="detail-skill-select" class="modal-input" style="max-width:340px;margin:0">' + opts + "</select>" + dtlBtn(t("detail.skillAttachConfirm"), "window._launcher.detailSkillAttach()", { variant: "primary", disabled: detailSkillBusy });
+    }
+    return '<div class="dtl-btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">' + toggleBtn + picker + '</div><div class="dtl-ai-status" id="detail-skill-status"></div>';
+  }
+  function refreshSkillAttach() {
+    var c = document.getElementById("detail-skill-attach");
+    if (c) c.innerHTML = detailSkillAttachInner();
+  }
+  function detailSkillAttachToggle() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    detailSkillPickerOpen = !detailSkillPickerOpen;
+    if (detailSkillPickerOpen && detailMySkills === null) {
+      refreshSkillAttach();
+      skillListMine().then(function(mine) {
+        var bound = {};
+        for (var i = 0; i < detailBoundSkills.length; i++) bound[detailBoundSkills[i]] = true;
+        detailMySkills = mine.filter(function(s) {
+          return !bound[s.ref];
+        });
+        refreshSkillAttach();
+      }).catch(function() {
+        detailMySkills = [];
+        refreshSkillAttach();
+      });
+    } else {
+      refreshSkillAttach();
+    }
+  }
+  function detailSkillAttach() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    var sel = document.getElementById("detail-skill-select");
+    var name = sel ? sel.value : "";
+    if (!name || detailSkillBusy) return;
+    var statusEl = document.getElementById("detail-skill-status");
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    var binding = "app:" + owner + "/" + filename;
+    detailSkillBusy = true;
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.skillAttaching");
+    }
+    skillSetBinding(name, binding).then(function() {
+      detailSkillBusy = false;
+      detailSkillPickerOpen = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t("detail.skillAttached"));
+    }).catch(function(err) {
+      detailSkillBusy = false;
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.skillAttachError") + ": " + (err.message || err);
+      }
+    });
+  }
+  function detailSkillDetach(name) {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app) || detailSkillBusy) return;
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    detailSkillBusy = true;
+    skillSetBinding(name, null).then(function() {
+      detailSkillBusy = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t("detail.skillDetached"));
+    }).catch(function(err) {
+      detailSkillBusy = false;
+      showNotice(t("detail.skillAttachError") + ": " + (err.message || err));
+    });
+  }
+  function skillApiBase() {
+    var cfg = loadConfig();
+    return cfg.aimeatUrl ? cfg.aimeatUrl.replace(/\/+$/, "") : "";
+  }
+  function skillAuthHeaders(withJson) {
+    var h = {};
+    var tok = getCortexOwnerToken();
+    if (tok) h["Authorization"] = "Bearer " + tok;
+    if (withJson) h["Content-Type"] = "application/json";
+    return h;
+  }
+  function skillListMine() {
+    var base = skillApiBase();
+    if (!base) return Promise.reject(new Error("No server configured"));
+    return fetch(base + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      return j.data && j.data.skills ? j.data.skills : [];
+    });
+  }
+  function skillGetMine(name) {
+    var base = skillApiBase();
+    return fetch(base + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      return j.data && j.data.skill || null;
+    });
+  }
+  function skillPublish(skillMd, files) {
+    var base = skillApiBase();
+    var body = { skill_md: skillMd };
+    if (files && Object.keys(files).length) body.files = files;
+    return fetch(base + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
+        return j.data && j.data.skill || null;
+      });
+    });
+  }
+  function skillSetBinding(name, binding) {
+    return skillGetMine(name).then(function(skill) {
+      if (!skill) throw new Error("Skill not found: " + name);
+      var md = skill.fileContents && skill.fileContents["SKILL.md"] || "";
+      var m = md.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/);
+      if (!m) throw new Error("SKILL.md has no frontmatter");
+      var fm = m[2];
+      var hasBindingLine = /^\s{2,}binding:.*$/m.test(fm);
+      var hasMetadata = /^metadata:\s*$/m.test(fm);
+      if (binding) {
+        if (hasBindingLine) fm = fm.replace(/^(\s{2,})binding:.*$/m, "$1binding: " + binding);
+        else if (hasMetadata) fm = fm.replace(/^metadata:\s*$/m, "metadata:\n  binding: " + binding);
+        else fm = fm + "\nmetadata:\n  binding: " + binding;
+      } else {
+        fm = fm.replace(/^\s{2,}binding:.*\r?\n?/m, "");
+        if (/^metadata:\s*$/m.test(fm) && !/^metadata:\s*\r?\n\s{2,}\S/m.test(fm)) {
+          fm = fm.replace(/^metadata:\s*\r?\n?/m, "");
+        }
+      }
+      var files = Object.assign({}, skill.fileContents);
+      delete files["SKILL.md"];
+      return skillPublish(m[1] + fm + m[3] + m[4], files);
     });
   }
   function detailAboutEdit() {
@@ -7278,7 +7555,10 @@
           forks: sa.forks || 0,
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
-          protection: prot
+          protection: prot,
+          // `protected` is the ACCESS-CODE flag (distinct from copy-`protection`); the detail view's
+          // access-code editor reads it to show whether the app currently requires a code.
+          accessCode: !!sa.protected
         };
         ownAppProtection[fn] = prot;
       }
@@ -7742,6 +8022,12 @@
     detailAboutCancel,
     detailAboutSave,
     detailToggleFavorite,
+    detailAccessCodeEdit,
+    detailAccessCodeCancel,
+    detailAccessCodeSave,
+    detailSkillAttachToggle,
+    detailSkillAttach,
+    detailSkillDetach,
     editAppDetails,
     showSubdomainModal,
     openConsents,

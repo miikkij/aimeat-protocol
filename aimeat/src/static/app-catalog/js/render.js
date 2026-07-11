@@ -258,7 +258,10 @@ function buildLibraryEntries(localApps, serverApps) {
     if (fn) {
       serverStateByFilename[fn] = {
         parked: !!sa.parked, forkable: !!sa.forkable, forks: sa.forks || 0,
-        owner: sa.owner || '', versionNumber: sa.version_number || null, protection: prot
+        owner: sa.owner || '', versionNumber: sa.version_number || null, protection: prot,
+        // `protected` is the ACCESS-CODE flag (distinct from copy-`protection`); the detail view's
+        // access-code editor reads it to show whether the app currently requires a code.
+        accessCode: !!sa.protected
       };
       ownAppProtection[fn] = prot;
     }
