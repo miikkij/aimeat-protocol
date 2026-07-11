@@ -297,16 +297,7 @@ SSR-removal history (6 files / ~9,000 lines removed 2026-03-03, static-HTML URL 
 
 ## Common Pitfalls
 
-- **Express 5 params:** `req.params.foo` is `string | string[]` — cast `as string`.
-- **Route ordering:** static routes (`/v1/memory/search`) before parameterized (`/v1/memory/:key`).
-- **Ed25519 sync hash (@noble/ed25519 v3.1+):** for sync ops set `ed.hashes.sha512 = (m) => ...` via `node:crypto`. `ed.etc.sha512Sync`/`concatBytes` were removed and `ed.etc` is frozen. Production uses async (`signAsync`/`verifyAsync`) and needs no hook; only test harnesses set the sync hook.
-- **MultiDiGraph:** if two nodes can have multiple edges, use `MultiDiGraph`, not `DiGraph`.
-- **First owner is operator** automatically.
-- **BUILD_ID cache busting:** public JS changes need a `pnpm dev` restart.
-- **`buildComponentPrompt()` is async** — all call sites must `await` it.
-- **Platform UI APIs:** Tabs uses `onChange` (not `onSelect`); DataTable has no `onRowClick`; Input/Select return `{el, getValue()}`.
-- **app-catalog is a modular esbuild build** (`src/static/app-catalog/js/*.js` → generated `app-catalog.html`): a function CALLED but not imported from its owning module is **not a build error** — esbuild treats the unknown name as a global → runtime `ReferenceError` only (bit us: `apps-io.js` called `getCortexOwnerToken` without importing it from `cortex.js`; `+ → Add app` threw). After editing any module: run a missing-import audit (a "name called here, exported by another module, but not imported/injected/local" static scan — excluding `window._launcher.X(...)` onclick strings + comments) AND click every interactive path in the browser. Edit the SOURCES, then rebuild (`pnpm build:app-catalog`); never edit `app-catalog.html` directly.
-- **Two app-upload UIs — keep BOTH in sync with the route:** the app-catalog publish modal (`src/static/app-catalog/js/server-io.js`) AND the Profile SPA form (`public/views/profile/apps-tab.js` + `public/js/services/apps.js`). When `POST /v1/apps` (or any route) gains a **required** field (e.g. `description`, since apps.ts v1.7.0), update EVERY client form or it 400s silently. Rule of thumb: adding a backend `required` field → grep for **all** forms/services that POST there, not just the one you're looking at.
+The catalogue of traps we've hit — organised by the KIND of problem (build/bundling, routing, frontend↔backend drift, identity/auth, storage, i18n, extensions/cortex, AI calls, crypto, organisms, deploy, concurrency, Windows tooling) — lives in **[`docs/pitfalls.md`](docs/pitfalls.md)**. Read it when something breaks in a way that feels like it "should work"; add an entry when a bug turns out to be a *repeatable* trap, not a one-off.
 
 ### Generator pipeline notes
 
