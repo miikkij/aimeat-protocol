@@ -1872,11 +1872,24 @@
           "directives": "Directives",
           "agent_config": "Agent Config",
           "activity": "Activity",
+          "usage": "Usage",
           "services": "Services",
           "quality": "Quality"
         },
         "changes": {
           "title": "New since you last looked"
+        },
+        "usage": {
+          "cost": "Cost (30d)",
+          "tokens": "Tokens (30d)",
+          "calls": "LLM calls",
+          "byModel": "By model",
+          "recentRuns": "Recent runs",
+          "unpriced": "unpriced",
+          "tokensLc": "tokens",
+          "callsLc": "calls",
+          "empty": "No metered LLM usage recorded yet. Usage appears here once this agent makes LLM calls that report tokens (image-only work may show none).",
+          "help": "Per-LLM-call usage from the node ledger. Cost is priced node-side from the model table; image and other non-token models may show 0 tokens."
         },
         "quality": {
           "performanceTitle": "Performance",
