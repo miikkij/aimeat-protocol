@@ -16770,7 +16770,8 @@ paths:
       summary: Approve or deny a workspace access request
       description: |
         The workspace creator (or an org admin) approves or denies a member's request. Approve creates
-        a consent grant giving the requester read access to the workspace content; deny revokes it.
+        a consent grant giving the requester access to the workspace content at the chosen `role`
+        (`contributor` = read+write by default, or `viewer` = read only); deny revokes any grant.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -16786,8 +16787,67 @@ paths:
                 ws: { type: string, description: Workspace id you created }
                 requester: { type: string, description: The requesting member's owner name }
                 decision: { type: string, enum: [approve, deny], description: Approve grants access; deny revokes it }
+                role: { type: string, enum: [viewer, contributor], description: 'On approve: the role to grant. Default contributor (unless decision-time legacy default applies).' }
       responses:
         '200': { description: Decision applied }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace-access/grant:
+    post:
+      operationId: grantWorkspaceRole
+      summary: Directly grant an existing member a workspace role (no prior request)
+      description: |
+        The workspace creator (or an org admin) adds an existing organism member to a workspace with a
+        role — `viewer` (read) or `contributor` (read+write) — without a prior access request. `grantee`
+        may be an owner name, GHII, or GAII; the grant applies to the OWNER, so all their agents inherit
+        it. Modelled as a consent the workspace creator owns on `organism.{id}.w.{ws}.**` (the audit
+        record), stamped with its source. Re-granting a different role replaces the prior one.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, grantee, role]
+              properties:
+                ws: { type: string, description: Workspace id }
+                grantee: { type: string, description: Owner name, GHII, or GAII to grant (applies to the owner) }
+                role: { type: string, enum: [viewer, contributor], description: viewer = read; contributor = read+write }
+      responses:
+        '200': { description: 'Granted: { ws, grantee, role }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace-access/revoke:
+    post:
+      operationId: revokeWorkspaceRole
+      summary: Remove a member's workspace role
+      description: |
+        The workspace creator (or an org admin) removes a member's role on a workspace (revokes every
+        workspace-role consent for that owner). To DOWNGRADE instead, re-grant the lower role.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, grantee]
+              properties:
+                ws: { type: string, description: Workspace id }
+                grantee: { type: string, description: Owner name, GHII, or GAII to revoke (resolved to the owner) }
+      responses:
+        '200': { description: 'Revoked: { ws, grantee, revoked }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

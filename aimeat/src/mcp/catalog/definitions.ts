@@ -1380,7 +1380,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_access',
-        description: "Manage access to a gated workspace, via `action`: 'request' = ask the creator for access to a workspace you can see but not read (org membership lets you DISCOVER workspaces; a workspace's CONTENT is gated by its creator); 'list' = (creator/admin) see who has requested and whether they are pending/approved; 'decide' = (creator/admin) approve (grant a read consent) or deny a request. Member-only; list/decide are creator-or-admin.",
+        description: "REQUEST/REVIEW flow for a gated workspace, via `action`: 'request' = ask the creator for access to a workspace you can see but not read (org membership lets you DISCOVER workspaces; a workspace's CONTENT is gated by its creator); 'list' = (creator/admin) see who has requested (pending/approved) plus current members + roles; 'decide' = (creator/admin) approve or deny a request (approve grants 'contributor' by default; pass role='viewer' for read-only). Member-only; list/decide are creator-or-admin. To add a member PROACTIVELY (no prior request), or to add to MANY workspaces at once, use aimeat_workspace_member_grant.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1390,6 +1390,42 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             message: { type: 'string', description: "action='request': optional note to the creator." },
             requester: { type: 'string', description: "action='decide': the requester's owner name (from action='list')." },
             decision: { type: 'string', description: "action='decide': 'approve' (default) or 'deny'." },
+            role: { type: 'string', description: "action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor, unless decision='viewer')." },
+        },
+    },
+    {
+        name: 'aimeat_workspace_member_grant',
+        description: "Directly grant an EXISTING organism member a workspace role — no prior access request needed. Grant to ONE workspace (`ws`) or MANY at once (`workspaces`: e.g. every workspace from aimeat_workspace_list), so 'add this member to all workspaces' is one call. `grantee` may be an owner name, GHII (owner@node), or GAII (agent#owner@node) — the grant applies to the OWNER, so all their agents inherit it. role: 'viewer' (read) | 'contributor' (read+write). Authorized for the workspace creator or an org admin. Per-workspace result: granted / skipped_creator / forbidden_or_not_found. Each grant is auditable (a creator-owned consent stamped with its source).",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', description: 'A single workspace id (use this and/or `workspaces`).' },
+            workspaces: { type: 'array', description: 'Many workspace ids to grant in one call.' },
+            grantee: { type: 'string', required: true, description: 'Owner name, GHII, or GAII to grant. Applies to the owner (agents inherit).' },
+            role: { type: 'string', required: true, description: "'viewer' (read) or 'contributor' (read+write)." },
+        },
+    },
+    {
+        name: 'aimeat_workspace_member_revoke',
+        description: "Remove a member's workspace role on ONE workspace (`ws`) or MANY (`workspaces`). `grantee` may be an owner name, GHII, or GAII (resolved to the owner). To DOWNGRADE (e.g. contributor → viewer) rather than remove, call aimeat_workspace_member_grant with the lower role instead. Authorized for the workspace creator or an org admin. Per-workspace result: revoked / not_a_member / forbidden_or_not_found.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', description: 'A single workspace id (use this and/or `workspaces`).' },
+            workspaces: { type: 'array', description: 'Many workspace ids to revoke in one call.' },
+            grantee: { type: 'string', required: true, description: 'Owner name, GHII, or GAII to revoke.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_members',
+        description: "List a workspace's members with their role ('viewer' | 'contributor'), the grant's source (grant | request | invite), who granted it, and when. Authorized for the workspace creator or an org admin. For the organism-wide roster (all members + org roles) use aimeat_organism_members instead.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
         },
     },
     {

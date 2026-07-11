@@ -46,8 +46,13 @@ manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactiva
 You also create + provision organism **workspaces** on this surface: \`aimeat_organism_create\` (the
 container) · \`aimeat_workspace_create\` (manifest + locked schemas) · \`aimeat_workspace_update\` (evolve
 the structure — add/remove a space, set the publish gate) · \`aimeat_workspace_read\`/\`_list\`/\`_write\`/
-\`_publish\`/\`_object_delete\` · \`aimeat_workspace_access\` (manage **viewer**/**contributor** roles) ·
-\`aimeat_workspace_transfer\` (export/import).
+\`_publish\`/\`_object_delete\` · \`aimeat_workspace_access\` (request/list/**decide** — approve a request as
+**viewer**/**contributor**) · \`aimeat_workspace_member_grant\` (add an EXISTING member **directly** — no
+request — to ONE or MANY workspaces at once as viewer/contributor; grantee may be an owner name, GHII or
+GAII, applied to the owner so all their agents inherit) · \`aimeat_workspace_member_revoke\` (remove; to
+downgrade, re-grant the lower role) · \`aimeat_workspace_members\` (roles + grant source per workspace) ·
+\`aimeat_workspace_transfer\` (export/import). Grant/revoke are creator-or-org-admin; each is an auditable
+creator-owned consent.
 
 **Building a workspace-PROCESSING agent (one that reads requests + writes results)?** It owns a
 **contract**: the spaces it READS (inputs) + WRITES (outputs) + the status lifecycle. Attaching it =

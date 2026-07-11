@@ -12,8 +12,13 @@
  *   agent to leave the draft for human review (it does not create the approval here).
  * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL)
  *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document / _delete / _create
+ *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.15.0 -- 2026-07-11 -- TARGET-028: aimeat_workspace_member_grant/_revoke/_members (proactively add
+ *     an existing GHII/GAII member to one or MANY workspaces as viewer|contributor, with revoke/downgrade
+ *     and a members listing that shows role + grant source); _access decide gains an explicit `role`.
+ *     Role logic now delegates to services/workspace-roles.ts (shared with the REST routes — unified IAM).
  *   v (2026-07-07) -- TARGET-009 S1: _publish takes expected_version (optimistic lock) and runs
  *     the write guards via validateMemoryWrite ctx; _object_delete refuses append-only records.
  *   v1.0.0 -- 2026-06-08 -- Initial: 5 workspace tools wrapping the manifest/draft/publish convention.
@@ -89,6 +94,7 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, granteeOwner, type WsRole } from '../services/workspace-roles.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -224,23 +230,21 @@ export function registerWorkspaceTools(
         const now = new Date().toISOString();
         await storage.createConsent({ id: randomUUID(), ownerGaii: owner, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
     };
-    // ── Workspace member roles (mirrors the REST routes): viewer = read, contributor = read+write,
-    //    as a consent the workspace CREATOR owns on organism.{id}.w.{ws}.**. See the routes for the model. ──
-    const WS_ROLE_PURPOSES = ['workspace-viewer', 'workspace-contributor', 'workspace-access'];
-    const setWsRole = async (creatorGhii: string, orgId: string, ws: string, granteeOwner: string, role: 'viewer' | 'contributor'): Promise<void> => {
-        const recipient = `ghii:${granteeOwner}@${config.nodeId}`;
-        const pattern = `organism.${orgId}.w.${ws}.**`;
-        const now = new Date().toISOString();
-        const prior = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
-        for (const g of prior) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
-        await storage.createConsent({ id: randomUUID(), ownerGaii: creatorGhii, dataPattern: pattern, recipient, purpose: role === 'contributor' ? 'workspace-contributor' : 'workspace-viewer', scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
-    };
-    const revokeWsRole = async (creatorGhii: string, orgId: string, ws: string, granteeOwner: string): Promise<void> => {
-        const recipient = `ghii:${granteeOwner}@${config.nodeId}`;
-        const pattern = `organism.${orgId}.w.${ws}.**`;
-        const now = new Date().toISOString();
-        const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
-        for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
+    // ── Workspace member roles: viewer = read, contributor = read+write, as a consent the workspace
+    //    CREATOR owns on organism.{id}.w.{ws}.**. Delegates to the ONE shared service so the MCP tools,
+    //    the REST routes, and the invite-accept path share a single authority path (no ad-hoc fork). ──
+    const setWsRole = (creatorGhii: string, orgId: string, ws: string, grantee: string, role: WsRole, source: 'grant' | 'request', grantedBy: string) =>
+        grantWorkspaceRole(storage, config, { creatorGhii, orgId, ws, grantee, role, source, grantedBy });
+    const revokeWsRole = (creatorGhii: string, orgId: string, ws: string, grantee: string) =>
+        revokeWsRoleSvc(storage, config, { creatorGhii, orgId, ws, grantee });
+    /** Whether the caller may MANAGE access to a workspace (its creator, or an org admin/creator).
+     *  Returns the workspace CREATOR's owner name (grants are owned by the creator), or null if denied. */
+    const wsManager = async (orgId: string, ws: string): Promise<{ createdBy: string } | null> => {
+        const entry = await findWsEntry(orgId, ws);
+        if (!entry) return null;
+        const role = await roleOf(orgId);
+        if (entry.createdBy === ownerName || role === 'creator' || role === 'admin') return { createdBy: entry.createdBy };
+        return null;
     };
 
     // ── aimeat_workspace_list ──
@@ -653,17 +657,18 @@ export function registerWorkspaceTools(
     mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
         {
             organism_id: z.string(), ws: z.string(),
-            action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests · 'decide' = (creator/admin) approve/deny one"),
+            action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests + members · 'decide' = (creator/admin) approve/deny one"),
             message: z.string().optional().describe("action='request': a note to the creator"),
             requester: z.string().optional().describe("action='decide': the requester's owner name"),
             decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
+            role: z.enum(['viewer', 'contributor']).optional().describe("action='decide' approve: the role to grant — 'viewer' (read) or 'contributor' (read+write). Omit to keep the current default (contributor, unless decision='viewer')."),
         },
         annotationsFor('aimeat_workspace_access'),
-        async ({ organism_id, ws, action, message, requester, decision }): Promise<TextResult> => {
+        async ({ organism_id, ws, action, message, requester, decision, role }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const entry = await findWsEntry(organism_id, ws);
             if (!entry) return fail('Workspace not found');
-            const isManager = async () => { const role = await roleOf(organism_id); return entry.createdBy === ownerName || role === 'creator' || role === 'admin'; };
+            const isManager = async () => { const r = await roleOf(organism_id); return entry.createdBy === ownerName || r === 'creator' || r === 'admin'; };
 
             if (action === 'request') {
                 if (entry.createdBy === ownerName) return fail('You created this workspace.');
@@ -675,20 +680,14 @@ export function registerWorkspaceTools(
             if (action === 'list') {
                 if (!(await isManager())) return fail('Only the workspace creator or an org admin can see access requests.');
                 const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-                const roleByOwner = new Map<string, 'viewer' | 'contributor'>();
-                for (const c of await storage.listConsents(creatorGhii, { status: 'active' })) {
-                    if (c.dataPattern !== `organism.${organism_id}.w.${ws}.**` || !WS_ROLE_PURPOSES.includes(c.purpose)) continue;
-                    const o = c.recipient.replace(/^ghii:/, '').split('@')[0];
-                    if (c.purpose === 'workspace-contributor') roleByOwner.set(o, 'contributor');
-                    else if (!roleByOwner.has(o)) roleByOwner.set(o, 'viewer');
-                }
+                const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
                 const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
                 const requests = items.map(r => {
                     const v = r.value as { requester?: string; message?: string; createdAt?: string };
                     const req = v.requester ?? bareOwner(r.ownerGaii);
-                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: roleByOwner.has(req) ? 'approved' : 'pending', role: roleByOwner.get(req) ?? null };
+                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: roles.has(req) ? 'approved' : 'pending', role: roles.get(req)?.role ?? null };
                 });
-                const members = [...roleByOwner.entries()].map(([owner, role]) => ({ owner, role }));
+                const members = [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null }));
                 return ok({ ws, requests, members });
             }
             if (action === 'decide') {
@@ -701,12 +700,93 @@ export function registerWorkspaceTools(
                     emitChange('organisms');
                     return ok({ status: 'denied', ws, requester });
                 }
-                const role = decision === 'viewer' ? 'viewer' : 'contributor';   // approve|contributor → contributor
-                await setWsRole(creatorGhii, organism_id, ws, requester, role);
+                // Explicit `role` wins; else preserve the historical default (contributor unless decision='viewer').
+                const granted: WsRole = role ?? (decision === 'viewer' ? 'viewer' : 'contributor');
+                await setWsRole(creatorGhii, organism_id, ws, requester, granted, 'request', ownerName);
                 emitChange('organisms');
-                return ok({ status: 'approved', ws, requester, role });
+                return ok({ status: 'approved', ws, requester, role: granted });
             }
             return fail("action must be 'request', 'list' or 'decide'.");
+        });
+
+    /** Normalize a single `ws` and/or a `workspaces` array into a de-duplicated list (order preserved). */
+    const wsList = (ws?: string, workspaces?: string[]): string[] => {
+        const out: string[] = [];
+        for (const w of [...(ws ? [ws] : []), ...(Array.isArray(workspaces) ? workspaces : [])]) {
+            const t = String(w ?? '').trim();
+            if (t && !out.includes(t)) out.push(t);
+        }
+        return out;
+    };
+
+    // ── aimeat_workspace_member_grant ── (proactively add an existing member; no prior request needed)
+    mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
+        {
+            organism_id: z.string(),
+            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
+            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to grant in one call — e.g. every workspace in the organism (from aimeat_workspace_list).'),
+            grantee: z.string().describe('The member to grant: an owner name, GHII (owner@node), or GAII (agent#owner@node). The grant applies to the OWNER, so all their agents inherit it.'),
+            role: z.enum(['viewer', 'contributor']).describe("'viewer' = read only · 'contributor' = read + write."),
+        },
+        annotationsFor('aimeat_workspace_member_grant'),
+        async ({ organism_id, ws, workspaces, grantee, role }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const targets = wsList(ws, workspaces);
+            if (!targets.length) return fail('Provide `ws` and/or `workspaces` — at least one workspace id.');
+            const owner = granteeOwner(grantee);
+            const results: Array<{ ws: string; status: string; role?: WsRole }> = [];
+            for (const w of targets) {
+                const mgr = await wsManager(organism_id, w);
+                if (!mgr) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
+                if (owner === mgr.createdBy) { results.push({ ws: w, status: 'skipped_creator' }); continue; }
+                await setWsRole(`${mgr.createdBy}@${config.nodeId}`, organism_id, w, grantee, role, 'grant', ownerName);
+                results.push({ ws: w, status: 'granted', role });
+            }
+            emitChange('organisms');
+            const granted = results.filter(r => r.status === 'granted').length;
+            return ok({ grantee: owner, role, granted, total: targets.length, results });
+        });
+
+    // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
+    mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
+        {
+            organism_id: z.string(),
+            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
+            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to revoke in one call.'),
+            grantee: z.string().describe('The member to revoke: owner name, GHII, or GAII (resolved to the owner). To DOWNGRADE instead of removing, call aimeat_workspace_member_grant with the lower role.'),
+        },
+        annotationsFor('aimeat_workspace_member_revoke'),
+        async ({ organism_id, ws, workspaces, grantee }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const targets = wsList(ws, workspaces);
+            if (!targets.length) return fail('Provide `ws` and/or `workspaces` — at least one workspace id.');
+            const owner = granteeOwner(grantee);
+            const results: Array<{ ws: string; status: string; revoked?: number }> = [];
+            for (const w of targets) {
+                const mgr = await wsManager(organism_id, w);
+                if (!mgr) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
+                const revoked = await revokeWsRole(`${mgr.createdBy}@${config.nodeId}`, organism_id, w, grantee);
+                results.push({ ws: w, status: revoked > 0 ? 'revoked' : 'not_a_member', revoked });
+            }
+            emitChange('organisms');
+            const revoked = results.filter(r => r.status === 'revoked').length;
+            return ok({ grantee: owner, revoked, total: targets.length, results });
+        });
+
+    // ── aimeat_workspace_members ── (list a workspace's members with roles + grant provenance)
+    mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
+        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+        annotationsFor('aimeat_workspace_members'),
+        async ({ organism_id, ws }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const mgr = await wsManager(organism_id, ws);
+            if (!mgr) return fail('Workspace not found, or only the workspace creator or an org admin can list its members.');
+            const creatorGhii = `${mgr.createdBy}@${config.nodeId}`;
+            const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
+            const members = [...roles.values()].map(m => ({
+                owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null, granted_at: m.grantedAt ?? null,
+            }));
+            return ok({ ws, creator: mgr.createdBy, members });
         });
 
     // ── aimeat_workspace_export ──

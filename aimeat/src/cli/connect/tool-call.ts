@@ -1167,7 +1167,9 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             if (action === 'decide') {
                 const requester = optionalString(input, 'requester');
                 if (!requester) throw new Error("action='decide' needs a requester.");
-                return client.post(`${orgPath}/decision`, { ws, requester, decision: optionalString(input, 'decision') === 'deny' ? 'deny' : 'approve' });
+                const body: JsonObject = { ws, requester, decision: optionalString(input, 'decision') === 'deny' ? 'deny' : 'approve' };
+                const role = optionalString(input, 'role'); if (role === 'viewer' || role === 'contributor') body.role = role;
+                return client.post(`${orgPath}/decision`, body);
             }
             if (action === 'request') {
                 const body: JsonObject = { ws };
@@ -1175,6 +1177,56 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
                 return client.post(orgPath, body);
             }
             throw new Error("action must be 'request', 'list' or 'decide'.");
+        },
+    },
+    {
+        name: 'aimeat_workspace_member_grant',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const grantee = requiredString(input, 'grantee');
+            const role = requiredString(input, 'role');
+            if (role !== 'viewer' && role !== 'contributor') throw new Error("role must be 'viewer' or 'contributor'.");
+            const targets = [...new Set([
+                ...(optionalString(input, 'ws') ? [optionalString(input, 'ws') as string] : []),
+                ...(optionalArray(input, 'workspaces') ?? []).filter((w): w is string => typeof w === 'string' && w.trim() !== ''),
+            ])];
+            if (!targets.length) throw new Error('Provide `ws` and/or `workspaces`.');
+            const orgPath = `/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/grant`;
+            const results: Array<{ ws: string; status: string; role?: string }> = [];
+            for (const w of targets) {
+                const r = await client.post(orgPath, { ws: w, grantee, role });
+                results.push(r.ok === false ? { ws: w, status: 'forbidden_or_not_found' } : { ws: w, status: 'granted', role });
+            }
+            return { ok: true, data: { grantee, role, granted: results.filter(r => r.status === 'granted').length, total: targets.length, results } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_member_revoke',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const grantee = requiredString(input, 'grantee');
+            const targets = [...new Set([
+                ...(optionalString(input, 'ws') ? [optionalString(input, 'ws') as string] : []),
+                ...(optionalArray(input, 'workspaces') ?? []).filter((w): w is string => typeof w === 'string' && w.trim() !== ''),
+            ])];
+            if (!targets.length) throw new Error('Provide `ws` and/or `workspaces`.');
+            const orgPath = `/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/revoke`;
+            const results: Array<{ ws: string; status: string; revoked?: number }> = [];
+            for (const w of targets) {
+                const r = await client.post(orgPath, { ws: w, grantee });
+                if (r.ok === false) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
+                const n = Number((r.data as { revoked?: number } | undefined)?.revoked ?? 0);
+                results.push({ ws: w, status: n > 0 ? 'revoked' : 'not_a_member', revoked: n });
+            }
+            return { ok: true, data: { grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_members',
+        handler: ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const ws = requiredString(input, 'ws');
+            return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
         },
     },
     {

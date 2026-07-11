@@ -136,6 +136,7 @@ import { getOrganismReadme, setOrganismReadme } from '../services/organism-readm
 import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeInviteeName, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../services/invitations.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../services/workspace-roles.js';
 import { getActiveEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 
@@ -1852,39 +1853,17 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
    * Reads honor ANY grant (viewer/contributor + the legacy 'workspace-access'); writes honor contributor
    * (the write gate also accepts the legacy requester-owned 'workspace-contribution'). Members are an
    * OWNER (+ their agents): the recipient is `ghii:owner@node`, so all the owner's agents inherit. */
-  const WS_ROLE_PURPOSES = ['workspace-viewer', 'workspace-contributor', 'workspace-access'];
-  const wsPattern = (id: string, ws: string) => `organism.${id}.w.${ws}.**`;
-  const recipientOf = (grantee: string) => `ghii:${parseGaiiLoose(grantee).owner || grantee}@${config.nodeId}`;
-  /** Set a member's role: revoke any prior workspace-role consent for them, then grant the new one. */
-  const setWorkspaceRole = async (creatorGhii: string, id: string, ws: string, grantee: string, role: 'viewer' | 'contributor'): Promise<string> => {
-    const recipient = recipientOf(grantee);
-    const pattern = wsPattern(id, ws);
-    const now = new Date().toISOString();
-    const prior = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
-    for (const g of prior) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
-    await storage.createConsent({ id: uuidv4(), ownerGaii: creatorGhii, dataPattern: pattern, recipient, purpose: role === 'contributor' ? 'workspace-contributor' : 'workspace-viewer', scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
-    return recipient;
-  };
-  const revokeWorkspaceRole = async (creatorGhii: string, id: string, ws: string, grantee: string): Promise<number> => {
-    const recipient = recipientOf(grantee);
-    const pattern = wsPattern(id, ws);
-    const now = new Date().toISOString();
-    const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
-    for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
-    return grants.length;
-  };
-  /** Map the creator's active grants → each member's current role for a workspace. */
-  const memberRolesForWs = async (creatorGhii: string, id: string, ws: string): Promise<Map<string, 'viewer' | 'contributor'>> => {
-    const pattern = wsPattern(id, ws);
-    const byOwner = new Map<string, 'viewer' | 'contributor'>();
-    for (const c of await storage.listConsents(creatorGhii, { status: 'active' })) {
-      if (c.dataPattern !== pattern || !WS_ROLE_PURPOSES.includes(c.purpose)) continue;
-      const owner = c.recipient.replace(/^ghii:/, '').split('@')[0];
-      if (c.purpose === 'workspace-contributor') byOwner.set(owner, 'contributor');
-      else if (!byOwner.has(owner)) byOwner.set(owner, 'viewer');
-    }
-    return byOwner;
-  };
+  // Workspace member roles delegate to the ONE shared service (services/workspace-roles.ts) so the REST
+  // routes, the MCP tools, and the invitation-accept path share a single authority path (no parallel
+  // ad-hoc mechanism). These thin wrappers keep the route-local call sites terse.
+  /** Set a member's role, stamping provenance (source + grantedBy) for the members listing. */
+  const setWorkspaceRole = (creatorGhii: string, id: string, ws: string, grantee: string, role: WsRole, source: WsGrantSource, grantedBy: string) =>
+    grantWorkspaceRole(storage, config, { creatorGhii, orgId: id, ws, grantee, role, source, grantedBy });
+  const revokeWorkspaceRole = (creatorGhii: string, id: string, ws: string, grantee: string) =>
+    revokeWsRoleSvc(storage, config, { creatorGhii, orgId: id, ws, grantee });
+  /** Map the creator's active grants → each member's current role + provenance for a workspace. */
+  const memberRolesForWs = (creatorGhii: string, id: string, ws: string): Promise<Map<string, WsMemberRole>> =>
+    listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: id, ws });
 
   /* ══ Document-space public sharing (meta.share) ══
    * A workspace's document-space content can be shared read-only without login. The single source of
@@ -2172,9 +2151,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         const requests = items.map(r => {
           const v = r.value as { requester?: string; message?: string; createdAt?: string };
           const requester = v.requester ?? bareOwner(r.ownerGaii);
-          return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester) ?? null };
+          return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester)?.role ?? null };
         });
-        return { ws: w.id, name: w.name, requests, members: [...roles.entries()].map(([owner, r]) => ({ owner, role: r })) };
+        return { ws: w.id, name: w.name, requests, members: [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null })) };
       }));
       res.json(success(config.nodeId, { workspaces }));
       return;
@@ -2194,9 +2173,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const requests = items.map(r => {
       const v = r.value as { requester?: string; message?: string; createdAt?: string };
       const requester = v.requester ?? bareOwner(r.ownerGaii);
-      return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester) ?? null };
+      return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester)?.role ?? null };
     });
-    const members = [...roles.entries()].map(([owner, role]) => ({ owner, role }));
+    const members = [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null, granted_at: m.grantedAt ?? null }));
     res.json(success(config.nodeId, { ws, requests, members }));
   });
 
@@ -2226,7 +2205,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const wsCreatorGhii = `${createdBy}@${config.nodeId}`;
     if (decision === 'approve') {
       const role = (req.body?.role === 'viewer' ? 'viewer' : 'contributor') as 'viewer' | 'contributor';
-      await setWorkspaceRole(wsCreatorGhii, id, ws, requester, role);
+      await setWorkspaceRole(wsCreatorGhii, id, ws, requester, role, 'request', req.auth!.owner as string);
       await notify(storage, `${requester}@${config.nodeId}`, {
         type: 'workspace_access_approved',
         title: `Your access to "${entry.name ?? ws}" was approved (${role})`,
@@ -2274,14 +2253,14 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     const createdBy = await requireWsManager(req, res, id, ws);
     if (!createdBy) return;
-    const granteeOwner = parseGaiiLoose(grantee).owner || grantee;
-    if (granteeOwner === createdBy) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The creator already has full access to their workspace')); return; }
-    await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role);
-    await notify(storage, `${granteeOwner}@${config.nodeId}`, {
+    const granteeOwnerName = parseGaiiLoose(grantee).owner || grantee;
+    if (granteeOwnerName === createdBy) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The creator already has full access to their workspace')); return; }
+    await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role, 'grant', req.auth!.owner as string);
+    await notify(storage, `${granteeOwnerName}@${config.nodeId}`, {
       type: 'workspace_access_granted', title: `You were added to "${ws}" as ${role}`, link: '/v1/profile#organisms',
     });
     emitChange('notifications');
-    res.json(success(config.nodeId, { ws, grantee: granteeOwner, role }));
+    res.json(success(config.nodeId, { ws, grantee: granteeOwnerName, role }));
   });
 
   /* ── POST /v1/organisms/:id/workspace-access/revoke — creator/admin removes a member's access.
@@ -2455,7 +2434,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       if (!entry) continue;
       const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
       if (createdBy === uname) continue;
-      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, g.ws, uname, g.role);
+      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, g.ws, uname, g.role, 'invite', inviter);
       grantedWs.push(g.ws);
     }
 
@@ -2671,7 +2650,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       if (!entry) continue; // workspace deleted since the invite — skip
       const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
       if (createdBy === ownerName) continue; // creator already has full access to their workspace
-      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, inv.organismId, g.ws, ownerName, g.role);
+      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, inv.organismId, g.ws, ownerName, g.role, 'invite', inv.invitedBy);
       grantedWs.push(g.ws);
     }
 
