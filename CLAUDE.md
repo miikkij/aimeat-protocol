@@ -169,7 +169,7 @@ A bare **Owner** name (`alice`) is the account layer — appears in `req.auth!.s
 
 **MANDATORY:** Every route that stores/retrieves data by identity MUST use `resolveIdentity(req.auth!, config.nodeId)` from `src/utils/gaii.ts`, **not** raw `req.auth!.sub`. Owner sessions → bare name becomes GHII (`alice` → `alice@node-id`); agent sessions → `sub` returned as-is (already full GAII). Without it, owner data is stored under the bare `alice` and becomes invisible to list/search/update. Compare ownership against `resolve(req)`, never `req.auth!.sub`.
 
-**Morsels:** single balance on `GHIIRecord.morselBalance` (the human pays; `AgentRecord.morselBalance` is always 0). `debitBalance`/`creditBalance`/`transferBalance` resolve any GAII/GHII/bare-name → owner GHII internally.
+**Morsels:** one balance on `GHIIRecord.morselBalance` — the human pays, agent balance is always 0; `debit/credit/transferBalance` resolve any GAII/GHII/bare-name → owner GHII. (Aggregation + economy detail: the guide above.)
 
 **Agents are never created implicitly** — registration creates only the owner + GHII; agents connect later via device auth (RFC 8628) where the owner approves each and selects scopes.
 
@@ -191,11 +191,11 @@ Full guide: `docs/coding-guidelines/extension-memory-architecture.md`. Three nam
 
 **Trust principle:** the extension is sovereign (decides storage/format/return); cortex trusts the ext API; app trusts cortex. No layer bypasses the one below.
 
-**Common mistakes:** (1) callExt path is `/v1/ext/name/action`, NOT `/v1/extensions/name/actions/action`. (2) `session.fetch` returns parsed JSON — use `resp.data`, don't call `resp.json()`. (3) Cortex register API: `{ libs: { "file.js": code } }`, NOT `{ lib: {...} }`. (4) Cortex re-activate: deactivate first, then activate. (5) Flat translation keys: generator produces `"tab.search": "Haku"` — `t()` must check flat key before nested path.
+**Common mistakes** (callExt path, `session.fetch` returns parsed JSON, cortex register/re-activate shapes, flat translation keys): see [`docs/pitfalls.md`](docs/pitfalls.md) §8 (+ §5 for translation keys).
 
 ## MCP Presigned Upload (File Transfer)
 
-MCP tools accepting file content (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install`) support presigned upload: omit content params → tool returns an `upload_url`; the agent PUTs the raw file (App/Storage) or a ZIP with `manifest.yaml` + `scripts/`/`libs/` (Extension/Cortex). Token is single-use, 60-min TTL, size-capped. Inline content still works (backward-compatible). Full guide: `docs/coding-guidelines/mcp-uploads.md`
+File-accepting MCP tools (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install`) support presigned upload: omit the content param → the tool returns an `upload_url` → PUT the raw file (App/Storage) or a ZIP with `manifest.yaml` + `scripts/`/`libs/` (Extension/Cortex). Inline still works. Full guide (token TTL, size caps): `docs/coding-guidelines/mcp-uploads.md`
 
 ## Key Commands
 
