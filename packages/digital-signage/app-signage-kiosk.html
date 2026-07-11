@@ -1,0 +1,196 @@
+<!-- AIMEAT App Manifest
+name: Signage Kiosk
+version: 2.0.0
+description: Full-screen digital signage display — reads one public screen document, no login
+entry: index.html
+-->
+<!--
+  @file app-signage-kiosk.html
+  @description The KIOSK face of the agent-faced digital signage app (Template 3, documents edition).
+    A screen is ONE public workspace document (space "screen", doc id = human-readable slug). Its
+    body carries a JSON payload { config, views:[...] }. This page fetches that document over the
+    NO-AUTH public endpoint (GET /v1/organisms/:id/workspace/public/document) and rotates the views
+    full-screen. There is NO login and NO signage-specific backend: the editable source of truth is
+    the same document the admin app + any MCP agent write via aimeat_workspace_write + publish, marked
+    public via PUT /workspace/share. The TV only reads.
+  @structure boot() -> load(screen) -> render(payload) -> rotate(); polls for changes.
+  @usage  https://<node>/apps/signage-kiosk.html?org=<organismId>&ws=<wsId>&screen=<slug>
+          (hash form also works: #org=..&ws=..&screen=..)
+  @version-history
+    v2.0.0 — 2026-07-11 — Rewritten for the workspace-document model (was memory-key kiosk). Public
+      document read, client-side rotation, per-view active window + weight, emergency override.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signage</title>
+  <style>
+    :root { --bg: #101018; --fg: #f5f5fa; --accent: #1a1a2e; --dim: #8a8a9a; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .view { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; display: flex;
+      align-items: center; justify-content: center; }
+    .view.on { opacity: 1; }
+    .view img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .view iframe { width: 100%; height: 100%; border: 0; }
+    .view .html { width: 100%; height: 100%; overflow: hidden; }
+    #banner { position: fixed; left: 0; right: 0; bottom: 0; background: var(--accent);
+      padding: 1.2rem 2rem; font-size: 1.6rem; display: none; }
+    #banner.urgent { background: #8a5a10; }
+    #banner.emergency { background: #7a1515; display: block; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem; text-align: center; padding: 2rem; }
+    #status .muted { color: var(--dim); font-size: 1rem; max-width: 40rem; }
+    #clock { position: fixed; top: 1.2rem; right: 1.6rem; font-size: 1.4rem; color: var(--dim); }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="clock"></div>
+  <div id="banner"></div>
+  <div id="status">
+    <div style="font-size:2rem">Signage</div>
+    <div class="muted" id="status-msg">Loading…</div>
+  </div>
+  <script>
+    'use strict';
+
+    // ── config: which screen to show ──────────────────────────────────────
+    function params() {
+      const q = new URLSearchParams(location.search);
+      const h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+      const get = (k) => q.get(k) || h.get(k) || '';
+      return { org: get('org'), ws: get('ws'), screen: get('screen') };
+    }
+    const CFG = params();
+    const POLL_MS = 30000;   // re-fetch the screen document to pick up edits
+    const SPACE = 'screen';  // the document space name in the manifest
+
+    const $ = (id) => document.getElementById(id);
+    function showStatus(msg) { $('status').style.display = 'flex'; $('status-msg').textContent = msg; }
+    function hideStatus() { $('status').style.display = 'none'; }
+
+    // ── fetch the public screen document (NO AUTH) ────────────────────────
+    async function fetchScreen() {
+      const url = '/v1/organisms/' + encodeURIComponent(CFG.org) + '/workspace/public/document'
+        + '?ws=' + encodeURIComponent(CFG.ws) + '&type=' + encodeURIComponent(SPACE)
+        + '&id=' + encodeURIComponent(CFG.screen);
+      const r = await fetch(url, { headers: { accept: 'application/json' } });
+      if (!r.ok) throw new Error(r.status === 404 ? 'not-public' : ('http-' + r.status));
+      const body = await r.json();
+      const doc = body && body.data && body.data.document;
+      if (!doc) throw new Error('no-doc');
+      return parsePayload(doc.markdown || '');
+    }
+
+    // The screen document body is the JSON payload, optionally wrapped in a ```json fence.
+    function parsePayload(markdown) {
+      let text = markdown.trim();
+      const fence = /```json\s*([\s\S]*?)```/i.exec(text);
+      if (fence) text = fence[1].trim();
+      let data;
+      try { data = JSON.parse(text); } catch { return { config: {}, views: [] }; }
+      return { config: data.config || {}, views: Array.isArray(data.views) ? data.views : [],
+        announcement: data.announcement || null };
+    }
+
+    // ── render + rotate ───────────────────────────────────────────────────
+    let rotateTimer = null, clockTimer = null;
+
+    function activeViews(views) {
+      const now = Date.now();
+      const inWindow = (v) => (!v.activeFrom || Date.parse(v.activeFrom) <= now)
+        && (!v.activeUntil || Date.parse(v.activeUntil) >= now);
+      // weight = how many rotation slots a view gets (min 1).
+      const list = [];
+      for (const v of views.filter(inWindow)) {
+        const w = Math.max(1, Number(v.weight) || 1);
+        for (let i = 0; i < w; i++) list.push(v);
+      }
+      return list;
+    }
+
+    function makeView(v) {
+      const el = document.createElement('div');
+      el.className = 'view';
+      if (v.type === 'image') {
+        const img = document.createElement('img'); img.src = v.content || ''; img.alt = v.name || '';
+        el.appendChild(img);
+      } else if (v.type === 'url') {
+        const f = document.createElement('iframe'); f.src = v.content || '';
+        f.setAttribute('sandbox', 'allow-scripts allow-same-origin'); el.appendChild(f);
+      } else { // html
+        const box = document.createElement('div'); box.className = 'html'; box.innerHTML = v.content || '';
+        el.appendChild(box);
+      }
+      return el;
+    }
+
+    function render(payload) {
+      hideStatus();
+      const cfg = payload.config || {};
+      if (cfg.accentColor) document.documentElement.style.setProperty('--accent', cfg.accentColor);
+      if (cfg.theme === 'light') { document.documentElement.style.setProperty('--bg', '#f5f5fa');
+        document.documentElement.style.setProperty('--fg', '#101018'); }
+
+      // Emergency / priority banner from an optional announcement.
+      const banner = $('banner');
+      const a = payload.announcement;
+      if (a && a.body) { banner.textContent = a.body; banner.className = a.priority || 'normal';
+        banner.style.display = (a.priority === 'emergency' || a.priority === 'urgent') ? 'block' : 'none'; }
+      else { banner.style.display = 'none'; }
+
+      const stage = $('stage'); stage.innerHTML = '';
+      const views = activeViews(payload.views);
+      if (views.length === 0) { showStatus('No active views for this screen.'); return; }
+
+      const nodes = views.map(makeView);
+      nodes.forEach((n) => stage.appendChild(n));
+      let i = 0;
+      const interval = Math.max(3, Number(cfg.rotationIntervalSec) || 8) * 1000;
+      const step = () => {
+        nodes.forEach((n) => n.classList.remove('on'));
+        nodes[i % nodes.length].classList.add('on');
+        i++;
+      };
+      clearInterval(rotateTimer);
+      step();
+      if (cfg.rotationEnabled !== false && nodes.length > 1) rotateTimer = setInterval(step, interval);
+    }
+
+    function startClock() {
+      clearInterval(clockTimer);
+      const tick = () => { $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+      tick(); clockTimer = setInterval(tick, 15000);
+    }
+
+    // ── boot + poll ───────────────────────────────────────────────────────
+    async function load() {
+      try {
+        const payload = await fetchScreen();
+        render(payload);
+      } catch (e) {
+        const msg = e && e.message;
+        if (msg === 'not-public') showStatus('This screen is not published publicly yet. In the Signage admin, mark it public.');
+        else showStatus('Could not load the screen (' + (msg || 'error') + '). Check org / ws / screen.');
+      }
+    }
+
+    function boot() {
+      if (!CFG.org || !CFG.ws || !CFG.screen) {
+        showStatus('Missing screen address. Open the kiosk URL with ?org=<id>&ws=<ws>&screen=<slug> (copy it from the Signage admin).');
+        return;
+      }
+      startClock();
+      load();
+      setInterval(load, POLL_MS);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
