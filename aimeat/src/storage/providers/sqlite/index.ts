@@ -42,7 +42,7 @@ import type {
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
-  AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
+  AppRecord, AppDraftRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
   SubdomainSiteRecord,
   AppGrantRecord,
   NotificationTemplateRecord,
@@ -4888,6 +4888,46 @@ export class SqliteStorage implements Storage {
       if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
     }
     return record;
+  }
+
+  // ── App drafts (staging slot; one per owner+filename) ──
+
+  async saveAppDraft(record: AppDraftRecord): Promise<void> {
+    // Upsert: at most one draft per (ownerGaii, filename); a re-save overwrites it.
+    this.db.prepare(
+      `INSERT INTO app_drafts (ownerGaii, ownerName, filename, manifest, mimeType, size, data, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(ownerGaii, filename) DO UPDATE SET
+         ownerName = excluded.ownerName, manifest = excluded.manifest,
+         mimeType = excluded.mimeType, size = excluded.size,
+         data = excluded.data, updatedAt = excluded.updatedAt`
+    ).run(
+      record.ownerGaii, record.ownerName, record.filename,
+      JSON.stringify(record.manifest), record.mimeType, record.size,
+      record.data, record.updatedAt,
+    );
+  }
+
+  async getAppDraft(ownerGaii: string, filename: string): Promise<AppDraftRecord | null> {
+    const row = this.db.prepare('SELECT * FROM app_drafts WHERE ownerGaii = ? AND filename = ?')
+      .get(ownerGaii, filename) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      ownerGaii: row.ownerGaii as string,
+      ownerName: row.ownerName as string,
+      filename: row.filename as string,
+      manifest: JSON.parse((row.manifest as string) || '{}'),
+      mimeType: row.mimeType as string,
+      size: row.size as number,
+      data: row.data as Buffer,
+      updatedAt: row.updatedAt as string,
+    };
+  }
+
+  async deleteAppDraft(ownerGaii: string, filename: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM app_drafts WHERE ownerGaii = ? AND filename = ?')
+      .run(ownerGaii, filename);
+    return result.changes > 0;
   }
 
   // ── App Marketplace (purchase receipts) ──

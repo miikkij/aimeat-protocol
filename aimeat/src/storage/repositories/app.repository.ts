@@ -26,10 +26,21 @@
  *   v1.5.0 — 2026-06-26 — Add updateAppMeta() so an owner can rename an app (and
  *     edit its description) in place — without re-publishing or changing the URL.
  */
-import type { AppRecord, AppListOptions, AppForkRecord } from '../interface.js';
+import type { AppRecord, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
+    /**
+     * Draft slot (staging). At most ONE draft per (ownerGaii, filename); saveAppDraft
+     * upserts (overwrites) it. The live app's published versions are untouched while a
+     * draft exists. getAppDraft returns it or null; deleteAppDraft removes it (returns
+     * true if a row was deleted). A draft is owner-only — never listed, never public.
+     * Publishing (routes/apps.ts POST .../publish-draft) promotes it to a new version
+     * via createApp and then deletes the draft.
+     */
+    saveAppDraft(record: AppDraftRecord): Promise<void>;
+    getAppDraft(ownerGaii: string, filename: string): Promise<AppDraftRecord | null>;
+    deleteAppDraft(ownerGaii: string, filename: string): Promise<boolean>;
     getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null>;
     getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null>;
     listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }>;

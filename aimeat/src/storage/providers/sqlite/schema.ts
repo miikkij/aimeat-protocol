@@ -869,6 +869,22 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (ownerGaii, filename)
     );
 
+    -- ── App drafts (staging slot; at most one per owner+filename). The live
+    --    published versions live in the apps table; this holds an unpublished draft
+    --    that is preview-only (owner, via a signed draft-preview token) until it is
+    --    published, which promotes it into apps and clears this row. ──
+    CREATE TABLE IF NOT EXISTS app_drafts (
+      ownerGaii      TEXT NOT NULL,
+      ownerName      TEXT NOT NULL,
+      filename       TEXT NOT NULL,
+      manifest       TEXT NOT NULL DEFAULT '{}',
+      mimeType       TEXT NOT NULL DEFAULT 'text/html',
+      size           INTEGER NOT NULL DEFAULT 0,
+      data           BLOB,
+      updatedAt      TEXT NOT NULL,
+      PRIMARY KEY (ownerGaii, filename)
+    );
+
     -- ── App Fork lineage (append-only event log; source of truth for fork
     --    statistics + the cross-owner lineage graph) ──
     CREATE TABLE IF NOT EXISTS app_forks (

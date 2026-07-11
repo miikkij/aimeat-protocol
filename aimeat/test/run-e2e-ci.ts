@@ -31,6 +31,7 @@ const ALL_SUITES = [
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
     'test/e2e-apps.ts',
+    'test/e2e-app-draft.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-protect.ts',
     'test/e2e-app-copyscan.ts',

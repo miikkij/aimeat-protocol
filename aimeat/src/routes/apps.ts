@@ -97,6 +97,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { generateDraftToken, verifyDraftToken, DraftTokenError } from '../services/draft-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { randomBytes } from 'node:crypto';
@@ -656,6 +657,56 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
+        // ── Draft preview (staging) ──────────────────────────────────────────
+        // A short-lived, signed draft-preview token serves the app's UNPUBLISHED
+        // draft instead of the live version — so the owner can test the next
+        // version end-to-end (real origin, real permissions: mic/camera work) on
+        // the isolated app origin, while the LIVE app stays untouched for users.
+        // The token is minted from the authenticated apex (POST .../draft/preview-token);
+        // this origin needs no session — the token IS the authorization.
+        const previewToken = req.query.preview as string | undefined;
+        if (previewToken) {
+            let claim;
+            try {
+                claim = await verifyDraftToken(previewToken);
+            } catch (err) {
+                const code = err instanceof DraftTokenError ? err.code : 'TOKEN_INVALID';
+                res.status(403).json(error(config.nodeId, code, err instanceof Error ? err.message : 'Invalid draft preview token'));
+                return;
+            }
+            // The token is scoped to one filename; the URL must match it.
+            if (claim.filename !== filename) {
+                res.status(403).json(error(config.nodeId, 'TOKEN_INVALID', 'Draft preview token does not match this app'));
+                return;
+            }
+            const draftOwnerGhii = claim.sub;
+            // H-2: never execute runnable draft HTML on the authenticated apex origin.
+            // When the app origin is provisioned and this request is on the apex, 301 to
+            // the isolated origin, preserving the preview token so the draft is served there.
+            if (config.appOriginEnabled && config.appHost && !req.appOrigin) {
+                const base = await appOriginUrl(config, storage, draftOwnerGhii, filename);
+                const sep = base.includes('?') ? '&' : '?';
+                res.redirect(301, `${base}${sep}preview=${encodeURIComponent(previewToken)}`);
+                return;
+            }
+            const draft = await storage.getAppDraft(draftOwnerGhii, filename);
+            if (!draft) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}"`));
+                return;
+            }
+            res.setHeader('Content-Type', draft.mimeType);
+            const draftIsHtml = /html/i.test(draft.mimeType);
+            const draftBody = draftIsHtml ? injectAimeatBadge(draft.data) : draft.data;
+            res.setHeader('Content-Length', draftBody.length.toString());
+            // Same inline CSP a published app gets, so the draft behaves identically to
+            // what it will once published. A draft is never cached (no-store).
+            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.status(200).send(draftBody);
+            return;
+        }
+
         let app = await storage.getAppByOwnerName(owner, filename, version);
         // Backward-compat: older links carry the full GHII (`owner@node`) as the
         // owner segment. ownerName is now normalized to the bare name, so retry
@@ -1045,6 +1096,228 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             detail: manifest.description || '',
             link: `${downloadUrl}?mode=inline`,
         }).catch(() => { /* feed is best-effort */ });
+    });
+
+    // ── App drafts (staging): edit + test the NEXT version without touching the
+    //    live one. A draft is a single unpublished slot per app; it is owner-only,
+    //    never listed/public, and testable end-to-end (real origin → mic/camera,
+    //    real permissions) via a short-lived signed preview token. Publishing the
+    //    draft promotes it to a new version and clears the slot. ──────────────────
+
+    // PUT /v1/apps/:owner/:filename/draft — save (upsert) the app's draft. The live
+    // published versions are untouched. Manifest fields default from the current live
+    // app when omitted, so a draft that only changes the HTML keeps its name/category.
+    router.put('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid filename.'));
+            return;
+        }
+        const { owner, ownerGhii } = await canonicalOwner(req);
+        const { content, mime_type, name, description, category, tags, icon, uses_cortex, protection } = req.body ?? {};
+
+        if (!content || typeof content !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content is required (base64 encoded)'));
+            return;
+        }
+        const data = decodeStrictBase64(content);
+        if (!data) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content must be base64-encoded (Buffer.from(html).toString("base64") / btoa(html)).'));
+            return;
+        }
+        const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
+        if (data.length > MAX_APP_SIZE) {
+            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Draft exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`));
+            return;
+        }
+
+        // Inherit the live app's manifest as the base (so a draft that only changes
+        // HTML keeps its name/description/category/icon), overriding with any fields
+        // the caller sent.
+        const live = await storage.getApp(ownerGhii, filename);
+        const base = live?.manifest;
+        const manifest: AppManifest = {
+            name: typeof name === 'string' ? name : (base?.name ?? filename.replace(/\.html?$/i, '')),
+            description: typeof description === 'string' ? description : (base?.description ?? ''),
+            version: base?.version ?? '1.0.0',
+            category: typeof category === 'string' ? category : (base?.category ?? 'utility'),
+            tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : (base?.tags ?? []),
+            authorDisplay: owner,
+            usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : (base?.usesCortex ?? []),
+        };
+        const effectiveIcon = typeof icon === 'string' ? icon : base?.icon;
+        if (effectiveIcon) manifest.icon = effectiveIcon;
+        const effectiveProtection = sanitizeProtection(protection) ?? base?.protection;
+        if (effectiveProtection && Object.values(effectiveProtection).some(Boolean)) manifest.protection = effectiveProtection;
+
+        const now = new Date().toISOString();
+        await storage.saveAppDraft({
+            ownerGaii: ownerGhii,
+            ownerName: owner,
+            filename,
+            manifest,
+            mimeType: typeof mime_type === 'string' ? mime_type : (live?.mimeType ?? 'text/html'),
+            size: data.length,
+            data,
+            updatedAt: now,
+        });
+
+        res.json(success(config.nodeId, {
+            filename,
+            saved: true,
+            size: data.length,
+            updated_at: now,
+            has_live_version: !!live,
+            live_version_number: live?.versionNumber ?? 0,
+            note: 'Draft saved. The live app is unchanged. Mint a preview token to test it, then publish the draft when ready.',
+        }, [
+            { description: 'Get a preview URL', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/preview-token` },
+            { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
+        ]));
+    });
+
+    // POST /v1/apps/:owner/:filename/draft/preview-token — mint a short-lived preview
+    // URL for the draft. On a node with the app origin ON, the URL points at the
+    // isolated app origin (a real, session-less origin where getUserMedia works); with
+    // it OFF, at the apex inline URL. Either way it opens TOP-LEVEL as a clean page.
+    router.post('/v1/apps/:owner/:filename/draft/preview-token', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { owner, ownerGhii } = await canonicalOwner(req);
+        const draft = await storage.getAppDraft(ownerGhii, filename);
+        if (!draft) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}". Save one with PUT .../draft first.`));
+            return;
+        }
+        const ttlSeconds = 600;
+        const token = await generateDraftToken({ sub: ownerGhii, filename }, ttlSeconds);
+        let previewUrl: string;
+        if (config.appOriginEnabled && config.appHost) {
+            const originBase = await appOriginUrl(config, storage, owner, filename);
+            const sep = originBase.includes('?') ? '&' : '?';
+            previewUrl = `${originBase}${sep}preview=${encodeURIComponent(token)}`;
+        } else {
+            previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
+        }
+        res.json(success(config.nodeId, {
+            preview_url: previewUrl,
+            token,
+            expires_in_seconds: ttlSeconds,
+            note: 'Open this URL in a new top-level tab to test the draft on a real origin (mic/camera prompts work). The link is single-app, owner-only, and expires shortly.',
+        }));
+    });
+
+    // DELETE /v1/apps/:owner/:filename/draft — discard the draft. The live app is
+    // untouched. Idempotent (404 only signals there was nothing to discard).
+    router.delete('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { ownerGhii } = await canonicalOwner(req);
+        const deleted = await storage.deleteAppDraft(ownerGhii, filename);
+        if (!deleted) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to discard for "${filename}"`));
+            return;
+        }
+        res.json(success(config.nodeId, { filename, discarded: true }));
+    });
+
+    // POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a NEW live
+    // version. Carries the live app's parked/forkable/protection/operator-hidden state
+    // forward (exactly like a normal re-publish), then clears the draft slot. THIS is
+    // the moment the live app changes + the public feed fires — saving/testing a draft
+    // never does.
+    router.post('/v1/apps/:owner/:filename/publish-draft', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+        const { owner, ownerGhii } = await canonicalOwner(req);
+
+        const draft = await storage.getAppDraft(ownerGhii, filename);
+        if (!draft) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+            return;
+        }
+
+        const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
+        const isUpdate = existingVersion > 0;
+        // New (first-version) draft counts against the per-owner app quota.
+        if (!isUpdate && config.maxAppsPerAgent > 0) {
+            const { total } = await storage.listApps({ ownerGaii: ownerGhii, limit: 1 });
+            if (total >= config.maxAppsPerAgent) {
+                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
+                return;
+            }
+        }
+        const newVersion = existingVersion + 1;
+
+        // Carry live state forward, mirroring the re-publish path so publishing a draft
+        // never silently re-exposes a parked app, drops protection, or escapes moderation.
+        let parkedState = false, forkableState = false, operatorHiddenState = false;
+        let operatorHiddenBy: string | undefined, operatorHiddenAt: string | undefined, operatorHideReason: string | undefined;
+        let accessCode: string | undefined;
+        if (isUpdate) {
+            const live = await storage.getApp(ownerGhii, filename);
+            parkedState = !!live?.parked;
+            forkableState = !!live?.forkable;
+            operatorHiddenState = !!live?.operatorHidden;
+            operatorHiddenBy = live?.operatorHiddenBy;
+            operatorHiddenAt = live?.operatorHiddenAt;
+            operatorHideReason = live?.operatorHideReason;
+            accessCode = live?.accessCode;
+        }
+
+        const now = new Date().toISOString();
+        const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: owner };
+        invalidateProtectionCache(owner, filename);
+
+        await storage.createApp({
+            ownerGaii: ownerGhii,
+            ownerName: owner,
+            filename,
+            versionNumber: newVersion,
+            manifest,
+            mimeType: draft.mimeType,
+            size: draft.size,
+            data: draft.data,
+            accessCode,
+            parked: parkedState,
+            forkable: forkableState,
+            operatorHidden: operatorHiddenState,
+            operatorHiddenBy,
+            operatorHiddenAt,
+            operatorHideReason,
+            createdAt: now,
+        });
+        await storage.deleteAppDraft(ownerGhii, filename);
+
+        const downloadUrl = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`;
+        await storage.addSiteChangeLog({
+            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            action: isUpdate ? 'app_update' : 'app_publish',
+            summary: `${isUpdate ? 'Updated' : 'Published'} app "${filename}" v${newVersion} from draft (${(draft.size / 1024).toFixed(1)} KB)`,
+            changedBy: owner,
+            changedAt: now,
+        });
+        emitChange('apps');
+        void recordPublicActivity(storage, config, {
+            category: 'apps',
+            actor: callerGaii,
+            summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
+            detail: manifest.description || '',
+            link: `${downloadUrl}?mode=inline`,
+        }).catch(() => { /* feed is best-effort */ });
+
+        res.status(201).json(success(config.nodeId, {
+            filename,
+            version_number: newVersion,
+            manifest,
+            size: draft.size,
+            parked: parkedState,
+            forkable: forkableState,
+            download_url: downloadUrl,
+            note: isUpdate
+                ? `Draft published as version ${newVersion}. It is now the live app; the draft slot is cleared.`
+                : 'Draft published as version 1. It is now live; the draft slot is cleared.',
+        }, [
+            { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
+        ]));
     });
 
     // POST /v1/apps/:owner/:filename/fork — Fork an app into YOUR OWN catalogue.

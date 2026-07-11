@@ -562,6 +562,25 @@ export interface AppRecord {
   operatorHideReason?: string; // optional operator-supplied reason (shown to owner)
 }
 
+/**
+ * A single, unpublished DRAFT of an app — the staging slot. At most one draft
+ * exists per (ownerGaii, filename); saving again overwrites it. The live app
+ * (its published versions) is untouched while a draft exists. Publishing the
+ * draft promotes it to a new AppRecord version and clears the draft. A draft is
+ * OWNER-ONLY: it is never listed, never public, and is served for preview only
+ * against a short-lived signed draft-preview token on the isolated app origin.
+ */
+export interface AppDraftRecord {
+  ownerGaii: string;
+  ownerName: string;
+  filename: string;
+  manifest: AppManifest;
+  mimeType: string;
+  size: number;
+  data: Buffer;
+  updatedAt: string;
+}
+
 export interface AppListOptions {
   ownerGaii?: string;
   category?: string;

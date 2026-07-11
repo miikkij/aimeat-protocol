@@ -12559,11 +12559,186 @@ paths:
         - { in: query, name: mode, required: false, schema: { type: string, enum: [inline] } }
         - { in: query, name: version, required: false, schema: { type: integer } }
         - { in: query, name: code, required: false, schema: { type: string }, description: Access code for protected apps }
+        - in: query
+          name: preview
+          required: false
+          schema: { type: string }
+          description: >
+            A signed draft-preview token (from POST .../draft/preview-token). When present and valid,
+            the app's UNPUBLISHED draft is served instead of the live version (the live app is
+            untouched). On a node with the app origin enabled an apex request is 301-redirected to the
+            isolated origin, preserving the token.
       responses:
-        '200': { description: App HTML (inline or attachment) }
+        '200': { description: App HTML (inline or attachment; the draft when a valid preview token is supplied) }
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/{owner}/{filename}/draft:
+    put:
+      operationId: saveAppDraft
+      summary: Save the app's unpublished draft (staging)
+      description: |
+        Upserts the single draft slot for `{owner}/{filename}` — the staging copy of the NEXT version.
+        The live published versions are untouched. A draft is owner-only (never listed, never public)
+        and is testable end-to-end via a short-lived preview token (POST `.../draft/preview-token`),
+        so the owner can verify the next version on a real origin (mic/camera prompts work) before it
+        goes live. Publishing the draft (POST `.../publish-draft`) promotes it to a new version and
+        clears the slot. Manifest fields omitted here default from the current live app.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, description: base64-encoded app HTML }
+                mime_type: { type: string }
+                name: { type: string }
+                description: { type: string }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+                icon: { type: string }
+                uses_cortex: { type: array, items: { type: string } }
+                protection:
+                  type: object
+                  properties:
+                    obfuscate: { type: boolean }
+                    domainLock: { type: boolean }
+                    watermark: { type: boolean }
+                    noRawDownload: { type: boolean }
+      responses:
+        '200':
+          description: Draft saved (live app unchanged)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          saved: { type: boolean }
+                          size: { type: integer }
+                          updated_at: { type: string }
+                          has_live_version: { type: boolean }
+                          live_version_number: { type: integer }
+                          note: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { description: Draft exceeds the app size limit }
+    delete:
+      operationId: discardAppDraft
+      summary: Discard the app's unpublished draft
+      description: Deletes the draft slot for `{owner}/{filename}`. The live app is untouched.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Draft discarded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          discarded: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No draft to discard }
+
+  /v1/apps/{owner}/{filename}/draft/preview-token:
+    post:
+      operationId: mintAppDraftPreviewToken
+      summary: Mint a preview URL for the app's draft
+      description: |
+        Returns a short-lived (≈10 min), owner-only preview URL for the current draft. On a node with
+        the app origin enabled the URL points at the isolated app origin (a real, session-less origin
+        where `getUserMedia` — mic/camera — works); otherwise at the apex inline URL. Open it TOP-LEVEL
+        in a new tab to test the next version exactly as it will run once published, while the live app
+        stays live. Requires a saved draft (`404` otherwise). The token is single-app and reusable
+        within its TTL.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Preview URL minted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          preview_url: { type: string }
+                          token: { type: string }
+                          expires_in_seconds: { type: integer }
+                          note: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No draft exists to preview }
+
+  /v1/apps/{owner}/{filename}/publish-draft:
+    post:
+      operationId: publishAppDraft
+      summary: Publish the draft as a new live version
+      description: |
+        Promotes the current draft to a NEW live version (auto-incremented), carrying the live app's
+        parked/forkable/protection/operator-hidden state forward exactly like a normal re-publish, then
+        clears the draft slot. THIS is the moment the live app changes and the public activity feed
+        fires — saving/testing a draft never does. Requires a saved draft (`404` otherwise).
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '201':
+          description: Draft published as a new live version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          version_number: { type: integer }
+                          parked: { type: boolean }
+                          forkable: { type: boolean }
+                          download_url: { type: string }
+                          note: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No draft to publish }
+        '429': { description: Publishing a first-version draft would exceed the published-app quota }
 
   /v1/apps/{owner}/{filename}/fork:
     post:

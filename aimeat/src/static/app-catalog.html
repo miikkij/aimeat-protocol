@@ -2869,9 +2869,17 @@
       "detail.run": "✨ Generate change",
       "detail.running": "Generating…",
       "detail.test": "▶ Test draft",
+      "detail.testLive": "🎤 Test on real origin",
+      "detail.publishTested": "🚀 Publish tested version",
       "detail.keep": "✔ Keep draft",
       "detail.discard": "✕ Discard",
       "detail.draftReady": "Draft ready — test it, then keep or discard.",
+      "detail.draftUploading": "Uploading draft to a real origin…",
+      "detail.draftOpened": "Draft opened in a new tab — mic/camera prompts work there.",
+      "detail.draftNeedsPublished": "Publish this app first, then you can test drafts of it on a real origin.",
+      "detail.draftNeedsSignin": "Sign in to test a draft on a real origin.",
+      "detail.draftPublishConfirm": "Publish the tested draft as the new live version?",
+      "detail.draftPublished": "✔ Published as v{v}. It is now the live app.",
       "detail.kept": "Draft kept as your local copy.",
       "detail.discarded": "Draft discarded.",
       "detail.aiUnavailable": "AI editing needs an OpenRouter key. Add one in AIMEAT settings, then reload.",
@@ -3209,9 +3217,17 @@
       "detail.run": "✨ Luo muutos",
       "detail.running": "Luodaan…",
       "detail.test": "▶ Testaa luonnos",
+      "detail.testLive": "🎤 Testaa oikeassa välilehdessä",
+      "detail.publishTested": "🚀 Julkaise testattu versio",
       "detail.keep": "✔ Säilytä luonnos",
       "detail.discard": "✕ Hylkää",
       "detail.draftReady": "Luonnos valmis — testaa, sitten säilytä tai hylkää.",
+      "detail.draftUploading": "Ladataan luonnosta oikeaan originiin…",
+      "detail.draftOpened": "Luonnos avattu uuteen välilehteen — mikrofoni/kamera toimivat siellä.",
+      "detail.draftNeedsPublished": "Julkaise appi ensin, niin voit testata sen luonnoksia oikeassa originissa.",
+      "detail.draftNeedsSignin": "Kirjaudu sisään testataksesi luonnosta oikeassa originissa.",
+      "detail.draftPublishConfirm": "Julkaistaanko testattu luonnos uutena live-versiona?",
+      "detail.draftPublished": "✔ Julkaistu versiona v{v}. Se on nyt live-appi.",
       "detail.kept": "Luonnos säilytetty paikallisena kopiona.",
       "detail.discarded": "Luonnos hylätty.",
       "detail.aiUnavailable": "Tekoälymuokkaus vaatii OpenRouter-avaimen. Lisää se AIMEAT-asetuksiin ja lataa sivu uudelleen.",
@@ -4036,7 +4052,8 @@
     if (isUrlApp) {
       aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
     } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.test"), "window._launcher.detailAiTest()") + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()", { variant: "success" }) + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
+      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.test"), "window._launcher.detailAiTest()") + // Real-origin test + promote — only for a PUBLISHED app (needs a server draft slot).
+      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) : "") + (app.published ? dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : "") + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()", { variant: "success" }) + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
     }
     aiHtml += "</div>";
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
@@ -4448,6 +4465,79 @@
     renderDetailView();
     var s2 = document.getElementById("detail-ai-status");
     if (s2) s2.textContent = t("detail.discarded");
+  }
+  function draftApi(method, owner, filename, sub, body) {
+    var cfg = loadConfig();
+    if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
+    var base = cfg.aimeatUrl.replace(/\/+$/, "");
+    var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
+    return fetch(base + path, {
+      method,
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken(), "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : void 0
+    }).then(function(resp) {
+      return resp.json().then(function(json) {
+        if (!json.ok) throw new Error(json.error && (json.error.message || json.error.code) || "HTTP " + resp.status);
+        return json.data;
+      });
+    });
+  }
+  function detailTestDraftLive() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    if (!app.published || !app.publishedFilename) {
+      showNotice(t("detail.draftNeedsPublished"));
+      return;
+    }
+    if (!getCortexOwnerToken()) {
+      showNotice(t("detail.draftNeedsSignin"));
+      return;
+    }
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    var statusEl = document.getElementById("detail-ai-status");
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.draftUploading");
+    }
+    draftApi("PUT", owner, filename, "draft", { content: detailDraftBlob }).then(function() {
+      return draftApi("POST", owner, filename, "draft/preview-token");
+    }).then(function(data) {
+      window.open(data.preview_url, "_blank", "noopener");
+      if (statusEl) {
+        statusEl.style.color = "#34d399";
+        statusEl.textContent = "✔ " + t("detail.draftOpened");
+      }
+    }).catch(function(err) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err.message || "Draft preview failed");
+      }
+    });
+  }
+  function detailPublishTestedDraft() {
+    var app = detailGetApp();
+    if (!app || !app.published || !app.publishedFilename) return;
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    var statusEl = document.getElementById("detail-ai-status");
+    Promise.resolve(showConfirm(t("detail.draftPublishConfirm"))).then(function(ok) {
+      if (!ok) return;
+      draftApi("POST", owner, filename, "publish-draft").then(function(data) {
+        detailDraftBlob = null;
+        if (statusEl) {
+          statusEl.style.color = "#34d399";
+          statusEl.textContent = t("detail.draftPublished").replace("{v}", data.version_number);
+        }
+        refreshAll();
+        renderDetailView();
+      }).catch(function(err) {
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + (err.message || "Publish failed");
+        }
+      });
+    });
   }
   function detailEditSource() {
     var app = detailGetApp();
@@ -7798,6 +7888,8 @@
     detailAiTest,
     detailAiKeep,
     detailAiDiscard,
+    detailTestDraftLive,
+    detailPublishTestedDraft,
     detailEditSource,
     detailImproveExternal,
     detailSharePrompt,

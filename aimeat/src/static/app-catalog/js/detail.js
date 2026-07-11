@@ -340,6 +340,9 @@ function renderDetailView() {
         '<div class="dtl-ai-status" style="margin:0 0 8px">' + t('detail.draftReady') + '</div>' +
         '<div class="dtl-btn-row">' +
           dtlBtn(t('detail.test'), 'window._launcher.detailAiTest()') +
+          // Real-origin test + promote — only for a PUBLISHED app (needs a server draft slot).
+          (app.published ? dtlBtn(t('detail.testLive'), 'window._launcher.detailTestDraftLive()', {variant:'primary'}) : '') +
+          (app.published ? dtlBtn(t('detail.publishTested'), 'window._launcher.detailPublishTestedDraft()', {variant:'success'}) : '') +
           dtlBtn(t('detail.keep'), 'window._launcher.detailAiKeep()', {variant:'success'}) +
           dtlBtn(t('detail.discard'), 'window._launcher.detailAiDiscard()') +
         '</div>' +
@@ -789,6 +792,74 @@ function detailAiDiscard() {
   if (s2) s2.textContent = t('detail.discarded');
 }
 
+// ── Draft (staging) on a REAL origin ──────────────────────────────────────────
+// The old "Test draft" runs the pending edit in the sandbox iframe (opaque origin),
+// where getUserMedia (mic/camera) is impossible. These two save the pending edit as a
+// SERVER draft — a staging slot that leaves the live app untouched — and open it TOP-
+// LEVEL on the isolated app origin, where it behaves exactly like the published app
+// will (mic/camera prompts work). "Publish tested version" promotes the exact tested
+// bytes to a new live version. Solves "test v19 before publishing, without breaking v18".
+
+function draftApi(method, owner, filename, sub, body) {
+  var cfg = loadConfig();
+  if (!cfg.aimeatUrl) return Promise.reject(new Error('Set the AIMEAT server URL in Settings first'));
+  var base = cfg.aimeatUrl.replace(/\/+$/, '');
+  var path = '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/' + sub;
+  return fetch(base + path, {
+    method: method,
+    headers: { 'Authorization': 'Bearer ' + getCortexOwnerToken(), 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(function (resp) {
+    return resp.json().then(function (json) {
+      if (!json.ok) throw new Error((json.error && (json.error.message || json.error.code)) || ('HTTP ' + resp.status));
+      return json.data;
+    });
+  });
+}
+
+function detailTestDraftLive() {
+  var app = detailGetApp();
+  if (!app || !detailDraftBlob) return;
+  if (!app.published || !app.publishedFilename) { showNotice(t('detail.draftNeedsPublished')); return; }
+  if (!getCortexOwnerToken()) { showNotice(t('detail.draftNeedsSignin')); return; }
+  var owner = detailServerOwner(app);
+  var filename = app.publishedFilename;
+  var statusEl = document.getElementById('detail-ai-status');
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.draftUploading'); }
+  // Save the pending edit as the server draft (detailDraftBlob is already base64),
+  // then mint a preview URL and open it top-level.
+  draftApi('PUT', owner, filename, 'draft', { content: detailDraftBlob })
+    .then(function () { return draftApi('POST', owner, filename, 'draft/preview-token'); })
+    .then(function (data) {
+      window.open(data.preview_url, '_blank', 'noopener');
+      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.draftOpened'); }
+    })
+    .catch(function (err) {
+      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Draft preview failed'); }
+    });
+}
+
+function detailPublishTestedDraft() {
+  var app = detailGetApp();
+  if (!app || !app.published || !app.publishedFilename) return;
+  var owner = detailServerOwner(app);
+  var filename = app.publishedFilename;
+  var statusEl = document.getElementById('detail-ai-status');
+  Promise.resolve(showConfirm(t('detail.draftPublishConfirm'))).then(function (ok) {
+    if (!ok) return;
+    draftApi('POST', owner, filename, 'publish-draft')
+      .then(function (data) {
+        detailDraftBlob = null;
+        if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = t('detail.draftPublished').replace('{v}', data.version_number); }
+        refreshAll();
+        renderDetailView();
+      })
+      .catch(function (err) {
+        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Publish failed'); }
+      });
+  });
+}
+
 // ── Detail: action shortcuts (reuse existing flows) ──
 
 function detailEditSource() { var app = detailGetApp(); if (app) viewSource(app); }
@@ -1158,6 +1229,8 @@ export {
   detailAiTest,
   detailAiKeep,
   detailAiDiscard,
+  detailTestDraftLive,
+  detailPublishTestedDraft,
   detailEditSource,
   detailImproveExternal,
   detailSharePrompt,
