@@ -15,6 +15,7 @@ export async function listApps() {
 /** Upload an app (HTML file + optional screenshot). */
 export async function uploadApp(filename, contentBase64, mimeType, opts = {}) {
   const body = { filename, content: contentBase64, mime_type: mimeType || 'text/html' };
+  if (opts.description) body.description = opts.description;
   if (opts.accessCode) body.access_code = opts.accessCode;
   if (opts.screenshotBase64) {
     body.screenshot = opts.screenshotBase64;
