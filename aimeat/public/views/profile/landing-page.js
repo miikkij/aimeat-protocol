@@ -1117,6 +1117,7 @@ const SIDEBAR_GROUPS = [
      * its route id still exist — restore by re-adding this item. */
     { id: 'extensions', icon: '\u{1F50C}', labelKey: 'profile.tabs.extensions' },
     { id: 'capabilities', icon: '⚡', labelKey: 'capabilities.tabLabel' },
+    { id: 'skills', icon: '\u{1F393}', labelKey: 'skills.tabLabel' },
     { id: 'packages', icon: '\u{1F4E6}', labelKey: 'profile.tabs.packages' },
     { id: 'portfolio', icon: '\u{1F3A8}', labelKey: 'portfolio.tabLabel' },
     { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
