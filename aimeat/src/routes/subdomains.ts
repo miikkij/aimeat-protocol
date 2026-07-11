@@ -43,6 +43,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
+import { verifyDraftToken, DraftTokenError } from '../services/draft-token.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
@@ -223,6 +224,59 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   res.send(app.data);
 }
 
+/**
+ * Serve an app's UNPUBLISHED draft on the app origin, gated by a draft-preview token.
+ * `siteTarget` is the subdomain mapping's "owner/filename" — the token must match that
+ * filename AND owner, binding the preview to exactly this subdomain's app. The draft
+ * bytes are served with the same CSP + badge + author-CSP relaxation a live app gets,
+ * so the draft behaves identically to what it will once published — but nothing is
+ * cached (no-store) and no download is counted.
+ */
+async function serveDraftPreview(
+  res: Response, storage: Storage, config: AimeatConfig,
+  siteTarget: string, token: string, csp: string, apexOrigin: string,
+): Promise<void> {
+  const slash = siteTarget.indexOf('/');
+  const owner = slash > 0 ? siteTarget.slice(0, slash) : '';
+  const filename = slash > 0 ? siteTarget.slice(slash + 1) : '';
+  const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
+
+  let claim;
+  try {
+    claim = await verifyDraftToken(token);
+  } catch (err) {
+    const code = err instanceof DraftTokenError ? err.code : 'TOKEN_INVALID';
+    res.status(403).json(error(config.nodeId, code, err instanceof Error ? err.message : 'Invalid draft preview token'));
+    return;
+  }
+  // Bind the token to THIS subdomain's app: same filename, same owner.
+  const claimBareOwner = claim.sub.includes('@') ? claim.sub.split('@')[0] : claim.sub;
+  if (claim.filename !== filename || claimBareOwner !== bareOwner) {
+    res.status(403).json(error(config.nodeId, 'TOKEN_INVALID', 'Draft preview token does not match this app'));
+    return;
+  }
+  const draft = await storage.getAppDraft(claim.sub, filename);
+  if (!draft) {
+    res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No draft to preview'));
+    return;
+  }
+  res.setHeader('Content-Type', draft.mimeType);
+  res.setHeader('Content-Security-Policy', csp);
+  res.setHeader('Cache-Control', 'no-store');       // a draft is never cached
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (/text\/html/i.test(draft.mimeType)) {
+    const relaxed = apexOrigin
+      ? relaxAppCspMeta(draft.data as Buffer | Uint8Array | string, apexOrigin)
+      : (draft.data as Buffer | Uint8Array | string);
+    const buf = injectAimeatBadge(relaxed);
+    res.setHeader('Content-Length', buf.length.toString());
+    res.send(buf);
+    return;
+  }
+  res.setHeader('Content-Length', draft.size.toString());
+  res.send(draft.data);
+}
+
 /** Insert an HTML snippet into a document head (fallbacks: after <body>, else prepend). */
 function injectHeadSnippet(html: string, snippet: string): string {
   if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, snippet + '</head>');
@@ -305,6 +359,17 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     if (site.kind === 'redirect') {
       res.redirect(301, site.target);
+      return;
+    }
+
+    // Draft preview (staging): a valid, short-lived draft-preview token serves this
+    // app's UNPUBLISHED draft instead of the live version — the owner tests the next
+    // version on this real, isolated, session-less origin (mic/camera work) while the
+    // live app stays untouched. The token is the authorization (this origin has no
+    // session); it is scoped to exactly this app (owner + filename).
+    const previewToken = req.query.preview as string | undefined;
+    if (previewToken) {
+      await serveDraftPreview(res, storage, config, site.target, previewToken, csp, apexOrigin);
       return;
     }
 

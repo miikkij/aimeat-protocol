@@ -27,6 +27,7 @@ import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { generateDraftToken } from '../services/draft-token.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -188,6 +189,153 @@ export function registerAppsTools(
             } catch (err) {
                 return { content: [{ type: 'text' as const, text: `Failed to publish app: ${(err as Error).message}` }], isError: true };
             }
+        },
+    );
+
+    // ── Tool: aimeat_app_draft_save ──
+    // Staging: save the NEXT version as a draft WITHOUT touching the live app, and get a
+    // preview URL to test it on a real origin (mic/camera work) before deciding to publish.
+    mcp.tool(
+        'aimeat_app_draft_save',
+        descriptionFor('aimeat_app_draft_save'),
+        {
+            filename: z.string().describe('App filename (e.g. "starwars.html"). The draft is the staging copy of THIS app.'),
+            content_base64: z.string().describe('Base64-encoded HTML of the draft (the next version to test).'),
+            name: z.string().optional().describe('Display name (defaults to the live app\'s name when omitted).'),
+            description: z.string().optional().describe('Description (defaults to the live app\'s when omitted).'),
+            category: z.string().optional().describe('Category (defaults to the live app\'s).'),
+            tags: z.array(z.string()).optional().describe('Tags (default: the live app\'s).'),
+            icon: z.string().optional().describe('Emoji icon (defaults to the live app\'s).'),
+        },
+        annotationsFor('aimeat_app_draft_save'),
+        async ({ filename, content_base64, name, description, category, tags, icon }) => {
+            const agentGaii = getAgentGaii();
+            const parsed = parseGAII(agentGaii);
+            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
+                return { content: [{ type: 'text' as const, text: 'Invalid filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.' }], isError: true };
+            }
+            const data = Buffer.from(content_base64, 'base64');
+            const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
+            if (data.length > MAX_APP_SIZE) {
+                return { content: [{ type: 'text' as const, text: `Draft exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)` }], isError: true };
+            }
+            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
+            // Inherit the live app's manifest as the base so a draft that only changes HTML
+            // keeps its name/description/category/icon.
+            const live = await storage.getApp(ownerGaii, filename);
+            const base = live?.manifest;
+            const manifest: AppManifest = {
+                name: name ?? base?.name ?? filename.replace(/\.html?$/i, ''),
+                description: (typeof description === 'string' ? description : base?.description) ?? '',
+                version: base?.version ?? '1.0.0',
+                category: category ?? base?.category ?? 'tool',
+                tags: tags ?? base?.tags ?? [],
+                authorDisplay: parsed.owner,
+                usesCortex: base?.usesCortex ?? [],
+            };
+            if (icon ?? base?.icon) manifest.icon = icon ?? base?.icon;
+            if (base?.protection) manifest.protection = base.protection;
+            try {
+                await storage.saveAppDraft({
+                    ownerGaii, ownerName: parsed.owner, filename, manifest,
+                    mimeType: live?.mimeType ?? 'text/html', size: data.length, data,
+                    updatedAt: new Date().toISOString(),
+                });
+                // Mint a preview token + apex preview URL. On a node with the app origin ON the
+                // apex GET handler 301-redirects this to the isolated origin (preserving the
+                // token), so the SAME URL works in both postures.
+                const token = await generateDraftToken({ sub: ownerGaii, filename }, 600);
+                const previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
+                logger.info(`App draft saved via MCP: ${filename}`, { by: agentGaii });
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            filename,
+                            saved: true,
+                            has_live_version: !!live,
+                            live_version_number: live?.versionNumber ?? 0,
+                            preview_url: previewUrl,
+                            preview_expires_in_seconds: 600,
+                            note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
+                        }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to save draft: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool: aimeat_app_draft_publish ──
+    mcp.tool(
+        'aimeat_app_draft_publish',
+        descriptionFor('aimeat_app_draft_publish'),
+        { filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.') },
+        annotationsFor('aimeat_app_draft_publish'),
+        async ({ filename }) => {
+            const agentGaii = getAgentGaii();
+            const parsed = parseGAII(agentGaii);
+            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
+            const draft = await storage.getAppDraft(ownerGaii, filename);
+            if (!draft) {
+                return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
+            }
+            const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
+            const isUpdate = existingVersion > 0;
+            const newVersion = existingVersion + 1;
+            // Carry the live parked/forkable/protection state forward, mirroring publish.
+            let parkedState = false, forkableState = false;
+            if (isUpdate) {
+                const live = await storage.getApp(ownerGaii, filename);
+                parkedState = !!live?.parked;
+                forkableState = !!live?.forkable;
+            }
+            const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: parsed.owner };
+            try {
+                await storage.createApp({
+                    ownerGaii, ownerName: parsed.owner, filename, versionNumber: newVersion,
+                    manifest, mimeType: draft.mimeType, size: draft.size, data: draft.data,
+                    parked: parkedState, forkable: forkableState, createdAt: new Date().toISOString(),
+                });
+                await storage.deleteAppDraft(ownerGaii, filename);
+                emitResourceListChanged(agentGaii);
+                logger.info(`App draft published via MCP: ${filename} v${newVersion}`, { by: agentGaii });
+                const downloadUrl = `/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}`;
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            filename, version_number: newVersion, is_update: isUpdate,
+                            parked: parkedState, download_url: downloadUrl, inline_url: `${downloadUrl}?mode=inline`,
+                            note: 'Draft published as the new live version; the draft slot is cleared.',
+                        }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to publish draft: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool: aimeat_app_draft_discard ──
+    mcp.tool(
+        'aimeat_app_draft_discard',
+        descriptionFor('aimeat_app_draft_discard'),
+        { filename: z.string().describe('App filename whose saved draft should be discarded (the live app is untouched).') },
+        annotationsFor('aimeat_app_draft_discard'),
+        async ({ filename }) => {
+            const agentGaii = getAgentGaii();
+            const parsed = parseGAII(agentGaii);
+            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
+            const discarded = await storage.deleteAppDraft(ownerGaii, filename);
+            if (!discarded) {
+                return { content: [{ type: 'text' as const, text: `No draft to discard for "${filename}".` }], isError: true };
+            }
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, discarded: true }, null, 2) }] };
         },
     );
 

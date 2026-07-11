@@ -89,7 +89,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
-    AppRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
+    AppRecord, AppDraftRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord, AppProtection,
     SubdomainSiteRecord,
     AppGrantRecord,
     NotificationTemplateRecord,
@@ -4131,6 +4131,58 @@ export class PrismaStorage implements Storage {
             },
         });
         return record;
+    }
+
+    // ── App drafts (staging slot; one per owner+filename) ──
+
+    async saveAppDraft(record: AppDraftRecord): Promise<void> {
+        this.ensureReady();
+        // Upsert: at most one draft per (ownerGaii, filename); a re-save overwrites it.
+        await this.prisma.appDraft.upsert({
+            where: { ownerGaii_filename: { ownerGaii: record.ownerGaii, filename: record.filename } },
+            create: {
+                ownerGaii: record.ownerGaii,
+                ownerName: record.ownerName,
+                filename: record.filename,
+                manifest: record.manifest as any,
+                mimeType: record.mimeType,
+                size: record.size,
+                data: record.data,
+                updatedAt: new Date(record.updatedAt),
+            },
+            update: {
+                ownerName: record.ownerName,
+                manifest: record.manifest as any,
+                mimeType: record.mimeType,
+                size: record.size,
+                data: record.data,
+                updatedAt: new Date(record.updatedAt),
+            },
+        });
+    }
+
+    async getAppDraft(ownerGaii: string, filename: string): Promise<AppDraftRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.appDraft.findUnique({
+            where: { ownerGaii_filename: { ownerGaii, filename } },
+        });
+        if (!row) return null;
+        return {
+            ownerGaii: row.ownerGaii,
+            ownerName: row.ownerName,
+            filename: row.filename,
+            manifest: row.manifest as any,
+            mimeType: row.mimeType,
+            size: row.size,
+            data: row.data as Buffer,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
+    async deleteAppDraft(ownerGaii: string, filename: string): Promise<boolean> {
+        this.ensureReady();
+        const result = await this.prisma.appDraft.deleteMany({ where: { ownerGaii, filename } });
+        return result.count > 0;
     }
 
     async getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {

@@ -1021,6 +1021,23 @@ model AppDownload {
   @@unique([ownerGaii, filename])
 }
 
+// Unpublished draft (staging slot): at most one per (ownerGaii, filename). The
+// live published versions live in App; this holds a preview-only draft until it
+// is published (promoted into App) and this row is cleared.
+model AppDraft {
+  id        String   @id @default(cuid())
+  ownerGaii String
+  ownerName String
+  filename  String
+  manifest  Json
+  mimeType  String
+  size      Int
+  data      Bytes
+  updatedAt DateTime @default(now())
+
+  @@unique([ownerGaii, filename])
+}
+
 model AppFork {
   id              String   @id
   sourceOwnerGaii String

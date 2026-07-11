@@ -1467,7 +1467,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_publish',
-        description: 'Publish or update an HTML app (versioned by group). Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback.',
+        description: 'Publish or update an HTML app STRAIGHT TO LIVE (versioned by group) — every call becomes the new live version users get immediately. Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback. DECIDING LIVE vs STAGING: use this when you are confident the app works. When you want to TEST the next version first (e.g. anything using the microphone/camera, which only work on a real origin — never in an embedded preview), stage it with aimeat_app_draft_save, open its preview_url to verify, then aimeat_app_draft_publish — the live app stays untouched until you do.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1517,6 +1517,36 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             filename: { type: 'string', required: true, description: 'Filename of the source app.' },
             new_filename: { type: 'string', required: true, description: 'Filename for the fork in your catalogue.' },
             version: { type: 'number', description: 'Source version to fork (default: latest).' },
+        },
+    },
+    {
+        name: 'aimeat_app_draft_save',
+        description: 'STAGING — save the NEXT version of an app as a draft WITHOUT touching the live one, and get a preview_url to test it on a real origin before publishing. Use this instead of aimeat_app_publish whenever you want to VERIFY before going live — especially for anything using the microphone or camera (getUserMedia only works on a real, top-level origin; it is impossible in an embedded/sandboxed preview, so testing in a preview pane will always "fail"). Flow: aimeat_app_draft_save → open preview_url in a browser (a real tab, mic/camera prompts work) → if good, aimeat_app_draft_publish; if not, edit + save again, or aimeat_app_draft_discard. The live app (the version users see) stays exactly as it was until you publish the draft. At most one draft per app; saving again overwrites it. Manifest fields you omit default from the current live app.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "drumpad.html").' },
+            content: { type: 'string', required: true, description: 'The draft HTML (the next version to test). Use @file:path with the CLI fallback.' },
+            name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
+            description: { type: 'string', description: 'Description (defaults to the live app\'s).' },
+        },
+    },
+    {
+        name: 'aimeat_app_draft_publish',
+        description: 'Promote an app\'s saved draft to a NEW live version, then clear the draft slot — THIS is the moment the live app changes. Carries the live app\'s parked/forkable/protection state forward, exactly like a normal re-publish. Call this after you have tested the draft via the preview_url from aimeat_app_draft_save and it works. Fails if there is no saved draft.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
+        },
+    },
+    {
+        name: 'aimeat_app_draft_discard',
+        description: 'Throw away an app\'s saved draft. The live app is untouched. Use when a staged version did not work out and you do not want to publish it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'App filename whose draft to discard.' },
         },
     },
     {
