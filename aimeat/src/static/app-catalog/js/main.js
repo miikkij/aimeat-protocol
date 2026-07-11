@@ -17,7 +17,7 @@ import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDet
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp, exportBackup, handleImportBackup, jsonImportSelectAll, submitJsonImport, removeDuplicateApps, clearAllData } from './settings.js';
 import { initAppsIo, setEditingAppId, addAppFromZip, addAppFromUrl, addAppFromFile, addAppFromSource, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
-import { initServerIo, isOperatorSession, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, addImportIgnore, removeImportIgnore, dismissServerImportBanner, showServerImportModal, serverImportSelectAll, submitServerImport, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { initServerIo, isOperatorSession, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
 import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt, onCardDragStart, onCardDragEnd, onCardDragOver, onCardDrop } from './render.js';
 
 
@@ -92,7 +92,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
 
   // ── Theme / Settings / Help / Export-Import / dedup / Clear → settings.js (imported at top; initSettings) ──
 
-  // ── Server I/O (import/publish/operator/grants/backup/server-import) → server-io.js (initServerIo) ──
+  // ── Server I/O (publish/operator/grants/backup) → server-io.js (initServerIo) ──
 
   // ── App Detail view + sign-in pill → detail.js (imported at top; wired via initDetail) ──
 
@@ -166,10 +166,6 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
     jsonImportSelectAll: jsonImportSelectAll,
     submitJsonImport: submitJsonImport,
     removeDuplicateApps: removeDuplicateApps,
-    showServerImportModal: showServerImportModal,
-    dismissServerImportBanner: dismissServerImportBanner,
-    serverImportSelectAll: serverImportSelectAll,
-    submitServerImport: submitServerImport,
     toggleBackupMenu: toggleBackupMenu,
     toggleCreateMenu: toggleCreateMenu,
     toggleCortexBar: toggleCortexBar,
@@ -244,7 +240,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
       updateModeToggle: updateModeToggle, getCortexOwnerToken: getCortexOwnerToken, launchApp: launchApp,
       viewPublished: viewPublished, viewSource: viewSource, generateId: generateId,
       generateSharePrompt: generateSharePrompt, openPromptBuilder: openPromptBuilder,
-      showPublishModal: showPublishModal, addImportIgnore: addImportIgnore, removeImportIgnore: removeImportIgnore,
+      showPublishModal: showPublishModal,
       getMainApps: function () { return allApps; },
       getServerState: function () { return serverStateByFilename; },
       getServerManifests: function () { return serverAppManifests; },
@@ -402,11 +398,6 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
       this.value = '';
     });
     document.getElementById('backup-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-    document.getElementById('server-import-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -591,8 +582,6 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
           document.getElementById('subdomain-overlay').hidden = true;
         } else if (!document.getElementById('backup-overlay').hidden) {
           document.getElementById('backup-overlay').hidden = true;
-        } else if (!document.getElementById('server-import-overlay').hidden) {
-          document.getElementById('server-import-overlay').hidden = true;
         } else if (!document.getElementById('json-import-overlay').hidden) {
           document.getElementById('json-import-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {

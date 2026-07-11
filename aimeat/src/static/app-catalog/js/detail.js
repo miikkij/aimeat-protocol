@@ -18,9 +18,9 @@ import { t } from './i18n.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
-let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession;
+let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession;
 export function initDetail(deps) {
-  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
 }
 
 // ── App Detail View ───────────────────────────────
@@ -975,7 +975,6 @@ async function detailDelete() {
   var app = detailGetApp();
   if (!app) return;
   if (!(await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; })))) return;
-  if (app.publishedFilename) addImportIgnore(app.publishedFilename);
   var id = app.id;
   deleteApp(id).then(function() {
     closeDetailView();
@@ -1026,7 +1025,6 @@ function openPublishedDetail(owner, filename, localId, versionNumber) {
         aimeatOwner: owner,
         aimeatFilename: filename
       };
-      removeImportIgnore(filename); // this app is now intentionally present locally
       return saveApp(app).then(function() {
         getMainApps().push(app);
         renderApps();

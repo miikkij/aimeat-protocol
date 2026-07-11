@@ -1492,23 +1492,6 @@
     .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
     .backup-result-errors { color: #ef4444; }
 
-    .server-import-banner {
-      margin: 0 24px 1rem;
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      background: var(--surface-glass);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      font-size: .85rem;
-      position: relative;
-      z-index: 1;
-    }
-    .server-import-banner-actions { display: flex; gap: 8px; }
-
     #help-overlay,
     #publish-overlay,
     #versions-overlay,
@@ -2136,15 +2119,6 @@
 
   <nav id="tag-bar"></nav>
 
-  <!-- Server-published apps missing locally — import is ALWAYS user-selected -->
-  <div id="server-import-banner" class="server-import-banner" data-view="library" style="display:none">
-    <span>&#x1F4E5; <strong id="server-import-count">0</strong> <span data-i18n="srvImport.bannerText">published apps from your account are not in this catalog.</span></span>
-    <div class="server-import-banner-actions">
-      <button class="modal-btn primary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.review">Review &amp; import...</button>
-      <button class="modal-btn secondary" onclick="window._launcher.dismissServerImportBanner()" data-i18n="srvImport.dismiss">Not now</button>
-    </div>
-  </div>
-
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
@@ -2411,7 +2385,6 @@
         <div class="settings-backup-actions">
           <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
           <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.settingsBtn">📥 Import from server…</button>
           <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
           <input type="file" id="import-file-input" accept=".json" hidden/>
         </div>
@@ -2500,18 +2473,6 @@
     </div>
   </div>
 
-  <!-- Server Apps Import Modal (user-selected) -->
-  <div id="server-import-overlay" hidden>
-    <div class="modal" id="server-import-modal">
-      <h2 data-i18n="srvImport.title">&#x1F4E5; Import published apps</h2>
-      <div id="server-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="server-import-body" style="overflow-y:auto;max-height:55vh"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('server-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.submitServerImport()" data-i18n="srvImport.import">Import selected</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Backup Import Modal -->
   <div id="backup-overlay" hidden>
@@ -2788,7 +2749,7 @@
       "pb.includeCortex": "Include Cortex Extensions",
       "pb.livePreview": "Live Preview",
       "pb.copy": "📋 Copy Prompt",
-      "card.view": "👁 View",
+      "card.view": "Open",
       "card.open": "Open",
       "card.openHint": "Open this app",
       "common.menu": "Menu",
@@ -2863,10 +2824,11 @@
       "card.parkedHint": "Only you can see and use this — hidden from the public catalogue.",
       "card.operatorHidden": "MODERATED BY OPERATOR: HIDDEN",
       "common.loading": "Loading…",
-      "consents.title": "App permissions",
+      "consents.title": "Permissions you granted this app",
       "consents.none": "You haven’t granted this app access.",
-      "consents.granted": "This app can:",
+      "consents.granted": "You granted this app permission to:",
       "consents.revoke": "Revoke access",
+      "consents.hint": "Revoking cuts the app off. It will ask for these again the next time it needs them — individual scopes aren’t edited here.",
       "ctx.details": "🔎 Details",
       "detail.launch": "▶ Launch",
       "detail.status": "Status",
@@ -2930,16 +2892,7 @@
       "dedup.none": "No duplicate apps found.",
       "dedup.confirm": "Delete duplicate copies (favorites and oldest copies are kept)? Copies to delete:",
       "dedup.done": "Duplicates removed",
-      "srvImport.bannerText": "published apps from your account are not in this catalog.",
-      "srvImport.review": "📥 Review & import...",
-      "srvImport.dismiss": "Not now",
-      "srvImport.title": "📥 Import published apps",
-      "srvImport.desc": "These apps are published under your account on the server but missing from this local catalog. Choose which ones to import — nothing is imported automatically.",
       "srvImport.import": "Import selected",
-      "srvImport.importing": "Importing...",
-      "srvImport.someFailed": "Some apps failed to import",
-      "srvImport.settingsBtn": "📥 Import from server…",
-      "srvImport.nothingMissing": "All your published apps are already in this catalog.",
       "backup.menu": "Backup",
       "backup.exportAll": "📦 Export all (.zip)",
       "backup.importFrom": "📥 Import from backup...",
@@ -3144,7 +3097,7 @@
       "pb.includeCortex": "Sisällytä Cortex-laajennukset",
       "pb.livePreview": "Esikatselu",
       "pb.copy": "📋 Kopioi prompti",
-      "card.view": "👁 Näytä",
+      "card.view": "Avaa",
       "card.open": "Avaa",
       "card.openHint": "Avaa tämä sovellus",
       "common.menu": "Valikko",
@@ -3219,10 +3172,11 @@
       "card.parkedHint": "Vain sinä näet ja voit käyttää tätä — ei näy julkisessa katalogissa.",
       "card.operatorHidden": "MODEROITU OPERAATTORIN TOIMESTA: PIILOTETTU",
       "common.loading": "Ladataan…",
-      "consents.title": "Appin oikeudet",
+      "consents.title": "Sovellukselle antamasi luvat",
       "consents.none": "Et ole antanut tälle apille pääsyä.",
-      "consents.granted": "Tämä appi voi:",
+      "consents.granted": "Annoit tälle sovellukselle luvan:",
       "consents.revoke": "Peru pääsy",
+      "consents.hint": "Peruminen katkaisee sovelluksen pääsyn. Se pyytää nämä uudelleen kun seuraavan kerran tarvitsee niitä — yksittäisiä oikeuksia ei muokata täältä.",
       "ctx.details": "🔎 Tiedot",
       "detail.launch": "▶ Käynnistä",
       "detail.status": "Tila",
@@ -3286,16 +3240,7 @@
       "dedup.none": "Duplikaattiappeja ei löytynyt.",
       "dedup.confirm": "Poistetaanko duplikaattikopiot (suosikit ja vanhimmat kopiot säilytetään)? Poistettavia kopioita:",
       "dedup.done": "Duplikaatit poistettu",
-      "srvImport.bannerText": "tilisi julkaistua appia puuttuu tästä katalogista.",
-      "srvImport.review": "📥 Katso ja tuo...",
-      "srvImport.dismiss": "Ei nyt",
-      "srvImport.title": "📥 Tuo julkaistut appit",
-      "srvImport.desc": "Nämä appit on julkaistu tililläsi palvelimella mutta puuttuvat paikallisesta katalogista. Valitse mitkä tuodaan — mitään ei tuoda automaattisesti.",
       "srvImport.import": "Tuo valitut",
-      "srvImport.importing": "Tuodaan...",
-      "srvImport.someFailed": "Osaa appeista ei voitu tuoda",
-      "srvImport.settingsBtn": "📥 Tuo palvelimelta…",
-      "srvImport.nothingMissing": "Kaikki julkaistut appisi ovat jo tässä katalogissa.",
       "backup.menu": "Varmuuskopio",
       "backup.exportAll": "📦 Vie kaikki (.zip)",
       "backup.importFrom": "📥 Tuo varmuuskopiosta...",
@@ -3867,8 +3812,6 @@
   var generateSharePrompt;
   var openPromptBuilder;
   var showPublishModal;
-  var addImportIgnore;
-  var removeImportIgnore;
   var getMainApps;
   var getServerState;
   var getServerManifests;
@@ -3876,7 +3819,7 @@
   var setIframeUrl;
   var isOperatorSession;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, addImportIgnore, removeImportIgnore, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -4676,7 +4619,6 @@
     if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
       return app.name || "this app";
     }))) return;
-    if (app.publishedFilename) addImportIgnore(app.publishedFilename);
     var id = app.id;
     deleteApp(id).then(function() {
       closeDetailView();
@@ -4727,7 +4669,6 @@
         aimeatOwner: owner,
         aimeatFilename: filename
       };
-      removeImportIgnore(filename);
       return saveApp(app).then(function() {
         getMainApps().push(app);
         renderApps();
@@ -6610,7 +6551,7 @@
       }
       body.innerHTML = '<div style="margin-bottom:6px;color:var(--text)">' + t("consents.granted") + '</div><ul style="margin:0 0 14px;padding-left:18px">' + g.scopes.map(function(s) {
         return "<li><code>" + escapeHtml(s) + "</code></li>";
-      }).join("") + `</ul><button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent('` + jsArg(g.grant_id) + `')">` + t("consents.revoke") + "</button>";
+      }).join("") + '</ul><div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + t("consents.hint") + `</div><button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent('` + jsArg(g.grant_id) + `')">` + t("consents.revoke") + "</button>";
     }).catch(function(e) {
       var body = document.getElementById("consents-body");
       if (body) {
@@ -6881,155 +6822,6 @@
     };
     body.innerHTML = '<h3 style="font-size:.95rem;margin:6px 0">✔ ' + t("backup.resultTitle") + '</h3><div style="font-size:.85rem">' + t("backup.resVersions") + ": " + s.versions_restored + "</div>" + section(t("backup.resCreated"), s.apps_created.concat(s.extensions_created)) + section(t("backup.resAppended"), s.apps_appended) + section(t("backup.resCopied"), s.apps_copied.concat(s.extensions_copied)) + section(t("backup.resSkipped"), s.apps_skipped.concat(s.extensions_skipped)) + (s.errors.length ? '<div class="backup-result-errors">' + section(t("backup.resErrors"), s.errors) + "</div>" : "");
   }
-  function importIgnoreKey() {
-    return "appCatalogImportIgnore." + getDbName();
-  }
-  function getImportIgnore() {
-    try {
-      return JSON.parse(localStorage.getItem(importIgnoreKey()) || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-  function addImportIgnore2(filename) {
-    var list = getImportIgnore();
-    if (list.indexOf(filename) === -1) {
-      list.push(filename);
-      localStorage.setItem(importIgnoreKey(), JSON.stringify(list));
-    }
-  }
-  function removeImportIgnore2(filename) {
-    localStorage.setItem(importIgnoreKey(), JSON.stringify(getImportIgnore().filter(function(f) {
-      return f !== filename;
-    })));
-  }
-  var serverImportState = { missing: [], aimeatUrl: "" };
-  function updateServerImportState(ownApps, localByFilename, aimeatUrl) {
-    serverImportState.missing = ownApps.filter(function(sa) {
-      return sa.filename && !localByFilename[sa.filename];
-    });
-    serverImportState.aimeatUrl = aimeatUrl;
-    renderServerImportBanner();
-  }
-  function renderServerImportBanner() {
-    var banner = document.getElementById("server-import-banner");
-    if (!banner) return;
-    var ignore = getImportIgnore();
-    var fresh = serverImportState.missing.filter(function(sa) {
-      return ignore.indexOf(sa.filename) === -1;
-    });
-    if (fresh.length === 0 || sessionStorage.getItem("aimeatServerImportDismissed") === "1") {
-      banner.style.display = "none";
-      return;
-    }
-    document.getElementById("server-import-count").textContent = fresh.length;
-    banner.style.display = "";
-  }
-  function dismissServerImportBanner() {
-    sessionStorage.setItem("aimeatServerImportDismissed", "1");
-    renderServerImportBanner();
-  }
-  function showServerImportModal() {
-    var settingsOv = document.getElementById("settings-overlay");
-    if (settingsOv) settingsOv.hidden = true;
-    var missing = serverImportState.missing || [];
-    var body = document.getElementById("server-import-body");
-    var ignore = getImportIgnore();
-    if (missing.length === 0) {
-      body.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted);padding:8px 0">' + t("srvImport.nothingMissing") + "</p>";
-      document.getElementById("server-import-status").textContent = "";
-      document.getElementById("server-import-overlay").hidden = false;
-      return;
-    }
-    var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t("srvImport.desc") + '</p><div class="backup-toolbar-row"><div><button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(true)">' + t("backup.selectAll") + '</button> / <button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(false)">' + t("backup.selectNone") + '</button></div></div><table class="backup-table"><tbody>';
-    for (var i = 0; i < missing.length; i++) {
-      var sa = missing[i];
-      var name = sa.manifest && sa.manifest.name ? sa.manifest.name : sa.filename;
-      var checked = ignore.indexOf(sa.filename) === -1 ? " checked" : "";
-      html += '<tr><td><input type="checkbox" class="server-import-cb" data-i="' + i + '"' + checked + "/></td><td>" + escapeHtml(name) + '<div class="mono-cell">' + escapeHtml(sa.filename) + "</div></td><td>" + (sa.version_number ? "v" + sa.version_number : "") + "</td><td>" + (sa.created_at ? new Date(sa.created_at).toLocaleDateString() : "") + "</td></tr>";
-    }
-    html += "</tbody></table>";
-    body.innerHTML = html;
-    document.getElementById("server-import-status").textContent = "";
-    document.getElementById("server-import-overlay").hidden = false;
-  }
-  function serverImportSelectAll(checked) {
-    document.querySelectorAll(".server-import-cb").forEach(function(b) {
-      b.checked = checked;
-    });
-  }
-  function submitServerImport() {
-    var selected = [];
-    document.querySelectorAll(".server-import-cb").forEach(function(b) {
-      if (b.checked) selected.push(serverImportState.missing[parseInt(b.getAttribute("data-i"), 10)]);
-    });
-    var statusEl = document.getElementById("server-import-status");
-    if (selected.length === 0) {
-      statusEl.style.color = "#ef4444";
-      statusEl.textContent = t("backup.nothingSelected");
-      return;
-    }
-    statusEl.style.color = "var(--text-muted)";
-    statusEl.textContent = t("srvImport.importing");
-    importServerApps(selected, serverImportState.aimeatUrl).then(function(res) {
-      var failedNames = {};
-      res.failed.forEach(function(f) {
-        failedNames[f.filename] = true;
-      });
-      selected.forEach(function(sa) {
-        if (!failedNames[sa.filename]) removeImportIgnore2(sa.filename);
-      });
-      renderApps4();
-      loadPublishedApps3();
-      if (res.failed.length) {
-        statusEl.style.color = "#ef4444";
-        statusEl.textContent = t("srvImport.someFailed") + " (" + res.failed.length + "): " + res.failed.map(function(f) {
-          return f.filename;
-        }).join(", ");
-      } else {
-        document.getElementById("server-import-overlay").hidden = true;
-      }
-    }).catch(function(e) {
-      statusEl.style.color = "#ef4444";
-      statusEl.textContent = e.message || String(e);
-    });
-  }
-  function importServerApps(toImport, aimeatUrl) {
-    if (toImport.length === 0) return Promise.resolve({ imported: 0, failed: [] });
-    var failed = [];
-    return Promise.all(toImport.map(function(sa) {
-      return fetchAppContentBase64(aimeatUrl, sa.owner || "", sa.filename).then(function(b64) {
-        var manifest = sa.manifest || {};
-        var app = {
-          id: generateId5(),
-          name: manifest.name || sa.filename,
-          description: manifest.description || "",
-          source: "aimeat",
-          origin: "ai-published",
-          url: null,
-          blob: b64,
-          tags: manifest.tags || [],
-          openMode: "tab",
-          icon: manifest.icon || "🤖",
-          screenshot: null,
-          favorite: false,
-          addedAt: sa.created_at || (/* @__PURE__ */ new Date()).toISOString(),
-          lastOpenedAt: null,
-          published: true,
-          publishedFilename: sa.filename,
-          publishedAt: sa.created_at || (/* @__PURE__ */ new Date()).toISOString(),
-          publishedUrl: "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(sa.filename),
-          publishedVersionNumber: sa.version_number || 1
-        };
-        return saveApp(app);
-      }).catch(function(err) {
-        failed.push({ filename: sa.filename, error: err && err.message || String(err) });
-        return null;
-      });
-    })).then(function() {
-      return { imported: toImport.length - failed.length, failed };
-    });
-  }
   function fetchAllPublishedApps(aimeatUrl, headers) {
     var LIMIT = 200;
     var all = [];
@@ -7066,17 +6858,7 @@
       }
     } catch (e) {
     }
-    getAllApps().then(function(apps) {
-      var localPublished = apps.filter(function(a) {
-        return a.published;
-      });
-      var localByFilename = {};
-      for (var i = 0; i < localPublished.length; i++) {
-        var lp = localPublished[i];
-        if (lp.publishedFilename) {
-          localByFilename[lp.publishedFilename] = lp;
-        }
-      }
+    getAllApps().then(function() {
       if (!aimeatUrl) {
         setOwnServerApps([]);
         renderApps4();
@@ -7099,15 +6881,11 @@
         var communityApps = currentOwner ? serverApps.filter(function(a) {
           return !sameOwner(a.owner, currentOwner);
         }) : serverApps;
-        var ownPublished = ownApps.filter(function(a) {
-          return !a.parked;
-        });
         return loadSubdomainSites().then(function() {
           setOwnServerApps(currentOwner ? ownApps : []);
           renderApps4();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           applyServerFilter();
-          updateServerImportState(ownPublished, localByFilename, aimeatUrl);
         });
       }).catch(function() {
         setOwnServerApps([]);
@@ -7191,7 +6969,6 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
-        removeImportIgnore2(app.publishedFilename);
         app.published = false;
         delete app.publishedFilename;
         delete app.publishedAt;
@@ -7278,7 +7055,6 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
-        removeImportIgnore2(filename);
         loadPublishedApps3();
       } else {
         showNotice("Failed to delete: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
@@ -7695,7 +7471,6 @@
         if (await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
           return app.name || "this app";
         }))) {
-          if (app.publishedFilename) addImportIgnore2(app.publishedFilename);
           deleteApp(appId).then(function() {
             renderApps5();
             loadPublishedApps3();
@@ -7977,10 +7752,6 @@
     jsonImportSelectAll,
     submitJsonImport,
     removeDuplicateApps,
-    showServerImportModal,
-    dismissServerImportBanner,
-    serverImportSelectAll,
-    submitServerImport,
     toggleBackupMenu,
     toggleCreateMenu,
     toggleCortexBar,
@@ -8055,8 +7826,6 @@
       generateSharePrompt: generateSharePrompt2,
       openPromptBuilder: openPromptBuilder2,
       showPublishModal: showPublishModal2,
-      addImportIgnore: addImportIgnore2,
-      removeImportIgnore: removeImportIgnore2,
       getMainApps: function() {
         return allApps;
       },
@@ -8224,11 +7993,6 @@
         this.hidden = true;
       }
     });
-    document.getElementById("server-import-overlay").addEventListener("click", function(e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
     document.getElementById("json-import-overlay").addEventListener("click", function(e) {
       if (e.target === this) {
         this.hidden = true;
@@ -8372,8 +8136,6 @@
           document.getElementById("subdomain-overlay").hidden = true;
         } else if (!document.getElementById("backup-overlay").hidden) {
           document.getElementById("backup-overlay").hidden = true;
-        } else if (!document.getElementById("server-import-overlay").hidden) {
-          document.getElementById("server-import-overlay").hidden = true;
         } else if (!document.getElementById("json-import-overlay").hidden) {
           document.getElementById("json-import-overlay").hidden = true;
         } else if (!document.getElementById("settings-overlay").hidden) {
