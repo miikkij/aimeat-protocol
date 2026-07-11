@@ -10,6 +10,9 @@
  *     MCP list (cross-member registry aggregation regression).
  *   v1.2.0 — 2026-06-09 — Test 15 now joins via MCP aimeat_organism_join (was REST), so 15–18 also cover
  *     the membership-identity fix (join must store the bare owner name the workspace gate checks).
+ *   v1.3.0 — 2026-07-11 — Tests 9a–9d: embedded-image URL normalization on write/publish (raw
+ *     /v1/storage → owner-addressed /v1/pub + file scoped to the workspace; upload embed_url; missing
+ *     file left unchanged).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -275,6 +278,67 @@ await test('8f. organism_overview lists the workspace with a breakdown', async (
 await test('8g. overview membership gate: A cannot overview owner 2 organism', async () => {
     const b = await A.client.call('aimeat_organism_overview', { organism_id: otherOrgId }, 1089);
     assert(b.result.isError === true, 'denied (not a member)');
+});
+
+// ── Embedded-image URL normalization ──
+// MCP-authored docs used to store raw ![](/v1/storage/<key>) URLs that loaded for nobody but the file
+// owner (the GET is owner-scoped + token-gated). On write + publish the backend now rewrites embedded
+// images to the owner-addressed /v1/pub form AND scopes the file to THIS workspace (members-only —
+// never the public internet). The upload response also hands back a ready embed_url.
+const IMG_KEY = `img/pyramid-${Date.now()}.png`;
+const PNG_1x1_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const embedUrlFor = (gaii: string, key: string) => `/v1/pub/${encodeURIComponent(gaii)}/${key.split('/').map(encodeURIComponent).join('/')}`;
+let imgAgentGaii = '', imgAgentToken = '', imgDocId = '';
+
+await test('9a. storage upload response carries owner_gaii + embed_url/embed_markdown', async () => {
+    // A storage-capable agent of owner 1 uploads the image (default agent scopes exclude storage).
+    const ag = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ name: `imgagent${Date.now()}`, owner: A.ownerName, capabilities: ['storage'], model: 'gpt-4o' }) });
+    assert(ag.status === 201, `img agent ${ag.status}: ${JSON.stringify(ag.body.error || ag.body)}`);
+    imgAgentGaii = ag.body.data.agent.gaii;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: imgAgentGaii, timestamp: ts, signature: await signMsg(ag.body.data.private_key, imgAgentGaii + ts) }) });
+    imgAgentToken = tok.body.data.token;
+    const up = await json('/v1/storage', { method: 'POST', headers: { Authorization: `Bearer ${imgAgentToken}` }, body: JSON.stringify({ key: IMG_KEY, data: PNG_1x1_B64, mime_type: 'image/png', visibility: 'private' }) });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body.error || up.body)}`);
+    assert(up.body.data.owner_gaii === imgAgentGaii, `owner_gaii in response: ${up.body.data.owner_gaii}`);
+    assert(up.body.data.embed_url === embedUrlFor(imgAgentGaii, IMG_KEY), `embed_url: ${up.body.data.embed_url}`);
+    assert(typeof up.body.data.embed_markdown === 'string' && up.body.data.embed_markdown.includes(up.body.data.embed_url), 'embed_markdown wraps embed_url');
+});
+
+await test('9b. write doc embedding /v1/storage/<key> → stored markdown rewritten to /v1/pub + file scoped to the workspace', async () => {
+    const md = `# Pyramid\n\n![pyramid](/v1/storage/${IMG_KEY})\n`;
+    const w = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'page', value: { title: 'Pyramid', markdown: md } }, 190);
+    assert(w.result.isError !== true, `write error: ${w.result.content?.[0]?.text}`);
+    imgDocId = JSON.parse(w.result.content[0].text).id;
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: [imgDocId] }, 191);
+    const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === imgDocId);
+    assert(item, 'doc readable');
+    const stored = item.value.markdown as string;
+    assert(!stored.includes(`/v1/storage/${IMG_KEY}`), `raw /v1/storage URL must be gone: ${stored}`);
+    assert(stored.includes(embedUrlFor(imgAgentGaii, IMG_KEY)), `rewritten to owner-addressed /v1/pub: ${stored}`);
+    // The file is now workspace-scoped (members-only), NOT public.
+    const head = await fetch(`${BASE}/v1/storage/${IMG_KEY}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
+    assert(head.status === 200, `HEAD own file ${head.status}`);
+    assert(head.headers.get('x-aimeat-visibility') === 'workspace', `file scoped to workspace, got ${head.headers.get('x-aimeat-visibility')}`);
+});
+
+await test('9c. publish → .latest markdown also carries the /v1/pub URL', async () => {
+    const p = await A.client.call('aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'shared.pages', id: imgDocId }, 192);
+    assert(p.result.isError !== true, `publish error: ${p.result.content?.[0]?.text}`);
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: [imgDocId] }, 193);
+    const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === imgDocId);
+    assert(item && item.published === true, 'doc published');
+    assert((item.value.markdown as string).includes(embedUrlFor(imgAgentGaii, IMG_KEY)), 'published markdown carries /v1/pub URL');
+});
+
+await test('9d. an embed pointing at a NON-existent file is left unchanged (never rewritten to a wrong target)', async () => {
+    const missing = `/v1/storage/img/does-not-exist-${Date.now()}.png`;
+    const w = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'page', value: { title: 'Missing', markdown: `![x](${missing})` } }, 194);
+    assert(w.result.isError !== true, `write error: ${w.result.content?.[0]?.text}`);
+    const id = JSON.parse(w.result.content[0].text).id;
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: [id] }, 195);
+    const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === id);
+    assert(item && (item.value.markdown as string).includes(missing), `unresolved embed left as-is: ${item?.value?.markdown}`);
 });
 
 await test('8b. delete removes a published object (draft + latest + versions)', async () => {

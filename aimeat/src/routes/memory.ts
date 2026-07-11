@@ -22,6 +22,8 @@
  *   v1.8.0 -- 2026-07-03 -- POST /v1/memory/bundle: ZIP export of selected memory values + storage
  *     files (+ manifest.json) for the profile "collection cart". Owner-scoped (caller's GHII + owned
  *     agents); non-owned/missing items are skipped and recorded in the manifest. Uses archiver.
+ *   v1.9.0 -- 2026-07-11 -- POST /v1/memory/files response adds embed_url/embed_markdown (owner-addressed
+ *     /v1/pub embed form; see services/doc-images).
  */
 
 import { Router } from 'express';
@@ -38,6 +40,7 @@ import { checkDeleteGuard } from '../services/write-guards.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { enqueueMemoryReplication } from '../services/memory-replication.js';
+import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { cached, TTL } from '../services/cache.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
@@ -1327,6 +1330,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       visibility: file.visibility,
       tags: file.tags || [],
       created_at: file.createdAt,
+      // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file to
+      // that workspace's members on save (never the public internet) — use it, not /v1/memory/files/<key>.
+      embed_url: pubEmbedUrl(file.ownerGaii, file.key),
+      embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
     }));
     emitChange('memory');
   });

@@ -18,6 +18,8 @@
  *     document can make its embedded images public for other viewers.
  *   v1.4.0 -- 2026-06-21 -- Drop the presigned-download audit write: allowed reads are no longer
  *     audited (consent audit now records only denials + grant/revoke mutations).
+ *   v1.5.0 -- 2026-07-11 -- POST /v1/storage response carries owner_gaii + embed_url/embed_markdown so a
+ *     caller can embed the file with the owner-addressed /v1/pub form (see services/doc-images).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -35,6 +37,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
+import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -229,12 +232,17 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
         res.status(201).json(success(config.nodeId, {
             key: file.key,
+            owner_gaii: file.ownerGaii,
             size: file.size,
             mime_type: file.mimeType,
             visibility: file.visibility,
             federate: file.federate ?? false,
             created_at: file.createdAt,
             overage_charged: storageQuota.overageMorsels > 0 ? storageQuota.overageMorsels : undefined,
+            // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file
+            // to that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
+            embed_url: pubEmbedUrl(file.ownerGaii, file.key),
+            embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(key)}` },
             { description: 'List all files', method: 'GET', url: '/v1/storage' },

@@ -27,6 +27,8 @@
  *   v1.8.0 -- 2026-05-30 -- F10 drift reconciliation: align catalog input metadata with reconciled
  *     server/connector schemas (organism, knowledge, groups, catalogue, apps, capabilities, boards,
  *     flags, memory, tasks, work, message, handbook, extensions, cortex, storage, instances).
+ *   v1.9.0 -- 2026-07-11 -- aimeat_storage_upload description: embed images via the response embed_url /
+ *     embed_markdown (owner-addressed /v1/pub), never a hand-written /v1/storage path.
  */
 
 export type ToolCallerType = 'agent' | 'owner' | 'operator' | 'public';
@@ -613,7 +615,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_storage_upload',
-        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download.',
+        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download. TO EMBED AN IMAGE IN A WORKSPACE DOCUMENT: use the embed_markdown / embed_url from the response (the owner-addressed /v1/pub/<owner>/<key> form) — NEVER hand-write a /v1/storage/<key> path, which loads for nobody but you. Saving an embedded image into a document automatically scopes the file to that workspace\'s members; it is not exposed to the public internet.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1258,7 +1260,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_write',
-        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>). Member-only.",
+        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images by uploading with aimeat_storage_upload and using the embed_markdown / embed_url it returns (the owner-addressed /v1/pub form) — NOT a hand-written /v1/storage/<key> path, which loads only for you. On save the embedded image is scoped to this workspace's members (not the public internet). Member-only.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

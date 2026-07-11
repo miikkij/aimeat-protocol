@@ -65,6 +65,9 @@
  *     instance's id/title/updated/version/bytes — titles only, no bodies) instead of every object's full
  *     value in one blob (which grew to 100s of KB, too big for an MCP round-trip). Pass `ids` to
  *     batch-open the FULL value of just those instances. Version history is never surfaced by _read.
+ *   v1.14.0 -- 2026-07-11 -- _write + _publish normalize embedded document image URLs (raw /v1/storage
+ *     → owner-addressed /v1/pub) and scope those files to the workspace (members-only) via
+ *     services/doc-images — MCP-authored docs no longer store images that load for nobody.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -85,6 +88,7 @@ import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemory
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
+import { normalizeDocValueImages } from '../services/doc-images.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -409,7 +413,11 @@ export function registerWorkspaceTools(
             if (!instanceId && isDoc) instanceId = 'doc-' + Math.random().toString(36).slice(2, 9);
             if (!instanceId) return fail('A records write needs an id (pass `id`, or include `id` in `value`).');
             const key = `${root}.${ot.namespace}.${instanceId}.draft`;
-            const v = coerceValue(value, instanceId);
+            let v = coerceValue(value, instanceId);
+            // Rewrite embedded image URLs to the owner-addressed /v1/pub form and scope those files to
+            // THIS workspace (members-only). MCP-authored docs otherwise store raw /v1/storage URLs that
+            // load for nobody but the file owner — the exact reason chat-written docs showed broken images.
+            if (isDoc) v = await normalizeDocValueImages(storage, config, v, ownerName, `${organism_id}/${ws}`);
             const valid = await validateMemoryWrite(key, v, storage);
             if (!valid.valid) return fail('Draft rejected by schema: ' + JSON.stringify(valid.errors));
             await writeRecord(key, v, await findByKey(key));   // content → authored by the calling agent
@@ -442,7 +450,10 @@ export function registerWorkspaceTools(
             const draft = items.filter(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)))
                 .reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
             if (!draft) return fail(`No draft at ${base}.draft`);
-            const valid = await validateMemoryWrite(`${base}.latest`, draft.value, storage, { viaPublish: true, expectedVersion: expected_version ?? null });
+            // Safety net for drafts written before the write-path normalizer (or by other clients): scope
+            // embedded images to this workspace + rewrite to /v1/pub before they become the published copy.
+            const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerName, `${organism_id}/${ws}`);
+            const valid = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion: expected_version ?? null });
             if (!valid.valid) return fail('Publish refused: ' + JSON.stringify(valid.errors));
             let maxN = 0;
             for (const r of items) { if (r.key.startsWith(`${base}.version.`)) { const s = r.key.slice(`${base}.version.`.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); } }
@@ -452,7 +463,7 @@ export function registerWorkspaceTools(
             // Change-guard: an unchanged re-publish (a contract agent re-publishes the same draft on every
             // poll/status cycle) must NOT append a byte-identical .version.N. Consume the draft and return
             // without touching .latest or firing the Tracked-Response/structure side effects.
-            if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draft.value)) {
+            if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
                 await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
                 emitChange('organisms');
                 return ok({ published: base, version: maxN, skipped: true });
@@ -468,8 +479,8 @@ export function registerWorkspaceTools(
             // record's existing owner (normalised to their GHII — never a raw agent GAII); a brand-new
             // record is owned by the caller's GHII. collapseTo removes any copy left under another identity.
             const latestOwner = existingLatest ? `${bareOwner(existingLatest.ownerGaii)}@${config.nodeId}` : ownerGhii;
-            if (versioned) await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
-            await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+            if (versioned) await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+            await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await collapseTo(`${base}.latest`, latestOwner);
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');

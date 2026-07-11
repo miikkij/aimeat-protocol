@@ -20,6 +20,8 @@
  *   v1.2.0 — 2026-07-05 — handleSkillUpload: skill-directory ZIPs (utype 'skill') extracted
  *     via the hardened safeUnzip (traversal/symlink/bomb guards + skill-layout allowlist)
  *     and published into the skills registry.
+ *   v1.3.0 — 2026-07-11 — handleStorageUpload response carries owner_gaii + embed_url/embed_markdown
+ *     (the owner-addressed /v1/pub embed form; see services/doc-images).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -33,6 +35,7 @@ import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
+import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -209,9 +212,14 @@ async function handleStorageUpload(
         success: true,
         type: 'storage',
         key: file.key,
+        owner_gaii: file.ownerGaii,
         size: file.size,
         mime_type: mimeType,
         visibility,
+        // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file to
+        // that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
+        embed_url: pubEmbedUrl(file.ownerGaii, file.key),
+        embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
     });
 }
 
