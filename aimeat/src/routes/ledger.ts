@@ -36,6 +36,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { getOwnerBudgetStatus } from '../services/ledger-budget.js';
 import { getOwnerMonthlyBilling, billingToCsv } from '../services/ledger-billing.js';
+import { getAdminLedger } from '../services/ledger-admin.js';
 
 type GroupDim = 'day' | 'agent' | 'model' | 'provider' | 'organism' | 'workspace' | 'scope';
 
@@ -275,6 +276,20 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
         return res.send(billingToCsv(summary));
       }
       res.json(success(config.nodeId, summary));
+    });
+
+  // ── GET /v1/admin/ledger ── OPERATOR-ONLY cross-user aggregate (NOT owner-scoped).
+  // requireRole('operator') gates the un-scoped cross-owner read (queryUsageDailyAllOwners).
+  // Node-wide totals + per-day series + per-user "top spenders" + per-agent + per-model, so the
+  // operator dashboard can show everyone's agent spend and drill per user → per agent.
+  router.get('/v1/admin/ledger',
+    requireAuth(),
+    requireRole('operator'),
+    async (req: Request, res: Response) => {
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      const data = await getAdminLedger(storage, { from, to });
+      res.json(success(config.nodeId, data));
     });
 
   return router;

@@ -66,7 +66,7 @@ import type {
   AgentDirectivesRecord, OwnerAgentDefaults,
   SharingGroupRecord,
   AgentActivityRecord,
-  AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter,
+  AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter, UsageEventFilter, AdminUsageDailyFilter,
   AgentMessageRecord,
   DirectMessageRecord,
   ContactConsentRecord,
@@ -6836,6 +6836,10 @@ export class SqliteStorage implements Storage {
 
   async listUsageEvents(filter: UsageEventFilter): Promise<AgentUsageEvent[]> {
     return agentUsageRepo.listUsageEvents(this.db, filter);
+  }
+
+  async queryUsageDailyAllOwners(filter: AdminUsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
+    return agentUsageRepo.queryUsageDailyAllOwners(this.db, filter);
   }
 
   // ══════════════════════════════════════════════════════════
