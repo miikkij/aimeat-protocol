@@ -128,7 +128,7 @@ AIMEAT's core interaction pattern: the app generates ready-made prompts, the use
 
 ## AIMEAT Development Organism (dogfood) — session rituals
 
-AIMEAT's development is tracked in an **AIMEAT organism** on aimeat.io (id `fbb51de5-56d5-4143-9871-b998a1187655`) via the **appdev MCP** (`mcp__claude_ai_AIMEAT_APPDEV__*`) — source of truth for **coordination + working context** (and for new design specs / roadmaps — see **Rule 11**); the repo stays source of truth for **code + the canonical protocol contract** (`openapi.yaml`, RFC). Full design: `docs/internal/aimeat-dev-organism-plan.md`.
+AIMEAT's development is tracked in an **AIMEAT organism** on aimeat.io (id `fbb51de5-56d5-4143-9871-b998a1187655`) via the **appdev MCP** (`mcp__claude_ai_AIMEAT_Appdev__*`) — source of truth for **coordination + working context** (and for new design specs / roadmaps — see **Rule 11**); the repo stays source of truth for **code + the canonical protocol contract** (`openapi.yaml`, RFC). Full design: `docs/internal/aimeat-dev-organism-plan.md`.
 
 **These rituals apply ONLY when the appdev MCP is connected.** If not, skip silently.
 
@@ -152,8 +152,8 @@ When creating/editing `room.target` records in the MACHINE ROOM workspace (org `
 
 - **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
 - **Framework:** Express 5.2.1 — `req.params` returns `string | string[]`, cast with `as string`
-- **Language:** TypeScript 5.9.3, strict, ES2022, NodeNext
-- **Crypto:** @noble/ed25519 3.0, jose 6.1 (EdDSA JWTs)
+- **Language:** TypeScript 6.0.x, strict, ES2022, NodeNext
+- **Crypto:** @noble/ed25519 3.1, jose 6.2 (EdDSA JWTs)
 - **Package manager:** pnpm · **Port:** 40050
 
 ## Identity Model — GHII vs GAII (CRITICAL)
@@ -216,7 +216,7 @@ pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
 
 Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding`. Memory-backend test commands are **deprecated** — don't use them.
 
-**Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` pass. The same four run in CI (`.github/workflows/ci.yml`). E2E/Playwright are NOT in the hook (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
+**Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` + `check:no-max-tokens` + `check:app-catalog` pass. The same six run in CI (`.github/workflows/ci.yml`). E2E/Playwright are NOT in the hook (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
 
 ## Code Conventions
 
@@ -228,9 +228,9 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 
 **Auth middleware** — `requireAuth()`, `requireRole('owner'|'agent')`, `requireScope('memory:write')` from `src/auth/middleware.js`. Owner endpoints: `req.auth!.sub` is the bare owner name, scopes bypassed. Agent endpoints: `req.auth!.sub` is the full GAII, `req.auth!.owner` the owner name.
 
-**Route registration** — routers follow `export function myRouter(config, storage): Router { ... }`, mounted in `src/server.ts` via `app.use(myRouter(config, storage))`.
+**Route registration** — routers follow `export function myRouter(config, storage): Router { ... }`, mounted via `app.use(myRouter(config, storage))` in `mountRoutes()` (`src/server-bootstrap/routes-loader.ts`).
 
-**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); two backends (SQLite better-sqlite3, MongoDB Prisma). New data types/fields must update ALL backends — see `docs/coding-guidelines/storage-sync.md`.
+**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); two supported backends (SQLite better-sqlite3, MongoDB Prisma; a PostgreSQL Prisma backend also exists). New data types/fields must update ALL backends — see `docs/coding-guidelines/storage-sync.md`.
 
 **Imports** — always use `.js` extensions (ESM): `import { foo } from '../services/foo.js';`
 
@@ -253,7 +253,7 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 
 ## Frontend
 
-Preact + HTM SPA, no build step. Full architecture, component library, admin conventions, **ES-module cache-busting (importmap + BUILD_ID)**, and **SSE live updates**: `docs/frontend-development-guide.md`.
+Preact + HTM SPA, no build step (the main SPA; the app-catalog is the one exception — an esbuild build, see [`docs/pitfalls.md`](docs/pitfalls.md) §1). Full architecture, component library, admin conventions, **ES-module cache-busting (importmap + BUILD_ID)**, and **SSE live updates**: `docs/frontend-development-guide.md`.
 
 Two rules from those mechanisms that bite often:
 - **New shared JS module** (absolute path like `/js/services/foo.js`): add an identity entry to the importmap in `public/spa.html` (`"/js/services/foo.js": "/js/services/foo.js"`). `portal.ts` stamps `?v=BUILD_ID` automatically. Relative imports, bare specifiers, and CSS need no entry.
@@ -302,8 +302,6 @@ The catalogue of traps we've hit — organised by the KIND of problem (build/bun
 ### Generator pipeline notes
 
 When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
-
-Known Phase 4/5 bugs to fix before enabling component/app-domain cortex or app phases are documented in `docs/superpowers/plans/2026-04-02-phase3-cortex-checklist.md` (wrong test prompt for non-data cortex; app not tested).
 
 ## Naming Convention — AIMEAT Only
 
