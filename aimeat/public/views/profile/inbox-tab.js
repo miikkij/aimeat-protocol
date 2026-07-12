@@ -8,9 +8,18 @@
  *   Toast UI editor used by workspace documents (Markdown⇄WYSIWYG toggle, lazy-loaded), with a
  *   markdown-textarea + live-preview fallback. First contact is gated as a request (accept/block).
  *   Re-fetches on SSE updates.
- * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · InteractiveForm · Avatar · helpers
+ * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · ReplyWithAiPopover · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.16.0 -- 2026-07-12 -- Peer display names (TARGET-031 part A): thread head, conversation list, group
+ *     headers and requests now show the peer's display name with the login handle in parens — "Kalle (kkk)"
+ *     — resolved once per peer (agents via /v1/agents/:gaii, humans via /v1/ghii/:ghii, both public) and
+ *     cached; federated peers not in the local store keep the bare handle.
+ *   v1.15.0 -- 2026-07-12 -- Reply with AI (TARGET-031): a ✨ action on the thread head (whole conversation)
+ *     and on every message bubble hands the conversation/message to the user's OWN AI chat via a popover —
+ *     COPY mode (a self-contained prompt to paste into any AI chat) or MCP mode (an AI with the AIMEAT MCP
+ *     reads the thread via aimeat_dm_thread, researches inside AIMEAT, drafts, and sends via aimeat_dm_send
+ *     after approval). Prompt text lives in /js/services/messages-ai-prompts.js.
  *   v1.14.0 -- 2026-06-23 -- Per-message 📓 action parks a message straight into the notebook for later
  *     processing (instant copy via parkMessageToNotebook — keeps the source link + reply intent; no AI step).
  *   v1.13.0 -- 2026-06-23 -- Agent capabilities in chat: (A) a peer agent's public `chat.commands` render
@@ -105,6 +114,7 @@ import { firstLine } from './notebook-helpers.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
+import { buildConversationReplyPrompt, buildMessageReplyPrompt, MODES, peerLabel } from '/js/services/messages-ai-prompts.js';
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
  * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
@@ -464,7 +474,7 @@ function tallyPoll(spec, recipients) {
   return out;
 }
 
-function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
+function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   const trk = tracked ? trackStateLabel(tracked.state) : null;
@@ -480,6 +490,8 @@ function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, tr
             onClick=${() => onTrack?.(msg)}>🔗</button>
           <button class="inbox-bubble-act" title=${t('inbox.parkToNotebook')}
             onClick=${() => onPark?.(msg)}>📓</button>
+          <button class="inbox-bubble-act" title=${t('inbox.ai.replyToMessage')}
+            onClick=${() => onReplyAi?.(msg)}>✨</button>
         </div>
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
         ${msg.interactive?.role === 'questions' ? (
@@ -679,6 +691,47 @@ function SchedulePanel({ agentName, onClose, showToast }) {
   </div>`;
 }
 
+/* ── Reply with AI (TARGET-031) — hand the conversation (or one message) to the user's OWN AI chat so
+ *    it can craft a reply WITH access to their AIMEAT (organisms, memory, workspaces, librarian). Two
+ *    modes: COPY (paste into any AI chat, paste the reply back) and MCP (an AI with the AIMEAT MCP reads
+ *    the thread via aimeat_dm_thread, researches, drafts, and sends via aimeat_dm_send after approval).
+ *    `build(mode)` returns the prompt for the picked mode; the InboxTab supplies it per source. ── */
+function ReplyWithAiPopover({ title, build, onClose, showToast }) {
+  const [mode, setMode] = useState(MODES.COPY);
+  const [copied, setCopied] = useState(false);
+  const text = build(mode);
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+      setCopied(true); setTimeout(() => setCopied(false), 1800);
+      showToast?.(t('inbox.ai.copied'));
+    } catch { showToast?.(t('inbox.failed'), true); }
+  };
+  return html`
+    <div class="inbox-ai-overlay" onClick=${onClose}>
+      <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
+        <div class="inbox-ai-head">
+          <span class="inbox-ai-title">✨ ${title}</span>
+          <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
+        </div>
+        <div class="inbox-ai-modes">
+          <button class=${`inbox-ai-mode${mode === MODES.COPY ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.COPY)}>
+            📋 ${t('inbox.ai.modeCopy')}
+          </button>
+          <button class=${`inbox-ai-mode${mode === MODES.MCP ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.MCP)}>
+            🔌 ${t('inbox.ai.modeMcp')}
+          </button>
+        </div>
+        <div class="inbox-ai-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
+        <textarea class="inbox-ai-text" readOnly rows="14" value=${text}></textarea>
+        <div class="inbox-ai-actions">
+          <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -686,6 +739,9 @@ export default function InboxTab({ showToast }) {
   const [thread, setThread] = useState([]);
   const [urlMap, setUrlMap] = useState({});
   const [mdViewer, setMdViewer] = useState(null);         // { url, name } — open markdown attachment viewer
+  const [aiReply, setAiReply] = useState(null);           // { title, build } — Reply with AI popover (TARGET-031)
+  const [peerNames, setPeerNames] = useState({});         // id (GHII/GAII or owner@node) → resolved display name
+  const peerNamesRef = useRef({});                        // dedup bookkeeping: an id present here was already looked up
   const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
@@ -971,6 +1027,46 @@ export default function InboxTab({ showToast }) {
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
   };
+  // Peer display names (TARGET-031, part A): the conversation payload carries only ids, so resolve a
+  // human-friendly name once per peer and cache it. Agents → GET /v1/agents/:gaii, humans (owner@node) →
+  // GET /v1/ghii/:ghii (both public, both return display_name). Federated peers on another node aren't
+  // in the local store → 404 → we keep the handle. Reserve each id synchronously so we fetch it once.
+  const resolvePeerNames = useCallback((ids) => {
+    const todo = [...new Set((ids || []).filter(Boolean))].filter(id => !(id in peerNamesRef.current));
+    if (!todo.length) return;
+    todo.forEach(id => { peerNamesRef.current[id] = ''; });   // reserve (fallback = handle) so we look it up once
+    Promise.all(todo.map(async (id) => {
+      const path = String(id).includes('#') ? `/v1/agents/${encodeURIComponent(id)}` : `/v1/ghii/${encodeURIComponent(id)}`;
+      const r = await apiGet(path).catch(() => null);
+      const dn = String(r?.data?.display_name || '').trim();
+      if (dn) peerNamesRef.current[id] = dn;
+    })).then(() => setPeerNames({ ...peerNamesRef.current }));
+  }, []);
+  // Resolve names for every peer currently on screen (conversation peers + their owners + requests + open thread).
+  useEffect(() => {
+    const ids = [];
+    for (const c of conversations) { if (c.peerGhii) { ids.push(c.peerGhii); ids.push(ownerKeyOf(c.peerGhii)); } }
+    for (const r of requests) if (r.contactId) ids.push(r.contactId);
+    if (activeConv?.peerGhii) { ids.push(activeConv.peerGhii); ids.push(ownerKeyOf(activeConv.peerGhii)); }
+    resolvePeerNames(ids);
+  }, [conversations, requests, activeConv, resolvePeerNames]);
+  // "Display name (handle)" for an id, falling back to the bare handle when we have no display name.
+  const peerDisplay = (id) => peerLabel(id, peerNames[id]);
+
+  // Reply with AI (TARGET-031): hand the whole open conversation, or one message, to the popover which
+  // renders a copy-paste prompt (any AI chat) or an MCP instruction prompt (aimeat_dm_thread → draft →
+  // aimeat_dm_send after approval). `build(mode)` closes over the current thread/message + peer.
+  const openConversationAi = () => {
+    if (!activeConv) return;
+    const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, thread, peerName: peerNames[activeConv.peerGhii] };
+    setAiReply({ title: `${t('inbox.ai.replyTo')} ${peerDisplay(activeConv.peerGhii)}`, build: (mode) => buildConversationReplyPrompt(src, mode) });
+  };
+  const openMessageAi = (msg) => {
+    if (!activeConv) return;
+    const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, message: msg, peerName: peerNames[activeConv.peerGhii] };
+    setAiReply({ title: t('inbox.ai.replyToMessage'), build: (mode) => buildMessageReplyPrompt(src, mode) });
+  };
+
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
   const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcAudience(''); };
   const addBcRecipient = (id) => {
@@ -1145,7 +1241,7 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-request-top">
               <${Avatar} seed=${r.contactId} size=${36} />
               <div class="inbox-request-id">
-                <div class="inbox-name">${escHtml(peerName(r.contactId))} <${PresenceDot} ghii=${r.contactId} /></div>
+                <div class="inbox-name">${escHtml(peerDisplay(r.contactId))} <${PresenceDot} ghii=${r.contactId} /></div>
                 <div class="inbox-sub">${escHtml(r.contactId)}</div>
               </div>
             </div>
@@ -1167,7 +1263,7 @@ export default function InboxTab({ showToast }) {
           <div class="inbox-conv-group" key=${g.ownerKey}>
             <div class="inbox-conv-group-head">
               <${Avatar} seed=${g.ownerKey} size=${28} />
-              <span class="inbox-name">${escHtml(ownerDisplayName(g.ownerKey))} <${PresenceDot} ghii=${g.ownerKey} /></span>
+              <span class="inbox-name">${escHtml(peerDisplay(g.ownerKey))} <${PresenceDot} ghii=${g.ownerKey} /></span>
               ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
             </div>
             ${g.convs.map(c => convRow(c, true))}
@@ -1180,7 +1276,7 @@ export default function InboxTab({ showToast }) {
     const active = activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
     const sub = subThreadLabel(c.peerGhii);
     // Nested: a subject thread shows its topic; otherwise the agent name / "Direct". Flat: the person.
-    const label = nested ? (c.subject || sub || t('inbox.directThread')) : peerName(c.peerGhii);
+    const label = nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(c.peerGhii);
     const icon = sub ? '🤖' : (c.subject ? '🏷' : '💬');
     return html`
       <button class=${`inbox-conv${active}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId} onClick=${() => openConversation(c)}>
@@ -1219,10 +1315,11 @@ export default function InboxTab({ showToast }) {
         <div class="inbox-thread-head">
           <${Avatar} seed=${activeConv.peerGhii} size=${36} />
           <div class="inbox-thread-id">
-            <div class="inbox-name">${escHtml(peerName(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
+            <div class="inbox-name">${escHtml(peerDisplay(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
             ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
             <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
           </div>
+          <button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ ${t('inbox.ai.replyWithAi')}</button>
           ${peerIsMyAgent ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
             onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
         </div>
@@ -1234,7 +1331,7 @@ export default function InboxTab({ showToast }) {
             return html`
               ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
               <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
-                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} tracked=${trackedByMsg[m.id]}
+                starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
                 answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
                 onAnswer=${submitInteractiveAnswers} submitting=${sending}
                 onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
@@ -1467,5 +1564,6 @@ export default function InboxTab({ showToast }) {
       <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
       ${mdViewer && html`<${MarkdownViewer} url=${mdViewer.url} name=${mdViewer.name} onClose=${() => setMdViewer(null)} />`}
+      ${aiReply && html`<${ReplyWithAiPopover} title=${aiReply.title} build=${aiReply.build} showToast=${showToast} onClose=${() => setAiReply(null)} />`}
     </div>`;
 }
