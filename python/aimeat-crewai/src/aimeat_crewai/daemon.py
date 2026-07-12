@@ -14,6 +14,13 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.16.5 -- Unified wake (the general event-responsiveness fix). When the serve daemon exposes it, the
+    idle wait parks on /local/wake/next, which resolves the instant ANY push source (task/record/dm/
+    message) arrives -- without consuming -- so a multi-source agent wakes on EVERY source instead of
+    only its single parked queue. Supersedes 0.16.4's tasks-quick-check for supported serves and also
+    closes the remaining ≤30s dm-latency (records+dms+tasks) and ≤poll-interval message-latency
+    (messages+tasks) gaps. Falls back to the 0.16.4 per-queue park on an older serve (404 -> latched).
+    See `_wait_unified` + the `wake_unified` gate.
   0.16.4 -- Task pushes wake a records/dms-parked agent (the real event-responsiveness fix). An agent
     listening for BOTH records (or dms) AND tasks parks its idle wait on the records/dm queue (those have
     park-priority), so a task push -- which lands in /local/tasks/next -- never answered that park and
@@ -461,6 +468,39 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
         return out
     except Exception:
         return []
+
+
+def _wait_unified(api: _Api, seconds: float, stop: dict[str, Any]) -> str:
+    """Park on the serve daemon's UNIFIED wake signal (/local/wake/next). Returns:
+      "woke"        -- a push source (task/record/dm/message) arrived; the caller re-lists + drains.
+      "timeout"     -- `seconds` elapsed with nothing.
+      "unsupported" -- the serve daemon is too old to expose the endpoint (404); the caller falls back
+                       to the legacy per-queue park (wake_path + also_wake_tasks).
+
+    Unlike the per-queue long-polls this does NOT consume anything -- it is a pure signal, so the woken
+    cycle drains records/dms and re-lists tasks/messages exactly as on a timeout (nothing to hand back).
+    Long-polled in <=5s chunks so SIGINT/SIGTERM get a look-in; a transient serve hiccup degrades to a
+    short sleep slice (same shape as _wait_for_work)."""
+    deadline = time.monotonic() + seconds
+    while not stop["flag"]:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return "timeout"
+        wait_ms = int(min(remaining, 5.0) * 1000)
+        try:
+            r = api.get(
+                "/local/wake/next",
+                params={"wait": wait_ms, "agent": api.agent_name},
+                timeout=wait_ms / 1000 + 10,
+            )
+            if r.status_code == 200:
+                return "woke"
+            if r.status_code == 404:
+                return "unsupported"
+            # 204 -- this chunk timed out with nothing; loop for the next chunk.
+        except Exception:
+            time.sleep(min(1.0, max(remaining, 0.1)))
+    return "timeout"
 
 
 def _wait_for_work(
@@ -1066,6 +1106,9 @@ def run_crew_daemon(
     woke_by_push = False
     next_poll_due = 0.0  # monotonic deadline for the safety-net re-list; 0 => poll on the first cycle
     safety_net_s = max(poll_interval_seconds, 300)
+    # Unified-wake support (serve >= the /local/wake/next release): None = untested, True = park on the
+    # unified signal (wakes on task/record/dm/message alike), False = serve too old -> legacy per-queue park.
+    wake_unified: bool | None = None
 
     # Concurrent-EXECUTE state (only used when effective_max > 1). Mutated by the
     # MAIN thread only: workers just run and return, the main thread reaps their
@@ -1508,24 +1551,39 @@ def run_crew_daemon(
             # parks on the serve long-poll and wakes instantly on a delivered
             # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            # A records/dms-parked agent that ALSO runs tasks must still wake on task pushes (they land in
-            # /local/tasks/next, not the parked queue). Quick-check tasks inside the park in that case so
-            # an offer/approve push starts EXECUTE within a slice instead of the ~5-min safety net.
-            also_wake_tasks = push_wake and "tasks" in listen_set and wake_path != "/local/tasks/next"
-            wake = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path, also_wake_tasks=also_wake_tasks)
-            woke_by_push = wake is not None
-            # The wake long-poll CONSUMED the event off the serve queue. /local/tasks/next is re-listed
-            # from the store next cycle, but /local/dm/next and /local/records/next are queue-only (no
-            # store re-list, no catch-up mid-session) -- so process the consumed event HERE or it is lost
-            # (a single-DM wake would otherwise be popped and never reach on_dm). The next cycle's drain
-            # still picks up any further events that arrived after this one.
-            if wake:
-                ev = wake.get("event")
-                if isinstance(ev, dict) and not stop["flag"]:
-                    if dms_on and wake_path == "/local/dm/next":
-                        _handle_dm(ev)
-                    elif records_on and wake_path == "/local/records/next":
-                        _handle_record(ev)
+            # Idle wait. PREFERRED: the unified wake (/local/wake/next) resolves the instant ANY push
+            # source (task/record/dm/message) arrives WITHOUT consuming, so this agent wakes on every
+            # source rather than only its single parked queue. It's a pure signal -- the cycle body above
+            # already drains records/dms and re-lists tasks/messages -- so nothing is processed inline.
+            # An older serve answers 404 once; we latch `wake_unified=False` and drop to the legacy park.
+            woke_by_push = False
+            used_unified = False
+            if push_wake and wake_unified is not False:
+                outcome = _wait_unified(api, cycle_sleep, stop)
+                if outcome == "unsupported":
+                    wake_unified = False
+                else:
+                    wake_unified = True
+                    used_unified = True
+                    woke_by_push = outcome == "woke"
+            if not used_unified:
+                # Legacy per-queue park (serve without /local/wake/next, or transport not 'tunnel'). A
+                # records/dms-parked agent that ALSO runs tasks must still wake on task pushes (they land
+                # in /local/tasks/next, not the parked queue), so quick-check tasks inside the park.
+                also_wake_tasks = push_wake and "tasks" in listen_set and wake_path != "/local/tasks/next"
+                wake = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path, also_wake_tasks=also_wake_tasks)
+                woke_by_push = wake is not None
+                # This per-queue park CONSUMED the event. /local/tasks/next is re-listed from the store
+                # next cycle, but /local/dm/next and /local/records/next are queue-only (no store re-list,
+                # no catch-up mid-session) -- so process the consumed event HERE or it is lost (a single-DM
+                # wake would otherwise be popped and never reach on_dm).
+                if wake:
+                    ev = wake.get("event")
+                    if isinstance(ev, dict) and not stop["flag"]:
+                        if dms_on and wake_path == "/local/dm/next":
+                            _handle_dm(ev)
+                        elif records_on and wake_path == "/local/records/next":
+                            _handle_record(ev)
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
 

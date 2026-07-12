@@ -47,6 +47,10 @@
  *   v1.3.0 — 2026-06-22 — P3 cancellation push: `task.cancelled` delivers populate a per-agent
  *     cancelled-set, exposed at `GET /local/cancelled` so the daemon checks a loopback set instead of
  *     scanning owner-scoped `agents.cancel.*` memory before every dispatch.
+ *   v1.4.0 — 2026-07-12 — Unified wake: `GET /local/wake/next` resolves the instant ANY push source
+ *     (task/record/dm/message) arrives, without consuming — a pure signal so the woken daemon drains
+ *     each queue as usual. Lets a multi-source agent (records+tasks, dms+tasks, …) wake on EVERY source
+ *     instead of only its single parked queue (the per-queue `/next` endpoints stay for older daemons).
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -139,6 +143,8 @@ class AgentChannel {
   private recordWaiters: RecordWaiter[] = [];
   private dmQueue: QueuedRecord[] = [];
   private dmWaiters: RecordWaiter[] = [];
+  /** One-shot waiters for the unified /local/wake/next signal (see nextWake/signalWake). */
+  private wakeWaiters: Array<(woke: boolean) => void> = [];
   /** Task ids the node pushed as cancelled (P3) — checked by the daemon instead of polling the
    *  owner-scoped `agents.cancel.*` memory before every dispatch. Bounded by a daemon's task volume. */
   private cancelledIds = new Set<string>();
@@ -165,6 +171,7 @@ class AgentChannel {
     const waiter = this.recordWaiters.shift();
     if (waiter) waiter(item);
     else this.recordQueue.push(item);
+    this.signalWake();
   }
 
   /** Long-poll: next undelivered record event, or null after `waitMs` with none. */
@@ -192,6 +199,7 @@ class AgentChannel {
     const waiter = this.dmWaiters.shift();
     if (waiter) waiter(item);
     else this.dmQueue.push(item);
+    this.signalWake();
   }
 
   /** Long-poll: next undelivered DM event, or null after `waitMs` with none. */
@@ -232,6 +240,7 @@ class AgentChannel {
     const waiter = this.waiters.shift();
     if (waiter) waiter(item);
     else this.queue.push(item);
+    this.signalWake();
   }
 
   handleMessages(messages: unknown[]): void {
@@ -244,6 +253,9 @@ class AgentChannel {
     }
     if (fresh > 0) {
       void wakeAgent(legacyWakeAdapter(this.entry), 'message_new', `${fresh} new message(s)`);
+      // Also fire the unified wake so a daemon parked on /local/wake/next re-polls its inbox now
+      // (messages have no drainable queue -- the wake just triggers the cycle's _poll_messages).
+      this.signalWake();
     }
   }
 
@@ -263,9 +275,42 @@ class AgentChannel {
     });
   }
 
+  /** Fire every pending unified-wake signal. One-shot: a `nextWake` waiter is removed once resolved.
+   *  Called whenever ANY push source arrives (task/record/dm/message) so a consumer parked on
+   *  /local/wake/next wakes on all of them, not just its single queue. Purely a SIGNAL — it does not
+   *  consume anything; the woken cycle drains each queue + re-lists tasks/messages as usual. */
+  private signalWake(): void {
+    for (const w of this.wakeWaiters.splice(0)) w(true);
+  }
+
+  /** True if any push queue already holds an undelivered item (task/record/dm). Lets `nextWake` return
+   *  immediately when work is pending at park time (messages have no queue — only a live signal wakes). */
+  hasPendingWake(): boolean {
+    return this.queue.length > 0 || this.recordQueue.length > 0 || this.dmQueue.length > 0;
+  }
+
+  /** Unified long-poll SIGNAL: resolves true the instant any push source arrives (or was already
+   *  pending), or false after `waitMs`. Unlike nextTask/nextRecord/nextDm it does NOT consume — the
+   *  caller drains the individual queues. Lets a multi-source agent wake on every source. */
+  nextWake(waitMs: number): Promise<boolean> {
+    if (this.hasPendingWake()) return Promise.resolve(true);
+    if (waitMs <= 0) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      const w = (woke: boolean) => { clearTimeout(timer); resolve(woke); };
+      const timer = setTimeout(() => {
+        const i = this.wakeWaiters.indexOf(w);
+        if (i >= 0) this.wakeWaiters.splice(i, 1);
+        resolve(false);
+      }, waitMs);
+      this.wakeWaiters.push(w);
+    });
+  }
+
   drainWaiters(): void {
     for (const w of this.waiters.splice(0)) w(null);
     for (const w of this.recordWaiters.splice(0)) w(null);
+    for (const w of this.dmWaiters.splice(0)) w(null);
+    for (const w of this.wakeWaiters.splice(0)) w(false);
   }
 }
 
@@ -520,6 +565,26 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     });
   });
 
+  // GET /local/wake/next?wait=ms[&agent=name] — UNIFIED wake long-poll: resolves the instant ANY push
+  // source (task / workspace-record / DM / message) arrives for this agent, or 204 after waitMs. Unlike
+  // the per-queue /next endpoints it does NOT consume — it is a pure wake signal, so the woken daemon
+  // then drains each queue (records/dm) and re-lists tasks/messages exactly as it does on a timeout.
+  // This lets a multi-source agent (e.g. records+tasks like image-maker) wake on EVERY source instead of
+  // only its single parked queue; older daemons keep using the per-queue endpoints, so this is additive.
+  app.get('/local/wake/next', async (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
+    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    const woke = await channels.get(entry.agent)!.nextWake(waitMs);
+    if (!woke) { res.status(204).end(); return; }
+    res.json({ ok: true, data: { agent: entry.agent, owner: entry.owner, woke: true } });
+  });
+
   // GET /local/cancelled?agent= — task ids the node has pushed as cancelled (P3). The daemon checks
   // this loopback set before a dispatch instead of scanning the owner-scoped `agents.cancel.*` memory.
   app.get('/local/cancelled', (req: Request, res: Response) => {
@@ -700,7 +765,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const summary = registry.list()
     .map(e => `${e.agent}@${e.owner} [${channels.get(e.agent)!.transportMode}]`)
     .join(', ');
-  console.error(`AIMEAT serve daemon listening on http://127.0.0.1:${port} (MCP: /v1/mcp, proxy: /v1/*, tool-call: /local/call/:tool, push: /local/tasks/next)`);
+  console.error(`AIMEAT serve daemon listening on http://127.0.0.1:${port} (MCP: /v1/mcp, proxy: /v1/*, tool-call: /local/call/:tool, push: /local/tasks/next, wake: /local/wake/next)`);
   console.error(`[serve] discovery: ${discoveryFile}`);
   console.error(`[serve] ${registry.size()} agent(s): ${summary} — ${tunnelCount} over tunnel`);
 }
