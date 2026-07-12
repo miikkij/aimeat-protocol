@@ -179,6 +179,31 @@ await test('6. Offline agent gets no live deliver; only backlog carries it', asy
   await t.close();
 });
 
+// ─── Phase 3: owner approval pushes the EXECUTE wake ───
+console.log('\nPhase 3 — Owner approval (queued → active) push');
+
+await test('7. Owner /start pushes a live task_assigned to a connected agent', async () => {
+  // Regression for the "waits for polling" gap: a queued task approved by the owner
+  // (queued -> active) must push the SAME task_assigned wake as create-time auto-activation,
+  // so a tunnel-parked daemon runs EXECUTE immediately instead of on its ~5-min safety-net re-list.
+  // Queue the task with NO socket open, so the ONLY live deliver can come from /start (test 6 proves
+  // an offline-queued task produces no deliver on connect — only backlog).
+  const startTaskId = await createQueuedTask('Approval push task');
+  const t = await TunnelClient.connect(BASE, agentToken);
+  await t.waitForBacklog(1500);   // drain the backlog snapshot (carries the queued task)
+  const t0 = Date.now();
+  const start = await json(`/v1/agents/${agentName}/tasks/${startTaskId}/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(start.status === 200, `start status ${start.status}: ${JSON.stringify(start.body)}`);
+  const d = await t.waitForDeliver(1000);
+  const latency = Date.now() - t0;
+  assert(d !== null, 'received a deliver frame on owner approval');
+  assert(d!.kind === 'task_assigned', `kind: ${d!.kind}`);
+  assert((d!.payload as any)?.id === startTaskId, `deliver payload id ${(d!.payload as any)?.id} != ${startTaskId}`);
+  assert((d!.payload as any)?.status === 'active', `approved task delivered as active, got ${(d!.payload as any)?.status}`);
+  assert(latency < PUSH_LATENCY_BUDGET_MS, `approval push latency ${latency}ms exceeds ${PUSH_LATENCY_BUDGET_MS}ms budget`);
+  await t.close();
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {
