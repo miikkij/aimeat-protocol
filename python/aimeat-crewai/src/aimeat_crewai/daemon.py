@@ -14,6 +14,14 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.16.4 -- Task pushes wake a records/dms-parked agent (the real event-responsiveness fix). An agent
+    listening for BOTH records (or dms) AND tasks parks its idle wait on the records/dm queue (those have
+    park-priority), so a task push -- which lands in /local/tasks/next -- never answered that park and
+    tasks were only re-listed on the ~5-min safety net (offer/approve orders sat for minutes even with a
+    live tunnel; e.g. image-maker, a records+tasks contract agent). `_wait_for_work` now quick-checks
+    /local/tasks/next (wait=0, consume-safe: the next cycle re-lists tasks from the store) each slice when
+    parked off the tasks queue, so a task push starts EXECUTE within a slice. 0.16.3's push_wake fix was a
+    real but DIFFERENT latent bug (startup latch); this is what image-maker actually hit.
   0.16.3 -- Live transport re-evaluation (event-responsiveness fix). push_wake was latched ONCE at
     startup from the discovery-time transport; in a fleet the shared serve daemon brings each agent's
     tunnel up asynchronously, so an agent that started before its tunnel was ready stayed in interval
@@ -457,7 +465,7 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
 
 def _wait_for_work(
     api: _Api, use_push: bool, seconds: float, stop: dict[str, Any],
-    wake_path: str = "/local/tasks/next",
+    wake_path: str = "/local/tasks/next", also_wake_tasks: bool = False,
 ) -> dict[str, Any] | None:
     """Idle wait between poll cycles. Returns the wake long-poll's `data` dict if a PUSH woke it (new work
     arrived), or None if it timed out / slept with nothing. The caller treats a non-None result as "woke".
@@ -477,6 +485,14 @@ def _wait_for_work(
     otherwise be popped here and never reach on_dm). Hence this returns the
     consumed `data` (with its `event`/`task`), not just a bool.
 
+    `also_wake_tasks`: when the park is on a NON-tasks queue (records/dm has priority) but this agent
+    ALSO triggers on tasks, a task push lands in /local/tasks/next and would never answer the parked
+    queue's long-poll -- so tasks would only be re-listed on the ~5-min safety net. With this flag on,
+    each slice first quick-checks /local/tasks/next (wait=0) and returns an empty-dict wake if a task is
+    queued, so a task push wakes within one short slice. Safe to consume here (unlike records/dms, the
+    next cycle re-lists tasks from the store), hence the bare `{}` marker (no queue-only event to hand
+    back; the caller just needs `woke` truthy to re-list).
+
     Without push (transport 'direct'/'auth_failed' -- node tunnel off or too
     old), the serve long-poll would always time out, so this falls back to the
     classic 1s-incremental sleep.
@@ -487,6 +503,17 @@ def _wait_for_work(
         if remaining <= 0:
             return None
         if use_push:
+            if also_wake_tasks:
+                try:
+                    rt = api.get(
+                        "/local/tasks/next",
+                        params={"wait": 0, "agent": api.agent_name},
+                        timeout=10,
+                    )
+                    if rt.status_code == 200:
+                        return {}
+                except Exception:
+                    pass
             wait_ms = int(min(remaining, 5.0) * 1000)
             try:
                 r = api.get(
@@ -1481,7 +1508,11 @@ def run_crew_daemon(
             # parks on the serve long-poll and wakes instantly on a delivered
             # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            wake = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path)
+            # A records/dms-parked agent that ALSO runs tasks must still wake on task pushes (they land in
+            # /local/tasks/next, not the parked queue). Quick-check tasks inside the park in that case so
+            # an offer/approve push starts EXECUTE within a slice instead of the ~5-min safety net.
+            also_wake_tasks = push_wake and "tasks" in listen_set and wake_path != "/local/tasks/next"
+            wake = _wait_for_work(api, push_wake, cycle_sleep, stop, wake_path=wake_path, also_wake_tasks=also_wake_tasks)
             woke_by_push = wake is not None
             # The wake long-poll CONSUMED the event off the serve queue. /local/tasks/next is re-listed
             # from the store next cycle, but /local/dm/next and /local/records/next are queue-only (no
