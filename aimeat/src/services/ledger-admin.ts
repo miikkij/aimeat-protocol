@@ -42,8 +42,8 @@ export interface AdminLedger {
   per_user: Array<{ owner_ghii: string; agents: number } & Totals>;
   /** Per agent, highest cost first; drill by `owner_ghii`. */
   per_agent: Array<{ agent_gaii: string; owner_ghii: string } & Totals>;
-  /** Per model, highest cost first. */
-  per_model: Array<{ model: string } & Totals>;
+  /** Per model, highest cost first; `providers` = where the model ran (openrouter/nvidia/…). */
+  per_model: Array<{ model: string; providers: string[] } & Totals>;
 }
 
 const isoDay = (offsetDays = 0): string =>
@@ -77,7 +77,7 @@ export async function getAdminLedger(
   const dayMap = new Map<string, AdminLedgerDay>();
   const userMap = new Map<string, { owner_ghii: string; agents: Set<string> } & Totals>();
   const agentMap = new Map<string, { agent_gaii: string; owner_ghii: string } & Totals>();
-  const modelMap = new Map<string, { model: string } & Totals>();
+  const modelMap = new Map<string, { model: string; providers: Set<string> } & Totals>();
 
   for (const r of rows) {
     const tokens = (r.promptTokens || 0) + (r.completionTokens || 0);
@@ -113,9 +113,10 @@ export async function getAdminLedger(
 
     let m = modelMap.get(r.model);
     if (!m) {
-      m = { model: r.model, ...blank() };
+      m = { model: r.model, providers: new Set<string>(), ...blank() };
       modelMap.set(r.model, m);
     }
+    if (r.provider && r.provider !== 'unknown') m.providers.add(r.provider);
     add(m, r.costUsd, tokens, r.calls, r.unpricedCalls);
   }
 
@@ -124,7 +125,9 @@ export async function getAdminLedger(
     .map(({ agents, ...rest }) => ({ ...rest, agents: agents.size }))
     .sort((a, b) => b.cost_usd - a.cost_usd);
   const per_agent = [...agentMap.values()].sort((a, b) => b.cost_usd - a.cost_usd);
-  const per_model = [...modelMap.values()].sort((a, b) => b.cost_usd - a.cost_usd);
+  const per_model = [...modelMap.values()]
+    .map(({ providers, ...rest }) => ({ ...rest, providers: [...providers].sort() }))
+    .sort((a, b) => b.cost_usd - a.cost_usd);
 
   return { from, to, totals, days, per_user, per_agent, per_model };
 }

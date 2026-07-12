@@ -5153,6 +5153,7 @@
     "ledgerColCalls": "Calls",
     "ledgerColUnpriced": "Unpriced",
     "ledgerColModel": "Model",
+    "ledgerColProvider": "Provider",
     "ledgerColAgent": "Agent",
     "ledgerAllUsers": "All users",
     "ledgerFilteredNote": "Showing agents for",

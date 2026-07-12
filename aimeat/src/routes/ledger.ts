@@ -106,6 +106,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
 
       const keyOf = GROUP_KEYS[groupBy];
       const buckets = new Map<string, Totals>();
+      const bucketProviders = new Map<string, Set<string>>();
       const totals = emptyTotals();
       for (const r of rows) {
         const k = keyOf(r);
@@ -113,10 +114,17 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
         if (!b) { b = emptyTotals(); buckets.set(k, b); }
         addDaily(b, r);
         addDaily(totals, r);
+        // Track the distinct providers behind each group so the UI can show WHERE a model ran
+        // (openrouter / nvidia / openai / anthropic / local …) — helps explain unpriced $0 rows.
+        if (r.provider && r.provider !== 'unknown') {
+          let ps = bucketProviders.get(k);
+          if (!ps) { ps = new Set(); bucketProviders.set(k, ps); }
+          ps.add(r.provider);
+        }
       }
 
       const groups = [...buckets.entries()]
-        .map(([key, t]) => ({ key, ...t }))
+        .map(([key, t]) => ({ key, ...t, providers: [...(bucketProviders.get(key) ?? [])].sort() }))
         .sort((a, b) => (groupBy === 'day' ? a.key.localeCompare(b.key) : b.cost_usd - a.cost_usd));
 
       res.json(success(config.nodeId, {
