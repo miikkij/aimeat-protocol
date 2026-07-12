@@ -134,3 +134,8 @@ docs/internal/
 # Any PNG dropped in the repo ROOT is a local verification screenshot — never commit it.
 # Leading slash = root only, so real assets in subdirs (aimeat-desktop/.../icons, public/) stay tracked.
 /*.png
+# Local temp/scratch files (e.g. saved web pages, snapshot dumps) — never commit.
+.tmp_*
+/*.tmp.html
+# Package build artifacts — packages/ holds app SOURCE; built .zip bundles are outputs.
+packages/*.zip
