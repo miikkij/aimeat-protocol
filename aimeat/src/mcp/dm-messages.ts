@@ -13,6 +13,10 @@
  *   v1.0.0 — 2026-06-22 — Initial: aimeat_dm_send (federated send + multi-attachment), gated messages:send.
  *   v1.1.0 — 2026-06-23 — aimeat_dm_ask (federated AskUserQuestion: structured option questions); inbox/thread
  *     now surface the `interactive` payload so the agent reads the human's machine-readable answers.
+ *   v1.2.0 — 2026-07-12 — aimeat_dm_send_as_owner: send AS THE OWNER (consented delegation for Inbox
+ *     "Reply with AI"). Gated by the explicit messages:send-as-owner scope; sender is the agent's OWN
+ *     owner, derived server-side (never a client id) so an agent can only speak as its own owner. The
+ *     reply lands in the owner's thread, attributed to the owner; the acting agent is logged for audit.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +29,8 @@ import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
 
 export function registerDmMessageTools(
     mcp: McpServer,
@@ -79,6 +85,73 @@ export function registerDmMessageTools(
                     text: JSON.stringify({
                         message_id: result.message.id,
                         conversation_id: result.message.conversationId,
+                        recipient: result.message.recipientGhii,
+                        status: result.message.status,
+                        attachments: result.message.attachments?.length ?? 0,
+                        created_at: result.message.createdAt,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── aimeat_dm_send_as_owner — send a federated DM AS THE OWNER (consented delegation) ──
+    // Gated by the explicit `messages:send-as-owner` scope (the registration filter only registers this
+    // tool when the agent holds it). The sender is the agent's OWN owner, derived SERVER-SIDE from the
+    // session GAII — never a client-supplied id — so an agent can only ever speak as its own owner, never
+    // another (no cross-owner impersonation). The reply lands in the OWNER's thread, attributed to the
+    // owner (as if sent from the UI); the acting agent is logged for audit. Powers Inbox "Reply with AI".
+    mcp.tool(
+        'aimeat_dm_send_as_owner',
+        descriptionFor('aimeat_dm_send_as_owner'),
+        {
+            to: z.string().min(3).max(256).describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node).'),
+            body: z.string().max(50000).optional().describe('Message body (GFM markdown). Optional only if you attach at least one file.'),
+            reply_to: z.string().uuid().optional().describe('Id of a message you are replying to (keeps the same conversation thread).'),
+            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title. Omit to continue the owner\'s existing thread via conversation_id.'),
+            conversation_id: z.string().min(8).max(64).optional().describe('The owner\'s existing thread with the recipient (so the reply lands in that thread). Omit for the default per-pair thread.'),
+            attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
+                .describe('Up to 20 files to attach, each pre-uploaded via aimeat_storage_upload (presigned).'),
+        },
+        annotationsFor('aimeat_dm_send_as_owner'),
+        async ({ to, body, reply_to, subject, conversation_id, attachments }) => {
+            const agentGaii = getAgentGaii();
+            const parsed = parseGaiiLoose(agentGaii);
+            // Server-derived: the acting agent's OWN owner GHII. Never trust a client id here.
+            const ownerGhii = `${parsed.owner}@${parsed.node}`;
+            const recipientGhii = to.trim();
+
+            if (recipientGhii === ownerGhii) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
+            }
+            if (!body?.trim() && !attachments?.length) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A message must have a body or at least one attachment.' }) }] };
+            }
+
+            const mapped = attachments?.length ? mapMessageAttachments(attachments, ownerGhii, config.nodeId) : undefined;
+            const result = await sendDirectMessage(ctx, {
+                senderGhii: ownerGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
+                conversationId: conversation_id, subject,
+            });
+
+            if (!result.ok) {
+                const msg = result.code === 'RECIPIENT_NOT_FOUND'
+                    ? `No such recipient: ${recipientGhii}`
+                    : 'The recipient is not accepting messages (blocked or pending first-contact approval).';
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
+            }
+
+            // Audit: an agent posted on the owner's behalf. The message displays as from the owner; this
+            // log is the durable record of WHICH agent acted (a persisted per-message field is a follow-up).
+            logger.info('dm sent as owner (delegated)', { agent: agentGaii, owner: ownerGhii, recipient: recipientGhii, messageId: result.message.id });
+
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        message_id: result.message.id,
+                        conversation_id: result.message.conversationId,
+                        sent_as: ownerGhii,
                         recipient: result.message.recipientGhii,
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,

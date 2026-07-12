@@ -78,7 +78,7 @@ const SCOPE_DOMAINS = [
   { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },
   { key: 'social',    permissions: ['read', 'write'] },
-  { key: 'messages',  permissions: ['send', 'read'] },
+  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner'] },
   { key: 'wallet',    permissions: ['read'] },
   { key: 'consent',   permissions: ['manage'] },
   { key: 'tunnel',    permissions: ['connect'] },

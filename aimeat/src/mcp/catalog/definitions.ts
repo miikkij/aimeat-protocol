@@ -233,6 +233,20 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_send_as_owner',
+        description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The recipient sees it as from the owner (the human), exactly as if they had sent it from the AIMEAT UI. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it this tool is not available and you should hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
+            body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.' },
+            reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).' },
+            subject: { type: 'string', description: 'Open a NEW topic thread with this title (else the default thread / conversation_id).' },
+            conversation_id: { type: 'string', description: 'The owner\'s existing thread with the recipient, so the reply lands there.' },
+            attachments: { type: 'array', description: 'Up to 20 attachment descriptors { storage_key, mime, kind, size, name }, each pre-uploaded via aimeat_storage_upload.' },
+        },
+    },
+    {
         name: 'aimeat_dm_ask',
         description: 'Ask a person a STRUCTURED question through the federated inbox — a federated AskUserQuestion. Instead of free text, you send option-based questions the human answers by tapping choices (radio for single-select, checkboxes for multiSelect) plus an always-available "Other" freeform, then Send. Use this to map intent / clarify BEFORE acting. Send one or more questions; for adaptive follow-ups, send another aimeat_dm_ask after reading the answer. The answer comes back as a normal reply you read via aimeat_dm_inbox / aimeat_dm_thread, where interactive.answers is the machine-readable result keyed by your question id. Same recipients + threading as aimeat_dm_send. Requires the messages:send scope.',
         caller: 'agent',
