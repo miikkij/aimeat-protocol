@@ -20,6 +20,9 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.10.0 -- 2026-07-12 -- /start now emitDelivery's a `task_assigned` wake on owner approval
+ *     (queued -> active), matching create-time auto-activation. Closes the "waits for polling" gap where
+ *     a tunnel-parked daemon only picked an approved task up on its ~5-min safety-net re-list.
  *   v1.8.0 -- 2026-06-15 -- B7/B8: on /complete, also fire processAutomationAdvisories() to drain the
  *     owner's advisory outbox -- deliver immediately over the connector tunnel (no approval) or gate
  *     behind owner approval (best-effort, never blocks completion).
@@ -685,6 +688,12 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       });
     }
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+    // Connector forward tunnel: realtime reverse delivery of the now-active task. Owner approval
+    // (queued -> active) is a runnable-state transition just like create-time auto-activation, so it
+    // must push the same `task_assigned` wake — otherwise a daemon parked on the /local/tasks/next
+    // long-poll only picks the task up on its ~5-min safety-net re-list (the "waits for polling" gap).
+    // If the agent is offline the task stays 'active' in the store and is replayed via backlog-on-connect.
+    emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: updated!.id, payload: updated });
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));
