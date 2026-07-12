@@ -14,6 +14,14 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.16.3 -- Live transport re-evaluation (event-responsiveness fix). push_wake was latched ONCE at
+    startup from the discovery-time transport; in a fleet the shared serve daemon brings each agent's
+    tunnel up asynchronously, so an agent that started before its tunnel was ready stayed in interval
+    polling for its whole life and never went event-driven (tasks picked up ~a poll tick late instead
+    of on the create/approve push). The loop now re-derives push_wake from a fresh /local/status each
+    cycle (loopback-only, not a node call) via the pure `_resolve_push_wake`: a direct agent upgrades to
+    push the moment its tunnel connects (and forces one catch-up re-list), and downgrades if it drops.
+    /local/status is now fetched every cycle (previously only when push was already on) — still free.
   0.14.0 -- Contract-engagement gate (docs/agent-workspace-contracts.md §7d). A pushed workspace-record
     wake is now dropped when this agent's engagement for that workspace/contract is RETIRED — the
     deterministic half of "Retire actually stops the agent" (retired -> skip; active/absent -> process;
@@ -643,6 +651,26 @@ def _serve_agent_status(api: _Api) -> dict[str, Any]:
     return {}
 
 
+def _resolve_push_wake(agent_status: dict[str, Any], current: bool) -> bool:
+    """Re-derive whether this cycle should push-wake (park on the serve long-poll) vs interval-poll.
+
+    push_wake is seeded once at startup from the transport at discovery time — but in a FLEET the shared
+    serve daemon brings each agent's tunnel up ASYNCHRONOUSLY, so an agent that started before its tunnel
+    was ready latched push_wake=False for its whole life (interval polling, never event-driven — the
+    "waits ~a poll tick to start" symptom). Re-deriving from a fresh /local/status each cycle lets a
+    direct/polling agent UPGRADE to push the moment its tunnel connects (and downgrade if it drops).
+
+    Pure + unit-testable. `transport=='tunnel'` -> True; any OTHER known transport -> False; an empty
+    status or a missing transport field keeps `current` (a transient empty read must never flap an
+    already-established transport)."""
+    if not agent_status:
+        return current
+    transport = agent_status.get("transport")
+    if not transport:
+        return current
+    return transport == "tunnel"
+
+
 # Type alias: function the caller provides to build a Crew for one task.
 # Receives the AIMEAT task dict (id, title, description, ...) and the
 # already-instantiated liaison Agent. Must return a crewai.Crew instance.
@@ -1251,12 +1279,24 @@ def run_crew_daemon(
             # P2: a revoked/expired bearer degrades the serve tunnel to 'auth_failed' (the node pushes
             # `auth_revoked`, the connector stops the socket). Detect it via the loopback status (free,
             # not a node call) and exit so the supervisor re-auths instead of looping forever. Replaces
-            # the old periodic node auth-liveness probe.
-            agent_status = _serve_agent_status(api) if (push_wake or records_on or dms_on) else {}
+            # the old periodic node auth-liveness probe. Fetched EVERY cycle now (not just when push is
+            # already on) so a direct/polling agent can observe its tunnel coming up and upgrade to push.
+            agent_status = _serve_agent_status(api)
             if agent_status.get("transport") == "auth_failed":
                 print(f"[daemon:{agent_name}] tunnel auth revoked/expired -- run `aimeat connect` to re-auth. Exiting.")
                 auth_failed = True
                 break
+
+            # Live transport re-evaluation: flip push_wake if the serve daemon's tunnel for this agent
+            # came up (or dropped) since startup. On a direct->tunnel upgrade, force one re-list now
+            # (next_poll_due=0) to catch a task queued while we were interval-polling, then rely on push.
+            new_push_wake = _resolve_push_wake(agent_status, push_wake)
+            if new_push_wake and not push_wake:
+                print(f"[daemon:{agent_name}] tunnel came up -> switching to push-wake long-poll")
+                next_poll_due = 0.0
+            elif push_wake and not new_push_wake:
+                print(f"[daemon:{agent_name}] tunnel dropped -> falling back to interval polling")
+            push_wake = new_push_wake
 
             # Re-list from the node only when a push woke us (or on the rare safety-net interval).
             # With no tunnel, push_wake is False so this is always True — unchanged polling.
