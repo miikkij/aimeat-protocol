@@ -280,6 +280,38 @@ Any service (hobby directory, marketplace, dating, news) is just a client readin
 
 ## Directory Structure
 
+### Monorepo layout (top level)
+
+```
+aimeat-protocol/                  pnpm workspace (root package.json proxies to aimeat/)
+├── openapi.yaml                  canonical API contract (OpenAPI 3.1) — keep in sync (Rule 3)
+├── CLAUDE.md                     AI-assistant instructions (mandatory rules)
+├── startup.prompt.md             paste-to-AI repo bootstrapping prompt (README-linked)
+├── .github/                      CI (ci.yml) + release workflows (release-desktop.yml)
+├── .githooks/                    pre-commit gate: lint / typecheck / typecheck:frontend /
+│                                 check:importmap / check:no-max-tokens / check:app-catalog
+├── aimeat/                       ★ the reference implementation (Node 24 / TS / Express 5)
+│   ├── src/                      backend (see tables below) — ~132 routes, ~184 services
+│   ├── public/                   Preact + HTM SPA, no build step
+│   ├── prisma/                   schema.prisma (Mongo) + schema.postgres.prisma
+│   ├── locales/                  en.json / fi.json (Rule 4: keep in sync)
+│   ├── test/                     E2E suites + run-e2e-ci.ts orchestrator
+│   ├── tools/                    dev tools (synthtraces self-play harness)
+│   ├── scripts/  bin/            build/ops scripts, `aimeat` CLI entry
+│   ├── eslint-rules/             custom lint rules (file headers, no-max-tokens)
+│   ├── Dockerfile  docker-compose.{,postgres,sqlite}.yml
+│   └── docs/                     implementation-local docs (integrations/…)
+├── python/aimeat-crewai/         ★ pip-installable CrewAI liaison/connector (own PyPI line)
+│   └── src/aimeat_crewai/        liaison.py, mcp_client.py, daemon.py, offers.py, cli.py
+├── aimeat-desktop/               ★ Tauri desktop app (Personal Node installer): src/ + src-tauri/
+├── packages/                     hosted app SOURCE (agent-kanban, club-board, digital-signage…)
+│                                 + build scripts (build-*.mjs); built .zip bundles are gitignored
+├── assets/                       brand/design assets, logos, mockups, screenshots
+└── docs/                         protocol spec (v4.0 Core/Platform) + coding-guidelines/ + guides
+```
+
+The agent **runtime** (fleet daemon + 40+ crew templates) is the sibling repo `miikkij/crewaimeat` (not vendored here); `python/aimeat-crewai/` is the in-repo connector it builds on, and `aimeat-desktop` ships those agents to the user's machine.
+
 ### Backend (`aimeat/src/`)
 
 | Directory | Purpose |
