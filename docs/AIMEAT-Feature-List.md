@@ -2,7 +2,9 @@
 
 **AI Memory Exchange and Action Transfer -- Protocol + Reference Implementation**
 
-Version: 3.0 | Date: 2026-04-30
+Version: 3.0-era snapshot | Original date: 2026-04-30
+
+> **Stale snapshot (kept as a domain inventory).** This list predates the **v4.0 re-baseline**. For the current, accurate picture use **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** (and `openapi.yaml`). Notable shifts since this list: the economy is **meters, not one currency** (morsels + USD metering ledger); **organisms/workspaces, the app platform + app-grants, the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps** are first-class; and **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, boards, and Foundry are deprecated**. Treat any entry below that conflicts with the v4.0 docs as superseded.
 
 This document lists every feature and capability provided by the AIMEAT protocol and the AIMEAT.io reference implementation. Features are grouped by domain. Each entry notes whether it is a protocol-level requirement (RFC) or an implementation-level extension (AIMEAT.io).
 

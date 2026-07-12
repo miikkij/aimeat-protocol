@@ -46,17 +46,20 @@ Configuration comes from (in priority order):
 ```bash
 AIMEAT_NODE_ID=aimeat-local-001-dev
 AIMEAT_PORT=40050
-AIMEAT_STORAGE=memory
+AIMEAT_STORAGE=sqlite
+AIMEAT_DB_PATH=./data/aimeat.db
 AIMEAT_ADMIN_PASSWORD=your-admin-password
 ```
 
 ### Storage Backends
 
+Valid backends are **SQLite, MongoDB, and PostgreSQL.** The old pure in-memory provider is deprecated; use SQLite with `AIMEAT_DB_PATH=:memory:` for a fast, ephemeral store on the real code path.
+
 | Backend | When to Use | Config |
 |---------|------------|--------|
-| `memory` | Development, testing | `AIMEAT_STORAGE=memory` |
-| `sqlite` | Personal nodes, single-user | `AIMEAT_STORAGE=sqlite`, `AIMEAT_SQLITE_PATH=./data/aimeat.db` |
+| `sqlite` | Dev, personal nodes, single-user, fast iteration | `AIMEAT_STORAGE=sqlite`, `AIMEAT_DB_PATH=./data/aimeat.db` (or `:memory:`) |
 | `mongodb` | Production, multi-user | `AIMEAT_STORAGE=mongodb`, `DATABASE_URL=mongodb://...` |
+| `postgresql` | Production, multi-user (alias `postgres`) | `AIMEAT_STORAGE=postgresql`, `DATABASE_URL=postgresql://...` |
 
 ---
 

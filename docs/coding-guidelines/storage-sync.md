@@ -2,14 +2,15 @@
 
 ## Overview
 
-AIMEAT has two storage implementations that MUST stay in sync:
+AIMEAT has **three** storage implementations that MUST stay in sync:
 
 | Backend | Implementation | Files |
 |---------|---------------|-------|
 | **SQLite** | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/` |
 | **MongoDB** | Prisma ORM (async API) | `src/storage/providers/mongodb/` + `prisma/schema.prisma` |
+| **PostgreSQL** | Prisma ORM (async API) | `src/storage/providers/postgres/` + `prisma/schema.postgres.prisma` (separate generated client `src/generated/prisma-postgres/`) |
 
-The in-memory mode is SQLite with `:memory:` path — same code, no persistence.
+The in-memory mode is SQLite with `:memory:` path — same code, no persistence. (The old pure in-memory provider is deprecated.)
 
 Both implement the `Storage` interface defined in `src/storage/interface.ts` (24 repository interfaces, 60+ record types, 650+ methods).
 
@@ -57,9 +58,9 @@ Update ALL SQL queries that touch the table:
 - `UPDATE` — include if mutable
 - Deserialization — map from DB row to TypeScript record
 
-### Step 4: Update Prisma Schema
+### Step 4: Update BOTH Prisma Schemas
 
-File: `prisma/schema.prisma`
+Files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (PostgreSQL). Both Prisma backends must carry the field or PostgreSQL drifts.
 
 ```prisma
 model Memory {
@@ -68,17 +69,18 @@ model Memory {
 }
 ```
 
-Then regenerate the Prisma client:
+Then regenerate BOTH Prisma clients:
 ```bash
 cd aimeat
-pnpm db:generate
+pnpm db:generate            # MongoDB client
+pnpm db:generate:postgres   # PostgreSQL client (src/generated/prisma-postgres/)
 ```
 
-### Step 5: Update MongoDB Implementation
+### Step 5: Update the MongoDB and PostgreSQL Implementations
 
-File: `src/storage/providers/mongodb/index.ts`
+Files: `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts`
 
-Update all Prisma queries that touch the model:
+Update all Prisma queries that touch the model in **both** providers:
 - `create()` — include new field
 - `findUnique()` / `findMany()` — include in select if needed
 - `update()` — include if mutable
@@ -92,10 +94,10 @@ cd aimeat
 # Verify compilation
 npx tsc --noEmit
 
-# Test all backends
-pnpm test:e2e:memory
+# Test the persistent backends (in-memory backend is deprecated — do not use)
 pnpm test:e2e:sqlite
 pnpm test:e2e:mongodb
+pnpm test:e2e:postgresql   # or: pnpm test:e2e:all-backends
 ```
 
 ---
@@ -159,10 +161,11 @@ CREATE TABLE IF NOT EXISTS my_new (
 
 Implementation: Add all CRUD methods to `src/storage/providers/sqlite/index.ts`
 
-### Step 5: Prisma — Add Model + Implementation
+### Step 5: Prisma — Add Model + Implementation (BOTH Prisma backends)
 
-Schema file: `prisma/schema.prisma`
+Schema files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (PostgreSQL). Note the id/attribute mapping differs per backend (Mongo `@map("_id") @db.ObjectId`; Postgres a plain `@id` string/uuid) — mirror the model in both, using each backend's conventions.
 ```prisma
+// schema.prisma (MongoDB)
 model MyNew {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
@@ -170,11 +173,11 @@ model MyNew {
 }
 ```
 
-Regenerate: `pnpm db:generate`
+Regenerate both clients: `pnpm db:generate` **and** `pnpm db:generate:postgres`
 
-Implementation: Add all CRUD methods to `src/storage/providers/mongodb/index.ts`
+Implementation: Add all CRUD methods to `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts`
 
-### Step 6: Type-Check and Test All Backends
+### Step 6: Type-Check and Test All Backends (SQLite + MongoDB + PostgreSQL)
 
 ---
 
@@ -218,10 +221,24 @@ pnpm db:generate     # Regenerates Prisma Client types
 
 ---
 
+## PostgreSQL Migration Pattern
+
+PostgreSQL uses Prisma with its own schema (`prisma/schema.postgres.prisma`) and generated client (`src/generated/prisma-postgres/`). Unlike schemaless MongoDB, Postgres enforces the schema, so a data-model change must land in the schema AND be pushed to the database:
+
+```bash
+# After updating prisma/schema.postgres.prisma:
+pnpm db:generate:postgres   # regenerate the postgres client
+pnpm db:push:postgres       # apply the schema to the database
+```
+
+Mirror any MongoDB model change here (same fields; use Postgres-native id/type conventions). Prefer deterministic plain `DateTime` timestamps (no `@updatedAt`) to keep backend parity, as the shared code sets timestamps explicitly.
+
+---
+
 ## Type Mapping
 
-| TypeScript | SQLite | Prisma/MongoDB |
-|------------|--------|----------------|
+| TypeScript | SQLite | Prisma (MongoDB / PostgreSQL) |
+|------------|--------|-------------------------------|
 | `string` | `TEXT` | `String` |
 | `number` (int) | `INTEGER` | `Int` |
 | `number` (float) | `REAL` | `Float` |
@@ -242,11 +259,13 @@ pnpm db:generate     # Regenerates Prisma Client types
 
 Until a formal migration framework is adopted, validation comes from E2E tests:
 
-- `pnpm test:e2e:memory` — validates SQLite in-memory
-- `pnpm test:e2e:sqlite` — validates SQLite on disk (with migrations)
+- `pnpm test:e2e:sqlite` — validates SQLite, disk or `:memory:` (with migrations); fast-iteration default
 - `pnpm test:e2e:mongodb` — validates MongoDB via Prisma
+- `pnpm test:e2e:postgresql` — validates PostgreSQL via Prisma (or `pnpm test:e2e:all-backends` for all three)
 
-**All three must pass.** If any backend fails after a schema change, the change is incomplete.
+> `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — not a supported backend.
+
+**All three persistent backends must pass.** If any backend fails after a schema change, the change is incomplete.
 
 ---
 

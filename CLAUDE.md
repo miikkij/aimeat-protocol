@@ -6,7 +6,7 @@ These rules MUST be followed at all times. They override any conflicting default
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated — do not use it for verification or report its failures.
+**Valid backends: SQLite, MongoDB, and PostgreSQL** (all persistent; SQLite = better-sqlite3, MongoDB + PostgreSQL = Prisma). The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated — do not use it for verification or report its failures.
 
 1. **Run only the suites your change can plausibly affect**, not the whole sweep. Filter runner (must `cd aimeat` first — relative paths):
    ```bash
@@ -14,7 +14,7 @@ These rules MUST be followed at all times. They override any conflicting default
    pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding [--test=...]
    ```
    For CLI-only changes (`src/cli/`), server suites don't exercise CLI code — say so instead of running them to fill a report.
-2. **End of a multi-step plan: full sweep on both persistent backends** (from root): `pnpm test:e2e:sqlite` then `pnpm test:e2e:mongodb`.
+2. **End of a multi-step plan: full sweep on the two primary persistent backends** (from root): `pnpm test:e2e:sqlite` then `pnpm test:e2e:mongodb`. PostgreSQL is a sibling Prisma backend with its own suite (`pnpm test:e2e:postgresql`, or `pnpm test:e2e:all-backends` for all three) — run it too when your change touches the Prisma schema / PG-specific storage (`schema.postgres.prisma`, `src/storage/providers/postgres/`).
 3. **Target: 0 failures in suites you ran.** Failure in an area you touched → not done, fix it. Failure in an unrelated suite → confirm it pre-exists on `main` (check `git status`/`git log -1`); mention but don't "fix" it. Ambiguous → ask.
 4. **New features must include E2E tests** (happy path + at least one failure mode).
 5. **Never claim work is done without running tests.** Evidence before assertions.
@@ -156,20 +156,21 @@ When creating/editing `room.target` records in the MACHINE ROOM workspace (org `
 - **Crypto:** @noble/ed25519 3.1, jose 6.2 (EdDSA JWTs)
 - **Package manager:** pnpm · **Port:** 40050
 
-## Identity Model — GHII vs GAII (CRITICAL)
+## Identity Model — GHII / GAII / GEAI (CRITICAL)
 
-Two distinct identity types. **Never confuse them.** Full reference (auth paths, aggregation pattern, morsel economy, ownership checks): `docs/coding-guidelines/identity-model.md`.
+**Three** distinct principal types. **Never confuse them.** Full reference (auth paths, aggregation pattern, morsel economy, ownership checks): `docs/coding-guidelines/identity-model.md`. GEAI ecosystem-app reference: `docs/building-an-aimeat-compatible-ecosystem-app.md`.
 
 | Identity | Format | Example | What it is |
 |----------|--------|---------|------------|
 | **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything (morsel balance, profile, trust). |
 | **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions. Own trust score. |
+| **GEAI** | `eco:{app}#owner@node-id` | `eco:drum-news#alice@aimeat-fi-001-genesis` | Ecosystem app. Its own domain where external applications are systematically (AI-accelerated) connected to AIMEAT. Onboarded via hello→approve→token (device-auth clone) with TOFU key pinning + a scope + data-area allowlist; writes into its own `eco:` namespace; **consented like an agent** (same revocable, attributable guarantees). |
 
-A bare **Owner** name (`alice`) is the account layer — appears in `req.auth!.sub` for owner JWTs, `req.auth!.owner` for both.
+A bare **Owner** name (`alice`) is the account layer — appears in `req.auth!.sub` for owner JWTs, `req.auth!.owner` for all principals. (Internal *hosted* apps are also identity-bearing, via scoped app grants that resolve `role:'app'` to the owner but fence to approved scopes — see `docs/coding-guidelines/security-development-dna.md` + H-2 app-origin isolation.)
 
-**MANDATORY:** Every route that stores/retrieves data by identity MUST use `resolveIdentity(req.auth!, config.nodeId)` from `src/utils/gaii.ts`, **not** raw `req.auth!.sub`. Owner sessions → bare name becomes GHII (`alice` → `alice@node-id`); agent sessions → `sub` returned as-is (already full GAII). Without it, owner data is stored under the bare `alice` and becomes invisible to list/search/update. Compare ownership against `resolve(req)`, never `req.auth!.sub`.
+**MANDATORY:** Every route that stores/retrieves data by identity MUST use `resolveIdentity(req.auth!, config.nodeId)` from `src/utils/gaii.ts`, **not** raw `req.auth!.sub`. Owner sessions → bare name becomes GHII (`alice` → `alice@node-id`); agent sessions → `sub` returned as-is (already full GAII); ecosystem sessions → the GEAI, returned as-is. Without it, owner data is stored under the bare `alice` and becomes invisible to list/search/update. Compare ownership against `resolve(req)`, never `req.auth!.sub`.
 
-**Morsels:** one balance on `GHIIRecord.morselBalance` — the human pays, agent balance is always 0; `debit/credit/transferBalance` resolve any GAII/GHII/bare-name → owner GHII. (Aggregation + economy detail: the guide above.)
+**Morsels:** one balance on `GHIIRecord.morselBalance` — the human pays, agent and ecosystem-app balances are always 0; `debit/credit/transferBalance` resolve any GAII/GEAI/GHII/bare-name → owner GHII. (Aggregation + economy detail: the guide above.)
 
 **Agents are never created implicitly** — registration creates only the owner + GHII; agents connect later via device auth (RFC 8628) where the owner approves each and selects scopes.
 
@@ -230,7 +231,7 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 
 **Route registration** — routers follow `export function myRouter(config, storage): Router { ... }`, mounted via `app.use(myRouter(config, storage))` in `mountRoutes()` (`src/server-bootstrap/routes-loader.ts`).
 
-**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); two supported backends (SQLite better-sqlite3, MongoDB Prisma; a PostgreSQL Prisma backend also exists). New data types/fields must update ALL backends — see `docs/coding-guidelines/storage-sync.md`.
+**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); **three supported backends**: SQLite (better-sqlite3), MongoDB (Prisma), PostgreSQL (Prisma, `schema.postgres.prisma` + `src/storage/providers/postgres/`). New data types/fields must update ALL backends (incl. both Prisma schemas) — see `docs/coding-guidelines/storage-sync.md`.
 
 **Imports** — always use `.js` extensions (ESM): `import { foo } from '../services/foo.js';`
 
@@ -268,7 +269,11 @@ Two rules from those mechanisms that bite often:
 
 ## Spec Documents
 
-`openapi.yaml` (canonical API contract — keep in sync, Rule 3); `docs/aimeat-implementation-prompt.md`; `docs/01-core.md`…`docs/09-community.md` (RFC sections); `docs/a-endpoints.md` (endpoint reference); `docs/b-config.md` (config schema); `docs/c-platform-notes.md` (AI platform compat); `docs/AIMEAT-RFC-v3.0-full.md` + `docs/AIMEAT-IO-Implementation-Guide-v3.0.md` (v3.0).
+**Current spec (v4.0, two-layer):** `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core protocol) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform built on the Core). The v4.0 split re-baselines the spec against the implementation: it promotes organisms/workspaces, the app platform (app grants + H-2 origin isolation), the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps, and the metering ledger to first-class; reframes the economy as **meters, not currencies** (morsels + USD metering) behind a *pluggable, non-mandatory* payment interface; keeps federation first-class around its real use (cross-node identity/login); and marks **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, boards, and Foundry as deprecated/removal**. v4.0 is a conceptual reframe, **not** an API break.
+
+`openapi.yaml` remains the canonical API contract (keep in sync, Rule 3). Supporting: `docs/aimeat-implementation-prompt.md`; `docs/a-endpoints.md` (endpoint reference); `docs/b-config.md` (config schema); `docs/c-platform-notes.md` (AI platform compat).
+
+**Historical (removed from the tree — recoverable from git history):** the superseded RFC versions (`AIMEAT-RFC-v1.2…v3.0-full.md`), the old implementation guides (`AIMEAT-IO-Implementation-Guide-v2.0/v3.0.md`), the modular `01-core.md`…`09-community.md` sections, and the Feb–Jun 2026 `plans/`, `analysis/`, `securityaudit/`, `testing/` etc. were cleaned out of `docs/` on 2026-07-12 (docs went 21 MB → 2.7 MB). They live in git history if ever needed. Do not recreate them; the v4.0 Core/Platform docs + `openapi.yaml` are canonical.
 
 ## AI Agent Prompts — Where They Live
 
