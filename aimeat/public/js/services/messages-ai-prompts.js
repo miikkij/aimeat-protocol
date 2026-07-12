@@ -6,12 +6,12 @@
  *   workspaces, librarian) so the reply is grounded, unlike a generic LinkedIn/Telegram AI button.
  *   Two builders (whole conversation / single message) × two modes:
  *     - 'copy' : a self-contained prompt the user pastes into any AI chat; they paste the reply back.
- *     - 'mcp'  : an instruction prompt for an AI with the AIMEAT MCP connected — it reads the LIVE thread
- *                (aimeat_dm_thread) and researches inside AIMEAT, then hands the finished reply back for
- *                the OWNER to send from the UI. It deliberately does NOT call aimeat_dm_send: an MCP
- *                session authenticates as the owner's AGENT, so a direct send would post under the agent
- *                (a separate thread), not as the owner. (A consent-gated "send as owner" delegation is a
- *                separate follow-up.)
+ *     - 'mcp'  : an instruction prompt for an AI with the AIMEAT MCP connected — it researches inside
+ *                AIMEAT, drafts, and (after the owner approves) sends the reply AS THE OWNER via
+ *                aimeat_dm_send_as_owner (the consent-gated delegation), so it lands in the owner's thread
+ *                from the owner — NOT under the agent's own identity. If that tool isn't granted, it hands
+ *                the reply back for the owner to send from the UI. It never uses aimeat_dm_send (that posts
+ *                under the agent into a separate thread).
  *   The Postilaatikko is the FEDERATION dm surface (aimeat_dm_*, NOT the private agent↔owner
  *   aimeat_message_* channel). Prompt text is English (house rule); the AI answers in the conv's language.
  * @structure
@@ -28,6 +28,9 @@
  *     aimeat_dm_send (an MCP session is the owner's AGENT, so the send went out under the agent into a
  *     separate thread). MCP mode now reads + researches + drafts and hands the reply back to the owner
  *     to send from the UI. "Send as owner" delegation tracked as a follow-up.
+ *   v1.2.0 -- 2026-07-12 -- MCP mode sends AS THE OWNER via aimeat_dm_send_as_owner (consent-gated
+ *     delegation, scope messages:send-as-owner), landing the reply in the owner's thread from the owner.
+ *     Graceful fallback to "hand me the reply" when the scope isn't granted; still never aimeat_dm_send.
  */
 
 export const MODES = { COPY: 'copy', MCP: 'mcp' };
@@ -118,23 +121,22 @@ export function buildConversationReplyPrompt({ peerGhii, subject, conversationId
 
   if (mode === MODES.MCP) {
     return [
-      '# Reply in AIMEAT with MCP research',
+      '# Reply in AIMEAT as me (via MCP)',
       '',
-      `Use my connected AIMEAT MCP to help me reply to my conversation with **${them}**${topic} in the`,
-      'AIMEAT Postilaatikko (the federation-wide direct-message inbox). Read the live thread and research',
-      'inside my AIMEAT, then give me a finished reply that I will send myself.',
+      `Use my connected AIMEAT MCP to reply to my conversation with **${them}**${topic} in the AIMEAT`,
+      'Postilaatikko (the federation-wide direct-message inbox), sending the reply AS ME (not as your own',
+      'agent identity) into this same thread.',
       '',
       '## Steps',
-      `1. Read the full, up-to-date thread: call \`aimeat_dm_thread\` with conversation_id "${conversationId || ''}".`,
-      `   If that id doesn't resolve, call \`aimeat_dm_inbox\` and find the thread with ${handleOf(peerGhii)} (${peerGhii}).`,
-      '2. Research before answering:',
+      '1. Research before answering:',
       enrichmentBlock().split('\n').map((l) => `   ${l}`).join('\n'),
-      '3. Draft a reply in the SAME language as the conversation, grounded in what you found, with links',
+      '2. Draft a reply in the SAME language as the conversation, grounded in what you found, with links',
       '   to the specific place (AIMEAT Pages, a workspace document, a URL) where useful.',
-      '4. Give me the finished reply so I can review it and send it from the AIMEAT UI myself.',
-      '   Do NOT send it with `aimeat_dm_send`: your MCP connection is my agent, so a direct send would go',
-      '   out under the agent\'s name and start a separate thread — I want the reply to come from me, in',
-      '   this thread, so I will send it myself.',
+      '3. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
+      `4. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
+      '   If `aimeat_dm_send_as_owner` is not available, it means I have not granted the "reply as me"',
+      '   permission yet — then just give me the finished reply and I will send it from the AIMEAT UI myself.',
+      '   Do NOT use `aimeat_dm_send`: that sends under your own agent identity into a separate thread.',
       '',
       '## The conversation so far',
       convo,
@@ -176,26 +178,25 @@ export function buildMessageReplyPrompt({ peerGhii, subject, conversationId, mes
 
   if (mode === MODES.MCP) {
     return [
-      '# Reply to one message in AIMEAT with MCP research',
+      '# Reply to one message in AIMEAT as me (via MCP)',
       '',
-      `Use my connected AIMEAT MCP to help me reply to this specific message from **${them}**${topic} in`,
-      'the AIMEAT Postilaatikko (federation-wide direct-message inbox). Read the live thread and research',
-      'inside my AIMEAT, then give me a finished reply that I will send myself.',
+      `Use my connected AIMEAT MCP to reply to this specific message from **${them}**${topic} in the AIMEAT`,
+      'Postilaatikko (federation-wide direct-message inbox), sending the reply AS ME (not as your own agent',
+      'identity) into this same thread.',
       '',
       '## The message',
       one,
       '',
       '## Steps',
-      `1. For full context, read the thread with \`aimeat_dm_thread\` (conversation_id "${conversationId || ''}"; if it`,
-      `   doesn't resolve, use \`aimeat_dm_inbox\` to find the thread with ${handleOf(peerGhii)}).`,
-      '2. Research before answering:',
+      '1. Research before answering:',
       enrichmentBlock().split('\n').map((l) => `   ${l}`).join('\n'),
-      '3. Draft a reply in the SAME language as the message, grounded in what you found, with links to the',
+      '2. Draft a reply in the SAME language as the message, grounded in what you found, with links to the',
       '   specific place (AIMEAT Pages, a workspace document, a URL) where useful.',
-      '4. Give me the finished reply so I can review it and send it from the AIMEAT UI myself.',
-      '   Do NOT send it with `aimeat_dm_send`: your MCP connection is my agent, so a direct send would go',
-      '   out under the agent\'s name and start a separate thread — I want the reply to come from me, in',
-      '   this thread, so I will send it myself.',
+      '3. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
+      `4. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
+      '   If `aimeat_dm_send_as_owner` is not available, I have not granted the "reply as me" permission yet',
+      '   — then just give me the finished reply and I will send it from the AIMEAT UI myself.',
+      '   Do NOT use `aimeat_dm_send`: that sends under your own agent identity into a separate thread.',
     ].join('\n');
   }
 

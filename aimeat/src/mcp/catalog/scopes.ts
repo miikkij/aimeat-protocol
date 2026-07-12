@@ -93,6 +93,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).
     aimeat_dm_send: 'messages:send',
     aimeat_dm_ask: 'messages:send',
+    // Delegated "reply as me": send a federated DM AS THE OWNER. Its own scope so the owner grants it
+    // deliberately (it is part of the full '*' bundle; granular agents opt in separately). The sender is
+    // still derived server-side from the agent's owner, so the scope never enables cross-owner sends.
+    aimeat_dm_send_as_owner: 'messages:send-as-owner',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
 };

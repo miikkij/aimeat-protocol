@@ -65,7 +65,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_schedule_delete', 'aimeat_schedule_report_internal',
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run',
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
-        'aimeat_dm_send', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
+        'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
