@@ -135,6 +135,12 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .inbox-thread-subject { font-size: 12px; color: var(--accent); margin-top: 1px; }
+/* "via <agent>" — an aggregated conversation one of the owner's agents sent (read-only). */
+.inbox-via-chip {
+  flex: none; font-size: 10.5px; padding: 1px 6px; border-radius: 999px;
+  background: var(--bg-dim); color: var(--text-dim); border: 1px solid var(--border); white-space: nowrap;
+}
+.inbox-thread-via { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
 .inbox-conv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .inbox-conv-line1, .inbox-conv-line2 { display: flex; align-items: center; gap: 6px; }
 .inbox-conv-line1 .inbox-name { flex: 1; }
