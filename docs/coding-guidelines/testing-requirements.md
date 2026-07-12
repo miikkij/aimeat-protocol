@@ -4,7 +4,7 @@
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend is deprecated and produces stale failures. SQLite with `:memory:` (`AIMEAT_DB_PATH=:memory:`) covers the same fast-iteration role with the actual production code path. Treat `pnpm test:e2e` and `pnpm test:e2e:memory` as deprecated — do not use them for verification, and do not report their failures as findings.
+**Valid backends: SQLite, MongoDB, and PostgreSQL** (all persistent). The in-memory backend is deprecated and produces stale failures. SQLite with `:memory:` (`AIMEAT_DB_PATH=:memory:`) covers the fast-iteration role with the actual production code path. Treat `pnpm test:e2e` and `pnpm test:e2e:memory` as deprecated — do not use them for verification, and do not report their failures as findings. Default verification uses SQLite (fast) + MongoDB (prod-parity); PostgreSQL is a sibling Prisma backend with its own suite (`pnpm test:e2e:postgresql`, or `pnpm test:e2e:all-backends`) — run it when a change touches the Prisma schema / PG provider.
 
 When a feature, bugfix, or structural change is completed:
 
@@ -228,12 +228,13 @@ run().catch(err => { console.error(err); process.exit(1); });
 
 ### Multi-Backend Testing
 
-Tests must pass on both **persistent** storage backends:
+Tests must pass on the **persistent** storage backends:
 
 | Backend | Env File | Command | Notes |
 |---------|----------|---------|-------|
 | SQLite | `.env.test.sqlite` | `pnpm test:e2e:sqlite` | Fast iteration default. Set `AIMEAT_DB_PATH=:memory:` for true in-memory speed without giving up the real SQL code path. |
 | MongoDB | `.env.test.mongodb` | `pnpm test:e2e:mongodb` | Most realistic. Required before end-of-plan and before any PR. |
+| PostgreSQL | `.env.test.postgres` | `pnpm test:e2e:postgresql` | Sibling Prisma backend (production option). Run when a change touches the Prisma schema / `postgres` provider; `pnpm test:e2e:all-backends` runs all three. |
 
 The in-memory backend (`pnpm test:e2e:memory`, the unsuffixed `pnpm test:e2e`) is **deprecated** and not a supported environment — its `.env.test.memory` file may not even exist in the repo. AIMEAT outgrew the pure-in-memory storage path long ago; SQLite `:memory:` covers that role using the production code path.
 

@@ -10,10 +10,10 @@ Set at registration (`POST /v1/agents/device-authorize`, body field `mode`) and 
 
 | Mode | Definition | Hello Integration |
 |------|-----------|---------|
-| `autonomous` | Runs continuously, decides when to act, monitors environment (Hermes, OpenClaw, Auto-GPT-style). | Full 13-step flow |
-| `interactive` | Responds to user requests in a chat or IDE session (Claude Code, Cursor, Cline, Falcon). | Full 13-step flow |
+| `autonomous` | Runs continuously, decides when to act, monitors environment (Hermes, OpenClaw, Auto-GPT-style). | Full 16-step flow (12 required + 4 optional) |
+| `interactive` | Responds to user requests in a chat or IDE session (Claude Code, Cursor, Cline, Falcon). | Full 16-step flow (12 required + 4 optional) |
 | `task-runner` | Triggered by a task, runs it, exits. No interactive command surface, no continuous presence (CrewAI crews, Inngest-style workers). | Reduced 7-step flow -- `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `accept_test_task`, `complete_test_task`, `publish_config`. The test-task pair is kept as the runner's smoke test; the omitted steps are not in the record at all -- not pending, not skipped. |
-| `coordinator` | Orchestrates other agents (Claude Desktop with MCP, LangGraph supervisor, CrewAI Manager Agent). Treated as interactive for onboarding. | Full 13-step flow |
+| `coordinator` | Orchestrates other agents (Claude Desktop with MCP, LangGraph supervisor, CrewAI Manager Agent). Treated as interactive for onboarding. | Full 16-step flow (12 required + 4 optional) |
 | `workstation` | Node-visiting agent that lives in the user's own environment (VSCode, Claude Desktop) and uses MCP directly -- not node-resident, so it has no runtime config, slash commands, telemetry, or task queue. | Narrowest 4-step flow -- `authenticate`, `identify_platform`, `report_capabilities`, `read_directives`. The MCP round-trip it already made to authenticate + report capabilities is its smoke test, so no test task is created. The omitted steps are not in the record at all. |
 
 Existing agents (created before this field existed) default to `interactive` -- they already went through the full flow. New agents declare a mode at registration; if omitted, the server treats it as `interactive`.

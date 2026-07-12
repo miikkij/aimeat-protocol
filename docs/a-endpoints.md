@@ -1,5 +1,7 @@
 ## Appendix A: Complete Endpoint Reference
 
+> **Note:** `openapi.yaml` is the canonical, always-current endpoint contract — prefer it over this hand-maintained table. **Deprecated (v4.0):** Tier 0.5 / OTK (`/v1/auth/otk`, `/initial-otk`, `/v1/auth/session`, `/challenge`), micro-memory (`/v1/mm`), and the legacy Ed25519 challenge-response `POST /v1/auth/token` — kept for compatibility, off the mainline; new integrations use device auth + MCP.
+
 **Bootstrap & Auth**
 
 | Method | Path | Auth | Tier | Description |

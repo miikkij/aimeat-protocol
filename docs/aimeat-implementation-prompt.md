@@ -2,7 +2,9 @@
 
 ## What You're Building
 
-Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in the attached file `AIMEAT-RFC-v1.2-full.md` — that is your source of truth. Read it fully before writing any code.
+> **Note (2026-07-12):** this is the *original from-scratch bootstrapping prompt*, kept for historical context. The reference implementation now exists. The current specification is **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** and the canonical API contract is **`openapi.yaml`** — use those, not the removed v1.2 RFC. Valid storage backends are SQLite, MongoDB, and PostgreSQL (the old in-memory-first framing below is obsolete).
+
+Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in `AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md` (with `openapi.yaml` as the canonical schema contract) — that is your source of truth. Read it fully before writing any code.
 
 ## The Goal
 
@@ -319,7 +321,7 @@ curl http://localhost:40050/v1/catalogue               # empty catalogue
 
 ## Read the RFC
 
-The attached `AIMEAT-RFC-v1.2-full.md` is ~4800 lines and 155KB. It contains:
+The current spec (`AIMEAT-RFC-v4.0-Core-full.md` + `-Platform-full.md`, with `openapi.yaml`) contains:
 - Complete endpoint definitions (75 paths, 88 operations across all tiers)
 - Data models for all entities
 - Sequence diagrams for auth, work queue, federation

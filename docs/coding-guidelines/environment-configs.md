@@ -24,7 +24,8 @@ DATABASE_URL=mongodb://user:pass@localhost:27017/aimeat
 # Auth
 AIMEAT_ADMIN_PASSWORD=<strong-random-password>
 AIMEAT_JWT_TTL=3600
-AIMEAT_OTK_ENABLED=true
+# OTK / Tier-0.5 keyed-browse is deprecated (superseded by device auth + MCP); leave off.
+AIMEAT_OTK_ENABLED=false
 
 # Economy
 AIMEAT_WELCOME_BONUS=100
@@ -125,8 +126,9 @@ AIMEAT_PORT=40050
 AIMEAT_NODE_TYPE=relay
 AIMEAT_BASE_URL=https://relay-eu.example.com
 
-# Storage: In-memory (no persistent data needed)
-AIMEAT_STORAGE=memory
+# Storage: ephemeral (relay holds no persistent user data) — SQLite :memory:
+AIMEAT_STORAGE=sqlite
+AIMEAT_DB_PATH=:memory:
 
 # Auth
 AIMEAT_ADMIN_PASSWORD=<password>
@@ -195,8 +197,9 @@ AIMEAT_PORT=40050
 AIMEAT_NODE_TYPE=full
 AIMEAT_BASE_URL=http://localhost:40050
 
-# Storage: In-memory (fast, no cleanup needed)
-AIMEAT_STORAGE=memory
+# Storage: SQLite :memory: (fast, no cleanup, real SQL code path)
+AIMEAT_STORAGE=sqlite
+AIMEAT_DB_PATH=:memory:
 
 # Auth (simple password for dev)
 AIMEAT_ADMIN_PASSWORD=devpass123
@@ -219,13 +222,14 @@ AIMEAT_DEFAULT_AGENT_SCOPES=*
 
 ## Testing Environments
 
-Three test configs exist for E2E testing:
+Two supported test configs exist for E2E testing:
 
 | File | Backend | Usage |
 |------|---------|-------|
-| `.env.test.memory` | In-memory SQLite | Fast E2E tests |
-| `.env.test.sqlite` | SQLite on disk | Persistence tests |
-| `.env.test.mongodb` | MongoDB | Production-like tests |
+| `.env.test.sqlite` | SQLite (disk or `:memory:`) | Fast-iteration default (`pnpm test:e2e:sqlite`) |
+| `.env.test.mongodb` | MongoDB | Production-like tests (`pnpm test:e2e:mongodb`) |
+
+> `.env.test.memory` / `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — do not use it for verification.
 
 All test environments use port 40251 and relaxed rate limits.
 

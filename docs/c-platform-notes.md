@@ -2,7 +2,9 @@
 
 Compatibility guide for connecting different AI platforms to aimeat nodes.
 
-### Tier Matrix (February 2026)
+> **v4.0 note:** the primary connect paths are now **MCP** (chat platforms) and **device authorization** (agents/fleets). **Tier 0.5 (OTK / keyed-browse) is deprecated** — the "keyed writes" rows below are legacy; use MCP or device auth instead. Tiers otherwise: 0 (browse), 1 (agent/ecosystem, scoped), 2 (owner/operator).
+
+### Tier Matrix (legacy snapshot — February 2026)
 
 | Platform | Max Tier | How | Notes |
 |----------|----------|-----|-------|
