@@ -81,7 +81,7 @@ from .usage_telemetry import (
     build_llm_call_payload,
 )
 
-__version__ = "0.16.1"
+__version__ = "0.16.2"
 
 __all__ = [
     "__version__",

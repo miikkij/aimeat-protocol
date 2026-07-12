@@ -35,17 +35,19 @@ class _Event:
 def test_payload_full_shape_with_provider_and_run_id() -> None:
     p = build_llm_call_payload(
         "anthropic/claude-sonnet-4",
-        {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cost": 0.0123},
         "task-1",
     )
+    # "anthropic" is a known routing prefix -> stripped into data.provider; cost from usage.cost.
     assert p == {
         "type": "llm_call",
         "task_id": "task-1",
         "data": {
-            "model": "anthropic/claude-sonnet-4",
+            "model": "claude-sonnet-4",
             "prompt_tokens": 10,
             "completion_tokens": 5,
             "provider": "anthropic",
+            "cost_usd": 0.0123,
             "run_id": "task-1",
         },
     }
@@ -61,6 +63,32 @@ def test_payload_coerces_bad_token_values() -> None:
     p = build_llm_call_payload("gpt-4o", {"prompt_tokens": None, "completion_tokens": -3}, None)
     assert p["data"]["prompt_tokens"] == 0
     assert p["data"]["completion_tokens"] == 0
+
+
+def test_payload_reads_openrouter_cost() -> None:
+    # OpenRouter's authoritative usage.cost (present when usage.include was set) -> data.cost_usd.
+    p = build_llm_call_payload("openrouter/z-ai/glm-5.2", {"prompt_tokens": 100, "completion_tokens": 40, "cost": 3.83e-05}, None)
+    assert p["data"]["cost_usd"] == 3.83e-05
+
+
+def test_payload_omits_cost_when_absent() -> None:
+    # No usage.cost -> no cost_usd; the node then prices from its table or records unpriced.
+    p = build_llm_call_payload("z-ai/glm-5.2", {"prompt_tokens": 1, "completion_tokens": 1}, None)
+    assert "cost_usd" not in p["data"]
+
+
+def test_model_normalization_collapses_routing_prefixes() -> None:
+    # Strip ONE known routing prefix (colon or slash) into data.provider so one model = one row.
+    assert build_llm_call_payload("nvidia:z-ai/glm-5.2", {}, None)["data"] == {
+        "model": "z-ai/glm-5.2", "prompt_tokens": 0, "completion_tokens": 0, "provider": "nvidia",
+    }
+    assert build_llm_call_payload("openai/z-ai/glm-5.2", {}, None)["data"]["model"] == "z-ai/glm-5.2"
+    # Only the OUTERMOST prefix is stripped once — the inner vendor segment survives.
+    d = build_llm_call_payload("openrouter/openai/gpt-oss-120b", {}, None)["data"]
+    assert d["model"] == "openai/gpt-oss-120b" and d["provider"] == "openrouter"
+    # Bare / vendor-first ids pass through unchanged, with no provider.
+    assert build_llm_call_payload("z-ai/glm-5.2", {}, None)["data"].get("provider") is None
+    assert build_llm_call_payload("bytedance-seed/seedream-4.5", {}, None)["data"]["model"] == "bytedance-seed/seedream-4.5"
 
 
 def _collect() -> tuple[list, "callable"]:

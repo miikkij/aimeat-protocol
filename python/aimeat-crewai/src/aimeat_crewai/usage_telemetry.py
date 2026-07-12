@@ -7,8 +7,11 @@ providers both emit it. This module subscribes once, and for each real LLM call 
 `type="llm_call"` telemetry event to the node over the loopback `aimeat connect serve`
 daemon (no bearer token needed -- the daemon holds it). The node records a priced,
 append-only usage row (extractUsageFields -> recordUsageEvent) so the owner sees spend at
-`/v1/ledger/usage`. Cost is NOT computed here (litellm is optional and often absent): we
-send model + tokens and let the node price it from its own table.
+`/v1/ledger/usage`. Cost = OpenRouter's authoritative `usage.cost` when the caller enabled
+usage.include on the request (CrewAI copies it onto the event's usage dict); litellm can't
+price many of our models, so we do NOT compute cost here. Absent -> the node prices it from
+its own table or records the call unpriced. The model id is normalized (routing prefix ->
+data.provider) so one model = one ledger row.
 
 `run_id` (the AIMEAT task) AND `agent_name` (which AIMEAT agent) are both stamped from
 ContextVars the daemon sets around each `crew.kickoff()` (see `usage_run`), so each usage
@@ -38,6 +41,11 @@ Changelog:
     host). Adds a _current_agent_name ContextVar (set by usage_run alongside run_id) and a
     fleet-aware sender that routes each call to the EMITTING agent's telemetry route, so usage
     no longer all lands on the first-installed agent. run_id/task attribution is unchanged.
+  0.16.2 -- The event-bus report now carries OpenRouter's authoritative `usage.cost` as
+    data.cost_usd (when the caller enables usage.include on the request) instead of leaving
+    text-LLM calls unpriced, + model-id normalization (strip a known routing prefix into
+    data.provider) so one model = one ledger row. No litellm pricing (it can't price these
+    models); no double-count (cost goes into the existing report).
 """
 from __future__ import annotations
 
@@ -83,29 +91,45 @@ def _int(v: Any) -> int:
     return n if n >= 0 else 0
 
 
-def _extract_provider(model: str) -> str | None:
-    """Derive a provider from a namespaced model id: "anthropic/claude-..." -> "anthropic".
-    A bare "gpt-4o" returns None; the node then defaults provider and prices by model
-    substring, so this is a best-effort hint only."""
-    if "/" in model:
-        head = model.split("/", 1)[0].strip()
-        return head or None
-    return None
+# Known LLM ROUTING prefixes (litellm-style). Stripped from the model id so ONE model = ONE
+# ledger row and the routing provider lives in data.provider, not baked into the model string.
+# Only the OUTERMOST known prefix is stripped, once, so a real vendor/model-family segment
+# survives: openrouter/openai/gpt-oss-120b -> (openai/gpt-oss-120b, openrouter).
+_ROUTING_PREFIXES = frozenset(
+    {"openrouter", "openai", "nvidia", "xai", "anthropic", "azure", "bedrock", "ollama", "local"}
+)
+
+
+def _normalize_model(model: str) -> tuple[str, str | None]:
+    """(canonical_model, routing_provider) — strip ONE leading known routing prefix, `prefix:rest`
+    or `prefix/rest`. openrouter/openai/gpt-oss-120b -> (openai/gpt-oss-120b, openrouter);
+    openai/z-ai/glm-5.2 -> (z-ai/glm-5.2, openai); nvidia:z-ai/glm-5.2 -> (z-ai/glm-5.2, nvidia).
+    Bare / vendor-first ids (z-ai/glm-5.2, bytedance-seed/seedream-4.5) pass through unchanged."""
+    m = (model or "").strip()
+    for sep in (":", "/"):
+        head, found, rest = m.partition(sep)
+        if found and rest and head.lower() in _ROUTING_PREFIXES:
+            return rest, head.lower()
+    return m, None
 
 
 def build_llm_call_payload(model: str, usage: dict[str, Any], run_id: str | None) -> dict[str, Any]:
-    """Build the telemetry POST body for one LLM call. Shape matches the node's
-    extractUsageFields: data.model (required), data.prompt_tokens / completion_tokens, an
-    optional data.provider, and run_id both in data and as the top-level task_id (the node
-    falls back to task_id when data.run_id is absent)."""
-    data: dict[str, Any] = {
-        "model": model,
-        "prompt_tokens": _int(usage.get("prompt_tokens")),
-        "completion_tokens": _int(usage.get("completion_tokens")),
-    }
-    provider = _extract_provider(model)
+    """Telemetry POST body for one LLM call. data.model is CANONICAL (routing prefix stripped),
+    the routing provider in data.provider, OpenRouter's authoritative data.cost_usd when the caller
+    enabled usage.include (else omitted -> node prices / unpriced), and run_id in data + top-level
+    task_id (the node falls back to task_id). Shape matches the node's extractUsageFields."""
+    pt = _int(usage.get("prompt_tokens"))
+    ct = _int(usage.get("completion_tokens"))
+    canonical_model, provider = _normalize_model(model)
+    data: dict[str, Any] = {"model": canonical_model, "prompt_tokens": pt, "completion_tokens": ct}
     if provider:
         data["provider"] = provider
+    # OpenRouter's authoritative per-call cost (present only when the request set usage.include).
+    # litellm can't price many of our models, so this response field is the source of truth; when
+    # it's absent the node prices from its table or records the call unpriced.
+    cost = usage.get("cost")
+    if isinstance(cost, (int, float)) and cost >= 0:
+        data["cost_usd"] = float(cost)
     if run_id:
         data["run_id"] = run_id
     payload: dict[str, Any] = {"type": "llm_call", "data": data}
