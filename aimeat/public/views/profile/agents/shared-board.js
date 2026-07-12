@@ -3,8 +3,14 @@
  * @description Shared Agent Board ("radiator") — fleet state at a glance. Mini-cards per agent
  *   (name + status color + ONE essential figure), a status legend that doubles as filter pills,
  *   and issue-first sorting so a problem never drowns among healthy agents. Clicking a card
- *   expands the same agent in the management list below.
+ *   expands the same agent in the management list below. On hover/focus each mini-card flips to
+ *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
+ *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.0.0 -- 2026-07-12 -- ID-card treatment: each board mini-card reveals a full agent
+ *     identity plate on hover/focus (labelled GAII + Global AI Instance Identifier, issued
+ *     date, last seen, tasks done/active/failed, messages, trust, morsels, issuer node,
+ *     copy-GAII). Default (non-hover) face unchanged: state-coloured name + one figure.
  *   v2.0.0 -- 2026-06-10 -- Glance optimization round: status legend = clickable filter pills
  *     (online/quiet/onboarding/issue) with counts; sort issues first, then onboarding, then the
  *     rest; cards slimmed to name + one figure (no "--" filler rows, tags line dropped — tags
@@ -17,6 +23,7 @@ import { h } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { detectAgentState, getStateColor } from './state-detector.js';
 
 const html = htm.bind(h);
@@ -79,19 +86,28 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
         `)}
       </div>
       <div class="pf-agd-board-grid">
-        ${shown.map(({ agent, state, onboarding }) => html`
-          <div
-            key=${agent.name}
-            class="pf-agd-board-card"
-            style="border-left-color: ${getStateColor(state)}"
-            onClick=${() => onAgentClick?.(agent.name)}
-          >
-            <div class="pf-agd-board-card-name" style="color: ${getStateColor(state)}">${agent.display_name || agent.name}</div>
-            <div class="pf-agd-board-card-activity">
-              ${glanceFigure(state, agent, onboarding)}
+        ${shown.map(({ agent, state, onboarding }) => {
+          const color = getStateColor(state);
+          return html`
+            <div
+              key=${agent.name}
+              class="pf-agd-board-card"
+              style="border-left-color: ${color}; --agd-state: ${color}"
+              tabindex="0"
+              role="button"
+              onClick=${() => onAgentClick?.(agent.name)}
+              onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAgentClick?.(agent.name); } }}
+            >
+              <div class="pf-agd-board-card-face">
+                <div class="pf-agd-board-card-name" style="color: ${color}">${agent.display_name || agent.name}</div>
+                <div class="pf-agd-board-card-activity">
+                  ${glanceFigure(state, agent, onboarding)}
+                </div>
+              </div>
+              ${renderIdCard(agent)}
             </div>
-          </div>
-        `)}
+          `;
+        })}
       </div>
       ${Object.keys(allTags).length > 0 && html`
         <div class="pf-agd-board-tags">
@@ -130,4 +146,91 @@ function formatTimeAgo(isoDate) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
   return `${Math.floor(diff / 86400)}d`;
+}
+
+// Absolute "issued" date for the ID card (browser locale, day-precision).
+function formatIssued(isoDate) {
+  if (!isoDate) return '—';
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// ── ID-card face (revealed on hover/focus of a board mini-card) ──
+// The radiator's mini-card answers "how is the fleet doing" at a glance; the ID
+// card answers "who exactly is this agent" on demand. It surfaces the full GAII
+// (with its expansion, so the owner learns display-name-vs-GAII) plus the
+// tombstone facts an identity card carries: when it was issued, when it was last
+// seen, and its work/trust footprint. All data comes from the fleet payload the
+// board already holds (agent.stats via ?include=stats) — no extra requests.
+function renderIdCard(agent) {
+  const gaii = agent.gaii || `${agent.name}@${agent.owner || ''}`;
+  const nodeId = gaii.includes('@') ? gaii.split('@').pop() : '';
+  const st = agent.stats || {};
+  const tasks = st.tasks || {};
+  const messages = st.messages || {};
+  const done = tasks.done || 0;
+  const active = tasks.active || 0;
+  const failed = tasks.failed || 0;
+  const msgTotal = messages.total || 0;
+  const trust = agent.trust_score ?? '—';
+  const morsels = agent.morsel_balance ?? 0;
+  const mode = agent.mode || 'interactive';
+
+  const stat = (label, value, cls = '') => html`
+    <div class="pf-agd-idcard-stat ${cls}">
+      <span class="pf-agd-idcard-stat-label">${label}</span>
+      <span class="pf-agd-idcard-stat-value">${value}</span>
+    </div>`;
+
+  return html`
+    <div class="pf-agd-idcard" aria-hidden="true">
+      <div class="pf-agd-idcard-top">
+        <span class="pf-agd-idcard-eyebrow">
+          <span class="pf-agd-idcard-dot"></span>${t('profile.agents.idcard.eyebrow')}
+        </span>
+        <span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}">${t('profile.agents.mode.' + mode) || mode}</span>
+      </div>
+
+      <div class="pf-agd-idcard-head">
+        <span class="pf-agd-idcard-avatar">🤖</span>
+        <div class="pf-agd-idcard-names">
+          <span class="pf-agd-idcard-name">${agent.display_name || agent.name}</span>
+          <span class="pf-agd-idcard-hint">${t('profile.agents.idcard.displayNameHint')}</span>
+        </div>
+      </div>
+
+      <div class="pf-agd-idcard-gaii">
+        <div class="pf-agd-idcard-gaii-head">
+          <span class="pf-agd-idcard-gaii-label">
+            <strong>${t('profile.agents.idcard.gaiiLabel')}</strong> · ${t('profile.agents.idcard.gaiiFull')}
+          </span>
+          <span onClick=${(e) => e.stopPropagation()}>
+            <${CopyButton}
+              text=${gaii}
+              className="pf-agd-idcard-copy"
+              label=${t('profile.agents.idcard.copyGaii')}
+              copiedLabel=${'✅ ' + t('profile.agents.idcard.copied')} />
+          </span>
+        </div>
+        <code class="pf-agd-idcard-gaii-value">${gaii}</code>
+      </div>
+
+      <div class="pf-agd-idcard-stats">
+        ${stat(t('profile.agents.idcard.issued'), formatIssued(agent.created_at))}
+        ${stat(t('profile.agents.idcard.lastSeen'), agent.last_seen ? formatTimeAgo(agent.last_seen) : t('profile.agents.idcard.never'))}
+        ${stat(t('profile.agents.idcard.done'), done)}
+        ${stat(t('profile.agents.idcard.active'), active, active > 0 ? 'pf-agd-idcard-stat--active' : '')}
+        ${stat(t('profile.agents.idcard.failed'), failed, failed > 0 ? 'pf-agd-idcard-stat--failed' : '')}
+        ${stat(t('profile.agents.idcard.messages'), msgTotal)}
+        ${stat(t('profile.agents.idcard.trust'), trust)}
+        ${stat(t('profile.agents.idcard.morsels'), typeof morsels === 'number' ? morsels.toLocaleString() : morsels)}
+      </div>
+
+      <div class="pf-agd-idcard-foot">
+        <span class="pf-agd-idcard-issuer">${t('profile.agents.idcard.issuer')}: ${nodeId || '—'}</span>
+        <span class="pf-agd-idcard-manage">${t('profile.agents.idcard.manageHint')} →</span>
+      </div>
+    </div>
+  `;
 }

@@ -2203,6 +2203,25 @@
         "issue": "ongelma",
         "newShort": "uusi",
         "issueShort": "ongelma"
+      },
+      "idcard": {
+        "eyebrow": "Tekoälyidentiteetti",
+        "gaiiLabel": "GAII",
+        "gaiiFull": "Global AI Instance Identifier",
+        "displayNameHint": "Näyttönimi — näin viittaat tähän agenttiin",
+        "issued": "Myönnetty",
+        "lastSeen": "Viimeksi nähty",
+        "done": "Valmiit",
+        "active": "Aktiiviset",
+        "failed": "Epäonnistuneet",
+        "messages": "Viestit",
+        "trust": "Luottamus",
+        "morsels": "Morselit",
+        "issuer": "Myöntäjä",
+        "copyGaii": "Kopioi",
+        "copied": "Kopioitu",
+        "manageHint": "Avaa hallitaksesi",
+        "never": "ei koskaan"
       }
     },
     "scopes": {
