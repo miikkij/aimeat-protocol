@@ -280,6 +280,13 @@ agent is read from a per-kickoff ContextVar and the call is POSTed to that agent
 telemetry route, so per-agent ledger grouping stays correct instead of collapsing onto the
 first-started agent.
 
+**Cost + clean model ids (0.16.2+):** the report carries OpenRouter's authoritative per-call
+`usage.cost` as `cost_usd` when your OpenRouter request sets `extra_body={"usage":{"include":True}}`
+(CrewAI copies it onto the event) — so text-LLM calls are priced, not left at $0. The model id is
+normalized (a known routing prefix like `openrouter/`/`nvidia:` is moved into `provider`), so one
+model shows as one ledger row instead of fragmenting across `openai/z-ai/glm-5.2`, `nvidia:z-ai/glm-5.2`,
+etc. When `usage.cost` is absent the node prices from its own table or records the call unpriced.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
