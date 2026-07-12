@@ -759,7 +759,7 @@ function AgentLedgerCard() {
           ${topModels.map((g) => html`
             <div class="pf-ai-app-row" key=${g.key}>
               <span class="pf-ai-app-name">${g.key}</span>
-              <span class="pf-ai-app-meta">${fmtCompact(g.total_tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'} · ${fmtCompact(g.calls)}</span>
+              <span class="pf-ai-app-meta">${(g.providers && g.providers.length) ? g.providers.join(', ') + ' · ' : ''}${fmtCompact(g.total_tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'} · ${fmtCompact(g.calls)}</span>
               <span class="pf-ai-app-cost">${fmtUsd(g.cost_usd)}</span>
             </div>`)}
         </div>`}

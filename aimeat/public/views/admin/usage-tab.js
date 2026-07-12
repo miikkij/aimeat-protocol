@@ -164,6 +164,7 @@ function renderLedgerSection(data, metric, selectedUser, setSelectedUser) {
 
   const modelRows = perModel.map((m) => [
     { text: m.model, mono: true },
+    { text: (m.providers && m.providers.length) ? m.providers.join(', ') : '—', mono: true },
     { text: usd(m.cost_usd), mono: true },
     { text: num(m.total_tokens || 0), mono: true },
     { text: num(m.calls || 0), mono: true },
@@ -203,6 +204,7 @@ function renderLedgerSection(data, metric, selectedUser, setSelectedUser) {
       <${DataTable}
         headers=${[
           t('dashboard.ledgerColModel') || 'Model',
+          t('dashboard.ledgerColProvider') || 'Provider',
           t('dashboard.ledgerColCost') || 'Cost',
           t('dashboard.ledgerColTokens') || 'Tokens',
           t('dashboard.ledgerColCalls') || 'Calls',

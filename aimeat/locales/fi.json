@@ -5153,6 +5153,7 @@
     "ledgerColCalls": "Kutsut",
     "ledgerColUnpriced": "Hinnoittelemattomat",
     "ledgerColModel": "Malli",
+    "ledgerColProvider": "Tarjoaja",
     "ledgerColAgent": "Agentti",
     "ledgerAllUsers": "Kaikki käyttäjät",
     "ledgerFilteredNote": "Näytetään agentit käyttäjälle",

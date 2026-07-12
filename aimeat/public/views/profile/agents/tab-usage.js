@@ -106,7 +106,7 @@ export default function TabUsage({ agent, agentName }) {
               </span>
             </div>
             <div class="pf-agd-log-entry-detail">
-              ${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}
+              ${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}
             </div>
           </div>
         `)}
