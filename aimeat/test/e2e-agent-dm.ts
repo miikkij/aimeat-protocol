@@ -85,6 +85,7 @@ async function createAgent(ownerName: string, ownerToken: string, agentName: str
 const stamp = Date.now();
 const aliceName = `dmalice${stamp}`;  // owner of the sending agents
 const bobName = `dmbob${stamp}`;      // recipient human
+let alice = { token: '', ghii: '' };  // owner of the sending agents
 let bob = { token: '', ghii: '' };
 let dmbot = { gaii: '', token: '' };  // agent WITH messages:send
 let mute = { gaii: '', token: '' };   // agent WITHOUT messages:send
@@ -93,7 +94,7 @@ console.log('\n=== AIMEAT Agent Federated DM E2E (Phase A) ===\n');
 
 console.log('Setup — owners + agents');
 await test('Register owner Alice + Bob', async () => {
-    const alice = await registerOwner(aliceName);
+    alice = await registerOwner(aliceName);
     bob = await registerOwner(bobName);
     dmbot = await createAgent(aliceName, alice.token, 'dmbot', ['messages:send', 'storage:write']);
     mute = await createAgent(aliceName, alice.token, 'mutebot', ['memory:read']);
@@ -225,6 +226,37 @@ await test('10. Owner can DM its own agent (with an attachment); the agent reads
     // The owner sees their sent copy as a thread with the agent (so they can follow + intervene).
     const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${owner.token}` } });
     assert(convs.body.data.conversations.some((c: any) => c.peerGhii === myAgent.gaii), 'owner sees the thread with their own agent');
+});
+
+console.log('\nOwner-aggregation — the owner sees their agent\'s outbound conversations (read-only)');
+await test('11. Alice (owner) sees dmbot\'s conversation with Bob in her list, tagged viaAgent', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(convs.status === 200, `conversations ${convs.status}`);
+    const c = convs.body.data.conversations.find((x: any) => x.peerGhii === bob.ghii && x.viaAgent === dmbot.gaii);
+    assert(c !== undefined, 'Alice sees the agent→Bob conversation tagged viaAgent=dmbot');
+});
+
+await test('12. Alice reads that thread read-only via ?agent=<dmbot> and sees the agent\'s message', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const c = convs.body.data.conversations.find((x: any) => x.viaAgent === dmbot.gaii);
+    const thread = await json(`/v1/messages/conversations/${encodeURIComponent(c.conversationId)}?agent=${encodeURIComponent(dmbot.gaii)}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(thread.status === 200, `thread ${thread.status}: ${JSON.stringify(thread.body)}`);
+    const m = thread.body.data.messages.find((x: any) => x.senderGhii === dmbot.gaii);
+    assert(m !== undefined, 'Alice reads the agent\'s outbound message in the thread');
+});
+
+await test('13. ?agent= must be one of the owner\'s OWN agents (Bob cannot read Alice\'s agent thread) → 403', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const c = convs.body.data.conversations.find((x: any) => x.viaAgent === dmbot.gaii);
+    // Bob asks to read the thread AS dmbot (not his agent) → 403.
+    const forbidden = await json(`/v1/messages/conversations/${encodeURIComponent(c.conversationId)}?agent=${encodeURIComponent(dmbot.gaii)}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(forbidden.status === 403, `expected 403 for a non-owned agent, got ${forbidden.status}`);
+});
+
+await test('14. Bob (a different owner) does NOT see Alice\'s agent conversations in his list', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const leaked = convs.body.data.conversations.find((x: any) => x.viaAgent === dmbot.gaii);
+    assert(leaked === undefined, 'Bob must not see Alice\'s agent-owned conversations');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

@@ -26952,6 +26952,14 @@ paths:
         - name: per_page
           in: query
           schema: { type: integer, default: 50 }
+        - name: agent
+          in: query
+          required: false
+          description: >-
+            Read an agent-owned ("via <agent>") thread — one of the owner's OWN agents' conversations,
+            surfaced read-only in the conversation list with a `viaAgent` tag. Pass that agent GAII to
+            read the thread under it. Only the caller's own agents are permitted (else 403).
+          schema: { type: string }
       responses:
         '200':
           description: Thread messages
@@ -26972,6 +26980,8 @@ paths:
                           total: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/messages/conversations/{conversationId}/read:
     post:

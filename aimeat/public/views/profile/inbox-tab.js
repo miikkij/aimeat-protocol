@@ -11,6 +11,10 @@
  * @structure InboxTab (default) · Composer (Toast UI) · MessageBubble · ReplyWithAiPopover · InteractiveForm · Avatar · helpers
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.17.0 -- 2026-07-12 -- Owner-aggregation: the list now also shows conversations one of the owner's
+ *     OWN agents had with external people (a DM the agent sent from its own inbox), tagged `viaAgent` and
+ *     labelled "via <agent>". These open READ-ONLY (banner + no composer; no read receipt), read under the
+ *     agent via GET conversations/:id?agent=<gaii>. Backend aggregates only this owner's agents.
  *   v1.16.0 -- 2026-07-12 -- Peer display names (TARGET-031 part A): thread head, conversation list, group
  *     headers and requests now show the peer's display name with the login handle in parens — "Kalle (kkk)"
  *     — resolved once per peer (agents via /v1/agents/:gaii, humans via /v1/ghii/:ghii, both public) and
@@ -897,7 +901,7 @@ export default function InboxTab({ showToast }) {
   // self-sustaining request loop. So live refreshes reload the thread WITHOUT marking read.
   const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
-    const msgs = (await messages.getConversation(conv.conversationId).catch(() => [])).slice().reverse();
+    const msgs = (await messages.getConversation(conv.conversationId, conv.viaAgent).catch(() => [])).slice().reverse();
     setThread(msgs);
     // REUSE already-resolved attachment URLs for the SAME conversation: a refresh / new message must NOT
     // re-resolve (and thus re-download via a fresh presigned URL) every existing image. Only fetch URLs
@@ -919,7 +923,8 @@ export default function InboxTab({ showToast }) {
       })));
     urlCacheRef.current = { convId: conv.conversationId, map };
     setUrlMap(map);
-    if (markRead) await messages.markConversationRead(conv.conversationId).catch(() => {});
+    // Agent-owned ("via <agent>") threads are read-only for the owner — don't post a read receipt as them.
+    if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
 
   useEffect(() => { loadLists(); }, [loadLists]);
@@ -1275,15 +1280,21 @@ export default function InboxTab({ showToast }) {
   const convRow = (c, nested) => {
     const active = activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
     const sub = subThreadLabel(c.peerGhii);
+    // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
+    // "via <agent>" and read-only. The `viaAgent` tag comes from the conversation list aggregation.
+    const via = c.viaAgent ? (subThreadLabel(c.viaAgent) || peerName(c.viaAgent)) : null;
     // Nested: a subject thread shows its topic; otherwise the agent name / "Direct". Flat: the person.
-    const label = nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(c.peerGhii);
-    const icon = sub ? '🤖' : (c.subject ? '🏷' : '💬');
+    const label = via
+      ? (nested ? `${t('inbox.viaAgent')} ${via}` : peerDisplay(c.peerGhii))
+      : (nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(c.peerGhii));
+    const icon = (via || sub) ? '🤖' : (c.subject ? '🏷' : '💬');
     return html`
       <button class=${`inbox-conv${active}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId} onClick=${() => openConversation(c)}>
         ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
         <div class="inbox-conv-main">
           <div class="inbox-conv-line1">
             <span class="inbox-name">${escHtml(label)} ${(!nested || c.peerGhii?.includes('#')) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
+            ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
             <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
           </div>
           <div class="inbox-conv-line2">
@@ -1305,6 +1316,8 @@ export default function InboxTab({ showToast }) {
     }
     // An announcement (a non-respondable broadcast) is read-only for the recipient — hide the composer.
     const isAnnouncement = thread.some(m => m.direction === 'inbound' && m.respondable === false);
+    // An aggregated "via <agent>" thread (a DM one of the owner's own agents sent) is read-only here.
+    const viaAgentName = activeConv.viaAgent ? (subThreadLabel(activeConv.viaAgent) || peerName(activeConv.viaAgent)) : null;
     // Agent capabilities in chat: command chips for any agent peer (public chat.commands); the schedule
     // panel only for the human's OWN agents (the scheduler routes resolve under the caller's owner).
     const peerIsAgent = isAgentPeer(activeConv.peerGhii);
@@ -1317,10 +1330,11 @@ export default function InboxTab({ showToast }) {
           <div class="inbox-thread-id">
             <div class="inbox-name">${escHtml(peerDisplay(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
             ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
+            ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
             <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
           </div>
-          <button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ ${t('inbox.ai.replyWithAi')}</button>
-          ${peerIsMyAgent ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
+          ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ ${t('inbox.ai.replyWithAi')}</button>` : null}
+          ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
             onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
         </div>
         <div class="inbox-msgs" ref=${msgsRef}>
@@ -1356,7 +1370,9 @@ export default function InboxTab({ showToast }) {
           : (!isAnnouncement && agentCommands
             ? html`<${CommandBar} commands=${agentCommands} onPick=${(c) =>
                 (Array.isArray(c.params) && c.params.length) ? setCmdFill(c) : insertCommand(c, {})} />` : null)}
-        ${isAnnouncement
+        ${viaAgentName
+          ? html`<div class="inbox-announce-note">🤖 ${(t('inbox.viaAgentReadonly') || 'Sent by your agent {agent} — view only.').replace('{agent}', viaAgentName)}</div>`
+          : isAnnouncement
           ? html`<div class="inbox-announce-note">📢 ${t('inbox.announcementNote')}</div>`
           : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
               sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}

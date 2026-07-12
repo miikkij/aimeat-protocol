@@ -52,8 +52,9 @@ export async function listConversations() {
   return r?.data?.conversations || [];
 }
 
-export async function getConversation(conversationId) {
-  const r = await apiGet(`/v1/messages/conversations/${enc(conversationId)}`);
+export async function getConversation(conversationId, viaAgent) {
+  const q = viaAgent ? `?agent=${enc(viaAgent)}` : '';
+  const r = await apiGet(`/v1/messages/conversations/${enc(conversationId)}${q}`);
   return r?.data?.messages || [];
 }
 

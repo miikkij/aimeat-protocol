@@ -21,6 +21,10 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation: local (same-node) direct messaging + first-contact gate.
  *   v1.1.0 -- 2026-06-21 -- Extract the send/deliver core into services/message-send.ts (shared with
  *     Tracked Response replies); the route is now a thin caller. Behaviour unchanged.
+ *   v1.2.0 -- 2026-07-12 -- Owner-aggregation in the conversation list: an owner also sees conversations
+ *     their OWN agents had with external people (an agent DM'd a user from its own inbox), tagged
+ *     `viaAgent`. GET conversations/:id accepts `?agent=<gaii>` to read such a thread read-only under the
+ *     (ownership-verified) agent. Only this owner's agents — server-derived, no cross-owner leak.
  */
 
 import { Router } from 'express';
@@ -227,10 +231,27 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /* ── GET /v1/messages/conversations — thread list (accepted) ── */
   router.get('/v1/messages/conversations', requireAuth(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
+    const ownerName = req.auth!.owner;
     const contacts = await storage.listContacts(ghii);
     const hidden = new Set(contacts.filter(c => c.state === 'pending' || c.state === 'blocked').map(c => c.contactId));
-    const conversations = (await storage.listConversations(ghii)).filter(c => !hidden.has(c.peerGhii));
-    res.json(success(config.nodeId, { conversations }));
+    const own = (await storage.listConversations(ghii)).filter(c => !hidden.has(c.peerGhii));
+
+    // Owner-aggregation: also surface conversations OWNED BY THIS OWNER'S OWN AGENTS with EXTERNAL peers
+    // — i.e. a DM an agent sent to someone from its own inbox. The owner owns their agents' data, so these
+    // roll up into the owner's list (tagged `viaAgent` so the client can label them "via <agent>" and open
+    // them read-only under that agent). Owner is server-derived → only this owner's agents (no cross-owner
+    // leak). Internal threads (an agent talking to the owner or a sibling agent) are skipped: the owner↔
+    // agent thread is already visible from the owner's own side, and sibling chatter isn't "sent to a user".
+    const agents = await storage.getAgentsByOwner(ownerName).catch(() => []);
+    const agentConvs = [];
+    for (const a of agents) {
+      const convs = await storage.listConversations(a.gaii).catch(() => []);
+      for (const c of convs) {
+        if (parseGaiiLoose(c.peerGhii).owner === ownerName) continue;   // skip internal (own owner) peers
+        agentConvs.push({ ...c, viaAgent: a.gaii });
+      }
+    }
+    res.json(success(config.nodeId, { conversations: [...own, ...agentConvs] }));
   });
 
   /* ── GET /v1/messages/conversations/:conversationId — full thread ── */
@@ -239,7 +260,19 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
-    const result = await storage.listConversation(ghii, conversationId, { page, perPage });
+    // `?agent=<gaii>` reads an agent-owned thread (the read-only "via <agent>" rows from the list). Only
+    // the owner's OWN agents are readable — verify ownership before reading under that identity.
+    const asAgent = String(req.query.agent || '').trim();
+    let readAs = ghii;
+    if (asAgent) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner).catch(() => []);
+      if (!agents.some(a => a.gaii === asAgent)) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not one of your agents'));
+        return;
+      }
+      readAs = asAgent;
+    }
+    const result = await storage.listConversation(readAs, conversationId, { page, perPage });
     res.json(success(config.nodeId, { messages: result.messages, total: result.total, page, per_page: perPage }));
   });
 
