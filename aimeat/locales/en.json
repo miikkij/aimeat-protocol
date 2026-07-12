@@ -48,7 +48,7 @@
   "inbox.ai.modeCopy": "Copy prompt",
   "inbox.ai.modeMcp": "Use MCP",
   "inbox.ai.hintCopy": "Paste this into your AI chat (Claude, …). It can look inside your AIMEAT to ground the reply. Paste the reply back here when ready.",
-  "inbox.ai.hintMcp": "For an AI with your AIMEAT MCP connected: it reads the thread, drafts a reply, and sends it after you approve.",
+  "inbox.ai.hintMcp": "For an AI with your AIMEAT MCP connected: it reads the live thread and researches inside your AIMEAT, then hands you a reply to send yourself (it won't send as its own agent identity).",
   "inbox.ai.copy": "Copy",
   "inbox.ai.copied": "Prompt copied",
   "inbox.announcementNote": "Announcement — replies are disabled",
