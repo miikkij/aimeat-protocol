@@ -31,6 +31,9 @@
  *   v1.4.0 -- 2026-07-02 -- ```aimeat-memory fenced blocks render as LIVE data embeds (MemoryEmbed):
  *     the named memory key is fetched at render time and shown as a table/props/list/value, so a
  *     document referencing agent-produced data is fresh on every open.
+ *   v1.5.0 -- 2026-07-12 -- Bare http(s) URLs autolink (GFM extended autolink): a raw https://… in the
+ *     source becomes a clickable link (target=_blank, scheme-sanitized), so a pasted URL in a message /
+ *     document is clickable without [label](url) syntax. Trailing sentence punctuation is trimmed.
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -61,6 +64,22 @@ export function sanitizeImgSrc(url) {
   const trimmed = url.trim();
   if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;   // relative (e.g. /v1/storage/…)
   return SAFE_IMG_SCHEME.test(trimmed) ? trimmed : null;
+}
+
+// Match a BARE http(s) URL starting at index i (GFM extended autolink). Trims trailing sentence
+// punctuation and an unbalanced closing paren so "see https://x." / "(https://x)" link the URL only.
+// Returns the URL string, or null. Scheme is validated separately by sanitizeHref before rendering.
+function matchAutolinkUrl(text, i) {
+  const m = /^https?:\/\/[^\s<]+/i.exec(text.slice(i));
+  if (!m) return null;
+  let url = m[0];
+  for (let trimming = true; trimming && url;) {
+    trimming = false;
+    const last = url[url.length - 1];
+    if ('.,;:!?\'"'.includes(last)) { url = url.slice(0, -1); trimming = true; }
+    else if (last === ')' && (url.split(')').length - 1) > (url.split('(').length - 1)) { url = url.slice(0, -1); trimming = true; }
+  }
+  return url || null;
 }
 
 // ── Inline parsing: code, bold, italic, links. Returns an array of vnodes/strings.
@@ -170,6 +189,22 @@ function parseInline(text, onWikiLink) {
         flush();
         out.push(h('em', null, parseInline(text.slice(i + 1, j), onWikiLink)));
         i = j + 1;
+        continue;
+      }
+    }
+
+    // Bare URL autolink (http/https only) — turn a raw https://… into a clickable link. Only at a
+    // boundary (start, or after whitespace / an opening bracket) so a scheme glued inside a token, or
+    // the url in an existing [label](url) link (consumed above), is left alone.
+    if ((c === 'h' || c === 'H') && (i === 0 || /\s|[([{<]/.test(text[i - 1]))) {
+      const url = matchAutolinkUrl(text, i);
+      if (url) {
+        const href = sanitizeHref(url);
+        flush();
+        out.push(href
+          ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, url)
+          : url);
+        i += url.length;
         continue;
       }
     }
