@@ -2203,6 +2203,25 @@
         "issue": "issue",
         "newShort": "new",
         "issueShort": "issue"
+      },
+      "idcard": {
+        "eyebrow": "AI Identity",
+        "gaiiLabel": "GAII",
+        "gaiiFull": "Global AI Instance Identifier",
+        "displayNameHint": "Display name — how you refer to this agent",
+        "issued": "Issued",
+        "lastSeen": "Last seen",
+        "done": "Done",
+        "active": "Active",
+        "failed": "Failed",
+        "messages": "Messages",
+        "trust": "Trust",
+        "morsels": "Morsels",
+        "issuer": "Issued by",
+        "copyGaii": "Copy",
+        "copied": "Copied",
+        "manageHint": "Open to manage",
+        "never": "never"
       }
     },
     "scopes": {
