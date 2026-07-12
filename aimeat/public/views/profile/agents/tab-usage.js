@@ -31,18 +31,22 @@ function fmtNum(v) {
   return Number(v || 0).toLocaleString();
 }
 
-export default function TabUsage({ agentName }) {
+export default function TabUsage({ agent, agentName }) {
   const [totals, setTotals] = useState(null);
   const [byModel, setByModel] = useState([]);
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // The ledger keys usage by the agent's FULL GAII (agent#owner@node), not the bare name — the
+  // node stores agentGaii, so filtering by the name matches nothing. Query with the GAII.
+  const gaii = agent?.gaii || agentName;
+
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
       const [modelResp, runsResp] = await Promise.all([
-        getLedgerUsage(agentName, { groupBy: 'model' }).catch(() => null),
-        getLedgerRuns(agentName, { limit: 50 }).catch(() => null),
+        getLedgerUsage(gaii, { groupBy: 'model' }).catch(() => null),
+        getLedgerRuns(gaii, { limit: 50 }).catch(() => null),
       ]);
       setTotals(modelResp?.data?.totals || null);
       setByModel(modelResp?.data?.groups || []);

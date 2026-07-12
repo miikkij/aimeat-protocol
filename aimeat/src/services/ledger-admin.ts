@@ -28,6 +28,8 @@ export interface AdminLedgerDay {
   cost_usd: number;
   total_tokens: number;
   calls: number;
+  /** Per-model split for this day (stacked chart series), like AI-usage's per_app. */
+  per_model: Record<string, { cost_usd: number; total_tokens: number; calls: number }>;
 }
 
 export interface AdminLedger {
@@ -83,12 +85,16 @@ export async function getAdminLedger(
 
     let day = dayMap.get(r.date);
     if (!day) {
-      day = { date: r.date, cost_usd: 0, total_tokens: 0, calls: 0 };
+      day = { date: r.date, cost_usd: 0, total_tokens: 0, calls: 0, per_model: {} };
       dayMap.set(r.date, day);
     }
     day.cost_usd += r.costUsd || 0;
     day.total_tokens += tokens;
     day.calls += r.calls || 0;
+    const dm = day.per_model[r.model] ?? (day.per_model[r.model] = { cost_usd: 0, total_tokens: 0, calls: 0 });
+    dm.cost_usd += r.costUsd || 0;
+    dm.total_tokens += tokens;
+    dm.calls += r.calls || 0;
 
     let u = userMap.get(r.ownerGhii);
     if (!u) {

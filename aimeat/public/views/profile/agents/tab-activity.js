@@ -24,6 +24,7 @@ import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
 import { getDirectives } from '/js/services/agent-directives.js';
 import { getWebhookConfig, getTelemetry, getDeliveryLog } from '/js/services/agent-integration.js';
+import { getLedgerUsage } from '/js/services/ledger.js';
 
 const html = htm.bind(h);
 
@@ -53,6 +54,7 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState(null);
   const [governance, setGovernance] = useState(null);
+  const [ledgerTotals, setLedgerTotals] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [logPage, setLogPage] = useState(1);
@@ -61,14 +63,18 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const [actResp, logResp, dirResp, whResp, telResp] = await Promise.all([
+      const [actResp, logResp, dirResp, whResp, telResp, ledgerResp] = await Promise.all([
         getActivity(agentName, 30).catch(() => null),
         getActivityLog(agentName, 1, 50).catch(() => null),
         getDirectives(agentName).catch(() => null),
         getWebhookConfig(agentName).catch(() => null),
         getTelemetry(agentName, { days: 1 }).catch(() => null),
+        // The usage ledger is the accurate token source (per-LLM-call). Keyed by the agent's
+        // full GAII, not the bare name — filtering by the name matches nothing.
+        getLedgerUsage(agent?.gaii || agentName, { groupBy: 'day' }).catch(() => null),
       ]);
       setStats(actResp?.data?.activity_stats || null);
+      setLedgerTotals(ledgerResp?.data?.totals || null);
       setEvents(logResp?.data?.events || []);
       setHasMore((logResp?.data?.events || []).length >= 50);
       setLogPage(1);
@@ -142,8 +148,11 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   // (completed before progress, timestamps jumping 05:25 → 05:28 → 05:25 otherwise).
   const sorted = [...events].sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
   const filtered = filter === 'all' ? sorted : sorted.filter(ev => eventCategory(ev) === filter);
-  // Telemetry not wired ≠ zero consumption — don't let "0" claim there was none.
-  const telemetryConnected = (governance?.telemetryCount || 0) > 0 || (stats?.tokensUsed30d || 0) > 0;
+  // The usage ledger (per-LLM-call) is the accurate token source now; prefer it and fall back to
+  // the legacy telemetry counters only when the ledger has nothing for this agent. Telemetry not
+  // wired ≠ zero consumption — don't let "0" claim there was none.
+  const ledgerTokens = (ledgerTotals && (ledgerTotals.calls || 0) > 0) ? (ledgerTotals.total_tokens || 0) : null;
+  const telemetryConnected = ledgerTokens != null || (governance?.telemetryCount || 0) > 0 || (stats?.tokensUsed30d || 0) > 0;
 
   return html`
     <div>
@@ -155,7 +164,7 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
             <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-card-value">${telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—'}</div>
+            <div class="stat-card-value">${ledgerTokens != null ? ledgerTokens.toLocaleString() : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</div>
             <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</div>
           </div>
           <div class="stat-card">

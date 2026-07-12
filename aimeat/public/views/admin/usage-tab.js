@@ -134,12 +134,18 @@ function renderLedgerSection(data, metric, selectedUser, setSelectedUser) {
     { label: t('dashboard.ledgerUnpriced') || 'Unpriced calls', value: totals.unpriced_calls || 0, tone: 'amber' },
   ];
 
+  // Stacked per-day series by model (like the AI-apps per-app chart), ordered by the top-level
+  // per_model (cost desc) so the legend/series order is stable.
   const labels = days.map((d) => d.date.slice(5));
-  const datasets = [{
-    label: isTokens ? (t('dashboard.ledgerTotalTokens') || 'Tokens') : (t('dashboard.ledgerTotalCost') || 'Cost'),
-    data: days.map((d) => (isTokens ? d.total_tokens : d.cost_usd) || 0),
-    backgroundColor: colorForIndex(0),
-  }];
+  const models = perModel.map((m) => m.model);
+  const datasets = models.map((model, i) => ({
+    label: model,
+    data: days.map((d) => {
+      const dm = (d.per_model && d.per_model[model]) || {};
+      return (isTokens ? dm.total_tokens : dm.cost_usd) || 0;
+    }),
+    backgroundColor: colorForIndex(i),
+  }));
   const yFormat = isTokens ? (v) => fmtCompact(v) : usd;
 
   // Per-user "top spenders" — the owner cell is a clickable toggle that drills the per-agent table.
@@ -178,9 +184,9 @@ function renderLedgerSection(data, metric, selectedUser, setSelectedUser) {
     <div>
       ${heading}
       <${StatsGrid} items=${statItems} />
-      ${datasets[0].data.some((v) => v > 0)
+      ${datasets.some((ds) => ds.data.some((v) => v > 0))
         ? html`<div class="adm-card"><h2>${t('dashboard.ledgerPerDay') || 'Cost over time'}</h2>
-            <${UsageChart} labels=${labels} datasets=${datasets} height=${240} yFormat=${yFormat} /></div>`
+            <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${240} yFormat=${yFormat} /></div>`
         : null}
       <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.ledgerTopSpenders') || 'Top spenders'}</h3>
       <${DataTable}
