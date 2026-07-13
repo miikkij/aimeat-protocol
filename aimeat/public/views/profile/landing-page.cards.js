@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
 import { t, getLocale } from "/js/i18n.js";
-import { escHtml } from "/js/utils.js";
+import { escHtml, fmtMoney } from "/js/utils.js";
 import { getNodeUrl } from "/js/services/auth.js";
 import { listAgents } from "/js/services/agents.js";
 import { listAllSchedules } from "/js/services/schedules.js";
@@ -254,9 +254,9 @@ export function CommerceCard() {
       <span class="pf-ai-win-sub">${sub}</span>
     </div>`;
   const morsels = t('profile.landing.commerceMorsels') || 'morsels';
-  // "10 morsels · 15.00 EUR" — money amounts are minor units, never summed with morsels.
+  // "10 morsels · 15.00 EUR" — money amounts are micro-units, never summed with morsels.
   const fmtTotals = (by) => Object.entries(by)
-    .map(([cur, n]) => cur === 'morsel' ? `${n} ${morsels}` : `${(n / 100).toFixed(2)} ${cur}`)
+    .map(([cur, n]) => cur === 'morsel' ? `${n} ${morsels}` : fmtMoney(n, cur))
     .join(' · ') || `0 ${morsels}`;
   return html`
     <div class="pf-home-card pf-commerce-card">

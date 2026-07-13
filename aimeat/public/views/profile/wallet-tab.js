@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
+import { escHtml, timeAgo, fmtMoney } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getWallet, getTransactions, requestMorsels } from '/js/services/wallet.js';
@@ -93,7 +93,7 @@ function MoneyActivity() {
   }, []);
   useEffect(() => { load(); }, [load]);
   if (!data || (!data.purchases.length && !data.sales.length)) return null;
-  const money = (amt, cur) => `${((amt || 0) / 100).toFixed(2)} ${cur}`;
+  const money = (amt, cur) => fmtMoney(amt, cur);
   const row = (x, isSale) => html`
     <div class="tx-item" key=${x.id}>
       <span>${(x.items?.[0]?.title) || (isSale ? t('profile.wallet.moneySale') : t('profile.wallet.moneyPurchase'))}
