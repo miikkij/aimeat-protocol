@@ -323,6 +323,36 @@ await test('Activate cortex', async () => {
     assert(status === 200, `activate status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
 });
 
+await test('Lib without exports/api_surface warns on install (discovery contract)', async () => {
+    const bareName = 'e2e-bare-cortex-' + Math.random().toString(36).slice(2, 8);
+    const bareManifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${bareName}
+  namespace: ${ownerName}
+  description: "Bare lib with no discovery fields"
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: bare
+      filename: bare.js
+`;
+    const { status, body } = await json('/v1/cortex', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ manifest: bareManifest, libs: { 'bare.js': '(function(){})();' } }),
+    });
+    assert(status === 201, `install status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    const warnings: string[] = body.data.warnings ?? [];
+    assert(warnings.some(w => w.includes('no exports')), `should warn about exports: ${JSON.stringify(warnings)}`);
+    assert(warnings.some(w => w.includes('no api_surface')), `should warn about api_surface: ${JSON.stringify(warnings)}`);
+    await json(`/v1/cortex/${encodeURIComponent(bareName)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+});
+
 // Trigger aggregator manually by importing and running it
 await test('Trigger aggregator via admin endpoint', async () => {
     const { status, body } = await json('/v1/admin/capabilities/aggregate', {
@@ -363,6 +393,38 @@ await test('Cortex capability visible in list', async () => {
     const { body } = await json('/v1/capabilities?source_type=cortex');
     const found = body.data.capabilities.some((c: any) => c.id === `cortex:${testCortexName}`);
     assert(found, 'cortex capability should appear in filtered list');
+});
+
+await test('Manifest update refreshes the aggregated capability', async () => {
+    // Enrich the manifest: version bump + new export + new api_surface line.
+    const updatedManifest = testCortexManifest
+        .replace('version: "1.0.0"', 'version: "1.1.0"')
+        .replace('exports: [doStuff, getInfo]', 'exports: [doStuff, getInfo, resetAll]')
+        .replace('AIMEAT.e2eTest.getInfo() — Get info. Returns { version: string, name: string }',
+            'AIMEAT.e2eTest.getInfo() — Get info. Returns { version: string, name: string }\n        AIMEAT.e2eTest.resetAll() — Reset all state. Returns { ok: boolean }');
+    const libs: Record<string, string> = {};
+    libs[`${testCortexName}.js`] = testCortexLib + '\n// v1.1.0';
+    const put = await json(`/v1/cortex/${testCortexName}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ manifest: updatedManifest, libs }),
+    });
+    assert(put.status === 200, `PUT status ${put.status}: ${JSON.stringify(put.body).slice(0, 200)}`);
+
+    const agg = await json('/v1/admin/capabilities/aggregate', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(agg.status === 200, `aggregate status ${agg.status}`);
+    assert(agg.body.data.updated >= 1, `should update >=1 capability, got: ${JSON.stringify(agg.body.data)}`);
+
+    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}`);
+    assert(status === 200, `capability status ${status}`);
+    const cap = body.data;
+    assert(cap.source.version === '1.1.0', `source version should refresh, got: ${cap.source.version}`);
+    assert(cap.usage.includes('resetAll'), `usage should carry the new api_surface line: ${cap.usage.slice(0, 200)}`);
+    const exportNames = (cap.exports ?? []).map((e: any) => e.name);
+    assert(exportNames.includes('resetAll'), `exports should include resetAll, got: ${exportNames}`);
 });
 
 await test('Cortex invoke from API returns BROWSER_ONLY', async () => {

@@ -1,3 +1,16 @@
+/**
+ * @file cortex-manifest.ts
+ * @description Parses and validates Cortex extension manifests (YAML): apiVersion/kind/metadata/spec,
+ *   per-component validation (schema, prompt, action, board-template, ontology, seed-data, lib),
+ *   static safety warnings for lib code, and namespace ownership checks.
+ * @structure parseCortexManifest() entry point; validate*Component() per type; validateNamespaceOwnership().
+ * @usage import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
+ * @version-history
+ *   v1.1.0 — 2026-07-13 — lib components without exports / api_surface now produce discovery warnings
+ *     (the capability aggregator publishes exactly those fields; empty ones make the cortex
+ *     undiscoverable via GET /v1/capabilities).
+ *   v1.0.0 — 2026-05-02 — extracted manifest parsing for the cortex layer.
+ */
 import { parse as parseYaml } from 'yaml';
 import { createRequire } from 'node:module';
 import type {
@@ -425,12 +438,27 @@ function validateLibComponent(
     }
   }
 
+  const exportNames = Array.isArray(raw.exports) ? raw.exports as string[] : [];
+  const apiSurface = (raw.api_surface as string) ?? '';
+
+  // Discovery contract: the capability aggregator publishes exactly these two fields as the
+  // cortex's callable surface (GET /v1/capabilities). Empty ones make the lib undiscoverable
+  // to agents — warn loudly, but don't block the install.
+  if (exportNames.length === 0) {
+    warnings.push(`components[${index}]: lib "${filename}" declares no exports — agents cannot `
+      + 'discover its API via GET /v1/capabilities. List the public function/member names in "exports".');
+  }
+  if (!apiSurface.trim()) {
+    warnings.push(`components[${index}]: lib "${filename}" has no api_surface — capability discovery `
+      + 'will show no call signatures. Describe the public API (signatures + return shapes) in "api_surface".');
+  }
+
   const comp: CortexLibComponent = {
     type: 'lib',
     name: raw.name as string,
     filename,
-    exports: Array.isArray(raw.exports) ? raw.exports as string[] : [],
-    api_surface: (raw.api_surface as string) ?? '',
+    exports: exportNames,
+    api_surface: apiSurface,
   };
   components.push(comp);
 }

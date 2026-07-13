@@ -3,6 +3,10 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.1.0 - 2026-07-13 - Cortex capabilities now refresh when the source version or the
+ *     derived usage (exports/api_surface/prompt) changes — previously a cortex capability
+ *     was only updated when its exports were missing entirely, so a manifest enrichment
+ *     or version bump never reached GET /v1/capabilities.
  *   v1.0.0 - 2026-05-02 - Initial aggregator
  */
 import { createHash } from 'node:crypto';
@@ -192,12 +196,20 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           updatedAt: now,
         });
         updated++;
-      } else if (existing.exports === null && libExports.length > 0) {
-        // Update existing capability with exports if they were missing
+      } else if (
+        existing.source.version !== cortex.version
+        || existing.usage !== usageLines.join('\n')
+        || (existing.exports === null && libExports.length > 0)
+      ) {
+        // Refresh: the source version bumped, the derived usage (exports/api_surface/prompt)
+        // changed, or exports were missing — mirror the extension branch so a manifest
+        // enrichment actually reaches GET /v1/capabilities.
         await storage.updateCapability(existing.id, {
-          exports: libExports.map(name => ({
+          source: { type: 'cortex', ref, version: cortex.version },
+          summary: cortex.description || existing.summary,
+          exports: libExports.length > 0 ? libExports.map(name => ({
             name, description: '', inputSchema: {}, outputSchema: {}, example: null,
-          })),
+          })) : existing.exports,
           usage: usageLines.join('\n'),
           whenToUse: promptContent ? promptContent.slice(0, 500) : existing.whenToUse,
           updatedAt: now,
