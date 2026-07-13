@@ -210,6 +210,43 @@ await test('Get share prompt', async () => {
     assert(body.data.gaii === ANON_GAII, `Expected gaii ${ANON_GAII}`);
 });
 
+await test('Get build-app prompt (canonical app-building prompt, public)', async () => {
+    const { status, body } = await json('/v1/prompts/build-app');
+    assert(status === 200, `Expected 200, got ${status}`);
+    assert(body.data.id === 'build-app', `Expected id build-app, got ${body.data.id}`);
+    assert(body.data.mode === 'new', `Expected default mode new, got ${body.data.mode}`);
+    assert(body.data.prompt.includes('Step 1 — Interview me first'), 'Expected the interview step in new mode');
+    assert(body.data.prompt.includes('mountLoginButton'), 'Expected the login-bar auth pattern');
+    assert(body.data.prompt.includes('/v1/libs/'), 'Expected the client-library catalog');
+    assert(body.data.prompt.includes('how to publish'), 'Expected the publish walkthrough in new mode');
+    assert(body.data.body.startsWith('## Step 2'), 'Expected body to start at the platform-instructions core');
+    assert(body.data.prompt.includes(body.data.body), 'Expected the full prompt to contain the body core');
+});
+
+await test('build-app prompt improve mode omits interview + publish walkthrough', async () => {
+    const { status, body } = await json('/v1/prompts/build-app?mode=improve');
+    assert(status === 200, `Expected 200, got ${status}`);
+    assert(body.data.mode === 'improve', `Expected mode improve, got ${body.data.mode}`);
+    assert(!body.data.prompt.includes('Interview me first'), 'Improve mode must not include the interview');
+    assert(!body.data.prompt.includes('how to publish'), 'Improve mode must not include the publish walkthrough');
+    assert(body.data.body.startsWith('## AIMEAT Platform Instructions'), 'Expected the improve-mode heading');
+});
+
+await test('build-app prompt embeds the idea and falls back to English on unknown lang', async () => {
+    const { status, body } = await json('/v1/prompts/build-app?idea=' + encodeURIComponent('a poll app for friends') + '&lang=sv');
+    assert(status === 200, `Expected 200, got ${status}`);
+    assert(body.data.prompt.includes('My initial idea: a poll app for friends'), 'Expected the idea embedded in the header');
+    assert(body.data.prompt.includes('in English'), 'Unknown lang must fall back to English');
+});
+
+await test('build-app prompt format=txt returns raw text/plain', async () => {
+    const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('text/plain'), 'Expected text/plain');
+    const text = await res.text();
+    assert(text.includes('mountLoginButton'), 'Expected the auth pattern in the raw text');
+});
+
 await test('Normal tiers still work', async () => {
     const { status: s0, body: b0 } = await json('/v1/prompts/0');
     assert(s0 === 200, `Tier 0: Expected 200, got ${s0}`);

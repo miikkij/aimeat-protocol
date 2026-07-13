@@ -5535,6 +5535,7 @@
     }
     desc.placeholder = t("pb.descPh");
     loadPbTemplates();
+    loadPbCore();
     overlay.style.display = "flex";
     desc.focus();
     updatePbPreview();
@@ -5542,6 +5543,24 @@
   function closePbPanel() {
     document.getElementById("prompt-builder-overlay").style.display = "none";
     pbSourceApp = null;
+  }
+  var pbCore = { new: null, improve: null };
+  function loadPbCore() {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var base = config.aimeatUrl.replace(/\/+$/, "");
+    ["new", "improve"].forEach(function(mode) {
+      fetch(base + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+        return r.json();
+      }).then(function(d) {
+        var body = d && d.data && d.data.body;
+        if (body && typeof body === "string") {
+          pbCore[mode] = body;
+          updatePbPreview();
+        }
+      }).catch(function() {
+      });
+    });
   }
   function loadPbTemplates() {
     var sel = document.getElementById("pb-template");
@@ -5611,127 +5630,132 @@
       prompt2 += "5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n";
       prompt2 += "Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n";
     }
-    prompt2 += isImprove ? "## AIMEAT Platform Instructions\n\n" : "## Step 2 — Build it (once I have answered)\n\n";
-    prompt2 += "This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n";
-    prompt2 += "### Available Client Libraries\n";
-    prompt2 += "Load with <script src> from the node base " + nodeUrl + "/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n";
-    prompt2 += "Core:\n";
-    prompt2 += "- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n";
-    prompt2 += "- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n";
-    prompt2 += "- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n";
-    prompt2 += "- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n";
-    prompt2 += "AI (prompt-driven — see the AI section below):\n";
-    prompt2 += "- aimeat-ai.js — LLM completions on the USER's own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n";
-    prompt2 += "Social & economy:\n";
-    prompt2 += "- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n";
-    prompt2 += "- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n";
-    prompt2 += "- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n";
-    prompt2 += "- aimeat-agents.js — commission & watch the owner's AI agents (`AIMEAT.agents`)\n";
-    prompt2 += "- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n";
-    prompt2 += "Media & misc:\n";
-    prompt2 += "- aimeat-audio.js — audio engine: instruments, synth, soundboard\n";
-    prompt2 += "- aimeat-speech.js — text-to-speech / speech helpers\n";
-    prompt2 += "- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid diagrams AND live data embeds: a ```aimeat-memory fence (lines `key: <memory key>`, optional `view: table|props|list|value|json`, `fields: a,b`, `title: …`) renders that memory key as a fresh table on every open — perfect for agent-produced data in documents.\n";
-    prompt2 += "- aimeat-editor.js — markdown editor: `AIMEAT.editor.mount(el, {value, onChange})`, `AIMEAT.editor.toolbar(adapter)`, `AIMEAT.editor.split(el, {value, onChange})` for editor + live preview (pairs with aimeat-markdown.js)\n";
-    prompt2 += "- aimeat-header.js — drop-in canonical site header (nav + theme)\n";
-    prompt2 += "- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n";
-    prompt2 += "Ready-made UI (node-bundled — load from " + nodeUrl + "/v1/cortex/<name>/libs/<name>.js, use only what you need):\n";
-    prompt2 += "- aimeat-ui-viewers — sortable/filterable DataTable + viewers (`AIMEAT.ui.viewers`)\n";
-    prompt2 += "- aimeat-ui-forms — form builder with validation (`AIMEAT.ui.forms`)\n";
-    prompt2 += "- aimeat-ui-layout — responsive layout helpers, master/detail (`AIMEAT.ui.layout`)\n";
-    prompt2 += "- aimeat-ui-nav — navbars, tabs, menus (`AIMEAT.ui.nav`)\n";
-    prompt2 += "- aimeat-ui-dialogs — modals, toasts, confirms (`AIMEAT.ui.dialogs`)\n";
-    prompt2 += "- aimeat-charts — charts / graphs (`AIMEAT.charts`)\n";
-    prompt2 += "- aimeat-canvas — drawing / freeform canvas (`AIMEAT.canvas`)\n";
-    prompt2 += 'Example: <script src="' + nodeUrl + '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"><\/script>\n\n';
-    prompt2 += "### Auth Pattern\n";
-    prompt2 += "Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n";
-    prompt2 += "```html\n";
-    prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n';
-    prompt2 += "<script>\n";
-    prompt2 += "function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n";
-    prompt2 += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
-    prompt2 += "\n";
-    prompt2 += "// Path 1 — fresh sign-in / sign-out via the login button:\n";
-    prompt2 += 'AIMEAT.auth.mountLoginButton("#login", {\n';
-    prompt2 += "  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n";
-    prompt2 += "  onLogout: hideApp\n";
-    prompt2 += "});\n";
-    prompt2 += "\n";
-    prompt2 += "// Path 2 — already signed in when the page loads. Restore the stored session\n";
-    prompt2 += "// explicitly; login() returns the session (or null if not signed in).\n";
-    prompt2 += "AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n";
-    prompt2 += "<\/script>\n";
-    prompt2 += "```\n\n";
-    prompt2 += "### Data Storage\n";
-    prompt2 += "Match the PRIVATE vs SHARED choice from Step 1:\n";
-    prompt2 += "```javascript\n";
-    prompt2 += "// PRIVATE — scoped to the logged-in owner, only they can read it:\n";
-    prompt2 += 'await AIMEAT.data.set("myapp.notes", data, { visibility: "private", tags: ["myapp"] });\n';
-    prompt2 += 'const mine = await AIMEAT.data.get("myapp.notes");\n';
-    prompt2 += "// SHARED/community — public so everyone can read; each user writes their own key:\n";
-    prompt2 += 'await AIMEAT.data.set("myapp.shared.<unique-id>", entry, { visibility: "public" });\n';
-    prompt2 += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
-    prompt2 += 'const results = await AIMEAT.data.search("query");\n';
-    prompt2 += "```\n";
-    prompt2 += "Works only when logged in. After a write, read it back to confirm it persisted.\n\n";
-    prompt2 += "### AI (prompt-driven)\n";
-    prompt2 += `aimeat-ai runs an LLM on the LOGGED-IN USER's own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every "Use AI" control on isAvailable().
+    var core = pbCore[isImprove ? "improve" : "new"];
+    if (core) {
+      prompt2 += core;
+    } else {
+      prompt2 += isImprove ? "## AIMEAT Platform Instructions\n\n" : "## Step 2 — Build it (once I have answered)\n\n";
+      prompt2 += "This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n";
+      prompt2 += "### Available Client Libraries\n";
+      prompt2 += "Load with <script src> from the node base " + nodeUrl + "/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n";
+      prompt2 += "Core:\n";
+      prompt2 += "- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n";
+      prompt2 += "- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n";
+      prompt2 += "- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n";
+      prompt2 += "- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n";
+      prompt2 += "AI (prompt-driven — see the AI section below):\n";
+      prompt2 += "- aimeat-ai.js — LLM completions on the USER's own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n";
+      prompt2 += "Social & economy:\n";
+      prompt2 += "- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n";
+      prompt2 += "- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n";
+      prompt2 += "- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n";
+      prompt2 += "- aimeat-agents.js — commission & watch the owner's AI agents (`AIMEAT.agents`)\n";
+      prompt2 += "- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n";
+      prompt2 += "Media & misc:\n";
+      prompt2 += "- aimeat-audio.js — audio engine: instruments, synth, soundboard\n";
+      prompt2 += "- aimeat-speech.js — text-to-speech / speech helpers\n";
+      prompt2 += "- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid diagrams AND live data embeds: a ```aimeat-memory fence (lines `key: <memory key>`, optional `view: table|props|list|value|json`, `fields: a,b`, `title: …`) renders that memory key as a fresh table on every open — perfect for agent-produced data in documents.\n";
+      prompt2 += "- aimeat-editor.js — markdown editor: `AIMEAT.editor.mount(el, {value, onChange})`, `AIMEAT.editor.toolbar(adapter)`, `AIMEAT.editor.split(el, {value, onChange})` for editor + live preview (pairs with aimeat-markdown.js)\n";
+      prompt2 += "- aimeat-header.js — drop-in canonical site header (nav + theme)\n";
+      prompt2 += "- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n";
+      prompt2 += "Ready-made UI (node-bundled — load from " + nodeUrl + "/v1/cortex/<name>/libs/<name>.js, use only what you need):\n";
+      prompt2 += "- aimeat-ui-viewers — sortable/filterable DataTable + viewers (`AIMEAT.ui.viewers`)\n";
+      prompt2 += "- aimeat-ui-forms — form builder with validation (`AIMEAT.ui.forms`)\n";
+      prompt2 += "- aimeat-ui-layout — responsive layout helpers, master/detail (`AIMEAT.ui.layout`)\n";
+      prompt2 += "- aimeat-ui-nav — navbars, tabs, menus (`AIMEAT.ui.nav`)\n";
+      prompt2 += "- aimeat-ui-dialogs — modals, toasts, confirms (`AIMEAT.ui.dialogs`)\n";
+      prompt2 += "- aimeat-charts — charts / graphs (`AIMEAT.charts`)\n";
+      prompt2 += "- aimeat-canvas — drawing / freeform canvas (`AIMEAT.canvas`)\n";
+      prompt2 += 'Example: <script src="' + nodeUrl + '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"><\/script>\n\n';
+      prompt2 += "### Auth Pattern\n";
+      prompt2 += "Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n";
+      prompt2 += "```html\n";
+      prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n';
+      prompt2 += "<script>\n";
+      prompt2 += "function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n";
+      prompt2 += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
+      prompt2 += "\n";
+      prompt2 += "// Path 1 — fresh sign-in / sign-out via the login button:\n";
+      prompt2 += 'AIMEAT.auth.mountLoginButton("#login", {\n';
+      prompt2 += "  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n";
+      prompt2 += "  onLogout: hideApp\n";
+      prompt2 += "});\n";
+      prompt2 += "\n";
+      prompt2 += "// Path 2 — already signed in when the page loads. Restore the stored session\n";
+      prompt2 += "// explicitly; login() returns the session (or null if not signed in).\n";
+      prompt2 += "AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n";
+      prompt2 += "<\/script>\n";
+      prompt2 += "```\n\n";
+      prompt2 += "### Data Storage\n";
+      prompt2 += "Match the PRIVATE vs SHARED choice from Step 1:\n";
+      prompt2 += "```javascript\n";
+      prompt2 += "// PRIVATE — scoped to the logged-in owner, only they can read it:\n";
+      prompt2 += 'await AIMEAT.data.set("myapp.notes", data, { visibility: "private", tags: ["myapp"] });\n';
+      prompt2 += 'const mine = await AIMEAT.data.get("myapp.notes");\n';
+      prompt2 += "// SHARED/community — public so everyone can read; each user writes their own key:\n";
+      prompt2 += 'await AIMEAT.data.set("myapp.shared.<unique-id>", entry, { visibility: "public" });\n';
+      prompt2 += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
+      prompt2 += 'const results = await AIMEAT.data.search("query");\n';
+      prompt2 += "```\n";
+      prompt2 += "Works only when logged in. After a write, read it back to confirm it persisted.\n\n";
+      prompt2 += "### AI (prompt-driven)\n";
+      prompt2 += `aimeat-ai runs an LLM on the LOGGED-IN USER's own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every "Use AI" control on isAvailable().
 `;
-    prompt2 += "```html\n";
-    prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n';
-    prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-ai.js"><\/script>\n';
-    prompt2 += "```\n";
-    prompt2 += "```javascript\n";
-    prompt2 += "if (await AIMEAT.ai.isAvailable()) {            // false until login + key configured\n";
-    prompt2 += '  const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt: "Summarise:\\n" + text });\n';
-    prompt2 += "  render(r.content);                            // also: r.model, r.usage, r.budget\n";
-    prompt2 += '} else { showHint("Log in and add an AI key to enable this."); }\n';
-    prompt2 += "// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n";
-    prompt2 += "```\n";
-    prompt2 += "Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n";
-    prompt2 += "### Real-time / multiplayer (optional)\n";
-    prompt2 += "For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n";
-    prompt2 += "```javascript\n";
-    prompt2 += "// 1) create or join a room\n";
-    prompt2 += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
-    prompt2 += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
-    prompt2 += "// 2) open a WebSocket for live presence + messages\n";
-    prompt2 += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
-    prompt2 += "ws.onmessage = (e) => handle(JSON.parse(e.data));\n";
-    prompt2 += "// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n";
-    prompt2 += "```\n";
-    prompt2 += "Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n";
-    prompt2 += "### Design Guidelines\n";
-    prompt2 += `Use CSS variables so the app themes cleanly, and RESPECT the user's AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage "aimeat-theme" ("light"|"dark"). Define light as the default and dark under [data-theme="dark"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):
+      prompt2 += "```html\n";
+      prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n';
+      prompt2 += '<script src="' + nodeUrl + '/v1/libs/aimeat-ai.js"><\/script>\n';
+      prompt2 += "```\n";
+      prompt2 += "```javascript\n";
+      prompt2 += "if (await AIMEAT.ai.isAvailable()) {            // false until login + key configured\n";
+      prompt2 += '  const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt: "Summarise:\\n" + text });\n';
+      prompt2 += "  render(r.content);                            // also: r.model, r.usage, r.budget\n";
+      prompt2 += '} else { showHint("Log in and add an AI key to enable this."); }\n';
+      prompt2 += "// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n";
+      prompt2 += "```\n";
+      prompt2 += "Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n";
+      prompt2 += "### Real-time / multiplayer (optional)\n";
+      prompt2 += "For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n";
+      prompt2 += "```javascript\n";
+      prompt2 += "// 1) create or join a room\n";
+      prompt2 += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
+      prompt2 += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
+      prompt2 += "// 2) open a WebSocket for live presence + messages\n";
+      prompt2 += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
+      prompt2 += "ws.onmessage = (e) => handle(JSON.parse(e.data));\n";
+      prompt2 += "// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n";
+      prompt2 += "```\n";
+      prompt2 += "Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n";
+      prompt2 += "### Design Guidelines\n";
+      prompt2 += `Use CSS variables so the app themes cleanly, and RESPECT the user's AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage "aimeat-theme" ("light"|"dark"). Define light as the default and dark under [data-theme="dark"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):
 `;
-    prompt2 += "```css\n";
-    prompt2 += ":root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n";
-    prompt2 += ':root[data-theme="dark"] { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; }\n';
-    prompt2 += "```\n";
-    prompt2 += "```js\n";
-    prompt2 += '(function(){ function apply(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n';
-    prompt2 += '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
-    prompt2 += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
-    prompt2 += "```\n";
-    prompt2 += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
-    prompt2 += "### Important Rules\n";
-    prompt2 += "- Return the COMPLETE HTML file, not fragments\n";
-    prompt2 += "- Never use literal closing script tags in JS comments or strings\n";
-    prompt2 += "- Keep it as a single self-contained HTML file\n";
-    prompt2 += "- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n";
-    prompt2 += "- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n";
-    prompt2 += `- Theme with CSS variables; respect the user's AIMEAT light/dark choice (localStorage "aimeat-theme") with an OS-preference fallback
+      prompt2 += "```css\n";
+      prompt2 += ":root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n";
+      prompt2 += ':root[data-theme="dark"] { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; }\n';
+      prompt2 += "```\n";
+      prompt2 += "```js\n";
+      prompt2 += '(function(){ function apply(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n';
+      prompt2 += '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
+      prompt2 += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
+      prompt2 += "```\n";
+      prompt2 += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+      prompt2 += "### Important Rules\n";
+      prompt2 += "- Return the COMPLETE HTML file, not fragments\n";
+      prompt2 += "- Never use literal closing script tags in JS comments or strings\n";
+      prompt2 += "- Keep it as a single self-contained HTML file\n";
+      prompt2 += "- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n";
+      prompt2 += "- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n";
+      prompt2 += `- Theme with CSS variables; respect the user's AIMEAT light/dark choice (localStorage "aimeat-theme") with an OS-preference fallback
 `;
-    prompt2 += "- Include error handling and loading states for API calls\n\n";
-    if (!isImprove) {
-      prompt2 += "## When the app is ready — tell me how to publish it\n";
-      prompt2 += "After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n";
-      prompt2 += "1. Open " + nodeUrl + "/app-catalog.html\n";
-      prompt2 += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
-      prompt2 += "3. Click Publish.\n";
-      prompt2 += "I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n";
-      prompt2 += "What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n";
+      prompt2 += "- Include error handling and loading states for API calls\n\n";
+      if (!isImprove) {
+        prompt2 += "## When the app is ready — tell me how to publish it\n";
+        prompt2 += "After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n";
+        prompt2 += "1. Open " + nodeUrl + "/app-catalog.html\n";
+        prompt2 += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
+        prompt2 += "3. Click Publish.\n";
+        prompt2 += "I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n";
+        prompt2 += "What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n";
+      }
     }
     if (mode === "improve" && pbSourceApp && pbSourceApp.blob) {
       var source = decodeURIComponent(escape(atob(pbSourceApp.blob)));
