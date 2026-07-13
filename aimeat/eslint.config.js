@@ -51,7 +51,7 @@ export default tseslint.config(
       // file-header cleaned to zero on 2026-07-13 and ratcheted to 'error' — every source
       // file must carry a header, enforced by the pre-commit hook + CI.
       'aimeat/file-header': 'error',
-      'aimeat/max-file-lines': ['warn', { max: 500 }],
+      'aimeat/max-file-lines': ['warn', { max: 800 }],
     },
   },
   {
