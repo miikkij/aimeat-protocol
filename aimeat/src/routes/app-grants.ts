@@ -152,6 +152,28 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     return { ok: true, origin: u.origin };
   }
 
+  // ── GET /v1/app-grants/scopes ── the grantable scope vocabulary, machine-readable + public.
+  // Apps and agentic coders check this BEFORE declaring <meta name="aimeat-scopes">: requesting
+  // ANY name outside the vocabulary fails the whole authorize with INVALID_SCOPE, and guessing
+  // names by analogy (storage:delete) is the #1 way that happens (AEB-2 finding). File deletion
+  // is intentionally covered by storage:write — overwriting is equally destructive, so the
+  // consent line "save and update your files" already covers it; there is no storage:delete.
+  router.get('/v1/app-grants/scopes', (_req: Request, res: Response) => {
+    const DEFAULT_SCOPES = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
+    res.json(success(config.nodeId, {
+      scopes: Object.entries(APP_GRANTABLE_SCOPES).map(([scope, description]) => ({
+        scope, description, default: DEFAULT_SCOPES.includes(scope),
+      })),
+      declare_with: '<meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write memory:delete ai:use">',
+      notes: [
+        'Apps that declare nothing get exactly the scopes marked default: true.',
+        'Requesting any scope outside this vocabulary fails the whole authorize with INVALID_SCOPE — check this list first.',
+        'File deletion is covered by storage:write; there is no storage:delete scope.',
+        'memory:delete is NOT in the default set — declare it when the app deletes memory keys.',
+      ],
+    }));
+  });
+
   // ── GET /v1/app-grants/authorize ── app sends the owner's browser here to start the grant.
   router.get('/v1/app-grants/authorize', async (req: Request, res: Response) => {
     sweep();
@@ -179,7 +201,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     const invalid = requested.filter(s => !APP_GRANTABLE_SCOPES[s]);
     if (invalid.length) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_SCOPE', `Not grantable: ${invalid.join(', ')}`));
+      return res.status(400).json(error(config.nodeId, 'INVALID_SCOPE', `Not grantable: ${invalid.join(', ')}. The vocabulary is served at GET /v1/app-grants/scopes (note: file deletion is covered by storage:write).`));
     }
 
     const slash = app.indexOf('/');

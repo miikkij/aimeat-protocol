@@ -4916,6 +4916,23 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/app-grants/scopes:
+    get:
+      operationId: appGrantScopes
+      summary: Grantable app scope vocabulary (machine-readable)
+      description: |
+        The complete scope vocabulary an app may request in the H-2 grant flow, with per-scope
+        descriptions and a `default` flag for the undeclared-app default set. Public — apps and
+        agentic coders check this BEFORE declaring `<meta name="aimeat-scopes">`: requesting any
+        name outside this vocabulary fails the whole authorize with INVALID_SCOPE. Note: file
+        deletion is covered by `storage:write` (there is no `storage:delete` scope) and
+        `memory:delete` is NOT in the default set.
+      tags:
+        - App Grants
+      responses:
+        '200':
+          description: '{ scopes: [{ scope, description, default }], declare_with, notes[] }'
+
   /v1/app-grants/authorize:
     get:
       operationId: appGrantAuthorize

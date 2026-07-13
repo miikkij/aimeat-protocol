@@ -239,6 +239,27 @@ await test('build-app prompt embeds the idea and falls back to English on unknow
     assert(body.data.prompt.includes('in English'), 'Unknown lang must fall back to English');
 });
 
+await test('app-grant scope vocabulary is served machine-readable', async () => {
+    const { status, body } = await json('/v1/app-grants/scopes');
+    assert(status === 200, `Expected 200, got ${status}`);
+    const scopes = body.data.scopes as Array<{ scope: string; description: string; default: boolean }>;
+    assert(Array.isArray(scopes) && scopes.length > 5, 'Expected a scope list');
+    const byName = Object.fromEntries(scopes.map(s => [s.scope, s]));
+    assert(byName['storage:write']?.default === true, 'storage:write must be a default scope');
+    assert(byName['memory:delete']?.default === false, 'memory:delete must NOT be a default scope');
+    assert(byName['storage:delete'] === undefined, 'storage:delete must not exist (delete is covered by storage:write)');
+    assert(body.data.notes.some((n: string) => n.includes('storage:write')), 'Expected the write-covers-delete note');
+});
+
+await test('build-app prompt includes the scope vocabulary section', async () => {
+    const { status, body } = await json('/v1/prompts/build-app');
+    assert(status === 200, `Expected 200, got ${status}`);
+    assert(body.data.prompt.includes('App permissions (scopes)'), 'Expected the scopes section');
+    assert(body.data.prompt.includes('aimeat-scopes'), 'Expected the meta-tag declaration');
+    assert(body.data.prompt.includes('NO storage:delete'), 'Expected the write-covers-delete warning');
+    assert(body.data.prompt.includes('memory:delete'), 'Expected memory:delete in the vocabulary');
+});
+
 await test('build-app prompt format=txt returns raw text/plain', async () => {
     const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
     assert(res.status === 200, `Expected 200, got ${res.status}`);
