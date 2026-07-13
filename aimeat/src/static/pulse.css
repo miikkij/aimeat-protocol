@@ -1,0 +1,100 @@
+/**
+ * @file pulse.css
+ * @description Styles for PULSE (pulse.html) — standalone poll app on the node's main origin.
+ *   Self-contained theme (dark default, light via prefers-color-scheme), pl- prefix.
+ * @usage <link rel="stylesheet" href="/pulse.css"> from pulse.html only.
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — initial benchmark build.
+ */
+:root {
+  --pl-bg: #101318;
+  --pl-card: #1a1f27;
+  --pl-border: #2c3440;
+  --pl-text: #e8ecf1;
+  --pl-dim: #9aa7b5;
+  --pl-accent: #e8564a;
+  --pl-accent-text: #ffffff;
+  --pl-ok: #3fb27f;
+  --pl-danger: #d4544a;
+  --pl-bar: #32405233;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --pl-bg: #f4f5f7;
+    --pl-card: #ffffff;
+    --pl-border: #d8dde4;
+    --pl-text: #1c2430;
+    --pl-dim: #5c6a7a;
+    --pl-bar: #1c243014;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--pl-bg); color: var(--pl-text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column;
+}
+.pl-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .8rem 1.2rem; border-bottom: 1px solid var(--pl-border);
+}
+.pl-brand { font-weight: 700; letter-spacing: .12em; color: var(--pl-accent); }
+.pl-header-right { display: flex; align-items: center; gap: .8rem; }
+.pl-whoami { color: var(--pl-dim); font-size: .9rem; }
+.pl-main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 1.2rem; }
+.pl-card {
+  background: var(--pl-card); border: 1px solid var(--pl-border);
+  border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+}
+.pl-card h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
+.pl-card h2 { font-size: 1.05rem; margin: 0 0 .7rem; }
+.pl-hidden { display: none !important; }
+.pl-dim { color: var(--pl-dim); }
+.pl-err { color: var(--pl-danger); min-height: 1.2em; margin: .5rem 0 0; font-size: .9rem; }
+.pl-label { display: block; margin: .7rem 0 .25rem; font-size: .85rem; color: var(--pl-dim); }
+.pl-input {
+  width: 100%; padding: .55rem .7rem; border-radius: 8px;
+  border: 1px solid var(--pl-border); background: var(--pl-bg); color: var(--pl-text);
+  font-size: 1rem;
+}
+.pl-row { display: flex; gap: .6rem; margin-top: .8rem; align-items: center; flex-wrap: wrap; }
+.pl-row .pl-input { flex: 1; width: auto; }
+.pl-mt { margin-top: 1rem; }
+.pl-btn {
+  padding: .5rem .95rem; border-radius: 8px; border: 1px solid var(--pl-border);
+  background: transparent; color: var(--pl-text); font-size: .95rem; cursor: pointer;
+}
+.pl-btn:hover { border-color: var(--pl-dim); }
+.pl-btn-primary { background: var(--pl-accent); border-color: var(--pl-accent); color: var(--pl-accent-text); }
+.pl-btn-danger { color: var(--pl-danger); border-color: var(--pl-danger); }
+.pl-opt-row { display: flex; gap: .5rem; margin-top: .4rem; }
+.pl-list-item {
+  display: flex; justify-content: space-between; align-items: center; gap: .6rem;
+  padding: .6rem .2rem; border-bottom: 1px solid var(--pl-border);
+}
+.pl-list-item:last-child { border-bottom: none; }
+.pl-list-title { cursor: pointer; flex: 1; }
+.pl-list-title:hover { color: var(--pl-accent); }
+.pl-badge {
+  font-size: .75rem; padding: .15rem .55rem; border-radius: 99px;
+  border: 1px solid var(--pl-border); color: var(--pl-dim); white-space: nowrap;
+}
+.pl-badge-open { color: var(--pl-ok); border-color: var(--pl-ok); }
+.pl-badge-closed { color: var(--pl-danger); border-color: var(--pl-danger); }
+.pl-poll-head { display: flex; justify-content: space-between; gap: .8rem; align-items: baseline; }
+.pl-vote-opt {
+  display: block; width: 100%; text-align: left; margin-top: .5rem;
+  padding: .65rem .8rem; border-radius: 8px; border: 1px solid var(--pl-border);
+  background: var(--pl-bg); color: var(--pl-text); font-size: 1rem; cursor: pointer;
+}
+.pl-vote-opt:hover:not(:disabled) { border-color: var(--pl-accent); }
+.pl-vote-opt:disabled { cursor: default; opacity: .75; }
+.pl-vote-opt.pl-my-vote { border-color: var(--pl-accent); box-shadow: inset 3px 0 0 var(--pl-accent); }
+.pl-result-row { margin-top: .55rem; }
+.pl-result-label { display: flex; justify-content: space-between; font-size: .95rem; }
+.pl-result-bar { height: 8px; border-radius: 4px; background: var(--pl-bar); margin-top: .25rem; overflow: hidden; }
+.pl-result-fill { height: 100%; background: var(--pl-accent); border-radius: 4px; transition: width .4s; }
+.pl-footer {
+  text-align: center; color: var(--pl-dim); font-size: .8rem;
+  padding: 1rem; border-top: 1px solid var(--pl-border);
+}
