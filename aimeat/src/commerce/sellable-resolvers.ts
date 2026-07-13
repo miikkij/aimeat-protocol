@@ -61,9 +61,6 @@ export function offerSellableResolver(): SellableResolver {
   return {
     kind: 'offer',
     async resolve(storage, config, ref, buyerOwner): Promise<Sellable> {
-      if ((ref.currency ?? 'morsel') !== 'morsel') {
-        throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, 'Agent offers are priced in morsels only');
-      }
       const identifier = ref.agent ?? '';
       if (!identifier) throw new CommerceError('INVALID_ITEM', 400, 'Offer line items need an agent reference');
       const agentGaii = identifier.includes('#') ? identifier : `${identifier}#${buyerOwner}@${config.nodeId}`;
@@ -81,15 +78,30 @@ export function offerSellableResolver(): SellableResolver {
       if (!isSelf && visibility === 'private') {
         throw new CommerceError('OFFER_PRIVATE', 403, 'This offer is private to its owner');
       }
-      let priceMorsels = 0;
-      if (!isSelf) {
-        if (!offer.price) throw new CommerceError('OFFER_NOT_FOR_SALE', 422, 'This offer declares no price and cannot be purchased cross-owner');
-        priceMorsels = Number(offer.price.morsels);
+      const sellerGhii = `${agent.owner}@${config.nodeId}`;
+      const currency = ref.currency ?? 'morsel';
+      let unitPrice = 0;
+      let psp: unknown;
+      if (currency === 'morsel') {
+        if (!isSelf) {
+          if (!offer.price) throw new CommerceError('OFFER_NOT_FOR_SALE', 422, 'This offer declares no price and cannot be purchased cross-owner');
+          unitPrice = Number(offer.price.morsels);
+        }
+      } else {
+        // Money: the offer must carry a matching money price, and the SELLER must have their own
+        // PSP credentials (commerce.psp under their GHII) — funds land on the seller's account.
+        if (!offer.priceMoney || offer.priceMoney.currency !== currency) {
+          throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This offer has no ${currency} price`);
+        }
+        const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
+        if (!pspRec?.value) throw new CommerceError('PSP_NOT_CONFIGURED', 403, 'The seller has no payment-provider credentials configured for money sales');
+        psp = pspRec.value;
+        unitPrice = Math.floor(offer.priceMoney.amount);
       }
       return {
         kind: 'offer', agentGaii, agentName, offerId: ref.offer_id,
         title: offer.title, sellerOwner: agent.owner,
-        sellerGhii: `${agent.owner}@${config.nodeId}`, priceMorsels,
+        sellerGhii, priceMorsels: unitPrice, psp,
       };
     },
   };

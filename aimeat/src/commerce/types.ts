@@ -42,6 +42,12 @@ export interface Sellable {
    */
   priceMorsels: number;
   /**
+   * The SELLER's PSP credentials for money currencies (opaque to core; e.g. { provider:'stripe',
+   * secretKey }). Loaded by the resolver from the seller's own records — money always settles on
+   * the seller's account, never the node's.
+   */
+  psp?: unknown;
+  /**
    * Custom revenue distribution replacing the default seller payout (e.g. EE: member cut +
    * org-wallet cut per commission %). Runs after the buyer charge; the fee leg is already routed.
    */
@@ -141,6 +147,8 @@ export interface PaymentHandler {
     reference: string;
     /** Opaque payment instrument from the adapter (e.g. a Stripe SPT); unused by morsels. */
     instrument?: unknown;
+    /** The session's seller — money handlers charge on the SELLER's own PSP credentials (psp). */
+    seller?: { ghii: string; owner: string; psp?: unknown };
   }): Promise<{ trackingCode: string }>;
   /** Pay one recipient their share of an already-collected amount. */
   payout(ctx: PaymentContext, args: {
@@ -156,5 +164,6 @@ export interface PaymentHandler {
     buyerGhii: string;
     amount: number;
     trackingCode: string;
+    seller?: { ghii: string; owner: string; psp?: unknown };
   }): Promise<void>;
 }

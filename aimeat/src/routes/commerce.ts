@@ -51,7 +51,10 @@ const PatchSchema = z.object({
 }).refine((b) => b.cancel === true || !!b.items, { message: 'Provide items to update or cancel:true' });
 
 const CompleteSchema = z.object({
-  payment: z.object({ handler: z.string().max(100).optional() }).optional(),
+  payment: z.object({
+    handler: z.string().max(100).optional(),
+    instrument: z.unknown().optional(),
+  }).optional(),
 });
 
 function sendCommerceError(res: Response, config: AimeatConfig, err: unknown): void {
@@ -150,7 +153,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
       const session = await loadOwnSession(req);
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler);
+      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument);
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));
