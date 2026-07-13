@@ -28,6 +28,9 @@
  *     later components get their spec/code/register steps (which left their spec boxes empty).
  *   v1.4.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
  *     fallback with OpenRouter's free-models router 'openrouter/free'.
+ *   v1.5.0 — 2026-07-13 — Extract internalFetch/extractRegisteredName/buildProbeScenarios to
+ *     generator-autopilot-helpers.ts and the spec + test/fix phases to generator-autopilot-phases.ts
+ *     (max-file-lines). Behavior unchanged; runAutopilot orchestrates the phases via a shared context.
  */
 
 import { type Storage } from '../storage/interface.js';
@@ -46,8 +49,10 @@ const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.w
 // No browser imports, no pathToFileURL hacks, no dynamic import()
 import { buildPrompt, stripCodeblock, createBundle } from './generator-prompts/index.js';
 import { validateComponent, verifyContract } from './generator-prompts/validate.js';
-import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
+import { validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
 import type { PromptRuntimeData, ComponentState, ProbeResult, Blueprint, InterviewSpec } from './generator-prompts/types.js';
+import { internalFetch, extractRegisteredName, buildProbeScenarios } from './generator-autopilot-helpers.js';
+import { type AutopilotRunCtx, runSpecPhase, runTestPhase } from './generator-autopilot-phases.js';
 
 // ── Autopilot state ──
 
@@ -78,32 +83,6 @@ export function cancelAutopilot(projectId: string): boolean {
 
 export function isAutopilotRunning(projectId: string): boolean {
   return runningAutopilots.get(projectId)?.status.status === 'running';
-}
-
-// ── Internal HTTP helper (calls own server) ──
-
-async function internalFetch(config: AimeatConfig, path: string, jwt: string, opts: { method?: string; body?: unknown } = {}): Promise<{ ok: boolean; status: number; data: unknown; error?: unknown }> {
-  const url = `http://localhost:${config.port}${path}`;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${jwt}`,
-  };
-  const fetchOpts: RequestInit = { method: opts.method || 'GET', headers };
-  if (opts.body) fetchOpts.body = JSON.stringify(opts.body);
-
-  const resp = await fetch(url, fetchOpts);
-  const text = await resp.text();
-  let json: Record<string, unknown>;
-  try {
-    json = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    log.error(`internalFetch ${opts.method || 'GET'} ${path} — non-JSON response (${resp.status}): ${text.slice(0, 500)}`);
-    return { ok: false, status: resp.status, data: null, error: { message: `Non-JSON response: ${text.slice(0, 200)}` } };
-  }
-  if (!resp.ok) {
-    log.warn(`internalFetch ${opts.method || 'GET'} ${path} — ${resp.status}: ${JSON.stringify(json.error || json).slice(0, 300)}`);
-  }
-  return { ok: resp.ok, status: resp.status, data: json.data, error: json.error };
 }
 
 // ── Main autopilot loop ──
@@ -269,6 +248,12 @@ export async function runAutopilot(
     blueprint,
   ).catch(() => {});
 
+  // Shared context for the extracted spec + test phases (they close over the same loop state).
+  const ctx: AutopilotRunCtx = {
+    config, jwt, projectId, ownerGhii, storage,
+    blueprint, interviewSpec,
+    debug, alog, callLLM, saveComp, entry,
+  };
   // ── Main loop ──
   try {
     for (const cid of phaseOrder) {
@@ -334,125 +319,7 @@ export async function runAutopilot(
 
       try {
         // ── SPEC GENERATION ──
-        const specTypes = ['extension', 'cortex', 'app'];
-        let spec: Record<string, unknown> | null = null;
-
-        if (specTypes.includes(compType)) {
-          const bpComp = ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel);
-          if (bpComp) {
-            // Build the spec prompt through the SAME backend route the browser UI uses
-            // (GET /prompts/:cid?type=spec) — identical to loadPromptFromBackend(projectId,
-            // id, 'spec') in generator-detail.js. The route ALWAYS produces a spec prompt for
-            // spec-bearing types and pulls cross-component dependencies (extension spec, data-API
-            // spec, translation keys) from the canonical generator.<project>.spec.<id> memory
-            // keys. The old inline construction gated on comp.spec being present on the in-memory
-            // component records and silently produced a null prompt → no spec generated → empty
-            // specs. Never reconstruct the prompt logic here; defer to the route, like the UI does.
-            const specPromptResp = await internalFetch(config, `/v1/generator/${projectId}/prompts/${encodeURIComponent(cid)}?type=spec`, jwt);
-            const specPrompt: string | null = specPromptResp.ok
-              ? (((specPromptResp.data as Record<string, unknown>)?.prompt as string) || null)
-              : null;
-            if (!specPrompt) {
-              alog.warn(`[${cid}] No spec prompt for ${compLabel} (status ${specPromptResp.status}) — continuing without spec`);
-            }
-
-            if (specPrompt) {
-              alog.info(`[${cid}] Generating spec for ${compLabel}`);
-              debug.writeArtifact(cid, 'spec-prompt', specPrompt).catch(() => {});
-              const specRaw = await callLLM(specPrompt);
-              debug.writeArtifact(cid, 'spec-raw-response', specRaw).catch(() => {});
-              let specText = specRaw.trim();
-              const fenceMatch = specText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
-              if (fenceMatch) specText = fenceMatch[1].trim();
-
-              try {
-                spec = JSON.parse(specText) as Record<string, unknown>;
-                debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
-                alog.info(`[${cid}] Spec generated: ${(spec as Record<string, unknown>).name as string}`);
-
-                // Validate spec structure — per component type
-                const validateSpec = (): { valid: boolean; errors: string[] } => {
-                  if (!spec) return { valid: false, errors: ['Spec is null'] };
-                  if (compType === 'extension') {
-                    const sv = validateExtensionSpec(spec);
-                    // Also check blueprint action coverage
-                    const specActionIds = new Set(((spec.actions || []) as Array<Record<string, unknown>>).map(a => a.id as string));
-                    const bpActions = Object.keys((blueprint as Record<string, unknown>).dataModel ? ((blueprint as Record<string, unknown>).dataModel as Record<string, unknown>).actions as Record<string, unknown> || {} : {})
-                      .filter(k => k.startsWith('ext:'))
-                      .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
-                    const missingActions = bpActions.filter(a => !specActionIds.has(a));
-                    if (missingActions.length > 0) {
-                      sv.valid = false;
-                      sv.errors.push(...missingActions.map(a => `Blueprint declares action "${a}" but it is missing from the spec`));
-                    }
-                    return sv;
-                  } else if (compType === 'app') {
-                    return validateAppSpec(spec);
-                  } else if (compType === 'cortex') {
-                    const sub = (bpComp?.subtype as string) || '';
-                    return sub === 'data' ? validateDataApiSpec(spec)
-                      : sub === 'component' ? validateComponentSpec(spec)
-                      : sub === 'app-domain' ? validateAppDomainSpec(spec)
-                      : { valid: true, errors: [] as string[] };
-                  }
-                  return { valid: true, errors: [] };
-                };
-
-                let sv = validateSpec();
-                if (!sv.valid) {
-                  alog.warn(`[${cid}] Spec validation failed: ${sv.errors.join('; ')} — retrying`);
-                  // Retry: ask LLM to fix the spec
-                  const specFixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
-                    + '## Errors\n' + sv.errors.map((e, i) => `${i + 1}. ${e}`).join('\n')
-                    + '\n\n## Current Spec\n```json\n' + JSON.stringify(spec, null, 2) + '\n```\n\n'
-                    + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing fields\n- Return ONLY the COMPLETE fixed JSON, no markdown fences';
-                  const fixedRaw = await callLLM(specFixPrompt);
-                  let fixedText = fixedRaw.trim();
-                  const fixFence = fixedText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
-                  if (fixFence) fixedText = fixFence[1].trim();
-                  try {
-                    spec = JSON.parse(fixedText) as Record<string, unknown>;
-                    sv = validateSpec();
-                    if (sv.valid) {
-                      alog.info(`[${cid}] Spec fix succeeded`);
-                      debug.writeArtifact(cid, 'spec-fixed', JSON.stringify(spec, null, 2)).catch(() => {});
-                    } else {
-                      alog.error(`[${cid}] Spec fix still invalid: ${sv.errors.join('; ')} — continuing without spec`);
-                      spec = null;
-                    }
-                  } catch {
-                    alog.error(`[${cid}] Spec fix JSON parse failed — continuing without spec`);
-                    spec = null;
-                  }
-                }
-              } catch {
-                alog.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
-                spec = null;
-              }
-
-              if (spec) {
-                comp = { ...comp, spec };
-                await saveComp(comp);
-                // Persist the spec to its canonical key (generator.<project>.spec.<cid>) through the
-                // SAME backend endpoint that backs the browser's "Save Spec" — POST .../components/:cid/spec.
-                // This is EXACTLY where the UI reads specs back from on F5: loadAllComponents() queries
-                // generator.<project>.spec.* and merges specMap[component.id] onto each component, so the
-                // spec only needs to live under this key — it does NOT need to be on the component record.
-                // The endpoint validates and version-bumps correctly (existing ? version+1 : 1); the old
-                // direct storage.setMemory used a hardcoded version:1 with a swallowed error, so a re-run
-                // (key already present) silently failed and the spec never reached the UI.
-                const storeResp = await internalFetch(config, `/v1/generator/${projectId}/components/${encodeURIComponent(cid)}/spec`, jwt, {
-                  method: 'POST', body: { spec },
-                });
-                if (storeResp.ok) {
-                  alog.info(`[${cid}] Spec stored at generator.${projectId}.spec.${cid} — UI will show it on refresh`);
-                } else {
-                  alog.error(`[${cid}] Spec store FAILED (status ${storeResp.status}): ${JSON.stringify(storeResp.error)} — spec will NOT appear in the UI`);
-                }
-              }
-            }
-          }
-        }
+        comp = await runSpecPhase(ctx, cid, compLabel, compType, comp);
 
         if (entry.cancelFlag) break;
 
@@ -747,316 +614,11 @@ export async function runAutopilot(
           // Already activated during registration above
         }
 
-        // ── TEST ──
-        // Honor the user's "Testauslaajuus" (test scope) selection: 'none' = skip the whole test
-        // phase. This is what "Ei testejä — ohita testaus" must do — without it, tests always ran
-        // and a single test failure `break`ed the entire pipeline, so later components never reached
-        // their spec/code/register steps and their SPEC boxes stayed empty. Skipping tests lets
-        // spec + code + register run for every component. Test scope does NOT gate spec generation
-        // (specs are produced in the spec phase, long before this block).
-        let testPassed = true; // assume passed unless test runs and fails
-        if (testScope === 'none') {
-          alog.info(`[${cid}] Test scope "none" — skipping test phase (spec + code + register already done)`);
-        }
-        if (testScope !== 'none' && ['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
-          try {
-            // Build the test prompt through the SAME backend route the browser UI uses
-            // (GET /prompts/:cid?type=test) — identical to loadPromptFromBackend(projectId, id,
-            // 'test') in generator-detail.js. The route selects the subtype-specific test prompt
-            // (gen-test-cortex-component / -app-domain / -spec, gen-test-extension-spec,
-            // gen-test-app) and loads this component's stored spec plus golden samples (the
-            // extension's stored probeResults) from the canonical records — the same inputs the
-            // inline branches assembled, with no risk of subtype/dependency drift.
-            const testPromptResp = await internalFetch(config, `/v1/generator/${projectId}/prompts/${encodeURIComponent(cid)}?type=test`, jwt);
-            const testPromptText = ((testPromptResp.data as Record<string, unknown>)?.prompt as string) || '';
-            if (!testPromptResp.ok || !testPromptText) {
-              throw new Error(`Failed to build test prompt for ${compLabel} (status ${testPromptResp.status}): ${JSON.stringify(testPromptResp.error)}`);
-            }
-
-            alog.info(`[${cid}] Generating test for ${compLabel}`);
-            debug.writeArtifact(cid, 'test-prompt', testPromptText).catch(() => {});
-            let testCode = await callLLM(testPromptText);
-            debug.writeArtifact(cid, 'test-raw-response', testCode).catch(() => {});
-            testCode = stripCodeblock(testCode);
-
-            const testEnvironment = (compType === 'cortex' || compType === 'app') ? 'browser' : 'server';
-            const testResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
-              method: 'POST',
-              body: { testCode, environment: testEnvironment },
-            });
-            let testResult = (testResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
-            if (testResult) {
-              // Store test result WITHOUT full trace (trace can be 100KB+, exceeds memory value limit)
-              // Trace is already saved in debug artifacts and terminal log
-              const testResultForStorage = { ...testResult };
-              delete (testResultForStorage as Record<string, unknown>).trace;
-              comp = { ...comp, testCode, testResult: testResultForStorage };
-              await saveComp(comp);
-              const testErrors = (testResult.errors as string[]) || [];
-              const testTrace = (testResult.trace as Array<Record<string, string>>) || [];
-              if (testResult.status === 'passed') {
-                alog.info(`[${cid}] ✅ Test PASSED`);
-              } else {
-                alog.error(`[${cid}] ❌ Test FAILED — ${testErrors.length} errors:`);
-                for (const e of testErrors) alog.error(`[${cid}]   - ${e}`);
-              }
-              // Log trace with shapes
-              for (const t of testTrace) {
-                const resultStr = t.result || 'null';
-                const shapeMatch = resultStr.match(/\[shape extracted from (\d+) chars\]/);
-                if (shapeMatch) {
-                  const shapeJson = resultStr.slice(0, resultStr.indexOf('\n[shape extracted')).trim().replace(/\s+/g, ' ').slice(0, 500);
-                  alog.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → SHAPE: ${shapeJson} [from ${shapeMatch[1]} chars]`);
-                } else {
-                  alog.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → ${resultStr.slice(0, 300)}`);
-                }
-              }
-            }
-
-            // ── TEST→REFLECT→FIX→RE-REGISTER→RE-TEST cycle ──
-            // Matches browser flow: generator-detail.js handleFixFromTest
-            const maxTestFixRounds = 2;
-            let testFixRound = 0;
-            const previousAttempts: Array<Record<string, unknown>> = [];
-
-            while (testResult && testResult.status === 'failed' && testFixRound < maxTestFixRounds && !entry.cancelFlag) {
-              testFixRound++;
-              alog.info(`[${cid}] Test failed — starting reflect+fix round ${testFixRound}/${maxTestFixRounds}`);
-
-              // Step 1: REFLECT — diagnose the failure (no code, just analysis)
-              let reflectionDiagnosis = '';
-              try {
-                const reflectionPrompt = await buildPrompt(storage, 'gen-reflection', {
-                  blueprint: blueprint as unknown as Blueprint,
-                  interviewSpec: interviewSpec as unknown as InterviewSpec,
-                  code: content,
-                  selfSpec: comp.spec as Record<string, unknown> | undefined,
-                  errors: (testResult.errors as string[]) || [],
-                  testContext: testResult as Record<string, unknown>,
-                } as unknown as PromptRuntimeData);
-                debug.writeArtifact(cid, `test-fix-${testFixRound}-reflection-prompt`, reflectionPrompt).catch(() => {});
-                reflectionDiagnosis = await callLLM(reflectionPrompt);
-                debug.writeArtifact(cid, `test-fix-${testFixRound}-reflection-response`, reflectionDiagnosis).catch(() => {});
-                alog.info(`[${cid}] Reflection: ${reflectionDiagnosis.slice(0, 200)}`);
-              } catch (e) {
-                alog.warn(`[${cid}] Reflection failed: ${(e as Error).message}`);
-              }
-
-              previousAttempts.push({
-                round: testFixRound,
-                diagnosis: reflectionDiagnosis.slice(0, 500),
-                errors: (testResult.errors as string[]) || [],
-              });
-
-              // Step 2: FIX — regenerate extension code with test context + diagnosis
-              const fixPrompt = await buildPrompt(storage, 'gen-fix', {
-                blueprint: blueprint as unknown as Blueprint,
-                interviewSpec: interviewSpec as unknown as InterviewSpec,
-                originalPrompt: prompt as string,
-                code: content,
-                errors: (testResult.errors as string[]) || [],
-                componentType: compType,
-                testContext: testResult as Record<string, unknown>,
-                previousAttempts,
-                reflectionDiagnosis,
-              } as unknown as PromptRuntimeData);
-              debug.writeArtifact(cid, `test-fix-${testFixRound}-fix-prompt`, fixPrompt).catch(() => {});
-              let fixedContent = await callLLM(fixPrompt);
-              debug.writeArtifact(cid, `test-fix-${testFixRound}-fix-response`, fixedContent).catch(() => {});
-              if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
-
-              // Step 3: VALIDATE the fix
-              let fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
-              if (!fixVr.valid) {
-                alog.warn(`[${cid}] Fix round ${testFixRound} validation failed: ${fixVr.errors[0]}`);
-                // One more try
-                const fixPrompt2 = await buildPrompt(storage, 'gen-fix', {
-                  blueprint: blueprint as unknown as Blueprint,
-                  interviewSpec: interviewSpec as unknown as InterviewSpec,
-                  originalPrompt: prompt as string,
-                  code: fixedContent,
-                  errors: fixVr.errors,
-                  componentType: compType,
-                } as unknown as PromptRuntimeData);
-                debug.writeArtifact(cid, `test-fix-${testFixRound}-refix-prompt`, fixPrompt2).catch(() => {});
-                fixedContent = await callLLM(fixPrompt2);
-                debug.writeArtifact(cid, `test-fix-${testFixRound}-refix-response`, fixedContent).catch(() => {});
-                if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
-                fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
-              }
-
-              if (!fixVr.valid) {
-                alog.warn(`[${cid}] Fix round ${testFixRound} still invalid — skipping re-register`);
-                continue;
-              }
-
-              // Step 4: RE-REGISTER
-              content = fixedContent;
-              comp = { ...comp, result: content, status: 'done', validationErrors: [] };
-              await saveComp(comp);
-              try {
-                await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
-                  method: 'POST', body: { content, type: compType },
-                });
-                if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
-                  await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
-                }
-                if (compType === 'extension' && comp.registeredAs) {
-                  await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
-                }
-                // Cortex re-registration: validate to extract manifest+libs, then re-register via cortex API
-                if (compType === 'cortex') {
-                  const reVr = validateComponent('cortex', content, blueprint as unknown as Blueprint);
-                  const extracted = reVr.extracted as { manifest: string; libs: Array<{ filename: string; code: string }> } | undefined;
-                  if (extracted?.manifest) {
-                    const libs: Record<string, string> = {};
-                    for (const lib of (extracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
-                    const newName = extracted.manifest.match(/name:\s*"?([^\s"]+)"?/)?.[1];
-                    // Deactivate+delete OLD cortex name if it changed
-                    const oldName = comp.registeredAs as string | undefined;
-                    if (oldName && oldName !== newName) {
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}`, jwt, { method: 'DELETE' }).catch(() => {});
-                    }
-                    // Deactivate+delete new name too (may exist from previous attempt)
-                    if (newName) {
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}`, jwt, { method: 'DELETE' }).catch(() => {});
-                    }
-                    await internalFetch(config, '/v1/cortex', jwt, {
-                      method: 'POST', body: { manifest: extracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
-                    });
-                    if (newName) {
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/activate`, jwt, { method: 'POST' });
-                      // Update registeredAs if name changed
-                      if (newName !== oldName) {
-                        comp = { ...comp, registeredAs: newName };
-                        await saveComp(comp);
-                        alog.info(`[${cid}] Cortex name changed: ${oldName} → ${newName}`);
-                      }
-                    }
-                  }
-                }
-                alog.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
-                // Update debug artifacts with the actual registered code
-                debug.writeComponentGenerated(cid, content).catch(() => {});
-              } catch (e) {
-                alog.warn(`[${cid}] Re-registration failed: ${(e as Error).message}`);
-                break;
-              }
-
-              // Step 5: RE-TEST with the same test code
-              try {
-                const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
-                  method: 'POST', body: { testCode, environment: testEnvironment },
-                });
-                testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
-                if (testResult) {
-                  const reTestForStorage = { ...testResult }; delete (reTestForStorage as Record<string, unknown>).trace;
-                  comp = { ...comp, testResult: reTestForStorage };
-                  await saveComp(comp);
-                  const reTestErrors = (testResult.errors as string[]) || [];
-                  if (testResult.status === 'passed') {
-                    alog.info(`[${cid}] ✅ Re-test round ${testFixRound}: PASSED`);
-                  } else {
-                    alog.error(`[${cid}] ❌ Re-test round ${testFixRound}: FAILED — ${reTestErrors.length} errors:`);
-                    for (const e of reTestErrors) alog.error(`[${cid}]   - ${e}`);
-                  }
-                }
-              } catch (e) {
-                alog.warn(`[${cid}] Re-test failed: ${(e as Error).message}`);
-                break;
-              }
-            }
-
-            // Final round: fresh generation if still failing
-            if (testResult && testResult.status === 'failed' && !entry.cancelFlag) {
-              alog.info(`[${cid}] All fix rounds exhausted — trying fresh generation`);
-              try {
-                const freshPrompt = await buildPrompt(storage, 'gen-fresh-generation', {
-                  blueprint: blueprint as unknown as Blueprint,
-                  interviewSpec: interviewSpec as unknown as InterviewSpec,
-                  originalPrompt: prompt as string,
-                  previousAttempts,
-                  testContext: testResult as Record<string, unknown>,
-                } as unknown as PromptRuntimeData);
-                debug.writeArtifact(cid, 'fresh-generation-prompt', freshPrompt).catch(() => {});
-                let freshContent = await callLLM(freshPrompt);
-                debug.writeArtifact(cid, 'fresh-generation-response', freshContent).catch(() => {});
-                if (compType !== 'cortex') freshContent = stripCodeblock(freshContent);
-                const freshVr = validateComponent(compType, freshContent, blueprint as unknown as Blueprint);
-                if (freshVr.valid) {
-                  content = freshContent;
-                  comp = { ...comp, result: content, status: 'done' };
-                  await saveComp(comp);
-                  // Re-register fresh
-                  await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
-                    method: 'POST', body: { content, type: compType },
-                  });
-                  if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
-                    await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
-                  }
-                  if (compType === 'extension' && comp.registeredAs) {
-                    await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
-                  }
-                  // Cortex fresh re-registration
-                  if (compType === 'cortex') {
-                    const freshExtracted = freshVr.extracted as { manifest: string; libs: Array<{ filename: string; code: string }> } | undefined;
-                    if (freshExtracted?.manifest) {
-                      const libs: Record<string, string> = {};
-                      for (const lib of (freshExtracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
-                      const newName = freshExtracted.manifest.match(/name:\s*"?([^\s"]+)"?/)?.[1];
-                      const oldName = comp.registeredAs as string | undefined;
-                      if (oldName && oldName !== newName) {
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}`, jwt, { method: 'DELETE' }).catch(() => {});
-                      }
-                      if (newName) {
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}`, jwt, { method: 'DELETE' }).catch(() => {});
-                      }
-                      await internalFetch(config, '/v1/cortex', jwt, {
-                        method: 'POST', body: { manifest: freshExtracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
-                      });
-                      if (newName) {
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/activate`, jwt, { method: 'POST' });
-                        if (newName !== oldName) {
-                          comp = { ...comp, registeredAs: newName };
-                          await saveComp(comp);
-                          alog.info(`[${cid}] Cortex name changed: ${oldName} → ${newName}`);
-                        }
-                      }
-                    }
-                  }
-                  alog.info(`[${cid}] Fresh generation registered — re-testing`);
-                  const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
-                    method: 'POST', body: { testCode, environment: testEnvironment },
-                  });
-                  testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
-                  if (testResult) {
-                    const freshTestForStorage = { ...testResult }; delete (freshTestForStorage as Record<string, unknown>).trace;
-                    comp = { ...comp, testResult: freshTestForStorage };
-                    await saveComp(comp);
-                    alog.info(`[${cid}] Fresh generation test: ${testResult.status as string}`);
-                  }
-                } else {
-                  alog.warn(`[${cid}] Fresh generation validation failed: ${freshVr.errors[0]}`);
-                }
-              } catch (e) {
-                alog.warn(`[${cid}] Fresh generation failed: ${(e as Error).message}`);
-              }
-            }
-
-          } catch (e) {
-            alog.error(`[${cid}] Test execution failed: ${(e as Error).message}`);
-          }
-
-          // Check final test status
-          const finalTestResult = comp.testResult as Record<string, unknown> | undefined;
-          if (finalTestResult && finalTestResult.status === 'failed') {
-            testPassed = false;
-          }
-        }
+        // ── TEST (extracted to generator-autopilot-phases.ts) ──
+        const testOutcome = await runTestPhase(ctx, cid, compLabel, compType, comp, content, prompt, testScope);
+        comp = testOutcome.comp;
+        content = testOutcome.content;
+        const testPassed = testOutcome.testPassed;
 
         if (!testPassed) {
           const testErrors = ((comp.testResult as Record<string, unknown>)?.errors as string[]) || [];
@@ -1100,66 +662,4 @@ export async function runAutopilot(
     // Keep status for 1 hour, then clean up
     setTimeout(() => runningAutopilots.delete(projectId), 60 * 60 * 1000);
   }
-}
-
-// ── Helpers ──
-
-function extractRegisteredName(type: string, content: string, _vr: { extracted?: unknown }): string | null {
-  if (type === 'extension' || type === 'cortex') {
-    const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*"?([^\s"]+)"?/);
-    return nameMatch?.[1] || null;
-  }
-  if (type === 'csm' || type === 'msm') {
-    const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*"?([^\s"]+)"?/);
-    return nameMatch?.[1] || null;
-  }
-  if (type === 'memory') {
-    // Memory content is JSON object — return the first key name as the registered name
-    try {
-      const stripped = stripCodeblock(typeof content === 'string' ? content : '');
-      const parsed = JSON.parse(stripped);
-      const keys = Object.keys(parsed);
-      return keys.length > 0 ? `memory:${keys[0]}` : 'memory';
-    } catch {
-      return 'memory';
-    }
-  }
-  if (type === 'translation') {
-    // Translation content is { locale: { key: value } } — return i18n.{locale} matching the stored memory key
-    try {
-      const stripped = stripCodeblock(typeof content === 'string' ? content : '');
-      const parsed = JSON.parse(stripped);
-      const locales = Object.keys(parsed);
-      return locales.length > 0 ? `i18n.${locales[0]}` : 'translation';
-    } catch {
-      return 'translation';
-    }
-  }
-  if (type === 'app') {
-    // App content is HTML with manifest comment: <!-- AIMEAT App Manifest\nname: kebab-case-name -->
-    const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*([^\n\r]+)/);
-    return nameMatch?.[1]?.trim() || 'app';
-  }
-  return null;
-}
-
-function buildProbeScenarios(blueprint: Record<string, unknown>, comp: Record<string, unknown>, content: string): Array<{ action: string; input: Record<string, unknown> }> {
-  // Prefer SPEC actions — they have correct IDs and example inputs matching the actual API.
-  // Blueprint scenarios have abstract inputs (e.g. {query, type}) that don't match the extension.
-  const spec = comp.spec as Record<string, unknown> | undefined;
-  if (spec) {
-    const specActions = (spec.actions || []) as Array<Record<string, unknown>>;
-    if (specActions.length > 0) {
-      return specActions
-        .filter(a => a.id && a.example)
-        .map(a => ({
-          action: a.id as string,
-          input: ((a.example as Record<string, unknown>)?.input as Record<string, unknown>) || {},
-        }));
-    }
-  }
-
-  // Fallback: extract action names from YAML content
-  const actionMatches = [...content.matchAll(/- id:\s*"?([^\s"]+)/g)];
-  return actionMatches.map(m => ({ action: m[1], input: {} }));
 }

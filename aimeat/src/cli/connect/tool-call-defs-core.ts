@@ -1,0 +1,368 @@
+/**
+ * @file cli/connect/tool-call-defs-core.ts
+ * @description Memory, discovery, work, wallet, board, storage, admin, capabilities, catalogue, consent, flag, group, instance, knowledge and skill connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
+ * @version-history
+ *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
+ */
+import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredArray } from './tool-call-helpers.js';
+
+export const coreTools: ConnectCliToolDefinition[] = [
+    {
+        name: 'aimeat_memory_read',
+        handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}`),
+    },
+    {
+        name: 'aimeat_memory_write',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { key: requiredString(input, 'key'), value: requiredValue(input, 'value') };
+            const visibility = optionalString(input, 'visibility');
+            const ttlHours = optionalNumber(input, 'ttl_hours');
+            if (visibility) body.visibility = visibility;
+            const tags = optionalArray(input, 'tags');
+            if (tags) body.tags = tags;
+            if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            return client.post('/v1/memory', body);
+        },
+    },
+    {
+        name: 'aimeat_memory_list',
+        handler: ({ client }, input) => {
+            const tags = optionalArray(input, 'tags')?.filter((tag): tag is string => typeof tag === 'string');
+            return client.get(`/v1/memory${query({
+                prefix: optionalString(input, 'prefix'),
+                visibility: optionalString(input, 'visibility'),
+                tags: tags?.length ? tags.join(',') : undefined,
+                owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
+                limit: optionalNumber(input, 'limit'),
+            })}`);
+        },
+    },
+    {
+        name: 'aimeat_memory_search',
+        handler: ({ client }, input) => client.get(`/v1/memory/search${query({ q: requiredString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_catalogue_search',
+        handler: ({ client }, input) => client.get(`/v1/catalogue${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_discover',
+        handler: ({ client }, input) => {
+            const q = query({
+                q: optionalString(input, 'q'),
+                type: optionalString(input, 'type'),
+                tags: optionalString(input, 'tags'),
+                segment: optionalString(input, 'segment'),
+                scope: optionalString(input, 'scope'),
+                per_page: optionalNumber(input, 'limit'),
+            });
+            // mode=map → facet counts only; mode=find (default) → ranked entries.
+            const path = optionalString(input, 'mode') === 'map' ? '/v1/discover/facets' : '/v1/discover';
+            return client.get(`${path}${q}`);
+        },
+    },
+    {
+        name: 'aimeat_agent_profile',
+        handler: ({ client }, input) => client.get(`/v1/agents/${encodeURIComponent(requiredString(input, 'gaii'))}`),
+    },
+    {
+        name: 'aimeat_action_execute',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { action_id: requiredString(input, 'action_id') };
+            const actionInput = optionalRecord(input, 'input');
+            if (actionInput) body.input = actionInput;
+            return client.post('/v1/work/request', body);
+        },
+    },
+    {
+        name: 'aimeat_work_inbox',
+        handler: ({ client }) => client.get('/v1/work/inbox'),
+    },
+    {
+        name: 'aimeat_work_accept',
+        handler: ({ client }, input) => client.post(`/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/accept`),
+    },
+    {
+        name: 'aimeat_work_deliver',
+        handler: ({ client }, input) => client.post(
+            `/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/deliver`,
+            { result: requiredValue(input, 'result') },
+        ),
+    },
+    {
+        name: 'aimeat_wallet_balance',
+        handler: ({ client }) => client.get('/v1/wallet'),
+    },
+    {
+        name: 'aimeat_board_read',
+        handler: ({ client }, input) => client.get(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`),
+    },
+    {
+        name: 'aimeat_board_post',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`,
+            { title: requiredString(input, 'title'), body: requiredString(input, 'body') },
+        ),
+    },
+    {
+        name: 'aimeat_storage_upload',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { key: requiredString(input, 'key'), content: requiredString(input, 'content') };
+            const mimeType = optionalString(input, 'mime_type');
+            if (mimeType) body.mime_type = mimeType;
+            return client.post('/v1/storage', body);
+        },
+    },
+    {
+        name: 'aimeat_storage_download',
+        handler: ({ client }, input) => client.get(`/v1/storage/${encodeURIComponent(requiredString(input, 'key'))}`),
+    },
+    {
+        name: 'aimeat_admin_stats',
+        handler: ({ client }) => client.get('/v1/admin/stats'),
+    },
+    {
+        name: 'aimeat_admin_agents',
+        handler: ({ client }) => client.get('/v1/admin/agents'),
+    },
+    {
+        name: 'aimeat_admin_config',
+        handler: ({ client }) => client.get('/v1/admin/config'),
+    },
+    {
+        name: 'aimeat_board_list',
+        handler: ({ client }) => client.get('/v1/boards'),
+    },
+    {
+        name: 'aimeat_board_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const description = optionalString(input, 'description');
+            const visibility = optionalString(input, 'visibility');
+            if (description) body.description = description;
+            if (visibility) body.visibility = visibility;
+            return client.post('/v1/boards', body);
+        },
+    },
+    {
+        name: 'aimeat_board_subscribe',
+        handler: ({ client }, input) => client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/subscribe`),
+    },
+    {
+        name: 'aimeat_board_react',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/react`,
+            { emoji: requiredString(input, 'emoji') },
+        ),
+    },
+    {
+        name: 'aimeat_board_reply',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/replies`,
+            { body: requiredString(input, 'body') },
+        ),
+    },
+    {
+        name: 'aimeat_board_members',
+        handler: ({ client }, input) => client.patch(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/members`,
+            { members: requiredArray(input, 'members') },
+        ),
+    },
+    {
+        name: 'aimeat_board_delete',
+        handler: ({ client }, input) => client.delete(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_list',
+        handler: ({ client }, input) => client.get(`/v1/capabilities${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_capabilities_get',
+        handler: ({ client }, input) => client.get(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_invoke',
+        handler: ({ client }, input) => client.post(
+            `/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/invoke`,
+            optionalRecord(input, 'input') ?? {},
+        ),
+    },
+    {
+        name: 'aimeat_capabilities_create',
+        handler: ({ client }, input) => client.post('/v1/capabilities', {
+            name: requiredString(input, 'name'),
+            description: requiredString(input, 'description'),
+            type: requiredString(input, 'type'),
+        }),
+    },
+    {
+        name: 'aimeat_capabilities_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const name = optionalString(input, 'name');
+            const description = optionalString(input, 'description');
+            if (name) body.name = name;
+            if (description) body.description = description;
+            return client.put(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`, body);
+        },
+    },
+    {
+        name: 'aimeat_capabilities_delete',
+        handler: ({ client }, input) => client.delete(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_vouch',
+        handler: ({ client }, input) => client.post(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/vouch`, {}),
+    },
+    {
+        name: 'aimeat_catalogue_agents',
+        handler: ({ client }, input) => client.get(`/v1/catalogue/agents${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_catalogue_boards',
+        handler: ({ client }) => client.get('/v1/catalogue/boards'),
+    },
+    {
+        name: 'aimeat_catalogue_directory',
+        handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_consent_grant',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { recipient: requiredString(input, 'recipient'), keys: requiredArray(input, 'keys') };
+            const purpose = optionalString(input, 'purpose');
+            if (purpose) body.purpose = purpose;
+            return client.post('/v1/consent', body);
+        },
+    },
+    {
+        name: 'aimeat_consent_list',
+        handler: ({ client }) => client.get('/v1/consent'),
+    },
+    {
+        name: 'aimeat_consent_revoke',
+        handler: ({ client }, input) => client.delete(`/v1/consent/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_flag_report',
+        handler: ({ client }, input) => client.post('/v1/flags', {
+            target_type: requiredString(input, 'target_type'),
+            target_id: requiredString(input, 'target_id'),
+            reason: requiredString(input, 'reason'),
+        }),
+    },
+    {
+        name: 'aimeat_group_list',
+        handler: ({ client }) => client.get('/v1/groups'),
+    },
+    {
+        name: 'aimeat_group_get',
+        handler: ({ client }, input) => client.get(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_group_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const description = optionalString(input, 'description');
+            if (description) body.description = description;
+            return client.post('/v1/groups', body);
+        },
+    },
+    {
+        name: 'aimeat_group_add_member',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { identifier: requiredString(input, 'identifier') };
+            const role = optionalString(input, 'role');
+            if (role) body.role = role;
+            return client.post(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members`, body);
+        },
+    },
+    {
+        name: 'aimeat_group_remove_member',
+        handler: ({ client }, input) => client.delete(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members/${encodeURIComponent(requiredString(input, 'identifier'))}`),
+    },
+    {
+        name: 'aimeat_instance_list',
+        handler: ({ client }) => client.get('/v1/instances'),
+    },
+    {
+        name: 'aimeat_instance_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const template = optionalString(input, 'template');
+            if (template) body.template = template;
+            return client.post('/v1/instances', body);
+        },
+    },
+    {
+        name: 'aimeat_instance_status',
+        handler: ({ client }, input) => client.get(`/v1/instances/${encodeURIComponent(requiredString(input, 'id'))}/status`),
+    },
+    {
+        name: 'aimeat_knowledge_list',
+        handler: ({ client }) => client.get('/v1/catalogue/knowledge'),
+    },
+    {
+        name: 'aimeat_knowledge_get',
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_knowledge_contribute',
+        handler: ({ client }, input) => client.post(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/contribute`, {
+            entry_key: requiredString(input, 'entry_key'),
+            content: requiredString(input, 'content'),
+        }),
+    },
+    {
+        name: 'aimeat_knowledge_links',
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/links`),
+    },
+    {
+        name: 'aimeat_skill_publish',
+        handler: ({ client }, input) => client.post('/v1/skills', {
+            skill_md: requiredString(input, 'skill_md'),
+            files: input.files,
+            scope: optionalString(input, 'scope'),
+            visibility: optionalString(input, 'visibility'),
+            organism: optionalString(input, 'organism_id'),
+            ws: optionalString(input, 'workspace_id'),
+        }),
+    },
+    {
+        name: 'aimeat_skill_list',
+        handler: ({ client, agentPath }, input) => {
+            const view = optionalString(input, 'view') ?? 'library';
+            if (view === 'linked') return client.get(`/v1/agents/${agentPath}/skills/links`);
+            return client.get(`/v1/skills?scope=${view === 'mine' ? 'user' : 'library'}`);
+        },
+    },
+    {
+        name: 'aimeat_skill_get',
+        handler: ({ client }, input) => {
+            const ref = optionalString(input, 'ref');
+            const manifestOnly = optionalBoolean(input, 'manifest_only') ? '&manifest_only=true' : '';
+            if (ref) {
+                const node = ref.match(/^node:([a-z0-9-]+)$/);
+                if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}?scope=node${manifestOnly}`);
+                const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
+                if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}?scope=user&owner=${encodeURIComponent(user[1])}${manifestOnly}`);
+                const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+)$/);
+                if (ws) return client.get(`/v1/skills/${encodeURIComponent(ws[3])}?scope=workspace&organism=${encodeURIComponent(ws[1])}&ws=${encodeURIComponent(ws[2])}${manifestOnly}`);
+                throw new Error(`Not a valid skill ref: ${ref}`);
+            }
+            return client.get(`/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}?${manifestOnly.replace('&', '')}`);
+        },
+    },
+    {
+        name: 'aimeat_skill_link',
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/skills`, {
+            ref: requiredString(input, 'ref'),
+        }),
+    },
+    {
+        name: 'aimeat_skill_unlink',
+        handler: ({ client, agentPath }, input) => client.delete(`/v1/agents/${agentPath}/skills?ref=${encodeURIComponent(requiredString(input, 'ref'))}`),
+    },
+];
