@@ -22,6 +22,9 @@
  *                            top-level step_guide + summary (required/optional counts,
  *                            completable, next_required_step). hints.next_step now prefers the
  *                            next required step. All additive + computed on a copy.
+ *   v1.4.0 -- 2026-07-14 -- hints.test_task_id is now ALWAYS present when a test task exists
+ *                            (it was gated on task status, starving deterministic connectors
+ *                            that fill the {test_task_id} placeholder from it).
  */
 
 import { Router, type Request } from 'express';
@@ -173,13 +176,15 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       testTaskStatus = task?.status;
     }
     const hints: Record<string, unknown> = {};
+    // Driver contract: hints.test_task_id is ALWAYS present when a test task exists -- connectors
+    // (aimeat-crewai onboarding driver) fill the {test_task_id} placeholder from it, so gating it
+    // on a specific task status starved them into calling propose_todos with an empty task id.
+    if (testTaskId) hints.test_task_id = testTaskId;
     if (testTaskStatus === 'active') {
       hints.test_task_active = true;
-      hints.test_task_id = testTaskId;
       hints.message = 'Your test task is active. Execute the todos and POST /complete to finish steps 9-10.';
     } else if (testTaskStatus === 'queued' && testTaskStep?.status === 'pending') {
       hints.message = `Propose todos on your test task (PATCH /v1/agents/${agentName}/tasks/${testTaskId}) to proceed with step 9.`;
-      hints.test_task_id = testTaskId;
     }
     // Reachability summary + machine-readable how-to guidance. Completion gates only on
     // required steps, so next_step now prefers the next required step (not pendingSteps[0],

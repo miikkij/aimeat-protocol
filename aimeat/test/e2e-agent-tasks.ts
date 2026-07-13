@@ -565,6 +565,17 @@ await test('22. Owner can /start the revised plan', async () => {
     assert(body.data.task.status === 'active', `status: ${body.data.task.status}`);
 });
 
+await test('22b. Propose-todos still 409s on an active task WITH a live plan (mid-execution guard)', async () => {
+    // Plan-less active tasks (auto-activated at create) accept a FIRST proposal, but an active
+    // task that already has non-outdated todos is mid-execution -- re-proposal must go via PATCH.
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/propose-todos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ todos: [{ title: 'Sneaky mid-execution replan', verification: 'never' }] }),
+    });
+    assert(status === 409, `expected 409 on active task with a live plan, got ${status}: ${JSON.stringify(body)}`);
+});
+
 await test('23. Revision_requested event was logged with owner message', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/events`, {
         headers: { Authorization: `Bearer ${agentToken}` },

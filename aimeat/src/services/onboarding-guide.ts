@@ -14,6 +14,10 @@
  *   import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
  * @version-history
  *   v1.0.0 -- 2026-06-30 -- Initial creation: deterministic Hello Integration completion guidance.
+ *   v1.1.0 -- 2026-07-14 -- Substitute {test_task_id} server-side from the accept_test_task step's
+ *                            details.testTaskId (it was emitted as a literal placeholder, and the
+ *                            hints no longer reliably carried the id -- connectors called
+ *                            propose_todos with an empty task id).
  */
 
 import type { AgentOnboardingStep } from '../storage/interface.js';
@@ -41,22 +45,39 @@ export interface OnboardingSummary {
   optional_pending: string[];
 }
 
-/** Deep-substitute `{name}` in every string within a JSON-ish value (returns a copy). */
-function substituteName<T>(value: T, name: string): T {
-  if (typeof value === 'string') return value.replaceAll('{name}', name) as unknown as T;
-  if (Array.isArray(value)) return value.map(v => substituteName(v, name)) as unknown as T;
+/** Deep-substitute `{placeholder}` variables in every string within a JSON-ish value (returns a copy). */
+function substituteVars<T>(value: T, vars: Record<string, string>): T {
+  if (typeof value === 'string') {
+    let out: string = value;
+    for (const [key, replacement] of Object.entries(vars)) out = out.replaceAll(`{${key}}`, replacement);
+    return out as unknown as T;
+  }
+  if (Array.isArray(value)) return value.map(v => substituteVars(v, vars)) as unknown as T;
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = substituteName(v, name);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = substituteVars(v, vars);
     return out as unknown as T;
   }
   return value;
 }
 
-/** Resolve a step's howTo with `{name}` substituted, or null when the step id is unknown. */
-function howToFor(stepId: string, agentName: string): StepHowTo | null {
+/**
+ * The real onboarding test task id, read from the accept_test_task step's details (stamped at
+ * /start and at device-auth registration). undefined when the flow has no test task (workstation)
+ * or the task has not been created yet -- then the `{test_task_id}` placeholder is left as-is.
+ */
+function testTaskIdFrom(steps: AgentOnboardingStep[]): string | undefined {
+  const details = steps.find(s => s.id === 'accept_test_task')?.details as Record<string, unknown> | undefined;
+  return typeof details?.testTaskId === 'string' ? details.testTaskId : undefined;
+}
+
+/** Resolve a step's howTo with `{name}` + `{test_task_id}` substituted, or null when the step id is unknown. */
+function howToFor(stepId: string, agentName: string, testTaskId?: string): StepHowTo | null {
   const howTo = getStepHowTo(stepId);
-  return howTo ? substituteName(howTo, agentName) : null;
+  if (!howTo) return null;
+  const vars: Record<string, string> = { name: agentName };
+  if (testTaskId) vars.test_task_id = testTaskId;
+  return substituteVars(howTo, vars);
 }
 
 /**
@@ -68,18 +89,20 @@ export function enrichSteps(
   resolveText: (key: string) => string,
   agentName: string,
 ): EnrichedStep[] {
+  const testTaskId = testTaskIdFrom(steps);
   return steps.map(step => ({
     ...step,
     descriptionText: resolveText(step.description),
-    howTo: howToFor(step.id, agentName),
+    howTo: howToFor(step.id, agentName, testTaskId),
   }));
 }
 
-/** Flow-scoped `{ [stepId]: StepHowTo }` -- only the steps in this agent's flow, `{name}`-substituted. */
+/** Flow-scoped `{ [stepId]: StepHowTo }` -- only the steps in this agent's flow, `{name}` + `{test_task_id}`-substituted. */
 export function buildStepGuide(steps: AgentOnboardingStep[], agentName: string): Record<string, StepHowTo> {
+  const testTaskId = testTaskIdFrom(steps);
   const guide: Record<string, StepHowTo> = {};
   for (const step of steps) {
-    const howTo = howToFor(step.id, agentName);
+    const howTo = howToFor(step.id, agentName, testTaskId);
     if (howTo) guide[step.id] = howTo;
   }
   return guide;

@@ -133,8 +133,9 @@ export interface StepHowTo {
   toolAlias?: string;
   /** Underlying REST route for non-MCP clients; null for passive steps. */
   restEndpoint: { method: 'GET' | 'POST' | 'PUT' | 'PATCH'; path: string } | null;
-  /** Copyable argument template. `{name}` is substituted with the agent's short name at emit time;
-   *  `{test_task_id}` is filled by the caller from the status payload's hints.test_task_id. */
+  /** Copyable argument template. `{name}` and `{test_task_id}` are both substituted server-side at
+   *  emit time ({test_task_id} from the accept_test_task step's details.testTaskId; also mirrored in
+   *  hints.test_task_id). The placeholder only survives when no test task exists yet. */
   args?: Record<string, unknown>;
   /** For tool === null steps: the condition under which the server auto-passes the step. */
   passiveNote?: string;

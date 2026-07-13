@@ -126,7 +126,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_propose_todos',
-        description: 'Propose TODOs for a queued task, or re-propose after the owner has requested changes. The server preserves the prior proposal as outdated history.',
+        description: 'Propose TODOs for a queued task, an auto-activated task that has no plan yet (e.g. the Hello Integration test task), or re-propose after the owner has requested changes. The server preserves the prior proposal as outdated history. For task-runner mode agents a proposal on a queued task auto-activates it (no owner click needed).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

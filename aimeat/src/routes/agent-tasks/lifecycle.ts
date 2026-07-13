@@ -3,6 +3,11 @@
  * @description Agent-task lifecycle routes (update, delete, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-14 — propose-todos: allow the FIRST proposal on a plan-less active task
+ *                          (auto-activated tasks are born active with zero todos — the 409 made
+ *                          accept_test_task structurally impossible), and auto-activate a queued
+ *                          task on proposal when the agent's mode is task-runner (zero-click
+ *                          onboarding; matches the daemon's documented auto-approval promise).
  */
 
 import type { Router } from 'express';
@@ -281,14 +286,26 @@ export function registerTaskLifecycleRoutes(
    * the queued/revision_requested state machine and preserves the outdated
    * history correctly.
    *
-   *  queued (no todos)        -> set todos = body.todos (status pending), no state change
-   *  queued (has pending)     -> replace pending todos with new ones (outdated preserved)
+   *  queued (no todos)        -> set todos = body.todos (status pending), no state change*
+   *  queued (has pending)     -> replace pending todos with new ones (outdated preserved)*
    *  revision_requested        -> mark all current non-outdated todos as 'outdated',
    *                              APPEND new todos with status 'pending', flip task
    *                              status back to 'queued' so the owner can /start
    *                              (or /request-changes again).
-   *  active                    -> 409 (mid-execution re-proposal goes through PATCH)
+   *  active (no live plan)     -> set todos = body.todos (status pending), stays active.
+   *                              Auto-activated tasks (task-runner create, the Hello
+   *                              Integration test task) are born 'active' with zero todos;
+   *                              the agent's FIRST proposal must not 409 -- there is no
+   *                              mid-execution plan to protect yet.
+   *  active (has live plan)    -> 409 (mid-execution re-proposal goes through PATCH)
    *  anything else             -> 409
+   *
+   *  *task-runner auto-approval: when the target agent's mode is 'task-runner', a proposal
+   *   on a plain 'queued' task also flips it to 'active' (started event + task_assigned
+   *   push, same as create-time auto-activation) -- the owner pre-authorized this agent to
+   *   start work without per-task gating, and a queued task that predates the mode switch
+   *   (e.g. the registration-time onboarding test task) must not wait for a manual click.
+   *   Revision cycles still return to 'queued': the owner explicitly asked to review.
    *
    * Owner can also call this endpoint (useful for owner-driven planning), but
    * the typical caller is the agent via aimeat_task_propose_todos MCP tool.
@@ -305,9 +322,12 @@ export function registerTaskLifecycleRoutes(
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
-    if (task.status !== 'queued' && task.status !== 'revision_requested') {
+    const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
+    const canPropose = task.status === 'queued' || task.status === 'revision_requested'
+      || (task.status === 'active' && !hasLivePlan);
+    if (!canPropose) {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `TODOs can only be proposed on queued or revision_requested tasks (current: ${task.status})`));
+        `TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: ${task.status})`));
       return;
     }
 
@@ -347,11 +367,23 @@ export function registerTaskLifecycleRoutes(
       status: 'pending',
     }));
 
+    // Revision cycle: agent's new proposal moves the task back to 'queued' so the owner can
+    // review again. Plain queued stays queued -- UNLESS the agent's mode is 'task-runner',
+    // where the owner pre-authorized work to start without per-task gating (the same signal
+    // create-time auto-activation keys off in create-read.ts). Active (plan-less) stays active.
+    let nextStatus: AgentTaskRecord['status'] = task.status === 'revision_requested' ? 'queued' : task.status;
+    let autoActivated = false;
+    if (task.status === 'queued') {
+      const agent = await storage.getAgent(task.agentGaii);
+      if (agent?.mode === 'task-runner') {
+        nextStatus = 'active';
+        autoActivated = true;
+      }
+    }
+
     const updated = await storage.updateAgentTask(id, {
       todos: [...preserved, ...newTodos],
-      // Revision cycle: agent's new proposal moves the task back to 'queued' so
-      // the owner can review again. Plain queued stays queued.
-      status: task.status === 'revision_requested' ? 'queued' : task.status,
+      status: nextStatus,
       lastEventAt: now,
       updatedAt: now,
     });
@@ -369,6 +401,33 @@ export function registerTaskLifecycleRoutes(
       },
       timestamp: now,
     });
+
+    if (autoActivated) {
+      // Mirror POST /start + create-time auto-activation: matching 'started' event so the
+      // history reads like an owner-approved start, activity metric, 'task.approved' webhook
+      // (subscribers react to "this task is now runnable" regardless of which gate flipped it),
+      // and the connector-tunnel task_assigned push so a parked daemon wakes immediately.
+      await storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: id,
+        type: 'started',
+        message: 'Task auto-activated on TODO proposal (agent mode: task-runner)',
+        timestamp: now,
+      });
+      await recordTaskStarted(storage, task.agentGaii);
+      if (webhookDispatcher) {
+        webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.approved', {
+          task_id: task.id,
+          title: task.title,
+          status: 'active',
+          todo_count: (updated?.todos ?? []).length,
+          pending_todo_count: (updated?.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
+          approved_at: now,
+          auto_activated: true,
+        });
+      }
+      emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id, payload: updated });
+    }
 
     if (webhookDispatcher) {
       webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
