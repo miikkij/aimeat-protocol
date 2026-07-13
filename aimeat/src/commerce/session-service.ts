@@ -267,8 +267,11 @@ export async function completeSession(
   const totalNet = lines.reduce((n, l) => n + l.net, 0);
 
   // 1) Collect the gross from the buyer.
+  // The single-seller rule guarantees every sellable shares the seller; money handlers charge on
+  // the SELLER's own PSP credentials (loaded by the resolver) — never on node-level keys.
+  const seller = { ghii: session.sellerGhii, owner: session.sellerOwner, psp: sellables[0]?.psp };
   const collected = session.total > 0
-    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, instrument })
+    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, instrument, seller })
     : { trackingCode: `comtx_free_${session.id}` };
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
@@ -279,7 +282,7 @@ export async function completeSession(
     }
   } catch (err) {
     if (session.total > 0) {
-      await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode });
+      await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode, seller });
     }
     const e = err as { message?: string };
     throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
