@@ -1,0 +1,303 @@
+/**
+ * @file src/routes/instances/install.ts
+ * @description Package install route — installs a package as an instance (dry_run validation,
+ *   real component registration via native storage APIs, @activate-cron firing, rollback on failure).
+ *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
+ */
+
+import type { Router } from 'express';
+import { randomUUID } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type {
+  Storage,
+  PackageRecord,
+  PackageInstanceRecord,
+  InstalledComponent,
+  PackageComponentType,
+  ScheduledJobRecord,
+  ExtensionRecord,
+} from '../../storage/interface.js';
+import { requireAuth } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { emitChange } from '../../services/event-bus.js';
+import {
+  registerComponent,
+  deleteComponent,
+  fetchComponentContent,
+  computeHash,
+} from '../../services/component-registrar.js';
+import { resolveGhii } from '../../utils/ghii-resolver.js';
+import type { Scheduler } from '../../services/scheduler.js';
+import { logger } from '../../utils/logger.js';
+
+// ── Helper: topological sort of components by dependencies ────────────
+
+function sortByDependencies(
+  components: { id: string; dependencies: string[] }[],
+): string[] {
+  const visited = new Set<string>();
+  const order: string[] = [];
+  const idSet = new Set(components.map(c => c.id));
+  const depMap = new Map(components.map(c => [c.id, c.dependencies]));
+
+  function visit(id: string): void {
+    if (visited.has(id)) return;
+    visited.add(id);
+    for (const dep of depMap.get(id) ?? []) {
+      if (idSet.has(dep)) visit(dep);
+    }
+    order.push(id);
+  }
+
+  for (const c of components) visit(c.id);
+  return order;
+}
+
+// ── Register install route ────────────────────────────────────────────
+
+export function registerInstallRoutes(
+  router: Router,
+  config: AimeatConfig,
+  storage: Storage,
+  scheduler?: Scheduler,
+): void {
+  // POST /v1/packages/:groupId/install — Install package as instance
+  router.post('/v1/packages/:groupId/install', requireAuth(), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const owner = req.auth!.owner;
+    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGaii = ownerGhii;
+
+    const { label, version, dry_run: dryRun } = req.body ?? {};
+    const isDryRun = dryRun === true;
+
+    // Resolve the target PackageRecord
+    let pkg: PackageRecord | null;
+    if (version && typeof version === 'string') {
+      pkg = await storage.getPackageByGroupAndVersion(groupId, version);
+    } else {
+      pkg = await storage.getLatestPublished(groupId);
+    }
+
+    if (!pkg) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `Package not found: ${groupId}${version ? ` version ${version}` : ''}`));
+      return;
+    }
+
+    if (pkg.status !== 'published') {
+      res.status(400).json(error(config.nodeId, 'NOT_PUBLISHED',
+        'Only published packages can be installed'));
+      return;
+    }
+
+    // Sort components by dependency order for installation
+    const componentOrder = sortByDependencies(pkg.components);
+    const componentMap = new Map(pkg.components.map(c => [c.id, c]));
+
+    // Generate unique component names: {packageName}-{ownerName}-{shortId}-{componentId}
+    // Short ID prevents collision when same owner installs the same package multiple times
+    const shortId = randomUUID().slice(0, 8);
+    const plannedComponents: InstalledComponent[] = componentOrder.map(compId => {
+      const comp = componentMap.get(compId)!;
+      return {
+        componentId: comp.id,
+        type: comp.type,
+        registeredAs: `${pkg!.name}-${owner}-${shortId}-${comp.id}`,
+        originalHash: comp.contentHash,
+        customized: false,
+      };
+    });
+
+    // ── Dry run: validate without registering ────────────────────────
+    if (isDryRun) {
+      const validationResults = plannedComponents.map(ic => {
+        const comp = componentMap.get(ic.componentId)!;
+        return {
+          componentId: ic.componentId,
+          type: ic.type,
+          registeredAs: ic.registeredAs,
+          contentSize: comp.content.length,
+          hasContent: comp.content.length > 0,
+          dependencies: comp.dependencies,
+        };
+      });
+
+      res.json(success(config.nodeId, {
+        dry_run: true,
+        packageGroupId: groupId,
+        version: pkg.version,
+        componentCount: plannedComponents.length,
+        installOrder: componentOrder,
+        components: validationResults,
+        label: (typeof label === 'string' && label) ? label : `${pkg.name} instance`,
+      }));
+      return;
+    }
+
+    // ── Real install: register each component ────────────────────────
+    const registeredComponents: { componentId: string; type: PackageComponentType; registeredAs: string }[] = [];
+    const registrationErrors: { componentId: string; error: string }[] = [];
+    // Maps populated as cortex/extension components register; passed to the
+    // app case in registerComponent so it can rewrite hardcoded URLs like
+    // /v1/cortex/comicland-v2/libs/...  →  /v1/cortex/<registeredAs>/libs/...
+    const cortexNameMap = new Map<string, string>();
+    const extensionNameMap = new Map<string, string>();
+
+    for (const compId of componentOrder) {
+      const comp = componentMap.get(compId)!;
+      const planned = plannedComponents.find(p => p.componentId === comp.id)!;
+      const registeredAs = planned.registeredAs;
+
+      const result = await registerComponent(storage, {
+        componentId: comp.id,
+        type: comp.type,
+        registeredAs,
+        content: comp.content,
+        label: comp.label,
+        owner,
+        ownerGaii,
+        packageName: pkg.name,
+        packageCategory: pkg.category,
+        packageTags: pkg.tags,
+        packageDescription: pkg.description,
+        urlRewrites: { cortexNames: cortexNameMap, extensionNames: extensionNameMap },
+      });
+
+      if (result.success) {
+        registeredComponents.push({
+          componentId: comp.id,
+          type: comp.type,
+          registeredAs,
+        });
+
+        // Capture the source-manifest short name so any later 'app' component
+        // can have its hardcoded /v1/cortex/<name>/ and /v1/ext/<name>/ URLs
+        // rewritten to the per-instance registeredAs.
+        if (result.originalShortName) {
+          if (comp.type === 'cortex') cortexNameMap.set(result.originalShortName, registeredAs);
+          else if (comp.type === 'extension') extensionNameMap.set(result.originalShortName, registeredAs);
+        }
+
+        // Register scheduled jobs AND fire @activate-cron jobs the same way
+        // the manual /v1/extensions/:name/activate route does
+        // (extensions.ts ~668–698). Two steps:
+        //   1) Insert each manifest __schedules entry into the scheduled_jobs
+        //      table so the scheduler (and runActivateJobs lookup) can find it
+        //   2) runActivateJobs(name) — fires every job whose cron === '@activate'
+        //
+        // Without step 1, runActivateJobs sees an empty list and bails — which
+        // is exactly the bug that left Comicland's init action unrun on package
+        // install, leaving config.app / config.genres / config.init missing in
+        // ext-namespace memory.
+        if (comp.type === 'extension' && scheduler) {
+          try {
+            const ext = await storage.getExtension(registeredAs) as ExtensionRecord | null;
+            const schedules = (ext?.config?.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
+            for (const sched of schedules) {
+              const jobId = `ext:${registeredAs}:${sched.id as string}`;
+              const existing = await storage.getScheduledJob(jobId);
+              if (!existing) {
+                const jobRecord: ScheduledJobRecord = {
+                  id: jobId,
+                  name: (sched.description as string) ?? `${registeredAs}/${sched.id as string}`,
+                  type: 'extension',
+                  extensionName: registeredAs,
+                  actionId: sched.action as string,
+                  cron: sched.cron as string,
+                  enabled: true,
+                  input: (sched.input as Record<string, unknown>) ?? undefined,
+                  createdBy: req.auth!.sub,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+                await storage.createScheduledJob(jobRecord);
+                scheduler.addJob(jobRecord);
+              }
+            }
+            await scheduler.runActivateJobs(registeredAs);
+          } catch (err) {
+            logger.error(`Failed to register or run @activate jobs for ${registeredAs}`, { error: String(err) });
+          }
+        }
+
+        // Recompute originalHash from native storage to ensure status comparisons match
+        const nativeContent = await fetchComponentContent(storage, comp.type, registeredAs, ownerGaii);
+        if (nativeContent !== null) {
+          const nativeHash = computeHash(nativeContent);
+          const planned = plannedComponents.find(p => p.componentId === comp.id);
+          if (planned) planned.originalHash = nativeHash;
+        }
+      } else {
+        registrationErrors.push({
+          componentId: comp.id,
+          error: result.error ?? 'Unknown error',
+        });
+
+        // ── Rollback: delete already-registered components in reverse ──
+        const rollbackErrors: string[] = [];
+        for (const reg of [...registeredComponents].reverse()) {
+          const deleted = await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii);
+          if (!deleted) {
+            rollbackErrors.push(reg.registeredAs);
+          }
+        }
+
+        const partialRollback = rollbackErrors.length > 0;
+        res.status(500).json(error(config.nodeId, 'INSTALL_FAILED',
+          `Component "${comp.id}" failed: ${result.error}. ` +
+          (partialRollback
+            ? `Partial rollback — orphaned components: ${rollbackErrors.join(', ')}`
+            : 'All previously registered components rolled back successfully.'),
+        ));
+        return;
+      }
+    }
+
+    // All components registered — create instance record
+    const now = new Date().toISOString();
+    const instanceRecord: PackageInstanceRecord = {
+      id: randomUUID(),
+      packageGroupId: groupId,
+      packageVersion: pkg.version,
+      packageRecordId: pkg.id,
+      owner,
+      ownerGhii,
+      label: (typeof label === 'string' && label) ? label : `${pkg.name} instance`,
+      installedComponents: plannedComponents,
+      status: 'installed',
+      installedAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      const created = await storage.createInstance(instanceRecord);
+
+      // Increment template install count if a listing exists
+      try {
+        const listing = await storage.getListingByPackage(groupId);
+        if (listing) {
+          await storage.incrementInstallCount(listing.id);
+        }
+      } catch {
+        // Non-critical — install succeeds even if counter update fails
+      }
+
+      emitChange('instances');
+
+      res.status(201).json(success(config.nodeId, created, [
+        { description: 'View instance', method: 'GET', url: `/v1/instances/${created.id}` },
+        { description: 'Check component status', method: 'GET', url: `/v1/instances/${created.id}/status` },
+      ]));
+    } catch (e) {
+      // Instance record creation failed — rollback all registered components
+      for (const reg of [...registeredComponents].reverse()) {
+        await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii);
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json(error(config.nodeId, 'INSTALL_FAILED', msg || 'Failed to create instance'));
+    }
+  });
+}

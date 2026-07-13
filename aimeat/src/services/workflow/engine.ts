@@ -46,23 +46,26 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskScope, AgentRecord } from '../../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
-import { buildGAII } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
-import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 import { evaluateSignal, extractProgress, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
-import { getWorkflow, validateWorkflow, runKey, collectSignalKeys, type ResolvedStep } from './store.js';
-import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
+import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
-import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
+import { template } from './engine-util.js';
+import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
+import {
+  dispatchStep, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
+} from './engine-steps.js';
 import type {
-  WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal, LocalizedString,
+  WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal,
 } from '../../models/workflow-schemas.js';
+
+export { isAgentReachable } from './engine-reachability.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -70,35 +73,7 @@ let _active: WorkflowEngine | null = null;
 export function setActiveWorkflowEngine(e: WorkflowEngine): void { _active = e; }
 export function getActiveWorkflowEngine(): WorkflowEngine | null { return _active; }
 
-/** Pick a display string from a localized value (prefers en_US, else fi_FI, else first). */
-function loc(s: LocalizedString | undefined): string {
-  if (!s) return '';
-  if (typeof s === 'string') return s;
-  return s.en_US ?? s.fi_FI ?? Object.values(s)[0] ?? '';
-}
-
 const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped', 'agent-offline']);
-
-// ── agent reachability (agent-offline fast-fail) ──────────────────────────────────
-/** lastSeen within this window ⇒ the agent is "online now" (a live polling daemon heartbeats ~1/min). */
-const AGENT_ONLINE_WINDOW_MS = 10 * 60_000;
-/** Consecutive webhook delivery failures ⇒ webhook_down (matches the stall detector). */
-const AGENT_WEBHOOK_DOWN_THRESHOLD = 10;
-/** How long after dispatch to wait before failing a no-progress step whose agent is unreachable. */
-const AGENT_OFFLINE_GRACE_MS = 5 * 60_000;
-
-/**
- * Is an agent reachable RIGHT NOW to pick up a dispatched task? True when it has a healthy push
- * webhook, OR its lastSeen heartbeat is fresh (an active polling serve-daemon). A null agent (never
- * registered / deleted) is unreachable. Pure — `nowMs` injected for testability.
- */
-export function isAgentReachable(agent: AgentRecord | null | undefined, nowMs: number): boolean {
-  if (!agent) return false;
-  const webhookOk = !!(agent.webhookEnabled && agent.webhookUrl) && (agent.webhookFailCount ?? 0) < AGENT_WEBHOOK_DOWN_THRESHOLD;
-  if (webhookOk) return true;
-  const lastSeenMs = new Date(agent.lastSeen).getTime();
-  return Number.isFinite(lastSeenMs) && (nowMs - lastSeenMs) < AGENT_ONLINE_WINDOW_MS;
-}
 
 /**
  * The steps that may start now: pending, past any retry backoff, and their `after` deps satisfied.
@@ -155,6 +130,20 @@ export class WorkflowEngine {
   setWebhookDispatcher(d: WebhookDispatcher): void { this.webhookDispatcher = d; }
   setPushService(p: PushService): void { this.pushService = p; }
   setEmailService(e: EmailService): void { this.emailService = e; }
+
+  /** Bundle the engine's services for the extracted step/notification helpers (engine-steps.ts). */
+  private stepDeps(): StepDeps {
+    return {
+      storage: this.storage, config: this.config,
+      webhookDispatcher: this.webhookDispatcher,
+      pushService: this.pushService, emailService: this.emailService,
+    };
+  }
+
+  /** Delegates to the extracted helper; kept as a method so callers (tick/onTaskTerminal/sweep) are unchanged. */
+  private async onStepFail(ownerGhii: string, run: WorkflowRun, stepId: string, reason: WorkflowRunStep['state']): Promise<void> {
+    return onStepFail(this.stepDeps(), ownerGhii, run, stepId, reason);
+  }
 
   /** Start the watchdog (timeouts + due retries). Idempotent; the timer is unref'd. */
   async start(): Promise<void> {
@@ -219,7 +208,7 @@ export class WorkflowEngine {
       await this.withLock(runId, async () => {
         // fresh mode: wipe the workflow's prior-run output ONCE, before any step dispatches, so an
         // idempotent skip-existing crew regenerates it (parallel shared-namespace steps can't clobber).
-        if (run.defSnapshot.fresh) await this.clearRunOutputs(ownerGhii, run);
+        if (run.defSnapshot.fresh) await clearRunOutputs(this.stepDeps(), ownerGhii, run);
         await this.tick(ownerGhii, run);
       });
     }
@@ -294,17 +283,17 @@ export class WorkflowEngine {
             rs.state = 'green'; rs.startedAt = rs.startedAt ?? now; rs.endedAt = now;
             rs.outputObserved = output.observed;
             this.recordProgress(rs, output.observed);
-            if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(r.deliverableKey, run.vars)])];
+            if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(r.deliverableKey, run.vars)])];
             advancedTerminal = true; mutated = true;
             continue;
           }
         }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
-        const taskIds = await this.dispatchStep(ownerGhii, run, step, r);
+        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok) => this.onPushTerminal(o, w, rid, s, ok));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
         dispatchedAny = true; mutated = true;
         // Heads-up if we just dispatched to an offline agent (the sweep fails it after the grace).
-        await this.maybeAlertAgentOffline(ownerGhii, run, step);
+        await maybeAlertAgentOffline(this.stepDeps(), ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
       if (!advancedTerminal) break;
@@ -353,7 +342,7 @@ export class WorkflowEngine {
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
       this.recordProgress(rs, output.observed);
-      if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(r.deliverableKey, run.vars)])];
+      if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(r.deliverableKey, run.vars)])];
 
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (output.ok) {
@@ -418,7 +407,7 @@ export class WorkflowEngine {
           // Recovered: the deliverable is present. Green retroactively; tick un-blocks dependents so a
           // slow edition's downstream (features/editorial) runs instead of being skipped.
           rs.state = 'green'; rs.endedAt = nowIso; rs.outputObserved = output.observed;
-          if (rdef?.deliverableKey) rs.writes = [...new Set([...rs.writes, this.template(rdef.deliverableKey, r.vars)])];
+          if (rdef?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(rdef.deliverableKey, r.vars)])];
           changed = true;
           continue;
         }
@@ -430,8 +419,8 @@ export class WorkflowEngine {
         // falls through to the timeout policy below.
         const producedNothing = (rs.progress?.count ?? 0) === 0;
         const sinceDispatch = now - new Date(rs.startedAt).getTime();
-        if (this.isAgentStep(step) && producedNothing && sinceDispatch >= AGENT_OFFLINE_GRACE_MS
-            && !(await this.anyAgentReachable(ownerName, step))) {
+        if (isAgentStep(step) && producedNothing && sinceDispatch >= AGENT_OFFLINE_GRACE_MS
+            && !(await anyAgentReachable(this.storage, this.config, ownerName, step))) {
           rs.state = 'agent-offline'; rs.endedAt = nowIso;
           this.failDownstream(r, step.id);
           await this.onStepFail(ownerGhii, r, step.id, 'agent-offline');
@@ -610,10 +599,6 @@ export class WorkflowEngine {
     return out;
   }
 
-  private template(tmpl: string, vars: Record<string, string>): string {
-    return tmpl.replace(/\{([a-zA-Z0-9_]+)\}/g, (_m, n: string) => vars[n] ?? `{${n}}`);
-  }
-
   /** Evaluate a signal (or 'none'/undefined → pass), accumulating the keys it reads. */
   private async evalSignal(signal: Signal | 'none' | undefined, ctx: SignalEvalCtx, reads: Set<string>): Promise<{ ok: boolean; observed: unknown }> {
     if (!signal || signal === 'none') return { ok: true, observed: { skipped: 'none' } };
@@ -674,160 +659,6 @@ export class WorkflowEngine {
   }
 
   /**
-   * `fresh` mode: at RUN START (before any step dispatches), delete every key the workflow PRODUCES —
-   * the union over steps of (success_signal keys minus that step's own inputs) + deliverable key — so an
-   * idempotent skip-existing crew regenerates them instead of finding a prior run's output present.
-   * Cleared ONCE up front, NOT per-step: parallel steps that share an output namespace (e.g. write-a +
-   * write-b + an independent step all under `article.*`) would otherwise wipe each other's fresh output
-   * when a later step's clear runs after an earlier one already wrote. Pure external inputs (read but
-   * produced by no step) are preserved — a key is only cleared if some step declares it as output. Reads
-   * across OWNER-SCOPE (+ sandbox prefix); best-effort (a delete failure is logged, not fatal).
-   */
-  private async clearRunOutputs(ownerGhii: string, run: WorkflowRun): Promise<void> {
-    const produced = new Set<string>();
-    for (const r of run.resolved ?? []) {
-      const outs = new Set(collectSignalKeys(r.success_signal));
-      for (const inKey of collectSignalKeys(r.required_to_function)) outs.delete(inKey);
-      if (r.deliverableKey) outs.add(r.deliverableKey);
-      for (const k of outs) produced.add(k);
-    }
-    if (produced.size === 0) return;
-    const ownerName = ownerGhii.split('@')[0];
-    const prefix = run.keyPrefix ?? '';
-    let cleared = 0;
-    for (const tmpl of produced) {
-      let full: string;
-      try { full = prefix + this.template(tmpl, run.vars); } catch { continue; }
-      try {
-        if (full.includes('*')) {
-          const listPrefix = full.slice(0, full.indexOf('*'));
-          const recs = await listOwnerScopeMemory(this.storage, this.config.nodeId, ownerName, { prefix: listPrefix });
-          const re = globToRegExp(full);
-          for (const rec of recs) if (re.test(rec.key)) { await this.storage.deleteMemory(rec.ownerGaii, rec.key); cleared++; }
-        } else {
-          const rec = await getOwnerScopeMemory(this.storage, this.config.nodeId, ownerName, full);
-          if (rec) { await this.storage.deleteMemory(rec.ownerGaii, rec.key); cleared++; }
-        }
-      } catch (err) {
-        logger.warn('fresh clearRunOutputs failed', { workflowId: run.workflowId, key: full, error: String(err) });
-      }
-    }
-    if (cleared) logger.info(`workflow ${run.workflowId} run ${run.runId}: fresh cleared ${cleared} prior-run output key(s)`);
-  }
-
-  /** A default agent-dispatch step (has an agent), not an ecosystem export-out/trigger-geai step. */
-  private isAgentStep(step: WorkflowStep): boolean {
-    return !step.action || step.action.kind === 'agent';
-  }
-
-  /** True if ANY of a step's target agents is reachable now (so the task can be picked up). */
-  private async anyAgentReachable(ownerName: string, step: WorkflowStep): Promise<boolean> {
-    const agents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
-    if (agents.length === 0) return true; // nothing to check (e.g. ecosystem step) ⇒ don't offline-fail
-    const now = Date.now();
-    for (const name of agents) {
-      const agent = await this.storage.getAgent(buildGAII(name, ownerName, this.config.nodeId));
-      if (isAgentReachable(agent, now)) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Heads-up alert (owner opt-in via pushService + always the in-app inbox) fired at dispatch when a
-   * step's agent(s) look OFFLINE — so the owner can bring the crew online before the offline grace
-   * elapses and the step fails. Best-effort: a notify/push problem never disturbs the run.
-   */
-  private async maybeAlertAgentOffline(ownerGhii: string, run: WorkflowRun, step: WorkflowStep): Promise<void> {
-    if (!this.isAgentStep(step)) return;
-    const ownerName = ownerGhii.split('@')[0];
-    if (await this.anyAgentReachable(ownerName, step)) return;
-    const agents = (Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : [])).join(', ');
-    const name = loc(run.defSnapshot.title) || run.workflowId;
-    const graceMin = Math.round(AGENT_OFFLINE_GRACE_MS / 60_000);
-    const title = 'Workflow agent offline';
-    const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
-    logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
-    try { await notify(this.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows' }); }
-    catch { /* in-app notify best-effort */ }
-    if (this.pushService?.enabled) {
-      this.pushService.sendNotification(ownerName, { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
-        .catch(() => { /* push best-effort */ });
-    }
-  }
-
-  /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
-  private async dispatchStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved?: ResolvedStep): Promise<string[]> {
-    // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
-    // async onPushTerminal path, never an agent task. They record no task ids.
-    if (step.action && step.action.kind !== 'agent') {
-      this.dispatchEcosystemStep(ownerGhii, run, step, step.action);
-      return [];
-    }
-    const ownerName = ownerGhii.split('@')[0];
-    const agents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
-    const now = new Date().toISOString();
-    const ids: string[] = [];
-    for (const agentName of agents) {
-      const agentGaii = buildGAII(agentName, ownerName, this.config.nodeId);
-      const scope: AgentTaskScope[] = [
-        { name: 'workflow-run', value: `${run.workflowId}/${run.runId}`, type: 'text', description: step.id },
-        { name: 'offer', value: step.offer ?? '', type: 'text', description: loc(step.description) },
-      ];
-      // Sandbox run: tell the agent the key prefix to write under (signals read under it too), so a
-      // test run doesn't clobber production keys. A cooperating agent honors it; the node can't force it.
-      if (run.keyPrefix) scope.push({ name: 'wf-key-prefix', value: run.keyPrefix, type: 'text', description: 'prefix all deliverable keys with this' });
-      const record: AgentTaskRecord = {
-        id: randomUUID(), agentGaii, ownerGaii: ownerGhii,
-        title: loc(step.description) || `${run.workflowId} · ${step.id}`,
-        description: loc(run.defSnapshot.description),
-        scope, rules: [], verification: { userExpects: '', technicalChecks: [] },
-        todos: [], status: 'active', createdAt: now, updatedAt: now, lastEventAt: now,
-      };
-      await this.storage.createAgentTask(record);
-      await this.storage.appendTaskEvent({ id: randomUUID(), taskId: record.id, type: 'started', message: `Dispatched by workflow "${run.workflowId}" step "${step.id}"`, timestamp: now });
-      this.webhookDispatcher?.dispatchWebhookEvent(agentGaii, 'task.approved', {
-        task_id: record.id, title: record.title, description: record.description ?? '',
-        has_todos: false, todo_count: 0, scope_summary: scope.map(s => `${s.type}:${s.value}`),
-        created_at: now, auto_activated: true, workflow_id: run.workflowId,
-      });
-      ids.push(record.id);
-    }
-    void resolved;
-    return ids;
-  }
-
-  /**
-   * Fire an ecosystem action step (export-out / trigger-geai) over the connect-tunnel and route its
-   * reply into onPushTerminal. Fire-and-forget: the run was already marked 'dispatched' + persisted
-   * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
-   * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
-   */
-  private dispatchEcosystemStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Exclude<WorkflowStep['action'], undefined | { kind: 'agent' }>): void {
-    const { workflowId, runId } = run;
-    const stepId = step.id;
-    const fire = async (): Promise<boolean> => {
-      const mgr = getActiveConnectTunnelManager();
-      if (!mgr) return false;
-      if (action.kind === 'trigger-geai') {
-        const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller: ownerGhii });
-        return reply.ok;
-      }
-      // export-out: read the owner-namespace `from` key and push it to the GEAI's ingest capability.
-      const fromKey = this.template(action.from, run.vars);
-      const rec = await this.storage.getMemory(ownerGhii, fromKey);
-      const reply = await mgr.invokeOnPrincipal(action.geai, {
-        capability: action.capability ?? '__deposit__',
-        input: { from: fromKey, data: rec?.value ?? null },
-        caller: ownerGhii,
-      });
-      return reply.ok;
-    };
-    fire()
-      .then(ok => this.onPushTerminal(ownerGhii, workflowId, runId, stepId, ok))
-      .catch(() => this.onPushTerminal(ownerGhii, workflowId, runId, stepId, false));
-  }
-
-  /**
    * The non-task completion path for ecosystem action steps — the parallel of onTaskTerminal that
    * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
    * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
@@ -865,141 +696,10 @@ export class WorkflowEngine {
     });
   }
 
-  /**
-   * On a RED step: GUARANTEE the owner sees it (push — node-owned, never silent), then best-effort
-   * dispatch the crew `workflow-inspector` agent for diagnosis/repair. The push is the contract; the
-   * inspector is enrichment, so a missing/offline inspector never hides the failure.
-   */
-  private async onStepFail(ownerGhii: string, run: WorkflowRun, stepId: string, reason: WorkflowRunStep['state']): Promise<void> {
-    const ownerName = ownerGhii.split('@')[0];
-    logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${stepId}" ${reason}`);
-    // 1. Guaranteed owner alert (deterministic, node-owned).
-    if (this.pushService?.enabled) {
-      this.pushService.sendNotification(ownerName, {
-        title: 'Workflow step failed',
-        body: `${loc(run.defSnapshot.title) || run.workflowId}: step "${stepId}" → ${reason}`,
-        url: '/v1/profile?tab=workflows',
-        tag: `workflow:${run.workflowId}`,
-      }).catch(() => { /* push best-effort */ });
-    }
-    // 2. Best-effort inspector dispatch (crew-owned; absent ⇒ skip silently, the push already fired).
-    const taskId = await this.dispatchInspector(ownerGhii, ownerName, run, stepId, reason);
-    if (taskId) {
-      run.inspections = [...(run.inspections ?? []), { stepId, taskId, reason, at: new Date().toISOString() }];
-    }
-  }
-
-  /**
-   * Queue a task to the owner's `workflow-inspector` agent (crew-owned) with full run context: the
-   * run record (defSnapshot + every step's state + expected-vs-observed) is at a known memory key.
-   * Tagged `workflow-inspect` (NOT `workflow-run`) so completing it never advances the run. Returns
-   * the task id, or null when no inspector agent is installed.
-   */
-  private async dispatchInspector(ownerGhii: string, ownerName: string, run: WorkflowRun, stepId: string, reason: WorkflowRunStep['state']): Promise<string | null> {
-    const inspectorGaii = buildGAII('workflow-inspector', ownerName, this.config.nodeId);
-    const inspector = await this.storage.getAgent(inspectorGaii);
-    if (!inspector) return null;
-
-    const rk = runKey(run.workflowId, run.runId);
-    const failing = run.steps[stepId];
-    const failingAgents = (run.defSnapshot.steps.find(s => s.id === stepId)?.agent) ?? '';
-    const now = new Date().toISOString();
-    const scope: AgentTaskScope[] = [
-      { name: 'workflow-inspect', value: `${run.workflowId}/${run.runId}`, type: 'text', description: stepId },
-    ];
-    const record: AgentTaskRecord = {
-      id: randomUUID(), agentGaii: inspectorGaii, ownerGaii: ownerGhii,
-      title: `Inspect workflow "${run.workflowId}" — step "${stepId}" ${reason}`,
-      description: [
-        `A workflow step failed (${reason}).`,
-        `Read the full run record at owner memory key "${rk}" — it carries defSnapshot, every step's`,
-        `state (green / input-red / output-red / timed-out / skipped), and per-leaf expected-vs-observed.`,
-        `Failing step: "${stepId}" (agent: ${Array.isArray(failingAgents) ? failingAgents.join(', ') : failingAgents}).`,
-        `Observed: ${JSON.stringify(failing?.outputObserved ?? failing?.inputObserved ?? {}).slice(0, 1000)}.`,
-        `Diagnose, auto-run any safe deterministic repairs, and report recommendations.`,
-      ].join(' '),
-      scope, rules: [], verification: { userExpects: '', technicalChecks: [] },
-      resources: { memoryKeys: [rk] },
-      todos: [], status: 'active', createdAt: now, updatedAt: now, lastEventAt: now,
-    };
-    await this.storage.createAgentTask(record);
-    await this.storage.appendTaskEvent({ id: randomUUID(), taskId: record.id, type: 'started', message: `Workflow inspection requested for "${run.workflowId}" step "${stepId}" (${reason})`, timestamp: now });
-    this.webhookDispatcher?.dispatchWebhookEvent(inspectorGaii, 'task.approved', {
-      task_id: record.id, title: record.title, description: record.description ?? '',
-      has_todos: false, todo_count: 0, scope_summary: scope.map(s => `${s.name}:${s.value}`),
-      created_at: now, auto_activated: true, workflow_id: run.workflowId,
-    });
-    return record.id;
-  }
-
-  private static readonly TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled']);
-  private static readonly FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out', 'agent-offline']);
-
-  /**
-   * Finish-notification (Rule: owner opt-in). When a full-live run reaches a terminal state AND the
-   * owner ticked `notify_on_finish` on the workflow, drop a single notification — the in-app inbox
-   * always, plus an email when the owner has a notification email and SMTP is configured — telling
-   * them whether the run succeeded or failed and a per-step log of how it went. Fires for BOTH
-   * outcomes (success and failure). Idempotent via run.notifiedFinish; fully best-effort so a
-   * notification/email problem never disturbs the run. Returns whether the run was mutated (so the
-   * caller persists the notifiedFinish flag).
-   */
-  private async onRunFinished(ownerGhii: string, run: WorkflowRun): Promise<boolean> {
-    if (run.mode !== 'full-live') return false;
-    if (!run.defSnapshot.notify_on_finish) return false;
-    if (run.notifiedFinish) return false;
-    if (!WorkflowEngine.TERMINAL_RUN.has(run.status)) return false;
-    run.notifiedFinish = true;
-
-    const name = loc(run.defSnapshot.title) || run.workflowId;
-    const succeeded = run.status === 'done';
-    const outcome = succeeded ? 'succeeded'
-      : run.status === 'cancelled' ? 'was cancelled'
-      : 'finished with failures';
-    const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'}`;
-
-    // Per-step log + a short header (duration, failed-step roster).
-    const stepLog = run.defSnapshot.steps
-      .map(s => `• ${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`)
-      .join('\n');
-    const failedSteps = run.defSnapshot.steps
-      .filter(s => WorkflowEngine.FAILED_STEP.has(run.steps[s.id]?.state))
-      .map(s => s.id);
-    const durMin = run.endedAt && run.startedAt
-      ? Math.max(0, Math.round((new Date(run.endedAt).getTime() - new Date(run.startedAt).getTime()) / 60_000))
-      : null;
-    const header = [
-      `Workflow "${name}" ${outcome}.`,
-      durMin !== null ? `Duration: ~${durMin} min.` : null,
-      failedSteps.length ? `Failed steps: ${failedSteps.join(', ')}.` : null,
-    ].filter(Boolean).join(' ');
-    const body = `${header}\n\nRun log:\n${stepLog}`;
-    const link = '/v1/profile?tab=workflows';
-
-    // 1. In-app inbox (the notification system) — always, best-effort (never throws).
-    await notify(this.storage, ownerGhii, {
-      type: succeeded ? 'workflow_finished' : 'workflow_failed',
-      title, body, link,
-    });
-
-    // 2. Email — only when configured AND the owner set a notification email.
-    try {
-      if (this.emailService?.enabled) {
-        const ghii = await this.storage.getGHII(ownerGhii);
-        if (ghii?.notificationEmail) {
-          await this.emailService.sendNotification(ghii.notificationEmail, title, body);
-        }
-      }
-    } catch (err) {
-      logger.warn('workflow finish email failed', { workflowId: run.workflowId, runId: run.runId, error: String(err) });
-    }
-    return true;
-  }
-
   private async persist(ownerGhii: string, run: WorkflowRun): Promise<void> {
     // Terminal-run finish notification (owner opt-in) — mutates run.notifiedFinish so it's persisted
     // below and fires exactly once across every terminal path (tick / cancelRun / sweep).
-    await this.onRunFinished(ownerGhii, run);
+    await onRunFinished(this.stepDeps(), ownerGhii, run);
     const key = runKey(run.workflowId, run.runId);
     const existing = await this.storage.getMemory(ownerGhii, key);
     const now = new Date().toISOString();
