@@ -176,22 +176,36 @@ parts are public.
 
 ### 4.1 Manifest (`manifest.yaml`)
 
+The server validates this shape strictly (`buildExtensionRecordFromManifest` in
+`src/routes/extensions.ts`): the identity fields live under a `metadata:` block,
+and **every action requires `id`, `method`, `path`, AND `script`** — an action
+missing `method`/`path` fails the whole install with `INVALID_MANIFEST`.
+
 ```yaml
-name: mytool
-version: 0.1.0
-description: Whatever your tool does
-author: yourhandle
+metadata:
+  name: mytool
+  version: 0.1.0
+  description: Whatever your tool does
+  author: yourhandle
 actions:
   - id: addItem
+    method: POST
+    path: /addItem
     script: scripts/actions/add-item.js
     description: Validate and store a new item
   - id: getDetail
+    method: POST
+    path: /getDetail
     script: scripts/actions/get-detail.js
     description: Fetch item detail, cache it
   - id: assignToAgent
+    method: POST
+    path: /assignToAgent
     script: scripts/actions/assign-to-agent.js
     description: Create a task for an agent
   - id: activate  # special name, runs on install
+    method: POST
+    path: /activate
     script: scripts/actions/activate.js
     description: Seed initial data, copy owner translations
 schedules:
@@ -303,14 +317,26 @@ export default async function(ctx, input) {
 
 ### 4.5 Install + activate
 
-```bash
-# Bundle scripts/ + manifest.yaml into a zip, then upload
-aimeat_extension_install --file mytool.zip   # MCP
-# or via REST:
-curl -X POST https://node/v1/extensions \
-  -F file=@mytool.zip -H "Authorization: Bearer $JWT"
+Via MCP: `aimeat_extension_install` (inline `manifest` + `scripts` map, or omit both
+to get an `upload_url` for a ZIP with `manifest.yaml` at root + `scripts/`), then
+`aimeat_extension_activate`.
 
-# Activate (runs activate action)
+Via REST the body is **JSON** (`{manifest, scripts}` — manifest is the YAML *string*,
+scripts maps each path referenced in the manifest to its source), not a multipart file:
+
+```bash
+# First install (POST rejects an existing name with 409):
+curl -X POST https://node/v1/extensions \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"manifest": "<manifest.yaml contents>", "scripts": {"scripts/actions/add-item.js": "<source>"}}'
+
+# Redeploy: idempotent upsert — replaces manifest + scripts in place, keeps the
+# ext:{name} memory and instances, re-runs @activate jobs when active:
+curl -X PUT https://node/v1/extensions/mytool \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"manifest": "...", "scripts": {...}}'
+
+# Activate (runs the activate action; extensions install inactive):
 curl -X POST https://node/v1/extensions/mytool/activate -H "Authorization: Bearer $JWT"
 ```
 
@@ -320,13 +346,32 @@ curl -X POST https://node/v1/extensions/mytool/activate -H "Authorization: Beare
 
 ### 5.1 Spec (`manifest.yaml` for cortex)
 
+The cortex manifest is k8s-style and strictly validated (`parseCortexManifest` in
+`src/services/cortex-manifest.ts`): `apiVersion` must be exactly
+`cortex.aimeat.org/v1`, `kind` must be `Extension`, `metadata.name` AND
+`metadata.namespace` are required, and libs are declared as `spec.components`
+entries of `type: lib`. `exports` + `api_surface` feed the capability aggregator —
+leave them empty and agents can't discover the lib.
+
 ```yaml
-spec_version: "1.0.0"
-name: mytool
-version: 1.0.0
-description: Browser API for mytool
-libs:
-  - mytool.js
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: mytool
+  namespace: mytool
+  description: Browser API for mytool
+  author: yourhandle
+spec:
+  version: 1.0.0
+  components:
+    - type: lib
+      name: mytool
+      filename: mytool.js
+      exports:
+        - listItems
+        - getDetail
+        - addItem
+      api_surface: "AIMEAT.mytool — listItems(); getDetail(id); addItem(payload)"
 ```
 
 ### 5.2 The lib itself (`libs/mytool.js`)
@@ -412,9 +457,28 @@ The simplest pattern: write a plain IIFE that uses `AIMEAT.data` and
 
 ### 5.3 Install + activate
 
+Via MCP: `aimeat_cortex_install` (inline `manifest` + `libs` map, or upload-mode ZIP
+with `manifest.yaml` at root + `libs/`), then `aimeat_cortex_activate`. Note
+`aimeat_cortex_install` is CREATE-only — updates go through `PUT /v1/cortex/{name}`.
+
+Via REST the body is **JSON** — `{manifest, libs}` where `libs` maps filename → source
+(the `libs` DICT format, not a `lib` object — see Common Mistakes §3):
+
 ```bash
-aimeat_cortex_install --file mytool-cortex.zip
-aimeat_cortex_activate --name mytool
+# First install (409 CONFLICT if the name exists):
+curl -X POST https://node/v1/cortex \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"manifest": "<manifest.yaml contents>", "libs": {"mytool.js": "<source>"}}'
+
+# Update in place:
+curl -X PUT https://node/v1/cortex/mytool \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"manifest": "...", "libs": {...}}'
+
+# New code only loads through a deactivate → activate cycle (activate alone is
+# idempotent and SKIPS reloading an already-active cortex — §5.4):
+curl -X POST https://node/v1/cortex/mytool/deactivate -H "Authorization: Bearer $JWT"
+curl -X POST https://node/v1/cortex/mytool/activate -H "Authorization: Bearer $JWT"
 ```
 
 Apps load it with `<script src="/v1/cortex/mytool/libs/mytool.js"></script>`.
