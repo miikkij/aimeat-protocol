@@ -224,12 +224,21 @@ export function CommerceCard() {
       const sessions = s?.data?.sessions ?? [];
       const orders = o?.data?.orders ?? [];
       const completed = sessions.filter((x) => x.status === 'completed');
+      // Currencies never mix: morsels and each money code (minor units) total separately.
+      const sumBy = (list, pick) => {
+        const by = {};
+        for (const x of list) {
+          const cur = x.currency || 'morsel';
+          by[cur] = (by[cur] || 0) + (pick(x) || 0);
+        }
+        return by;
+      };
       setStats({
         bought: completed.length,
         open: sessions.filter((x) => x.status === 'open').length,
-        spent: completed.reduce((n, x) => n + ((x.receipt && x.receipt.charged) || 0), 0),
+        spentBy: sumBy(completed, (x) => x.receipt && x.receipt.charged),
         sold: orders.length,
-        earned: orders.reduce((n, x) => n + ((x.receipt && x.receipt.earned) || 0), 0),
+        earnedBy: sumBy(orders, (x) => x.receipt && x.receipt.earned),
       });
     } catch { setStats(null); /* commerce disabled or unreachable — render nothing */ }
   }, []);
@@ -245,12 +254,16 @@ export function CommerceCard() {
       <span class="pf-ai-win-sub">${sub}</span>
     </div>`;
   const morsels = t('profile.landing.commerceMorsels') || 'morsels';
+  // "10 morsels · 15.00 EUR" — money amounts are minor units, never summed with morsels.
+  const fmtTotals = (by) => Object.entries(by)
+    .map(([cur, n]) => cur === 'morsel' ? `${n} ${morsels}` : `${(n / 100).toFixed(2)} ${cur}`)
+    .join(' · ') || `0 ${morsels}`;
   return html`
     <div class="pf-home-card pf-commerce-card">
       <div class="pf-home-card-title">${t('profile.landing.commerceTitle') || 'Commerce'}</div>
       <div class="pf-ai-windows">
-        ${chip(t('profile.landing.commerceBought') || 'Purchases', String(stats.bought), `${stats.spent} ${morsels}`)}
-        ${chip(t('profile.landing.commerceSold') || 'Sales', String(stats.sold), `${stats.earned} ${morsels}`)}
+        ${chip(t('profile.landing.commerceBought') || 'Purchases', String(stats.bought), fmtTotals(stats.spentBy))}
+        ${chip(t('profile.landing.commerceSold') || 'Sales', String(stats.sold), fmtTotals(stats.earnedBy))}
         ${chip(t('profile.landing.commerceOpen') || 'Open carts', String(stats.open), t('profile.landing.commerceOpenSub') || 'checkout sessions')}
       </div>
     </div>`;
