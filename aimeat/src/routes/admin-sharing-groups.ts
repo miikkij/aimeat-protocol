@@ -7,7 +7,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, SharingGroupRecord } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 
@@ -16,7 +16,7 @@ export function adminSharingGroupsRouter(config: AimeatConfig, storage: Storage)
 
   router.get('/v1/admin/sharing-groups', requireAuth(), requireRole('operator'), async (req, res) => {
     const owners = await storage.listOwners();
-    const allGroups: any[] = [];
+    const allGroups: SharingGroupRecord[] = [];
 
     for (const owner of owners) {
       const ownerGhii = `${owner.name}@${config.nodeId}`;

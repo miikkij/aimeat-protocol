@@ -23,7 +23,7 @@
 
 import { createHash } from 'node:crypto';
 import YAML from 'yaml';
-import type { Storage, PackageComponentType } from '../storage/interface.js';
+import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -257,7 +257,7 @@ export async function registerComponent(
           installedAt: now,
           installedBy: owner,
           manifest: manifestStr,
-          components: cortexComponents as any,
+          components: cortexComponents as unknown as CortexComponent[],
           activationArtifacts: {
             schemaKeys: [],
             promptKeys: [],
@@ -305,7 +305,7 @@ export async function registerComponent(
             await storage.setMemory({
               key: promptKey,
               ownerGaii,
-              value: { name: comp.name, content: comp.content, variables: (comp as any).variables },
+              value: { name: comp.name, content: comp.content, variables: comp.variables },
               visibility: 'public',
               tags: ['cortex', 'prompt', registeredAs],
               ttlHours: null,
@@ -439,8 +439,8 @@ export async function registerComponent(
     }
 
     return { success: true, componentId, registeredAs, originalShortName };
-  } catch (err: any) {
-    return { success: false, componentId, registeredAs, error: err.message ?? String(err) };
+  } catch (err) {
+    return { success: false, componentId, registeredAs, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

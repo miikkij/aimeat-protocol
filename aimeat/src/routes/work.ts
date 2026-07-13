@@ -112,7 +112,14 @@ async function createWorkItem(
   config: AimeatConfig,
   storage: Storage,
   requesterGaii: string,
-  body: any,
+  body: {
+    action_id?: string;
+    provider_gaii?: string;
+    input?: unknown;
+    ttl_hours?: number;
+    callback_url?: string;
+    priority?: 'low' | 'normal' | 'high';
+  },
   peers: Map<string, PeerInfo>,
   notificationService?: MailboxNotificationService | null,
 ) {
@@ -238,7 +245,7 @@ async function createWorkItem(
     actionId: action_id,
     providerGaii: provider_gaii,
     requesterGaii,
-    input,
+    input: input as Record<string, unknown>,
     cost,
     callbackUrl: callback_url,
     ttlExpiresAt: new Date(now.getTime() + ttl * 3600_000).toISOString(),

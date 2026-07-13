@@ -31,7 +31,7 @@ function deserializeAction(row: Record<string, unknown>): ActionRecord {
   if (row.maxInputSizeBytes !== null) record.maxInputSizeBytes = row.maxInputSizeBytes as number;
   if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
-  record.federate = (row as any).federate === 1;
+  record.federate = row.federate === 1;
   return record;
 }
 

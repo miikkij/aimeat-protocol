@@ -7,7 +7,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 
@@ -20,7 +20,7 @@ export function adminAgentTasksRouter(config: AimeatConfig, storage: Storage): R
     const page = parseInt(req.query.page as string || '1', 10);
     const perPage = Math.min(parseInt(req.query.per_page as string || '20', 10), 100);
 
-    let allTasks: any[];
+    let allTasks: AgentTaskRecord[];
     let total: number;
 
     if (agentGaii) {
@@ -31,7 +31,7 @@ export function adminAgentTasksRouter(config: AimeatConfig, storage: Storage): R
     } else {
       // Aggregate across all owners
       const owners = await storage.listOwners();
-      const collected: any[] = [];
+      const collected: AgentTaskRecord[] = [];
       for (const owner of owners) {
         const ownerGhii = `${owner.name}@${config.nodeId}`;
         const result = await storage.listAgentTasksByOwner(ownerGhii, { status });
@@ -52,7 +52,7 @@ export function adminAgentTasksRouter(config: AimeatConfig, storage: Storage): R
         status: t.status,
         todo_progress: {
           total: t.todos?.length ?? 0,
-          done: t.todos?.filter((td: any) => td.status === 'done').length ?? 0,
+          done: t.todos?.filter((td: AgentTaskTodo) => td.status === 'done').length ?? 0,
         },
         created_at: t.createdAt,
         last_event_at: t.lastEventAt,

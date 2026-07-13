@@ -24,7 +24,7 @@ function deserializeBoard(row: Record<string, unknown>): BoardRecord {
   };
   if (row.description) record.description = row.description as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
-  record.federate = (row as any).federate === 1;
+  record.federate = row.federate === 1;
   return record;
 }
 

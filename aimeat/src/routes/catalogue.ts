@@ -20,6 +20,23 @@ import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
 
+/** Shape of a stored knowledge-package manifest value (memory record `value`). */
+interface KnowledgePackageManifest {
+  type?: string;
+  name?: string;
+  author?: string;
+  content_type?: string;
+  language?: string;
+  maturity?: string;
+  synthesis?: unknown;
+  sharing?: unknown;
+  tags?: string[];
+  references?: Array<{ verified?: boolean }>;
+  entries?: Array<{ visibility?: string }>;
+  created?: string;
+  updated?: string;
+}
+
 export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService, getRealtimeStats?: () => RealtimeStats | null): Router {
   const router = Router();
 
@@ -293,7 +310,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
     // Find all public package manifests across GHIIs and agents
     const seen = new Set<string>();
-    let manifests: Array<{ key: string; value: any; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
+    let manifests: Array<{ key: string; value: KnowledgePackageManifest; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
 
     const collectManifests = async (gaii: string) => {
       const records = await storage.listMemory(gaii, {
@@ -302,11 +319,11 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         tags: ['knowledge-package'],
       });
       for (const m of records) {
-        if (m.key.endsWith('/manifest') && !seen.has(m.key) && (m.value as any)?.type === 'knowledge-package') {
+        if (m.key.endsWith('/manifest') && !seen.has(m.key) && (m.value as KnowledgePackageManifest)?.type === 'knowledge-package') {
           seen.add(m.key);
           manifests.push({
             key: m.key,
-            value: m.value,
+            value: m.value as KnowledgePackageManifest,
             ownerGaii: m.ownerGaii,
             tags: m.tags,
             createdAt: m.createdAt,
@@ -362,9 +379,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         maturity: v.maturity,
         synthesis: v.synthesis,
         references_count: (v.references || []).length,
-        verified_references: (v.references || []).filter((r: any) => r.verified).length,
+        verified_references: (v.references || []).filter(r => r.verified).length,
         entries_count: (v.entries || []).length,
-        public_entries: (v.entries || []).filter((e: any) => e.visibility === 'public').length,
+        public_entries: (v.entries || []).filter(e => e.visibility === 'public').length,
         sharing: v.sharing,
         created: v.created || m.createdAt,
         updated: v.updated || m.updatedAt,

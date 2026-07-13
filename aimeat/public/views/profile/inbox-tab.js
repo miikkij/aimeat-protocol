@@ -861,7 +861,7 @@ export default function InboxTab({ showToast }) {
     await tracked.setMessageImportant(msg.id, on).catch(() => {});
   };
 
-  const useSuggestedReply = async (tr) => {
+  const startSuggestedReply = async (tr) => {
     const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
     setDraftPrefill(d?.draft?.body || awaitingDrafts[tr.id] || '');
     setReplyingTrId(tr.id);
@@ -1136,7 +1136,7 @@ export default function InboxTab({ showToast }) {
   const openTracked = async (tr) => {
     if (!tr.source?.conversationId) return;
     await openConversation({ conversationId: tr.source.conversationId, peerGhii: tr.source.peerGhii });
-    if (tr.state === 'awaiting-approval') await useSuggestedReply(tr);
+    if (tr.state === 'awaiting-approval') await startSuggestedReply(tr);
   };
 
   // Open a specific thread when arriving from a notification deep-link (sessionStorage hint set by
@@ -1359,7 +1359,7 @@ export default function InboxTab({ showToast }) {
               <div class="inbox-draft-actions">
                 <button class="btn-ghost btn-sm" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>📄 ${t('inbox.trackOpenRecord')}</button>
                 <button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackReject')}</button>
-                <button class="btn-primary btn-sm" onClick=${() => useSuggestedReply(tr)}>${t('inbox.trackApprove')}</button>
+                <button class="btn-primary btn-sm" onClick=${() => startSuggestedReply(tr)}>${t('inbox.trackApprove')}</button>
               </div>
             </div>
           </div>`)}

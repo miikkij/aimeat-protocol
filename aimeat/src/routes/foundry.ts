@@ -883,12 +883,12 @@ window.__testRunning = true;
 
       // Blueprint is REQUIRED before submitting components
       const projectRec = await storage.getMemory(gaii, `foundry.${projectId}.project`);
-      const blueprint = (projectRec?.value as any)?.blueprint;
+      const blueprint = (projectRec?.value as { blueprint?: { components?: Array<{ id?: string; label?: string }> } })?.blueprint;
       if (!blueprint) {
         res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint must be submitted before components'));
         return;
       }
-      if (blueprint.components && !blueprint.components.some((c: any) => c.id === componentId)) {
+      if (blueprint.components && !blueprint.components.some((c) => c.id === componentId)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
         return;
       }
@@ -921,7 +921,7 @@ window.__testRunning = true;
       // Merge with existing record to preserve frontend fields (id, label, prompt, history, etc.)
       const existingValue = (existingRec?.value ?? {}) as Record<string, unknown>;
       // Resolve label from blueprint if not in existing record
-      const bpComp = blueprint.components?.find((c: { id: string }) => c.id === componentId);
+      const bpComp = blueprint.components?.find((c) => c.id === componentId);
       const mergedValue = {
         ...existingValue,
         id: componentId,

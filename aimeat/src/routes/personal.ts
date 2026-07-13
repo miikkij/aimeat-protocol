@@ -14,6 +14,8 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
+import type { Request } from 'express';
+import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord, NotificationPreferences } from '../storage/interface.js';
@@ -44,7 +46,8 @@ export function personalRouter(
         return;
       }
 
-      const { node_id, owner_name, public_key, agent_gaiis, visibility } = (req as any).validated;
+      const { node_id, owner_name, public_key, agent_gaiis, visibility } =
+        (req as Request & { validated: z.infer<typeof AnchorRequestSchema> }).validated;
       const ownerFromAuth = req.auth!.owner;
 
       // Verify the requesting owner matches
@@ -210,7 +213,7 @@ export function personalRouter(
         return;
       }
 
-      const { visibility } = (req as any).validated;
+      const { visibility } = (req as Request & { validated: z.infer<typeof VisibilityUpdateSchema> }).validated;
 
       const updated = await storage.updatePersonalNode(nodeId, { visibility });
 

@@ -34,10 +34,10 @@ function deserializeAgent(row: Record<string, unknown>): AgentRecord {
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
   if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
   if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
-  record.federate = (row as any).federate === 1;
+  record.federate = row.federate === 1;
   if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
   if (row.webhookSecret) record.webhookSecret = row.webhookSecret as string;
-  record.webhookEnabled = (row as any).webhookEnabled === 1;
+  record.webhookEnabled = row.webhookEnabled === 1;
   if (row.webhookLastSuccess) record.webhookLastSuccess = row.webhookLastSuccess as string;
   if (row.webhookLastFailure) record.webhookLastFailure = row.webhookLastFailure as string;
   record.webhookFailCount = (row.webhookFailCount as number) ?? 0;

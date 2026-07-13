@@ -192,7 +192,7 @@ export async function executeHttpTest(
       });
       // Return the action's actual data (unwrap AIMEAT envelope)
       const b = resp.body as Record<string, unknown> | null;
-      const result = (b as any)?.data ?? null;
+      const result = b?.data ?? null;
       trace.push({ fn: 'callExt', args: `${extName}/${actionId}(${trunc(body)})`, result: trunc(result), status: resp.status });
       return result;
     };
@@ -201,8 +201,9 @@ export async function executeHttpTest(
       const resp = await testFetch(`/v1/memory/ext:${extName}/${key}`, { method: 'GET' });
       const b = resp.body as Record<string, unknown> | null;
       let result: unknown = null;
-      if (resp.ok && (b as any)?.data?.value !== undefined) result = (b as any).data.value;
-      else if (resp.ok && (b as any)?.data !== undefined) result = (b as any).data;
+      const data = b?.data as { value?: unknown } | undefined;
+      if (resp.ok && data?.value !== undefined) result = data.value;
+      else if (resp.ok && b?.data !== undefined) result = b.data;
       trace.push({ fn: 'readExtMemory', args: `${extName}/${key}`, result: trunc(result), status: resp.status });
       return result;
     };

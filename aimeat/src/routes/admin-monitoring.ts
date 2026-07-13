@@ -15,7 +15,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
@@ -269,7 +269,9 @@ export function adminMonitoringRouter(
             }
         }
         if (agent_data) {
-            for (const [, data] of Object.entries(agent_data as Record<string, any>)) {
+            for (const [, data] of Object.entries(
+                agent_data as Record<string, { memories?: MemoryRecord[]; transactions?: WalletTransaction[] }>,
+            )) {
                 if (data.memories) {
                     for (const m of data.memories) {
                         await storage.setMemory(m);

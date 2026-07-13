@@ -94,9 +94,10 @@ export function registerCapabilitiesTools(
                 storage.incrementCapabilityStats(cap.id, { success: 1, error: 0, totalMs: result.duration_ms }).catch(() => {});
 
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-            } catch (err: any) {
-                storage.incrementCapabilityStats(cap.id, { success: 0, error: 1, totalMs: 0, lastError: err.message }).catch(() => {});
-                return { content: [{ type: 'text' as const, text: `Invoke failed: ${err.message}` }], isError: true };
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                storage.incrementCapabilityStats(cap.id, { success: 0, error: 1, totalMs: 0, lastError: message }).catch(() => {});
+                return { content: [{ type: 'text' as const, text: `Invoke failed: ${message}` }], isError: true };
             }
         },
     );
@@ -165,11 +166,12 @@ export function registerCapabilitiesTools(
             try {
                 const created = await storage.createCapability(record);
                 return { content: [{ type: 'text' as const, text: JSON.stringify(created, null, 2) }] };
-            } catch (err: any) {
-                if (err.message?.includes('UNIQUE') || err.message?.includes('duplicate')) {
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                if (message.includes('UNIQUE') || message.includes('duplicate')) {
                     return { content: [{ type: 'text' as const, text: `Capability '${record.id}' already exists` }], isError: true };
                 }
-                return { content: [{ type: 'text' as const, text: `Create failed: ${err.message}` }], isError: true };
+                return { content: [{ type: 'text' as const, text: `Create failed: ${message}` }], isError: true };
             }
         },
     );

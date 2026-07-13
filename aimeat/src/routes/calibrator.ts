@@ -199,6 +199,27 @@ Output as JSON:
   "analysis": "Multi-paragraph synthesis of all proposals, what overlaps, what's unique to specific models, and what the overall calibration strategy should be."
 }`;
 
+/** Loosely-typed shapes for the dynamic calibrator JSON stored in memory records. */
+interface CalibratorDimension {
+  name?: string;
+  description?: unknown;
+  category?: unknown;
+  [key: string]: unknown;
+}
+
+interface CalibratorBatchModel {
+  modelId?: string;
+  modelLabel?: string;
+  step2_analysis?: { overallScore?: number | null; dimensions?: CalibratorDimension[] };
+  [key: string]: unknown;
+}
+
+interface CalibratorCandidateModel {
+  id: string;
+  label: string;
+  [key: string]: unknown;
+}
+
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -240,7 +261,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       const allMemory = await storage.listMemory(gaii, { prefix: 'calibrator.', tags: ['project'] });
       const projectRecords = allMemory
         .filter(m => m.key.endsWith('.project'))
-        .sort((a, b) => new Date((b.value as any).createdAt).getTime() - new Date((a.value as any).createdAt).getTime());
+        .sort((a, b) => new Date((b.value as Record<string, unknown>).createdAt as string).getTime() - new Date((a.value as Record<string, unknown>).createdAt as string).getTime());
 
       const projects = [];
       for (const m of projectRecords) {
@@ -258,7 +279,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
             .map(bm => bm.value as Record<string, unknown>)
             .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
           const latestBatch = batches[0];
-          const models = (latestBatch.models as any[]) || [];
+          const models = (latestBatch.models as CalibratorBatchModel[]) || [];
           const scores = models
             .map(m => m.step2_analysis?.overallScore)
             .filter((s): s is number => s != null);
@@ -422,7 +443,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
           const v = m.value as Record<string, unknown>;
           return { version: v.version, changelog: v.changelog, createdAt: v.createdAt };
         })
-        .sort((a: any, b: any) => (a.version as number) - (b.version as number));
+        .sort((a, b) => (a.version as number) - (b.version as number));
       res.json(success(config.nodeId, { versions }));
     }
   );
@@ -465,10 +486,10 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
       const project = projectRecord.value as Record<string, unknown>;
-      const candidateModels = (project.candidateModels as any[]) || [];
+      const candidateModels = (project.candidateModels as CalibratorCandidateModel[]) || [];
 
       const batchId = `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      const models = candidateModels.map((m: any) => ({
+      const models = candidateModels.map((m) => ({
         modelId: m.id,
         modelLabel: m.label,
         step1_generation: { status: 'pending', output: null, durationMs: null, error: null, promptSent: null },
@@ -503,8 +524,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       let batches = allMemory
         .map(m => {
           const b = m.value as Record<string, unknown>;
-          const models = (b.models as any[]) || [];
-          const scores = models.map((model: any) => ({
+          const models = (b.models as CalibratorBatchModel[]) || [];
+          const scores = models.map((model) => ({
             modelId: model.modelId,
             modelLabel: model.modelLabel,
             overallScore: model.step2_analysis?.overallScore ?? null,
@@ -518,7 +539,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
             scores,
           };
         })
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
 
       const versionFilter = req.query.version as string | undefined;
       if (versionFilter) {
@@ -563,8 +584,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       await setCalMemory(gaii, `calibrator.${id}.batch.${batchId}`, batch, ['calibrator', 'batch']);
 
       // Auto-discover dimensions from Step 2 results
-      const batchModels = (batch.models as any[]) || [];
-      const allDimensions: any[] = [];
+      const batchModels = (batch.models as CalibratorBatchModel[]) || [];
+      const allDimensions: CalibratorDimension[] = [];
       for (const model of batchModels) {
         const dims = model.step2_analysis?.dimensions;
         if (Array.isArray(dims)) {
@@ -574,8 +595,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
 
       if (allDimensions.length > 0) {
         const dimRecord = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
-        const existingDims = (dimRecord?.value as any[]) || [];
-        const existingNames = new Set(existingDims.map((d: any) => d.name));
+        const existingDims = (dimRecord?.value as CalibratorDimension[]) || [];
+        const existingNames = new Set(existingDims.map((d) => d.name));
         let added = false;
         for (const dim of allDimensions) {
           if (dim.name && !existingNames.has(dim.name)) {

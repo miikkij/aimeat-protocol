@@ -16,7 +16,7 @@ import { Router } from 'express';
 import { randomBytes, randomUUID, createHmac } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
@@ -163,7 +163,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
       webhookFailCount: 0,
       webhookLastSuccess: null,
       webhookLastFailure: null,
-    } as any);
+    } as unknown as Partial<AgentRecord>);
 
     emitChange('agents');
 

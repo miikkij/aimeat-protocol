@@ -63,10 +63,10 @@ export async function invokeCapability(
       });
       const body = await response.json() as Record<string, unknown>;
 
-      if (!(body as any).ok) {
-        throw Object.assign(new Error((body as any).error?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
+      if (!body.ok) {
+        throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
       }
-      result = mode === 'raw' ? body : (body as any).data;
+      result = mode === 'raw' ? body : body.data;
       break;
     }
 
@@ -97,7 +97,7 @@ export async function invokeCapability(
         }
 
         const body = await response.json() as Record<string, unknown>;
-        result = mode === 'raw' ? body : (body as any).result ?? body;
+        result = mode === 'raw' ? body : body.result ?? body;
       } finally {
         clearTimeout(timeout);
       }

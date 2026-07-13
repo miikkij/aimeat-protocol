@@ -595,8 +595,8 @@ export function adminRouter(
 
             emitChange('packages');
             res.json(success(config.nodeId, { seeded: results }));
-        } catch (e: any) {
-            res.status(500).json(error(config.nodeId, 'SEED_FAILED', e.message ?? 'Seed failed'));
+        } catch (e) {
+            res.status(500).json(error(config.nodeId, 'SEED_FAILED', e instanceof Error ? e.message : 'Seed failed'));
         }
     });
 

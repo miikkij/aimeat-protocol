@@ -1100,7 +1100,7 @@ export async function applyConfigOverrides(
     try {
       const value = parseConfigValue(field, rawValue);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
-      (config as any)[field.key] = value;
+      (config as unknown as Record<string, unknown>)[field.key] = value;
       applied.push(dotPath);
     } catch {
       skipped.push(dotPath);

@@ -33,7 +33,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, KnowledgeManifest, MemoryLinkRecord, OperatorReviewRecord, OperatorReviewAction } from '../storage/interface.js';
+import type { Storage, KnowledgeManifest, MemoryLinkRecord, MemoryRecord, OperatorReviewRecord, OperatorReviewAction } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -151,13 +151,13 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Resolve entry data — can be in req.body.entry_data, pkg.entry_data,
     // or directly on each entry's .value field (AI chat output format)
-    const entryData: Record<string, unknown> = req.body.entry_data ?? (pkg as any).entry_data ?? {};
+    const entryData: Record<string, unknown> = req.body.entry_data ?? pkg.entry_data ?? {};
     // Extract inline values from entries into entryData
     for (const entry of manifest.entries) {
-      if ((entry as any).value !== undefined) {
+      if ((entry as { value?: unknown }).value !== undefined) {
         const entryName = entry.key.split('/').pop() ?? entry.key;
         if (!entryData[entry.key] && !entryData[entryName]) {
-          entryData[entryName] = (entry as any).value;
+          entryData[entryName] = (entry as { value?: unknown }).value;
         }
       }
     }
@@ -472,9 +472,9 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
     const { record: existing, ownerGaii } = found;
 
-    const manifest: Record<string, any> = typeof existing.value === 'string'
+    const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
-      : Object.assign({}, existing.value as Record<string, any>);
+      : { ...(existing.value as KnowledgeManifest) };
     if (!manifest.sharing) manifest.sharing = { catalog_listed: false, allow_clone: false, morsel_price: 0 };
 
     if (catalog_listed !== undefined) manifest.sharing.catalog_listed = !!catalog_listed;
@@ -534,13 +534,13 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
     const { record: existing, ownerGaii } = found;
 
-    const manifest: Record<string, any> = typeof existing.value === 'string'
+    const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
-      : Object.assign({}, existing.value as Record<string, any>);
+      : { ...(existing.value as KnowledgeManifest) };
 
     // Find and update the entry in the manifest
     const entries = manifest.entries || [];
-    const entry = entries.find((e: any) => e.key === entryKey || e.key.endsWith('/' + entryKey));
+    const entry = entries.find((e) => e.key === entryKey || e.key.endsWith('/' + entryKey));
     if (!entry) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Entry not found in package'));
       return;
@@ -596,7 +596,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Find the source manifest (search across all agents for public memory)
     const allAgents = await storage.listAgents();
-    let sourceManifest: any = null;
+    let sourceManifest: MemoryRecord | null = null;
     let sourceOwnerGaii = '';
 
     for (const agent of allAgents) {
@@ -717,7 +717,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       : null;
 
     // Find public manifest — check owners (GHIIs) first, then agents
-    let sourceManifest: any = null;
+    let sourceManifest: MemoryRecord | null = null;
     let sourceOwnerGaii = '';
 
     const allOwners = await storage.listOwners();
@@ -869,7 +869,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Find consents granted to this organism for package data
     const allAgents = await storage.listAgents();
-    const packages: any[] = [];
+    const packages: Array<{ key: string; manifest: unknown; ownerGaii: string; contributed_at: string }> = [];
 
     for (const agent of allAgents) {
       const consents = await storage.listConsents(agent.gaii, { recipient: `organism.${organismId}`, status: 'active' });
@@ -877,7 +877,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
         if (consent.dataPattern.startsWith('packages/') && consent.dataPattern.endsWith('/*')) {
           const prefix = consent.dataPattern.replace('/*', '/manifest');
           const manifest = await storage.getMemory(agent.gaii, prefix);
-          if (manifest && (manifest.value as any)?.type === 'knowledge-package') {
+          if (manifest && (manifest.value as { type?: string })?.type === 'knowledge-package') {
             packages.push({
               key: prefix,
               manifest: manifest.value,
@@ -899,7 +899,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Find the manifest
     const allAgents = await storage.listAgents();
-    let manifest: any = null;
+    let manifest: MemoryRecord | null = null;
 
     for (const agent of allAgents) {
       const mem = await storage.getMemory(agent.gaii, manifestKey);
@@ -957,7 +957,17 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     const allAgents = await storage.listAgents();
     const seenKeys = new Set<string>();
-    let manifests: any[] = [];
+    type AdminManifestRow = {
+      key: string;
+      value: KnowledgeManifest;
+      ownerGaii: string;
+      visibility: string;
+      flagCount: number;
+      createdAt: string;
+      updatedAt: string;
+      isSystem: boolean;
+    };
+    let manifests: AdminManifestRow[] = [];
 
     // Collect from all agents
     for (const agent of allAgents) {
@@ -966,11 +976,11 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
         tags: ['knowledge-package'],
       });
       for (const m of agentManifests) {
-        if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
+        if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
           seenKeys.add(m.key);
           manifests.push({
             key: m.key,
-            value: m.value,
+            value: m.value as KnowledgeManifest,
             ownerGaii: m.ownerGaii,
             visibility: m.visibility,
             flagCount: m.flagCount ?? 0,
@@ -989,11 +999,11 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       tags: ['knowledge-package'],
     });
     for (const m of operatorManifests) {
-      if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
+      if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
         seenKeys.add(m.key);
         manifests.push({
           key: m.key,
-          value: m.value,
+          value: m.value as KnowledgeManifest,
           ownerGaii: m.ownerGaii,
           visibility: m.visibility,
           flagCount: m.flagCount ?? 0,
@@ -1078,7 +1088,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       maturity: maturity || 'published',
       synthesis: { level: 'original', description: 'System knowledge created by operator' },
       references: [],
-      entries: entries.map((e: any, i: number) => ({
+      entries: entries.map((e: { title?: string }, i: number) => ({
         key: `packages/${packageId}/entry-${i}`,
         title: e.title || `Entry ${i + 1}`,
         visibility: entryVisibility as 'public' | 'private' | 'owner',
@@ -1200,7 +1210,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Find the package (search all agents)
     const allAgents = await storage.listAgents();
-    let manifest: any = null;
+    let manifest: MemoryRecord | null = null;
 
     for (const agent of allAgents) {
       const mem = await storage.getMemory(agent.gaii, manifestKey);

@@ -324,12 +324,13 @@ export function instancesRouter(
         { description: 'View instance', method: 'GET', url: `/v1/instances/${created.id}` },
         { description: 'Check component status', method: 'GET', url: `/v1/instances/${created.id}/status` },
       ]));
-    } catch (e: any) {
+    } catch (e) {
       // Instance record creation failed — rollback all registered components
       for (const reg of [...registeredComponents].reverse()) {
         await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii);
       }
-      res.status(500).json(error(config.nodeId, 'INSTALL_FAILED', e.message ?? 'Failed to create instance'));
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json(error(config.nodeId, 'INSTALL_FAILED', msg || 'Failed to create instance'));
     }
   });
 
@@ -786,7 +787,7 @@ export function instancesRouter(
       const content = action.content as string | undefined;
 
       if (!compId || typeof compId !== 'string') continue;
-      if (!validActions.includes(actionType as any)) {
+      if (!(validActions as readonly string[]).includes(actionType)) {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
           `Invalid action "${actionType}" for component "${compId}". Valid: ${validActions.join(', ')}`));
         return;
@@ -912,7 +913,7 @@ export function instancesRouter(
     // Preserve any existing components not mentioned in the migration actions
     for (const ic of instance.installedComponents) {
       const inAction = migrationActions.some(
-        (a: any) => a.componentId === ic.componentId,
+        (a: { componentId?: string }) => a.componentId === ic.componentId,
       );
       if (!inAction) {
         newInstalledComponents.push({ ...ic });

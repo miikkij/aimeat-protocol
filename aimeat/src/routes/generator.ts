@@ -635,12 +635,12 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
       const validLevels = ['none', 'basic', 'comprehensive'] as const;
       const level = (req.body?.level || 'none') as string;
-      if (!validLevels.includes(level as any)) {
+      if (!(validLevels as readonly string[]).includes(level)) {
         res.status(400).json(error(config.nodeId, 'INVALID_BODY', `Invalid test level: ${level}. Must be one of: ${validLevels.join(', ')}`));
         return;
       }
 
-      const blueprint = (projectRec.value as any)?.blueprint;
+      const blueprint = (projectRec.value as { blueprint?: Blueprint })?.blueprint;
       const components: TestResult[] = [];
       if (blueprint?.components && level !== 'none') {
         for (const comp of blueprint.components as Array<{ id: string; type?: string }>) {
@@ -1105,12 +1105,12 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
 
       // Blueprint is REQUIRED before submitting components
       const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
-      const blueprint = (projectRec?.value as any)?.blueprint;
+      const blueprint = (projectRec?.value as { blueprint?: Blueprint })?.blueprint;
       if (!blueprint) {
         res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint must be submitted before components'));
         return;
       }
-      if (blueprint.components && !blueprint.components.some((c: any) => c.id === componentId)) {
+      if (blueprint.components && !blueprint.components.some((c) => c.id === componentId)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
         return;
       }

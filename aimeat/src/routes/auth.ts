@@ -17,7 +17,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
@@ -706,7 +706,11 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     if (otk.action === 'write_memory') {
-      const { key: memKey, value, visibility } = otk.params as any;
+      const { key: memKey, value, visibility } = otk.params as {
+        key?: string;
+        value?: unknown;
+        visibility?: MemoryRecord['visibility'];
+      };
       if (!memKey || value === undefined) {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'OTK params must include key and value'));
         return;
