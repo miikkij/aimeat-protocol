@@ -1,7 +1,16 @@
 /**
- * AIMEAT API Module
- * Session-aware fetch wrapper for AIMEAT /v1/* endpoints.
- * Relies on aimeat-auth.js being loaded for session management.
+ * @file public/js/api.js
+ * @description Session-aware fetch wrapper for AIMEAT /v1/* endpoints. Attaches (and refreshes) the
+ *   JWT from the auth session, parses the AIMEAT response envelope, throws on `ok:false`, and retries
+ *   429/5xx/network failures with exponential backoff and a per-call timeout/retry override.
+ *
+ * @structure
+ *   - api(path, opts): core call — auth injection, timeout, 401-refresh, retry loop, envelope handling
+ *   - apiGet/apiPost/apiPut/apiPatch/apiDelete: HTTP-method shorthands over api()
+ *   - parseJwtPayload/sleep: internal helpers (unverified JWT expiry check, backoff delay)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 /**
@@ -73,7 +82,7 @@ export async function api(path, opts = {}) {
       return json;
     } catch (err) {
       if (err.name === 'AbortError') {
-        if (attempt === maxRetries) throw new Error('Request timed out after ' + Math.round(timeoutMs / 1000) + 's');
+        if (attempt === maxRetries) throw new Error('Request timed out after ' + Math.round(timeoutMs / 1000) + 's', { cause: err });
         continue;
       }
       // Don't retry client errors (4xx) — only retry network/server errors

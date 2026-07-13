@@ -33,10 +33,6 @@ function dt(key, _locale) {
 /* ══════════════════════════════════════════════
    HELPERS
    ══════════════════════════════════════════════ */
-function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 function formatBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
@@ -587,7 +583,7 @@ function CommunityApps({ locale, isLoggedIn, session }) {
       fetch('/v1/apps').then(r => r.json()).then(d2 => {
         if (d2.ok && d2.data?.apps) setApps(d2.data.apps);
       });
-    } catch (e) {
+    } catch {
       setCodePending(p => ({ ...p, [filename]: 'error' }));
     }
   }, [session]);
@@ -661,7 +657,7 @@ function AppCodeManager({ filename, isProtected, locale, onUpdate, status }) {
 /* ══════════════════════════════════════════════
    MAIN VIEW
    ══════════════════════════════════════════════ */
-export default function PortalDevView({ navigate, locale }) {
+export default function PortalDevView({ locale }) {
   const [platforms, setPlatforms] = useState([]);
   const [stats, setStats] = useState({ agents: 0, chatSessions: 0, actions: 0, boards: 0 });
   const [selectedPlatform, setSelectedPlatform] = useState(null);

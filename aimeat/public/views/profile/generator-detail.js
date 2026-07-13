@@ -117,8 +117,8 @@ export async function runWithAi(projectId, prompt, systemPrompt = null) {
     if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
     return resp.data.content;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Cancelled');
-    if (e.name === 'TypeError') throw new Error('Network error — connection lost');
+    if (e.name === 'AbortError') throw new Error('Cancelled', { cause: e });
+    if (e.name === 'TypeError') throw new Error('Network error — connection lost', { cause: e });
     throw e;
   } finally {
     clearTimeout(timeoutId);
@@ -178,7 +178,7 @@ function StepArrow({ direction = 'right' } = {}) {
 
 /* ── ComponentDetail ─────────────────────────────────── */
 
-export function ComponentDetail({ component, project, components, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session, orSettings }) {
+export function ComponentDetail({ component, project, projectId, liveStatuses, onUpdate, onAdvance, showToast, session, orSettings }) {
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
   const [registering, setRegistering] = useState(false);
@@ -246,7 +246,6 @@ export function ComponentDetail({ component, project, components, projectId, int
     }
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
-  const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
   const prompt = component.prompt || generatedPrompt || '';
 
   // Workflow step for guided UI
@@ -444,7 +443,6 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleRunComponentAi() {
     setAiRunning(true);
     try {
-      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
       const fresh = await loadPromptFromBackend(projectId, component.id, 'code');
       writeDebugArtifact(projectId, component.id, 'prompt', fresh);
       let content = await runWithAi(projectId, fresh);
@@ -753,7 +751,7 @@ export function ComponentDetail({ component, project, components, projectId, int
                       try {
                         const fixed = await runWithAi(projectId, fixPrompt);
                         // Strip code fences if present
-                        const cleaned = fixed.replace(/^\`\`\`json?\s*\n?/m, '').replace(/\n?\`\`\`\s*$/m, '').trim();
+                        const cleaned = fixed.replace(/^```json?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
                         setSpecResult(cleaned);
                         setSpecValidation(null);
                         showToast?.('Fixed spec received — click Validate Spec');

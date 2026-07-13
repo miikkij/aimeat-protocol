@@ -157,7 +157,7 @@ function EventLog({ events, onViewMore }) {
   `;
 }
 
-export default function AgentActivitySubtab({ agentName, session, showToast }) {
+export default function AgentActivitySubtab({ agentName }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);

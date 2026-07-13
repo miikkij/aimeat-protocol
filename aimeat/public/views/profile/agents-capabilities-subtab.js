@@ -107,7 +107,7 @@ function ActionQueueSupport({ scopes }) {
   `;
 }
 
-export default function AgentCapabilitiesSubtab({ agentName, session, showToast, agent }) {
+export default function AgentCapabilitiesSubtab({ agentName, agent }) {
   const [techCaps, setTechCaps] = useState(null);
   const [domainCaps, setDomainCaps] = useState(null);
   const [languages, setLanguages] = useState(null);

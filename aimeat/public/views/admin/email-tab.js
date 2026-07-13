@@ -228,7 +228,7 @@ export default function EmailTab({ data, reload, locale }) {
       const r = await getEmailTemplates(loc);
       setTemplates(r.data.templates || []);
       setSeeded(!!r.data.seeded);
-    } catch (_) {
+    } catch {
       setTemplates(null);
     }
     setTplLoading(false);
@@ -239,7 +239,7 @@ export default function EmailTab({ data, reload, locale }) {
     try {
       await saveConfig([{ path: dotPath, value: newValue }]);
       reload();
-    } catch (_) { /* reload will show current state */ }
+    } catch { /* reload will show current state */ }
     setCfgSaving(false);
   }
 

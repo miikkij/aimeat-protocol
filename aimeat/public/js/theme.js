@@ -42,13 +42,6 @@ function storedChoice() {
   }
 }
 
-/** Resolve the OS preference (used only while there is no explicit choice). */
-function osPreference() {
-  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    ? 'dark'
-    : 'light';
-}
-
 /** Sync the <meta name="theme-color"> so mobile browser chrome matches. */
 function syncMetaThemeColor(theme) {
   const meta = document.querySelector('meta[name="theme-color"]');

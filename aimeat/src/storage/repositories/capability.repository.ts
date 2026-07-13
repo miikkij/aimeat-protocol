@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/repositories/capability.repository.ts
+ * @description Storage repository interface for agent capabilities: CRUD, listing/filtering,
+ *   invocation stats, execution logs, operator overrides, and trust/vouch tracking. Each
+ *   backend (SQLite/MongoDB/PostgreSQL) implements this contract.
+ *
+ * @structure
+ *   - CapabilityRepository: create/get/update/delete + list/lookup by owner/source
+ *   - stats & logs: incrementCapabilityStats, addCapabilityLog, listCapabilityLogs, prune
+ *   - governance: setCapabilityOverride, setCapabilityTrust, increment/decrementVouchCount
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityTrust, CapabilityFilter } from '../interface.js';
 
 export interface CapabilityRepository {

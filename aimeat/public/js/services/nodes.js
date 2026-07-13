@@ -1,6 +1,16 @@
 /**
- * AIMEAT Nodes Service
- * Personal node registration, detachment, visibility.
+ * @file public/js/services/nodes.js
+ * @description Frontend service for personal-node lifecycle: gated by the bootstrap
+ *   `personal_nodes_enabled` flag, it lists, anchors (registers), detaches, and changes the
+ *   visibility of the owner's personal node via `/v1/personal/*` endpoints.
+ *
+ * @structure
+ *   - isPersonalEnabled: caches the bootstrap flag before any personal-node call
+ *   - listNodes: returns the owner's single personal node (or empty array)
+ *   - registerNode/detachNode/setVisibility: anchor, delete, and update-visibility actions
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
 

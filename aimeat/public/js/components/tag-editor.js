@@ -1,3 +1,15 @@
+/**
+ * @file public/js/components/tag-editor.js
+ * @description Preact + HTM inline tag editor — renders removable tag pills plus an input
+ *   to add new tags, enforcing a max count and 64-char cap, and reports every change via onSave.
+ *
+ * @structure
+ *   - TagEditor (default export): component taking { tags, onSave, maxTags } props
+ *   - addTag / removeTag: local handlers that trim/dedupe and emit the updated array through onSave
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';

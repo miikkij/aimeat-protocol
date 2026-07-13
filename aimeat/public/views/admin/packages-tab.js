@@ -49,7 +49,7 @@ function ReviewPanel({ item, onDone }) {
       try {
         const res = await reviewTemplate(item.id);
         if (!cancelled && res.ok !== false) setDetail(res.data);
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -296,7 +296,7 @@ function ModerationHistory({ history }) {
 }
 
 /* ── Main Tab ── */
-export default function PackagesAdminTab({ data, reload, session }) {
+export default function PackagesAdminTab() {
   const [packages, setPackages] = useState([]);
   const [instances, setInstances] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -323,7 +323,7 @@ export default function PackagesAdminTab({ data, reload, session }) {
         setPending(pendRes.data?.pending ?? pendRes.data?.templates ?? []);
         setHistory(pendRes.data?.history ?? []);
       }
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     setLoading(false);
   }, []);
 
@@ -334,7 +334,6 @@ export default function PackagesAdminTab({ data, reload, session }) {
 
   if (loading) return html`<${Spinner} text=${t('dashboard.loading')} />`;
 
-  const published = packages.filter(p => p.status === 'published').length;
   const pendingCount = pending.length;
   const stats = [
     { label: t('dashboard.pkgTotalPackages') || 'Total Packages', value: packages.length, color: 'var(--accent, #60a5fa)' },

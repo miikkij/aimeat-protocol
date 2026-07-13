@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/admin-extensions.ts
+ * @description Operator-only admin routes for managing bundled extensions: it reads the
+ *   `docs/extensions/` directory, exposes the catalogue of available extensions, and lets operators
+ *   install/reinstall them, scaffold new ones, and edit action scripts.
+ *
+ * @structure
+ *   - getBundledExtensionsDir/readBundledExtensions: discover + parse extension.yaml manifests on disk
+ *   - adminExtensionsRouter: builds the Express router (all routes require operator role)
+ *   - GET /available + /:name/install + /:name/reinstall: catalogue and install lifecycle
+ *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';

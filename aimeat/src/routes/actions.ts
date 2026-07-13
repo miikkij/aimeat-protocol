@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/actions.ts
+ * @description Express routes for the action marketplace — agents publish/update/list callable
+ *   actions with category, JSON schemas, and morsel pricing; enforces trust, quota, and category rules.
+ *
+ * @structure
+ *   - actionsRouter(config, storage): mounts /v1/actions CRUD + discovery endpoints
+ *   - POST /v1/actions: publish (agent scope work:publish); min-trust gate for paid actions, per-agent cap
+ *   - ALLOWED_CATEGORIES: whitelist validated on publish/update
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

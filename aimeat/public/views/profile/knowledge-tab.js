@@ -29,7 +29,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet } from '/js/api.js';
 import { listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -64,8 +64,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const [organismLoading, setOrganismLoading] = useState(false);
 
   const ghii = session?.ghii || session?.owner || '';
-  const nodeUrl = window.location.origin;
-  const nodeId = session?.nodeId || '';
 
   const loadPackages = useCallback(async ({ showSpinner = true } = {}) => {
     try {
@@ -178,7 +176,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast('Prompt template not available yet');
       }
-    } catch (err) {
+    } catch {
       showToast(t('profile.knowledge.copyFailed'));
     }
   }, [showToast]);
@@ -216,7 +214,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         catalogListed: pkg.sharing?.catalog_listed ?? true,
         organismShare: '',
       });
-    } catch (e) {
+    } catch {
       setImportError(t('profile.knowledge.parseError'));
     }
   }, [ghii]);
@@ -241,7 +239,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast(t('knowledge.import.error'));
       }
-    } catch (err) {
+    } catch {
       showToast(t('knowledge.import.error'));
     } finally { setImporting(false); }
   }, [importPreview, showToast, loadPackages]);
@@ -424,7 +422,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         ${rels.map((rel, i) => {
           const targetEntry = allEntries.find(e => e.key === rel.key || e.key.endsWith('/' + rel.key));
           const targetLabel = targetEntry ? (targetEntry.title || rel.key) : rel.key;
-          const shortKey = rel.key.includes('/') ? rel.key.split('/').pop() : rel.key;
           return html`
             <button key=${i} class="kpkg-relation-chip" onClick=${(e) => { e.stopPropagation(); scrollToEntry(rel.key); }}
               title="${relationLabels[rel.relation] || rel.relation}: ${targetLabel}">

@@ -11,7 +11,6 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { CopyButton as BaseCopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { StatusDot } from '/components/StatusDot.js';
@@ -223,9 +222,9 @@ For most apps, plain fetch() is all you need. Only load libraries when you need 
 - File storage (images, drawings): needs aimeat-auth.js + aimeat-storage.js
 
 If you do need libs, load auth first in <head>:
-<script src="${n}/v1/libs/aimeat-auth.js"><\/script>
-<script src="${n}/v1/libs/aimeat-storage.js"><\/script>
-<script src="${n}/lib/realtime.js"><\/script>
+<script src="${n}/v1/libs/aimeat-auth.js"></script>
+<script src="${n}/v1/libs/aimeat-storage.js"></script>
+<script src="${n}/lib/realtime.js"></script>
 
 Auth init (only when using libs that require auth):
 async function initAimeat() {
@@ -238,7 +237,7 @@ async function initAimeat() {
 }
 
 ### AimeatRealtime \u2014 P2P WebSocket (live multiplayer, no polling):
-Client library: <script src="${n}/lib/realtime.js"><\/script>
+Client library: <script src="${n}/lib/realtime.js"></script>
 This is a separate class (NOT on AIMEAT namespace). Requires a JWT token.
 
 Setup (get token from AIMEAT.auth):
@@ -290,7 +289,7 @@ NOTE: Use the Realtime P2P API for ALL multiplayer games.
    - Receive moves: rt.on("broadcast", (msg) => handleMove(msg.payload))
 
 Auth setup (needed for Realtime WebSocket):
-Include <script src="${n}/v1/libs/aimeat-auth.js"><\/script> in <head>
+Include <script src="${n}/v1/libs/aimeat-auth.js"></script> in <head>
 Call initAimeat() to get a session, then:
   const session = AIMEAT.auth.getSession();
   const rt = new AimeatRealtime("${n}", session.jwt);
@@ -967,7 +966,7 @@ function pickProvocation() {
   return lines[lines.length - 1];
 }
 
-function OnelinersFeed({ locale }) {
+function OnelinersFeed() {
   const [messages, setMessages] = useState([]);
   const [provocation] = useState(() => pickProvocation());
 
@@ -1032,7 +1031,7 @@ function CopyButton({ text, label, copiedLabel }) {
 /* ══════════════════════════════════════════════
    PROMPT SECTION COMPONENT
    ══════════════════════════════════════════════ */
-function PromptSection({ locale }) {
+function PromptSection() {
   const promptText = buildMainPrompt();
 
   return html`
@@ -1051,7 +1050,7 @@ function PromptSection({ locale }) {
 /* ══════════════════════════════════════════════
    USER WORLD ACCORDION
    ══════════════════════════════════════════════ */
-function UserWorldAccordion({ navigate }) {
+function UserWorldAccordion() {
   const [stats, setStats] = useState({ wallet: '-', agents: '-', memory: '-', work: '-', services: '-', apps: '-', files: '-' });
   const [identity, setIdentity] = useState({ owner: '-', ghii: '-' });
 

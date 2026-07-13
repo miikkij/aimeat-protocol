@@ -46,18 +46,6 @@ const CRON_PRESETS = [
   { key: 'custom', cron: '' },
 ];
 
-const KIND_BADGE = {
-  ai: { cls: 'sch-badge--ai', key: 'profile.scheduler.kind.ai' },
-  agent_task: { cls: 'sch-badge--agent', key: 'profile.scheduler.kind.agent_task' },
-  extension: { cls: 'sch-badge--ext', key: 'profile.scheduler.kind.extension' },
-  core: { cls: 'sch-badge--core', key: 'profile.scheduler.kind.core' },
-};
-
-function kindBadge(kind) {
-  const b = KIND_BADGE[kind] || KIND_BADGE.core;
-  return html`<span class="sch-badge ${b.cls}">${t(b.key)}</span>`;
-}
-
 function resultBadge(result) {
   if (!result) return html`<span class="sch-muted">—</span>`;
   const cls = result === 'error' ? 'sch-badge--err' : 'sch-badge--ok';

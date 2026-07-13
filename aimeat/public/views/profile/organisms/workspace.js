@@ -145,7 +145,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     try {
       const raw = sessionStorage.getItem(docKey);
       if (raw) { const v = JSON.parse(raw); if (v && v.type && v.id) return { type: v.type, mode: v.mode === 'edit' ? 'edit' : 'view', page: { id: v.id } }; }
-    } catch (e) { /* noop */ }
+    } catch { /* noop */ }
     return null;
   });
   // Active tab — Overview first (ALWAYS the landing view: the whole workspace on one scroll),
@@ -181,11 +181,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // history never shows as unseen. Neutral gray badges only — red is reserved for errors.
   const seenKey = 'aimeat.ws.' + orgId + '.' + wsId + '.seen';
   const [seen, setSeen] = useState(() => {
-    try { const raw = localStorage.getItem(seenKey); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+    try { const raw = localStorage.getItem(seenKey); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
   const markSeen = useCallback((tabId) => setSeen(prev => {
     const next = { ...(prev || {}), [tabId]: new Date().toISOString() };
-    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) { /* noop */ }
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }
     return next;
   }), [seenKey]);
   // Items (not raw events) changed since the tab's seen mark. The user's own non-agent edits
@@ -285,11 +285,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   useEffect(() => {
     if (!ws?.manifest) return;
     let req = null;
-    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch (e) { req = null; }
+    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch { req = null; }
     if (!req || !req.namespace || !req.id) return;
     const ot = (ws.manifest.objectTypes || []).find(o => o.namespace === req.namespace);
     if (ot) { setTab('space:' + ot.name); setActiveDoc({ type: ot.name, mode: 'view', page: { id: req.id } }); }
-    try { sessionStorage.removeItem(openDocKey); } catch (e) { /* noop */ }
+    try { sessionStorage.removeItem(openDocKey); } catch { /* noop */ }
   }, [ws, openDocKey]);
 
   // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
@@ -297,7 +297,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     try {
       if (activeDoc?.type && activeDoc.page?.id) sessionStorage.setItem(docKey, JSON.stringify({ type: activeDoc.type, id: activeDoc.page.id, mode: activeDoc.mode }));
       else sessionStorage.removeItem(docKey);
-    } catch (e) { /* noop */ }
+    } catch { /* noop */ }
   }, [activeDoc, docKey]);
 
   // Subscribe to 'organisms' ONLY — NOT the global 'memory' firehose (every one of dozens of agents'
@@ -358,7 +358,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   useEffect(() => {
     if (seen !== null || ws === undefined) return;
     const next = { __base: new Date().toISOString() };
-    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) { /* noop */ }
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }
     setSeen(next);
   }, [seen, ws]);
   // Changes landing on the tab the user is LOOKING at are seen immediately — otherwise a draft
@@ -528,8 +528,6 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     updateSections(typeName, [...(sectionsByType[typeName] || []), { id, name: '', parentId: parentId || null, documents: [] }]);
     setEditingSec(id);   // open the new section in rename mode; it becomes plain text once named/blurred
   };
-  const renameSection = (typeName, secId, name) =>
-    updateSections(typeName, (sectionsByType[typeName] || []).map(s => s.id === secId ? { ...s, name } : s));
   const removeSection = (typeName, secId, secName) => {
     confirm(
       (t('organisms.confirmRemoveSection') || 'Remove the section “{name}”? Its documents move to Unsorted — they are not deleted.').replace('{name}', secName || '…'),
@@ -935,7 +933,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const docItem = (d) => html`
       <div class="pj-doc-item ${isActive(d) ? 'active' : ''} ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'di' + d.id}
         draggable=${true}
-        onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch (x) { /* noop */ } } }}
+        onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch { /* noop */ } } }}
         onDragEnd=${() => { draggedDoc.current = null; }}>
         <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
         <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />

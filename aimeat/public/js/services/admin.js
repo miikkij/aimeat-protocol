@@ -1,6 +1,17 @@
 /**
- * Admin API Service
- * All admin dashboard API calls go through this module.
+ * @file public/js/services/admin.js
+ * @description Admin dashboard API service layer — thin wrappers over the shared api.js
+ *   HTTP helpers that map every admin operation to its `/v1/admin/*` (and related) endpoint.
+ *
+ * @structure
+ *   - getDashboard/getConfig/saveConfig/deleteConfig: node config + dashboard reads/writes
+ *   - getAdminAgents/getAdminOwners/grantRole + security-incident helpers: identity & moderation
+ *   - boards/actions/work/messages: content and telemetry reads
+ *   - maintenance/seedExamples/backup/restore: operational tooling
+ *   - federation/peering helpers: cross-node peer management
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 

@@ -1,3 +1,16 @@
+/**
+ * @file src/server-bootstrap/config-init.ts
+ * @description Server bootstrap step that initializes storage, builds the config-provenance registry,
+ *   layers in Consul and DB-persisted config overrides, and wires storage into the auth subsystems.
+ *
+ * @structure
+ *   - ConfigInitResult: returned { storage, provenance, consulService }
+ *   - initializeConfig(config, configSources?): creates storage, records provenance sources,
+ *     applies Consul + DB overrides, and initializes revocation/session auth storage
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';

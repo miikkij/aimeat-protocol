@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/work.ts
+ * @description Work-queue routes — the agent-to-agent paid work lifecycle: request/batch submission,
+ *   inbox/sent listing, accept/progress/reject/deliver/rate, plus escrow holds and settlement, webhook
+ *   delivery with exponential-backoff retries, cross-node work resolution, and a work→task bridge.
+ *
+ * @structure
+ *   - fireWebhook(url, payload, maxRetries): safeFetch-guarded webhook POST with backoff + in-memory log
+ *   - getWebhookLog(): exposes recent webhook delivery entries
+ *   - createWorkItem(...): builds a work item (escrow, tracking code, notification)
+ *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -565,7 +580,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       return;
     }
 
-    const { output, metadata } = req.body ?? {};
+    const { output } = req.body ?? {};
 
     // Settle: pay provider, network fee, burn
     await settlePayment(storage, config, work);

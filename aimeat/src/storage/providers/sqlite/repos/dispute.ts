@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/dispute.ts
+ * @description SQLite (better-sqlite3) repository for disputes, dispute audit trails, and moderation
+ *   appeals: synchronous CRUD + list queries plus row (de)serialization of the JSON ruling field.
+ *
+ * @structure
+ *   - createDispute / getDispute / getDisputeByTrackingCode / updateDispute / listDisputes*: dispute CRUD
+ *   - addDisputeAuditEntry / getDisputeAuditLog: append-and-read dispute audit trail
+ *   - createAppeal / getAppeal / getAppealByFlagId / listAppeals / updateAppeal: flag-appeal CRUD
+ *   - deserializeDispute / deserializeAppeal: row → typed record mapping
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { DisputeRecord, DisputeAuditEntry, AppealRecord } from '../../../interface.js';
 

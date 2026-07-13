@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/admin-maintenance.ts
+ * @description Operator-only admin routes for extension hooks and maintenance mode:
+ *   list/set/clear the action lists bound to lifecycle hooks, and read/toggle the
+ *   node's maintenance state (persisted to storage and mirrored in an in-memory cache).
+ *
+ * @structure
+ *   - adminMaintenanceRouter(config, storage, maintenanceCache?): Router
+ *   - GET/PUT/DELETE /v1/admin/hooks[/:hookName]: manage extension hook actions
+ *   - GET/POST /v1/admin/maintenance: read/toggle maintenance mode
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

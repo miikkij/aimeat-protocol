@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/providers/sqlite/repos/board.ts
+ * @description SQLite (better-sqlite3) repository functions for boards — CRUD and (de)serialization
+ *   for board records, posts, and subscriptions, with JSON-encoded array/object columns.
+ *
+ * @structure
+ *   - deserializeBoard / deserializePost / deserializeBoardSubscription: row → record mappers
+ *   - createBoard and related board / post / subscription query and mutation helpers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { BoardRecord, BoardPostRecord, BoardSubscriptionRecord } from '../../../interface.js';
 

@@ -1,3 +1,14 @@
+/**
+ * @file public/views/admin/work-tab.js
+ * @description Admin dashboard tab listing work items — a read-only table of tracking code, status,
+ *   action, requester/provider GAIIs, morsel cost, and creation time.
+ *
+ * @structure
+ *   - WorkTab (default export): renders data.work.items as a status-badged table, or an Empty state
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);

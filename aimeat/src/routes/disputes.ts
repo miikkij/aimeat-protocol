@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/disputes.ts
+ * @description Work dispute routes — opening disputes, counter-disputes, partial offers, and
+ *   operator rulings, backed by a hash-chained tamper-evident audit log and morsel escrow
+ *   settlement/return on resolution.
+ *
+ * @structure
+ *   - computeAuditHash/appendAuditEntry: build the SHA-256 hash-chained dispute audit log
+ *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';

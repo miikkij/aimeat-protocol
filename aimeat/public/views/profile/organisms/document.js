@@ -77,11 +77,11 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
       let out = raw;
       for (const su of urls) {
         try { const bu = await orgService.fetchStorageObjectUrl(su); created.push(bu); out = out.split(su).join(bu); }
-        catch (e) { /* leave the storage URL — renders broken but never throws */ }
+        catch { /* leave the storage URL — renders broken but never throws */ }
       }
       if (!cancelled) setRendered(out);
     })();
-    return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } }); };
+    return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } }); };
   }, [shown.markdown]);
 
   // A [file](/v1/…) LINK (pdf etc.) can't carry the session token on a plain navigation, so intercept
@@ -97,8 +97,8 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     const tab = window.open('', '_blank', 'noopener');
     orgService.fetchStorageObjectUrl(href).then(bu => {
       if (tab) tab.location.href = bu; else window.open(bu, '_blank', 'noopener');
-      setTimeout(() => { try { URL.revokeObjectURL(bu); } catch (err) { /* noop */ } }, 60_000);
-    }).catch(() => { try { tab?.close(); } catch (err) { /* noop */ } });
+      setTimeout(() => { try { URL.revokeObjectURL(bu); } catch { /* noop */ } }, 60_000);
+    }).catch(() => { try { tab?.close(); } catch { /* noop */ } });
   };
 
   // created/saved/published timestamps come from the workspace read (record metadata on the value).
@@ -162,7 +162,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       const r = await orgService.setImageVisibility(key, visibility);
       if (r?.ok === false) throw new Error(r?.error?.message || 'Failed');
       setImages(imgs => imgs.map(i => i.key === key ? { ...i, visibility } : i));
-    } catch (e) { /* leave as-is; a failed toggle just doesn't change the pill */ }
+    } catch { /* leave as-is; a failed toggle just doesn't change the pill */ }
     finally { setImgBusy(false); }
   };
   const makeAllImagesPublic = async () => {
@@ -209,7 +209,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
           const bu = await orgService.fetchStorageObjectUrl(su);
           displayMap.current[bu] = su; blobUrls.push(bu);
           initial = initial.split(su).join(bu);
-        } catch (e) { /* leave the storage URL — it renders broken but saves intact */ }
+        } catch { /* leave the storage URL — it renders broken but saves intact */ }
       }
       if (cancelled || !containerRef.current) return;
       inst = new Editor({
@@ -241,9 +241,9 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     })();
     return () => {
       cancelled = true;
-      if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } }
+      if (inst) { try { inst.destroy(); } catch { /* noop */ } }
       editorRef.current = null;
-      blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } });
+      blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } });
     };
   }, [mode]);
 

@@ -1,6 +1,16 @@
 /**
- * Route Manifest — tracks relay hops through federation for fee settlement.
- * Per RFC v1.6 §13.12.
+ * @file src/types/route-manifest.ts
+ * @description Route Manifest types and helpers — tracks the relay hop chain a work
+ *   request travels through federation, for signed integrity and network-fee settlement
+ *   (RFC v1.6 §13.12).
+ *
+ * @structure
+ *   - RouteHop / RouteManifest: signed per-hop record and the full origin→destination path
+ *   - RelayFeeDistribution + computeRelayFeeDistribution(fee, hops): split fee (origin/relays/dest/burn)
+ *   - buildHopSigningMessage(...): canonical Ed25519 signing string for a hop
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 /** A single hop in the relay chain. */

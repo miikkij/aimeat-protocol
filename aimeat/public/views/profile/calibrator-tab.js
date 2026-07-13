@@ -512,7 +512,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
 
 // ── Root Component ──
 
-export default function CalibratorTab({ session, showToast }) {
+export default function CalibratorTab({ showToast }) {
   const [view, setView] = useState('list');
   const [activeProjectId, setActiveProjectId] = useState(null);
 

@@ -96,7 +96,7 @@ function PlaybookItem({ item }) {
   `;
 }
 
-function Playbook({ answers, tier, slug, onBack, onRestart }) {
+function Playbook({ answers, tier, onBack, onRestart }) {
   const mcpUrl = `${location.origin}/v1/mcp`;
   const sections = useMemo(() => buildPlaybook(answers, mcpUrl), [answers, mcpUrl]);
   const md = useMemo(

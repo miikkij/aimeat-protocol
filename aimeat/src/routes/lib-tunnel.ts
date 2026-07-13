@@ -1,10 +1,19 @@
+/**
+ * @file src/routes/lib-tunnel.ts
+ * @description Generates the browser-served aimeat-tunnel.js client library as a string — a
+ *   config-templated IIFE providing an auto-reconnecting WebSocket tunnel between a personal node
+ *   and the operator, with heartbeat, request/response handling, and mailbox sync.
+ *
+ * @structure
+ *   - aimeatTunnelLib(config): returns the JS source (interpolates nodeId, baseUrl, heartbeat interval)
+ *   - Emitted TunnelClient: connect/close, exponential-backoff reconnect, status callbacks
+ *   - Emitted AIMEAT.tunnel: { connect, create, version } mounted on the global AIMEAT namespace
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
-/**
- * aimeat-tunnel.js — Personal node tunnel client library
- * Provides auto-reconnect WebSocket tunnel, heartbeat sender, and mailbox sync.
- * Depends on AIMEAT.auth being loaded first.
- */
 export function aimeatTunnelLib(config: AimeatConfig): string {
   return `// aimeat-tunnel.js — AIMEAT Tunnel Client Library (Personal Node ↔ Operator)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}

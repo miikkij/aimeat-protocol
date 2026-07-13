@@ -1,3 +1,17 @@
+/**
+ * @file src/server-bootstrap/middleware-guards.ts
+ * @description Installs early request guards during server bootstrap: maintenance-mode gating
+ *   (503 + a styled HTML page for browsers), node-type guards for relay/mirror nodes, and a
+ *   first-run redirect that serves the setup wizard when no owners exist yet.
+ *
+ * @structure
+ *   - setupGuards(app, config, storage, maintenanceCache, invalidateHasOwnersCache): wires the guards
+ *   - rejectForRelay / mirrorReadOnly: node-type handlers returned for selective mounting
+ *   - maintenancePageHtml(nodeId, message): renders the auto-refreshing maintenance page
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';

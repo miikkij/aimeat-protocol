@@ -1,6 +1,14 @@
 /**
- * AIMEAT Shared Hooks
- * Reusable Preact hooks for common data-fetching and UI patterns.
+ * @file public/js/hooks.js
+ * @description Reusable Preact hooks for the SPA. Provides useApiCall, which fetches
+ *   an AIMEAT /v1/* endpoint and tracks loading/error/data state with a reload trigger.
+ *
+ * @structure
+ *   - useApiCall(endpoint, options): fetches via api(), returns { data, error, loading, reload }
+ *   - reload(): bumps an internal key to re-run the fetch (e.g. after a mutation)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '/js/api.js';

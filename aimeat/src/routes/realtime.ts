@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/realtime.ts
+ * @description Realtime "rooms" API (gated by config.realtimeEnabled). Lets authenticated
+ *   principals create and list rooms for realtime/multiplayer apps, returning a WebSocket URL;
+ *   delegates room lifecycle to the RealtimeManager and honours room limits.
+ *
+ * @structure
+ *   - realtimeRouter(config, storage, realtimeManager, peers?): builds the router
+ *   - POST /v1/realtime/rooms: create a room (503 when disabled, 429 on ROOM_LIMIT_REACHED)
+ *   - additional room listing/lookup routes over realtimeManager
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

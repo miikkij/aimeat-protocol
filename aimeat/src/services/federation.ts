@@ -1,4 +1,18 @@
 /**
+ * @file src/services/federation.ts
+ * @description Federation service — resolves which peer node hosts a GAII (with a 5-minute cache),
+ *   runs the background heartbeat, and tracks per-peer health/availability across federated nodes.
+ *
+ * @structure
+ *   - PeerInfo: shape of a known peer (keys, trust tier, availability, heartbeat stats, versions)
+ *   - resolveGaii: cache → local storage → peer lookup to find a GAII's hosting node
+ *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+/**
  * Federation service — background heartbeat, GAII resolution cache,
  * and peer health monitoring.
  */

@@ -1,3 +1,17 @@
+/**
+ * @file public/views/admin/hooks-tab.js
+ * @description Admin dashboard "Extension Hooks" tab (Preact + HTM): shows each lifecycle hook
+ *   (owner/agent registration, work, settlement, board, federation) with an inline description and
+ *   its bound actions, and lets an operator clear a hook's bindings after confirmation.
+ *
+ * @structure
+ *   - HooksTab (default): renders the hooks table from props.data.hooks
+ *   - hookDesc map: per-hook human-readable descriptions from i18n
+ *   - doClear(): confirm + deleteHook() then reload
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -8,7 +22,7 @@ import { deleteHook } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
 export default function HooksTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const hooks = data.hooks || {};
   const hookNames = Object.keys(hooks);

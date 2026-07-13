@@ -1,3 +1,17 @@
+/**
+ * @file src/i18n.ts
+ * @description Server-side i18n core: loads locales/en.json + fi.json at startup and produces
+ *   bound translation functions with dot-path key resolution, {{var}} interpolation, and fallback.
+ *
+ * @structure
+ *   - LOCALES / DEFAULT_LOCALE / Locale: supported locale set (en, fi)
+ *   - createT(locale): returns a TFunction that resolves keys, falls back to en, then to the key
+ *   - detectLocale(acceptLang): picks best locale from an Accept-Language header
+ *   - toLocale(val): validates/coerces an arbitrary value to a Locale
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

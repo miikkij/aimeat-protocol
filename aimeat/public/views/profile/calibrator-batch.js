@@ -83,7 +83,7 @@ async function callModel(projectId, prompt, modelId, { retries = 1, temperature,
       }
       return content;
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Request timed out (30 min)');
+      if (e.name === 'AbortError') throw new Error('Request timed out (30 min)', { cause: e });
       // Retry on network errors
       if (attempt < retries && e.name === 'TypeError') {
         console.warn(`callModel retry ${attempt + 1}/${retries}: network error`);
@@ -211,7 +211,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
     setProgress(`${t('profile.calibrator.step1')}: ${t('profile.calibrator.generating')} — ${models.length} ${t('profile.calibrator.models')} (parallel)...`);
 
     // Run all models in parallel
-    const results = await Promise.allSettled(models.map(async (m, i) => {
+    const results = await Promise.allSettled(models.map(async (m) => {
       const copy = { ...m };
       const candidate = candidates.find(c => c.id === copy.modelId);
       if (!candidate || !candidate.modelId) {
@@ -309,7 +309,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         .replace(/\{MODEL_NAME\}/g, m.modelLabel || '')
         .replace(/\{ANALYSIS_TEXT\}/g, typeof m.step2_analysis.analysis === 'string' ? m.step2_analysis.analysis : JSON.stringify(m.step2_analysis.analysis || '', null, 2));
 
-      let judgeProposals = { proposals: [], reasoning: '', promptSent: judgeComposed, rawResponse: null };
+      let judgeProposals;
       try {
         // Step 3a: Judge reflection — focused proposals, low randomness
         const raw = await callModel(projectId, judgeComposed, project.reasoningLlm.modelId, { temperature: 0.2 });
@@ -328,7 +328,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         .replace(/\{MODEL_NAME\}/g, m.modelLabel || '')
         .replace(/\{ANALYSIS_TEXT\}/g, typeof m.step2_analysis.analysis === 'string' ? m.step2_analysis.analysis : JSON.stringify(m.step2_analysis.analysis || '', null, 2));
 
-      let selfProposals = { proposals: [], reasoning: '', promptSent: selfComposed, rawResponse: null };
+      let selfProposals;
       const selfModelId = candidate?.modelId || project.reasoningLlm.modelId;
       try {
         // Step 3b: Self-reflection — candidate reflects on own output
@@ -375,7 +375,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       .replace(/\{JUDGE_PROPOSALS\}/g, judgeBlocks.join('\n\n') || '(none)')
       .replace(/\{CANDIDATE_PROPOSALS\}/g, selfBlocks.join('\n\n') || '(none)');
 
-    let synthesis = { ...PENDING_SYNTHESIS };
+    let synthesis;
     try {
       // Step 4: Synthesis — deterministic grouping and scoring
       const raw = await callModel(projectId, composed, project.reasoningLlm.modelId, { temperature: 0.1 });
@@ -660,7 +660,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
           ${!currentVersion?.targetOutput ? html`
             <div class="fnd-cal-warning">${t('profile.calibrator.noTargetWarning')}</div>
           ` : ''}
-          ${models.filter(m => m.step1_generation?.status === 'done').map((m, i) => {
+          ${models.filter(m => m.step1_generation?.status === 'done').map((m) => {
             const modelIndex = models.indexOf(m);
             const a = m.step2_analysis;
             return html`
@@ -726,7 +726,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
       <details class="fnd-cal-step" open=${anyReflected}>
         <summary>${t('profile.calibrator.step3')}</summary>
         <div class="fnd-cal-step-body">
-          ${models.filter(m => m.step2_analysis?.status === 'done').map((m, i) => {
+          ${models.filter(m => m.step2_analysis?.status === 'done').map((m) => {
             const modelIndex = models.indexOf(m);
             const r = m.step3_reflection;
             const jp = r?.judgeProposals;

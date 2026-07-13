@@ -1,6 +1,15 @@
 /**
- * AIMEAT Cortex Extension Service
- * All Cortex extension API calls in one place.
+ * @file public/js/services/cortex.js
+ * @description Frontend service layer for the Cortex (extension) API — centralizes all
+ *   /v1/cortex REST calls: list, detail (with prompt content + ontology), lifecycle, and installs.
+ *
+ * @structure
+ *   - listExtensions / getExtensionDetail: read installed extensions and enrich detail with prompts/ontology
+ *   - activateExtension / deactivateExtension / uninstallExtension / toggleVisibility: lifecycle + visibility
+ *   - installExtension / installBundledExtension: install from a YAML manifest (+libs) or a bundled /cortex-bundled/ id
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 import { getNodeUrl } from '/js/services/auth.js';

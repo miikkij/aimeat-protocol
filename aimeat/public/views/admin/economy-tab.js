@@ -1,10 +1,22 @@
+/**
+ * @file public/views/admin/economy-tab.js
+ * @description Admin dashboard Economy tab — renders morsel-supply, daily-activity, and policy
+ *   metrics, plus an operator mint form that credits morsels to a target GAII.
+ *
+ * @structure
+ *   - default EconomyTab({ data, reload }): reads data.dash.economy, shows EconRow metric cards
+ *   - doMint(): validates amount (1–1,000,000) and calls mintMorsels(), surfacing the result
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, EconRow, StatsGrid } from './shared.js';
+import { num, EconRow } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 
 export default function EconomyTab({ data, reload }) {

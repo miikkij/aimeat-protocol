@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/admin-config.ts
+ * @description Operator-only admin config API. Exposes the node's configuration schema
+ *   (types, ranges, descriptions, provenance/source, editability) and applies mutations to
+ *   persistable fields, integrating with Consul-sourced values and provenance tracking.
+ *
+ * @structure
+ *   - adminConfigRouter(config, storage, provenance?, consulService?): builds the router
+ *   - GET /v1/admin/config: dynamic schema from CONFIG_FIELDS incl. secret "_configured" flags
+ *   - mutation routes: validate + persist mutable config, emit change events
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

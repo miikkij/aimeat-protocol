@@ -1,7 +1,18 @@
+/**
+ * @file src/routes/spec.ts
+ * @description Serves the canonical OpenAPI contract and interactive API docs — GET /v1/spec returns
+ *   openapi.yaml as text/yaml; GET /v1/docs renders a Swagger UI page (with a relaxed CSP for the
+ *   unpkg.com-hosted assets) pointed at /v1/spec.
+ *
+ * @structure
+ *   - specRouter(): mounts GET /v1/spec (locates + serves openapi.yaml) and GET /v1/docs (Swagger UI)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 export function specRouter(): Router {
   const router = Router();

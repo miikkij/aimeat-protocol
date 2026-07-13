@@ -27,10 +27,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { normalizeToastType } from '/components/Toast.js';
-import { getSession, getNodeUrl, onAuthChange } from '/js/services/auth.js';
+import { getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { listAgents } from '/js/services/agents.js';
 import { getWallet } from '/js/services/wallet.js';
@@ -122,7 +121,6 @@ const TABS = [
 ];
 
 export default function Profile({ navigate, locale }) {
-  const NODE_URL = getNodeUrl();
   const [session, setSession] = useState(null);
   const savedTab = () => {
     const id = sessionStorage.getItem('aimeat-profile-tab');
@@ -130,8 +128,8 @@ export default function Profile({ navigate, locale }) {
     if (id === 'home') return 'home';
     return id && TABS.some(t => t.id === id) ? id : 'home';
   };
-  const [activeTab, setActiveTab] = useState(savedTab);
-  const [visitedTabs, setVisitedTabs] = useState(() => {
+  const [, setActiveTab] = useState(savedTab);
+  const [, setVisitedTabs] = useState(() => {
     const initial = savedTab();
     return initial === 'home' ? new Set() : new Set([initial]);
   });
@@ -259,19 +257,6 @@ export default function Profile({ navigate, locale }) {
       disconnect();
     };
   }, [session]);
-
-  // Tab switching
-  function switchTab(tabId) {
-    setActiveTab(tabId);
-    sessionStorage.setItem('aimeat-profile-tab', tabId);
-    if (tabId !== 'home') {
-      setVisitedTabs(prev => {
-        const next = new Set(prev);
-        next.add(tabId);
-        return next;
-      });
-    }
-  }
 
   // Common props passed to all tabs
   const tabProps = { session, showToast, onStats: updateStats, navigate, locale };

@@ -1,9 +1,14 @@
 /**
- * Federation barrel router — composes all federation sub-routers into a
- * single router that can be mounted in server.ts without changes.
+ * @file src/routes/federation.ts
+ * @description Federation barrel router — composes the peer, sync, settlements, genesis, and auth
+ *   sub-routers into one mountable router, and re-exports shared federation helpers for back-compat.
  *
- * Re-exports shared helpers so existing imports from this module continue
- * to work (peerKeyCache, performKeyExchange, PeerKeyEntry).
+ * @structure
+ *   - federationRouter(config, storage, peers, networkDirectory?): mounts all federation sub-routers
+ *   - Re-exports: peerKeyCache, performKeyExchange, PeerKeyEntry (from services/federation-helpers.js)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { Router } from 'express';

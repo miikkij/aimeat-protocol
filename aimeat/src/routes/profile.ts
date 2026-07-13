@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/profile.ts
+ * @description Serves the standalone legacy profile page (self-contained HTML) at GET /v1/profile —
+ *   an SSR-rendered "My Profile" page with inlined CSS and localized translations injected as a
+ *   window.T object, driven client-side by the aimeat-auth.js library.
+ *
+ * @structure
+ *   - profileRouter(config, storage): Router exposing GET /v1/profile (locale-resolved, sets lang cookie)
+ *   - profileHtml(config, locale, translations): builds the full HTML document string
+ *   - buildProfileTranslations / sanitize: gather flat profile+modal i18n and HTML-escape interpolations
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

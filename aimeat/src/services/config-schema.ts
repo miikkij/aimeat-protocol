@@ -1,12 +1,16 @@
 /**
- * Shared config field definitions — single source of truth.
+ * @file src/services/config-schema.ts
+ * @description Single source of truth for AIMEAT's tunable config fields — each entry maps an
+ *   AimeatConfig key to its admin dot-path, AIMEAT_* env var, type, validator, mutability, and admin
+ *   display mode. Consumed by the admin config API, startup overrides, live Consul updates, the config
+ *   loader, and CLI export/import.
  *
- * Used by:
- *  - admin.ts (GET + PUT /v1/admin/config)
- *  - config.ts (applyConfigOverrides on startup)
- *  - consul-config.ts (watch callback applying live changes)
- *  - config-loader.ts (env/file source mapping)
- *  - CLI tools (config export/import)
+ * @structure
+ *   - ConfigFieldDef: the field-definition interface (key, dotPath, envVar, type, validate, immutable, adminDisplay)
+ *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

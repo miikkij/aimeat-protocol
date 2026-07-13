@@ -1,3 +1,15 @@
+/**
+ * @file src/utils/tracking-code.ts
+ * @description Small helpers that mint unique, human-readable identifiers using crypto random bytes —
+ *   tracking codes for work/disputes and short request IDs.
+ *
+ * @structure
+ *   - generateTrackingCode(): "tc-{unix_ms}-{8hex}"
+ *   - generateRequestId(): "req-{8hex}"
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { randomBytes } from 'node:crypto';
 
 /**

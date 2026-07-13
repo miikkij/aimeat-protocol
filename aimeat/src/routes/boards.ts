@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/boards.ts
+ * @description Public message-board API — create boards, post/reply/react, subscribe, and read with
+ *   consent + moderation enforcement. New posts fan out to subscriber callback URLs via SSRF-safe
+ *   fetch, and system/public boards are operator-gated.
+ *
+ * @structure
+ *   - boardsRouter(config, storage): mounts the /v1/boards/* routes
+ *   - notifySubscribers(): fire-and-forget webhook fan-out with category/tag filters via safeFetch
+ *   - POST /v1/boards + posts/reactions/replies/subscribe: create + interact (scope/role gated)
+ *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';

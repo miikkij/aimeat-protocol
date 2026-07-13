@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/owners.ts
+ * @description Owner (GHII human account) routes — registration of new owners with keypair
+ *   generation, first-owner operator bootstrap, pre-registration extension hooks, and owner
+ *   profile/trust surfacing.
+ *
+ * @structure
+ *   - ownersRouter(config, storage): builds the owners router
+ *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';

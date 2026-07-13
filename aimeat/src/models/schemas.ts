@@ -1,3 +1,20 @@
+/**
+ * @file src/models/schemas.ts
+ * @description Central Zod request-body schemas for every AIMEAT API domain (identity, auth, memory,
+ *   actions, work queue, disputes, boards, federation, admin, wallet, storage, schema-locking, consent,
+ *   TOTP), plus the `validateBody()` Express middleware factory that enforces them and returns the
+ *   standard error envelope on failure.
+ *
+ * @structure
+ *   - Identity/Auth: OwnerRegistrationSchema, AgentRegistrationSchema, TokenRequestSchema, OtkGenerateSchema
+ *   - Memory/Actions: MemoryWriteSchema, MemoryUpdateSchema, ActionPublishSchema, ActionPricingSchema
+ *   - Work/Disputes: WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, DisputeOpenSchema
+ *   - Boards/Federation/Admin: BoardCreateSchema, PeeringRequestSchema, ConfigUpdateSchema, RoleGrantSchema
+ *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { z } from 'zod';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────

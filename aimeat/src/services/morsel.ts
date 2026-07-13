@@ -1,3 +1,19 @@
+/**
+ * @file src/services/morsel.ts
+ * @description Morsel economy service — escrow, settlement, and allowance logic for work requests.
+ *   Uses atomic debit/credit storage ops to avoid TOCTOU double-spend and splits network fees
+ *   across provider/requester/relay/registry nodes per RFC §10.11/§16.2.
+ *
+ * @structure
+ *   - calculateWorkCost: base price + 10% network fee → escrow total
+ *   - holdEscrow/returnEscrow: atomically debit/credit escrow with transaction logs
+ *   - settlePayment: burn + fee split + pay provider on successful delivery
+ *   - applyDailyAllowance: capped daily allowance credit
+ *   - calculateEscrow: sum in-escrow amounts across a requester's open work
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
@@ -16,7 +32,7 @@ export interface SettlementResult {
 /**
  * Calculate morsel costs for a work request.
  */
-export function calculateWorkCost(baseMorsels: number, burnRate: number) {
+export function calculateWorkCost(baseMorsels: number, _burnRate: number) {
     const networkFee = Math.ceil(baseMorsels * 0.1);
     const total = baseMorsels + networkFee;
     return { basePrice: baseMorsels, networkFee, total, inEscrow: total };
@@ -62,7 +78,7 @@ export async function settlePayment(
     work: WorkRecord,
     relayPath: string[] = [],
 ): Promise<SettlementResult> {
-    const { basePrice, networkFee, total } = work.cost;
+    const { basePrice, networkFee } = work.cost;
 
     // Burn portion of network fee (applied first)
     const burned = Math.floor(networkFee * config.burnRate);

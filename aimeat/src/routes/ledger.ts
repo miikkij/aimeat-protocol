@@ -31,7 +31,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentUsageDailyRecord, AgentUsageEvent } from '../storage/interface.js';
+import type { Storage, AgentUsageDailyRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { getOwnerBudgetStatus } from '../services/ledger-budget.js';

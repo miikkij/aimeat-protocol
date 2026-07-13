@@ -16,7 +16,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };

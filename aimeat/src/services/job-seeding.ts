@@ -1,3 +1,16 @@
+/**
+ * @file src/services/job-seeding.ts
+ * @description Idempotently seeds the core scheduled-job records (with cron expressions) into storage
+ *   at startup, creating each only if absent so restarts don't duplicate them; feature-gated jobs are
+ *   seeded per config (consent, personal nodes, verification nonce cleanup).
+ *
+ * @structure
+ *   - CoreJobDef: shape of a seeded job (id, name, coreHandler, cron)
+ *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

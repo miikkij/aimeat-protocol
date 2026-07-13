@@ -1,6 +1,17 @@
 /**
- * Memory Replication Service — consent-based memory replication to federation peers.
- * Per RFC v1.6 §13.11.4 (replication protocol) and §13.11.5 (queue).
+ * @file src/services/memory-replication.ts
+ * @description Memory Replication Service — consent-based replication of public memory
+ *   entries to federation peers (RFC v1.6 §13.11.4 protocol, §13.11.5 queue). Only
+ *   entries that are public and covered by an active `federation`-scope consent are
+ *   eligible; replication is signed and tracked per key/peer.
+ *
+ * @structure
+ *   - ReplicationResult: per-peer replication outcome shape
+ *   - isEligibleForReplication(storage, ownerGaii, key): public + federation-consent gate
+ *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

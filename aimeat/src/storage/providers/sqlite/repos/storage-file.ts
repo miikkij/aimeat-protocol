@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/storage-file.ts
+ * @description SQLite (better-sqlite3) repository functions for binary storage files, chunked uploads,
+ *   and micro-memory. Handles row (de)serialization of file blobs, tags, access codes, and the federate
+ *   flag, keyed by (ownerGaii, key).
+ *
+ * @structure
+ *   - Storage files: create/get/list/delete + updateFileTagsByKey
+ *   - Chunked uploads: records backing the presigned/multipart upload flow
+ *   - Micro-memory: small per-agent key/value storage rows
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { StorageFileRecord, ChunkedUploadRecord, MicroMemoryRecord } from '../../../interface.js';
 

@@ -37,7 +37,7 @@ import {
   loadReflectionHistory, isDuplicatePrescription, MAX_REFLECTIONS,
 } from '/js/services/foundry.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/foundry-prompts.js';
-import { validateComponent, validateSkeleton, validateUnit } from '/js/services/foundry-validate.js';
+import { validateComponent } from '/js/services/foundry-validate.js';
 import { verifyContract } from '/js/services/foundry-contract.js';
 import { smokeTest } from '/js/services/foundry-smoke.js';
 import { createBundle } from '/js/services/foundry-context-bundle.js';
@@ -104,8 +104,8 @@ export async function runWithAi(projectId, prompt, systemPrompt = null, modelRol
     if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
     return resp.data.content;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Cancelled');
-    if (e.name === 'TypeError') throw new Error('Network error — connection lost');
+    if (e.name === 'AbortError') throw new Error('Cancelled', { cause: e });
+    if (e.name === 'TypeError') throw new Error('Network error — connection lost', { cause: e });
     throw e;
   } finally {
     clearTimeout(timeoutId);
@@ -223,7 +223,7 @@ function generatePassPrompt(pass, ctx) {
 /**
  * Handle saving the response for a pass based on its type.
  */
-async function handlePassSubmit(projectId, componentId, pass, response, ctx) {
+async function handlePassSubmit(projectId, componentId, pass, response, _ctx) {
   switch (pass.type) {
     case 'test':
       await saveTestCode(projectId, componentId, response);
@@ -486,7 +486,6 @@ export function ComponentDetail({ component, project, components, projectId, int
     }
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
-  const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
   const prompt = component.prompt || generatedPrompt || '';
 
   // Workflow step for guided UI

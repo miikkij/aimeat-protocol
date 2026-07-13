@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/totp.ts
+ * @description Routes for TOTP two-factor authentication on GHII accounts: setup
+ *   (generate secret + QR + backup codes), verify/activate, disable, and backup-code
+ *   handling. Gated on config.totpEnabled and driven by the totp service; secrets are
+ *   stored encrypted.
+ *
+ * @structure
+ *   - totpRouter(config, storage): Router mounting the /v1/ghii/totp/* endpoints
+ *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

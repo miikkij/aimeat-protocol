@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/admin-monitoring.ts
+ * @description Operator-only admin routes for monitoring and federation control — listing all work
+ *   items, inspecting federation peers/peering requests, and initiating a federation join
+ *   (key exchange) with a genesis/target node.
+ *
+ * @structure
+ *   - adminMonitoringRouter(config, storage, peers): builds the operator-gated router
+ *   - GET /v1/admin/work: lists all work items with status and cost
+ *   - GET /v1/admin/federation: lists peering requests/peers
+ *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -254,7 +269,7 @@ export function adminMonitoringRouter(
             }
         }
         if (agent_data) {
-            for (const [gaii, data] of Object.entries(agent_data as Record<string, any>)) {
+            for (const [, data] of Object.entries(agent_data as Record<string, any>)) {
                 if (data.memories) {
                     for (const m of data.memories) {
                         await storage.setMemory(m);
@@ -278,7 +293,7 @@ export function adminMonitoringRouter(
 
     // POST /v1/admin/roles/grant — grant operator role (operator only)
     router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
-        const { owner, role } = req.body ?? {};
+        const { owner } = req.body ?? {};
 
         const ownerRecord = await storage.getOwner(owner);
         if (!ownerRecord) {

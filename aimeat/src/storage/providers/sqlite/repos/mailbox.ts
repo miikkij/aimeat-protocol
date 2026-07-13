@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/mailbox.ts
+ * @description SQLite repository functions for personal-node mailbox items: CRUD over
+ *   the `mailbox_items` table while keeping each personal node's `mailboxUsedBytes`
+ *   quota counter in sync. Also carries maintenance-state persistence helpers.
+ *
+ * @structure
+ *   - createMailboxItem/getMailboxItem/listMailboxItems: insert + read mailbox rows
+ *   - deleteMailboxItem/deleteMailboxItemsByNode: delete rows and decrement usage bytes
+ *   - deserializeMailboxItem: row → MailboxItemRecord mapping
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { MailboxItemRecord, MaintenanceState } from '../../../interface.js';
 

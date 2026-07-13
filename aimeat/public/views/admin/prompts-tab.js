@@ -1,3 +1,18 @@
+/**
+ * @file public/views/admin/prompts-tab.js
+ * @description Admin dashboard System Prompts tab — browse managed prompts grouped by category,
+ *   edit content + locale overrides + active flag, view/restore version history, and reset a
+ *   single prompt / group / all prompts to factory defaults.
+ *
+ * @structure
+ *   - GROUP_NAMES: maps prompt group keys to i18n labels
+ *   - PromptsTab (default): list view (stats, grouped accordions, reset-group/all) and
+ *     an edit view (content textarea, variables/usedIn reference, change note, version history)
+ *   - Handlers: openEdit/handleSave/handleReset/handleResetAll/handleRestore call the admin service
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
@@ -19,7 +34,7 @@ const GROUP_NAMES = {
   generator: 'promptsGroupGenerator',
 };
 
-export default function PromptsTab({ data, reload }) {
+export default function PromptsTab({ data }) {
   const [prompts, setPrompts] = useState(data?.systemPrompts?.prompts || []);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState(null);

@@ -1,3 +1,19 @@
+/**
+ * @file src/routes/lib-work.ts
+ * @description Server-generated browser client library (aimeat-work.js): builds the JS source string
+ *   served to browsers for the AIMEAT.work namespace — action catalogue browsing plus work-exchange
+ *   (request/accept/deliver). The node URL and baseUrl are interpolated at generation time.
+ *
+ * @structure
+ *   - aimeatWorkLib(config): returns the aimeat-work.js source as a string
+ *   - embedded AIMEAT.work client: catalogue() (public) + authenticated work request/accept/deliver
+ *
+ * @usage
+ *   Requires aimeat-auth.js loaded first (uses AIMEAT.auth.getSession()).
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

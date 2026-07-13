@@ -1,3 +1,16 @@
+/**
+ * @file src/services/prompt-seeder.ts
+ * @description Seeds managed system prompts into storage on startup from the factory
+ *   defaults (PROMPT_SEEDS). New prompts are inserted at version 1; existing prompts get
+ *   metadata refreshed but admin-edited content is preserved — except code-owned groups
+ *   (generator/builders/tiers) and specific ids that are always re-synced from source.
+ *
+ * @structure
+ *   - seedSystemPrompts(storage): upsert seeds, insert-or-update, and version new inserts
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { PROMPT_SEEDS } from './prompt-defaults.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

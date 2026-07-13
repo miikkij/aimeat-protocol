@@ -1,6 +1,15 @@
 /**
- * OpenClaw + AIMEAT — View Module
- * Static documentation page for OpenClaw integration.
+ * @file public/views/openclaw.js
+ * @description SPA view rendering a static documentation/landing page for connecting an
+ *   OpenClaw (or any MCP client) agent runtime to an AIMEAT node — setup steps, auth
+ *   options, the MCP tool catalogue, use-case scenarios, and memory key conventions.
+ *
+ * @structure
+ *   - OpenClawView: Preact component; derives node URL from window.origin, loads openclaw.css
+ *   - renders MCP config snippets, an 18-tool reference table, and memory-key patterns
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
 import { useEffect } from 'preact/hooks';

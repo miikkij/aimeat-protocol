@@ -21,7 +21,7 @@ export default function NotificationsTab({ session, showToast }) {
   const [vapidKey, setVapidKey] = useState(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailPrefs, setEmailPrefs] = useState({ enabled: false, extensions: true, system: true, security: true });
-  const [savingEmail, setSavingEmail] = useState(false);
+  const [, setSavingEmail] = useState(false);
 
   useEffect(() => {
     if (session) checkSubscription();

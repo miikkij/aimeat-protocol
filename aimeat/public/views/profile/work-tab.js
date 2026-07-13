@@ -11,14 +11,14 @@
  *     hand-rolled .modal-overlay markup.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { listInbox, listSent, submitRating, acceptWork, rejectWork, deliverWork, updateProgress } from '/js/services/work.js';
+import { listInbox, listSent, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);

@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/providers/sqlite/repos/action.ts
+ * @description SQLite (better-sqlite3) repository for action records — CRUD over the `actions`
+ *   table with JSON (de)serialization of schemas, pricing, tags, and semantic metadata.
+ *
+ * @structure
+ *   - deserializeAction: maps a DB row (parsing JSON columns) to an ActionRecord
+ *   - createAction/getAction: insert (with UNIQUE→ACTION_EXISTS) and fetch by provider+id
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { ActionRecord } from '../../../interface.js';
 

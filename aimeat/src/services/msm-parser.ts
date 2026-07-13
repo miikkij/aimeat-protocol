@@ -1,3 +1,17 @@
+/**
+ * @file src/services/msm-parser.ts
+ * @description Parser and validator for MSM (Machine Service Manifest) YAML — the descriptor of an
+ *   external service's auth, actions (endpoint/input/output/mapping), and health check.
+ *
+ * @structure
+ *   - MSM types: MsmDefinition, MsmAction, MsmFieldDef, MsmCategory, MsmAuthType (+ valid-value lists)
+ *   - parseMsm(yaml): converts snake_case YAML into a normalized MsmDefinition
+ *   - validateMsm(def): returns an array of human-readable validation error strings
+ *   - internal helpers: parseFieldDef/parseFieldMap/parseAction
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { parse as parseYaml } from 'yaml';
 
 // ── MSM Types ──

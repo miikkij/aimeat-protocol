@@ -1,3 +1,17 @@
+/**
+ * @file src/middleware/__tests__/cookie-consent.test.ts
+ * @description Vitest unit tests for the cookie-consent middleware — verifies the consent banner
+ *   snippet is injected into HTML responses before </body>, skipped for non-HTML/non-string bodies,
+ *   and that categories/policy URL are reflected in the emitted CookieConsent.run() config.
+ *
+ * @structure
+ *   - makeConfig / createMocks: helpers building a full AimeatConfig and mock Express req/res/next
+ *   - cookieConsentMiddleware suite: injection, content-type gating, category + policy-url rendering, edge cases
+ *   - buildStandaloneSnippetJs suite + extractRunConfig: asserts IIFE shape and always-on "necessary" category
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -180,12 +194,6 @@ describe('cookieConsentMiddleware', () => {
     const htmlBody = '<html><body><p>Hello</p></body></html>';
 
     // The overridden send should inject the snippet
-    // We need to capture what the original send receives
-    const originalSend = vi.fn().mockReturnThis();
-    // Swap in a spy for the underlying send
-    const wrappedSend = res.send;
-    // The middleware replaced res.send with a wrapper that calls originalSend
-    // Let's just call it and verify it modifies the body
     // Re-create to properly test the interception
     const req2 = {} as Request;
     const headers2 = new Map<string, string | number | readonly string[]>();

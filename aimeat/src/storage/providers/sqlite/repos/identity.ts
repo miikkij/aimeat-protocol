@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/identity.ts
+ * @description SQLite (better-sqlite3) implementation of the identity repository — CRUD for GHII
+ *   records (incl. lookups by owner, email hash, and Google sub), chat instances, and email
+ *   verifications, with row (de)serialization between DB columns and the record types.
+ *
+ * @structure
+ *   - createGHII / getGHII / getGHIIByOwner / getGHIIByEmailHash / getGHIIByGoogleSub / updateGHII / listGHIIs / deleteGHII
+ *   - createChatInstance / getChatInstance (+ list/update/delete): chat instance persistence
+ *   - deserializeGHII: maps a DB row to a GHIIRecord (JSON fields, boolean coercion)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type {
   GHIIRecord, PersonalNodeRecord, ChatInstanceRecord,

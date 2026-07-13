@@ -1,29 +1,24 @@
-// @file src/routes/foundry.ts
-// @description Service foundry API. Thin validation layer over Memory API.
-// Agents and the browser UI submit generated content here; the route validates it, then writes to
-// foundry.* memory keys using the same structure the frontend reads.
-// @structure
-//   POST   /v1/foundry/projects                                           — create a new foundry project
-//   GET    /v1/foundry/projects                                           — list all projects for the caller
-//   GET    /v1/foundry/:projectId                                         — get full project state (project, interviewSpec, components)
-//   DELETE /v1/foundry/:projectId                                         — delete project and all associated data (cascade)
-//   POST   /v1/foundry/:projectId/interview                               — save/update interview spec for a project
-//   POST   /v1/foundry/:projectId/settings                                — store project settings values (with optional encryption)
-//   GET    /v1/foundry/:projectId/settings                                — retrieve project settings values
-//   POST   /v1/foundry/:projectId/steps/blueprint                         — validate + store blueprint
-//   POST   /v1/foundry/:projectId/components/:componentId/submit          — validate + store component content
-//   POST   /v1/foundry/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
-//   POST   /v1/foundry/:projectId/test                                    — run tests in dependency order
-//   GET    /v1/foundry/:projectId/screenshots/:filename                   — serve test screenshot PNGs
-//   POST   /v1/foundry/:projectId/log                                     — write log entry to memory
-//   POST   /v1/foundry/:projectId/complete                                — mark project active
-//   GET    /v1/foundry/:projectId/prompts/:componentId                    — get the generation prompt for a component
-//   GET    /v1/foundry/:projectId/prompts                                 — get the blueprint generation prompt
-// @usage
-//   Consumed by AI agents via device auth (foundry:read / foundry:write / foundry:execute scopes)
-//   and by the browser UI (owner JWT satisfies agent role check).
-// @version-history
-//   v1.0.0 — 2026-03-26 — Copied from generator.ts (v5.2.0) and renamed to foundry
+/**
+ * @file src/routes/foundry.ts
+ * @description Service foundry API — a thin validation layer over the Memory API. Agents and the
+ *   browser UI submit generated project content (interview spec, blueprint, components); the route
+ *   validates it and persists to owner-scoped foundry.* memory keys the frontend reads back.
+ *
+ * @structure
+ *   - POST/GET/DELETE /v1/foundry/projects[/:projectId]: project lifecycle + full-state read (cascade delete)
+ *   - POST /v1/foundry/:projectId/interview | /settings | /steps/blueprint: validate + store each stage
+ *   - POST /v1/foundry/:projectId/components/:componentId/submit|register: validate content, register into catalogue
+ *   - POST /v1/foundry/:projectId/test + /screenshots/:filename: run tests in dependency order, serve PNG evidence
+ *   - GET /v1/foundry/:projectId/prompts[/:componentId]: generation prompts for blueprint/components
+ *
+ * @usage
+ *   Consumed by AI agents via device auth (foundry:read/write/execute scopes) and by the browser UI
+ *   (owner JWT satisfies the agent role check).
+ *
+ * @version-history
+ *   v1.0.0 — 2026-03-26 — Copied from generator.ts (v5.2.0) and renamed to foundry
+ *   v1.1.0 — 2026-07-13 — Converted line-comment header to standard JSDoc block header
+ */
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -36,7 +31,7 @@ import type { ComponentType } from '../services/foundry-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/foundry-registration.js';
 import { emitChange } from '../services/event-bus.js';
 // encryption removed from foundry settings — values stored as plain text in owner-scoped memory
-import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/foundry-testing.js';
+import { executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/foundry-testing.js';
 import type { TestReport, TestResult } from '../services/foundry-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -262,7 +257,7 @@ export function foundryRouter(config: AimeatConfig, storage: Storage): Router {
     async (req, res) => {
       const projectId = req.params['projectId'] as string;
       const gaii = ownerGhii(req);
-      const { values, secretKeys } = req.body as {
+      const { values } = req.body as {
         values: Record<string, string | number | boolean>;
         secretKeys?: string[];
       };
@@ -342,7 +337,6 @@ export function foundryRouter(config: AimeatConfig, storage: Storage): Router {
       const compRec = await storage.getMemory(gaii, `foundry.${projectId}.component.${componentId}`);
       const compVal = (compRec?.value as Record<string, unknown>) ?? {};
       const compType = (compVal.type as string) || 'unknown';
-      const registeredAs = compVal.registeredAs as string || componentId;
 
       const token = (req.headers.authorization ?? '').replace('Bearer ', '');
       const baseUrl = `http://localhost:${config.port}`;

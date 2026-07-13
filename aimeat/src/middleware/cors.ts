@@ -1,9 +1,17 @@
 /**
- * CORS middleware — per-entity origin resolution.
+ * @file src/middleware/cors.ts
+ * @description CORS middleware with per-entity origin resolution: picks the most specific
+ *   allowedOrigins (memory key → agent → GHII → node default), sets/omits CORS headers accordingly,
+ *   and short-circuits preflight OPTIONS with 204/403. Anonymous mode allows all origins.
  *
- * Phase 1: Node-level only (config.corsAllowedOrigins).
- * Phase 2: GHII-level — authenticated users can restrict their origins.
- *          Resolution: GHII.allowedOrigins → node default.
+ * @structure
+ *   - corsMiddleware(config, getStorage): the Express RequestHandler
+ *   - resolveAllowedOrigins(): walks memory/agent/GHII/node scopes for the effective allowlist
+ *   - extractMemoryKey(): parses /v1/memory[/cors]/:key paths for key-level origin overrides
+ *   - setCorsHeaders(): writes Allow-Origin/Methods/Headers/Expose headers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { RequestHandler, Request } from 'express';

@@ -1,10 +1,18 @@
 /**
- * Sync Health & Peer Priority — monitors sync infrastructure health
- * and computes peer priority scores for sync ordering.
- * Per RFC v1.6 §32.6.3 (throttling) and §32.6.4 (peer priority).
+ * @file src/services/sync-health.ts
+ * @description Monitors federation sync infrastructure health (queue depth, average duration,
+ *   failure rate, active syncs, throttle state) and computes per-peer priority scores for sync
+ *   ordering. Per RFC v1.6 §32.6.3 (throttling) and §32.6.4 (peer priority).
+ *
+ * @structure
+ *   - SyncHealthMetrics / PeerPriority: exported metric + priority-score shapes
+ *   - Module-level counters: rolling sync durations, active count, attempt/failure totals
+ *   - (below) functions recording sync attempts and computing throttle + peer-priority scores
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getPeerSyncState } from './catalogue-sync.js';

@@ -1,6 +1,13 @@
 /**
- * Config persistence repository — stores admin-editable config values.
- * Keys are prefixed with "config:" in the underlying store.
+ * @file src/storage/repositories/config.repository.ts
+ * @description Storage-layer interface for persisting admin-editable config values (keyed by dot-path,
+ *   stored under a "config:" prefix in the backend), implemented per backend (SQLite / Prisma).
+ *
+ * @structure
+ *   - ConfigRepository: supportsConfigPersistence + get/set/delete a single value + getAll values
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 export interface ConfigRepository {
   /** Returns true if this storage supports config persistence (false for in-memory) */

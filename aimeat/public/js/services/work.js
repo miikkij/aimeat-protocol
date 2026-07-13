@@ -1,6 +1,15 @@
 /**
- * AIMEAT Work Service
- * Work inbox, sent items, and ratings.
+ * @file public/js/services/work.js
+ * @description Frontend service layer for the Work API — wrappers over /v1/work* covering the
+ *   work inbox/sent lists and the accept/reject/deliver/progress/rate lifecycle actions.
+ *
+ * @structure
+ *   - listInbox / listSent: read incoming and outgoing work items
+ *   - acceptWork / rejectWork / deliverWork / updateProgress: work lifecycle transitions
+ *   - submitRating: rate a completed work item
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
 

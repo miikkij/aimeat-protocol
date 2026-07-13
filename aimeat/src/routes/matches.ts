@@ -1,7 +1,17 @@
 /**
- * Match API — Phase 2.1
+ * @file src/routes/matches.ts
+ * @description Match API — endpoints for viewing and responding to AI-generated match suggestions
+ *   between profiles, with per-partner consent checks that gate whether a matched profile's details
+ *   are revealed.
  *
- * Endpoints for viewing and responding to AI-generated match suggestions.
+ * @structure
+ *   - matchesRouter: builds the Express router (auth required)
+ *   - GET /v1/matches: list the caller's own match suggestions (paginated, consent-filtered)
+ *   - respond/status routes: accept/decline suggestions and update match state
+ *   - param: helper normalizing string | string[] route params
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { Router } from 'express';

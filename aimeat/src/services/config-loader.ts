@@ -1,4 +1,19 @@
 /**
+ * @file src/services/config-loader.ts
+ * @description Unified config loader that reads raw config values from environment variables and
+ *   config files (aimeat.ini / aimeat.json / .env), normalizing each source to a dot-path keyed
+ *   string map; typed parsing happens later via parseConfigValue().
+ *
+ * @structure
+ *   - loadEnvSource: maps AIMEAT_* env vars to dot-path string values
+ *   - loadFileSource: locates and parses an ini/json/.env config file into dot-path values
+ *   - flattenToStrings/parseEnvFile (helpers): normalize nested/env formats to dot-paths
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+/**
  * Unified config loader — reads values from env vars and config files.
  *
  * Each source normalizes to Record<string, string> keyed by dot-path.

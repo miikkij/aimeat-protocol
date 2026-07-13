@@ -1,3 +1,16 @@
+/**
+ * @file public/js/components/tag-cloud.js
+ * @description Preact/HTM presentational component rendering a set of tags as clickable
+ *   filter pills, with an optional "show all / fewer" cap and a clear button.
+ *
+ * @structure
+ *   - default TagCloud({ tags, selected, onToggle, onClear, limit }): controlled filter cloud;
+ *     respects caller order when `limit` set (else alphabetical), keeps selected pills visible
+ *   - showAll state: toggles the capped view; clear pill appears only when a filter is active
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';

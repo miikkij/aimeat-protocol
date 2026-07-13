@@ -125,7 +125,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   const owners = [];
   for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
 
-  const after = async (p) => { setBusy(true); try { await p; await loadAccess(); } catch (e) { /* the row stays so the user can retry */ } finally { setBusy(false); } };
+  const after = async (p) => { setBusy(true); try { await p; await loadAccess(); } catch { /* the row stays so the user can retry */ } finally { setBusy(false); } };
   const doGrant = (g, r) => { const name = (g || '').trim(); if (name) { after(orgService.grantWorkspaceRole(orgId, wsId, name, r)); setGrantee(''); } };
   const doRevoke = (g) => after(orgService.revokeWorkspaceRole(orgId, wsId, g));
   const doDecide = (requester, decision) => after(orgService.decideWorkspaceAccess(orgId, wsId, requester, decision));

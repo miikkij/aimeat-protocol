@@ -1,3 +1,16 @@
+/**
+ * @file src/storage/repositories/organism.repository.ts
+ * @description Storage repository interface for organisms and their membership graph:
+ *   organism CRUD/listing, memberships, join requests, reputation, and the Phase 4
+ *   pending-approval (gate) primitive. Each backend implements this contract.
+ *
+ * @structure
+ *   - OrganismRepository: organism + membership + join-request + reputation operations
+ *   - PendingApproval methods: create/get/list/update plus listOverduePendingApprovals
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { ArchiveFilter, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord, PendingApprovalRecord } from '../interface.js';
 
 export interface OrganismRepository {

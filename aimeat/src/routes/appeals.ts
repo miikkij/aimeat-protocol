@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/appeals.ts
+ * @description Moderation appeals API. Lets a content owner appeal a flag against their
+ *   content, lists appeals, and lets moderators review (dismiss/action) them. Resolves the
+ *   flagged content's owner across memory, board posts, actions, and agents.
+ *
+ * @structure
+ *   - getContentOwner(storage, targetType, targetId): resolves owning GAII/GHII of flagged content
+ *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';

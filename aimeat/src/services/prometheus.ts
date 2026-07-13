@@ -1,3 +1,17 @@
+/**
+ * @file src/services/prometheus.ts
+ * @description Prometheus metrics registry — defines all AIMEAT metrics (tunnel connections/messages,
+ *   mailbox, auth failures, rate-limit hits, scope denials) plus Node.js process metrics, exposed as
+ *   a singleton for the /metrics endpoint and auth middleware to record against.
+ *
+ * @structure
+ *   - createMetricsRegistry(config): builds the Registry + all metrics, stores the singleton
+ *   - getPromMetrics(): returns the typed PromMetrics handle (or null before init)
+ *   - PromMetrics: interface listing every counter/gauge/histogram
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import {
   Registry,
   Counter,

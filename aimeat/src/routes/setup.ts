@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/setup.ts
+ * @description First-run node setup routes — serves the setup wizard, reports whether the node still
+ *   needs an initial owner, and creates the first owner account (keypair, hashed password, owner JWT)
+ *   before any owners exist; guarded by an optional setup-IP allowlist.
+ *
+ * @structure
+ *   - resolvePublicFile: locate a public/ asset from both src/ and dist/ layouts
+ *   - setupRouter: builds the Express router, with a checkSetupIp gate
+ *   - GET /v1/setup/status: report whether setup is needed (no owners yet)
+ *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -95,7 +110,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 return;
             }
 
-            const { username, displayName, email, password, importPublicKey } = owner;
+            const { username, displayName, password, importPublicKey } = owner;
 
             // Validate username
             if (!username || typeof username !== 'string') {

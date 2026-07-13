@@ -1,3 +1,14 @@
+/**
+ * @file src/utils/fire-hook.ts
+ * @description Fire-and-forget wrapper around the hooks service — runs hook handlers for an event
+ *   asynchronously without blocking the caller, logging (rather than throwing) any failure.
+ *
+ * @structure
+ *   - fireHook(config, storage, event, payload): invokes executeHooks() and catches/logs errors
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { executeHooks } from '../services/hooks.js';

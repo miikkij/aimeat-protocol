@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/portal-api.ts
+ * @description Small JSON API carried over from the removed SSR portal. Currently exposes
+ *   POST /v1/portal/try-memory — an authenticated append to a public "board" memory key that keeps only
+ *   the last 20 messages with a 72h TTL, used by the try-it demo surface.
+ *
+ * @structure
+ *   - portalApiRouter(config, storage): builds the Express router
+ *   - POST /v1/portal/try-memory: validate text (<=280 chars) + boardKey, append message, cap at 20, write back
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

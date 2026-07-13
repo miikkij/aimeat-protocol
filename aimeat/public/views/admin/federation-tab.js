@@ -22,9 +22,9 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, num, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } from './shared.js';
+import { dt, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import {
-  getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
+  approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
   testFederationNode, joinGenesisNetwork, updatePeerPolicy, promotePeer, getNetworkDirectory,
   getFederationBook, rebuildFederationBook, pullFederationBook,

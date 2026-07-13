@@ -133,7 +133,7 @@ export default function GeneratorDebugTab() {
       await copyToClipboard(parts.join('\n'));
       setCopying('done');
       setTimeout(() => setCopying(false), 2000);
-    } catch (e) {
+    } catch {
       setCopying(false);
     }
   }

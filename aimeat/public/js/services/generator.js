@@ -106,7 +106,7 @@ export async function updateProject(projectId, updates) {
   const current = await getProject(projectId);
   if (!current) throw new Error('Project not found');
   const version = current._version || 0;
-  const { _version, ...rest } = current;
+  const rest = Object.fromEntries(Object.entries(current).filter(([k]) => k !== '_version'));
   const updated = { ...rest, ...updates, updatedAt: new Date().toISOString() };
   await apiPut(`/v1/memory/generator.${projectId}.project`, {
     value: updated,
@@ -276,7 +276,7 @@ export async function getComponent(projectId, componentId) {
 
 export async function saveComponent(projectId, component) {
   let version = component._version || 0;
-  const { _version, ...data } = component;
+  const data = Object.fromEntries(Object.entries(component).filter(([k]) => k !== '_version'));
   const key = `generator.${projectId}.component.${data.id}`;
   if (version === 0) {
     // New component — use POST to create
@@ -527,7 +527,7 @@ function namespacedYaml(result, owner) {
 /**
  * POST a CSM/MSM manifest. On 409 NAME_TAKEN, delete the old one (if owned) and retry.
  */
-async function upsertManifest(endpoint, body, owner) {
+async function upsertManifest(endpoint, body, _owner) {
   try {
     return await apiPost(endpoint, body);
   } catch (err) {

@@ -1,3 +1,18 @@
+/**
+ * @file src/storage/providers/sqlite/repos/agent.ts
+ * @description SQLite (better-sqlite3) repository for agent (GAII) records — CRUD plus
+ *   morsel-balance debit, with JSON (de)serialization of capabilities/scopes/webhook/platform fields.
+ *
+ * @structure
+ *   - deserializeAgent: maps a DB row to an AgentRecord (parses JSON columns, coerces int flags)
+ *   - createAgent / getAgent / getAgentsByOwner / listAgents: inserts and reads (NAME_TAKEN on unique clash)
+ *   - updateAgent: full-row update merged over existing record
+ *   - deleteAgent: transactional cascade delete of agent-owned data + the agent row
+ *   - debitBalance: conditional morselBalance decrement
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { AgentRecord } from '../../../interface.js';
 import { cascadeDeleteAgentData } from './owner.js';

@@ -15,14 +15,14 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Spinner, Empty } from './shared.js';
+import { Badge, Spinner, Empty } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as adminService from '/js/services/admin.js';
 
 const CONTENT_TYPES = ['document', 'research', 'idea', 'plan', 'dataset', 'tutorial', 'collection', 'article', 'story', 'fiction'];
 const MATURITY_OPTS = ['draft', 'review', 'published'];
 
-export default function KnowledgeAdminTab({ data, reload }) {
+export default function KnowledgeAdminTab() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);

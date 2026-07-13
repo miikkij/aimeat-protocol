@@ -1,3 +1,15 @@
+/**
+ * @file public/views/admin/genesis-tab.js
+ * @description Admin dashboard tab for Genesis federation peers — shows peer stats and a table
+ *   with per-peer approve/suspend/remove actions (operator tooling).
+ *
+ * @structure
+ *   - GenesisTab (default export): renders StatsGrid (total/approved/suspended/pending) + peers table
+ *   - doAction: confirm-then-call wrapper around approve/suspend/removeGenesisPeer with reload + error toast
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -8,7 +20,7 @@ import { useConfirm } from '/components/Modal.js';
 import { approveGenesisPeer, suspendGenesisPeer, removeGenesisPeer } from '/js/services/admin.js';
 
 export default function GenesisTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const gen = data.genesis;
   if (!gen) return html`<${Empty} text=${t('dashboard.genesisNotAvailable')} />`;

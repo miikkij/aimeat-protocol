@@ -1,12 +1,3 @@
-import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
-import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
-import { sign } from '../auth/keypair.js';
-
 /**
  * @file app-store.ts
  * @description App Store routes — purchase flow, license verification, purchase history.
@@ -27,6 +18,15 @@ import { sign } from '../auth/keypair.js';
  * @version-history
  *   v1.0.0 — 2026-03-13 — Renamed from marketplace.ts to app-store.ts; routes /v1/marketplace/* → /v1/app-store/*
  */
+import { Router } from 'express';
+import { randomBytes } from 'node:crypto';
+import type { AimeatConfig } from '../config.js';
+import type { Storage, AppManifest } from '../storage/interface.js';
+import { requireAuth } from '../auth/middleware.js';
+import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
+import { sign } from '../auth/keypair.js';
+
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 

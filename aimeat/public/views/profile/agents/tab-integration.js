@@ -45,7 +45,7 @@ import {
 
 const html = htm.bind(h);
 
-export default function TabIntegration({ agent, onboarding, session, showToast, agentName }) {
+export default function TabIntegration({ agent, onboarding, showToast, agentName }) {
   const state = detectAgentState(agent, onboarding);
   const [webhook, setWebhook] = useState(null);
   const [bundleVersion, setBundleVersion] = useState(null);
@@ -282,7 +282,6 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, cur
 
 function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, curlText, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, agentPromptText, postChecklist) {
   const steps = onboarding?.steps || [];
-  const agentName = agent.name;
 
   const passedSteps = steps.filter(s => s.status === 'passed');
   const gapSteps = steps.filter(s => s.status !== 'passed');

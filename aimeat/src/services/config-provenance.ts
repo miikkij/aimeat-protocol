@@ -1,10 +1,16 @@
 /**
- * Config Provenance Registry — tracks where each config value originated.
+ * @file src/services/config-provenance.ts
+ * @description Config Provenance Registry — tracks which source layer each config dot-path came
+ *   from (defaults → env → file → consul → database), built at startup and updated on runtime writes.
  *
- * Built during startup as each config source layer is applied:
- *   1. defaults → 2. env → 3. file → 4. consul → 5. database
+ * @structure
+ *   - ConfigSource: the provenance layer union type
+ *   - ConfigProvenance: registry with initDefaults + markEnv/markFile/markConsul/markDatabase setters
+ *   - getSource / getAll: read a field's source or the whole map
+ *   - revertSource: recompute a field's source down the precedence chain after a DB override is removed
  *
- * Updated at runtime when admin writes change values.
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 export type ConfigSource = 'default' | 'env' | 'file' | 'consul' | 'database';

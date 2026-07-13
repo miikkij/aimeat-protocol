@@ -1,3 +1,17 @@
+/**
+ * @file src/server.ts
+ * @description Express application factory — createServer() assembles the whole HTTP stack: trust-proxy
+ *   config, compression (excluding SSE streams), CORS, auth, rate-limiting and other middleware, then
+ *   delegates config/service init, guard setup, and route mounting to the server-bootstrap modules.
+ *
+ * @structure
+ *   - ServerResult: bundle returned by createServer (app + tunnel/realtime/scheduler/storage managers)
+ *   - ConfigSources: provenance metadata (env/file/cli keys) passed in for accurate tracking
+ *   - createServer: builds and wires the Express app and its background managers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import express from 'express';
 import compression from 'compression';
 import type { AimeatConfig } from './config.js';

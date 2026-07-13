@@ -1,9 +1,30 @@
+/**
+ * @file src/routes/ghii.ts
+ * @description GHII (Global Human Intelligence Identifier) routes — the human identity layer on top
+ *   of AIMEAT's owner system (GHII format username@nodeId): registration, password/federated/social
+ *   login, email verification, magic link, password reset, account recovery, and legacy-account
+ *   email completion during sign-in. Operators are owners with role ['owner','operator']; GHII users
+ *   are owners with role ['owner'] plus a GHII profile.
+ *
+ * @structure
+ *   - ghiiRouter(config, storage, emailService, onDirectoryChange, peers): registers all /v1/ghii/* routes
+ *   - POST /v1/ghii: register a new human identity (owner account + GHII profile in one step)
+ *   - Login / email-verify / magic-link / password-reset / recovery / attach-email flows
+ *
+ * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts
+ *
+ * @version-history
+ *   v1.1.0 — 2026-07-08 — Added POST /v1/ghii/login/attach-email — legacy/unverified accounts (correct
+ *     password but verificationLevel < 1) can attach + verify an email during sign-in; the login gate
+ *     returns { email_required, has_email } so the client can drive the completion flow.
+ *   v1.0.0 — 2026-07-13 — Header standardized to @file/@description format
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EmailService } from '../services/email.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
@@ -21,27 +42,6 @@ import type { PeerInfo } from '../services/federation.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
 import { GhiiRegistrationSchema, GhiiWebRegistrationSchema, GhiiLoginSchema, validateBody } from '../models/schemas.js';
 
-/**
- * @file ghii.ts
- * @description GHII (Global Human Intelligence Identifier) routes — human identity on top of the owner
- *   system: register, password/federated/social login, email verification, magic link, password reset,
- *   account recovery, and legacy-account email completion during sign-in.
- * @structure ghiiRouter(config, storage, emailService, onDirectoryChange, peers) registers all /v1/ghii/* routes.
- * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts.
- * @version-history
- * v1.1.0 - 2026-07-08 - Added POST /v1/ghii/login/attach-email — legacy/unverified accounts (correct
- *   password but verificationLevel < 1) can attach + verify an email during sign-in. The login gate now
- *   returns details { email_required, has_email } so the client can drive the completion flow.
- *
- * GHII — Global Human Intelligence Identifier
- *
- * Human identity layer on top of AIMEAT's owner system.
- * GHII format: username@nodeId (e.g. alice@aimeat-finland-001)
- *
- * Key distinction:
- * - Operators/admins are owners with role=['owner','operator'] — they manage the node
- * - GHII users are owners with role=['owner'] + a GHII profile — they use apps
- */
 export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void, peers?: Map<string, PeerInfo>): Router {
     const router = Router();
 
@@ -365,7 +365,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 // Verify attestation signature against peer's known public key
                 if (homePeer.publicKey && attestation.signature) {
                     const { verify: verifySignature } = await import('../auth/keypair.js');
-                    const { signature: _sig, ...attestationPayload } = attestation;
+                    const attestationPayload = Object.fromEntries(
+                        Object.entries(attestation).filter(([k]) => k !== 'signature'),
+                    );
                     const payloadJson = JSON.stringify(attestationPayload);
                     const sigValid = await verifySignature(homePeer.publicKey, payloadJson, attestation.signature);
                     if (!sigValid) {
@@ -781,7 +783,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     // Creates owner + GHII profile with optional email verification
     router.post('/v1/ghii/register-web', registrationLimit, validateBody(GhiiWebRegistrationSchema, config.nodeId), async (req, res) => {
         let { username, display_name } = req.body ?? {};
-        const { email, locale, city, area, interests } = req.body ?? {};
+        const { email, locale, interests } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));

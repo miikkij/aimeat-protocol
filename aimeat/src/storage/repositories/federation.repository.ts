@@ -1,3 +1,19 @@
+/**
+ * @file src/storage/repositories/federation.repository.ts
+ * @description Storage-interface contract for federation persistence: federation peers, peering
+ *   requests, registered personal (home) nodes, per-node mailbox items, and genesis-peer records —
+ *   implemented per backend (SQLite/Prisma).
+ *
+ * @structure
+ *   - saveFederationPeer / listFederationPeers / deleteFederationPeer: approved-peer registry
+ *   - *PeeringRequest: peering-request lifecycle
+ *   - *PersonalNode: personal-node registration + lookup (by id/owner/status)
+ *   - *MailboxItem / getMailboxStats / cleanExpiredMailboxItems: per-node store-and-forward queue
+ *   - *GenesisPeer: genesis-peer registry
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { PeeringRequestRecord, PersonalNodeRecord, MailboxItemRecord, GenesisPeerRecord, FederationPeerRecord } from '../interface.js';
 
 export interface FederationRepository {

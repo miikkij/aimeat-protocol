@@ -1,12 +1,18 @@
 /**
- * `aimeat join [url]` — guided federation join flow.
+ * @file src/cli/federation-join.ts
+ * @description `aimeat join [url]` CLI wizard (@clack/prompts) — guided federation join: discovery →
+ *   role selection → signed introduce → approval polling → Ed25519 key exchange → .env update. Persists
+ *   a resumable pending-join file so an interrupted operator approval can be resumed later.
  *
- * Handles: discovery → role selection → introduce → approval polling →
- * key exchange → .env update → done.
+ * @structure
+ *   - runFederationJoin(config, targetUrl?, locale?): main flow orchestrating the 9 join steps
+ *   - pollApproval(...): polls the peer's introduce status until approved/rejected/interrupted
+ *   - doKeyExchange(...): POSTs public key + capabilities to the target's key-exchange endpoint
+ *   - ensureKeypair/setEnvVar/saveFederationState: keypair provisioning and .env persistence
+ *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
- * Two paths:
- *  - Contributor: auto-approved, instant join
- *  - Operator: pending approval, polls until approved/rejected
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';

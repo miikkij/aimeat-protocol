@@ -1,3 +1,15 @@
+/**
+ * @file public/views/admin/consul-tab.js
+ * @description Admin dashboard tab for the Consul KV config integration — shows connection
+ *   status and key count, and lets operators export config to / import config from Consul.
+ *
+ * @structure
+ *   - ConsulTab({ data, reload }): renders status, disabled/setup help, and export/import actions
+ *   - handleExport/handleImport: call consulExport/consulImport and reload dashboard data
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';

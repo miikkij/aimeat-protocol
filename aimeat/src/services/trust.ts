@@ -1,3 +1,17 @@
+/**
+ * @file src/services/trust.ts
+ * @description Trust scoring service — computes an agent's trust score (0–100) from a weighted blend
+ *   of delivery success rate (0.30), positive ratings (0.25), account age (0.15), volume (0.15), and
+ *   disputes lost (0.15), with anti-manipulation diversity tracking over unique counterparties.
+ *
+ * @structure
+ *   - calculateTrustScore(gaii, storage): aggregates work/dispute history into a TrustData score
+ *   - TRUST_WEIGHTS / DISPUTE_PENALTY_PER_LOSS: scoring constants
+ *   - TrustData: the computed score plus its component breakdown
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Storage } from '../storage/interface.js';
 
 /** Trust score component weights (must sum to 1.0) */

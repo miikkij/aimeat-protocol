@@ -1,3 +1,16 @@
+/**
+ * @file public/views/admin/overview-tab.js
+ * @description Admin dashboard overview tab: node health card, headline counters
+ *   (owners/agents/actions/boards/tasks/sharing-groups), today's economy figures,
+ *   quick config, and a health-warnings table. Fetches live task and sharing-group
+ *   counts on mount.
+ *
+ * @structure
+ *   - OverviewTab({ data }): renders health/stats/economy/config/warnings from data.dash
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';

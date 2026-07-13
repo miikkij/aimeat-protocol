@@ -315,7 +315,7 @@ fi
 `;
   }
 
-  private renderWebhookRoute(ctx: BundleContext): string {
+  private renderWebhookRoute(_ctx: BundleContext): string {
     return `# webhook-route.yaml -- Hermes webhook route configuration
 # Copy this file to your Hermes config directory.
 #
@@ -340,7 +340,7 @@ route:
 `;
   }
 
-  private renderHooksYaml(ctx: BundleContext): string {
+  private renderHooksYaml(_ctx: BundleContext): string {
     return `# hooks.yaml -- Hermes hook registration
 # Copy this file to your Hermes config directory.
 #

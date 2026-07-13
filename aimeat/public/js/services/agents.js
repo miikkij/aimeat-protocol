@@ -1,6 +1,18 @@
 /**
- * AIMEAT Agents Service
- * Agent CRUD, scope management, and chat sessions.
+ * @file public/js/services/agents.js
+ * @description Frontend service layer for agent management — lists/deletes agents, edits scopes,
+ *   CORS, and concurrency; agent groups; chat sessions/instances; and workspace-contract tagging +
+ *   one-click contract adoption tasks.
+ *
+ * @structure
+ *   - listAgents / deleteAgent / updateAgentScopes / setMaxConcurrentTasks: agent CRUD + config
+ *   - getAgentCors / setAgentCors: per-agent CORS origins
+ *   - offersWorkspaceContract / contractNamesOf / adoptContractTask / getAgentEngagements: workspace-contract tags
+ *   - getAgentGroups / saveAgentGroups: owner-scoped custom agent grouping (memory `agents.groups`)
+ *   - listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
 

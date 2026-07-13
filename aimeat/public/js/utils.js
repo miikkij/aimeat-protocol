@@ -1,6 +1,18 @@
 /**
- * AIMEAT Shared Utilities
- * Common helper functions used across all portal views.
+ * @file public/js/utils.js
+ * @description Shared browser helpers used across all portal/SPA views — HTML/attribute escaping and
+ *   entity decoding, relative-time and byte formatting, clipboard copy, locale detection/persistence,
+ *   a whitelist HTML sanitizer, star-field generation, and a broken-image SVG fallback handler.
+ *
+ * @structure
+ *   - escHtml/escAttr/decodeEntities: XSS-safe escaping + reversal of double-escaped names
+ *   - timeAgo/formatBytes: human-readable time and size formatting
+ *   - detectLocale/persistLocale: en/fi preference via URL → localStorage → cookie → navigator
+ *   - sanitizeHtml: strip to a safe tag/attribute whitelist
+ *   - copyToClipboard/generateStars/handleImgError: clipboard, background stars, image error placeholder
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 /** HTML-escape a string (prevents XSS in user-generated content). */

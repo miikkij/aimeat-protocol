@@ -15,14 +15,14 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty, Badge, StatsGrid } from './shared.js';
+import { dt, Empty, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
 
 const PAGE_SIZE = 20;
 
 const STATUSES = ['', 'draft', 'queued', 'active', 'stalled', 'done', 'failed'];
 
-export default function AgentTasksTab({ data, reload, session }) {
+export default function AgentTasksTab() {
   const [tasks, setTasks] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

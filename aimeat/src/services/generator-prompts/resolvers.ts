@@ -23,11 +23,10 @@ function warnFallback(promptId: string, varName: string, fallbackValue: string):
   return fallbackValue;
 }
 import type {
-  PromptRuntimeData, Blueprint, BlueprintComponent, InterviewSpec,
+  PromptRuntimeData,
   ComponentState, DataSource,
 } from './types.js';
-import { formatBundlesForPrompt, createBundle } from './bundle.js';
-import { getFragment } from './index.js';
+import { formatBundlesForPrompt } from './bundle.js';
 
 type Vars = Record<string, string>;
 
@@ -387,8 +386,6 @@ function resolveCortexData(data: PromptRuntimeData): Vars {
 function resolveCortexComponent(data: PromptRuntimeData): Vars {
   // Match browser buildFeatureCortexPrompt() — use case, view, structures, data cortex API
   const interview = data.interviewSpec;
-  const bpComp = data.blueprintComponent;
-  const labelLower = (data.componentLabel || '').toLowerCase();
 
   // Use cases — pass ALL use cases so the LLM can pick the relevant one
   // (Label matching doesn't work when labels are in a different language than use case titles)
@@ -534,7 +531,6 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
   }
 
   // Build app-domain code template from spec
-  const specName = (spec?.name as string) || 'app';
   const specLibName = (spec?.libName as string) || 'app';
   const views = (spec?.views as string[]) || [];
   const viewComp = (spec?.viewComposition as Record<string, string[]>) || {};
@@ -679,7 +675,6 @@ ${viewCases}
 
 function resolveAppSpec(data: PromptRuntimeData): Vars {
   // App spec is simple — name, theme, locale. All cortex info comes from blueprint.
-  const bp = data.blueprint;
   const comps = data.completedComponents || [];
 
   // List all registered cortexes with their specs
@@ -765,26 +760,6 @@ RULES:
 DaisyUI + Tailwind CSS are loaded via CDN in the HTML head.
 Use daisyUI CSS classes for all UI components: \`class="card"\`, \`class="table"\`, \`class="btn"\`, \`class="tabs"\`, etc.
 Do NOT load aimeat-ui-* libraries — use daisyUI instead.
-`;
-  }
-
-  // Build translation keys section
-  const translationKeys = data.translationKeys || [];
-  let translationKeysSection = '';
-  if (translationKeys.length > 0) {
-    const sorted = [...translationKeys].sort();
-    translationKeysSection = `
-## AVAILABLE TRANSLATION KEYS (from registered translation components — use EXACTLY these)
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  Your app MUST use these EXACT keys when calling t(key, translations). ║
-║  Do NOT invent your own keys like "field.name" or "detail.addresses".  ║
-║  The translation components have ALREADY defined these keys.           ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-${sorted.map(k => '- `' + k + '`').join('\n')}
-
-Total: ${sorted.length} keys available. If you need a label, find the closest matching key from this list.
 `;
   }
 
@@ -1230,8 +1205,10 @@ function buildContextString(data: PromptRuntimeData): string {
 
     for (const [key, schema] of Object.entries(dm.memoryKeys || {})) {
       if (schema.producedBy === compId || schema.consumedBy?.includes(compId)) {
-        const { source, producedBy, consumedBy, ...rest } = schema;
-        relevant[key] = rest;
+        // Strip pipeline metadata (source, producedBy, consumedBy) — not part of the data shape
+        relevant[key] = Object.fromEntries(
+          Object.entries(schema).filter(([k]) => k !== 'source' && k !== 'producedBy' && k !== 'consumedBy'),
+        );
       }
     }
 

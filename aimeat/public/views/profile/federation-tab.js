@@ -20,7 +20,7 @@ import { Spinner } from './shared.js';
 import { StatusDot } from '/components/StatusDot.js';
 import { listPeers } from '/js/services/federation.js';
 
-export default function FederationTab({ session, showToast }) {
+export default function FederationTab() {
   const [federation, setFederation] = useState(null);
 
   useEffect(() => {

@@ -1,9 +1,15 @@
 /**
- * Consul KV config service — loads and watches config from HashiCorp Consul.
+ * @file src/services/consul-config.ts
+ * @description Consul KV config service — loads, watches, and writes runtime config from HashiCorp
+ *   Consul. Values are dot-path keyed under a prefix; only mutable fields are applied (immutable ignored).
  *
- * Consul values are keyed by dot-path (e.g. aimeat/config/morsel_policy/welcome_bonus).
- * Only mutable fields are applied — immutable fields are ignored.
- * Values are raw strings, parsed type-aware via parseConfigValue().
+ * @structure
+ *   - ConsulConfigService interface: loadAll / startWatching / stopWatching / set / health
+ *   - createConsulConfigService(config): returns an instance, or null when Consul is disabled
+ *   - polling watcher hashes loadAll() output to detect and dispatch config changes
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import Consul from 'consul';

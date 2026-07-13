@@ -1,3 +1,16 @@
+/**
+ * @file src/storage/providers/sqlite/repos/consent.ts
+ * @description SQLite (better-sqlite3) repository functions for consent records, consent audit
+ *   entries, and schema-lock records. Handles row (de)serialization and consent matching against
+ *   data patterns, recipients, and wildcard scopes.
+ *
+ * @structure
+ *   - deserializeConsent / deserializeSchema: map DB rows to typed records
+ *   - createConsent + related CRUD/query helpers over the consents / schema tables
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { ConsentRecord, ConsentAuditEntry, SchemaRecord } from '../../../interface.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';

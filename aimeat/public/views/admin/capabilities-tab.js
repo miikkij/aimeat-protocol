@@ -1,3 +1,16 @@
+/**
+ * @file public/views/admin/capabilities-tab.js
+ * @description Admin dashboard tab listing all registered capabilities — searchable table with
+ *   input/output schema keys, source type, invocation/error stats, and an expandable per-row
+ *   panel showing full JSON schemas, owner, status, auth, vouches, and usage.
+ *
+ * @structure
+ *   - CapabilitiesTab({ session }): default component; fetches /v1/admin/capabilities, filters, expands rows
+ *   - schemaKeys(schema): summarizes a JSON schema's property keys + types for the compact columns
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -20,7 +33,7 @@ function schemaKeys(schema) {
     }).join(', ');
 }
 
-export default function CapabilitiesTab({ data, session }) {
+export default function CapabilitiesTab({ session }) {
   const [caps, setCaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');

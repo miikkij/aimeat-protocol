@@ -1,3 +1,18 @@
+/**
+ * @file src/services/totp.ts
+ * @description TOTP (RFC 6238) two-factor auth helpers: generates a secret + otpauth URI + QR data
+ *   URL and backup codes on setup, validates codes/backup codes (timing-safe), and encrypts the
+ *   secret at rest with AES-256-GCM.
+ *
+ * @structure
+ *   - setupTotp(): create secret, QR, and hashed/encrypted material for storage
+ *   - validateTotpCode() / validateBackupCode(): verify a submitted code (timing-safe backup compare)
+ *   - generateBackupCodes(): mint a fresh set of plain + hashed backup codes
+ *   - encryptSecret() / decryptSecret(): internal AES-256-GCM (iv:authTag:ciphertext) at-rest crypto
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { TOTP, Secret } from 'otpauth';
 import { createRequire } from 'node:module';
 import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from 'node:crypto';

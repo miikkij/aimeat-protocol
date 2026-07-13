@@ -1,10 +1,16 @@
-/* AIMEAT Push Notification Service Worker
+/**
+ * @file public/sw.js
+ * @description AIMEAT push-notification service worker. Displays incoming Web Push messages and
+ *   routes clicks to the right SPA view, preferring an already-open window on the same path.
  *
- * Click routing: a notification payload carries `url` (or `data.url`) — a same-origin path such
- * as '/v1/profile?tab=messages#inbox/<conversationId>' or '/v1/apps/<owner>/<file>?mode=inline'.
- * On click we prefer an already-open window on the SAME path (focus + postMessage so the SPA can
- * switch tabs in place — see the 'aimeat-notification-click' listener in spa.html); otherwise a
- * new window opens the URL, and the SPA's cold-load deep-linking (?tab= / #hash) lands the view.
+ * @structure
+ *   - install/activate: skipWaiting + clients.claim so click-routing fixes take effect immediately
+ *   - push: parses the JSON payload into a notification (title/body/icon/badge/tag/data.url)
+ *   - notificationclick: focuses a matching same-path window (postMessage 'aimeat-notification-click')
+ *     for in-place tab switching, else opens a new window that cold-loads via ?tab= / #hash
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 // Take over immediately so click-routing fixes apply without waiting for every tab to close.

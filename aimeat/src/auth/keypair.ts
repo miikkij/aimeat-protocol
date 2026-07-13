@@ -1,3 +1,18 @@
+/**
+ * @file src/auth/keypair.ts
+ * @description Ed25519 keypair primitives (@noble/ed25519) used across the node for signing:
+ *   generates base64 keypairs and signs/verifies UTF-8 messages (federation advisories, JWT-adjacent
+ *   signatures, personal-node anchoring).
+ *
+ * @structure
+ *   - KeyPair: base64 public/private key pair shape
+ *   - generateKeyPair: create a random Ed25519 keypair
+ *   - sign: sign a string message with a base64 private key
+ *   - verify: verify a base64 signature against a message and base64 public key (false on any error)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import * as ed from '@noble/ed25519';
 
 export interface KeyPair {

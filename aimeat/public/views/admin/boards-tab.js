@@ -1,3 +1,17 @@
+/**
+ * @file public/views/admin/boards-tab.js
+ * @description Admin dashboard "Boards" tab (Preact + HTM) — lists boards, expands/collapses
+ *   their posts, creates new boards, and adds/removes board members through the admin API service.
+ *
+ * @structure
+ *   - BoardsTab: default component rendering the board list + create form + member controls
+ *   - togglePosts: lazy-loads and shows/hides a board's posts
+ *   - createBoard: submits the new-board form to POST /v1/boards
+ *   - addMember/removeMember: PATCH board membership via patchBoardMembers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';

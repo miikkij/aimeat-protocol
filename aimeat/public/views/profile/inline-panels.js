@@ -18,7 +18,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { listAgents } from '/js/services/agents.js';
 import * as memoryService from '/js/services/memory.js';
-import { listSubscriptions, listAllBoards } from '/js/services/boards.js';
+import { listSubscriptions } from '/js/services/boards.js';
 import { listInstances, listPackages } from '/js/services/packages.js';
 import { Spinner } from './shared.js';
 
@@ -125,7 +125,7 @@ function AgentsPanel({ session, switchTab }) {
 
 /* ───── Memory panel ───── */
 
-function MemoryPanel({ session, switchTab }) {
+function MemoryPanel({ switchTab }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -170,7 +170,7 @@ function MemoryPanel({ session, switchTab }) {
 
 /* ───── Boards panel ───── */
 
-function BoardsPanel({ session, switchTab }) {
+function BoardsPanel({ switchTab }) {
   const [boards, setBoards] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -212,7 +212,7 @@ function BoardsPanel({ session, switchTab }) {
 
 /* ───── Packages panel ───── */
 
-function PackagesPanel({ session, switchTab }) {
+function PackagesPanel({ switchTab }) {
   const [instances, setInstances] = useState([]);
   const [available, setAvailable] = useState([]);
   const [loading, setLoading] = useState(true);

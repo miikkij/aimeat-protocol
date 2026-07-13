@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/admin.ts
+ * @description Top-level admin router — operator authentication (timing-safe password, ephemeral
+ *   in-memory sessions) and composition of the domain-split admin sub-routers.
+ *
+ * @structure
+ *   - adminRouter(config, storage, maintenanceCache?, provenance?, consulService?, peers?): mounts sub-routers
+ *   - verifyAdminPassword / adminSessions / create+validateAdminSession: in-memory 1h operator sessions
+ *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -5,7 +18,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
-import { validateOwnerName, buildGAII } from '../utils/gaii.js';
+import { validateOwnerName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
 // i18n imports removed — admin UI is now a client-side SPA
@@ -88,20 +101,6 @@ export function adminRouter(
 
     // ── Admin Setup Pages (password-protected, no JWT needed) ──
 
-    function checkSetupPassword(req: import('express').Request, res: import('express').Response): boolean {
-        // Check admin session cookie first
-        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
-        if (sessionId && validateAdminSession(sessionId)) return true;
-
-        // Accept password via header only (NOT query param — password must not appear in URLs)
-        const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword)) {
-            res.status(401).type('text/html').send(injectCspNonce(ADMIN_LOGIN_HTML, res));
-            return false;
-        }
-        return true;
-    }
-
     /** Set the admin session cookie on a response */
     function setSessionCookie(res: import('express').Response, sessionId: string): void {
         const isHttps = config.baseUrl?.startsWith('https://');
@@ -163,8 +162,6 @@ export function adminRouter(
         }
 
         const keyPair = await generateKeyPair();
-        const allOwners = await storage.listOwners();
-        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
         // Setup wizard is admin-password-protected — always grant operator
         const roles = ['owner', 'operator'];
 

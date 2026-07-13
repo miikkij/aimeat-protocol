@@ -1,3 +1,16 @@
+/**
+ * @file public/views/admin/agents-tab.js
+ * @description Admin dashboard "Agents" tab (Preact + HTM): lists registered GAII agents with owner,
+ *   trust score, morsel balance, and last-seen, and expands each row on demand to show full agent
+ *   detail (capabilities + trust breakdown) fetched from the admin API.
+ *
+ * @structure
+ *   - AgentsTab (default): renders the agents table from props.data.agents
+ *   - toggleDetail(): lazy-loads per-agent detail via getAgentDetail() into expandable sub-panels
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';

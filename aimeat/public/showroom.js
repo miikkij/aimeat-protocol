@@ -53,7 +53,6 @@
     catch (e) {
       var a = el('div', 'alert alert-error text-xs', 'error: ' + (e && e.message ? e.message : e));
       mount.appendChild(a);
-      // eslint-disable-next-line no-console
       console.error('[showroom] ' + title, e);
     }
   }

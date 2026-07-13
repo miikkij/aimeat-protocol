@@ -57,7 +57,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import {
   listProjects, createProject, updateProject, archiveProject,
   loadAllComponents, saveComponent,
-  saveInterviewSpec, getInterviewSpec,
+  saveInterviewSpec,
   writeProjectLog,
 } from '/js/services/generator.js';
 import { buildBlueprintFixPrompt } from '/js/services/generator-prompts.js';
@@ -77,7 +77,7 @@ import { ProjectDashboard } from './generator-dashboard.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
-function ProjectListView({ onSelect, onCreate, showToast, session }) {
+function ProjectListView({ onSelect, onCreate }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);

@@ -39,7 +39,7 @@
  *   v1.1.0 — 2026-06-02 — Migrate bespoke prompt-copy button to canonical CopyButton component
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -120,7 +120,7 @@ function formatMemoryKey(key) {
 }
 
 /* ── Prompt Builder ── */
-function buildPortfolioPrompt({ session, catalog, selectedImages, selectedApps, selectedBoards, selectedCortex, selectedMemories, portfolioType, designStyle, authGates, customTypeDesc, customGateDesc }) {
+function buildPortfolioPrompt({ session, selectedImages, selectedApps, selectedBoards, selectedCortex, selectedMemories, portfolioType, designStyle, authGates, customTypeDesc, customGateDesc }) {
   const ghii = session.ghii || (session.owner + '@unknown');
   const url = NODE_URL;
 
@@ -457,7 +457,6 @@ function PortfolioBuilder({ session, navigate }) {
 
     const prompt = buildPortfolioPrompt({
       session,
-      catalog,
       selectedImages: imgList,
       selectedApps: appList,
       selectedBoards: boardList,
@@ -983,7 +982,7 @@ function PortfolioViewer({ username, navigate }) {
         const j = await resp.json().catch(() => null);
         const ok = !!(resp.ok && j && j.ok !== false);
         reply(ok, ok ? (j.data?.value ?? null) : null);
-      } catch (_) {
+      } catch {
         reply(false, null);
       }
     };
@@ -1088,7 +1087,7 @@ function PortfolioViewer({ username, navigate }) {
 
 
 /* ── Main Export ── */
-export default function Portfolio({ navigate, locale }) {
+export default function Portfolio({ navigate }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {

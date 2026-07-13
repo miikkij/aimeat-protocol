@@ -1,3 +1,19 @@
+/**
+ * @file src/storage/repositories/memory.repository.ts
+ * @description Backend-agnostic storage contract for the memory subsystem — set/get/list/delete/count,
+ *   optimistic-locked updates, per-owner and cross-owner substring search, native ranked full-text
+ *   search (the Tier-1 librarian primitive), flag counting, admin-wide listing, and version-history
+ *   for trackable keys. Implemented per storage backend (SQLite FTS5 / MongoDB $text / Postgres).
+ *
+ * @structure
+ *   - MemoryVersionRecord / MemoryTextHit / MemoryTextSearchOpts: supporting types for history + FTS
+ *   - MemoryRepository: the interface (setMemory, getMemory, listMemory, countMemory, searchMemory)
+ *   - searchText(query, opts): indexed, best-first cross-owner full-text retrieval
+ *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { ArchiveFilter, MemoryRecord } from '../interface.js';
 
 /** One archived prior version of a TRACKABLE memory key — appended to the history table when the key

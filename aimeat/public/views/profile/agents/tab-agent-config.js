@@ -96,7 +96,7 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
     </div>`;
 }
 
-export default function TabAgentConfig({ agent, agentName, session, showToast, onDeleteClick }) {
+export default function TabAgentConfig({ agent, agentName, showToast, onDeleteClick }) {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState('');

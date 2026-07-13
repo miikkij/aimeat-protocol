@@ -17,7 +17,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { ContactCard } from '/components/ContactCard.js';
 import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
 

@@ -1,7 +1,18 @@
 /**
- * Federation genesis routes — genesis peering CRUD, cross-federation catalogue,
- * genesis catalogue ingest, genesis memory read/routing, subscriptions,
- * network stats, and organism reputation.
+ * @file src/routes/federation-genesis.ts
+ * @description Cross-federation "genesis" routes — genesis peering CRUD, the aggregated
+ *   cross-federation catalogue, signed catalogue ingest, cross-genesis memory read/routing with
+ *   consent + caching, prefix subscriptions, network stats, and organism reputation.
+ *
+ * @structure
+ *   - federationGenesisRouter(config, storage, peers, networkDirectory): mounts /v1/federation/genesis-* endpoints
+ *   - peering: request/list/approve/suspend/remove (operator-only), cross-catalogue aggregation
+ *   - genesis-catalogue-ingest: verifies active peer + Ed25519 signature, stores entries as __genesis__ memory
+ *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
+ *   - subscriptions + network-stats + /v1/organisms/:id/reputation
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { Router } from 'express';

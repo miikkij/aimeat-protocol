@@ -26,7 +26,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, fmtUp, fmtBytes, StatsGrid, StatCard, EconRow } from './shared.js';
+import { num, fmtUp, fmtBytes, StatCard, EconRow } from './shared.js';
 import * as api from '/js/services/admin.js';
 
 /* ── Helpers ── */

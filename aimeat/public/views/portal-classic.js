@@ -1,7 +1,17 @@
 /**
- * Portal Classic — View Module
- * Card-based portal with Welcome Board, expandable groups (For Me, Agents, Builders),
- * mega-prompts, and morsels economy footer.
+ * @file public/views/portal-classic.js
+ * @description Classic card-based landing portal (Preact + HTM): a live Welcome Board plus three
+ *   expandable groups (For Me/apps, My AI Agents, For Builders) that each surface a copy-pasteable
+ *   mega-prompt for building apps, agent workflows, or connecting an agent runtime.
+ *
+ * @structure
+ *   - buildAppBuilderPrompt / buildAgentPrompt / buildConnectPrompt: compose the copy-paste prompts
+ *   - WelcomeBoard: reads/posts the shared welcome board via /v1/memory + /v1/portal/try-memory
+ *   - CardGroup / CopyPromptBtn: expandable card + copy-button wrapper primitives
+ *   - PortalClassicView (default): assembles hero, board, card groups, and morsels footer
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -18,10 +28,6 @@ const NODE_URL = window.location.origin;
    ══════════════════════════════════════════════ */
 function ct(key) {
   return globalT('classic.' + key);
-}
-
-function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ══════════════════════════════════════════════
@@ -87,7 +93,7 @@ Response: { ok: true, data: { key: "apps/art/[unique-id].png", size: 12345, ... 
 Public image URL (for <img> tags): ${n}/v1/pub/${anonGaii}/apps/art/[unique-id].png
 
 ### Realtime P2P API (WebSocket \u2014 for live multiplayer, no polling needed)
-Client library: <script src="${n}/lib/realtime.js"><\/script>
+Client library: <script src="${n}/lib/realtime.js"></script>
 
 Quick start:
   const rt = new AimeatRealtime("${n}", token);

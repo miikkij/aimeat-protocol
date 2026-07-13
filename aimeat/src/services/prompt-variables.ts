@@ -1,3 +1,15 @@
+/**
+ * @file src/services/prompt-variables.ts
+ * @description Helpers for managed system prompts — substitute {{variable}} placeholders and
+ *   resolve locale-specific prompt content from an Accept-Language header.
+ *
+ * @structure
+ *   - substituteVariables: replaces {{name}} tokens, leaving unknown ones intact
+ *   - resolvePromptContent: picks a locale override (exact tag, then language prefix) or the default
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { SystemPromptRecord } from '../storage/interface.js';
 
 /**

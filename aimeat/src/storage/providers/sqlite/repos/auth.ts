@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/auth.ts
+ * @description SQLite (better-sqlite3) repository functions for the auth data plane — one-time keys
+ *   (OTK), RFC 8628 device-authorization records, and OAuth client/refresh-token/approval records.
+ *   Each function takes the Database handle and performs a single prepared-statement operation.
+ *
+ * @structure
+ *   - OTK: createOtk, getOtk, consumeOtk (initial-grace + expiry/used lifecycle), deserializeOtk
+ *   - Device auth: create/get/consume records for the device-authorization grant
+ *   - OAuth: client, refresh-token, and approval record CRUD
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type {
   OtkRecord, DeviceAuthorizationRecord,

@@ -1,9 +1,20 @@
+/**
+ * @file public/views/admin/matching-tab.js
+ * @description Admin dashboard tab for the AI matching engine — shows profile/match stats and
+ *   provides a button to manually trigger a matching run, reporting the number of matches found.
+ *
+ * @structure
+ *   - MatchingTab({ data }): default component; renders stats grid + trigger button, calls runMatching()
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, StatsGrid, ExpandableHelp } from './shared.js';
+import { StatsGrid, ExpandableHelp } from './shared.js';
 import { runMatching } from '/js/services/admin.js';
 
 export default function MatchingTab({ data }) {

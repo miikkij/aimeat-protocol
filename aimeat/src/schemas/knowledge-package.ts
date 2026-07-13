@@ -1,5 +1,15 @@
-/** JSON Schema definitions for Knowledge Package content types.
- *  Used for schema locking on `packages/{uuid}/{entry}` memory keys. */
+/**
+ * @file src/schemas/knowledge-package.ts
+ * @description JSON Schema definitions for Knowledge Package content — the manifest and entry
+ *   shapes used to lock schemas on `packages/{uuid}/{entry}` memory keys.
+ *
+ * @structure
+ *   - KNOWLEDGE_CONTENT_TYPES: enum of allowed package content types (idea, research, plan, …)
+ *   - ManifestSchema: JSON Schema for a package manifest (name, version, synthesis, references, entries)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 
 export const KNOWLEDGE_CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',

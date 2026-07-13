@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { getSession } from '/js/services/auth.js';
 

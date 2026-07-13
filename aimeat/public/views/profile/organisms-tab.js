@@ -58,8 +58,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [archivedOpen, setArchivedOpen] = useState(false);   // collapsible "Archived" section (closed by default)
   // organism whose workspaces are open, then the specific workspace within it — both restored from
   // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
-  const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch (e) { return null; } });
-  const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch (e) { return null; } });
+  const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch { return null; } });
+  const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch { return null; } });
   // Transient deep-link target from the organism mindmap: open this space's tab on first render of the
   // workspace. In-memory only (not persisted) — an F5 lands on the workspace overview, not a stale tab.
   const [openSpace, setOpenSpace] = useState(null);
@@ -181,10 +181,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
   // Persist the open organism + workspace (F5 restore), and drop a restored id the user can no longer open.
   useEffect(() => {
-    try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch (e) { /* noop */ }
+    try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch { /* noop */ }
   }, [openId]);
   useEffect(() => {
-    try { if (openWs) sessionStorage.setItem('aimeat.ws.openWs', openWs); else sessionStorage.removeItem('aimeat.ws.openWs'); } catch (e) { /* noop */ }
+    try { if (openWs) sessionStorage.setItem('aimeat.ws.openWs', openWs); else sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }
   }, [openWs]);
   useEffect(() => {
     if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) { setOpenId(null); setOpenWs(null); }
@@ -209,7 +209,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const params = new URLSearchParams(window.location.search);
       const org = params.get('org');
       if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
-    } catch (e) { /* noop */ }
+    } catch { /* noop */ }
   }, []);
 
   // Cross-organism content search (debounced) — librarian FTS across all my own content.

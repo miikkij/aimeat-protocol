@@ -1,6 +1,16 @@
 /**
- * AIMEAT Consent & Permissions Service
- * Consent management, audit trail, permissions, GDPR export.
+ * @file public/js/services/consent.js
+ * @description Frontend API-service wrapper for the consent, permissions, audit, and GDPR-export
+ *   endpoints — thin fetch helpers that unwrap the response envelope for SPA views.
+ *
+ * @structure
+ *   - listConsents / grantConsent / revokeConsent / bulkRevoke: manage active consent grants
+ *   - listAuditEntries: fetch consent audit-log entries for a day range
+ *   - getPermissionSummary / getKeyPermissions: effective permission rules & visibility per key
+ *   - exportGdpr: full owner data export
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
 

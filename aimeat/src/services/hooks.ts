@@ -1,3 +1,16 @@
+/**
+ * @file src/services/hooks.ts
+ * @description Extension-hook execution service — runs the action references configured for a hook
+ *   name in sequence, calling each action's webhook (SSRF-guarded), aborting the flow on rejection.
+ *
+ * @structure
+ *   - executeHooks(config, storage, hookName, context): resolves action refs, POSTs to their webhooks
+ *   - HookContext / HookResult: passed-through context and { allowed, reason?, hookAction? } outcome
+ *   - outbound calls gated by validateOutboundUrl + safeFetch with a 10s timeout
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

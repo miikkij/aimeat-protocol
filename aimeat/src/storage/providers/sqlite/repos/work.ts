@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/providers/sqlite/repos/work.ts
+ * @description SQLite (better-sqlite3) repository functions for work orders and wallet transactions —
+ *   CRUD plus (de)serialization of JSON-encoded input/output/cost/rating columns.
+ *
+ * @structure
+ *   - deserializeWork / deserializeTransaction: row → record mappers
+ *   - createWork / getWork / updateWork and related work + wallet-transaction helpers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { WorkRecord, WalletTransaction } from '../../../interface.js';
 

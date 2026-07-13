@@ -33,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
-import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
@@ -43,9 +43,6 @@ type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
 export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
-
-  /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
-  const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {

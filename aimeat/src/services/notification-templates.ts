@@ -1,11 +1,18 @@
 /**
- * Notification Templates Service — Phase 3.2
+ * @file src/services/notification-templates.ts
+ * @description Notification template service — bilingual (en/fi) default templates plus placeholder
+ *   substitution and resolution for web-push and email mailbox notifications.
  *
- * Default templates, placeholder substitution, and resolution logic
- * for push and email notifications.
+ * @structure
+ *   - TEMPLATE_IDS / SUPPORTED_LOCALES: known template ids and locales
+ *   - DEFAULTS: per-locale default title/body/subject text with {placeholder} tokens
+ *   - getDefaultTemplate(id, locale): returns the default template (falls back to en)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { Storage, NotificationTemplateRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 
 export const TEMPLATE_IDS = ['web_push_mailbox', 'email_mailbox'] as const;
 export type TemplateId = typeof TEMPLATE_IDS[number];

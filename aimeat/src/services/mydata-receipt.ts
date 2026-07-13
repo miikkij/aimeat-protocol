@@ -1,3 +1,16 @@
+/**
+ * @file src/services/mydata-receipt.ts
+ * @description Generates Kantara/MyData-style consent receipts from AIMEAT consent records — mapping a
+ *   ConsentRecord (owner, purpose, data pattern, expiry) into a structured MyDataConsentReceipt with
+ *   PII principal/controller and purpose metadata (version KI-CR-v1.1.0, FI jurisdiction).
+ *
+ * @structure
+ *   - MyDataConsentReceipt: the receipt shape (principal, controllers, services/purposes/PII categories)
+ *   - createMyDataReceiptService(config): returns { generateReceipt(consent) }
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 import type { ConsentRecord } from '../storage/interface.js';
 

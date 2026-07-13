@@ -590,7 +590,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     const requesterGaii = resolve(req);
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;
-    const { target_prefix, entries: requestedEntries } = req.body;
+    const { entries: requestedEntries } = req.body;
 
     const sourceManifestKey = `packages/${sourcePackageId}/manifest`;
 

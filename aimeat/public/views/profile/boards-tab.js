@@ -35,9 +35,8 @@ export default function BoardsTab({ session, showToast }) {
   const [boardView, setBoardView] = useState(null);
   const [brdSubTab, setBrdSubTab] = useState('mine');
   const [showBrdForm, setShowBrdForm] = useState(false);
-  // Refs used by the board-detail view below — declared unconditionally (Rules of Hooks).
+  // Ref used by the board-detail view below — declared unconditionally (Rules of Hooks).
   const postRef = useRef(null);
-  const memberInputRef = useRef(null);
 
   useEffect(() => {
     if (session) loadMyData();
@@ -268,7 +267,7 @@ export default function BoardsTab({ session, showToast }) {
 }
 
 /** Board member management section for shared boards. */
-function BoardMembers({ boardId, allowedGaiis, onAdd, onRemove }) {
+function BoardMembers({ allowedGaiis, onAdd, onRemove }) {
   const inputRef = useRef(null);
 
   function handleAdd() {

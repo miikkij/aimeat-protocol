@@ -22,7 +22,7 @@ import { getAdminMemory, deleteAdminMemory } from '/js/services/admin.js';
 
 const PAGE_SIZE = 50;
 
-export default function MemoryTab({ data, reload, session }) {
+export default function MemoryTab() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);

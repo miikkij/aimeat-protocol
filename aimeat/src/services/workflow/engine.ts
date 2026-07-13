@@ -321,7 +321,7 @@ export class WorkflowEngine {
   }
 
   // ── task terminal → advance ────────────────────────────────────────────────────
-  async onTaskTerminal(task: AgentTaskRecord, outcome: 'done' | 'failed'): Promise<void> {
+  async onTaskTerminal(task: AgentTaskRecord, _outcome: 'done' | 'failed'): Promise<void> {
     const scope = task.scope?.find(s => s.name === 'workflow-run');
     if (!scope?.value) return;
     const [workflowId, runId] = scope.value.split('/');
