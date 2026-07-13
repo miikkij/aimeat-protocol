@@ -10368,7 +10368,36 @@ paths:
                 type: object
 
   # ── Commerce (TARGET-033) ─────────────────────────────────────
+  /v1/commerce/orders:
+    get:
+      operationId: listCommerceOrders
+      summary: List received orders (seller view)
+      description: Completed checkout sessions mirrored under the seller owner's GHII, newest first.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
   /v1/commerce/checkout-sessions:
+    get:
+      operationId: listCheckoutSessions
+      summary: List own checkout sessions (buyer view)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
     post:
       operationId: createCheckoutSession
       summary: Open a checkout session

@@ -346,6 +346,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     marketplaceListingFeeMorsels: parseInt(process.env.AIMEAT_MARKETPLACE_LISTING_FEE ?? '2', 10),
     marketplaceTransactionFeePercent: parseInt(process.env.AIMEAT_MARKETPLACE_TX_FEE_PERCENT ?? '5', 10),
     marketplaceEscrowEnabled: process.env.AIMEAT_MARKETPLACE_ESCROW !== 'false',
+    marketplaceFeeMode: process.env.AIMEAT_MARKETPLACE_FEE_MODE === 'burn' ? 'burn' : 'operator',
+    operatorFeeAccount: process.env.AIMEAT_OPERATOR_FEE_ACCOUNT || null,
+    commerceFeePercent: process.env.AIMEAT_COMMERCE_FEE_PERCENT
+        ? parseInt(process.env.AIMEAT_COMMERCE_FEE_PERCENT, 10) : null,
+    commerceEnabled: process.env.AIMEAT_COMMERCE_ENABLED !== 'false',
+    commerceSessionTtlMinutes: parseInt(process.env.AIMEAT_COMMERCE_SESSION_TTL_MINUTES ?? '60', 10),
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,

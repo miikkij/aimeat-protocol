@@ -16,6 +16,7 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.1.0 — 2026-07-13 — Fee leg routed via settleMarketplaceFee (operator|burn), TARGET-033 phase 2
  *   v1.0.0 — 2026-03-13 — Renamed from marketplace.ts to app-store.ts; routes /v1/marketplace/* → /v1/app-store/*
  */
 import { Router } from 'express';
@@ -26,6 +27,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
+import { settleMarketplaceFee } from '../services/marketplace-fee.js';
 
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -121,16 +123,9 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             timestamp: now,
         });
 
-        if (transactionFee > 0) {
-            await storage.addTransaction({
-                id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
-                gaii: app.ownerGaii,
-                type: 'app_store_fee',
-                amount: -transactionFee,
-                trackingCode: txId,
-                timestamp: now,
-            });
-        }
+        // Fee leg: credited to the operator or burned per AIMEAT_MARKETPLACE_FEE_MODE
+        // (replaces the old app_store_fee tx that recorded a vanishing fee on the seller).
+        await settleMarketplaceFee(storage, config, { fee: transactionFee, payerGhii: buyerGaii, trackingCode: txId, source: 'app-store' });
 
         // Snapshot app content
         const appContent = app.data.toString('base64');

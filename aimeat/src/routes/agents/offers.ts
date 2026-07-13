@@ -14,6 +14,7 @@ import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
+import { settleMarketplaceFee } from '../../services/marketplace-fee.js';
 import { listWorkflows } from '../../services/workflow/store.js';
 
 export function registerOffersRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -161,7 +162,8 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'OFFER_INVOKE_FAILED', e.message || 'Offer invocation failed')); return;
     }
 
-    // Success → settle: credit the provider (price minus the marketplace fee) + record the audit trail.
+    // Success → settle: credit the provider (price minus the marketplace fee) + record the audit
+    // trail. The fee leg routes to the operator or burns per AIMEAT_MARKETPLACE_FEE_MODE.
     let receipt: Record<string, unknown> = { charged: 0 };
     if (price > 0) {
       const providerGhii = `${agent.owner}@${config.nodeId}`;
@@ -173,6 +175,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       const trackingCode = `offtx_${Date.now()}_${randomBytes(6).toString('hex')}`;
       await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: callerGhii, type: 'offer_spend', amount: -price, counterpartyGaii: providerGhii, trackingCode, timestamp: now });
       await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: providerGhii, type: 'offer_earn', amount: earnings, counterpartyGaii: callerGhii, trackingCode, timestamp: now });
+      await settleMarketplaceFee(storage, config, { fee, payerGhii: callerGhii, trackingCode, source: 'offer' });
       receipt = { charged: price, earned: earnings, fee, trackingCode };
     }
     res.json(success(config.nodeId, { offer: offerId, agent: agent.name, result, receipt }));

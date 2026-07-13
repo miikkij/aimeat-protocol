@@ -144,7 +144,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
           rest: { endpoint: `${b}/v1/commerce`, spec: `${b}/v1/spec` },
           mcp: { endpoint: `${b}/v1/mcp` },
         },
-        capabilities: [
+        capabilities: config.commerceEnabled ? [
           {
             name: 'dev.ucp.shopping.checkout',
             version: '1',
@@ -154,10 +154,10 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
               complete: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions/{id}/complete` },
             },
           },
-        ],
-        payment_handlers: listPaymentHandlers().map((h) => ({
+        ] : [],
+        payment_handlers: config.commerceEnabled ? listPaymentHandlers().map((h) => ({
           id: h.id, title: h.title, currencies: h.currencies,
-        })),
+        })) : [],
       },
       signing_keys: signingKeys,
     });

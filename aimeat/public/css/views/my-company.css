@@ -184,6 +184,21 @@
   font-size: 0.72rem;
   color: var(--text-dim);
 }
+.mc-chip-ok { color: var(--success, #22c55e); border-color: var(--success, #22c55e); }
+.mc-chip-warn { color: var(--warning, #f59e0b); border-color: var(--warning, #f59e0b); }
+
+/* Payments panel (Settings tab): node payment handlers + KYB pre-stage */
+.mc-payments {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mc-payment-row { display: flex; gap: 0.5rem; align-items: baseline; }
 
 .mc-use { display: flex; gap: 0.5rem; align-items: flex-end; margin-top: 0.3rem; }
 .mc-use-input { flex: 1; resize: vertical; font-family: inherit; }

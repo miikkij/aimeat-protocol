@@ -221,6 +221,37 @@ function SettingsPanel({ org, onSaved }) {
     </form>`;
 }
 
+/** Payments (read-only): the node's payment handlers + checkout status from /.well-known/ucp,
+ * and the company's KYB pre-stage (Y-tunnus given or not). Real-money handlers appear here
+ * automatically once the node's EE edition registers them — no UI change needed. */
+function PaymentsPanel({ org }) {
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/.well-known/ucp').then(r => r.json()).then(p => { if (alive) setProfile(p); }).catch(() => { if (alive) setProfile(false); });
+    return () => { alive = false; };
+  }, []);
+  if (profile === null) return html`<p class="mc-empty">${t('myCompany.loading')}</p>`;
+  const handlers = (profile && profile.ucp && profile.ucp.payment_handlers) || [];
+  const checkoutOn = !!(profile && profile.ucp && (profile.ucp.capabilities || []).length);
+  const hasKybPre = !!org.businessId;
+  return html`
+    <div class="mc-payments">
+      <div class="mc-label">${t('myCompany.paymentsCheckout')}
+        <span class="mc-chip ${checkoutOn ? 'mc-chip-ok' : 'mc-chip-warn'}">${checkoutOn ? t('myCompany.paymentsOn') : t('myCompany.paymentsOff')}</span>
+      </div>
+      <div class="mc-label">${t('myCompany.paymentsHandlers')}</div>
+      ${handlers.length === 0
+        ? html`<p class="mc-empty">${t('myCompany.paymentsNone')}</p>`
+        : html`<ul class="mc-order-list">${handlers.map(h => html`
+            <li key=${h.id} class="mc-payment-row"><b>${h.title || h.id}</b> <span class="mc-mini">${h.id} · ${(h.currencies || []).join(', ')}</span></li>`)}</ul>`}
+      <div class="mc-label">${t('myCompany.paymentsKyb')}
+        <span class="mc-chip ${hasKybPre ? 'mc-chip-ok' : 'mc-chip-warn'}">${hasKybPre ? t('myCompany.paymentsKybPre') : t('myCompany.paymentsKybMissing')}</span>
+      </div>
+      <span class="mc-mini">${t('myCompany.paymentsKybHint')}</span>
+    </div>`;
+}
+
 /** Compose the prompt the user takes to their AI to generate the portfolio HTML (prompt-driven). */
 function buildPortfolioPrompt(org, offerings, c) {
   const origin = (typeof window !== 'undefined' && window.location.origin) || '';
@@ -659,6 +690,7 @@ export default function MyCompanyView() {
             ${subTab === 'orders' && html`<${OrdersList} orders=${ordersReceived} view="owner" empty=${t('myCompany.noOrdersReceived')} />`}
             ${subTab === 'customers' && html`<${CustomersPanel} slug=${selected.slug} />`}
             ${subTab === 'portfolio' && html`<${PortfolioPanel} org=${selected} offerings=${offerings} />`}
+            ${subTab === 'settings' && html`<${PaymentsPanel} org=${selected} />`}
             ${subTab === 'settings' && html`<${SettingsPanel} org=${selected} onSaved=${(updated) => {
               // Update in place (no loadOrgs → no loading flash that would remount the panel and drop the "saved ✓").
               if (!updated) return;

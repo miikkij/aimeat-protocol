@@ -17,6 +17,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { settleMarketplaceFee, commerceFeePercent } from '../services/marketplace-fee.js';
 import { logger } from '../utils/logger.js';
 import { stubEnterpriseProvider, type EnterpriseContext, type EnterpriseProvider } from './provider.js';
 
@@ -36,6 +37,8 @@ export function buildEnterpriseContext(config: AimeatConfig, storage: Storage): 
       // capability/input are typed loosely at the seam; the EE module passes the records it fetched.
       return invokeCapability(config, storage, capability as never, (input ?? {}) as Record<string, unknown>, callerGhii, jwt, mode);
     },
+    settleMarketplaceFee: (args) => settleMarketplaceFee(storage, config, args),
+    commerceFeePercent: () => commerceFeePercent(config),
     logger,
   };
 }

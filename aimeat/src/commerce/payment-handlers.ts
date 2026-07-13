@@ -14,6 +14,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { PaymentHandler, PaymentContext, PaymentResult } from './types.js';
+import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 
 const registry = new Map<string, PaymentHandler>();
 
@@ -60,23 +61,30 @@ export function morselPaymentHandler(): PaymentHandler {
       if (!debited) {
         throw new PaymentError('INSUFFICIENT_BALANCE', 402, `This purchase costs ${amount} morsels and the balance does not cover it`);
       }
-      const feePercent = config.marketplaceTransactionFeePercent ?? 5;
-      const fee = Math.ceil(amount * feePercent / 100);
+      const fee = Math.ceil(amount * commerceFeePercent(config) / 100);
       const earnings = amount - fee;
       await storage.creditBalance(sellerGhii, earnings);
       const now = new Date().toISOString();
       const trackingCode = `comtx_${Date.now()}_${randomBytes(6).toString('hex')}`;
       await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: buyerGhii, type: 'commerce_spend', amount: -amount, counterpartyGaii: sellerGhii, trackingCode: `${trackingCode}:${reference}`, timestamp: now });
       await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: sellerGhii, type: 'commerce_earn', amount: earnings, counterpartyGaii: buyerGhii, trackingCode: `${trackingCode}:${reference}`, timestamp: now });
+      // Fee leg: credited to the operator or burned, per AIMEAT_MARKETPLACE_FEE_MODE.
+      await settleMarketplaceFee(storage, config, { fee, payerGhii: buyerGhii, trackingCode, source: 'commerce' });
       return { charged: amount, earned: earnings, fee, trackingCode };
     },
 
     async refund(ctx: PaymentContext, { buyerGhii, sellerGhii, result }): Promise<void> {
-      const { storage } = ctx;
-      // Best effort: return the full charge to the buyer, claw the earnings back from the seller.
+      const { storage, config } = ctx;
+      // Best effort: return the full charge to the buyer, claw the earnings back from the seller
+      // and (operator mode) the fee back from the operator. Burned fees re-enter supply via the
+      // buyer credit — the burn tx already records the destruction, this records the re-issue.
       try {
         await storage.creditBalance(buyerGhii, result.charged);
         await storage.debitBalance(sellerGhii, result.earned);
+        if (result.fee > 0 && config.marketplaceFeeMode === 'operator') {
+          const operatorGhii = await resolveOperatorFeeGhii(storage, config);
+          if (operatorGhii) await storage.debitBalance(operatorGhii, result.fee);
+        }
         const now = new Date().toISOString();
         await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: buyerGhii, type: 'commerce_refund', amount: result.charged, counterpartyGaii: sellerGhii, trackingCode: result.trackingCode, timestamp: now });
       } catch { /* refund must never throw — the caller already carries the primary error */ }

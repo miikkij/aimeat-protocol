@@ -39,7 +39,9 @@ async function setupOwner(label: string) {
     assert(reg.status === 201, `ghii ${reg.status}`);
     const ts = new Date().toISOString();
     const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    return { name, token: tok.body.data.token as string };
+    const token = tok.body.data.token as string;
+    const roles: string[] = (JSON.parse(Buffer.from(token.split('.')[1] as string, 'base64url').toString('utf8')).roles) ?? [];
+    return { name, token, roles };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 async function balance(token: string): Promise<number> {
@@ -50,13 +52,19 @@ async function balance(token: string): Promise<number> {
 
 console.log('\n=== AIMEAT Commerce E2E (TARGET-033) ===\n');
 
+let op: Awaited<ReturnType<typeof setupOwner>>;
 let seller: Awaited<ReturnType<typeof setupOwner>>;
 let buyer: Awaited<ReturnType<typeof setupOwner>>;
 let vendorGaii = '';
 const PRICE = 10;
 
-await test('Setup: seller + buyer owners; seller publishes priced offers', async () => {
+await test('Setup: operator-neutral + seller + buyer owners; seller publishes priced offers', async () => {
+    // Register a NEUTRAL owner first: on a fresh DB the first registered owner is self-healed
+    // into the operator role — without this, the SELLER would be the operator and the fee leg
+    // would credit the seller, breaking the balance assertions below.
+    op = await setupOwner('o');
     seller = await setupOwner('s'); buyer = await setupOwner('b');
+    assert(!seller.roles.includes('operator') && !buyer.roles.includes('operator'), 'seller/buyer must not hold the operator role');
     const ag = await json('/v1/agents', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ name: 'vendor', owner: seller.name, capabilities: ['social'] }) });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body.error || ag.body)}`);
     vendorGaii = `vendor#${seller.name}@${NODE_ID}`;
@@ -128,6 +136,7 @@ await test('4. PATCH items → quantity 1, total re-quoted', async () => {
 await test('5. Complete → charged, fee split, fulfillment TASK queued for the seller agent', async () => {
     const buyerBefore = await balance(buyer.token);
     const sellerBefore = await balance(seller.token);
+    const opBefore = await balance(op.token);
     const r = await json(`/v1/commerce/checkout-sessions/${sessionId}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body.error)}`);
     const s = r.body.data.session;
@@ -137,6 +146,12 @@ await test('5. Complete → charged, fee split, fulfillment TASK queued for the 
     assert((s.fulfillment?.taskIds || []).length === 1, `taskIds: ${JSON.stringify(s.fulfillment)}`);
     assert(await balance(buyer.token) === buyerBefore - PRICE, 'buyer debited');
     assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'seller credited (minus fee)');
+    // Fee destination (operator mode is the default): when our neutral owner holds the operator
+    // role (fresh DB), the fee lands on them exactly. On a shared server another suite's owner may
+    // be the operator — the seller/buyer legs above still pin the arithmetic.
+    if (op.roles.includes('operator')) {
+        assert(await balance(op.token) === opBefore + s.receipt.fee, 'operator received the fee (fee mode: operator)');
+    }
     const tasks = await json('/v1/agents/vendor/tasks', { headers: auth(seller.token) });
     const task = (tasks.body.data.tasks || []).find((t: any) => (t.scope || []).some((sc: any) => sc.name === 'commerce_session' && sc.value === sessionId));
     assert(!!task, 'fulfillment task visible to the seller');
@@ -193,7 +208,27 @@ await test('11. Seller order copy exists under the seller GHII (commerce.order.*
     assert((order.id ?? order.session?.id) === sessionId || JSON.stringify(order).includes(sessionId), 'order carries the session id');
 });
 
-await test('12. Anonymous requests are rejected (401)', async () => {
+await test('12. Buyer list shows own sessions; seller sees none of them', async () => {
+    const mine = await json('/v1/commerce/checkout-sessions', { headers: auth(buyer.token) });
+    assert(mine.status === 200, `list ${mine.status}`);
+    const ids = (mine.body.data.sessions || []).map((s: any) => s.id);
+    assert(ids.includes(sessionId), `completed session in buyer list: ${JSON.stringify(ids)}`);
+    const sellers = await json('/v1/commerce/checkout-sessions', { headers: auth(seller.token) });
+    const sellerIds = (sellers.body.data.sessions || []).map((s: any) => s.id);
+    assert(!sellerIds.includes(sessionId), 'buyer sessions are not visible in the seller\'s session list');
+});
+
+await test('13. Seller order list shows the received order; buyer\'s order list does not', async () => {
+    const got = await json('/v1/commerce/orders', { headers: auth(seller.token) });
+    assert(got.status === 200, `orders ${got.status}`);
+    const ids = (got.body.data.orders || []).map((o: any) => o.id);
+    assert(ids.includes(sessionId), `order in seller list: ${JSON.stringify(ids)}`);
+    const buyers = await json('/v1/commerce/orders', { headers: auth(buyer.token) });
+    const buyerIds = (buyers.body.data.orders || []).map((o: any) => o.id);
+    assert(!buyerIds.includes(sessionId), 'the order copy belongs to the seller, not the buyer');
+});
+
+await test('14. Anonymous requests are rejected (401)', async () => {
     const r = await json('/v1/commerce/checkout-sessions', { method: 'POST', body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }) });
     assert(r.status === 401, `expected 401, got ${r.status}`);
 });

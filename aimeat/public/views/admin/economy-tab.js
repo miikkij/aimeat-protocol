@@ -8,6 +8,7 @@
  *   - doMint(): validates amount (1–1,000,000) and calls mintMorsels(), surfacing the result
  *
  * @version-history
+ *   v1.1.0 — 2026-07-13 — Commerce card: checkout sessions, sales volume, operator fees, fee mode (TARGET-033)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -62,6 +63,19 @@ export default function EconomyTab({ data, reload }) {
         <${EconRow} label=${t('dashboard.dailyAllowancesIssued')} value=${num(e.daily_allowances_issued_today)} />
       </div>
     </div>
+
+    ${e.commerce && html`
+      <div class="adm-card">
+        <h2>${t('dashboard.commerceTitle')}</h2>
+        <${EconRow} label=${t('dashboard.commerceEnabled')} value=${e.commerce.enabled ? t('dashboard.on') || 'on' : t('dashboard.off') || 'off'} />
+        <${EconRow} label=${t('dashboard.commerceFeeMode')} value=${e.commerce.fee_mode === 'operator' ? t('dashboard.feeModeOperator') : t('dashboard.feeModeBurn')} />
+        <${EconRow} label=${t('dashboard.commerceFeePercent')} value=${e.commerce.fee_percent + '%'} />
+        <${EconRow} label=${t('dashboard.commerceSessions')} value=${`${num(e.commerce.checkout_sessions.total)} (${num(e.commerce.checkout_sessions.open)} / ${num(e.commerce.checkout_sessions.completed)} / ${num(e.commerce.checkout_sessions.cancelled)} / ${num(e.commerce.checkout_sessions.expired)})`} />
+        <${EconRow} label=${t('dashboard.commerceSalesAllTime')} value=${num(e.commerce.sales_volume_all_time) + ' ' + t('dashboard.morselUnit')} />
+        <${EconRow} label=${t('dashboard.commerceSalesToday')} value=${num(e.commerce.sales_volume_today) + ' ' + t('dashboard.morselUnit')} />
+        <${EconRow} label=${t('dashboard.commerceFeesAllTime')} value=${num(e.commerce.operator_fees_all_time) + ' ' + t('dashboard.morselUnit')} />
+        <${EconRow} label=${t('dashboard.commerceFeesToday')} value=${num(e.commerce.operator_fees_today) + ' ' + t('dashboard.morselUnit')} />
+      </div>`}
 
     <div class="adm-card">
       <h2>${t('dashboard.morselPolicy')}</h2>
