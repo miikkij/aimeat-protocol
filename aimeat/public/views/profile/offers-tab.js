@@ -67,6 +67,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
     setOpen(true);
     requestAnimationFrame(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     onAutoOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per autoOpen request; onAutoOpened is a parent callback that must not re-trigger open/scroll each render.
   }, [autoOpen]);
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);

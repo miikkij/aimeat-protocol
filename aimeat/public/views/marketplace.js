@@ -139,7 +139,7 @@ function HomeView({ extAction, instanceConfig, onNav, tl }) {
     extAction('browse', { limit: 50 })
       .then(d => setListings(d))
       .catch(() => setErr(t('mkt.myListings.error')));
-  }, []);
+  }, [extAction]);
 
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
   if (!listings) return html`<div class="mk-alert mk-alert-info">...</div>`;
@@ -221,6 +221,9 @@ function BrowseView({ extAction, instanceConfig, onNav, params, tl }) {
       .catch(() => setErr(t('mkt.search.error')));
   }, [q, category, minPrice, maxPrice, extAction]);
 
+  // Run the initial search once on mount. doSearch closes over the form fields (q/category/price),
+  // so including it would re-run the search on every keystroke — not the intent.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { doSearch(1); }, []);
 
   const clearSearch = () => {
@@ -468,7 +471,7 @@ function MyListingsView({ extAction, onNav, tl }) {
     extAction('browse', { seller: 'me', status: 'all' })
       .then(d => setListings(d.listings || []))
       .catch(() => setErr(t('mkt.myListings.error')));
-  }, []);
+  }, [extAction]);
 
   const doAction = (actionId, body, successMsg) => {
     setActionMsg('');
@@ -531,7 +534,7 @@ function MyPurchasesView({ extAction }) {
     extAction('browse', { buyer: 'me' })
       .then(d => setPurchases(d.purchases || d.listings || []))
       .catch(() => setErr(t('mkt.myPurchases.error')));
-  }, []);
+  }, [extAction]);
 
   const doRate = () => {
     if (!rateId) return;

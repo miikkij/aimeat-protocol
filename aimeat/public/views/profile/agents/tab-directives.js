@@ -13,7 +13,7 @@
  */
 
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
@@ -46,7 +46,7 @@ export default function TabDirectives({ agentName, showToast }) {
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const resp = await getDirectives(agentName);
@@ -66,9 +66,9 @@ export default function TabDirectives({ agentName, showToast }) {
       }
     }
     setLoading(false);
-  }
+  }, [agentName]);
 
-  useEffect(() => { loadData(); }, [agentName]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   // M6: No SSE listener -- directives are owner-initiated only
 

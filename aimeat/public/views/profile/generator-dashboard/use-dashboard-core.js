@@ -48,7 +48,9 @@ export function useDashboardCore(projectId, onBack, showToast) {
   const [liveStatuses, setLiveStatuses] = useState({});
   const [pendingEdit, setPendingEdit] = useState(null);
 
-  // Load on mount
+  // Load on mount / when the project changes. loadData is recreated each render (closes over
+  // stable setters + props); the reload is intentionally keyed to projectId only.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData(); }, [projectId]);
 
   // SSE live updates — instant refresh when data changes
@@ -56,6 +58,8 @@ export function useDashboardCore(projectId, onBack, showToast) {
     const handler = () => loadData();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
+    // Handler reloads on every data-change event; the listener is keyed to projectId only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   async function loadData() {
@@ -104,6 +108,10 @@ export function useDashboardCore(projectId, onBack, showToast) {
     } catch { /* best effort */ }
   }
 
+  // Refresh live statuses whenever the project record changes. refreshStatuses is recreated each
+  // render and is also returned from this hook (consumers depend on its runtime behavior); keep it
+  // out of the deps and key the effect to the project record.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (project) refreshStatuses(); }, [project]);
 
   // Advance to next unregistered component in phase order
@@ -135,6 +143,10 @@ export function useDashboardCore(projectId, onBack, showToast) {
         else setSelectedId(phaseOrder[0]);
       }
     }
+    // Auto-select the first incomplete component only when the component-set SIZE changes.
+    // Deliberately keyed to length: depending on the full `components`/`phases`/`selectedId`
+    // would re-run on every reference change and could re-select on unrelated updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [components.length]);
 
   return {

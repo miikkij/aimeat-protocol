@@ -38,6 +38,10 @@ function NodesList({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) loadData();
+    // Load nodes once the session is available. loadData closes over onStats (prop)
+    // and stable service/setters; keyed on session intentionally (liveRef below
+    // handles subsequent refreshes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   // Live update listener

@@ -56,7 +56,7 @@ export default function McpTab({ session, showToast, onStats }) {
         showToast(t('profile.mcp.deleteError'), true);
       } finally { setDeleting(null); }
     }, { danger: true });
-  }, [showToast, loadData]);
+  }, [confirm, showToast, loadData]);
 
   const platformLabel = (p) => {
     const labels = {

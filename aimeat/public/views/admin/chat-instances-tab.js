@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -32,19 +32,19 @@ function ChannelChat({ boardId }) {
   const feedRef = useRef(null);
   const [toast, showErr, , clearToast] = useToast();
 
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     try {
       const res = await getBoardPosts(boardId, 100);
       setPosts((res.data?.posts || []).reverse());
     } catch (e) { console.warn('Failed to load:', e.message); setPosts([]); }
     setLoading(false);
-  }
+  }, [boardId]);
 
   useEffect(() => {
     loadPosts();
     const iv = setInterval(loadPosts, 5000);
     return () => clearInterval(iv);
-  }, [boardId]);
+  }, [boardId, loadPosts]);
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;

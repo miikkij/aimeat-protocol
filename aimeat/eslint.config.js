@@ -65,9 +65,11 @@ export default tseslint.config(
       'no-undef': 'off',
       // Preact uses the same hook contract as React, so these rules apply. Warn-level for now
       // (gradual adoption) — surfaces missing/incorrect effect deps and hook-ordering issues.
-      // rules-of-hooks cleaned to zero on 2026-07-13 and ratcheted to 'error'.
+      // rules-of-hooks + exhaustive-deps cleaned to zero on 2026-07-13 and ratcheted to
+      // 'error'. Intentional mount/[key] effects carry a documented per-line disable with
+      // justification; genuine missing deps were added (stable values / useCallback-wrapped).
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
       // Legacy-frontend findings surfaced when lint coverage was extended to public/
       // (2026-06-19). Cleaned to zero on 2026-07-13 and ratcheted to 'error' so new
       // occurrences fail the pre-commit hook + CI instead of silently accumulating.

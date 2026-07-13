@@ -29,7 +29,7 @@
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-tab.js ProjectDashboard
  *   v1.1.0 — 2026-03-26 — Enrich multi-pass components with initial passes on load
  */
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import {
   getProject, loadAllComponents, saveComponent, cleanupOldEntries,
@@ -50,14 +50,18 @@ export function useDashboardCore(projectId, onBack, showToast) {
   const [liveStatuses, setLiveStatuses] = useState({});
   const [pendingEdit, setPendingEdit] = useState(null);
 
-  // Load on mount
+  // Load on mount. loadData closes over the onBack prop (not guaranteed memoized by the parent),
+  // so we key on projectId only: reload on project switch without re-running every parent render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData(); }, [projectId]);
 
-  // SSE live updates — instant refresh when data changes
+  // SSE live updates — instant refresh when data changes. Re-subscribe only on project switch;
+  // loadData closes over the possibly-unstable onBack prop, so it is intentionally not a dep.
   useEffect(() => {
     const handler = () => loadData();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   async function loadData() {
@@ -105,14 +109,14 @@ export function useDashboardCore(projectId, onBack, showToast) {
   }
 
   // Refresh live statuses
-  async function refreshStatuses() {
+  const refreshStatuses = useCallback(async () => {
     try {
       const s = await getComponentStatuses(projectId);
       setLiveStatuses(s);
     } catch { /* best effort */ }
-  }
+  }, [projectId]);
 
-  useEffect(() => { if (project) refreshStatuses(); }, [project]);
+  useEffect(() => { if (project) refreshStatuses(); }, [project, refreshStatuses]);
 
   // Advance to next unregistered component in phase order
   function advanceToNext(currentId) {
@@ -143,6 +147,10 @@ export function useDashboardCore(projectId, onBack, showToast) {
         else setSelectedId(phaseOrder[0]);
       }
     }
+    // Deliberately keyed on components.length only — auto-selects the first incomplete component
+    // when components first arrive (guarded by !selectedId). Adding components/selectedId/phases
+    // would re-run on unrelated updates and fight the user's manual selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [components.length]);
 
   return {

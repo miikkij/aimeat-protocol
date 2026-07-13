@@ -79,6 +79,10 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       triggeredAuto.current = true;
       handleEnrich();
     }
+    // One-shot auto-enrich when the parent flags this card, guarded by the triggeredAuto ref.
+    // handleEnrich is recreated each render and enrich/planning change as the flow progresses;
+    // depending on them would re-run this effect on every change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEnrich]);
 
   const cycleView = () => setView(v => v === 'line' ? 'peek' : v === 'peek' ? 'full' : 'line');

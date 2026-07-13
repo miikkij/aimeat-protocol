@@ -495,6 +495,9 @@ export default function Landing({ navigate }) {
     const onAuth = () => check();
     window.addEventListener('aimeat-auth-change', onAuth);
     return () => window.removeEventListener('aimeat-auth-change', onAuth);
+    // navigate is a router prop; this is a deliberate mount-only "redirect on arrival"
+    // check that must not re-run (and re-redirect) if navigate's identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return html`

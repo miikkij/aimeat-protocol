@@ -59,6 +59,9 @@ export default function TabUsage({ agent, agentName }) {
     setLoading(false);
   }
 
+  // Reload when the agent changes. loadData closes over gaii (agent?.gaii||agentName)
+  // and stable setters; the loadRef mirror below handles live refetches.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData(); }, [agentName]);
 
   const loadRef = useRef(loadData);

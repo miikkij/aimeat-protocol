@@ -60,7 +60,11 @@ export function useApiCall(endpoint, options = {}) {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  // deps are intentionally dynamic (endpoint/method/reloadKey + caller-supplied deps)
+  // Deps are intentionally dynamic: endpoint/method/reloadKey plus the caller-supplied `deps`
+  // (spread — not statically verifiable). `body` and `skip` are read via closure but omitted on
+  // purpose: `body` is typically a fresh object literal (adding it would refetch every render) and
+  // callers signal body/skip changes through `deps`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, method, reloadKey, ...deps]);
 
   /** Call reload() to re-trigger the fetch (e.g. after a mutation). */

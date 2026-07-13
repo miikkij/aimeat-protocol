@@ -64,6 +64,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
   const [message, setMessage] = useState(null); // { text, error }
   const [loaded, setLoaded] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Mount-only settings load; loadSettings (and the loadModels it calls) use only stable setters/t.
   useEffect(() => { loadSettings(); }, []);
 
   async function loadSettings() {
@@ -91,6 +92,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
     if (loaded && onSettingsChange) {
       onSettingsChange({ hasApiKey: hasApiKey, autoRetry, maxRetries, provider, baseUrl });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Notify parent only when the listed settings change; onSettingsChange is a caller callback intentionally excluded to avoid re-firing on every parent re-render.
   }, [loaded, hasApiKey, autoRetry, maxRetries, provider, baseUrl]);
 
   async function loadModels() {
@@ -630,11 +632,13 @@ export function SettingsCollectionView({ project, blueprint, onComplete, showToa
       }
       setLoaded(true);
     }).catch(() => setLoaded(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Load saved settings once per project (guarded by loaded/noSettings); allSettings is rebuilt each render and `loaded` flips inside the async body, so adding them would re-fire the loader. Intentionally keyed to projectId.
   }, [project.projectId]);
 
   // Auto-skip when no settings needed (hook always called, respecting rules of hooks)
   useEffect(() => {
     if (noSettings) onComplete({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Fire onComplete once when there are no settings to collect; onComplete is a caller callback intentionally excluded to avoid re-firing on parent re-render.
   }, [noSettings]);
 
   if (noSettings) {

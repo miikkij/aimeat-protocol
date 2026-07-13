@@ -148,10 +148,13 @@ export default function TabMessages({ agent, agentName, showToast }) {
     loadCommands();
     loadThreads();
     loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Full initial load on mount and when the agent changes; the loaders also close over activeThread, but re-keying on it would double-fetch (activeThread is handled by the effect below).
   }, [agentName]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Reload messages when the active thread changes; loadMessages also depends on agentName, which the mount effect above already handles.
   useEffect(() => { loadMessages(); }, [activeThread]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Re-subscribe when the agent or active thread changes; the callback reads the current loaders via closure (fresh for these deps).
   useEffect(() => onLiveUpdate(['agent-messages'], () => { loadMessages(); loadThreads(); loadCommands(); }), [agentName, activeThread]);
 
   useEffect(() => {

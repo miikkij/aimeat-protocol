@@ -44,6 +44,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [settings, setSettings] = useState({ autoDetectIntent: false, autoRunPlan: false, autoDistribute: false });
   const [autoEnrichKey, setAutoEnrichKey] = useState(null); // the just-captured note to auto-enrich (trust mode)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Initial load once the session is available; the loaders close over session/onStats/setters and are intentionally keyed to session.
   useEffect(() => { if (session) { loadInbox(); loadOrgNames(); loadSettings(); } }, [session]);
 
   async function loadSettings() {

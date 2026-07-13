@@ -244,6 +244,10 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     if (component.spec && !specResult) {
       setSpecResult(JSON.stringify(component.spec, null, 2));
     }
+    // Hand-tuned trigger list: react only to these specific component fields. Depending on the whole
+    // `component` object, `onUpdate`, `projectId`, or the spec* state would broaden triggers and risk
+    // a save→onUpdate→re-run loop (see v1.1.0 "Fix useEffect deps").
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
   const prompt = component.prompt || generatedPrompt || '';
@@ -521,7 +525,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     } else {
       setCurrentTestPrompt(null);
     }
-  }, [component.id, component.registeredAs]);
+  }, [component.id, component.registeredAs, isTestable, projectId]);
 
   async function handleCopyTestPrompt() {
     if (!currentTestPrompt) return;

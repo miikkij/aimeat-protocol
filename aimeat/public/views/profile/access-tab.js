@@ -167,7 +167,7 @@ function SharingGroupsSection({ showToast }) {
     } finally {
       setSaving(false);
     }
-  }, [editName, editDesc, showToast, loadGroups]);
+  }, [editName, editDesc, editRead, editWrite, showToast, loadGroups]);
 
   const handleAddMember = useCallback(async (groupId) => {
     if (!memberIdent.trim()) {

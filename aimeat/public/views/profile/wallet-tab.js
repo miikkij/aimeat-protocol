@@ -44,6 +44,7 @@ export default function WalletTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData is a loader defined below (recreated each render); effect intentionally re-runs only when session changes.
   }, [session]);
 
   // Live update listener

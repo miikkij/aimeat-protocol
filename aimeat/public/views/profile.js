@@ -241,7 +241,7 @@ export default function Profile({ navigate, locale }) {
       }
       updateStats(s);
     });
-  }, [session]);
+  }, [session, updateStats]);
 
   // SSE live updates — broadcast a custom event carrying WHICH domains changed so tabs can
   // re-fetch selectively (detail.domains is a Set<string>, or null = everything changed).
@@ -258,8 +258,12 @@ export default function Profile({ navigate, locale }) {
     };
   }, [session]);
 
-  // Common props passed to all tabs
-  const tabProps = { session, showToast, onStats: updateStats, navigate, locale };
+  // Common props passed to all tabs. Memoised so renderTab's identity is stable
+  // across renders that don't change these inputs (avoids remounting the shown tab).
+  const tabProps = useMemo(
+    () => ({ session, showToast, onStats: updateStats, navigate, locale }),
+    [session, showToast, updateStats, navigate, locale],
+  );
 
   // Render a tab component by ID — called by LandingPage to show content inline
   const renderTab = useCallback((tabId) => {

@@ -26,7 +26,7 @@
  *     (AIMEAT_SECRETARY_ENABLED, read from /v1/site/header-nav `features.secretary`). Governance + model unaffected.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
@@ -102,8 +102,8 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
   const [role, setRole] = useState('member');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  async function load() { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch { setMembers([]); } }
-  useEffect(() => { load(); }, [slug]);
+  const load = useCallback(async () => { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch { setMembers([]); } }, [slug]);
+  useEffect(() => { load(); }, [load]);
   async function add(e) {
     e.preventDefault(); setBusy(true); setErr('');
     try { await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/members`, { owner: owner.trim().toLowerCase(), role }); setOwner(''); await load(); }
@@ -264,6 +264,7 @@ function PortfolioPanel({ org, offerings }) {
       const c = r.data?.config; setCfg(c || null);
       if (c) { setIncludeOfferings(c.includeOfferings !== false); setIncludeInfo(c.includeInfo !== false); setUseLogo(c.useLogo !== false && !!org.logo); setLook(c.lookDescription || ''); if (c.themeId) setThemeId(c.themeId); }
     }).catch(() => setCfg(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Load portfolio config when the company changes; org.logo is only read to seed the initial useLogo default and must not re-trigger a config refetch that would clobber in-progress edits.
   }, [org.slug]);
 
   const choices = () => ({ includeOfferings, includeInfo, useLogo, lookDescription: look });

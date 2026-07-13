@@ -154,6 +154,9 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: vis[e.key] || 'private' })));
     }).catch(() => { if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: 'private' }))); });
     return () => { cancelled = true; };
+    // Runs once on mount from the initial `page` snapshot; the editor is remounted per document
+    // via `key`, so re-running on `page` identity changes is unnecessary and would reset image state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const changeImageVisibility = async (key, visibility) => {
@@ -245,6 +248,10 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       editorRef.current = null;
       blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } });
     };
+    // Re-init the editor only on mode switch. `uploadAndMap` is recreated every render (adding it
+    // would rebuild the editor on every render) and `page` is the initial content snapshot — both
+    // are read intentionally via closure to keep the live editor instance stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const save = async () => {

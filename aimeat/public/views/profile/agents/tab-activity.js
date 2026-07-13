@@ -118,6 +118,7 @@ export default function TabActivity({ agent, agentName }) {
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Load activity when the agent changes; loadData also closes over the agent object, but re-keying on it would double up with the live-update refetch below.
   useEffect(() => { loadData(); }, [agentName]);
 
   const loadRef = useRef(loadData);

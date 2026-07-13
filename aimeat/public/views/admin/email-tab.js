@@ -220,6 +220,7 @@ export default function EmailTab({ data, reload, locale }) {
 
   useEffect(() => {
     if (email && email.enabled) loadTemplates(tplLocale);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reload templates when the locale or enabled-state changes; email is the whole config object (new identity per parent render) so email?.enabled is the stable signal; keying on `email` would refetch every render.
   }, [tplLocale, email?.enabled]);
 
   async function loadTemplates(loc) {

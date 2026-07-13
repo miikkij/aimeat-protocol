@@ -151,22 +151,25 @@ export default function StatsTab({ data }) {
 
   useEffect(() => {
     if (period !== 'custom') fetchStats(period);
-  }, [period]);
+  }, [period, fetchStats]);
 
   // Listen for live updates
   useEffect(() => {
     const handler = () => { fetchStats(period, customFrom, customTo, { showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [period, customFrom, customTo]);
+  }, [period, customFrom, customTo, fetchStats]);
 
   // Re-render charts when data changes; destroy on unmount
   useEffect(() => {
     if (sd) renderAllCharts(sd, chartRefs);
     return () => {
+      // renderAllCharts reassigns chartRefs.current; the cleanup must read the LIVE ref (not a
+      // snapshot taken at effect-run time) to destroy whatever chart instances currently exist.
       for (const key of Object.keys(chartRefs.current)) {
         if (chartRefs.current[key]) {
           chartRefs.current[key].destroy();
+          // eslint-disable-next-line react-hooks/exhaustive-deps
           delete chartRefs.current[key];
         }
       }

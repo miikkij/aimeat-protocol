@@ -26,6 +26,9 @@ export default function SecurityTab() {
     try { const r = await getSecurityIncidents(); setState({ incidents: r?.data?.incidents || [], open: r?.data?.open || 0, total: r?.data?.total || 0, loading: false }); }
     catch (e) { setState({ incidents: [], open: 0, total: 0, loading: false }); showErr((e && e.message) || 'Failed to load incidents'); }
   };
+  // load once on mount. `load` is re-created each render and closes over showErr/setState; including
+  // it would re-run every render (loop).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const resolve = async (id) => {

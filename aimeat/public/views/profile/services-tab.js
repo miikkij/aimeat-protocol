@@ -158,6 +158,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) loadMyData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Load my services once the session is available; loadMyData closes over session/onStats and is intentionally keyed to session.
   }, [session]);
 
   async function loadMyData() {

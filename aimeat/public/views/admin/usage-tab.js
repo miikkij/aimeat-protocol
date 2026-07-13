@@ -72,14 +72,14 @@ export default function UsageTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(period); }, [period]);
+  useEffect(() => { load(period); }, [period, load]);
 
   // Silent background refresh on live updates (no spinner flash).
   useEffect(() => {
     const handler = () => { load(period); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [period]);
+  }, [period, load]);
 
   const presets = [
     { key: '7d',  label: t('dashboard.period7Days')  || '7 days' },

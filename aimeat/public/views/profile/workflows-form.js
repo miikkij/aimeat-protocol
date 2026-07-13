@@ -68,8 +68,11 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
     });
   }, []);
 
-  // Pre-load offers for steps that already name an agent (edit mode).
-  useEffect(() => { steps.forEach(s => s.agent && loadOffers(s.agent)); }, []);  
+  // Pre-load offers for steps that already name an agent (edit mode). Mount-once by design: `steps` is
+  // read as its INITIAL value only, and later per-step agent changes call loadOffers from the select's
+  // onChange (below), so re-running on every steps edit is not wanted. loadOffers is a stable []-useCallback.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { steps.forEach(s => s.agent && loadOffers(s.agent)); }, []);
 
   const setStep = (i, patch) => setSteps(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
   const addStep = () => setSteps(prev => [...prev, blankStep()]);

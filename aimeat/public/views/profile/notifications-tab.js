@@ -7,7 +7,7 @@
  *     failures so the user knows to unblock notifications in browser settings.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -23,18 +23,9 @@ export default function NotificationsTab({ session, showToast }) {
   const [emailPrefs, setEmailPrefs] = useState({ enabled: false, extensions: true, system: true, security: true });
   const [, setSavingEmail] = useState(false);
 
-  useEffect(() => {
-    if (session) checkSubscription();
-  }, [session]);
-
-  // Re-check email verification when other tabs update data (e.g. email confirmed)
-  useEffect(() => {
-    const handler = () => { if (session) checkSubscription({ showSpinner: false }); }; // silent
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [session]);
-
-  async function checkSubscription({ showSpinner = true } = {}) {
+  // Defined before the effects below so their dependency arrays can reference it
+  // (a useCallback const is not hoisted). Re-created only when `session` changes.
+  const checkSubscription = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
     try {
       // Get VAPID key
@@ -73,7 +64,18 @@ export default function NotificationsTab({ session, showToast }) {
       }
     } catch { /* no prefs yet */ }
     setLoading(false);
-  }
+  }, [session]);
+
+  useEffect(() => {
+    if (session) checkSubscription();
+  }, [session, checkSubscription]);
+
+  // Re-check email verification when other tabs update data (e.g. email confirmed)
+  useEffect(() => {
+    const handler = () => { if (session) checkSubscription({ showSpinner: false }); }; // silent
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [session, checkSubscription]);
 
   async function handleSubscribe() {
     setSubStatus('subscribing');

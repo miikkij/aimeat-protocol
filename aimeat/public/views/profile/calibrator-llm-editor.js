@@ -25,6 +25,7 @@ export default function LlmConfigEditor({ config, onChange, onRemove, label }) {
 
   // Local draft state — only persisted on Save
   const [draft, setDraft] = useState({ ...config });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Reset the local draft only when a different config is loaded (config.id); config is spread to seed the draft, but keying on the whole object would clobber in-progress edits on every parent re-render.
   useEffect(() => { setDraft({ ...config }); setDirty(false); }, [config.id]);
 
   const provider = draft.provider || 'openrouter';
