@@ -30,21 +30,16 @@ export default function GeneratorDebugTab() {
   async function loadProjects() {
     setLoading(true);
     try {
-      // Load both generator and foundry debug projects
-      const [genResp, foundryResp] = await Promise.all([
-        apiGet('/v1/generator/debug/projects').catch(() => ({ data: { projects: [] } })),
-        apiGet('/v1/foundry/debug/projects').catch(() => ({ data: { projects: [] } })),
-      ]);
+      // Load generator debug projects
+      const genResp = await apiGet('/v1/generator/debug/projects').catch(() => ({ data: { projects: [] } }));
       const genProjects = (genResp?.data?.projects || []).map(p => ({ ...p, source: 'generator' }));
-      const foundryProjects = (foundryResp?.data?.projects || []).map(p => ({ ...p, source: 'foundry' }));
-      setProjects([...foundryProjects, ...genProjects]);
+      setProjects([...genProjects]);
     } catch { setProjects([]); }
     setLoading(false);
   }
 
-  function getDebugBase(projectId) {
-    const proj = projects.find(p => p.projectId === projectId);
-    return proj?.source === 'foundry' ? '/v1/foundry/debug' : '/v1/generator/debug';
+  function getDebugBase(_projectId) {
+    return '/v1/generator/debug';
   }
 
   async function selectProject(projectId) {
@@ -173,7 +168,7 @@ export default function GeneratorDebugTab() {
           ${projects.map(p => html`
             <div class="adm-card adm-card-clickable" onClick=${() => selectProject(p.projectId)}>
               <div class="adm-card-header">
-                <strong>${p.source === 'foundry' ? '🏭 ' : '🔴 '}${p.projectId}</strong>
+                <strong>🔴 ${p.projectId}</strong>
                 <button class="adm-btn" onClick=${e => { e.stopPropagation(); handleCopyAll(p.projectId); }}>
                   ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All'}
                 </button>

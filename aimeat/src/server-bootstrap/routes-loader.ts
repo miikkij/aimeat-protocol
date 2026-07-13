@@ -108,7 +108,6 @@ import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
 import { generatorRouter } from '../routes/generator.js';
 import { generatorAutopilotRouter } from '../routes/generator-autopilot.js';
-import { foundryRouter } from '../routes/foundry.js';
 import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
@@ -339,9 +338,6 @@ export async function mountRoutes(
   if (config.generatorEnabled) {
     app.use(generatorRouter(config, storage));   // Agent-driven service generator
     app.use(generatorAutopilotRouter(config, storage)); // Backend autopilot for generator
-  }
-  if (config.foundryEnabled) {
-    app.use(foundryRouter(config, storage));     // Prompt-driven service builder
   }
   if (config.calibratorEnabled) {
     app.use(calibratorRouter(config, storage));  // Prompt calibration tool
