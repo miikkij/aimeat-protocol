@@ -494,8 +494,7 @@ function buildPromptFromBuilder() {
   prompt += '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n';
   prompt += 'AI (prompt-driven — see the AI section below):\n';
   prompt += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
-  prompt += 'Social & economy:\n';
-  prompt += '- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n';
+  prompt += 'Economy & agents:\n';
   prompt += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
   prompt += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
   prompt += '- aimeat-agents.js — commission & watch the owner\'s AI agents (`AIMEAT.agents`)\n';
