@@ -1,3 +1,15 @@
+/**
+ * @file src/routes/lib-live.ts
+ * @description Generates the client-side aimeat-live.js library string served to apps — the
+ *   realtime "subscribe to server-pushed domain changes" helper (TARGET-012) that wraps the
+ *   node's SSE transport in one shared, multi-tab-elected EventSource with debounce and backoff.
+ *
+ * @structure
+ *   - aimeatLiveLib(config): returns the aimeat-live.js source, exposing AIMEAT.live.{connect,subscribe,onUpdate,disconnect}
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

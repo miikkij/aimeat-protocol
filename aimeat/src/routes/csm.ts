@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/csm.ts
+ * @description Routes for CSM (Client Service Model) definitions — the YAML/JSON
+ *   schemas that describe a service's data shape and rules. Registers/validates CSMs,
+ *   converts them to JSON Schema, and serves built-in CSM templates loaded from
+ *   docs/csm-examples at startup.
+ *
+ * @structure
+ *   - loadCsmTemplates(): read + parse docs/csm-examples/*.csm.yaml into template metadata
+ *   - csmRouter(config, storage): Router mounting the /v1/csm endpoints
+ *   - POST /v1/csm: parse (YAML or JSON), validate, and register a CSM service
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';

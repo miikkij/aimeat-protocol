@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/consent.ts
+ * @description Consent-grant API — lets an owner create, list, inspect, and revoke consent records
+ *   authorizing recipients (wildcard, GAII, organism, ghii, domain, node) to access data patterns.
+ *   Also exposes the buffered consent-audit log. Identity resolved via resolveIdentity().
+ *
+ * @structure
+ *   - consentRouter(config, storage, stats, onDirectoryChange): mounts the routes below
+ *   - POST /v1/consent: create a grant (recipient-format + quota validation, max 100/owner)
+ *   - GET /v1/consent, GET /v1/consent/:id, DELETE /v1/consent/:id: list, inspect, revoke
+ *   - GET /v1/consent/audit: pending consent-audit buffer entries
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';

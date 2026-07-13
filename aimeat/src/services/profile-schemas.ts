@@ -1,3 +1,17 @@
+/**
+ * @file src/services/profile-schemas.ts
+ * @description Defines the standardized JSON Schemas for interest-profile fields (interests,
+ *   location, bio, seeking, availability, languages) and seeds them into Schema Locking at startup.
+ *   Idempotent and non-destructive — it will not overwrite operator-customized schemas.
+ *
+ * @structure
+ *   - interestsSchema/locationSchema/bioSchema/seekingSchema/availabilitySchema/languagesSchema: per-field JSON Schemas
+ *   - PROFILE_SCHEMAS: the field→schema list keyed to `profile.*.<field>` patterns
+ *   - seedProfileSchemas(storage, lockedBy): registers each schema via Schema Locking, skipping existing ones
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Storage } from '../storage/interface.js';
 
 // ── Interest Profile Schema Definitions ──

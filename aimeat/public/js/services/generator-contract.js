@@ -18,8 +18,6 @@
  * @returns {{ valid: boolean, mismatches: string[] }}
  */
 export function verifyContract(type, result, blueprintComponent, blueprint) {
-  const mismatches = [];
-
   if (!blueprintComponent) return { valid: true, mismatches: [] };
 
   if (type === 'extension') {
@@ -72,7 +70,7 @@ function verifyExtensionContract(result, comp, blueprint) {
   return { valid: mismatches.length === 0, mismatches };
 }
 
-function verifyCortexContract(result, comp, blueprint) {
+function verifyCortexContract(result, comp, _blueprint) {
   const mismatches = [];
   if (!result) return { valid: false, mismatches: ['No result to verify'] };
 
@@ -106,7 +104,6 @@ function verifyAppContract(result, comp, blueprint) {
   for (const cortex of cortexComps) {
     if (cortex.registeredAs || cortex.label) {
       // Check for some reference to the cortex in the HTML
-      const name = cortex.registeredAs || cortex.label;
       if (!result.includes('/v1/cortex/') && !result.includes('cortex')) {
         mismatches.push(`App should load cortex but no cortex script reference found`);
       }

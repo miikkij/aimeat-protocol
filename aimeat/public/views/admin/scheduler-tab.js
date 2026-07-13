@@ -1,6 +1,14 @@
 /**
- * Admin Dashboard — Scheduler Tab
- * Displays scheduled jobs, allows triggering, enabling/disabling, and deleting.
+ * @file public/views/admin/scheduler-tab.js
+ * @description Admin dashboard Scheduler tab — lists scheduled jobs with summary stats and lets the
+ *   operator run a job now, toggle enabled/disabled, or delete it.
+ *
+ * @structure
+ *   - default SchedulerTab({ data, reload }): stats grid (total/active/disabled/failed) + jobs table
+ *   - handleRunNow / handleToggleEnabled / handleDelete: per-job actions calling the admin service
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -8,11 +16,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, DataTable, Empty, useToast, Toast } from './shared.js';
-import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob, fetchSchedulerExecutionLog } from '/js/services/admin.js';
+import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
 export default function SchedulerTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const jobs = data.schedulerJobs?.jobs || [];
 

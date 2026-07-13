@@ -1,3 +1,18 @@
+/**
+ * @file src/services/csm-parser.ts
+ * @description CSM (Community Service Model) parser: parses a YAML service definition into a typed
+ *   CsmDefinition, validates its structure/consent/moderation/uiHints blocks, and converts its data
+ *   schema into a JSON Schema for the generic validation layer.
+ *
+ * @structure
+ *   - CsmDefinition / CsmFieldDef / CsmServiceType: the parsed CSM type model
+ *   - parseCsm(yaml): YAML → CsmDefinition
+ *   - validateCsm(def): returns a list of structural/semantic validation errors
+ *   - csmToJsonSchema(def): CSM data schema → JSON Schema
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { parse as parseYaml } from 'yaml';
 
 // ── CSM Types ──

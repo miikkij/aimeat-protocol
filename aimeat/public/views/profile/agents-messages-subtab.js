@@ -150,7 +150,7 @@ function ThreadList({ threads, activeThread, onSelect }) {
   `;
 }
 
-export default function AgentMessagesSubtab({ agentName, session, showToast }) {
+export default function AgentMessagesSubtab({ agentName, showToast }) {
   const [messages, setMessages] = useState([]);
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);

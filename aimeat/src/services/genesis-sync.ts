@@ -1,11 +1,17 @@
 /**
- * Genesis Sync Service — real catalogue exchange with cross-federation peers.
- * Per RFC v1.6 §13.11.7 (genesis sync) — replaces the Phase 3.4 stub.
+ * @file src/services/genesis-sync.ts
+ * @description Genesis Sync Service — periodic catalogue exchange with cross-federation genesis peers
+ *   (RFC v1.6 §13.11.7). Fetches peer catalogues, stores entries under a `genesis:{node}:{entry}` prefix,
+ *   prunes stale entries, pushes local federable CSMs, and syncs prefix-subscribed memory. All outbound
+ *   URLs are SSRF-validated.
  *
- * E.1: Fetches catalogues from active genesis peers, stores entries with
- *      `genesis:{genesisNodeId}:{entryId}` prefix, removes stale entries,
- *      and pushes local federable CSMs to peers.
- * E.3: Memory prefix subscriptions — syncs matching memory entries to peers.
+ * @structure
+ *   - createGenesisSyncService(config, storage): returns { start, stop, syncNow } or null when disabled
+ *   - fetchPeerCatalogue(peer): pulls a peer's cross-catalogue (SSRF-guarded)
+ *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

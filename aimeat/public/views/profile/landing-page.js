@@ -1013,35 +1013,6 @@ function CortexSection({ switchTab, onDismiss }) {
 /* (AppStrip removed \u2014 the cross-type "Continue" card replaced it: raw filenames in a horizontal
  * scroller duplicated the Apps tab and read as a file listing.) */
 
-/* ───── Generic layout components ───── */
-
-function MenuSection({ title, annotation, children }) {
-  return html`
-    <div class="pf-landing-section">
-      <div class="pf-menu-title">
-        ${title}
-        ${annotation && html`<span class="pf-menu-annotation">${annotation}</span>`}
-      </div>
-      ${children}
-    </div>
-  `;
-}
-
-function MenuItem({ icon, label, badge, badgeMuted, primary, indigo, active, onClick }) {
-  let cls = 'pf-menu-item';
-  if (primary) cls += ' pf-primary';
-  if (indigo) cls += ' pf-indigo';
-  if (active) cls += ' pf-menu-active';
-  return html`
-    <a class=${cls} onClick=${(e) => { e.preventDefault(); onClick?.(); }}>
-      ${icon} ${label}
-      ${badge != null && badge > 0 && html`
-        <span class="pf-menu-badge${badgeMuted ? ' pf-badge-muted' : ''}">${badge}</span>
-      `}
-    </a>
-  `;
-}
-
 /* ───── Inbox nav button — fixed under Home (non-movable), with an unread badge ───── */
 
 function InboxNavButton({ active, onClick }) {
@@ -1058,25 +1029,6 @@ function InboxNavButton({ active, onClick }) {
       <span class="pf-side-label">${t('profile.tabs.inbox')}</span>
       ${unread > 0 ? html`<span class="pf-side-badge">${unread}</span>` : null}
     </button>`;
-}
-
-/* ───── Inline view wrapper — renders tab content below its trigger ───── */
-
-function InlineView({ tabId, label, onClose, renderTab }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-  }, [tabId]);
-
-  return html`
-    <div class="pf-inline-view" ref=${ref}>
-      <div class="pf-inline-view-header">
-        <button class="pf-back-btn" onClick=${onClose}>\u2715 ${t('profile.close')}</button>
-        <span class="pf-back-current">${label}</span>
-      </div>
-      <div class="pf-inline-view-body">${renderTab(tabId)}</div>
-    </div>
-  `;
 }
 
 /* ───── Persistent sidebar groups (replaces the tier-adaptive menu) ─────
@@ -1147,7 +1099,7 @@ const DEFAULT_PINS = ['organisms', 'agents', 'memory', 'scheduler'];
 
 /* ───── Main landing page ───── */
 
-export default function LandingPage({ tier, stats, session, navigate, showToast, locale, renderTab, getTabLabel }) {
+export default function LandingPage({ tier, stats, session, showToast, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
   const [appsLoaded, setAppsLoaded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -1174,7 +1126,6 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   const openViewRef = useRef(null);
   const fromPopRef = useRef(false);
   openViewRef.current = openView;
-  const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
   const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
@@ -1296,17 +1247,6 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
     window.addEventListener('aimeat-open-tab', handler);
     return () => window.removeEventListener('aimeat-open-tab', handler);
   }, [open]);
-
-  /* Render inline view if it matches the given slot */
-  const viewAt = (slot) => {
-    if (!openView || openView.slot !== slot) return null;
-    return html`<${InlineView}
-      tabId=${openView.tabId}
-      label=${getTabLabel(openView.tabId)}
-      onClose=${close}
-      renderTab=${renderTab}
-    />`;
-  };
 
   const isOpen = (tabId) => openView?.tabId === tabId;
 

@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/repositories/node.repository.ts
+ * @description Storage-backend-agnostic interface for node-level state: node keypair, maintenance
+ *   mode, push subscriptions, trusted issuers, verification nonces, realtime rooms, site change log,
+ *   extensions, escrow holds, and cortex extensions/lib files. Implemented per backend.
+ *
+ * @structure
+ *   - NodeRepository: node key + maintenance getters/setters
+ *   - push/trusted-issuer/verification-nonce CRUD; realtime room + site-change-log ops
+ *   - extension, escrow-hold, and cortex-extension/lib-file CRUD
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type {
   MaintenanceState,
   PushSubscriptionRecord,

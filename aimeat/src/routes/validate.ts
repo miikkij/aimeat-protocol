@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/validate.ts
+ * @description Dry-run validation endpoint — POST /v1/validate checks an arbitrary request body
+ *   against the Zod schema mapped to a given endpoint+method, letting clients pre-validate before
+ *   committing a real call.
+ *
+ * @structure
+ *   - SCHEMA_MAP: path → { method → Zod schema } registry of validatable endpoints
+ *   - validateRouter(config): mounts POST /v1/validate returning validity/errors or a no-rules note
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';

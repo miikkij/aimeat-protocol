@@ -22,7 +22,7 @@ import { num, dt, Empty, StatsGrid } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
 
 
-export default function AgentIntegrationTab({ data, session }) {
+export default function AgentIntegrationTab({ data: _data, session }) {
   useViewCSS('/css/views/admin-agent-integration.css');
   const [platforms, setPlatforms] = useState([]);
   const [onboarding, setOnboarding] = useState(null);

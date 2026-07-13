@@ -1,3 +1,16 @@
+/**
+ * @file src/storage/repositories/notification.repository.ts
+ * @description Storage interface segment for personal-node push notifications — the contract every
+ *   backend implements to store Web Push subscriptions (CRUD, per-node listing/counting) and each
+ *   personal node's notification preferences.
+ *
+ * @structure
+ *   - NotificationRepository: interface for push-subscription CRUD + per-node queries
+ *   - preference methods: get/upsert/delete a node's NotificationPreferences
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { PersonalPushSubscriptionRecord, NotificationPreferences } from '../interface.js';
 
 export interface NotificationRepository {

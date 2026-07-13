@@ -1,3 +1,18 @@
+/**
+ * @file src/auth/middleware.ts
+ * @description Express auth middleware — extracts and verifies JWTs / Personal Access Tokens,
+ *   attaches the resolved identity to req.auth, and gates routes by presence, role, scope, and
+ *   principal type. Supports anonymous-mode fallback and browser PAT-to-cookie session bootstrap.
+ *
+ * @structure
+ *   - initSessionAuth / enableAnonymousAuth / isAnonymousMode / getAnonymousCredentials: startup wiring
+ *   - optionalAuth / requireAuth / requireAuthOrAnonymous: presence-level gates
+ *   - requireRole / requireScope / requireExternalPrincipal / requireLocalSession: authorization gates
+ *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';

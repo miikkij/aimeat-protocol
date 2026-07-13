@@ -12,9 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
-import { escHtml, escAttr } from '/js/utils.js';
 import { t, getLocale, switchLocale } from '/js/i18n.js';
-import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 
@@ -60,12 +58,6 @@ function isLoggedIn() {
 
 function apiFetch(path) {
   return fetch(NODE_URL + path).then(r => r.json());
-}
-
-function authFetch(path, opts) {
-  const headers = getAuthHeaders();
-  if (!headers) return Promise.reject(new Error('Not logged in'));
-  return fetch(NODE_URL + path, { ...opts, headers: { ...headers, ...(opts?.headers || {}) } }).then(r => r.json());
 }
 
 /* ── Sub-views ─────────────────────────────────── */

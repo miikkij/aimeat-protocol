@@ -15,7 +15,7 @@ import { escHtml } from '/js/utils.js';
 import { num, dt, Empty, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
 
-export default function SharingGroupsTab({ data, reload, session }) {
+export default function SharingGroupsTab() {
   const [groups, setGroups] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);

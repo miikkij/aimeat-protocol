@@ -1,6 +1,16 @@
 /**
- * AIMEAT Apps Service
- * App listing and upload.
+ * @file public/js/services/apps.js
+ * @description Frontend service layer for the hosted-app catalogue: list, upload,
+ *   delete, and patch metadata of the owner's published HTML apps via the /v1/apps API.
+ *
+ * @structure
+ *   - listApps(): GET /v1/apps → array (visibility decided server-side by auth)
+ *   - uploadApp(filename, contentBase64, mimeType, opts): POST a new app + optional screenshot
+ *   - deleteApp(filename): DELETE an app by filename
+ *   - patchApp(filename, updates): PATCH app metadata (name/description/access_code/parked)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiDelete, apiPatch, api } from '/js/api.js';
 

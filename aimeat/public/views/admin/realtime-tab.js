@@ -1,3 +1,15 @@
+/**
+ * @file public/views/admin/realtime-tab.js
+ * @description Admin dashboard "Realtime" tab (Preact + HTM) — displays live collaboration state:
+ *   active rooms with peer counts and Yjs documents, with an operator action to close a room.
+ *
+ * @structure
+ *   - RealtimeTab({ data, reload }): default export; StatsGrid (rooms/peers/docs) + rooms & Yjs-docs tables
+ *   - doClose(roomId): confirm-then-closeRoom() with toast error handling and reload
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -8,7 +20,7 @@ import { closeRoom } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
 export default function RealtimeTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const rt = data.realtime;
   if (!rt) return html`<${Empty} text=${t('dashboard.realtimeUnavailable')} />`;

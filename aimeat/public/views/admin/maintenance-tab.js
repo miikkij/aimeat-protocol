@@ -1,3 +1,18 @@
+/**
+ * @file public/views/admin/maintenance-tab.js
+ * @description Admin dashboard "Maintenance" tab (Preact + HTM) — toggles the node's
+ *   maintenance mode with a custom message, downloads a full JSON backup, and restores from an
+ *   uploaded backup file (behind a danger-confirm).
+ *
+ * @structure
+ *   - MaintenanceTab: default component with maintenance toggle + backup/restore controls
+ *   - toggle: enables/disables maintenance mode via setMaintenance
+ *   - doBackup: fetches the backup and triggers a client-side JSON file download
+ *   - pickRestore: file-picker + confirm flow that POSTs a parsed backup to restore
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
@@ -9,7 +24,7 @@ import { useConfirm } from '/components/Modal.js';
 import { setMaintenance, getBackup, doRestore as apiRestore } from '/js/services/admin.js';
 
 export default function MaintenanceTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const m = data.maintenance || { enabled: false, message: '', enabledAt: null, enabledBy: null };
   const [msg, setMsg] = useState(m.message || '');

@@ -65,7 +65,7 @@ import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
-import { detectAgentState, getDefaultTab, getStateColor } from './state-detector.js';
+import { detectAgentState, getDefaultTab } from './state-detector.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabReadme from './tab-readme.js';
 import TabIntegration from './tab-integration.js';

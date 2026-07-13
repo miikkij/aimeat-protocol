@@ -1,3 +1,14 @@
+/**
+ * @file public/components/Spinner.js
+ * @description Preact + HTM inline loading indicator component rendering the theme.css
+ *   .spinner element with optional trailing loading text.
+ *
+ * @structure
+ *   - Spinner({ text }): returns a spinner span plus an optional loading-text label
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);

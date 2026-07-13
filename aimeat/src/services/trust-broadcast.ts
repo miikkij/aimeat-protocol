@@ -1,6 +1,16 @@
 /**
- * Trust Advisory Broadcast Service — outbound broadcast of trust advisories to federation peers.
- * Per RFC v1.5 §13.5.
+ * @file src/services/trust-broadcast.ts
+ * @description Trust Advisory Broadcast Service (RFC v1.5 §13.5) — signs a trust advisory
+ *   (warning/suspend/ban) with the node's Ed25519 key and POSTs it to every active federation peer,
+ *   with each outbound URL validated by safeFetch-style URL checks, returning a per-peer delivery report.
+ *
+ * @structure
+ *   - TrustAdvisory: signed advisory shape (target node, type, reason, issuer, timestamp, signature)
+ *   - BroadcastResult: aggregate delivery report (per-peer success/failure counts)
+ *   - broadcastTrustAdvisory: builds, signs, and fans out the advisory to all peers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

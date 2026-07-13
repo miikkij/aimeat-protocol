@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/lib-data.ts
+ * @description Server-side generator for the browser `aimeat-data.js` client library — returns a
+ *   self-contained IIFE exposing AIMEAT.data (memory get/set with public-read fallback), with the
+ *   node id and base URL baked in at generation time.
+ *
+ * @structure
+ *   - aimeatDataLib(config): returns the aimeat-data.js source string as an IIFE
+ *   - (embedded) data.set/get/getPublic: authed memory API with app-creator public fallback
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

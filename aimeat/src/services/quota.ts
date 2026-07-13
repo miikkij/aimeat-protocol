@@ -13,7 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord, MicroMemoryRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 
 // ── Size calculators ──

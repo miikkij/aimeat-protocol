@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/oauth.repository.ts
+ * @description Backend-agnostic storage interface for OAuth state — the persistence contract each
+ *   provider implements for registered OAuth clients, refresh tokens, and remembered consent approvals,
+ *   including bulk deletes by client, GAII, and owner.
+ *
+ * @structure
+ *   - OAuthRepository: interface for OAuth client CRUD, refresh-token CRUD, and approval (remembered-consent) CRUD
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { OAuthClientRecord, OAuthRefreshTokenRecord, OAuthApprovalRecord } from '../interface.js';
 
 export interface OAuthRepository {

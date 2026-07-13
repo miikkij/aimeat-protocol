@@ -30,7 +30,7 @@ export default function PushTab({ data, reload }) {
   const [expanded, setExpanded] = useState({});
   const [subStatus, setSubStatus] = useState(null); // null | 'subscribing' | 'subscribed' | 'unsubscribing' | 'error'
   const { confirm, ConfirmUI } = useConfirm();
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
 
   if (!push) return html`<${Empty} text=${t('dashboard.pushNotConfigured')} />`;
 

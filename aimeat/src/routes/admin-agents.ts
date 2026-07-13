@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/admin-agents.ts
+ * @description Operator-only admin routes for agents — list all agents with full detail and
+ *   set/clear an agent's CORS allowed-origins (validated http(s) URLs or '*').
+ *
+ * @structure
+ *   - adminAgentsRouter(config, storage): Router factory
+ *   - GET /v1/admin/agents: list agents (gaii, owner, trust, balance, origins, federate, timestamps)
+ *   - PUT /v1/admin/agents/:gaii/cors: validate + persist allowedOrigins, then emitChange('config')
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

@@ -36,7 +36,7 @@ function agentDirectivesToText(rules) {
     .join('\n');
 }
 
-export default function TabDirectives({ agentName, session, showToast }) {
+export default function TabDirectives({ agentName, showToast }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [purpose, setPurpose] = useState('');

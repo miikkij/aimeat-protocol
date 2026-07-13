@@ -1,6 +1,16 @@
 /**
- * AIMEAT Security Service
- * GHII CORS and per-agent CORS management.
+ * @file public/js/services/security.js
+ * @description Frontend service for the profile Security tab — manages GHII (owner-wide) and
+ *   per-agent CORS allow-lists and lists/revokes active owner JWT sessions.
+ *
+ * @structure
+ *   - getGhiiCors / setGhiiCors: owner-wide CORS allowed origins (null = allow all)
+ *   - getAgentCors / setAgentCors: per-agent CORS allowed origins
+ *   - listSessions / revokeSession / revokeAllSessions: active session management
+ *   - loadAll(agents): aggregates GHII CORS + all agents' CORS in one call
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
 

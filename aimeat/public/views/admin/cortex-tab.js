@@ -24,7 +24,7 @@ import * as cortexService from '/js/services/cortex.js';
 
 const COMP_ICONS = { schema: '\u{1F4D0}', prompt: '\u{1F4AC}', action: '\u26A1', 'board-template': '\u{1F4CC}', ontology: '\u{1F9EC}', 'seed-data': '\u{1F331}', lib: '\u{1F4E6}' };
 
-export default function CortexTab({ data, reload, session }) {
+export default function CortexTab() {
   const [toast, showErr, showOk, clearToast] = useToast();
   const showToast = (text, isError) => isError ? showErr(text) : showOk(text);
   const { confirm, ConfirmUI } = useConfirm();

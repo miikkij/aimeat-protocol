@@ -516,7 +516,7 @@ function EcoAutomationSection({ app, showToast }) {
 
       showToast?.(t('profile.ecosystem.autoSaved'), 'success');
       await load();
-    } catch (e) {
+    } catch {
       showToast?.(t('profile.ecosystem.autoSaveError'), 'error');
     } finally {
       setSaving(false);
@@ -565,7 +565,7 @@ function EcoAutomationSection({ app, showToast }) {
       } else {
         showToast?.(t('profile.ecosystem.advFailed'), 'warning');
       }
-    } catch (e) {
+    } catch {
       showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
       setAdvBusy(b => ({ ...b, [id]: false }));
@@ -579,7 +579,7 @@ function EcoAutomationSection({ app, showToast }) {
       await rejectAdvisory(app.app, id);
       showToast?.(t('profile.ecosystem.advRejected'), 'success');
       setAdvisories(list => (list || []).filter(p => p.id !== id));
-    } catch (e) {
+    } catch {
       showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
       setAdvBusy(b => ({ ...b, [id]: false }));
@@ -964,7 +964,7 @@ function EcoAskInClaude({ app }) {
  * All the existing functionality (subscribe / unsubscribe) is preserved here verbatim — only
  * relocated. The toggle is independent per card and resets when the card is collapsed/re-expanded.
  */
-function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, subForm, setSubForm }) {
+function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, setSubForm }) {
   const [open, setOpen] = useState(false);
   return html`
     <div class="pf-eco-tech">
@@ -1045,7 +1045,7 @@ export default function EcosystemTab({ onStats, showToast }) {
     try {
       const items = await listAppData(app);
       setAppData(d => ({ ...d, [geai]: items }));
-    } catch (e) {
+    } catch {
       // Leave the cached value (if any); a transient failure shouldn't blank the section.
     }
   };
@@ -1060,7 +1060,7 @@ export default function EcosystemTab({ onStats, showToast }) {
       const [a, p, s] = await Promise.all([listEcosystemApps(), listPending(), listSubscriptions()]);
       setApps(a); setPending(p); setSubs(s);
       onStats?.({ ecosystem: a.length });
-    } catch (e) {
+    } catch {
       showToast?.(t('profile.ecosystem.loadError'), 'error');
     } finally {
       setLoading(false);
@@ -1101,26 +1101,26 @@ export default function EcosystemTab({ onStats, showToast }) {
       await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset] });
       showToast?.(t('profile.ecosystem.approved'), 'success');
       await loadData();
-    } catch (e) { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
+    } catch { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
   }
   async function onDeny(userCode) {
     try { await approve(userCode, { action: 'deny' }); await loadData(); }
-    catch (e) { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
+    catch { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
   }
   async function onRevokeConfirm() {
     const app = revokeApp;
     setRevokeApp(null); setRevokeInput('');
     try { await revoke(app); showToast?.(t('profile.ecosystem.revoked'), 'success'); await loadData(); }
-    catch (e) { showToast?.(t('profile.ecosystem.revokeError'), 'error'); }
+    catch { showToast?.(t('profile.ecosystem.revokeError'), 'error'); }
   }
   async function onSubscribe(app) {
     const event = subForm[app]?.event || 'memory.write';
     try { await subscribe(app, event); setSubForm(f => ({ ...f, [app]: {} })); await loadData(); }
-    catch (e) { showToast?.(t('profile.ecosystem.subError'), 'error'); }
+    catch { showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
   async function onUnsubscribe(app, event) {
     try { await unsubscribe(app, event); await loadData(); }
-    catch (e) { showToast?.(t('profile.ecosystem.subError'), 'error'); }
+    catch { showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
 
   if (loading) return html`<div class="pf-eco"><${Spinner} /></div>`;

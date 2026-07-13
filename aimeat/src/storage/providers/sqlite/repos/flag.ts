@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/flag.ts
+ * @description SQLite (better-sqlite3) repository functions for content-moderation flags and
+ *   AI-generated match records — row (de)serialization plus CRUD/query helpers over the `flags` and
+ *   `matches` tables.
+ *
+ * @structure
+ *   - deserializeFlag/deserializeMatch: map DB rows to FlagRecord/MatchRecord shapes
+ *   - createFlag + flag query/update helpers: persist and manage moderation flags
+ *   - match helpers: persist and query match suggestions between profiles
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { FlagRecord, FlagSummary, MatchRecord } from '../../../interface.js';
 

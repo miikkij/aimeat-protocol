@@ -1,6 +1,16 @@
 /**
- * AIMEAT Catalogue Service
- * Service listing, publishing, and unpublishing.
+ * @file public/js/services/catalogue.js
+ * @description Frontend service layer for the AIMEAT action catalogue — lists an owner's services,
+ *   browses the public catalogue by category, and publishes/unpublishes services via /v1/catalogue.
+ *
+ * @structure
+ *   - listMyServices(owner): GET services owned by a given owner
+ *   - browse(category): GET the catalogue, optionally category-filtered
+ *   - publish(...): POST a new service (display name, price, unit, optional webhook)
+ *   - unpublish(serviceId): DELETE a service
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
 

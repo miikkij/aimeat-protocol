@@ -41,10 +41,14 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // Cleaned to zero on 2026-07-13 and ratcheted to 'error' — unused imports/vars/params
+      // now fail the pre-commit hook + CI instead of accumulating. Unused args prefixed with `_`.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
 
       // Custom AIMEAT rules
-      'aimeat/file-header': 'warn',
+      // file-header cleaned to zero on 2026-07-13 and ratcheted to 'error' — every source
+      // file must carry a header, enforced by the pre-commit hook + CI.
+      'aimeat/file-header': 'error',
       'aimeat/max-file-lines': ['warn', { max: 500 }],
     },
   },
@@ -61,13 +65,12 @@ export default tseslint.config(
       // (gradual adoption) — surfaces missing/incorrect effect deps and hook-ordering issues.
       'react-hooks/rules-of-hooks': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
-      // Pre-existing legacy-frontend findings surfaced when lint coverage was extended to
-      // public/ (2026-06-19). None are runtime bugs (verified) — they're style/best-practice
-      // debt to clean up incrementally. Kept as warnings (consistent with this config's
-      // warn-based gradual adoption) so they stay visible without blocking CI.
-      'no-useless-escape': 'warn',
-      'preserve-caught-error': 'warn',
-      'no-useless-assignment': 'warn',
+      // Legacy-frontend findings surfaced when lint coverage was extended to public/
+      // (2026-06-19). Cleaned to zero on 2026-07-13 and ratcheted to 'error' so new
+      // occurrences fail the pre-commit hook + CI instead of silently accumulating.
+      'no-useless-escape': 'error',
+      'preserve-caught-error': 'error',
+      'no-useless-assignment': 'error',
     },
   },
 );

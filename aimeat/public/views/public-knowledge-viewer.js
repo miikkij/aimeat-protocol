@@ -18,8 +18,6 @@ import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { LoadMore } from '/components/Pagination.js';
 
-const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
-
 const CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
   'tutorial', 'collection', 'article', 'story', 'fiction', 'guide'
@@ -83,7 +81,7 @@ function RenderValue({ value, depth = 0 }) {
       return html`<span>${value.join(', ')}</span>`;
     }
     return html`<div class="pkv-val-list">
-      ${value.map((item, i) => html`
+      ${value.map((item) => html`
         <div class="pkv-val-list-item">
           <${RenderValue} value=${item} depth=${depth + 1} />
         </div>
@@ -283,7 +281,7 @@ function BrowseView({ onSelect }) {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [contentType, setContentType] = useState('');
-  const [language, setLanguage] = useState('');
+  const [language] = useState('');
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);

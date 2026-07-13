@@ -1,14 +1,16 @@
 /**
- * AI Matching Engine — Phase 2.1
+ * @file src/services/matching.ts
+ * @description AI Matching Engine — automatically scores and pairs user profiles by shared interests
+ *   (0.40), geographic proximity (0.25), activity (0.20), and compatibility (0.15), persisting match
+ *   records and optionally emailing suggestions. Runs on demand or on a schedule.
  *
- * Automated matching system that compares user profiles based on
- * interests, geographic proximity, activity, and compatibility.
+ * @structure
+ *   - createMatchingEngine(...): builds the engine (score profiles, generate + store matches)
+ *   - startMatchingScheduler(...): periodic auto-matching runner
+ *   - ProfileData / MatchScore: input profile and per-pair score breakdown types
  *
- * Scoring formula:
- *   match_score = (0.40 x shared_interests_score)
- *               + (0.25 x distance_score)
- *               + (0.20 x activity_score)
- *               + (0.15 x compatibility_score)
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { randomBytes } from 'node:crypto';
@@ -79,7 +81,6 @@ function calculateMatchScoreImpl(
   maxDistanceKm: number,
 ): MatchScore {
   // 1. Shared interests score: min(shared_count / 3, 1.0)
-  const lowerA = profileA.interests.map(i => i.toLowerCase());
   const lowerB = profileB.interests.map(i => i.toLowerCase());
   const sharedInterests: string[] = [];
   for (const interest of profileA.interests) {
@@ -167,8 +168,6 @@ export function createMatchingEngine(
   directoryService: DirectoryService,
   emailService: EmailService,
 ): MatchingEngine {
-  let lastRoundResult: MatchingRoundResult | null = null;
-
   async function runMatchingRound(): Promise<MatchingRoundResult> {
     const startTime = Date.now();
     let matchesCreated = 0;
@@ -332,7 +331,6 @@ export function createMatchingEngine(
         timestamp: new Date().toISOString(),
       };
 
-      lastRoundResult = result;
       logger.info('Matching round complete', result);
       return result;
     } catch (err) {

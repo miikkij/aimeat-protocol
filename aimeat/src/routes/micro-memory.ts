@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/micro-memory.ts
+ * @description Micro-memory (`/v1/mm/*`) routes — a lightweight, URL-based key/value memory surface
+ *   with visibility levels and per-owner quotas, supporting plain and base64 (`value64`) values plus
+ *   batched key/value pairs in query params. (Deprecated per RFC v4.0; retained for compatibility.)
+ *
+ * @structure
+ *   - microMemoryRouter(config, storage): mounts the /v1/mm/* routes
+ *   - resolveValue / parseBatchPairs: query-param value decoding (value64) and batch parsing
+ *   - GET /v1/mm/test-url-length: probe for the node's maximum accepted URL length
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -116,7 +130,6 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
         // Dev mode: allow requests without OTK using first registered agent/owner
         let gaii: string;
         let isAnonymous = false;
-        let isAccessCodeOnly = false;
         if (!otkKey && req.query.access_code && req.query.op === 'list' && req.query.set) {
             // Access-code-only mode: find the set across all agents by searching for matching access_code
             const setName = req.query.set as string;
@@ -128,7 +141,6 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
             }
             gaii = found.gaii;
             isAnonymous = true;
-            isAccessCodeOnly = true;
         } else if (!otkKey && config.anonymousMode) {
             const ANON_GAII = `shared#anonymous@${config.nodeId}`;
             gaii = ANON_GAII;

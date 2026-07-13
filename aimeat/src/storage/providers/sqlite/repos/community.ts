@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/providers/sqlite/repos/community.ts
+ * @description SQLite (better-sqlite3) repository for community/organism data — CRUD for organisms,
+ *   memberships, join requests, and organism reputation, plus row deserialization (JSON columns → records).
+ *
+ * @structure
+ *   - deserializeOrganism / deserializeMembership / deserializeJoinRequest: row → typed record mappers
+ *   - createOrganism / getOrganism / listOrganisms / updateOrganism / deleteOrganism: organism CRUD
+ *   - createMembership / listMembers / updateMembership / ... : membership + join-request operations
+ *   - setOrganismReputation / getOrganismReputation: reputation persistence
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord } from '../../../interface.js';
 

@@ -518,7 +518,7 @@ function MyListingsView({ extAction, onNav, tl }) {
 }
 
 /* ── My Purchases ── */
-function MyPurchasesView({ extAction, onNav, tl }) {
+function MyPurchasesView({ extAction }) {
   const [purchases, setPurchases] = useState(null);
   const [err, setErr] = useState('');
   const [rateId, setRateId] = useState('');
@@ -587,7 +587,7 @@ function MyPurchasesView({ extAction, onNav, tl }) {
 /* ══════════════════════════════════════════════
    Main Marketplace Component
    ══════════════════════════════════════════════ */
-export default function MarketplaceView({ navigate: spaNavigate, locale }) {
+export default function MarketplaceView() {
   const [view, setView] = useState('instances');
   const [instanceId, setInstanceId] = useState(null);
   const [instanceConfig, setInstanceConfig] = useState({});

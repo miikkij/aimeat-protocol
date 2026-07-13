@@ -144,7 +144,7 @@ function tryParseYaml(text: string): YamlParseResult {
       const parsed = parseYaml(fixed) as Record<string, unknown>;
       const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
       return { errors, parsed, cleaned };
-    } catch (_e2) {
+    } catch {
       // Both attempts failed — report the original error
       errors.push(`YAML parse error: ${(_e1 as Error).message}`);
       return { errors, parsed: null, cleaned: preCleaned };

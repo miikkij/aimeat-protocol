@@ -1,4 +1,18 @@
 /**
+ * @file src/cli/config-export.ts
+ * @description CLI command `aimeat config export` — serializes the current AimeatConfig into
+ *   env, ini, json, or writes mutable values to Consul KV, using CONFIG_FIELDS metadata.
+ *
+ * @structure
+ *   - runConfigExport: dispatches on format (env/ini/json/consul)
+ *   - exportToEnv/exportToIni/exportToJson: render config to the respective text format
+ *   - exportToConsul: pushes mutable (non-immutable) config values into Consul KV
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+/**
  * CLI command: aimeat config export
  * Exports current config to various formats (env, ini, json, consul).
  */

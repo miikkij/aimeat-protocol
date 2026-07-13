@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/personal.ts
+ * @description Routes for anchoring and operating "personal nodes" against an operator node —
+ *   anchor/status/list/update/deregister, mailbox stats, web-push subscriptions, and per-node
+ *   notification preferences (REQ-007).
+ *
+ * @structure
+ *   - personalRouter(config, storage, tunnelManager, notificationService): mounts /v1/personal/* endpoints
+ *   - anchor lifecycle: POST/GET/PATCH/DELETE /v1/personal/anchor + /status + /nodes (slot + ownership checks)
+ *   - push: subscribe/unsubscribe/list/test with SSRF endpoint allow-list and per-node quota
+ *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';

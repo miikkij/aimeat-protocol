@@ -46,7 +46,6 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
   const displayName = svc.display_name || svc.displayName || svc.name || '';
   const category = svc.category || '';
   const priceMorsels = svc.price_morsels ?? svc.pricing?.base_morsels ?? svc.pricing?.baseMorsels ?? 0;
-  const priceUnit = svc.unit || svc.pricing?.per_unit?.unit || '';
 
   return html`
     <div class="card card-clickable ${expanded ? 'svc-card-expanded' : ''}" onClick=${onToggle}>

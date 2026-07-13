@@ -1,4 +1,19 @@
 /**
+ * @file public/js/services/auth.js
+ * @description Centralized frontend auth/session service wrapping window.AIMEAT.auth —
+ *   provides session lookups, profile read/update, password change, and auth-change subscription.
+ *
+ * @structure
+ *   - getSession/hasSession/getOwner/getGhii/getNodeUrl: read the active session
+ *   - getProfile/updateProfile: fetch and PUT the current user's GHII profile
+ *   - changePassword: POST a password change for the logged-in owner
+ *   - onAuthChange: subscribe to aimeat-auth-change events, returns unsubscribe
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+/**
  * AIMEAT Auth Service
  * Centralized session/auth access — replaces direct window.AIMEAT.auth usage.
  */

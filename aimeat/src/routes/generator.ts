@@ -1,43 +1,37 @@
-// @file src/routes/generator.ts
-// @description Service generator API. Thin validation layer over Memory API.
-// Agents and the browser UI submit generated content here; the route validates it, then writes to
-// generator.* memory keys using the same structure the frontend reads.
-// @structure
-//   POST   /v1/generator/projects                                           — create a new generator project
-//   GET    /v1/generator/projects                                           — list all projects for the caller
-//   GET    /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components)
-//   DELETE /v1/generator/:projectId                                         — delete project and all associated data (cascade)
-//   POST   /v1/generator/:projectId/interview                               — save/update interview spec for a project
-//   POST   /v1/generator/:projectId/settings                                — store project settings values (with optional encryption)
-//   GET    /v1/generator/:projectId/settings                                — retrieve project settings values
-//   POST   /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
-//   POST   /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
-//   POST   /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
-//   POST   /v1/generator/:projectId/test                                    — run tests in dependency order
-//   GET    /v1/generator/:projectId/screenshots/:filename                   — serve test screenshot PNGs
-//   POST   /v1/generator/:projectId/log                                     — write log entry to memory
-//   POST   /v1/generator/:projectId/complete                                — mark project active
-//   GET    /v1/generator/:projectId/prompts/:componentId                    — get the generation prompt for a component
-//   GET    /v1/generator/:projectId/prompts                                 — get the blueprint generation prompt
-// @usage
-//   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute scopes)
-//   and by the browser UI (owner JWT satisfies agent role check).
-// @version-history
-//   v1.0.0 — 2026-03-18 — Initial implementation
-//   v1.1.0 — 2026-03-18 — Add project management and interview endpoints (Task 3)
-//   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
-//   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
-//   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
-//   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
-//   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
-//   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
-//   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
-//   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
-//   v2.0.0 — 2026-03-19 — Add DELETE /v1/generator/:projectId cascade delete; validate componentId in heartbeat against blueprint
-//   v5.0.0 — 2026-03-20 — Remove agent guide, my-assignments, and session endpoints (replaced by OpenRouter autopilot)
-//   v5.1.0 — 2026-03-21 — Add settings collection endpoints (POST/GET /v1/generator/:projectId/settings)
-//   v5.2.0 — 2026-03-21 — Add test execution endpoint, screenshot serving, and screenshot cleanup on delete (Task 16)
-//   v5.3.0 — 2026-06-06 — prompts/:componentId now merges stored specs (generator.<project>.spec.<id>) onto completedComponents, matching the browser's loadAllComponents merge — so dependency specs reach the prompt from their canonical key, not just from the component record
+/**
+ * @file src/routes/generator.ts
+ * @description Service generator API — a thin validation layer over the Memory API. Agents and the
+ *   browser UI submit generated content (interview specs, blueprints, components) here; the route
+ *   validates each, then writes to `generator.*` memory keys using the same structure the frontend reads.
+ *
+ * @structure
+ *   - POST/GET/DELETE /v1/generator/projects[/:projectId]: project lifecycle + full state read
+ *   - POST /:projectId/interview | /steps/blueprint | /components/:id/submit: validate + store stages
+ *   - POST /:projectId/components/:id/register: register a validated component into the AIMEAT catalogue
+ *   - POST /:projectId/test + GET /screenshots/:filename: run dependency-ordered tests and serve PNGs
+ *   - GET /:projectId/prompts[/:componentId]: build blueprint/component generation prompts from stored specs
+ *
+ * @usage
+ *   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute
+ *   scopes) and by the browser UI (owner JWT satisfies the agent role check).
+ *
+ * @version-history
+ *   v1.0.0 — 2026-03-18 — Initial implementation
+ *   v1.1.0 — 2026-03-18 — Add project management and interview endpoints (Task 3)
+ *   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
+ *   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
+ *   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
+ *   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
+ *   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
+ *   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
+ *   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
+ *   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
+ *   v2.0.0 — 2026-03-19 — Add DELETE /v1/generator/:projectId cascade delete; validate componentId in heartbeat against blueprint
+ *   v5.0.0 — 2026-03-20 — Remove agent guide, my-assignments, and session endpoints (replaced by OpenRouter autopilot)
+ *   v5.1.0 — 2026-03-21 — Add settings collection endpoints (POST/GET /v1/generator/:projectId/settings)
+ *   v5.2.0 — 2026-03-21 — Add test execution endpoint, screenshot serving, and screenshot cleanup on delete (Task 16)
+ *   v5.3.0 — 2026-06-06 — prompts/:componentId now merges stored specs (generator.<project>.spec.<id>) onto completedComponents, matching the browser's loadAllComponents merge — so dependency specs reach the prompt from their canonical key, not just from the component record
+ */
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -50,7 +44,7 @@ import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp, registerCortex } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 // encryption removed from generator settings — values stored as plain text in owner-scoped memory
-import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
+import { executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -285,9 +279,8 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     async (req, res) => {
       const projectId = req.params['projectId'] as string;
       const gaii = ownerGhii(req);
-      const { values, secretKeys } = req.body as {
+      const { values } = req.body as {
         values: Record<string, string | number | boolean>;
-        secretKeys?: string[];
       };
 
       if (!values || typeof values !== 'object') {
@@ -365,7 +358,6 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
       const compVal = (compRec?.value as Record<string, unknown>) ?? {};
       const compType = (compVal.type as string) || 'unknown';
-      const registeredAs = compVal.registeredAs as string || componentId;
 
       // Save testCode to component record BEFORE running the test.
       // The browser test page reads testCode from the component record (GET /test-page/).

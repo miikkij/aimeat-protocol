@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/storage-factory.ts
+ * @description Storage backend factory — lazily imports and instantiates the requested Storage
+ *   provider (SQLite / MongoDB / PostgreSQL, default in-memory SQLite), awaiting readiness for the
+ *   Prisma backends and printing actionable guidance if the SQLite native bindings fail to load.
+ *
+ * @structure
+ *   - createStorage(opts): resolves a Storage instance for the chosen provider
+ *   - sqliteLoadFailed(err): prints fix guidance and exits when better-sqlite3 bindings fail
+ *   - StorageProvider / StorageOptions: provider union and factory input types
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Storage } from './interface.js';
 
 export type StorageProvider = 'memory' | 'sqlite' | 'mongodb' | 'postgresql';

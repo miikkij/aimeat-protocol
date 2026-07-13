@@ -54,7 +54,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope, AgentTaskRating, RaterType } from '../storage/interface.js';
 import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
+import { requireAuth, requireRole, agentNotFoundResponse } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 import { recordPublicActivity } from '../services/public-activity.js';
@@ -109,16 +109,6 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     const scopes = (req.auth!.scopes as string[] | undefined) ?? [];
     if (scopes.includes('*') || scopes.includes(scope)) return true;
     return scopes.includes(`${scope.split(':')[0]}:*`);
-  }
-
-  /**
-   * An H-2 app grant acting for its OWN owner: role 'app' + the required task scope + the target
-   * agent belongs to the app's own owner (agent.owner === the app token's owner). This is the same
-   * "scoped external principal reaching its owner's own data" pattern agents/GEAIs use — never
-   * cross-owner, never a scope escalation (app tokens get no owner bypass in requireScope).
-   */
-  function appActsForOwner(req: Express.Request, agentOwner: string, scope: string): boolean {
-    return req.auth!.roles.includes('app') && tokenHasScope(req, scope) && agentOwner === req.auth!.owner;
   }
 
   /**

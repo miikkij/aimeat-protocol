@@ -1,10 +1,16 @@
 /**
- * Cache Cleanup Service — prevents unbounded storage growth from federated data.
- * Runs hourly to prune expired entries.
+ * @file src/services/cache-cleanup.ts
+ * @description Cache Cleanup Service — prevents unbounded storage growth from federated data by
+ *   scanning each agent's memory for federation key prefixes (federated:, replica:, genesis:,
+ *   _conflict_, expiring:) and deleting entries older than their respective TTLs. Runs hourly.
  *
- * Scans memory entries by agent GAII, filtering for federated key prefixes
- * (replica:, federated:, genesis:, _conflict_, expiring:) and removes entries
- * older than their respective TTLs.
+ * @structure
+ *   - runCleanupCycle(config, storage): single sweep across all agents; returns per-prefix removal counts
+ *   - startCacheCleanupJob(config, storage): schedules the hourly cycle (30s warm-up), returns the timer
+ *   - CleanupResult / FEDERATION_PREFIXES: result shape and the scanned key prefixes
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

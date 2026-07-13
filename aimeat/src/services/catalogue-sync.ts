@@ -1,6 +1,17 @@
 /**
- * Catalogue Sync Service — outbound diff-based catalogue push to federation peers.
- * Per RFC v1.6 §13.11.3 (delta sync) and §13.11.6 (triggering).
+ * @file src/services/catalogue-sync.ts
+ * @description Catalogue Sync Service — outbound diff-based catalogue push to
+ *   federation peers (RFC v1.6 §13.11.3 delta sync, §13.11.6 triggering). Tracks
+ *   per-peer sync state, computes catalogue hashes, and signs payloads with the node
+ *   Ed25519 key before POSTing federable CSMs to each peer.
+ *
+ * @structure
+ *   - PeerSyncState / getPeerSyncState / resetPeerSyncState: in-memory per-peer sync tracking
+ *   - CatalogueSyncResult: shape of a per-peer sync outcome
+ *   - syncCatalogueToPeer(peer, config, storage): diff, hash, sign, and push to one peer
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

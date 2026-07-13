@@ -1,3 +1,14 @@
+/**
+ * @file public/views/admin/actions-tab.js
+ * @description Admin dashboard tab that lists registered catalogue actions in a table —
+ *   id, name/description, provider, category, base morsel cost, and tags.
+ *
+ * @structure
+ *   - ActionsTab({ data }): renders data.actions.actions; shows Empty state when none registered
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);

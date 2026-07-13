@@ -420,8 +420,8 @@ function ScaffoldForm({ onCreated }) {
 
 // ── Inline instance panel for a single extension ──
 function ExtensionPanel({ ext, onUninstall }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
-  const { confirm, ConfirmUI } = useConfirm();
+  const [toast, showErr, , clearToast] = useToast();
+  const { confirm } = useConfirm();
   const [expanded, setExpanded] = useState(false);
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -646,8 +646,8 @@ function ExtensionPanel({ ext, onUninstall }) {
 }
 
 // ── Available Extension Card (with disk script editor + add action) ──
-function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload, loadAvailable }) {
-  const { confirm, ConfirmUI } = useConfirm();
+function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, loadAvailable }) {
+  const { ConfirmUI } = useConfirm();
   const [showEditor, setShowEditor] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
   const [script, setScript] = useState('');
@@ -821,7 +821,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
 }
 
 export default function ServicesTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const extensions = data.extensions?.extensions || [];
   const [available, setAvailable] = useState([]);

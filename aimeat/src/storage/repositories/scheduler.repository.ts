@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/scheduler.repository.ts
+ * @description Storage-interface contract for scheduled jobs and their execution logs — the
+ *   backend-agnostic repository shape each provider implements for the job scheduler.
+ *
+ * @structure
+ *   - SchedulerRepository: CRUD + filtered listing for scheduled jobs
+ *   - execution-log methods: create, filtered list/count, and prune-before-date retention
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { ScheduledJobRecord, ExecutionLogEntry } from '../interface.js';
 
 export interface SchedulerRepository {

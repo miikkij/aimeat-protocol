@@ -1,9 +1,21 @@
+/**
+ * @file public/views/admin/directory-tab.js
+ * @description Admin dashboard "Directory" tab (Preact + HTM) — shows directory index stats (entries,
+ *   cities, categories) and an operator control to rebuild the directory index.
+ *
+ * @structure
+ *   - DirectoryTab({ data }): default export; renders StatsGrid + rebuild button, tracks rebuild state
+ *   - doRebuild(): calls rebuildDirectory() and surfaces success/error feedback
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, StatsGrid, ExpandableHelp } from './shared.js';
+import { StatsGrid, ExpandableHelp } from './shared.js';
 import { rebuildDirectory } from '/js/services/admin.js';
 
 export default function DirectoryTab({ data }) {

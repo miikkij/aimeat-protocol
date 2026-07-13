@@ -434,9 +434,8 @@ export function buildTestFirstPrompt({ componentType, subtype, label, blueprint,
     .map(ds => ({ name: ds.name, sample: ds.sampleResponse || ds.sampleEntry }));
 
   const isServerSide = componentType === 'extension';
-  const environment = isServerSide ? 'server' : 'browser';
 
-  let environmentRules = '';
+  let environmentRules;
   if (isServerSide) {
     environmentRules = `
 ## Test Environment: Server-Side (V8 Sandbox)

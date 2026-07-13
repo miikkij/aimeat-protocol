@@ -132,7 +132,6 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
   // Override the cancel ref to use our cancel function
   // The autopilotState.cancelledRef is checked by the old code — but now the server handles cancellation
   // We just need to make the UI's cancel button call our handleCancel
-  const originalCancel = autopilotState.cancel;
   autopilotState.cancel = handleCancel;
 
   return { handleRunAll };

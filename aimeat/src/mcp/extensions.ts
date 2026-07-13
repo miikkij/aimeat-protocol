@@ -41,7 +41,7 @@ export function registerExtensionsTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
-    emitResourceListChanged: (agentGaii: string) => void,
+    _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -184,7 +184,6 @@ export function registerExtensionsTools(
             }
 
             // Determine memory namespace (instance-scoped or extension-scoped)
-            const effectiveInstanceId = instance_id ?? '_default';
             const extMemoryOwner = instance_id
                 ? `ext:${ext.name}.${instance_id}`
                 : `ext:${ext.name}`;

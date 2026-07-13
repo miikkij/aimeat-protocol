@@ -1,3 +1,16 @@
+/**
+ * @file src/middleware/idempotency.ts
+ * @description Express middleware implementing idempotent POST/PUT requests via an Idempotency-Key
+ *   header: caches the first response (24h TTL, bounded LRU-style eviction) and replays it for repeat
+ *   keys. Validates the key is a UUID to prevent cache-key abuse.
+ *
+ * @structure
+ *   - idempotency(): middleware factory; skips non-POST/PUT and keyless requests, validates + caches
+ *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Request, Response, NextFunction } from 'express';
 
 interface CachedResponse {

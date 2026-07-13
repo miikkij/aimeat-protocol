@@ -1,3 +1,16 @@
+/**
+ * @file public/views/admin/ghii-tab.js
+ * @description Admin dashboard tab for managing GHII human users — lists accounts with
+ *   verification level, email, TOTP status and timestamps, and lets the operator change
+ *   verification level, remove an attached email, or delete a GHII.
+ *
+ * @structure
+ *   - GhiiTab({ data, reload }): renders stats + user table with confirm-guarded actions
+ *   - setLevel / doDelete / doRemoveEmail: call admin service (updateGhiiLevel, deleteGhii, removeGhiiEmail)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);

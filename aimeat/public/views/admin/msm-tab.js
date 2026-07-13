@@ -21,7 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
+import { dt, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
 import { getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate } from '/js/services/admin.js';
 import { Modal } from '/components/Modal.js';
 
@@ -42,7 +42,7 @@ export default function MsmTab({ data, reload }) {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
 
   async function showDetail(name) {
     try {
@@ -176,8 +176,6 @@ export default function MsmTab({ data, reload }) {
 
   // ── Edit view ──
   if (view === 'edit' && detail) {
-    const def = detail.definition || {};
-    const svc = def.service || {};
     return html`
       <div>
         <button class="adm-btn-sm" onClick=${() => setView('detail')}>\u2190 ${t('dashboard.back')}</button>

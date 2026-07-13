@@ -1,7 +1,23 @@
+/**
+ * @file src/services/realtime-manager.ts
+ * @description In-memory WebSocket room manager for realtime apps — rooms, peers, presence/signal
+ *   relay, Yjs collaborative-doc sync, echat chat with history cache, per-peer rate limiting,
+ *   idle cleanup, metrics, and cross-node federation relays.
+ *
+ * @structure
+ *   - RealtimeMessage / PeerConnection / RealtimeRoom / RealtimeStats: wire + internal types
+ *   - RealtimeManager: room lifecycle (create/join/close, auto-delete empty), message routing, broadcast
+ *   - Yjs snapshots: store latest update per doc, persist to memory, reload on demand
+ *   - Federation relay: fetch/discover remote rooms, bridge a local room to a remote node's room
+ *   - Cleanup + metrics: idle-room reaper, message/peer counters, getStats()
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, RealtimeRoomRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 // ── Message types ──

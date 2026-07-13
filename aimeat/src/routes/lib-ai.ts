@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/lib-ai.ts
+ * @description Server-side generator for the browser client library `aimeat-ai.js`.
+ *   Emits an IIFE that gives hosted apps an AIMEAT.ai facade (isAvailable/complete/
+ *   completeJson/models) which proxies to /v1/ai/* using the user's own OpenRouter key,
+ *   so the key never leaves the server; includes short in-memory caches and typed error codes.
+ *
+ * @structure
+ *   - aimeatAiLib(config): returns the aimeat-ai.js source string served to browsers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

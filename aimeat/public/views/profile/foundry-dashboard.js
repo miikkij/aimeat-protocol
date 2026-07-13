@@ -30,7 +30,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { updateProject, deleteProject, getAppLaunchUrl, writeProjectLog, MULTI_PASS_TYPES, getNextPass } from '/js/services/foundry.js';
+import { updateProject, deleteProject, getAppLaunchUrl, writeProjectLog, MULTI_PASS_TYPES } from '/js/services/foundry.js';
 import { useConfirm } from '/components/Modal.js';
 import { ComponentDetail, TestScopeSelector, TestResultsView } from './foundry-detail.js';
 import { SettingsCollectionView } from './foundry-settings.js';
@@ -53,14 +53,6 @@ import { DebugPanel } from './foundry-dashboard/DebugPanel.js';
 
 /* ── Pass Progress (multi-pass sidebar indicator) ──── */
 
-const PASS_STATUS_ICON = {
-  validated: '\u2705',   // ✅
-  failed: '\u274C',      // ❌
-  in_progress: '\uD83D\uDD04', // 🔄
-  prompt_ready: '\uD83D\uDD04', // 🔄
-  pending: '\u2B1C',     // ⬜
-};
-
 const PASS_TYPE_KEY = {
   test: 'passTest',
   skeleton: 'passSkeleton',
@@ -69,7 +61,7 @@ const PASS_TYPE_KEY = {
   reflection: 'passReflection',
 };
 
-function PassProgress({ passes, onGenerateNext }) {
+function PassProgress({ passes }) {
   if (!passes || passes.length === 0) return null;
   const done = passes.filter(p => p.status === 'validated').length;
   const total = passes.length;

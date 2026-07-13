@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/chat-instances.ts
+ * @description Routes for registering and tracking chat sessions (AI-chat/app instances) tied to an
+ *   owner's GHII — each session gets a deterministic chat-instance id and can be listed and updated
+ *   (last-seen) as memory is written from that session.
+ *
+ * @structure
+ *   - chatInstancesRouter: builds the Express router (all routes require auth)
+ *   - POST /v1/chat-instances: register a new session, verifying the owner's GHII exists
+ *   - GET/other routes: list and touch chat instances for the caller
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

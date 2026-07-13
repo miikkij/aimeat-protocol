@@ -1,3 +1,17 @@
+/**
+ * @file src/middleware/cookie-consent.ts
+ * @description Builds and injects a vanilla-cookieconsent banner into HTML responses when
+ *   enabled by config. Constructs the CookieConsent.run() config from configured categories
+ *   and injects the CSS/JS snippet before </body>; also exposes a standalone IIFE variant.
+ *
+ * @structure
+ *   - buildCookieConsentRunConfig(config): assembles categories + preference sections + i18n JSON
+ *   - cookieConsentMiddleware(config): wraps res.send to inject the snippet into text/html bodies
+ *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { RequestHandler, Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
 

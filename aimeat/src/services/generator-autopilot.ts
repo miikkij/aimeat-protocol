@@ -226,7 +226,7 @@ export async function runAutopilot(
   async function saveComp(comp: Record<string, unknown>) {
     const key = `generator.${projectId}.component.${comp.id as string}`;
     const version = (comp._version as number) || 0;
-    const { _version, ...data } = comp;
+    const data = Object.fromEntries(Object.entries(comp).filter(([k]) => k !== '_version'));
     try {
       if (version === 0) {
         await storage.setMemory({
@@ -1104,7 +1104,7 @@ export async function runAutopilot(
 
 // ── Helpers ──
 
-function extractRegisteredName(type: string, content: string, vr: { extracted?: unknown }): string | null {
+function extractRegisteredName(type: string, content: string, _vr: { extracted?: unknown }): string | null {
   if (type === 'extension' || type === 'cortex') {
     const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*"?([^\s"]+)"?/);
     return nameMatch?.[1] || null;

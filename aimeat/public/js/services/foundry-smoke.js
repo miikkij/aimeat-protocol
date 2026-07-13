@@ -10,7 +10,7 @@
  *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 
-import { apiPost, apiGet } from '/js/api.js';
+import { apiPost } from '/js/api.js';
 
 /**
  * Run a quick smoke test on a registered component.

@@ -1,14 +1,21 @@
 /**
- * Match Notification Service — Phase 1.6
+ * @file src/services/match-notification.ts
+ * @description Background job that periodically rebuilds the directory index, detects newly
+ *   appeared profiles/matches, and emails notifications to opted-in users. Skips silently when the
+ *   feature or the email service is disabled; the first run only primes the known-set (no emails).
  *
- * Background job that periodically scans the directory index for
- * new matches and sends email notifications to users who opted in.
+ * @structure
+ *   - NotificationState: tracks lastRunAt and the set of already-known GHIIs
+ *   - startMatchNotificationJob: sets up the interval job (returns null when disabled) and its run loop
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EmailService } from './email.js';
-import type { DirectoryService, DirectoryEntry } from './directory.js';
+import type { DirectoryService } from './directory.js';
 import type { MatchSuggestion } from './email-templates.js';
 import { logger } from '../utils/logger.js';
 
@@ -43,7 +50,6 @@ export function startMatchNotificationJob(
       // Rebuild directory index first to get latest data
       await directoryService.rebuildIndex();
 
-      const stats = directoryService.getStats();
       const allEntries = (await directoryService.search({ perPage: 10000 })).entries;
 
       if (state.lastRunAt === null) {

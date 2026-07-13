@@ -1,7 +1,16 @@
 /**
- * AIMEAT i18n Module
- * Loads translations from /locales/*.json and provides t() lookup.
- * Uses nested JSON structure, accessed via dot-notation keys.
+ * @file public/js/i18n.js
+ * @description SPA i18n runtime: fetches /locales/*.json (with English fallback), flattens the
+ *   nested JSON into dot-notation keys, and exposes t()/tOr() lookup plus locale switching.
+ *
+ * @structure
+ *   - loadTranslations(): fetches en.json as fallback + the active locale, version-cache-busted
+ *   - t(key, vars) / tOr(key, fallbackText, vars): dot-key lookup with {var} interpolation
+ *   - switchLocale() / onLocaleChange(): change locale and notify subscribed listeners
+ *   - flatten(): internal — collapses nested translation objects to dot-notation keys
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { detectLocale, persistLocale } from './utils.js';
 

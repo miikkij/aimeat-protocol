@@ -126,7 +126,7 @@ function tryParseYaml(text) {
       const parsed = parseYaml(fixed);
       const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
       return { errors, parsed, cleaned };
-    } catch (_e2) {
+    } catch {
       // Both attempts failed — report the original error
       errors.push(`YAML parse error: ${_e1.message}`);
       return { errors, parsed: null, cleaned: preCleaned };
@@ -214,7 +214,7 @@ export function validateAntiPatterns(type, code) {
         .replace(/\/(?:[^/\\]|\\.)+\/[gimsuy]*/g, '//'); // remove regex literals
       if (!/&gt;|&lt;|&amp;[a-z]|&quot;/.test(stripped)) return false;
       // Flag lines with entities in code context
-      return /[=(){}\[\];]/.test(line);
+      return /[=(){}[\];]/.test(line);
     });
     if (entityLines.length > 0) {
       errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);
@@ -437,7 +437,7 @@ const validators = {
         }
       }
       // Anti-pattern scan
-      const ap = validateAntiPatterns('translation', json);
+      validateAntiPatterns('translation', json);
       // translation anti-patterns are warnings only, don't block validation
 
       return { valid: errors.length === 0, errors, extracted: json };

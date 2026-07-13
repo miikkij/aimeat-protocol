@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/index.ts
+ * @description Barrel module re-exporting every per-domain storage repository interface
+ *   (owner, agent, memory, action, work, wallet, organism, app, capability, …). Provides
+ *   a single import point for the repository contracts that compose the Storage interface.
+ *
+ * @structure
+ *   - export type { …Repository }: re-exports of all domain repository interfaces
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 export type { OwnerRepository } from './owner.repository.js';
 export type { AgentRepository } from './agent.repository.js';
 export type { MemoryRepository } from './memory.repository.js';

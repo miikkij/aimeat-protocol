@@ -1,3 +1,18 @@
+/**
+ * @file src/services/organism-reputation.ts
+ * @description Organism reputation calculation service (Phase 3.4) — computes a weighted 0–1
+ *   reputation score for an organism from member count, activity, trust, age, and flags, using
+ *   log/cap normalization constants.
+ *
+ * @structure
+ *   - createOrganismReputationService(config, storage): factory returning { calculateReputation }
+ *   - calculateReputation(organismId): loads organism + active members and blends the weighted factors
+ *   - WEIGHT_* / normalization constants: member/activity/trust/age/flags weights and caps
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
 // Phase 3.4 — Organism Reputation Calculation Service
 
 import type { AimeatConfig } from '../config.js';

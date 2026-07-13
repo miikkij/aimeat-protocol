@@ -1,6 +1,17 @@
 /**
- * AIMEAT Knowledge Service
- * Knowledge package import, CRUD, links, prompts, discovery.
+ * @file public/js/services/knowledge.js
+ * @description Frontend API service layer for knowledge packages — wraps the /v1/knowledge and
+ *   related endpoints for import, CRUD, links, sharing, discovery, cloning, and reputation.
+ *
+ * @structure
+ *   - importPackage / getPackage / deletePackage: package lifecycle over memory + admin endpoints
+ *   - listLinks / createLink / deleteLink: inter-package relations
+ *   - discoverPackages / listOrganismPackages / contributeToOrganism: catalogue + organism sharing
+ *   - updateSharing / updateEntryVisibility / clonePackage: visibility and copy operations
+ *   - getPackageReputation / getPackageReviews / getHumanPrompt / getAgentPrompt: reputation + templates
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 

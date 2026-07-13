@@ -1,5 +1,16 @@
 /**
- * AIMEAT View Template
+ * @file public/views/_template.js
+ * @description Scaffold template for a new AIMEAT SPA view (Preact + HTM) — copy-and-rename
+ *   starting point demonstrating view CSS loading, data fetching, form submit, and render states.
+ *
+ * @structure
+ *   - MyView (default export): example view showing useApiCall data fetch + manual apiPost submit
+ *   - Header block: step-by-step checklist for wiring a new view (route, import map, portal fallback, i18n, css)
+ *
+ * @usage cp public/views/_template.js public/views/myview.js, then follow the numbered steps below.
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  * ─────────────────────────────────────────────────────────────────────────────
  * Copy this file to create a new view:
  *   cp public/views/_template.js public/views/myview.js
@@ -19,7 +30,7 @@ import { useState, useEffect }     from 'preact/hooks';
 const html = htm.bind(h);
 import { t }                       from '/js/i18n.js';
 import { escHtml }                 from '/js/utils.js';
-import { apiGet, apiPost }         from '/js/api.js';
+import { apiPost }                 from '/js/api.js';
 import { useApiCall }              from '/js/hooks.js';
 
 /**
@@ -29,7 +40,7 @@ import { useApiCall }              from '/js/hooks.js';
  * @param {function} props.navigate - SPA router, e.g. navigate('/v1/profile')
  * @param {string}   props.locale   - Active locale ('en' | 'fi')
  */
-export default function MyView({ navigate, locale }) {
+export default function MyView({ navigate }) {
 
   // ── Load view CSS ──────────────────────────────────────────────────────────
   useEffect(() => {

@@ -1,4 +1,18 @@
-import type { AimeatConfig } from '../config.js';
+/**
+ * @file src/middleware/envelope.ts
+ * @description Canonical AIMEAT response envelope — every route builds its JSON body with the
+ *   success()/error() helpers here so all responses share the same protocol/version/node/timestamp/
+ *   request_id shape plus optional hint next-actions and pagination meta.
+ *
+ * @structure
+ *   - HintAction: shape of a next-action hint (description/method/url + optional example)
+ *   - AimeatResponse<T>: the full envelope type (ok, protocol, data, error, hints, meta)
+ *   - success: build an ok:true envelope with data, optional hints and meta
+ *   - error: build an ok:false envelope with a code/message and default docs hints
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { generateRequestId } from '../utils/tracking-code.js';
 
 export interface HintAction {

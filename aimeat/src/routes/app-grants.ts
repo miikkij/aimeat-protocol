@@ -37,7 +37,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppGrantRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';

@@ -1,9 +1,16 @@
 /**
- * Federation shared helpers — keyword matching functions for cross-catalogue
- * filtering and peer key cache with TTL for signature verification.
+ * @file src/services/federation-helpers.ts
+ * @description Federation shared helpers used across the federation routers
+ *   (peer, sync, genesis, settlements): keyword/location matching for cross-catalogue
+ *   filtering, a TTL peer-key cache for signature verification, and outbound key exchange.
  *
- * Used by federation-peer, federation-sync, federation-genesis, and
- * federation-settlements routers.
+ * @structure
+ *   - matchesKeyword/matchesActionKeyword/matchesGenesisKeyword/matchesLocation: search filters
+ *   - PeerKeyEntry / peerKeyCache: TTL cache of peer node + agent public keys
+ *   - performKeyExchange(peerUrl, config, storage): exchange and cache peer public keys
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

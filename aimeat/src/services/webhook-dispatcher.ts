@@ -64,7 +64,7 @@ import type { Storage, WebhookDeliveryLog } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
-import { type WebhookEventType, type WebhookPayload, buildWebhookEnvelope } from '../models/webhook-schemas.js';
+import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 

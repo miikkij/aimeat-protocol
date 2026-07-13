@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/wellknown.ts
+ * @description Serves the node's discovery documents at /.well-known — the AIMEAT node
+ *   descriptor and the OpenAI-style ai-plugin.json manifest.
+ *
+ * @structure
+ *   - wellknownRouter(config, storage): mounts the two well-known GET endpoints
+ *   - GET /.well-known/aimeat: node id/type, public key, capability set, federation settings, key endpoints
+ *   - GET /.well-known/ai-plugin.json: ChatGPT-plugin manifest pointing at /v1/spec
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

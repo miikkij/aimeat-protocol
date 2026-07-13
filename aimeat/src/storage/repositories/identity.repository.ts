@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/identity.repository.ts
+ * @description Backend-agnostic storage interface for human identity — the persistence contract each
+ *   provider implements for GHII records (incl. lookups by owner, email hash, Google sub, and external
+ *   OIDC id), chat instances, and email verifications.
+ *
+ * @structure
+ *   - IdentityRepository: interface for GHII CRUD + lookups, chat-instance CRUD, and email-verification lifecycle
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { GHIIRecord, ChatInstanceRecord, EmailVerificationRecord } from '../interface.js';
 
 export interface IdentityRepository {

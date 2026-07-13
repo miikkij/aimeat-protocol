@@ -50,7 +50,7 @@ function extractImageUrls(valueText) {
   return out;
 }
 
-export default function TabDataAccess({ agent, agentName, session, showToast, allAgents }) {
+export default function TabDataAccess({ agent, agentName, showToast, allAgents }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [tags, setTags] = useState(agent.tags ?? []);
   const [memoryAreas, setMemoryAreas] = useState([]);

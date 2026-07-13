@@ -1,3 +1,16 @@
+/**
+ * @file src/storage/repositories/agent.repository.ts
+ * @description Storage-backend-agnostic interface for agent (GAII) persistence: CRUD/lookup by
+ *   gaii, name, or owner, plus atomic morsel-balance operations (debit/credit/capped-credit/transfer).
+ *   Each backend (SQLite, MongoDB, PostgreSQL) implements this contract.
+ *
+ * @structure
+ *   - AgentRepository: create/get/getByName/getByOwner/update/delete/list agents
+ *   - balance ops: debitBalance, creditBalance, creditBalanceCapped, transferBalance (atomic)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AgentRecord } from '../interface.js';
 
 export interface AgentRepository {

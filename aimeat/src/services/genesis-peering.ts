@@ -1,3 +1,17 @@
+/**
+ * @file src/services/genesis-peering.ts
+ * @description Service managing cross-federation "genesis" peerings — request/approve/suspend/remove
+ *   peer records, aggregate a cross-node catalogue, and compute network-reach statistics.
+ *
+ * @structure
+ *   - GenesisPeeringService: interface for the peering lifecycle + catalogue/stats reads
+ *   - createGenesisPeeringService(config, storage): implementation enforcing maxGenesisPeers + uniqueness
+ *   - getCrossCatalogue: merges local federate=true CSMs with active peer summaries
+ *   - getNetworkStats: totals peers/organisms/owners/agents and derives networkReach
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord } from '../storage/interface.js';

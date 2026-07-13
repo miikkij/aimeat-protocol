@@ -114,7 +114,7 @@ import { authorizeRead } from '../services/access-guard.js';
 import { ecoMayReadKey } from '../services/ecosystem-access.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
-import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
+import { expireOverdueApprovals } from '../services/gate-expiry.js';
 import { notify } from '../services/notify.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { isMemoryBackedSpace } from '../services/workspace-meta.js';

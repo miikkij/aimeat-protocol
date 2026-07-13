@@ -108,7 +108,7 @@ import type {
     SystemPromptRecord,
     SystemPromptVersionRecord,
     ExecutionLogEntry,
-    PackageRecord, PackageComponent, PackageComponentType, PackageFilter,
+    PackageRecord, PackageComponent, PackageFilter,
     TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
     PackageInstanceRecord, InstalledComponent, InstanceFilter,
     CapabilityRecord, CapabilityLogEntry, CapabilityFilter, CapabilityOverride, CapabilityTrust,
@@ -390,7 +390,7 @@ export class PrismaStorage implements Storage {
         return row ? this.toAgentRecord(row) : null;
     }
 
-    async getAgentByName(name: string, nodeId: string): Promise<AgentRecord | null> {
+    async getAgentByName(name: string, _nodeId: string): Promise<AgentRecord | null> {
         this.ensureReady();
         const row = await this.prisma.agent.findFirst({ where: { name } });
         return row ? this.toAgentRecord(row) : null;

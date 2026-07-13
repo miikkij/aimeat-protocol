@@ -1,3 +1,17 @@
+/**
+ * @file src/services/personal-routing.ts
+ * @description Routes messages (action requests, work assignments, notifications, federation
+ *   sync) to an agent hosted on a personal node. Delivers via the WebSocket tunnel when the
+ *   node is online and awaits a response; otherwise queues to the agent's mailbox.
+ *
+ * @structure
+ *   - RoutingResult: delivered/queued outcome shape
+ *   - routeToPersonalNode(tunnelManager, mailboxService, storage, targetGaii, message, notificationService?):
+ *       locates the hosting personal node, then tunnel-delivers or mailbox-queues the message
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { v4 as uuidv4 } from 'uuid';
 import type { TunnelManager, TunnelMessage } from './personal-tunnel.js';
 import { MailboxService } from './mailbox.js';

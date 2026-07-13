@@ -1,11 +1,14 @@
 /**
- * useViewCSS — no-op hook kept for API compatibility.
+ * @file public/components/useViewCSS.js
+ * @description No-op hook kept only for call-site API compatibility. View CSS is now preloaded as
+ *   <link rel="stylesheet"> in spa.html (BUILD_ID-stamped by portal.ts serveSpa), so no dynamic
+ *   per-view CSS loading is needed.
  *
- * All view CSS files are now preloaded as <link rel="stylesheet"> in spa.html
- * (stamped with BUILD_ID at serve time by portal.ts serveSpa), so CSS is always
- * applied before any view component renders. No dynamic loading needed.
+ * @structure
+ *   - useViewCSS(_cssPath): does nothing; the parameter is ignored
  *
- * @param {string} _cssPath — unused, kept for call-site compatibility
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 export function useViewCSS(_cssPath) {
   // CSS is preloaded in spa.html — nothing to do here

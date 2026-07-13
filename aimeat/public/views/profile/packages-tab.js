@@ -146,7 +146,7 @@ function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
   `;
 }
 
-export default function PackagesTab({ session, showToast, navigate, locale }) {
+export default function PackagesTab({ session, showToast, navigate }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [instances, setInstances] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -173,8 +173,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
       try {
         const fedRes = await pkgService.listFederationTemplates({ limit: 50 });
         if (fedRes.ok) setRemoteTemplates(fedRes.data?.templates ?? []);
-      } catch (_) { /* federation may not be available */ }
-    } catch (e) { /* ignore */ }
+      } catch { /* federation may not be available */ }
+    } catch { /* ignore */ }
     setLoading(false);
   }, []);
 
@@ -248,7 +248,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
       if (!ok) return;
     }
     try {
-      const newProjectId = await importPackageToGenerator(groupId, null, currentUser);
+      await importPackageToGenerator(groupId, null, currentUser);
       showToast(t('profile.packages.importSuccess') || 'Package imported as generator project');
       navigate('generator');
     } catch (e) {
@@ -350,7 +350,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
       } else {
         showToast('Failed to load prompt', true);
       }
-    } catch (e) {
+    } catch {
       showToast('Failed to load prompt', true);
     }
   };

@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/lib-storage.ts
+ * @description Server-side generator that emits the browser `aimeat-storage.js` client library as a
+ *   string — the file upload/download SDK (AIMEAT.storage) served to app/cortex pages.
+ *
+ * @structure
+ *   - aimeatStorageLib(config): returns the JS source, node URL and generation timestamp baked in
+ *   - emitted storage.upload(): accepts File/Blob/base64, base64-encodes, POSTs /v1/storage
+ *   - emitted authFetch(): routes calls through the loaded AIMEAT.auth session
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

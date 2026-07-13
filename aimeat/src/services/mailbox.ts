@@ -1,3 +1,17 @@
+/**
+ * @file src/services/mailbox.ts
+ * @description Store-and-forward mailbox service for offline personal nodes: enqueues items under a
+ *   per-node capacity/retention quota, flushes them on reconnect, expires stale items, and emits
+ *   stats/Prometheus metrics for enqueue/flush/quota-rejection events.
+ *
+ * @structure
+ *   - MailboxService: constructed with config + storage
+ *   - enqueue(): capacity-checked insert with retention-based expiry + metrics
+ *   - flush() / cleanExpired() / hasCapacity() / getStats(): drain, GC, quota, and usage reporting
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord } from '../storage/interface.js';

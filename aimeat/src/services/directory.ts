@@ -1,3 +1,16 @@
+/**
+ * @file src/services/directory.ts
+ * @description Directory service — builds and searches the public people/organism directory:
+ *   filtering by type, location (city/area/country and geo radius), and interests, with facet
+ *   aggregation (cities, interests) over the indexed directory entries.
+ *
+ * @structure
+ *   - DirectoryService: class that indexes GHII/organism entries and answers search queries
+ *   - DirectoryEntry / DirectorySearchOpts / DirectorySearchResult / DirectoryStats: public types
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

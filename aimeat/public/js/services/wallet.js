@@ -1,4 +1,18 @@
 /**
+ * @file public/js/services/wallet.js
+ * @description Frontend wallet service — thin API-layer helpers for reading morsel balance,
+ *   listing transactions, and requesting a daily allowance top-up.
+ *
+ * @structure
+ *   - getWallet: GET /v1/wallet balance and info
+ *   - getTransactions: GET /v1/wallet/transactions (paged)
+ *   - requestMorsels: POST /v1/wallet/request to request a morsel allowance
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+/**
  * AIMEAT Wallet Service
  * Balance, transactions, morsel requests.
  */

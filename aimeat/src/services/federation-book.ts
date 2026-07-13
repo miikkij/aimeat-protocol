@@ -58,7 +58,7 @@ export interface FederationBook {
 
 /** Canonical string the primary signs (and leaves verify) for a book — excludes `signature`. */
 export function bookSignString(book: FederationBook): string {
-  const { signature: _sig, ...rest } = book;
+  const rest = Object.fromEntries(Object.entries(book).filter(([k]) => k !== 'signature'));
   return JSON.stringify(rest);
 }
 
@@ -111,7 +111,7 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
     resources,
     computed_at: new Date().toISOString(),
   };
-  const { node_card_hash: _h, computed_at: _c, ...stable } = card;
+  const stable = Object.fromEntries(Object.entries(card).filter(([k]) => k !== 'node_card_hash' && k !== 'computed_at'));
   card.node_card_hash = sha256(JSON.stringify(stable));
   return card;
 }

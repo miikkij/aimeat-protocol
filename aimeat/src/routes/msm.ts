@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/msm.ts
+ * @description Routes for MSM (Merchant Service Model) integration definitions — the
+ *   YAML/JSON descriptors for external service integrations. Registers/validates MSMs
+ *   and serves built-in MSM templates loaded from docs/msm-examples at startup. Install
+ *   role is configurable via config.msmInstallRole.
+ *
+ * @structure
+ *   - loadMsmTemplates(): read + parse docs/msm-examples/*.msm.yaml into template metadata
+ *   - msmRouter(config, storage): Router mounting the /v1/msm endpoints
+ *   - POST /v1/msm: parse (YAML or JSON), validate, and register an MSM integration
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -224,8 +239,10 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
     // Strip sensitive auth config (env var names) from the public definition
     const safeDef = { ...msm.definition } as Record<string, unknown>;
     if (safeDef.auth && typeof safeDef.auth === 'object') {
-      const { env_var, env_var_secret, ...safeAuth } = safeDef.auth as Record<string, unknown>;
-      safeDef.auth = safeAuth;
+      const authObj = safeDef.auth as Record<string, unknown>;
+      safeDef.auth = Object.fromEntries(
+        Object.entries(authObj).filter(([k]) => k !== 'env_var' && k !== 'env_var_secret'),
+      );
     }
 
     res.json(success(config.nodeId, {

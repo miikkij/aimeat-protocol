@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/schemas.ts
+ * @description Schema-locking API for memory keys: owners/operators attach a JSON Schema (with
+ *   apply_to scope + mode) to a key, with lock ownership enforced so only the locking principal (or
+ *   an operator) can overwrite it, and validator cache invalidation on replace.
+ *
+ * @structure
+ *   - schemaRouter(config, storage): mounts the memory-schema routes
+ *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

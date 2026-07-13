@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/flags.ts
+ * @description Content-flagging (moderation report) API. Lets authenticated principals flag
+ *   memory, board posts, actions, or agents with a reason, and moderators review flags —
+ *   resolving organism-scoped moderation config when a flagged memory key belongs to an organism.
+ *
+ * @structure
+ *   - VALID_TARGET_TYPES / VALID_REASONS / VALID_REVIEW_STATUSES: input enums
+ *   - resolveOrganismConfig(): derives organism moderation settings from a flagged memory key
+ *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';

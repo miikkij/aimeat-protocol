@@ -1,6 +1,18 @@
 /**
- * Federation peer routes — peer directory, introduction, key exchange,
- * heartbeat, peering request CRUD, peer management, and connectivity test.
+ * @file src/routes/federation-peer.ts
+ * @description Federation peer routes — the public peer directory and node-to-node handshake surface:
+ *   signed introduction, Ed25519 key exchange, heartbeat/presence, service-summary aggregation,
+ *   peering-request CRUD, tier promotion/auto-admit policy evaluation, and the federation node book.
+ *
+ * @structure
+ *   - federationPeerRouter(config, storage, peers): builds the router over the in-memory peer map
+ *   - GET /v1/federation/directory: public peer + personal-node directory (Tier 0)
+ *   - GET /v1/federation/service-summary: compact federated-item summary for hub aggregation (cached hash)
+ *   - promotionMetrics(peer): computes measurable promotion-eligibility metrics (Phase B)
+ *   - introduce / key-exchange / heartbeat / peering-request handlers with signature verification
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { Router } from 'express';
@@ -18,7 +30,7 @@ import { sign, verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
-import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
+import { computeServiceSummary } from '../utils/service-summary.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../services/presence.js';
 import { deriveTierFlags, coerceTier, type PeerTier } from '../services/federation-tiers.js';
 import {
@@ -139,7 +151,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     // POST /v1/federation/peer/introduce — unauthenticated "knock on the door" for joining nodes
     // SECURITY: Requires cryptographic signature + operator approval (never auto-approve)
     router.post('/v1/federation/peer/introduce', async (req, res) => {
-        const { node_id, node_url, node_type, public_key, role, message, signature, timestamp } = req.body ?? {};
+        const { node_id, node_url, public_key, role, message, signature, timestamp } = req.body ?? {};
 
         if (!node_id || !node_url || !public_key || !role) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id, node_url, public_key, and role are required'));
@@ -520,7 +532,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     // POST /v1/federation/heartbeat — peer health heartbeat
     // SECURITY: Verify signature from known peers
     router.post('/v1/federation/heartbeat', async (req, res) => {
-        const { from_node_id, timestamp, status: peerStatus, stats, signature } = req.body ?? {};
+        const { from_node_id, timestamp, signature } = req.body ?? {};
 
         if (from_node_id && peers.has(from_node_id)) {
             const peer = peers.get(from_node_id)!;

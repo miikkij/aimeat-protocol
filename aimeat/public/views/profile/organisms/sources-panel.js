@@ -70,7 +70,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         const r = await knowledgeService.discoverPackages({ limit: 50, sort: 'recent' });
         setResults((r?.data?.packages || []).filter(p => !ql || String(p.name || '').toLowerCase().includes(ql)));
       }
-    } catch (e) { setResults([]); }
+    } catch { setResults([]); }
     finally { setLoading(false); }
   };
   const searchRef = useRef(doSearch); searchRef.current = doSearch;

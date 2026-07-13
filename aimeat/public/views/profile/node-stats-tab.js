@@ -36,7 +36,7 @@ function StatCard({ label, value, color }) {
   </div>`;
 }
 
-export default function NodeStatsTab({ session, showToast }) {
+export default function NodeStatsTab() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
 

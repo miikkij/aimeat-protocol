@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/portal-human.ts
+ * @description Builds the human-facing "try it now" portal landing page as a self-contained HTML
+ *   string (Finnish-first, mobile-first). Carries strict double-escaping rules for JS embedded in HTML.
+ *
+ * @structure
+ *   - humanPortalHtml(config, t, locale, stats): renders the full localized landing page
+ *   - esc(): HTML-entity escaping; jesc(): escaping for JS single-quoted strings inside templates
+ *   - top-of-file comment documents the two-level template-literal escaping contract (do not remove)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -53,14 +66,10 @@ export function humanPortalHtml(
   config: AimeatConfig,
   t: TFunction,
   locale: Locale,
-  stats: { agents: number; chatSessions: number; actions: number; boards: number },
+  _stats: { agents: number; chatSessions: number; actions: number; boards: number },
 ): string {
-  const otherLocale = locale === 'fi' ? 'en' : 'fi';
   const otherLocaleLabel = locale === 'fi' ? 'EN' : 'FI';
   const currentLocaleLabel = locale === 'fi' ? 'FI' : 'EN';
-
-  // Example chips — t() joins arrays with ', ' so chips must not contain commas
-  const chips = t('cards.memory.exampleChips').split(', ');
 
   return `<!DOCTYPE html>
 <html lang="${locale}">

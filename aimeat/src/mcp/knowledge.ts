@@ -29,7 +29,7 @@ export function registerKnowledgeTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
-    emitResourceListChanged: (agentGaii: string) => void,
+    _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
     const agentGaii = getAgentGaii();
 

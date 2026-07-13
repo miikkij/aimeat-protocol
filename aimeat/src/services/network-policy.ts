@@ -125,7 +125,7 @@ export function coercePolicy(value: unknown): NetworkPolicyDoc {
 
 /** Canonical string a genesis node signs (and a peer verifies) for a policy doc — excludes `signature`. */
 export function policySignString(doc: NetworkPolicyDoc): string {
-  const { signature: _sig, ...rest } = doc;
+  const rest = Object.fromEntries(Object.entries(doc).filter(([k]) => k !== 'signature'));
   return JSON.stringify(rest);
 }
 

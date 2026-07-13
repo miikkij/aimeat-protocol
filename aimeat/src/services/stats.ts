@@ -62,14 +62,17 @@ export interface StatsSnapshot {
   [key: string]: unknown;
 }
 
-const TRACKED_COUNTERS = [
-  'requests_total', 'memory_writes', 'memory_reads',
-  'consent_grants', 'consent_revocations',
-  'schema_validations', 'schema_validation_failures',
-  'auth_failures_total', 'rate_limit_hits_total', 'scope_denials_total',
-] as const;
-
-export type CounterName = (typeof TRACKED_COUNTERS)[number];
+export type CounterName =
+  | 'requests_total'
+  | 'memory_writes'
+  | 'memory_reads'
+  | 'consent_grants'
+  | 'consent_revocations'
+  | 'schema_validations'
+  | 'schema_validation_failures'
+  | 'auth_failures_total'
+  | 'rate_limit_hits_total'
+  | 'scope_denials_total';
 
 /** Tunnel counter fields (excludes gauges and computed latency fields). */
 export type TunnelCounterName =

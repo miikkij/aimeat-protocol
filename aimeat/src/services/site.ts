@@ -1,3 +1,16 @@
+/**
+ * @file src/services/site.ts
+ * @description SiteService — serves the portal HTML (custom operator template or default spa.html
+ *   fallback, cached), resolving {{config|memory|storage|kv|board:*}} tags and header-nav config.
+ *
+ * @structure
+ *   - SiteService.getPortalHtml(): returns portal HTML with tag substitution and TTL caching
+ *   - HeaderNavConfig / PUBLIC_NAV_LINK_IDS: operator-configurable public header link order/visibility
+ *   - CONFIG_WHITELIST + TAG_REGEX: safe config keys and the {{...}} tag grammar for substitution
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { randomBytes } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';

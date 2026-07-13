@@ -1,10 +1,24 @@
+/**
+ * @file public/views/admin/cors-tab.js
+ * @description Admin dashboard CORS tab — shows the node-default allowed origins and lets
+ *   the operator add/edit/clear per-GHII and per-agent CORS allow-list overrides.
+ *
+ * @structure
+ *   - OriginSuggestions: quick-add buttons for common origins (localhost ports, wildcard)
+ *   - InlineEditor: edit an existing override's comma-separated origin list
+ *   - AddOverrideForm: pick a GHII/agent and assign an origin allow-list
+ *   - CorsTab (default): composes node-default + GHII + agent override cards, wires save/clear to admin service
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Empty, useToast, Toast } from './shared.js';
+import { useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
 
@@ -105,7 +119,7 @@ export default function CorsTab({ data, reload }) {
   // Track which row is being edited
   const [editGhii, setEditGhii] = useState(null);
   const [editAgent, setEditAgent] = useState(null);
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
   async function doClearGhii(ghii) {

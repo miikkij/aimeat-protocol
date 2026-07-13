@@ -587,8 +587,8 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "format": "xml|json|html|csv|unknown",
       "encoding": "utf-8|iso-8859-1|auto",
       "sampleEntry": "One raw entry from the source, copy-pasted exactly as-is",
-      "responseEnvelope": "For API/RSS sources: describe the top-level response structure that WRAPS the entries. Example for REST API: { \"totalResults\": \"number\", \"companies\": \"array of company objects\" }. Example for RSS: { \"channel\": { \"item\": \"array of items\" } }. This tells the extension generator which field name to use when accessing the results array (e.g., response.companies, not response.results). CRITICAL for correct parsing.",
-      "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ \"key\": \"Item A\", \"value\": { \"score\": 42.5, \"status\": \"active\" } }]. Omit this field for non-user-input sources.",
+      "responseEnvelope": "For API/RSS sources: describe the top-level response structure that WRAPS the entries. Example for REST API: { "totalResults": "number", "companies": "array of company objects" }. Example for RSS: { "channel": { "item": "array of items" } }. This tells the extension generator which field name to use when accessing the results array (e.g., response.companies, not response.results). CRITICAL for correct parsing.",
+      "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ "key": "Item A", "value": { "score": 42.5, "status": "active" } }]. Omit this field for non-user-input sources.",
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
       "notes": "Any observations from fetching/analyzing the source",
@@ -737,8 +737,9 @@ export async function buildComponentPrompt(type, label, projectDescription, blue
       // and AI copies them into the actual values if they're present
       const cleaned = {};
       for (const [key, schema] of Object.entries(relevant)) {
-        const { source, producedBy, consumedBy, ...dataSchema } = schema;
-        cleaned[key] = dataSchema;
+        cleaned[key] = Object.fromEntries(
+          Object.entries(schema).filter(([k]) => k !== 'source' && k !== 'producedBy' && k !== 'consumedBy'),
+        );
       }
       context += '\n## Domain Data Model (EXACT schemas — follow these precisely)\n';
       context += 'These are the memory key schemas for this component. Use these exact key names and data shapes.\n\n';
@@ -1068,7 +1069,6 @@ If these are missing, the app WILL crash with "getTranslations is not a function
         'aimeat-canvas': 'DrawingCanvas(container, {width, height, tools, onSave})',
       };
       for (const libName of comp.uses) {
-        const camelName = libName.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         context += `- **${libName}**: Load via \`<script src="/v1/cortex/${libName}/libs/${libName}.js"></script>\`\n`;
         context += `  Access via \`AIMEAT['${libName}'].*\`\n`;
         if (platformApis[libName]) {

@@ -106,7 +106,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
       }
 
       // Generate fresh test code
-      let testCode = null;
+      let testCode;
       try {
         await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'batch' } });
         const testPrompt = buildTestPrompt(

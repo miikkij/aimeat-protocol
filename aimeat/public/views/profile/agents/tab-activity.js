@@ -20,10 +20,9 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
 import { getDirectives } from '/js/services/agent-directives.js';
-import { getWebhookConfig, getTelemetry, getDeliveryLog } from '/js/services/agent-integration.js';
+import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.js';
 import { getLedgerUsage } from '/js/services/ledger.js';
 
 const html = htm.bind(h);
@@ -50,7 +49,7 @@ function eventCategory(event) {
   return 'system';
 }
 
-export default function TabActivity({ agent, agentName, session, showToast }) {
+export default function TabActivity({ agent, agentName }) {
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState(null);
   const [governance, setGovernance] = useState(null);

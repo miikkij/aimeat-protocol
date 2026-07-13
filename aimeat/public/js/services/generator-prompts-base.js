@@ -1499,18 +1499,11 @@ export function extractCodeBlocks(text) {
 export function summarizeExtensionApi(result) {
   console.warn('[DEPRECATED] summarizeExtensionApi — use component.spec instead. See generator-specs.js.');
   if (!result) return '  (no code available)\n';
-  const lines = typeof result === 'string' ? result.split('\n') : [];
   const summary = [];
 
   // Extract metadata.name
   const nameMatch = result.match(/name:\s*"?([^\s"]+)"?/);
   if (nameMatch) summary.push(`  Extension name: ${nameMatch[1]}`);
-
-  // Extract actions (id, method, path, description)
-  const actionRegex = /- id:\s*(\S+)/g;
-  const descRegex = /description:\s*"([^"]+)"/g;
-  const methodRegex = /method:\s*(\S+)/g;
-  const pathRegex = /path:\s*(\S+)/g;
 
   // Parse YAML actions section
   const actionsStart = result.indexOf('actions:');

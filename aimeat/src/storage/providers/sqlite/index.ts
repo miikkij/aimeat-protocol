@@ -58,7 +58,7 @@ import type {
   SystemPromptRecord,
   SystemPromptVersionRecord,
   ExecutionLogEntry,
-  PackageRecord, PackageComponent, PackageFilter, PackageComponentType,
+  PackageRecord, PackageComponent, PackageFilter,
   TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
   PackageInstanceRecord, InstalledComponent, InstanceFilter,
   CapabilityRecord, CapabilityLogEntry, CapabilityStats,

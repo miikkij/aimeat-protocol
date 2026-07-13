@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/providers/sqlite/repos/owner.ts
+ * @description SQLite (better-sqlite3) repository for owner (GHII) records — CRUD over the `owners`
+ *   table with JSON serialization of the roles array.
+ *
+ * @structure
+ *   - deserializeOwner: maps a DB row to an OwnerRecord
+ *   - createOwner/getOwner/listOwners/updateOwner: insert (UNIQUE→NAME_TAKEN), fetch, list, update
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { OwnerRecord } from '../../../interface.js';
 

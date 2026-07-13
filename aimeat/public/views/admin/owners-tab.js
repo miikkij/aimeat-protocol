@@ -1,3 +1,15 @@
+/**
+ * @file public/views/admin/owners-tab.js
+ * @description Admin dashboard tab listing registered owners (name, display name, roles,
+ *   agent count, created date) with an operator action to grant the operator role.
+ *
+ * @structure
+ *   - OwnersTab({ data, reload }): renders the owners table
+ *   - doGrant(name): confirms then grants the operator role via grantRole and reloads
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -8,7 +20,7 @@ import { grantRole } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
 export default function OwnersTab({ data, reload }) {
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const owners = data.owners || [];
   if (owners.length === 0) return html`<${Empty} text=${t('dashboard.noOwnersFound')} />`;

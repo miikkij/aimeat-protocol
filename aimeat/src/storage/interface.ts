@@ -1,3 +1,18 @@
+/**
+ * @file src/storage/interface.ts
+ * @description Central storage contract for the node: the record type definitions
+ *   (owners, agents, memory, and every other domain entity) plus the `Storage`
+ *   interface every backend (SQLite, MongoDB, PostgreSQL) must implement. Adding a
+ *   data type/field here means updating all backends (see storage-sync guide).
+ *
+ * @structure
+ *   - Record interfaces (OwnerRecord, AgentRecord, MemoryRecord, …): persisted entity shapes
+ *   - SemanticAnnotation and supporting value/filter types shared across repositories
+ *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 // Phase 0.7b — Semantic annotation for records (JSON-LD-compatible)
 export interface SemanticAnnotation {
   '@context'?: Record<string, string>;

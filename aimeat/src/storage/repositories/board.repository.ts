@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/board.repository.ts
+ * @description Backend-agnostic storage interface for boards — the persistence contract implemented
+ *   by each provider (SQLite/MongoDB/PostgreSQL) covering boards, posts, reactions, and subscriptions.
+ *   (Boards are marked deprecated per RFC v4.0 but the contract remains.)
+ *
+ * @structure
+ *   - BoardRepository: interface for board CRUD + visibility/members, posts CRUD, reactions, and subscriptions
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { BoardRecord, BoardPostRecord, BoardSubscriptionRecord } from '../interface.js';
 
 export interface BoardRepository {

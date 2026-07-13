@@ -29,7 +29,7 @@ export default function CsmTab({ data, reload }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
   async function showDetail(name) {

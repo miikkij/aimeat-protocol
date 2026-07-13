@@ -1,3 +1,15 @@
+/**
+ * @file src/routes/admin-economy.ts
+ * @description Operator-only economy administration route: mints morsels to an agent's balance while
+ *   enforcing the per-day mint cap (config.maxOperatorMintPerDay) and recording a 'mint' transaction.
+ *
+ * @structure
+ *   - adminEconomyRouter(config, storage): mounts POST /v1/admin/mint (requireRole 'operator')
+ *   - mint handler: validates gaii/amount, checks daily cap against listAllTransactions, credits + logs
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

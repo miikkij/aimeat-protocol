@@ -49,7 +49,6 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
   useEffect(() => onLiveUpdate(['agents'], () => loadRef.current()), []);
 
   const handleDelete = useCallback(async (s) => {
-    const name = s.display_name || s.name || 'session';
     confirm(t('profile.chatSessions.confirmDelete'), async () => {
       setDeleting(s.name);
       try {

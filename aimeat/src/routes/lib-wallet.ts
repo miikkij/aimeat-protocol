@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/lib-wallet.ts
+ * @description Server-side generator for the browser client library aimeat-wallet.js. Returns
+ *   the JS source (as a string) exposing AIMEAT.wallet — morsel balance and transaction history
+ *   helpers that call /v1/wallet using the AIMEAT.auth session.
+ *
+ * @structure
+ *   - aimeatWalletLib(config): returns the IIFE source string, stamped with node id
+ *   - emitted wallet.balance() / wallet.transactions(): authenticated fetches of /v1/wallet[/transactions]
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

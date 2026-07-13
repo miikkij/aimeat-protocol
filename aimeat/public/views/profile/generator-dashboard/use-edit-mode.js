@@ -32,7 +32,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import {
-  loadAllComponents, saveComponent, registerComponent, writeProjectLog,
+  saveComponent, registerComponent, writeProjectLog,
   savePendingEdit, clearPendingEdit,
 } from '/js/services/generator.js';
 import { buildImpactPrompt, buildEditPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
@@ -174,7 +174,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
               comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
             );
             const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
-            try { content = await runWithAi(projectId, fp); } catch (e) { break; }
+            try { content = await runWithAi(projectId, fp); } catch { break; }
             content = stripCodeblock(content);
             vr = validateComponent(comp.type, content, core.project?.blueprint);
           }

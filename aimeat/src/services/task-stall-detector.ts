@@ -10,7 +10,7 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, AgentRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 

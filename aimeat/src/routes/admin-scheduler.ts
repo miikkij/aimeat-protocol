@@ -1,3 +1,19 @@
+/**
+ * @file src/routes/admin-scheduler.ts
+ * @description Operator-only routes for managing the scheduled-job engine — list/inspect jobs, manually
+ *   trigger a run, enable/disable or change a job's cron, delete jobs, and read execution history. All
+ *   routes require an authenticated operator and emit a 'scheduler' change event on mutation.
+ *
+ * @structure
+ *   - adminSchedulerRouter(config, storage, scheduler): builds the Express router
+ *   - GET jobs / jobs/:id: list and detail
+ *   - POST jobs/:id/trigger: run a job now via scheduler.triggerNow
+ *   - PATCH/DELETE jobs/:id: update (enable/cron) with reschedule, or remove
+ *   - GET execution-log: scheduled-job execution history
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

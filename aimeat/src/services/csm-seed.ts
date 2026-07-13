@@ -1,3 +1,16 @@
+/**
+ * @file src/services/csm-seed.ts
+ * @description Startup seeder for CSM (Content Structure Model) templates — reads `.csm.yaml` files
+ *   from docs/csm-examples/, validates them, generates JSON Schemas, and registers both the locked
+ *   schema and the CSM record in storage. Idempotent: skips any CSM already registered by name.
+ *
+ * @structure
+ *   - seedCsmTemplates(storage, systemGaii): main entry that parses, validates, and registers each template
+ *   - uses parseCsm/validateCsm/csmToJsonSchema from csm-parser for parsing and schema generation
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

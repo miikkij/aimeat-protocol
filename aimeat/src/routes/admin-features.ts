@@ -1,3 +1,17 @@
+/**
+ * @file src/routes/admin-features.ts
+ * @description Operator-only admin API surface — GHII user administration, email/notification
+ *   templates and sending, directory rebuild, matching-engine control, push config, and genesis
+ *   peering management. All routes gated by requireAuth() + requireRole('operator').
+ *
+ * @structure
+ *   - adminFeaturesRouter(config, storage, services): mounts /v1/admin/* routes
+ *   - handle(): DRY try/catch wrapper returning a standard 500 envelope
+ *   - Route groups: GHII users, notification templates, directory, matching, push, genesis peering
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

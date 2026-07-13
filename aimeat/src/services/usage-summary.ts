@@ -22,7 +22,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { getMemoryTotalBytes, getStorageTotalBytes, getMicroMemoryTotalBytes } from './quota.js';
+import { getMemoryTotalBytes, getMicroMemoryTotalBytes } from './quota.js';
 import { cached, invalidateKey, TTL } from './cache.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps

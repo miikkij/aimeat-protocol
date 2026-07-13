@@ -19,17 +19,6 @@ import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
 
-/* ── Data for markdown generator ──────────────── */
-
-const LIBRARIES = [
-  ['aimeat-auth', '/v1/libs/aimeat-auth.js', '—', 'Identity, registration, login, JWT, session management'],
-  ['aimeat-data', '/v1/libs/aimeat-data.js', 'aimeat-auth', 'Memory key-value storage, search, micro-memory'],
-  ['aimeat-storage', '/v1/libs/aimeat-storage.js', 'aimeat-auth', 'Binary file upload/download, drag & drop'],
-  ['AimeatRealtime', '/lib/realtime.js', 'aimeat-auth', 'WebSocket P2P rooms, WebRTC data channels, Yjs CRDT'],
-  ['aimeat-social', '/v1/libs/aimeat-social.js', 'aimeat-auth', 'Boards, posts, reactions, replies'],
-  ['aimeat-wallet', '/v1/libs/aimeat-wallet.js', 'aimeat-auth', 'Balance, transactions, morsel economy'],
-  ['aimeat-work', '/v1/libs/aimeat-work.js', 'aimeat-auth', 'Action catalogue, work requests, deliveries'],
-];
 
 const API_SECTIONS = [
   { title: 'Authentication', rows: [

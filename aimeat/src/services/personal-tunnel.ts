@@ -1,3 +1,18 @@
+/**
+ * @file src/services/personal-tunnel.ts
+ * @description WebSocket tunnel manager linking a genesis node to owners' personal (home) nodes:
+ *   maintains per-node connections, correlates request/response messages, runs heartbeats, and syncs
+ *   queued mailbox items to a node when it reconnects.
+ *
+ * @structure
+ *   - TunnelMessage / PersonalNodeConnection: the wire protocol + per-connection state types
+ *   - TunnelManager: connection registry, pending-response map, and heartbeat loop
+ *   - handleConnection(): registers a node's socket, replacing any stale existing connection
+ *   - setNotificationService(): wires optional mailbox-notification delivery
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';

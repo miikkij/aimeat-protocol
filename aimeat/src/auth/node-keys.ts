@@ -1,3 +1,18 @@
+/**
+ * @file src/auth/node-keys.ts
+ * @description Bootstraps the node's Ed25519 signing keypair: loads it from storage,
+ *   falls back to a persisted `~/.aimeat/node-key.json` (optionally AES-256-GCM
+ *   encrypted via AIMEAT_KEY_PASSPHRASE), or generates a fresh pair — then wires the
+ *   keys into every token subsystem (JWT, upload/download/confirm/share/draft tokens).
+ *
+ * @structure
+ *   - encryptNodeKey/decryptNodeKey: AES-256-GCM + PBKDF2 key-file protection (P3-8)
+ *   - loadPersistedNodeKey/persistNodeKey: read/write the on-disk key file (0o600)
+ *   - initializeNode(config, storage): resolve/generate keys and init all token signers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pbkdf2Sync, randomBytes as cryptoRandomBytes, createCipheriv, createDecipheriv } from 'node:crypto';

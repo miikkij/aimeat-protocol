@@ -33,7 +33,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { Modal, useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -685,7 +685,7 @@ export default function ExtensionsTab({ session, showToast }) {
 
       ${comps.filter(c => c.type === 'lib').map(lib => {
         const scriptUrl = NODE_URL + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(lib.filename);
-        const scriptTag = '<script src="' + scriptUrl + '"><\/script>';
+        const scriptTag = '<script src="' + scriptUrl + '"></script>';
         return html`
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>

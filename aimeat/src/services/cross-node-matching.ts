@@ -1,3 +1,16 @@
+/**
+ * @file src/services/cross-node-matching.ts
+ * @description Cross-node community matching service. Produces anonymized interest/location
+ *   profiles (only for GHIIs that granted community-discovery consent) and scores similarity
+ *   between two profiles, for privacy-preserving federated match discovery.
+ *
+ * @structure
+ *   - AnonymizedProfile / CrossMatchRequest: data shapes for anonymized discovery
+ *   - createCrossNodeMatchingService(config, storage): getAnonymizedProfiles + calculateCrossMatchScore
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

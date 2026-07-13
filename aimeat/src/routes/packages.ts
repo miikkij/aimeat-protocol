@@ -376,7 +376,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       // Re-propose a previously rejected/suspended listing
-      const updated = await storage.updateTemplateListing(existing.id, {
+      await storage.updateTemplateListing(existing.id, {
         status: 'pending_review',
         proposedAt: new Date().toISOString(),
         proposedBy: ghii,

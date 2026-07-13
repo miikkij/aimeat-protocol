@@ -1,3 +1,16 @@
+/**
+ * @file src/routes/lib-social.ts
+ * @description Server module that generates the `aimeat-social.js` browser client library as a string,
+ *   templated with the node id/base URL. The emitted IIFE exposes `AIMEAT.social` for boards, posts,
+ *   reactions and replies, using the loaded `AIMEAT.auth` session for authenticated calls.
+ *
+ * @structure
+ *   - aimeatSocialLib(config): returns the full JS source for the served social client library
+ *   - Emitted client: createBoard/boards, post/posts/getPost, react/reply over /v1/boards endpoints
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 
 /**

@@ -1,3 +1,16 @@
+/**
+ * @file src/storage/providers/sqlite/repos/service-manifest.ts
+ * @description SQLite (better-sqlite3) repository for service manifests — CSM (Consumer Service Model)
+ *   and MSM (Machine Service Manifest) records, with JSON (de)serialization and federate flag handling.
+ *
+ * @structure
+ *   - deserializeCsm / deserializeMsm: map DB rows to typed records (parse definition/semantic JSON)
+ *   - createCsm / getCsm / listCsms: CSM writes and reads (CSM_NAME_TAKEN on unique clash)
+ *   - MSM CRUD helpers (below): parallel operations for MSM records
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type Database from 'better-sqlite3';
 import type { CsmRecord, MsmRecord } from '../../../interface.js';
 

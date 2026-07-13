@@ -1,6 +1,15 @@
 /**
- * Federation settlement routes — signed cross-node morsel transfers
- * (inbound settlements and outbound settlement initiation).
+ * @file src/routes/federation-settlements.ts
+ * @description Express routes for signed cross-node morsel settlements — receives Ed25519-signed
+ *   settlements from approved peers and initiates outbound settlements, with multi-hop relay-fee logic.
+ *
+ * @structure
+ *   - federationSettlementsRouter(config, storage, peers): mounts /v1/federation/settle endpoints
+ *   - POST /v1/federation/settle: validates addressing, positive amount, known active peer, and signature
+ *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import { Router } from 'express';

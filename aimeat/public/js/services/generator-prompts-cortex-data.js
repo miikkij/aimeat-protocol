@@ -12,7 +12,7 @@
  *   v1.1.0 — 2026-03-26 — Add full cortex YAML manifest format to output section
  */
 
-import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER } from './generator-prompts-base.js';
+import { INSTRUCTION_DISCLAIMER } from './generator-prompts-base.js';
 
 /**
  * Build prompt for generating a data cortex component.
@@ -25,7 +25,6 @@ import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER } from './generator-prompts-base
 export function buildDataCortexPrompt(label, projectDescription, blueprint, completedBundles) {
   const structures = blueprint?.dataModel?.structures || {};
   const actions = blueprint?.dataModel?.actions || {};
-  const memoryKeys = blueprint?.dataModel?.memoryKeys || {};
 
   // Find extension bundle
   const extBundle = completedBundles.find(b => b.type === 'extension');
@@ -58,7 +57,6 @@ ${structuresText}
 ## Methods to Export
 
 ${cortexActions.map(a => {
-  const inputStr = a.input ? JSON.stringify(a.input) : '{}';
   const outputRef = a.output?.$ref || JSON.stringify(a.output || 'any');
   return `- **${a.method}**(${Object.keys(a.input || {}).join(', ')}) → returns ${outputRef}`;
 }).join('\n')}

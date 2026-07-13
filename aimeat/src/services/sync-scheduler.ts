@@ -1,6 +1,15 @@
 /**
- * Sync Scheduler — coordinates catalogue sync based on sync mode.
- * Implements bulk/instant/hybrid scheduling per RFC v1.6 §13.11.6.
+ * @file src/services/sync-scheduler.ts
+ * @description Coordinates federation catalogue/memory sync to peers based on the node's
+ *   sync mode (bulk/instant/hybrid), debouncing change events into batched sync runs and
+ *   applying peer prioritization and throttling from sync-health.
+ *
+ * @structure
+ *   - notifyCatalogueChange(): debounces CSM/action changes into a batched peer sync (instant/hybrid)
+ *   - batchTimer / batchedPeerIds: module-level debounce state for the batch window
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import type { AimeatConfig } from '../config.js';

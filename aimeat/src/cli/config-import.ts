@@ -1,12 +1,22 @@
 /**
- * CLI command: aimeat config import
- * Imports config from a file or Consul into the database.
+ * @file src/cli/config-import.ts
+ * @description CLI command `aimeat config import` — loads config values from a file or Consul KV,
+ *   classifies them as mutable/immutable/unknown, and writes only the valid mutable ones into the
+ *   persistent database after operator confirmation.
+ *
+ * @structure
+ *   - classifyValues: splits incoming dot-path values into mutable/immutable/unknown via the config schema
+ *   - confirm: readline Y/n prompt
+ *   - runConfigImport(config, options): orchestrates source load → classify → confirm → storage.setConfigValue
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import * as readline from 'node:readline';
-import { loadFileSource, flattenToStrings } from '../services/config-loader.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
+import { loadFileSource } from '../services/config-loader.js';
+import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';

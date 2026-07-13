@@ -1,3 +1,16 @@
+/**
+ * @file src/server-bootstrap/routes-loader.ts
+ * @description Central route mounting for the AIMEAT server: imports every domain router and wires
+ *   them (with shared middleware and injected services — federation, directory, tunnels, realtime,
+ *   scheduler, workflow engine, enterprise provider) onto the Express app during bootstrap.
+ *
+ * @structure
+ *   - router imports: pulls in all src/routes/* and mcp/enterprise routers
+ *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import express from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -152,8 +165,6 @@ import { initStats } from '../services/stats.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
-import { statsMiddleware } from '../middleware/stats.js';
-import { metricsMiddleware } from '../middleware/metrics.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 
 export interface MountRoutesOptions {

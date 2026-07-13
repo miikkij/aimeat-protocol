@@ -1,3 +1,15 @@
+/**
+ * @file src/storage/repositories/moderation.repository.ts
+ * @description Storage-interface segment for moderation — the CRUD contract each backend implements
+ *   for content flags, appeals, and profile matches (create/get/update/list plus match expiry/cleanup).
+ *
+ * @structure
+ *   - ModerationRepository: interface grouping flag ops (createFlag/getFlagSummary/listFlags/...),
+ *     appeal ops (createAppeal/getAppealByFlagId/...), and match ops (createMatch/deleteExpiredMatches/...)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { FlagRecord, FlagSummary, AppealRecord, MatchRecord } from '../interface.js';
 
 export interface ModerationRepository {

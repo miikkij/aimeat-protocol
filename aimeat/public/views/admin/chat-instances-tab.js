@@ -1,3 +1,16 @@
+/**
+ * @file public/views/admin/chat-instances-tab.js
+ * @description Admin dashboard tab for AI chat instances and operator channels:
+ *   lists active chat sessions (with delete), and manages `ops:`-prefixed operator
+ *   boards with an inline live chat panel that polls posts every 5s.
+ *
+ * @structure
+ *   - ChannelChat({ boardId }): inline board chat feed + composer (5s polling)
+ *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session table
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -17,7 +30,7 @@ function ChannelChat({ boardId }) {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const feedRef = useRef(null);
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
 
   async function loadPosts() {
     try {
@@ -90,7 +103,7 @@ export default function ChatInstancesTab({ data, reload }) {
   const [channels, setChannels] = useState([]);
   const [openChats, setOpenChats] = useState(new Set());
   const nameRef = useRef(null);
-  const [toast, showErr, showOk, clearToast] = useToast();
+  const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
   async function loadChannels() {

@@ -133,10 +133,10 @@ var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
  * @param {object} dataCortexBundle - Context bundle from the data cortex
  * @param {object} structures - Blueprint structures relevant to this feature
  * @param {Array} translationKeys - Translation keys relevant to this feature
- * @param {Array} usesLibs - Platform cortex libraries this component uses (from blueprint)
+ * @param {Array} _usesLibs - Platform cortex libraries this component uses (from blueprint)
  * @returns {string} Complete prompt
  */
-export function buildFeatureCortexPrompt(label, useCase, view, dataCortexBundle, structures, translationKeys, usesLibs) {
+export function buildFeatureCortexPrompt(label, useCase, view, dataCortexBundle, structures, translationKeys, _usesLibs) {
 
   const structuresText = Object.entries(structures || {}).map(([name, schema]) =>
     `**${name}**: ${JSON.stringify(schema, null, 2)}`

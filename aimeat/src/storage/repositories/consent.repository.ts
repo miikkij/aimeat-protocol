@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/repositories/consent.repository.ts
+ * @description Backend-agnostic storage contract for the consent layer — CRUD over consent grants,
+ *   matching a grant to a (memory key, accessor) access attempt, expiring stale grants, and the
+ *   append/query/prune lifecycle of the consent audit log. Implemented per storage backend.
+ *
+ * @structure
+ *   - ConsentRepository: the interface all backends implement
+ *   - Grants: create/get/list/update/delete + findMatchingConsents + expireStaleConsents
+ *   - Audit: addConsentAuditEntry, listConsentAudit, pruneConsentAudit
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { ConsentRecord, ConsentAuditEntry } from '../interface.js';
 
 export interface ConsentRepository {

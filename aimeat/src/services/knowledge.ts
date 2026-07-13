@@ -1,3 +1,15 @@
+/**
+ * @file src/services/knowledge.ts
+ * @description Deprecated knowledge-template seeding shim. Knowledge packager prompt templates
+ *   are now managed by system-prompt storage (prompt-defaults.ts / prompt-seeder.ts); this file
+ *   keeps seedKnowledgeTemplates as a no-op for backward compatibility with the startup sequence.
+ *
+ * @structure
+ *   - seedKnowledgeTemplates(storage, systemGaii): no-op, retained for server.ts startup compatibility
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { Storage } from '../storage/interface.js';
 
 /**

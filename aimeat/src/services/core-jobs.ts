@@ -1,3 +1,16 @@
+/**
+ * @file src/services/core-jobs.ts
+ * @description Defines and registers the node's built-in scheduled job handlers on the Scheduler —
+ *   pure async functions (no setInterval) for daily allowance, work/dispute timeouts, TTL cleanups,
+ *   consent expiry/prune, capability aggregation, task-stall detection, and the living-document pulse.
+ *
+ * @structure
+ *   - registerCoreHandler(scheduler, config, storage): wires each core handler by name (feature-gated by config)
+ *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';

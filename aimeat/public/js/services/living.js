@@ -481,7 +481,7 @@ export function aggregateData(sources, slotId) {
   return (sources || [])
     .filter(s => s.slot === slotId && s.active !== false)
     .map(s => {
-      const value = Number(s.data?.value ?? parseFloat(String(s.text).replace(/[^0-9.\-]/g, '')));
+      const value = Number(s.data?.value ?? parseFloat(String(s.text).replace(/[^0-9.-]/g, '')));
       const label = s.data?.label || String(s.text || '').split(':')[0]?.slice(0, 16) || '';
       return { label, value, at: s.addedAt };
     })

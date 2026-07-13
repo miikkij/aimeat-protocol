@@ -1,6 +1,15 @@
 /**
- * AIMEAT Boards Service
- * Board CRUD, subscriptions, posts, reactions.
+ * @file public/js/services/boards.js
+ * @description Frontend service layer for the Boards API — thin wrappers over /v1/boards*
+ *   for board CRUD, membership/subscriptions, posts, and reactions.
+ *
+ * @structure
+ *   - listSubscriptions / listAllBoards: read subscribed and public boards
+ *   - createBoard / deleteBoard / updateBoardVisibility / updateBoardMembers: board management
+ *   - subscribe / listPosts / createPost / deletePost / reactToPost: participation
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 

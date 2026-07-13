@@ -1,3 +1,18 @@
+/**
+ * @file src/routes/admin-prompts.ts
+ * @description Operator-only routes for managing DB-backed system prompts: list/get, update
+ *   (with content-size + locale-override validation and versioning), reset to factory defaults
+ *   (single / group / all), and version history browse + restore.
+ *
+ * @structure
+ *   - adminPromptsRouter(config, storage): mounts /v1/admin/prompts* endpoints (all requireRole('operator'))
+ *   - reset-group / reset-all: re-seed prompts from PROMPT_SEEDS / seedSystemPrompts
+ *   - PATCH :id: validates 64 KB content + ≤10 locale overrides, bumps version via stableStringify diff
+ *   - versions + restore: append version records, prune to 50
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

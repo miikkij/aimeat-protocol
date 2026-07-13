@@ -1,3 +1,14 @@
+/**
+ * @file src/utils/catalogue-hash.ts
+ * @description Computes the SHA-256 federation catalogue hash used for change-detection between
+ *   peers, hashing sorted "name:updatedAt" entries of CSMs marked federate:true (RFC v1.6 §13.11.3).
+ *
+ * @structure
+ *   - computeCatalogueHash: filters federable CSMs, sorts entries, returns their SHA-256 digest
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import { createHash } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 

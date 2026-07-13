@@ -1,3 +1,18 @@
+/**
+ * @file src/utils/logger.ts
+ * @description Central Winston logger with request-scoped context and credential masking. An
+ *   AsyncLocalStorage-backed format injects requestId/gaii into every log line; a masking format redacts
+ *   sensitive fields (tokens, passwords, keys, cookies). JSON output in production, colorized pretty
+ *   output in development.
+ *
+ * @structure
+ *   - requestContext: AsyncLocalStorage<RequestContext> carrying requestId/gaii per request
+ *   - contextFormat/maskSensitive: Winston formats for context injection and field redaction
+ *   - logger: the configured Winston logger (console transport, LOG_LEVEL-driven)
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import winston from 'winston';
 import { AsyncLocalStorage } from 'node:async_hooks';
 

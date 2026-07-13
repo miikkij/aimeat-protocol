@@ -1,3 +1,17 @@
+/**
+ * @file src/storage/repositories/wallet.repository.ts
+ * @description Storage-interface contract for the wallet/morsel transaction ledger: append a
+ *   transaction, read a principal's (or all) transaction history, and purge a principal's records —
+ *   implemented per backend (SQLite/Prisma).
+ *
+ * @structure
+ *   - WalletRepository: interface implemented per backend
+ *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
+ *   - deleteTransactions(gaii): purge a principal's ledger entries
+ *
+ * @version-history
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 import type { WalletTransaction } from '../interface.js';
 
 export interface WalletRepository {
