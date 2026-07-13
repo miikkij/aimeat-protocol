@@ -69,6 +69,34 @@ agent's engagement for that workspace/contract is retired, so Retire actually st
   new `e2e-organism-workspace-engagements` suite (15/15). `aimeat-crewai` 0.14.0 gates the record-push loop on
   engagements (retired → skip; fail-open), making Retire a real off-switch.
 
+### Removed
+
+- **Foundry (the multi-pass service builder) is gone.** It was broken and unused; the **Generator** is the
+  kept, supported service-builder path (fully independent of Foundry). Removed 47 files — `routes/foundry`,
+  the `foundry-*` services, the whole `public/views/profile/foundry-dashboard/`, every `foundry-*` frontend
+  service + prompt builder, `foundry.css`, and the `e2e-foundry` + Playwright specs — plus every consumer:
+  the route mount, `config.foundryEnabled`, the profile **Foundry** tab, i18n `profile.foundry`, the
+  `spa.html` importmap entries, and the OpenRouter project-ownership namespace. Do not reference
+  `foundry.*` / `/v1/foundry` / `foundryEnabled` — that surface no longer exists.
+
+### Internal
+
+- **ESLint driven to zero and ratcheted to error; a hard 800-line file-size cap.** The accumulated lint debt
+  (1612 warnings, all at `warn` under the earlier "gradual adoption" plan — enough raw output to choke tooling)
+  was cleared to **0 problems** and every rule flipped `warn`→`error`, with `eslint … --max-warnings 0` as the
+  backstop and the pre-commit hook + CI enforcing it. Nothing was suppressed to reach zero: `no-unused-vars`
+  (363) fixed by real removal / `_`-prefix; `aimeat/file-header` (217) with **real** headers, not stubs;
+  `@typescript-eslint/no-explicit-any` (643) with real domain types (the sole exception being the Prisma
+  provider's deliberately-dynamic dual client, kept as a documented `PrismaRow` + per-line disables);
+  `react-hooks/exhaustive-deps` (139) + `rules-of-hooks` (2); and the mechanical escape/caught-error/
+  useless-assignment rules (118). `aimeat/max-file-lines` was raised 500→800 and made an error after bringing
+  **every** source file under 800 by **pure, byte-identical extraction** into sibling modules (no behavior
+  change): ~60 oversized files across routes, services, Preact views, and — the hard part — the two giant
+  storage-provider classes (`SqliteStorage` 7182→86, `PrismaStorage` 8355→228 lines) decomposed into
+  `methods/*.ts` via a documented class+interface mixin (prototype `Object.assign` + declaration merge). SQLite
+  E2E stayed green throughout (the SQLite-provider split alone passed 468/0); MongoDB/PostgreSQL E2E for the
+  Prisma-provider split still needs a run against real DB infra.
+
 ## [1.36.0] - 2026-07-02
 
 Adds configurable **Casdoor** and **Microsoft Entra ID** social sign-in alongside Google, built on a single
