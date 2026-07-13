@@ -9,6 +9,7 @@
  * @usage const provider = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
  *        await provider.mountRoutes(app);
  * @version-history
+ *   v0.2.0 — 2026-07-13 — add optional getPaymentHandlers() (commerce core seam, TARGET-033)
  *   v0.1.0 — 2026-06-23 — initial enterprise seam (experiment skeleton)
  */
 import type express from 'express';
@@ -18,6 +19,7 @@ import type { success as successFn, error as errorFn } from '../middleware/envel
 import type { requireAuth as requireAuthFn, requireRole as requireRoleFn } from '../auth/middleware.js';
 import type { resolveIdentity as resolveIdentityFn, buildGAII as buildGAIIFn } from '../utils/gaii.js';
 import type { logger as loggerInst } from '../utils/logger.js';
+import type { PaymentHandler } from '../commerce/types.js';
 
 /**
  * Everything the EE module needs, injected by core. The EE module is plain ESM JS in a separate
@@ -51,6 +53,13 @@ export interface EnterpriseProvider {
   version: string;
   /** Mount the edition's routes on the Express app. Stub mounts `ENTERPRISE_REQUIRED` responders. */
   mountRoutes(app: express.Express): void | Promise<void>;
+  /**
+   * Payment handlers this edition contributes to the commerce core's registry (TARGET-033).
+   * Community/stub: absent (core registers only the morsel handler). EE: real-money handlers
+   * (stripe-spt, wallet tokens, stablecoin) — they land in the same registry and appear in the
+   * /.well-known/ucp profile automatically.
+   */
+  getPaymentHandlers?(): PaymentHandler[] | Promise<PaymentHandler[]>;
 }
 
 /** HTTP status used when a gated namespace is hit on a node without the EE module. */

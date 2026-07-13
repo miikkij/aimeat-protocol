@@ -10,9 +10,11 @@
  *   - GET /.well-known/ai-plugin.json: ChatGPT-plugin manifest pointing at /v1/spec
  *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
+ *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.2.0 — 2026-07-13 — Add UCP business profile (TARGET-033 commerce core)
  *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 API catalog, and discovery Link headers (agent readiness)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -23,6 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { listPaymentHandlers } from '../commerce/payment-handlers.js';
 
 /**
  * RFC 8288 discovery Link headers on every GET/HEAD response, so agents that land on
@@ -111,7 +114,10 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
           anchor: `${b}/`,
           'service-desc': [{ href: `${b}/v1/spec`, type: 'application/yaml' }],
           'service-doc': [{ href: `${b}/v1/docs`, type: 'text/html' }],
-          'service-meta': [{ href: `${b}/.well-known/aimeat`, type: 'application/json' }],
+          'service-meta': [
+            { href: `${b}/.well-known/aimeat`, type: 'application/json' },
+            { href: `${b}/.well-known/ucp`, type: 'application/json' },
+          ],
         },
         {
           anchor: `${b}/v1/mcp`,
@@ -119,6 +125,42 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         },
       ],
     }));
+  });
+
+  // UCP business profile (Universal Commerce Protocol, version 2026-04-08) — declares the
+  // commerce transports (REST + MCP), the checkout capability, and every payment handler in the
+  // commerce registry. The handler list is an honest edition indicator: a Community node
+  // advertises only io.aimeat.morsels; an EE node's real-money handlers appear here automatically.
+  router.get('/.well-known/ucp', async (_req, res) => {
+    const b = config.baseUrl;
+    const nodeKey = await storage.getNodeKey();
+    const signingKeys = nodeKey
+      ? [{ kty: 'OKP', crv: 'Ed25519', x: Buffer.from(nodeKey.publicKey, 'base64').toString('base64url'), use: 'sig' }]
+      : [];
+    res.json({
+      ucp: {
+        version: '2026-04-08',
+        services: {
+          rest: { endpoint: `${b}/v1/commerce`, spec: `${b}/v1/spec` },
+          mcp: { endpoint: `${b}/v1/mcp` },
+        },
+        capabilities: [
+          {
+            name: 'dev.ucp.shopping.checkout',
+            version: '1',
+            endpoints: {
+              create: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions` },
+              update: { method: 'PATCH', url: `${b}/v1/commerce/checkout-sessions/{id}` },
+              complete: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions/{id}/complete` },
+            },
+          },
+        ],
+        payment_handlers: listPaymentHandlers().map((h) => ({
+          id: h.id, title: h.title, currencies: h.currencies,
+        })),
+      },
+      signing_keys: signingKeys,
+    });
   });
 
   router.get('/.well-known/ai-plugin.json', (_req, res) => {
