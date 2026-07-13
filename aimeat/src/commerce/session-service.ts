@@ -1,36 +1,38 @@
 /**
  * @file src/commerce/session-service.ts
- * @description The checkout-session lifecycle of the commerce core (TARGET-033): resolve offers
- *   into priced Sellables, create/read/update/cancel sessions, and complete a session atomically
- *   (charge via the selected PaymentHandler → fulfill each line item as an agent TASK on the
- *   offer-ask path → write the seller's order copy → close the session; refund on fulfillment
- *   failure). Sessions are memory records — `commerce.session.{id}` under the buyer owner's GHII,
- *   `commerce.order.{id}` under the seller owner's GHII — no storage-schema changes.
- * @structure CommerceError · resolveSellable · createSession · getSession · updateSessionItems ·
- *   cancelSession · completeSession
+ * @description The checkout-session lifecycle of the commerce core (TARGET-033): resolve line
+ *   items through the sellable-resolver registry (agent offers in core, org offerings in EE),
+ *   create/read/update/cancel sessions, and complete a session — collect the gross from the buyer
+ *   → fulfill each line item as an agent TASK on the offer-ask path → pay out per item (default
+ *   seller payout, or the sellable's custom distribute e.g. EE commission split) → route the fee
+ *   leg (operator | burn) → close. A fulfillment failure after collect refunds and rethrows,
+ *   leaving the session open for retry. Sessions are memory records — `commerce.session.{id}`
+ *   under the buyer owner's GHII, `commerce.order.{id}` under the seller owner's GHII — no
+ *   storage-schema changes.
+ * @structure CommerceError (re-export) · createSession · getSession · listSessions · listOrders ·
+ *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.0.0 — 2026-07-13 — Resolver registry + collect/payout orchestration + distribute seam (phase 4)
  *   v1.0.0 — 2026-07-13 — Initial session service (TARGET-033 phase 1)
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import type { Offer } from '../models/offer-schemas.js';
 import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext } from './types.js';
 import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
+import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
+import { CommerceError } from './errors.js';
+import { commerceFeePercent, settleMarketplaceFee } from '../services/marketplace-fee.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
+
+export { CommerceError } from './errors.js';
 
 /** Lifetime of an open session (lazy expiry — checked on read and on complete). */
 const sessionTtlMs = (config: AimeatConfig) => (config.commerceSessionTtlMinutes || 60) * 60 * 1000;
 
 const sessionKey = (id: string) => `commerce.session.${id}`;
 const orderKey = (id: string) => `commerce.order.${id}`;
-
-export class CommerceError extends Error {
-  constructor(public code: string, public statusCode: number, message: string) {
-    super(message);
-  }
-}
 
 /** Upsert one memory record (the same shape every service-side writer in the codebase uses). */
 async function putRecord(storage: Storage, ownerGaii: string, key: string, value: unknown): Promise<void> {
@@ -42,53 +44,21 @@ async function putRecord(storage: Storage, ownerGaii: string, key: string, value
   });
 }
 
-/**
- * Resolve one offer reference into a priced Sellable, enforcing the same rules the offer-invoke
- * settlement enforces: private offers are owner-only; cross-owner purchase requires an explicit
- * `price` (absent price = not for sale); self-purchase is free.
- */
-export async function resolveSellable(
-  storage: Storage,
-  config: AimeatConfig,
-  agentIdentifier: string,
-  offerId: string,
-  buyerOwner: string,
-): Promise<Sellable> {
-  const agentGaii = agentIdentifier.includes('#')
-    ? agentIdentifier
-    : `${agentIdentifier}#${buyerOwner}@${config.nodeId}`;
-  const agent = await storage.getAgent(agentGaii);
-  if (!agent) throw new CommerceError('AGENT_NOT_FOUND', 404, `Agent not found: ${agentIdentifier}`);
-
-  const agentName = agentGaii.split('#')[0] as string;
-  const rec = await storage.getMemory(agentGaii, `agents.${agentName}.offers`);
-  const offers = ((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
-  const offer = offers.find((o) => o.id === offerId);
-  if (!offer) throw new CommerceError('OFFER_NOT_FOUND', 404, `Offer not found: ${offerId}`);
-
-  const isSelf = agent.owner === buyerOwner;
-  const visibility = offer.visibility ?? 'private';
-  if (!isSelf && visibility === 'private') {
-    throw new CommerceError('OFFER_PRIVATE', 403, 'This offer is private to its owner');
-  }
-  let priceMorsels = 0;
-  if (!isSelf) {
-    if (!offer.price) throw new CommerceError('OFFER_NOT_FOR_SALE', 422, 'This offer declares no price and cannot be purchased cross-owner');
-    priceMorsels = Number(offer.price.morsels);
-  }
-  return {
-    kind: 'offer', agentGaii, agentName, offerId,
-    title: offer.title, sellerOwner: agent.owner,
-    sellerGhii: `${agent.owner}@${config.nodeId}`, priceMorsels,
-  };
+/** Resolve one raw ref through the registry (kind defaults to 'offer'). */
+async function resolveOne(storage: Storage, config: AimeatConfig, ref: SellableRef, buyerOwner: string): Promise<Sellable> {
+  const kind = ref.kind ?? 'offer';
+  const resolver = getSellableResolver(kind);
+  if (!resolver) throw new CommerceError('UNKNOWN_ITEM_KIND', 422, `No sellable resolver for kind: ${kind}`);
+  return resolver.resolve(storage, config, ref, buyerOwner);
 }
 
 /** Resolve raw items, enforce the single-seller rule, and price the lines. */
 async function resolveItems(
   storage: Storage,
   config: AimeatConfig,
-  rawItems: Array<{ agent: string; offer_id: string; quantity?: number }>,
+  rawItems: SellableRef[],
   buyerOwner: string,
+  currency: string,
 ): Promise<{ items: CheckoutLineItem[]; sellerOwner: string; sellerGhii: string; total: number }> {
   if (!rawItems.length) throw new CommerceError('EMPTY_CART', 400, 'A checkout session needs at least one line item');
   const items: CheckoutLineItem[] = [];
@@ -97,12 +67,15 @@ async function resolveItems(
   let total = 0;
   for (const raw of rawItems) {
     const quantity = Math.max(1, Math.trunc(raw.quantity ?? 1));
-    const sellable = await resolveSellable(storage, config, raw.agent, raw.offer_id, buyerOwner);
+    const sellable = await resolveOne(storage, config, { ...raw, currency }, buyerOwner);
     if (!sellerOwner) { sellerOwner = sellable.sellerOwner; sellerGhii = sellable.sellerGhii; }
     else if (sellerOwner !== sellable.sellerOwner) {
       throw new CommerceError('MULTI_SELLER_CART', 422, 'All line items in one checkout session must belong to the same seller');
     }
-    items.push({ agent: sellable.agentGaii, offerId: sellable.offerId, quantity, title: sellable.title, unitPrice: sellable.priceMorsels });
+    items.push({
+      kind: sellable.kind, agent: sellable.agentGaii, offerId: sellable.offerId,
+      org: raw.org, quantity, title: sellable.title, unitPrice: sellable.priceMorsels,
+    });
     total += sellable.priceMorsels * quantity;
   }
   return { items, sellerOwner, sellerGhii, total };
@@ -114,11 +87,14 @@ export async function createSession(
   args: {
     buyerOwner: string;
     buyerIdentity: string;
-    items: Array<{ agent: string; offer_id: string; quantity?: number }>;
+    items: SellableRef[];
     note?: string;
+    /** 'morsel' (default) or a money code an EE handler + KYB-verified seller supports. */
+    currency?: string;
   },
 ): Promise<CheckoutSessionRecord> {
-  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, args.items, args.buyerOwner);
+  const currency = args.currency ?? 'morsel';
+  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, args.items, args.buyerOwner, currency);
   const now = new Date();
   const session: CheckoutSessionRecord = {
     id: `cs_${randomUUID()}`,
@@ -127,7 +103,7 @@ export async function createSession(
     buyerGhii: `${args.buyerOwner}@${config.nodeId}`,
     buyerIdentity: args.buyerIdentity,
     sellerOwner, sellerGhii,
-    items, currency: 'morsel', total,
+    items, currency, total,
     note: args.note,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -182,10 +158,10 @@ export async function updateSessionItems(
   storage: Storage,
   config: AimeatConfig,
   session: CheckoutSessionRecord,
-  rawItems: Array<{ agent: string; offer_id: string; quantity?: number }>,
+  rawItems: SellableRef[],
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
-  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, rawItems, session.buyerOwner);
+  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, rawItems, session.buyerOwner, session.currency);
   const updated: CheckoutSessionRecord = {
     ...session, items, sellerOwner, sellerGhii, total, updatedAt: new Date().toISOString(),
   };
@@ -242,15 +218,18 @@ async function createFulfillmentTask(
 }
 
 /**
- * Complete a session atomically: charge → fulfill (TASK per line item) → seller order copy →
- * close. A fulfillment failure after a successful charge refunds through the same handler and
- * rethrows, leaving the session open for retry.
+ * Complete a session: collect the gross → fulfill (TASK per line item) → per-item payouts
+ * (default seller payout, or the sellable's custom distribute) → fee leg → seller order copy →
+ * close. A fulfillment failure after a successful collect refunds through the same handler and
+ * rethrows, leaving the session open for retry. Payout/fee legs run after fulfillment and are
+ * best-effort ordered — the buyer's money moves exactly once.
  */
 export async function completeSession(
   storage: Storage,
   config: AimeatConfig,
   session: CheckoutSessionRecord,
   handlerId?: string,
+  instrument?: unknown,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
   if (Date.now() > new Date(session.expiresAt).getTime()) {
@@ -267,10 +246,32 @@ export async function completeSession(
   }
 
   const ctx: PaymentContext = { config, storage };
-  const result = session.total > 0
-    ? await handler.charge(ctx, { buyerGhii: session.buyerGhii, sellerGhii: session.sellerGhii, amount: session.total, reference: session.id })
-    : { charged: 0, earned: 0, fee: 0, trackingCode: `comtx_free_${session.id}` };
 
+  // Re-resolve every line through the registry: revalidates availability and restores the
+  // per-kind distribution behavior (callbacks cannot live inside the persisted session record).
+  const sellables: Sellable[] = [];
+  for (const item of session.items) {
+    sellables.push(await resolveOne(storage, config, {
+      kind: item.kind, agent: item.agent, offer_id: item.offerId, org: item.org, currency: session.currency,
+    }, session.buyerOwner));
+  }
+
+  // Per-item money math on the QUOTED prices the session carries.
+  const feePct = commerceFeePercent(config);
+  const lines = session.items.map((item) => {
+    const gross = item.unitPrice * item.quantity;
+    const fee = Math.ceil(gross * feePct / 100);
+    return { item, gross, fee, net: gross - fee };
+  });
+  const totalFee = lines.reduce((n, l) => n + l.fee, 0);
+  const totalNet = lines.reduce((n, l) => n + l.net, 0);
+
+  // 1) Collect the gross from the buyer.
+  const collected = session.total > 0
+    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, instrument })
+    : { trackingCode: `comtx_free_${session.id}` };
+
+  // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
   const taskIds: string[] = [];
   try {
     for (const item of session.items) {
@@ -278,16 +279,35 @@ export async function completeSession(
     }
   } catch (err) {
     if (session.total > 0) {
-      await handler.refund(ctx, { buyerGhii: session.buyerGhii, sellerGhii: session.sellerGhii, result });
+      await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode });
     }
     const e = err as { message?: string };
     throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
   }
 
+  // 3) Payouts: the sellable's custom distribution (EE commission splits) or the default
+  //    seller payout. 4) Then the fee leg (operator | burn).
+  if (session.total > 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const { item, gross, fee, net } = lines[i]!;
+      const sellable = sellables[i]!;
+      if (sellable.distribute) {
+        await sellable.distribute(ctx, { session, item, gross, fee, net, trackingCode: collected.trackingCode });
+      } else {
+        await handler.payout(ctx, { toGhii: sellable.sellerGhii, amount: net, currency: session.currency, buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, reference: session.id });
+      }
+    }
+    // The morsel fee leg routes to operator|burn. Money-currency fees stay where the PSP
+    // collected them (Stripe application-fee model) — the receipt still records the number.
+    if (session.currency === 'morsel') {
+      await settleMarketplaceFee(storage, config, { fee: totalFee, payerGhii: session.buyerGhii, trackingCode: collected.trackingCode, source: 'commerce' });
+    }
+  }
+
   const completed: CheckoutSessionRecord = {
     ...session,
     status: 'completed',
-    receipt: { handler: handler.id, ...result },
+    receipt: { handler: handler.id, charged: session.total, earned: totalNet, fee: totalFee, trackingCode: collected.trackingCode },
     fulfillment: { taskIds },
     updatedAt: new Date().toISOString(),
   };

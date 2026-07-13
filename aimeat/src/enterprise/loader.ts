@@ -18,6 +18,8 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { settleMarketplaceFee, commerceFeePercent } from '../services/marketplace-fee.js';
+import { safeFetch } from '../utils/url-validator.js';
+import { CommerceError } from '../commerce/errors.js';
 import { logger } from '../utils/logger.js';
 import { stubEnterpriseProvider, type EnterpriseContext, type EnterpriseProvider } from './provider.js';
 
@@ -39,6 +41,8 @@ export function buildEnterpriseContext(config: AimeatConfig, storage: Storage): 
     },
     settleMarketplaceFee: (args) => settleMarketplaceFee(storage, config, args),
     commerceFeePercent: () => commerceFeePercent(config),
+    safeFetch,
+    commerceError: (code, statusCode, message) => new CommerceError(code, statusCode, message),
     logger,
   };
 }

@@ -15,24 +15,48 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 
-/** A normalized "thing for sale" — phase 1: an agent offer with a concrete morsel price. */
+/** Everything a custom distribution needs about one settled line item. */
+export interface DistributeArgs {
+  session: CheckoutSessionRecord;
+  item: CheckoutLineItem;
+  /** Gross line total the buyer paid, the fee taken from it, and what remains to distribute. */
+  gross: number;
+  fee: number;
+  net: number;
+  trackingCode: string;
+}
+
+/** A normalized "thing for sale" — an agent offer, or (EE) a company-catalog offering. */
 export interface Sellable {
-  kind: 'offer';
+  /** Resolver kind: 'offer' (core) | 'org-offering' (EE) | future kinds. */
+  kind: string;
   agentGaii: string;
   agentName: string;
   offerId: string;
   title: string;
   sellerOwner: string;
   sellerGhii: string;
-  /** Unit price in morsels; 0 for self-purchase (an owner "buying" from their own agent is free). */
+  /**
+   * Unit price in the session currency — morsels, or minor units for money currencies;
+   * 0 for self-purchase (an owner "buying" from their own agent is free).
+   */
   priceMorsels: number;
+  /**
+   * Custom revenue distribution replacing the default seller payout (e.g. EE: member cut +
+   * org-wallet cut per commission %). Runs after the buyer charge; the fee leg is already routed.
+   */
+  distribute?: (ctx: PaymentContext, args: DistributeArgs) => Promise<void>;
 }
 
 /** One line of a checkout session, resolved against the live offer at creation/update time. */
 export interface CheckoutLineItem {
+  /** Sellable kind — re-resolved through the same resolver at complete time. */
+  kind: string;
   /** Provider agent — full GAII. */
   agent: string;
   offerId: string;
+  /** org-offering: "creatorOwner/slug" so the resolver can find the catalog again. */
+  org?: string;
   quantity: number;
   /** Snapshot fields resolved from the offer (price may change later; the session keeps its quote). */
   title: string;
@@ -64,7 +88,8 @@ export interface CheckoutSessionRecord {
   sellerOwner: string;
   sellerGhii: string;
   items: CheckoutLineItem[];
-  currency: 'morsel';
+  /** 'morsel' (Community default) or an ISO money code (EE handlers; amounts in minor units). */
+  currency: string;
   total: number;
   note?: string;
   receipt?: CheckoutReceipt;
@@ -93,6 +118,10 @@ export interface PaymentResult {
  * A payment method provider. Core registers `io.aimeat.morsels`; the EE module contributes
  * real-money handlers (stripe-spt, wallet tokens, stablecoin) via
  * `EnterpriseProvider.getPaymentHandlers()` — same registry, same contract.
+ *
+ * The money flow is split so custom distributions (EE commission splits) reuse the same handler:
+ * `collect` takes the gross from the buyer, `payout` pays one recipient, `refund` reverses a
+ * collect. The session service orchestrates: collect → fulfill → payouts/distribute → fee leg.
  */
 export interface PaymentHandler {
   /** Reverse-DNS handler id advertised in the UCP profile (e.g. `io.aimeat.morsels`). */
@@ -102,19 +131,30 @@ export interface PaymentHandler {
   /** Currencies this handler settles (e.g. ['morsel'] or ['USD', 'EUR']). */
   currencies: string[];
   /**
-   * Atomically charge the buyer and credit the seller (minus any marketplace fee).
+   * Take the gross amount from the buyer (or their payment instrument).
    * Throws { code, statusCode, message } on failure (e.g. INSUFFICIENT_BALANCE → 402).
    */
-  charge(ctx: PaymentContext, args: {
+  collect(ctx: PaymentContext, args: {
     buyerGhii: string;
-    sellerGhii: string;
     amount: number;
+    currency: string;
     reference: string;
-  }): Promise<PaymentResult>;
-  /** Undo a charge when fulfillment fails after payment (best effort, must not throw). */
+    /** Opaque payment instrument from the adapter (e.g. a Stripe SPT); unused by morsels. */
+    instrument?: unknown;
+  }): Promise<{ trackingCode: string }>;
+  /** Pay one recipient their share of an already-collected amount. */
+  payout(ctx: PaymentContext, args: {
+    toGhii: string;
+    amount: number;
+    currency: string;
+    buyerGhii: string;
+    trackingCode: string;
+    reference: string;
+  }): Promise<void>;
+  /** Reverse a collect when fulfillment fails after payment (best effort, must not throw). */
   refund(ctx: PaymentContext, args: {
     buyerGhii: string;
-    sellerGhii: string;
-    result: PaymentResult;
+    amount: number;
+    trackingCode: string;
   }): Promise<void>;
 }
