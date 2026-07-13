@@ -428,6 +428,17 @@ for completeness but are NOT needed for typical app building:
 
 ## Building Apps on AIMEAT
 
+**Start here — fetch the canonical build prompt first:**
+`GET {{BASE_URL}}/v1/prompts/build-app` (add `?format=txt` for raw text,
+`?idea=<what to build>` to embed the idea, `?lang=fi` for a Finnish-facing app).
+It is the SAME battle-tested prompt the app-catalog's "Create new app" button
+copies: the complete library catalog, the correct auth pattern (login bar +
+session restore — the #1 mistake hand-rolled apps make), data-visibility
+patterns, AI usage, realtime, theming, and the publish walkthrough. Follow it
+instead of assembling the rules below by hand. Ready-made starting skeletons:
+`GET {{BASE_URL}}/v1/app-templates` (use-case scaffolds + app shells;
+fetch one by id and build inside it).
+
 Apps are for human users (GHII identity), not AI agents (GAII). The
 aimeat-auth.js library provides a login bar that handles human
 registration and login. When the user clicks "Sign In", they create

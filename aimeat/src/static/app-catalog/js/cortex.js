@@ -372,6 +372,8 @@ function openPromptBuilder(app) {
 
   // Load authoring templates (booster-kit) into the "Start from a template" picker
   loadPbTemplates();
+  // Load the canonical platform-instructions core from the node (single source of truth)
+  loadPbCore();
 
   overlay.style.display = 'flex';
   desc.focus();
@@ -381,6 +383,25 @@ function openPromptBuilder(app) {
 function closePbPanel() {
   document.getElementById('prompt-builder-overlay').style.display = 'none';
   pbSourceApp = null;
+}
+
+// The canonical platform-instructions core, fetched from the node (GET /v1/prompts/build-app —
+// the node is the single source of truth; the inline text in buildPromptFromBuilder is only the
+// offline / older-node fallback). Keyed by mode; refreshed each time the builder opens.
+var pbCore = { new: null, improve: null };
+function loadPbCore() {
+  var config = loadConfig();
+  if (!config.aimeatUrl) return;
+  var base = config.aimeatUrl.replace(/\/+$/, '');
+  ['new', 'improve'].forEach(function (mode) {
+    fetch(base + '/v1/prompts/build-app?mode=' + mode + '&lang=' + encodeURIComponent(getLang()))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var body = d && d.data && d.data.body;
+        if (body && typeof body === 'string') { pbCore[mode] = body; updatePbPreview(); }
+      })
+      .catch(function () { /* older node without the endpoint — inline fallback is used */ });
+  });
 }
 
 // Booster-kit: populate the "Start from a template" picker from /v1/app-templates and, on
@@ -453,7 +474,13 @@ function buildPromptFromBuilder() {
     prompt += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
   }
 
-  // Build instructions — framed as Step 2 for new apps.
+  // Build instructions — framed as Step 2 for new apps. Prefer the node-served canonical
+  // core (GET /v1/prompts/build-app, fetched by loadPbCore — single source of truth); the
+  // inline text below is the offline / older-node fallback and may lag behind the node's.
+  var core = pbCore[isImprove ? 'improve' : 'new'];
+  if (core) {
+    prompt += core;
+  } else {
   prompt += isImprove ? '## AIMEAT Platform Instructions\n\n' : '## Step 2 — Build it (once I have answered)\n\n';
   prompt += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
 
@@ -591,6 +618,7 @@ function buildPromptFromBuilder() {
     prompt += '3. Click Publish.\n';
     prompt += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
     prompt += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
+  }
   }
 
   // Source code for improve mode

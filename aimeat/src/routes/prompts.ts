@@ -14,6 +14,8 @@
  *     workflows liaison), with node_id/gaii/agent_name substituted from the caller's auth.
  *   v1.6.0 -- 2026-06-13 -- Add GET /v1/agents/me/handbook/offerings: the "Offerings & Workflows for
  *     agents" page (constant-backed, registered before /:module).
+ *   v1.7.0 -- 2026-07-13 -- Add GET /v1/prompts/build-app: the canonical app-building prompt (same
+ *     text as the app-catalog Create-new-app button), node-served so agentic coders get the paved path.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -26,6 +28,7 @@ import { handbookForRole } from '../services/handbooks/index.js';
 import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
+import { buildAppPrompt } from '../services/build-app-prompt.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -222,6 +225,37 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Publish the drafted offer', method: 'POST', url: '/v1/memory' },
       { description: 'Full offer + workflow spec', method: 'GET', url: '/v1/agents/me/handbook/surface/agent' },
+    ]));
+  });
+
+  // GET /v1/prompts/build-app — the canonical "build an AIMEAT app" prompt: the SAME text the
+  // app-catalog's Create-new-app button copies, served from the node so agentic coders (Claude
+  // Code, Cursor, any MCP/HTTP client) get the exact paved path a browser user gets. Public —
+  // it is build guidance, not a secret. ?mode=new|improve, ?lang=en|fi, ?idea=<the app idea>,
+  // ?format=txt for raw text/plain (curl / agent-friendly). `data.body` is the platform-
+  // instructions core the app-catalog composes its dynamic header around; `data.prompt` is the
+  // complete copy-paste prompt. MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/build-app', (req, res) => {
+    const mode = req.query.mode === 'improve' ? 'improve' as const : 'new' as const;
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
+    const { full, body } = buildAppPrompt(config, { lang, mode, idea });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(full);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'build-app',
+      name: 'Build an AIMEAT app',
+      description: 'Canonical guided prompt for building a single-file HTML app on this node — identical to the app-catalog Create-new-app prompt.',
+      mode,
+      lang,
+      prompt: full,
+      system_prompt: full,
+      body,
+    }, [
+      { description: 'Starter templates (use-case scaffolds + app shells)', method: 'GET', url: '/v1/app-templates' },
+      { description: 'Publish the finished app', method: 'POST', url: '/v1/apps' },
     ]));
   });
 

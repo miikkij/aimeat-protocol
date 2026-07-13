@@ -186,7 +186,9 @@ export function bootstrapRouter(
               limitation: 'Memory keys limited to anonymous.* namespace',
             },
             app_building: {
-              note: 'When building an app, always use the standard template with the AIMEAT login bar. See the "Building Apps on AIMEAT" section in /llms.txt for full templates and SDK documentation.',
+              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. Starter skeletons: GET /v1/app-templates. See the "Building Apps on AIMEAT" section in /llms.txt for the full SDK documentation.',
+              build_prompt: `${base}/v1/prompts/build-app`,
+              starter_templates_endpoint: `${base}/v1/app-templates`,
               sdk_libraries: [
                 `${base}/v1/libs/aimeat-auth.js - login UI, session management (required for all apps)`,
                 `${base}/v1/libs/aimeat-data.js - memory API: get, set, search`,

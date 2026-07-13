@@ -6767,6 +6767,40 @@ paths:
         '401':
           description: Authentication required
 
+  /v1/prompts/build-app:
+    get:
+      operationId: getBuildAppPrompt
+      summary: Canonical "build an AIMEAT app" prompt
+      description: >-
+        The node-served, single-source-of-truth app-building prompt — the SAME text the
+        app-catalog's "Create new app" button copies. Intended for agentic coders (Claude Code,
+        Cursor, any HTTP client) and AI chats alike: complete client-library catalog, the correct
+        login-bar auth pattern, data-visibility patterns, AI usage, realtime, theming, and the
+        publish walkthrough. data.prompt is the complete copy-paste prompt; data.body is the
+        platform-instructions core the app-catalog composes its dynamic header around. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [new, improve], default: new }
+          description: new = full guided build (interview + publish walkthrough); improve = platform-instructions body for changing an existing app
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi], default: en }
+          description: Conversation/UI language instruction embedded in the prompt
+        - name: idea
+          in: query
+          schema: { type: string, maxLength: 500 }
+          description: The app idea to embed into the prompt header (mode=new)
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the full prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
+
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
     post:
