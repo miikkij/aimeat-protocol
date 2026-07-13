@@ -277,6 +277,7 @@ entry: index.html
 | aimeat-markdown | `loadScript('/v1/libs/aimeat-markdown.js')` | `AIMEAT.md.render(text, target)` — safe markdown INTO an element (returns an Element; never assign it to innerHTML — use the target param or `renderToString`). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid and LIVE data embeds (an `aimeat-memory` fence naming a memory key renders as a fresh table on every open) |
 | aimeat-organism | `loadScript('/v1/libs/aimeat-organism.js')` | `AIMEAT.organism.list/workspaces/read/writeDraft/publish` — organisms & workspaces with a NORMALIZED read (published + drafts merged per item; the raw workspace GET returns them as separate maps) |
 | aimeat-editor | `loadScript('/v1/libs/aimeat-editor.js')` | `AIMEAT.editor.mount/toolbar/split` — CodeMirror 6 markdown editor with live preview (pairs with aimeat-markdown) |
+| aimeat-live | `loadScript('/v1/libs/aimeat-live.js')` | `AIMEAT.live.subscribe(domains, fn)` — server-pushed change signals (SSE): re-fetch a view's data when the server says its domain changed, instead of polling |
 
 ### Key rules
 
@@ -287,6 +288,9 @@ entry: index.html
   convert to blob, use `URL.createObjectURL(blob)` as img src.
 - Realtime: register `rt.on()` handlers BEFORE `rt.connect()`. Throttle
   high-frequency events (pointermove etc.) to ~30ms batches.
+- Views that display server data subscribe to `AIMEAT.live` and re-fetch on change —
+  do NOT build `setInterval` polling loops. (Deletes don't push an event: refresh the
+  view locally after a delete.)
 
 ### Other options (not app building)
 
@@ -484,6 +488,7 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | aimeat-markdown | `/v1/libs/aimeat-markdown.js` | Markdown rendering. `AIMEAT.md.render(text, target)` renders a safe dependency-free GFM subset INTO an element — it returns an Element, so never assign the result to innerHTML (that shows "[object HTMLDivElement]"); use the target param, appendChild, or `renderToString(text)`. `await AIMEAT.md.renderRich(text, target)` upgrades to full GFM (task lists, footnotes, highlighted code, Mermaid diagrams), sanitized, with automatic fallback to the safe subset when CDNs are unreachable. LIVE DATA EMBEDS: a fenced block with language `aimeat-memory` (body lines `key: <memory key>`, optional `owner: <gaii>` for public reads, `view: table/props/list/value/json`, `fields: a, b`, `title: ...`) renders the named memory key as a table/props/list — fetched at render time, so the document shows fresh agent-produced data on every open; access is the server's memory read (workspace rules + entry visibility) and denials render a placeholder. |
 | aimeat-organism | `/v1/libs/aimeat-organism.js` | Organisms & workspaces. `list()`, `workspaces(orgId)`, `read(orgId, wsId)` → `{ manifest, readmeText, spaces }` where each space's items merge published + draft per instance (`{ id, hasRealId, draft, latest, value, title, updatedAt, status }`) — the raw workspace GET returns `objects` (published) and `drafts` as SEPARATE maps; this lib does the merging, id resolution (value.id convention) and `_createdAt/_updatedAt/_version` metadata handling for you. `writeDraft`, `publish`, `revertToDraft`, `deleteObject` (needs the memory:delete scope — declare it via `<meta name="aimeat-scopes">`), `saveReadme`, `search`. Items with `hasRealId:false` cannot round-trip — render them read-only. Requires aimeat-auth. |
 | aimeat-editor | `/v1/libs/aimeat-editor.js` | Markdown editor: `AIMEAT.editor.mount(el, {value, onChange})` (CodeMirror 6 with textarea fallback), `toolbar(adapter)` for formatting buttons, `split(el, {value, onChange})` for editor + live preview rendered through aimeat-markdown. |
+| aimeat-live | `/v1/libs/aimeat-live.js` | Live updates over SSE. `AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload())` — one shared, owner-scoped EventSource per browser (multi-tab via Web Locks + BroadcastChannel), debounced, visibility-gated, auto-reconnecting. The callback tells you WHICH domains changed; re-fetch only that data. Domains: `agent-tasks`, `agents`, `organisms`, `notifications`, `memory`. Use this instead of polling for any view that shows server data. Deletes do not emit a change event — refresh locally after a delete. Requires aimeat-auth + a logged-in session. |
 
 ### Standard App Template
 
@@ -840,8 +845,19 @@ Key rules for agent-faced apps:
   backend lock — first publish wins, losers stand down.
 - `deliverable` is a POINTER, never the payload — the work product lives where it belongs
   (a document space, a memory key, a URL) and the board links to it.
-- Poll politely in the UI (the board changes while humans watch); agents poll via
-  `aimeat_workspace_read` on their own schedule.
+- Shared state lives in workspace records or PUBLIC memory — never in the owner's private
+  memory keys. Agent MCP sessions run in the agent's own GAII namespace and cannot read
+  the owner's private keys; an app that stashes shared data there is invisible to its
+  agent face.
+- The human-face UI subscribes to live updates (`AIMEAT.live.subscribe(['organisms'], fn)`
+  — see SDK reference) so the board refreshes when an agent publishes, no polling; agents
+  re-read via `aimeat_workspace_read` on their own schedule.
+- Bind a usage skill to the published app (skill frontmatter
+  `metadata.binding: app:{owner}/{filename}`): what the app is for, its record spaces and
+  schemas, what the outputs mean, where deliverables belong, its quirks. Any agent about
+  to drive the app finds it via `aimeat_skill_list { binding }` /
+  `GET /v1/apps/{owner}/{filename}/skills` — the seeded node skill `use-app-bound-skills`
+  teaches agents to look before driving.
 - Full working example: the "Agent Kanban" proof app (packages/agent-kanban in the AIMEAT
   repo) — verified end-to-end: human files a task, an agent claims it (assignee + status),
   progresses it, and finishes with a deliverable link the human clicks.
@@ -1108,6 +1124,21 @@ await AIMEAT.work.progress(trackingCode, data)
 await AIMEAT.work.reject(trackingCode, reason)
 await AIMEAT.work.deliver(trackingCode, output)
 await AIMEAT.work.rate(trackingCode, { rating, feedback })
+```
+
+**AIMEAT.live** (`/v1/libs/aimeat-live.js`):
+```javascript
+// Server-pushed change signals (SSE) — subscribe instead of polling.
+const off = AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload())
+// domains: 'agent-tasks' | 'agents' | 'organisms' | 'notifications' | 'memory'
+AIMEAT.live.onUpdate(fn)         // subscribe to ALL domains
+off()                            // unsubscribe (auto-disconnects when last one leaves)
+AIMEAT.live.connect()            // optional: start the shared stream early (idempotent)
+AIMEAT.live.disconnect()
+// Also mirrored as a window event:
+window.addEventListener('aimeat-live-update', (e) => { const d = e.detail?.domains })
+// One shared owner-scoped connection across tabs; debounced ~1s; reconnects with backoff.
+// Deletes do NOT push an event — refresh the view locally after a delete.
 ```
 
 **AimeatRealtime** (`/lib/realtime.js`):
