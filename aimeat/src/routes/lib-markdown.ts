@@ -269,7 +269,11 @@ var RICH_CSS = '.md-body li.task-list-item{list-style:none;margin-left:-1.2rem;}
   '[data-theme="dark"] .md-body .hljs-built_in,[data-theme="dark"] .md-body .hljs-type{color:#e5c07b;}' +
   '[data-theme="dark"] .md-body .hljs-symbol,[data-theme="dark"] .md-body .hljs-bullet,[data-theme="dark"] .md-body .hljs-meta,[data-theme="dark"] .md-body .hljs-selector-id,[data-theme="dark"] .md-body .hljs-variable,[data-theme="dark"] .md-body .hljs-template-variable{color:#56b6c2;}' +
   '[data-theme="dark"] .md-body .hljs-deletion{color:#e06c75;}' +
-  '.md-body .md-mem{border:1px solid var(--color-base-300,#3a3a3a);border-radius:8px;padding:.5em .8em .7em;margin:1em 0;background:var(--color-base-200,#1c1c1c);}' +
+  // Theme-neutral embed chrome: LIGHT fallbacks by default, dark fallbacks only under
+  // [data-theme="dark"]. The old dark-hex fallbacks rendered black boxes inside light-themed
+  // apps that don't define the daisyUI --color-base-* variables (AEB-2 finding).
+  '.md-body .md-mem{border:1px solid var(--color-base-300,#d8dde4);border-radius:8px;padding:.5em .8em .7em;margin:1em 0;background:var(--color-base-200,#f4f5f7);}' +
+  '[data-theme="dark"] .md-body .md-mem{border-color:var(--color-base-300,#3a3a3a);background:var(--color-base-200,#1c1c1c);}' +
   '.md-body .md-mem-head{display:flex;align-items:center;gap:.6em;font-size:.78rem;opacity:.75;margin-bottom:.35em;}' +
   '.md-body .md-mem-title{font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere;flex:1;}' +
   '.md-body .md-mem-refresh{border:none;background:transparent;color:inherit;cursor:pointer;border-radius:4px;padding:0 .3em;font-size:.9rem;}' +

@@ -408,7 +408,14 @@ async function requestConsentPopup(app, scopeStr, manage) {
   var left = (window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0);
   var top = (window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0);
   var popup = window.open(url, 'aimeat_consent', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
-  if (!popup) return null; // popup blocked
+  if (!popup) {
+    // Popup blocked. This happens when the click carries no user activation — synthetic
+    // .click() calls, automated/embedded browsers — or with aggressive blockers. Fail LOUDLY
+    // so the app can react (the silent null here made sign-in look like a dead button).
+    try { console.warn('[aimeat-auth] consent popup blocked — app-origin sign-in needs a real user click (user activation). Synthetic/automated clicks cannot open the consent window.'); } catch (e) { /* no console */ }
+    emit('popup-blocked', { app: app });
+    return null;
+  }
   var msg = await new Promise(function (resolve) {
     var done = false, iv = null;
     function onMsg(e) {

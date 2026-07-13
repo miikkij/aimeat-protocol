@@ -17,6 +17,9 @@
  *     accelerator was locked inside the browser bundle, invisible to agentic coders).
  */
 import type { AimeatConfig } from '../config.js';
+// The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
+// what the authorize endpoint actually accepts (guessed scope names were an AEB-2 finding).
+import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -102,6 +105,18 @@ export function buildAppPrompt(
   body += '</' + 'script>\n';
   body += '```\n\n';
 
+  // App permissions — the scope vocabulary, generated from the authorize endpoint's own constant
+  body += '### App permissions (scopes)\n';
+  body += 'An app that declares nothing gets the DEFAULT grant: `memory:read memory:write storage:read storage:write`. If the app needs more, declare EVERY scope it uses in the head — the user approves them at sign-in:\n';
+  body += '```html\n';
+  body += '<meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write memory:delete ai:use">\n';
+  body += '```\n';
+  body += 'The complete grantable vocabulary on this node (requesting ANY name outside this list fails sign-in with INVALID_SCOPE — take names from here, never guess; live list: GET ' + nodeUrl + '/v1/app-grants/scopes):\n';
+  for (const [s, d] of Object.entries(APP_GRANTABLE_SCOPES)) {
+    body += '- `' + s + '` — ' + d + '\n';
+  }
+  body += 'Notes: deleting memory keys needs `memory:delete` (NOT in the defaults). File DELETION is covered by `storage:write` — there is NO storage:delete scope. AI features need `ai:use`.\n\n';
+
   // Data storage
   body += '### Data Storage\n';
   body += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
@@ -185,7 +200,8 @@ export function buildAppPrompt(
 
   // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
-  body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n\n';
+  body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
+  body += 'Namespace rule: data written through MCP tools is stored under the AGENT\'s identity (GAII, `name#owner@node`), NOT the human owner\'s — so a browser app reading the signed-in owner\'s keys will NOT see it. When agents seed or share data the app must read: store the author identity inside each record, write such keys with public visibility and read them with `AIMEAT.data.getPublic(<full agent GAII>, key)`, or add `?owner_scope=true` to memory reads (resolves the owner\'s agents\' keys too).\n\n';
 
   // After-build publish walkthrough (new-app mode only)
   if (!isImprove) {
