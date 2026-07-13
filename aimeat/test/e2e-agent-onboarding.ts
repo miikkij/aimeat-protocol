@@ -210,6 +210,19 @@ await test('3b. GET enriches steps with descriptionText + howTo and returns step
     // {name} is substituted server-side in args.
     assert(JSON.stringify(byId.publish_commands.howTo.args).includes(`agents.${agentName}.commands`), 'publish_commands args {name} not substituted');
 
+    // {test_task_id} is ALSO substituted server-side (from accept_test_task.details.testTaskId) --
+    // it used to be emitted as a literal placeholder while hints stopped carrying the id, which
+    // starved deterministic connectors into calling propose_todos with an empty task id.
+    const stepTaskId = byId.accept_test_task.details?.testTaskId;
+    assert(typeof stepTaskId === 'string' && stepTaskId.length > 0, 'accept_test_task.details.testTaskId missing');
+    assert(byId.accept_test_task.howTo.args.task_id === stepTaskId,
+        `accept_test_task howTo.args.task_id should be the real id, got ${JSON.stringify(byId.accept_test_task.howTo.args.task_id)}`);
+    assert(!JSON.stringify(byId.accept_test_task.howTo).includes('{test_task_id}'), 'accept_test_task howTo still contains the {test_task_id} placeholder');
+    assert(!JSON.stringify(byId.complete_test_task.howTo).includes('{test_task_id}'), 'complete_test_task howTo still contains the {test_task_id} placeholder');
+    assert(data.step_guide.accept_test_task.args.task_id === stepTaskId, 'step_guide accept_test_task task_id not substituted');
+    // hints.test_task_id is ALWAYS present when a test task exists (driver contract).
+    assert(data.hints.test_task_id === stepTaskId, `hints.test_task_id should be ${stepTaskId}, got ${JSON.stringify(data.hints.test_task_id)}`);
+
     // step_guide keys === step ids.
     const guideKeys = Object.keys(data.step_guide).sort();
     const stepIds = steps.map(s => s.id).sort();
@@ -1105,6 +1118,109 @@ await test('41. Task-runner non-test-task steps pass; test-task pair stays pendi
     assert(completeStep?.status === 'pending',
         `complete_test_task should still be pending without a real subprocess, got ${completeStep?.status}`);
     assert(ob.status === 'in_progress', `expected in_progress (test-task pair not finished), got ${ob.status}`);
+});
+
+let runnerTestTaskId = '';
+
+await test('41b. Born-active test task accepts the FIRST propose-todos (no 409 deadlock) and stays active', async () => {
+    // The re-run /start creates the test task ALREADY ACTIVE. Before the fix, propose-todos
+    // rejected active tasks outright, so accept_test_task (validated by proposed todos) was
+    // structurally impossible on every re-run -- the sanomat-desk 6/7 deadlock.
+    const { body: obBody } = await json(`/v1/agents/${runnerName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const acceptStep = obBody.data.onboarding.steps.find((s: any) => s.id === 'accept_test_task');
+    runnerTestTaskId = acceptStep.details.testTaskId;
+    // Driver contract (bug 1): hints + step_guide carry the REAL id, not the placeholder.
+    assert(obBody.data.hints.test_task_id === runnerTestTaskId,
+        `hints.test_task_id should be ${runnerTestTaskId}, got ${JSON.stringify(obBody.data.hints.test_task_id)}`);
+    assert(obBody.data.step_guide.accept_test_task.args.task_id === runnerTestTaskId,
+        'step_guide accept_test_task task_id not substituted for task-runner flow');
+
+    const { body: taskBody } = await json(`/v1/agents/${runnerName}/tasks/${runnerTestTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(taskBody.data.task.status === 'active', `test task should be born active, got ${taskBody.data.task.status}`);
+
+    const { status, body } = await json(`/v1/agents/${runnerName}/tasks/${runnerTestTaskId}/propose-todos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${runnerToken}` },
+        body: JSON.stringify({
+            todos: [{ title: 'Complete the onboarding test task', verification: 'Task status becomes done' }],
+        }),
+    });
+    assert(status === 200, `propose-todos on plan-less active task should be 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'active', `task should stay active, got ${body.data.task.status}`);
+    assert(body.data.task.todos.length === 1, `expected 1 todo, got ${body.data.task.todos.length}`);
+});
+
+await test('41c. Zero-click finish: complete the test task -> reduced 7-step flow completes', async () => {
+    // accept_test_task auto-validates now that todos exist.
+    const { body: mid } = await json(`/v1/agents/${runnerName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const acceptStep = mid.data.onboarding.steps.find((s: any) => s.id === 'accept_test_task');
+    assert(acceptStep.status === 'passed', `accept_test_task should pass after proposal, got ${acceptStep.status}`);
+
+    const { status: doneStatus, body: doneBody } = await json(`/v1/agents/${runnerName}/tasks/${runnerTestTaskId}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${runnerToken}` },
+        body: JSON.stringify({ message: 'Onboarding test task complete' }),
+    });
+    assert(doneStatus === 200, `complete status ${doneStatus}: ${JSON.stringify(doneBody)}`);
+
+    const { body: after } = await json(`/v1/agents/${runnerName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(after.data.onboarding.status === 'completed',
+        `onboarding should complete 7/7 with zero owner clicks, got ${after.data.onboarding.status}`);
+});
+
+await test('41d. Queued task of a task-runner agent auto-activates on propose-todos (no owner click)', async () => {
+    // The registration-time test task is born QUEUED (created before the fleet sets task-runner
+    // mode). Before the fix the node never auto-approved the proposal, so onboarding stalled
+    // until the owner clicked Start in the dashboard (43 minutes, live). Reproduce: default-mode
+    // agent gets a queued task, mode flips to task-runner, THEN the agent proposes.
+    const flipName = 'onboard-modeflip';
+    const { status: regStatus, body: regBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: flipName, owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(regStatus === 201, `register status ${regStatus}: ${JSON.stringify(regBody)}`);
+    const flipToken = await getToken(regBody.data.agent.gaii, regBody.data.private_key, true);
+
+    const { status: taskStatus, body: taskBody } = await json(`/v1/agents/${flipName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Pre-mode-switch task', description: 'Created queued before task-runner mode.', status: 'queued' }),
+    });
+    assert(taskStatus === 201, `task create status ${taskStatus}: ${JSON.stringify(taskBody)}`);
+    const flipTaskId = taskBody.data.task.id;
+    assert(taskBody.data.task.status === 'queued', `default-mode task should stay queued, got ${taskBody.data.task.status}`);
+
+    const { status: modeStatus } = await json(`/v1/agents/${flipName}/mode`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${flipToken}` },
+        body: JSON.stringify({ mode: 'task-runner' }),
+    });
+    assert(modeStatus === 200, `PATCH mode status ${modeStatus}`);
+
+    const { status, body } = await json(`/v1/agents/${flipName}/tasks/${flipTaskId}/propose-todos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${flipToken}` },
+        body: JSON.stringify({ todos: [{ title: 'Do the work', verification: 'done' }] }),
+    });
+    assert(status === 200, `propose-todos status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'active',
+        `queued task should auto-activate on proposal for task-runner mode, got ${body.data.task.status}`);
+
+    // The task history must read like an owner-approved start.
+    const { body: evBody } = await json(`/v1/agents/${flipName}/tasks/${flipTaskId}/events`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const started = (evBody.data.events ?? []).find((e: any) => e.type === 'started');
+    assert(started, `expected a 'started' event after auto-activation, got ${JSON.stringify((evBody.data.events ?? []).map((e: any) => e.type))}`);
 });
 
 // ─── Workstation mode: narrowest 4-step Hello Integration (node-visiting MCP agent) ───

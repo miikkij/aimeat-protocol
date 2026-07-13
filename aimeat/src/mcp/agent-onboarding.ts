@@ -19,6 +19,8 @@
  *     via DEFAULT_LOCALE) + howTo, and returns step_guide + summary (completable, next_required_step)
  *     so a connector drives each pending step deterministically. Also replicates the REST
  *     optional->skipped-on-completion pass so the two surfaces match. next_step prefers next required.
+ *   v1.4.0 -- 2026-07-14 -- hints.test_task_id is now ALWAYS present when a test task exists (it was
+ *     gated on task status, starving deterministic connectors that fill {test_task_id} from it).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -108,13 +110,15 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
     const hints: Record<string, unknown> = {};
 
     if (testTaskId) {
+        // Driver contract: hints.test_task_id is ALWAYS present when a test task exists --
+        // connectors fill the {test_task_id} placeholder from it, so gating it on a specific
+        // task status starved them into calling propose_todos with an empty task id.
+        hints.test_task_id = testTaskId;
         const task = await storage.getAgentTask(testTaskId);
         if (task?.status === 'active') {
             hints.test_task_active = true;
-            hints.test_task_id = testTaskId;
             hints.message = 'Your test task is active. Execute the todos and complete the task to finish Hello Integration.';
         } else if (task?.status === 'queued' && testTaskStep?.status === 'pending') {
-            hints.test_task_id = testTaskId;
             hints.message = 'Propose todos on your test task with aimeat_task_propose_todos to proceed with Hello Integration.';
         }
     }

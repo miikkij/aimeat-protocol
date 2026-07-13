@@ -3312,7 +3312,7 @@ components:
         args:
           type: object
           additionalProperties: true
-          description: Copyable argument template. `{name}` is substituted server-side; `{test_task_id}` is filled from hints.test_task_id.
+          description: Copyable argument template. `{name}` and `{test_task_id}` are both substituted server-side (the placeholder only survives when no test task exists yet); `{test_task_id}` is also mirrored in hints.test_task_id.
         passiveNote:
           type: string
           description: For tool === null steps, the condition under which the server auto-passes the step.
@@ -25968,11 +25968,20 @@ paths:
         proposal as outdated history.
 
         Behaviour by current task status:
-          - queued: new todos are stored as pending.
+          - queued: new todos are stored as pending. If the agent's mode is
+            'task-runner', the task is auto-activated on proposal (started
+            event + task_assigned push) -- the owner pre-authorized work to
+            start without per-task gating.
           - revision_requested: existing pending todos are retired to
             'outdated', new todos are appended as pending, and the task
-            transitions back to 'queued' for owner review.
-          - any other status: 409 INVALID_STATE.
+            transitions back to 'queued' for owner review (no auto-activation
+            -- the owner explicitly asked to review the revised plan).
+          - active with NO live (non-outdated) todos: new todos are stored as
+            pending, status stays active. Auto-activated tasks (task-runner
+            create-time activation, the Hello Integration test task) are born
+            active with zero todos; the first proposal is allowed.
+          - active with a live plan, or any other status: 409 INVALID_STATE
+            (mid-execution re-proposal goes through PATCH).
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -28431,7 +28440,8 @@ paths:
                             description: |
                               Next-step guidance for the agent. May include
                               `next_step` (step id; now prefers the next required step),
-                              `message` (human-readable), `test_task_id`, `test_task_active`.
+                              `message` (human-readable), `test_task_id` (ALWAYS present
+                              when a test task exists), `test_task_active`.
                             additionalProperties: true
                           post_onboarding_checklist:
                             type: object

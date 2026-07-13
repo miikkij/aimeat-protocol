@@ -13,6 +13,8 @@
  *   v1.3.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.5.0 -- 2026-07-14 -- propose_todos auto-activates a queued task when the agent's mode is
+ *     task-runner (started event + task_assigned push) -- parity with the REST propose-todos route.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +25,8 @@ import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interfa
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
+import { emitDelivery } from '../services/event-bus.js';
+import { recordTaskStarted } from '../services/activity-recorder.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -242,9 +246,23 @@ export function registerAgentTaskTools(
                 status: 'pending',
             }));
 
+            // Task-runner auto-approval (mirrors POST /propose-todos in routes/agent-tasks/lifecycle.ts):
+            // the owner pre-authorized a task-runner agent to start work without per-task gating, so a
+            // proposal on a plain 'queued' task activates it immediately (zero-click onboarding). A
+            // revision cycle still returns to 'queued' -- the owner explicitly asked to review the plan.
+            let nextStatus: AgentTaskRecord['status'] = task.status === 'revision_requested' ? 'queued' : task.status;
+            let autoActivated = false;
+            if (task.status === 'queued') {
+                const agent = await storage.getAgent(task.agentGaii);
+                if (agent?.mode === 'task-runner') {
+                    nextStatus = 'active';
+                    autoActivated = true;
+                }
+            }
+
             const updated = await storage.updateAgentTask(task_id, {
                 todos: [...preserved, ...newTodos],
-                status: task.status === 'revision_requested' ? 'queued' : task.status,
+                status: nextStatus,
                 lastEventAt: now,
                 updatedAt: now,
             });
@@ -257,6 +275,18 @@ export function registerAgentTaskTools(
                 details: { todo_count: newTodos.length, outdated_count: preserved.length },
                 timestamp: now,
             });
+
+            if (autoActivated) {
+                await storage.appendTaskEvent({
+                    id: randomUUID(),
+                    taskId: task_id,
+                    type: 'started',
+                    message: 'Task auto-activated on TODO proposal (agent mode: task-runner)',
+                    timestamp: now,
+                });
+                await recordTaskStarted(storage, task.agentGaii);
+                emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: task_id, payload: updated });
+            }
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
