@@ -73,6 +73,9 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
   const [result, setResult] = useState(null);
   const [vis, setVis] = useState(offer.visibility || 'private');
   const [morsels, setMorsels] = useState(offer.price?.morsels ?? 0);
+  // Money price (minor units on the offer, shown/edited in major units). Needs the seller's own PSP key.
+  const [moneyAmt, setMoneyAmt] = useState(offer.priceMoney ? (offer.priceMoney.amount / 100).toFixed(2) : '');
+  const [moneyCur, setMoneyCur] = useState(offer.priceMoney?.currency ?? 'EUR');
   const [savingBill, setSavingBill] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
   const [runs, setRuns] = useState(undefined);   // undefined = not loaded, [] = none
@@ -135,7 +138,9 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
     setSavingBill(true);
     try {
       const price = Number(morsels) > 0 ? { morsels: Number(morsels), unit: 'per-call' } : null;
-      const r = await offersService.setOfferBilling(entry.agent, offer.id, { price, visibility: vis });
+      const amt = Math.round(parseFloat(String(moneyAmt).replace(',', '.')) * 100);
+      const priceMoney = Number.isFinite(amt) && amt > 0 ? { amount: amt, currency: moneyCur } : null;
+      const r = await offersService.setOfferBilling(entry.agent, offer.id, { price, priceMoney, visibility: vis });
       if (r?.ok === false) showToast(r?.error?.message || (t('profile.offers.billSaveFailed') || 'Could not save'));
       else { showToast(t('profile.offers.billSaved') || 'Saved.'); onChanged?.(); }
     } catch (e) { showToast((e && e.message) || (t('profile.offers.billSaveFailed') || 'Could not save')); }
@@ -208,8 +213,14 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
               </select>
               <input type="number" min="0" class="input-field input-sm of-bill-price" value=${morsels} onInput=${(e) => setMorsels(e.target.value)} placeholder=${t('profile.offers.priceMorsels') || 'Price'} />
               <span class="of-mini">${t('profile.offers.morsels') || 'morsels'} / ${t('profile.offers.perCall') || 'call'}</span>
+              <input type="text" inputmode="decimal" class="input-field input-sm of-bill-price" value=${moneyAmt} onInput=${(e) => setMoneyAmt(e.target.value)} placeholder="0.00" />
+              <select class="input-field input-sm of-bill-cur" value=${moneyCur} onChange=${(e) => setMoneyCur(e.target.value)}>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
               <button class="btn-outline btn-sm" disabled=${savingBill} onClick=${saveBilling}>${t('profile.offers.saveBilling') || 'Save'}</button>
             </div>
+            ${Number(moneyAmt.replace ? moneyAmt.replace(',', '.') : moneyAmt) > 0 ? html`<div class="of-mini">${(t('profile.offers.moneyHint') || 'Money sales need your own payment key (Wallet → Selling & payments). Funds settle on YOUR account.')}</div>` : null}
             ${vis !== 'private' && Number(morsels) > 0 ? html`<div class="of-mini">${(t('profile.offers.billHint') || 'Others pay {n} morsels per call; you keep it minus the marketplace fee. Your own use is free.').replace('{n}', morsels)}</div>` : null}
             ${vis !== 'private' && !offer.callable ? html`<div class="of-mini of-warn">${t('profile.offers.notCallableHint') || 'Not machine-callable yet — others can find it, but invoking it needs a capability binding (action_id).'}</div>` : null}
           </div>
