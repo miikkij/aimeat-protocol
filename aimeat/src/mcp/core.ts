@@ -31,6 +31,8 @@
  *     backing gate: a knowledge-backed manifest sailed through MCP while REST returned 422).
  *   v1.9.0 -- 2026-07-11 -- aimeat_storage_upload inline result carries owner_gaii + embed_url/
  *     embed_markdown so an agent embeds images with the /v1/pub form, not a raw /v1/storage path.
+ *   v1.9.1 -- 2026-07-13 -- Extracted the operator-only admin tools (15-18) to ./core-admin.ts
+ *     (max-file-lines); registration order preserved (called last). No behavior change.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -51,6 +53,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
+import { registerCoreAdminTools } from './core-admin.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -726,136 +729,6 @@ export function registerCoreTools(
         },
     );
 
-    // ── Admin Tools (operator-only) ──
-    // These tools are registered for all sessions but check operator role at runtime.
-    // This avoids needing to know roles at session creation time.
-
-    async function isOperator(): Promise<boolean> {
-        const parsed = parseGAII(agentGaii);
-        if (!parsed) return false;
-        const owner = await storage.getOwner(parsed.owner);
-        return !!owner && owner.roles.includes('operator');
-    }
-
-    // ── Tool 15: aimeat_admin_stats ──
-    mcp.tool(
-        'aimeat_admin_stats',
-        descriptionFor('aimeat_admin_stats'),
-        {},
-        annotationsFor('aimeat_admin_stats'),
-        async () => {
-            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
-            const agents = await storage.listAgents();
-            const actions = await storage.listActions();
-            const boards = await storage.listBoards();
-            const allWork = await storage.listAllWork();
-            let totalMorsels = 0;
-            let activeAgents = 0;
-            const now = Date.now();
-            const seenOwners = new Set<string>();
-            for (const a of agents) {
-                if (!seenOwners.has(a.owner)) {
-                    seenOwners.add(a.owner);
-                    const ghii = await storage.getGHIIByOwner(a.owner);
-                    totalMorsels += ghii?.morselBalance ?? 0;
-                }
-                if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) activeAgents++;
-            }
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        node_id: config.nodeId,
-                        uptime_seconds: Math.floor(process.uptime()),
-                        counts: { agents: agents.length, active_agents_24h: activeAgents, actions: actions.length, boards: boards.length, work_items: allWork.length },
-                        economy: { total_morsels_in_circulation: totalMorsels },
-                    }, null, 2),
-                }],
-            };
-        },
-    );
-
-    // ── Tool 16: aimeat_admin_agents ──
-    mcp.tool(
-        'aimeat_admin_agents',
-        descriptionFor('aimeat_admin_agents'),
-        { limit: z.number().optional() },
-        annotationsFor('aimeat_admin_agents'),
-        async ({ limit }) => {
-            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
-            const agents = await storage.listAgents();
-            const subset = limit ? agents.slice(0, limit) : agents;
-            const ownerBalances = new Map<string, number>();
-            for (const a of subset) {
-                if (!ownerBalances.has(a.owner)) {
-                    const ghii = await storage.getGHIIByOwner(a.owner);
-                    ownerBalances.set(a.owner, ghii?.morselBalance ?? 0);
-                }
-            }
-            const result = subset.map(a => ({
-                gaii: a.gaii, owner: a.owner, display_name: a.displayName,
-                trust_score: a.trustScore, morsel_balance: ownerBalances.get(a.owner) ?? 0,
-                last_seen: a.lastSeen, created_at: a.createdAt,
-            }));
-            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-        },
-    );
-
-    // ── Tool 17: aimeat_admin_config ──
-    mcp.tool(
-        'aimeat_admin_config',
-        descriptionFor('aimeat_admin_config'),
-        {},
-        annotationsFor('aimeat_admin_config'),
-        async () => {
-            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        node_id: config.nodeId, port: config.port,
-                        storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
-                        jwt_ttl_seconds: config.jwtTtlSeconds,
-                        welcome_bonus: config.welcomeBonus, daily_allowance: config.dailyAllowance,
-                        burn_rate: config.burnRate, max_operator_mint_per_day: config.maxOperatorMintPerDay,
-                    }, null, 2),
-                }],
-            };
-        },
-    );
-
-    // ── Tool 18: aimeat_admin_mint ──
-    mcp.tool(
-        'aimeat_admin_mint',
-        descriptionFor('aimeat_admin_mint'),
-        { gaii: z.string(), amount: z.number().int().positive() },
-        annotationsFor('aimeat_admin_mint'),
-        async ({ gaii, amount }) => {
-            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
-            const agent = await storage.getAgent(gaii);
-            if (!agent) return { content: [{ type: 'text' as const, text: `Agent not found: ${gaii}` }], isError: true };
-
-            const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
-            const allTx = await storage.listAllTransactions();
-            const mintedToday = allTx
-                .filter(tx => tx.type === 'mint' && new Date(tx.timestamp) >= dayStart)
-                .reduce((sum, tx) => sum + tx.amount, 0);
-            if (mintedToday + amount > config.maxOperatorMintPerDay) {
-                return { content: [{ type: 'text' as const, text: `Daily mint cap (${config.maxOperatorMintPerDay}) would be exceeded. Already minted ${mintedToday} today.` }], isError: true };
-            }
-
-            await storage.creditBalance(gaii, amount);
-            const { randomBytes: rb } = await import('node:crypto');
-            await storage.addTransaction({
-                id: `tx-${Date.now()}-${rb(4).toString('hex')}`,
-                gaii, type: 'mint', amount,
-                counterpartyGaii: agentGaii,
-                timestamp: new Date().toISOString(),
-            });
-            emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
-            const mintedAgentRecord = await storage.getAgent(gaii);
-            const mintedGhii = mintedAgentRecord ? await storage.getGHIIByOwner(mintedAgentRecord.owner) : null;
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: mintedGhii?.morselBalance ?? 0 }, null, 2) }] };
-        },
-    );
+    // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
+    registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
 }

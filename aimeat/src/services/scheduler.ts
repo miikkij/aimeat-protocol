@@ -66,22 +66,15 @@ import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
-import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
-import type { ExtensionCtx } from './extension-runtime.js';
-import { getEncryptionKey } from './encryption.js';
-import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
-import { completeForOwner } from './ai-completion.js';
-import { notify } from './notify.js';
-import { getActiveWorkflowEngine } from './workflow/engine.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
+import { runExtensionJob } from './scheduler-extension-job.js';
+import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -97,7 +90,7 @@ export function getActiveScheduler(): Scheduler | null { return _activeScheduler
 export type JobTrigger = 'cron' | 'manual' | 'activate';
 
 /** Result returned by a kind-specific executor (memory I/O + optional spawned task). */
-interface JobRunResult {
+export interface JobRunResult {
   reads: string[];
   writes: string[];
   taskId?: string;
@@ -494,55 +487,7 @@ export class Scheduler {
    * to the owner's output key. Zero agent involvement; runs even when offline.
    */
   private async executeAiJob(job: ScheduledJobRecord): Promise<JobRunResult> {
-    const owner = job.ownerScope;
-    if (!owner) throw new Error(`AI job "${job.id}" missing ownerScope`);
-    const cfg = (job.input ?? {}) as {
-      inputKeys?: string[]; inputNamespaces?: string[]; prompt?: string;
-      systemPrompt?: string; model?: string; outputKey?: string;
-      outputVisibility?: 'private' | 'owner' | 'public';
-    };
-    if (!cfg.prompt || typeof cfg.prompt !== 'string') {
-      throw new Error(`AI job "${job.id}" missing prompt`);
-    }
-
-    const inputKeys = Array.isArray(cfg.inputKeys) ? cfg.inputKeys : [];
-    const reads: string[] = [];
-    const parts: string[] = [cfg.prompt];
-    for (let i = 0; i < inputKeys.length; i++) {
-      const key = inputKeys[i];
-      const ns = cfg.inputNamespaces?.[i] || owner;
-      const rec = await this.storage.getMemory(ns, key);
-      reads.push(ns === owner ? key : `${ns}::${key}`);
-      const valueText = rec == null
-        ? '(empty)'
-        : (typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2));
-      parts.push(`\n--- INPUT: ${key} ---\n${valueText}`);
-    }
-    const composedPrompt = parts.join('\n');
-
-    const result = await completeForOwner(this.storage, this.config, owner, {
-      prompt: composedPrompt,
-      systemPrompt: cfg.systemPrompt,
-      model: cfg.model,
-      appId: `schedule:${job.id}`,
-    });
-
-    const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;
-    const now = new Date().toISOString();
-    const existing = await this.storage.getMemory(owner, outputKey);
-    await this.storage.setMemory({
-      key: outputKey,
-      ownerGaii: owner,
-      value: result.content,
-      visibility: cfg.outputVisibility || 'private',
-      tags: ['scheduler', 'ai-output'],
-      ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    });
-
-    return { reads, writes: [outputKey] };
+    return runAiJob(this.storage, this.config, job);
   }
 
   /**
@@ -735,14 +680,7 @@ export class Scheduler {
    * names the workflow; `ownerScope` is the owner GHII it belongs to.
    */
   private async executeWorkflowJob(job: ScheduledJobRecord): Promise<JobRunResult> {
-    const owner = job.ownerScope;
-    const workflowId = (job.input as { workflowId?: string } | undefined)?.workflowId;
-    if (!owner || !workflowId) throw new Error(`workflow job "${job.id}" missing ownerScope/workflowId`);
-    const engine = getActiveWorkflowEngine();
-    if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
-    const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
-    if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
-    return { reads: [], writes: [`workflows.run.${workflowId}.${result.runId}`] };
+    return runWorkflowJob(job);
   }
 
   /**
@@ -753,39 +691,7 @@ export class Scheduler {
    * it does not hot-loop — the next scheduled fire retries.
    */
   private async executeEcoCapabilityJob(job: ScheduledJobRecord): Promise<JobRunResult> {
-    const owner = job.ownerScope;
-    if (!owner) throw new Error(`eco-capability job "${job.id}" missing ownerScope`);
-    const cfg = (job.input ?? {}) as { app?: string; capability_id?: string; input?: Record<string, unknown> };
-    const app = cfg.app;
-    const capabilityId = cfg.capability_id;
-    if (!app || !capabilityId) {
-      throw new Error(`eco-capability job "${job.id}" missing app/capability_id in input`);
-    }
-
-    const ownerName = parseGaiiLoose(owner).owner;
-    const geai = buildGEAI(app, ownerName, this.config.nodeId);
-    const caller = `${ownerName}@${this.config.nodeId}`;
-
-    const mgr = getActiveConnectTunnelManager();
-    if (!mgr) {
-      // No tunnel server running — skip rather than error (nothing to invoke against).
-      return { reads: [], writes: [], skipped: true, skipReason: 'connect-tunnel unavailable' };
-    }
-
-    try {
-      const reply = await mgr.invokeOnPrincipal(geai, { capability: capabilityId, input: cfg.input ?? {}, caller });
-      if (!reply.ok) {
-        throw new Error(`Ecosystem app "${app}" refused or failed capability "${capabilityId}"`);
-      }
-      return { reads: [], writes: [`eco.${app}.${capabilityId}`] };
-    } catch (err) {
-      // The GEAI being offline at fire time is a SKIP, not an error — don't hot-loop; retry next fire.
-      const code = (err as { code?: string }).code;
-      if (code === 'ECOSYSTEM_OFFLINE') {
-        return { reads: [], writes: [], skipped: true, skipReason: `app "${app}" offline` };
-      }
-      throw err;
-    }
+    return runEcoCapabilityJob(this.config, job);
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {
@@ -802,230 +708,6 @@ export class Scheduler {
   }
 
   private async executeExtensionJob(job: ScheduledJobRecord): Promise<{ reads: string[]; writes: string[] }> {
-    if (!job.extensionName || !job.actionId) {
-      throw new Error(`Extension job "${job.id}" missing extensionName or actionId`);
-    }
-
-    const ext = await this.storage.getExtension(job.extensionName);
-    if (!ext) {
-      throw new Error(`Extension "${job.extensionName}" not found`);
-    }
-    if (ext.status !== 'active') {
-      throw new Error(`Extension "${job.extensionName}" is not active`);
-    }
-
-    const action = ext.actions.find(a => a.id === job.actionId);
-    if (!action) {
-      throw new Error(`Action "${job.actionId}" not found in extension "${job.extensionName}"`);
-    }
-
-    // Build the extension context — scheduler runs as a system caller
-    const extMemoryOwner = job.instanceId
-      ? `ext:${ext.name}.${job.instanceId}`
-      : `ext:${ext.name}`;
-
-    // For an instance-scoped job, load the instance and decrypt its secret config so a scheduled
-    // sync gets the same bring-your-own-key config a live instance action would. `type: 'secret'`
-    // fields are decrypted just before the VM (see services/extension-secrets.ts).
-    const encKey = getEncryptionKey(this.config);
-    let instanceCtx: { id: string; config: Record<string, unknown> } | undefined;
-    if (job.instanceId) {
-      const inst = await this.storage.getExtensionInstance(ext.name, job.instanceId);
-      instanceCtx = {
-        id: job.instanceId,
-        config: inst
-          ? decryptSecretFields(inst.config, getInstanceSecretKeys(ext), encKey)
-          : (job.input ?? {}),
-      };
-    }
-
-    const baseCtx: ExtensionCtx = {
-      memory: {
-        get: async (key) => {
-          const record = await this.storage.getMemory(extMemoryOwner, key);
-          return record ? record.value : null;
-        },
-        set: async (key, value) => {
-          const existing = await this.storage.getMemory(extMemoryOwner, key);
-          const now = new Date().toISOString();
-          await this.storage.setMemory({
-            key,
-            ownerGaii: extMemoryOwner,
-            value,
-            visibility: 'public',
-            tags: [],
-            ttlHours: null,
-            version: existing ? existing.version + 1 : 1,
-            createdAt: existing ? existing.createdAt : now,
-            updatedAt: now,
-          });
-        },
-        search: async (prefix) => {
-          const records = await this.storage.listMemory(extMemoryOwner, { prefix });
-          return records.map(r => ({ key: r.key, value: r.value }));
-        },
-        delete: async (key) => this.storage.deleteMemory(extMemoryOwner, key),
-        getPublic: async (namespace, key) => {
-          // Try direct namespace lookup first
-          let record = await this.storage.getMemory(namespace, key);
-          // If not found and namespace looks like an owner name (no @ or #),
-          // resolve to the owner's default agent GAII and retry
-          if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
-            const agents = await this.storage.getAgentsByOwner(namespace);
-            for (const agent of agents) {
-              record = await this.storage.getMemory(agent.gaii, key);
-              if (record) break;
-            }
-          }
-          return (record && record.visibility === 'public') ? record.value : null;
-        },
-      },
-      fetch: async (url, opts) => {
-        const resp = await fetch(url, {
-          method: opts?.method || 'GET',
-          headers: opts?.headers,
-          body: opts?.body,
-          signal: AbortSignal.timeout(30_000),
-        });
-        // Always read raw bytes first so we can detect charset from multiple sources
-        const buf = await resp.arrayBuffer();
-        const ct = resp.headers.get('content-type') || '';
-        const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-        let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
-
-        // If Content-Type didn't specify charset, peek at XML/HTML prolog for encoding declaration
-        if (!charset) {
-          const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
-          const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
-          const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
-          charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
-        }
-
-        // Guard against mislabeled encoding: if declared non-UTF-8 but bytes are valid
-        // UTF-8 multibyte (e.g. Cloudflare transcoding), trust the bytes over the label
-        if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-          const bytes = new Uint8Array(buf);
-          let hasMultibyte = false;
-          for (let i = 0; i < bytes.length - 1; i++) {
-            if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
-              hasMultibyte = true; break;
-            }
-            if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
-                (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
-              hasMultibyte = true; break;
-            }
-          }
-          if (hasMultibyte) charset = 'utf-8';
-        }
-
-        const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
-        const text = decoder.decode(buf);
-        const headers: Record<string, string> = {};
-        resp.headers.forEach((v, k) => { headers[k] = v; });
-        return { status: resp.status, ok: resp.ok, text, headers };
-      },
-      wallet: {
-        // Scheduler jobs run as system — no wallet operations
-      },
-      consent: {
-        check: async (gaii, scope) => {
-          const consents = await this.storage.listConsents(gaii, { status: 'active' });
-          return consents.some(c => c.purpose === scope);
-        },
-        require: async (gaii, scope) => {
-          const consents = await this.storage.listConsents(gaii, { status: 'active' });
-          if (!consents.some(c => c.purpose === scope)) {
-            throw new Error(`CONSENT_REQUIRED: ${scope}`);
-          }
-        },
-      },
-      trust: {
-        getScore: async (gaii: string) => {
-          const agent = await this.storage.getAgent(gaii);
-          return agent?.trustScore ?? 0;
-        },
-      },
-      caller: {
-        gaii: `scheduler@${this.config.nodeId}`,
-        owner: ext.installedBy,
-        roles: ['operator'],
-      },
-      config: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
-      instance: instanceCtx,
-      log: {
-        info: (msg, data) => logger.info(`[ext:${ext.name}:scheduler] ${msg}`, data),
-        warn: (msg, data) => logger.warn(`[ext:${ext.name}:scheduler] ${msg}`, data),
-        error: (msg, data) => logger.error(`[ext:${ext.name}:scheduler] ${msg}`, data),
-      },
-      notify: async (message, opts) => {
-        const key = `notifications.${ext.installedBy}`;
-        const existing = await this.storage.getMemory(ext.installedBy, key);
-        const list = Array.isArray(existing?.value) ? existing.value : [];
-        list.push({
-          id: randomUUID(),
-          message,
-          title: opts?.title || ext.name,
-          priority: opts?.priority || 'normal',
-          channel: opts?.channel || 'extension',
-          source: ext.name,
-          read: false,
-          createdAt: new Date().toISOString(),
-        });
-        // Keep last 100 notifications
-        const trimmed = list.slice(-100);
-        await this.storage.setMemory({
-          key, ownerGaii: ext.installedBy, value: trimmed,
-          visibility: 'private', tags: ['notifications'], ttlHours: null,
-          version: (existing?.version || 0) + 1,
-          createdAt: existing?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        // Also surface it where the owner actually looks: the header bell + web push,
-        // deep-linked to the Extensions tab.
-        const installerGhii = ext.installedBy.includes('@') ? ext.installedBy : `${ext.installedBy}@${this.config.nodeId}`;
-        void notify(this.storage, installerGhii, {
-          type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
-        });
-        return true;
-      },
-      email: async (to, subject, body) => {
-        if (!this.emailService?.enabled) {
-          logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`);
-          return false;
-        }
-        // Tier 2: operator-granted unrestricted
-        if (ext.config?.emailPolicy === 'unrestricted') {
-          return this.emailService.sendNotification(to, subject, body);
-        }
-        const ownerGhii = `${ext.installedBy}@${this.config.nodeId}`;
-        const ghiiRec = await this.storage.getGHII(ownerGhii);
-        // Tier 0: self-only (installer's own verified email)
-        if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
-          return this.emailService.sendNotification(to, subject, body);
-        }
-        // Tier 1: check consent
-        const consents = await this.storage.listConsents(ownerGhii, { status: 'active' });
-        if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
-          return this.emailService.sendNotification(to, subject, body);
-        }
-        logger.warn(`[ext:${ext.name}] Scheduled email blocked: no authorization for recipient`);
-        return false;
-      },
-    };
-
-    // Wrap with memory access tracking
-    const { ctx, accessLog } = trackMemoryAccess(baseCtx);
-
-    // Validate input is a plain object — reject non-serializable values
-    const rawInput = job.input ?? {};
-    let input: Record<string, unknown>;
-    try {
-      input = JSON.parse(JSON.stringify(rawInput)) as Record<string, unknown>;
-    } catch {
-      throw new Error(`Scheduled job "${job.id}" has non-serializable input`);
-    }
-    await executeExtensionAction(action.scriptContent, ctx, input, ext.limits);
-
-    return { reads: accessLog.reads, writes: accessLog.writes };
+    return runExtensionJob(this.storage, this.config, this.emailService, job);
   }
 }

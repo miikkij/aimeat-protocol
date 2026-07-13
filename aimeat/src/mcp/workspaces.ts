@@ -94,7 +94,8 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
-import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, granteeOwner, type WsRole } from '../services/workspace-roles.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
+import { registerWorkspaceMemberTools } from './workspace-members.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -709,85 +710,9 @@ export function registerWorkspaceTools(
             return fail("action must be 'request', 'list' or 'decide'.");
         });
 
-    /** Normalize a single `ws` and/or a `workspaces` array into a de-duplicated list (order preserved). */
-    const wsList = (ws?: string, workspaces?: string[]): string[] => {
-        const out: string[] = [];
-        for (const w of [...(ws ? [ws] : []), ...(Array.isArray(workspaces) ? workspaces : [])]) {
-            const t = String(w ?? '').trim();
-            if (t && !out.includes(t)) out.push(t);
-        }
-        return out;
-    };
-
-    // ── aimeat_workspace_member_grant ── (proactively add an existing member; no prior request needed)
-    mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
-        {
-            organism_id: z.string(),
-            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to grant in one call — e.g. every workspace in the organism (from aimeat_workspace_list).'),
-            grantee: z.string().describe('The member to grant: an owner name, GHII (owner@node), or GAII (agent#owner@node). The grant applies to the OWNER, so all their agents inherit it.'),
-            role: z.enum(['viewer', 'contributor']).describe("'viewer' = read only · 'contributor' = read + write."),
-        },
-        annotationsFor('aimeat_workspace_member_grant'),
-        async ({ organism_id, ws, workspaces, grantee, role }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const targets = wsList(ws, workspaces);
-            if (!targets.length) return fail('Provide `ws` and/or `workspaces` — at least one workspace id.');
-            const owner = granteeOwner(grantee);
-            const results: Array<{ ws: string; status: string; role?: WsRole }> = [];
-            for (const w of targets) {
-                const mgr = await wsManager(organism_id, w);
-                if (!mgr) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
-                if (owner === mgr.createdBy) { results.push({ ws: w, status: 'skipped_creator' }); continue; }
-                await setWsRole(`${mgr.createdBy}@${config.nodeId}`, organism_id, w, grantee, role, 'grant', ownerName);
-                results.push({ ws: w, status: 'granted', role });
-            }
-            emitChange('organisms');
-            const granted = results.filter(r => r.status === 'granted').length;
-            return ok({ grantee: owner, role, granted, total: targets.length, results });
-        });
-
-    // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
-    mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
-        {
-            organism_id: z.string(),
-            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to revoke in one call.'),
-            grantee: z.string().describe('The member to revoke: owner name, GHII, or GAII (resolved to the owner). To DOWNGRADE instead of removing, call aimeat_workspace_member_grant with the lower role.'),
-        },
-        annotationsFor('aimeat_workspace_member_revoke'),
-        async ({ organism_id, ws, workspaces, grantee }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const targets = wsList(ws, workspaces);
-            if (!targets.length) return fail('Provide `ws` and/or `workspaces` — at least one workspace id.');
-            const owner = granteeOwner(grantee);
-            const results: Array<{ ws: string; status: string; revoked?: number }> = [];
-            for (const w of targets) {
-                const mgr = await wsManager(organism_id, w);
-                if (!mgr) { results.push({ ws: w, status: 'forbidden_or_not_found' }); continue; }
-                const revoked = await revokeWsRole(`${mgr.createdBy}@${config.nodeId}`, organism_id, w, grantee);
-                results.push({ ws: w, status: revoked > 0 ? 'revoked' : 'not_a_member', revoked });
-            }
-            emitChange('organisms');
-            const revoked = results.filter(r => r.status === 'revoked').length;
-            return ok({ grantee: owner, revoked, total: targets.length, results });
-        });
-
-    // ── aimeat_workspace_members ── (list a workspace's members with roles + grant provenance)
-    mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
-        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
-        annotationsFor('aimeat_workspace_members'),
-        async ({ organism_id, ws }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const mgr = await wsManager(organism_id, ws);
-            if (!mgr) return fail('Workspace not found, or only the workspace creator or an org admin can list its members.');
-            const creatorGhii = `${mgr.createdBy}@${config.nodeId}`;
-            const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
-            const members = [...roles.values()].map(m => ({
-                owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null, granted_at: m.grantedAt ?? null,
-            }));
-            return ok({ ws, creator: mgr.createdBy, members });
-        });
+    // ── Workspace member-role tools (member_grant, member_revoke, members) ──
+    // Extracted to workspace-members.ts; registered here to preserve tool order.
+    registerWorkspaceMemberTools(mcp, storage, config, { ownerName, ok, fail, denyReason, wsManager, setWsRole, revokeWsRole });
 
     // ── aimeat_workspace_export ──
     mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
