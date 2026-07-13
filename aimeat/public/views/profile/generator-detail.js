@@ -5,12 +5,11 @@
  *   plus test prompt generation, test execution, and result display.
  *   Also exports shared AI utility functions (runWithAi, stripCodeblock, cancelAiRequest).
  * @structure
- *   - runWithAi, stripCodeblock, cancelAiRequest: AI call utilities (shared)
- *   - getWorkflowStep: determines component's current workflow state
- *   - StepArrow: SVG arrow indicator for guided workflow
  *   - ComponentDetail: main per-component editor panel
- *   - TestScopeSelector: radio group for test scope level
- *   - TestResultsView: renders full test report with screenshots
+ *   Re-exports (from sibling modules, kept here for import compatibility):
+ *   - runWithAi, stripCodeblock, cancelAiRequest (./generator-detail.ai.js)
+ *   - getWorkflowStep (./generator-detail.helpers.js)
+ *   - TestScopeSelector, TestResultsView (./generator-detail.results.js)
  * @usage
  *   import { ComponentDetail, TestScopeSelector, TestResultsView } from './generator-detail.js';
  *   import { runWithAi, stripCodeblock, cancelAiRequest } from './generator-detail.js';
@@ -19,6 +18,8 @@
  *   v1.1.0 — 2026-03-24 — Fix useEffect deps (testCode/testResult sync), add trace display
  *   v1.2.0 — 2026-03-25 — Fix validationResult reset: Register button no longer disappears after validation passes
  *   v1.3.0 — 2026-03-26 — V5: context bundles on register, explain step before validation
+ *   v1.4.0 — 2026-07-13 — Split for max-file-lines: AI utils, workflow helpers, spec section and
+ *     results view moved to sibling modules (behavior unchanged; re-exported for compatibility)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -34,147 +35,21 @@ import {
 // DEPRECATED: browser-side prompt builders no longer used. Prompts loaded from database via API.
 // import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
-import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec } from '/js/services/generator-spec-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
 import { buildExplainPrompt, buildReflectionPrompt, buildFixPrompt } from '/js/services/generator-prompts-fix.js';
 import { runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
+import { runWithAi, stripCodeblock, cancelAiRequest, loadPromptFromBackend } from './generator-detail.ai.js';
+import { getWorkflowStep, StepArrow } from './generator-detail.helpers.js';
+import { SpecSection } from './generator-detail.spec-section.js';
+import { TestScopeSelector, TestResultsView } from './generator-detail.results.js';
 
-/* ── OpenRouter Autopilot Helpers (shared) ───────────── */
-
-// Active AbortController for current AI request — allows instant cancel
-let _activeAiController = null;
-
-/** Strip markdown codeblock wrapper if AI wrapped the response in ``` */
-export function stripCodeblock(text) {
-  if (!text) return text;
-  const trimmed = text.trim();
-  // Count how many ``` fences exist
-  const fenceCount = (trimmed.match(/^```/gm) || []).length;
-  if (fenceCount === 2) {
-    // Single code block wrapper: ```lang\n...\n``` — strip the outer fences
-    const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
-    if (match) return match[1].trim();
-  }
-  if (fenceCount > 2) {
-    // Multiple code blocks inside (e.g., cortex: ```yaml + ```javascript, or extension: ```yaml + ```js per action)
-    // Check if the ENTIRE response is wrapped in an OUTER fence (AI sometimes does this)
-    const outerMatch = trimmed.match(/^```\s*\n([\s\S]*)\n```\s*$/);
-    if (outerMatch) return outerMatch[1].trim();
-
-    // Extension multi-block pattern: ```yaml\n...\n``` followed by one or more ```javascript\n...\n```
-    // Combine into single text: YAML content + JS content separated by // actions/... markers
-    const blocks = [];
-    const blockRegex = /```(\w*)\s*\n([\s\S]*?)```/g;
-    let match;
-    while ((match = blockRegex.exec(trimmed)) !== null) {
-      blocks.push({ lang: match[1], content: match[2].trim() });
-    }
-    if (blocks.length >= 2) {
-      const yamlBlock = blocks.find(b => b.lang === 'yaml' || b.lang === 'yml');
-      const jsBlocks = blocks.filter(b => b.lang === 'javascript' || b.lang === 'js' || b.lang === '');
-      if (yamlBlock && jsBlocks.length > 0) {
-        // Check if JS blocks already have // actions/ markers — if so, combine cleanly
-        const hasActionMarkers = jsBlocks.some(b => /^\/\/\s*actions\//m.test(b.content));
-        if (hasActionMarkers) {
-          // Extension format: YAML manifest + action files with // actions/ markers
-          return yamlBlock.content + '\n' + jsBlocks.map(b => b.content).join('\n');
-        }
-      }
-      // Generic multi-block: combine all blocks
-      return blocks.map(b => b.content).join('\n\n');
-    }
-
-    // Fallback: return with fences — the validator can handle them
-    return trimmed;
-  }
-  // No fences or unparseable — return as-is
-  return trimmed;
-}
-
-export async function runWithAi(projectId, prompt, systemPrompt = null) {
-  const body = { projectId, prompt };
-  if (systemPrompt) body.systemPrompt = systemPrompt;
-  // Use direct fetch with 10-minute timeout (apiPost has 30s limit)
-  const controller = new AbortController();
-  _activeAiController = controller;
-  const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
-  const headers = { 'Content-Type': 'application/json' };
-  const session = window.AIMEAT?.auth?.getSession?.();
-  if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
-  try {
-    const raw = await fetch('/v1/openrouter/complete', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
-    });
-    if (!raw.ok) {
-      // Try to parse error body, fall back to status text
-      let msg = `HTTP ${raw.status}`;
-      try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
-      throw new Error(msg);
-    }
-    const resp = await raw.json();
-    if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-    return resp.data.content;
-  } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Cancelled', { cause: e });
-    if (e.name === 'TypeError') throw new Error('Network error — connection lost', { cause: e });
-    throw e;
-  } finally {
-    clearTimeout(timeoutId);
-    _activeAiController = null;
-  }
-}
-
-/** Abort the active AI request immediately */
-export function cancelAiRequest() {
-  if (_activeAiController) _activeAiController.abort();
-}
-
-/* ── Prompt Loading (from database via API — single source of truth) ── */
-
-/**
- * Load a component prompt from the database via the backend API.
- * Replaces the old browser-side buildComponentPrompt() which used local JS templates.
- * @param {string} projectId
- * @param {string} componentId
- * @param {'code'|'spec'|'test'} type - prompt type
- * @returns {Promise<string>} the prompt text
- */
-async function loadPromptFromBackend(projectId, componentId, type = 'code') {
-  const s = window.AIMEAT?.auth?.getSession?.();
-  if (!s) throw new Error('Not authenticated');
-  const resp = await s.fetch(`/v1/generator/${projectId}/prompts/${componentId}?type=${type}`);
-  if (!resp.ok) throw new Error(resp.error?.message || 'Failed to load prompt');
-  return resp.data?.prompt || '';
-}
-
-/* ── Workflow Helpers ─────────────────────────────────── */
-
-export function getWorkflowStep(component, validationResult, result) {
-  if (component.registeredAs) return 'done';
-  if (validationResult?.valid === true) return 'register';
-  if (validationResult?.valid === false) return 'fix';
-  if ((result || '').trim()) return 'validate';
-  if (component.status === 'waiting_user' || component.status === 'prompt_ready') return 'paste';
-  return 'copy';
-}
-
-/** Small circle-with-arrow SVG placed inline next to the current action target.
- * @param {Object} props
- * @param {'right'|'down'} [props.direction='right'] - arrow direction
- */
-function StepArrow({ direction = 'right' } = {}) {
-  const chevron = direction === 'down'
-    ? 'M8 10l4 4 4-4'   // ↓ pointing down
-    : 'M10 8l4 4-4 4';  // → pointing right
-  const cls = `pf-gen-step-arrow${direction === 'down' ? ' pf-gen-step-arrow--down' : ''}`;
-  return html`<svg class=${cls} viewBox="0 0 24 24" width="22" height="22">
-    <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" opacity="0.15"/>
-    <circle cx="12" cy="12" r="10" fill="none" stroke="var(--accent,#E8564A)" stroke-width="1.5"/>
-    <path d=${chevron} fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-}
+// Re-export moved symbols so existing consumers (generator-tab, generator-dashboard, dashboard hooks)
+// keep importing them from this module unchanged.
+export { runWithAi, stripCodeblock, cancelAiRequest };
+export { getWorkflowStep };
+export { TestScopeSelector, TestResultsView };
 
 /* ── ComponentDetail ─────────────────────────────────── */
 
@@ -502,14 +377,6 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     ? buildExplainPrompt(component.type, result, bpComp)
     : null;
 
-  // Spec fix prompt — derived from current spec validation errors + spec result (shared by Copy and Fix-with-AI buttons)
-  const specFixPrompt = specValidation && !specValidation.valid
-    ? 'Fix the following spec JSON. It has validation errors.\n\n'
-      + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
-      + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
-      + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON'
-    : null;
-
   // Test prompt for testable component types
   const testableTypes = ['extension', 'cortex', 'app'];
   const isTestable = testableTypes.includes(component.type) && component.registeredAs;
@@ -640,144 +507,13 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
       </div>
 
       <!-- SPEC (extension and cortex only) -->
-      ${hasSpec && html`
-        <div class="pf-gen-section">
-          <label>SPEC PROMPT</label>
-          <pre class="pf-gen-prompt-box" style="max-height:200px;overflow:auto;font-size:11px">${specPrompt || 'Loading spec prompt...'}</pre>
-          <div class="flex-row-wrap">
-            <${CopyButton} text=${specPrompt} label="Copy Spec Prompt" className="btn-outline btn-sm"
-              onCopied=${() => showToast?.('Spec prompt copied')} />
-            ${orSettings?.hasApiKey && html`
-              <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
-                onClick=${async () => {
-                  if (!specPrompt) return;
-                  setSpecAiRunning(true);
-                  try {
-                    const aiResult = await runWithAi(projectId, specPrompt);
-                    setSpecResult(aiResult);
-                    showToast?.('Spec generated');
-                  } catch (e) {
-                    showToast?.('Spec generation failed: ' + e.message, true);
-                  }
-                  setSpecAiRunning(false);
-                }}
-                disabled=${specAiRunning || !specPrompt}>
-                ${specAiRunning ? html`<span class="pf-gen-or-spinner"></span> Generating...` : 'Run with AI'}
-              </button>
-            `}
-          </div>
-        </div>
-        <div class="pf-gen-section">
-          <label>SPEC RESULT</label>
-          <textarea
-            class="pf-gen-result-area"
-            rows="8"
-            placeholder="Paste the spec JSON here (from AI response)"
-            value=${specResult}
-            onInput=${e => { setSpecResult(e.target.value); setSpecValidation(null); }}
-          />
-          <div class="pf-gen-actions">
-            <button class="btn-primary btn-sm" onClick=${() => {
-              try {
-                const parsed = JSON.parse(specResult);
-                // Validate spec structure
-                let sv;
-                if (component.type === 'extension') sv = validateExtensionSpec(parsed);
-                else if (component.type === 'app') sv = validateAppSpec(parsed);
-                else if (component.subtype === 'data') sv = validateDataApiSpec(parsed);
-                else if (component.subtype === 'component') sv = validateComponentSpec(parsed);
-                else if (component.subtype === 'app-domain') sv = validateAppDomainSpec(parsed);
-                // FAIL LOUD: a cortex must declare its subtype. A silent fallback to a default
-                // validator (previously validateDataApiSpec) masked the real bug — a missing subtype —
-                // as a confusing "Missing wrapsExtension" error on a component cortex. Name the real cause.
-                else if (component.type === 'cortex') sv = { valid: false, errors: ['Cortex component "' + component.id + '" has no subtype (expected data | component | app-domain) — this is an upstream blueprint/init bug; fix the subtype, do not guess a validator'] };
-                else sv = { valid: false, errors: ['Cannot select a spec validator for component "' + component.id + '" (type=' + component.type + ', subtype=' + component.subtype + ')'] };
-                // Also check blueprint action IDs
-                const bp = project?.blueprint;
-                if (bp && component.type === 'extension') {
-                  const specActionIds = new Set((parsed.actions || []).map(a => a.id));
-                  const bpActions = Object.keys(bp.dataModel?.actions || {})
-                    .filter(k => k.startsWith('ext:'))
-                    .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
-                  for (const expected of bpActions) {
-                    if (!specActionIds.has(expected)) {
-                      sv.valid = false;
-                      sv.errors.push('Blueprint declares action "' + expected + '" but it is missing from the spec');
-                    }
-                  }
-                }
-                setSpecValidation(sv);
-                if (sv.valid) showToast?.('Spec validation passed');
-                else showToast?.('Spec validation failed: ' + sv.errors[0], true);
-              } catch (e) {
-                setSpecValidation({ valid: false, errors: ['Invalid JSON: ' + e.message] });
-                showToast?.('Invalid JSON: ' + e.message, true);
-              }
-            }} disabled=${!specResult.trim()}>
-              Validate Spec
-            </button>
-            ${specValidation?.valid && html`
-              <button class="btn-success btn-sm" onClick=${async () => {
-                try {
-                  const parsed = JSON.parse(specResult);
-                  await saveSpec(projectId, component.id, parsed);
-                  // Rebuild code prompt now that the spec is saved
-                  const freshPrompt = await loadPromptFromBackend(projectId, component.id, 'code');
-                  setGeneratedPrompt(freshPrompt);
-                  if (component.prompt) {
-                    await saveComponent(projectId, { ...component, prompt: freshPrompt, spec: parsed });
-                  }
-                  showToast?.('Spec saved');
-                  onUpdate();
-                } catch (e) {
-                  showToast?.('Save failed: ' + e.message, true);
-                }
-              }}>
-                Save Spec
-              </button>
-            `}
-            ${component.spec && specResult && html`
-              <span class="text-caption" style="color:var(--success,#22c55e)">✓ Spec saved</span>
-            `}
-          </div>
-          ${specValidation && !specValidation.valid && html`
-            <div class="pf-gen-validation-errors">
-              <strong>Spec Validation Errors</strong>
-              <ul>${specValidation.errors.map(e => html`<li>${e}</li>`)}</ul>
-              <div class="flex-row-wrap" style="margin-top:8px">
-                <${CopyButton} text=${specFixPrompt} label="Copy Fix Prompt" className="btn-outline btn-sm"
-                  onCopied=${() => showToast?.('Fix prompt copied')} />
-                ${orSettings?.hasApiKey && html`
-                  <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
-                    onClick=${async () => {
-                      const fixPrompt = specFixPrompt;
-                      setSpecAiRunning(true);
-                      try {
-                        const fixed = await runWithAi(projectId, fixPrompt);
-                        // Strip code fences if present
-                        const cleaned = fixed.replace(/^```json?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
-                        setSpecResult(cleaned);
-                        setSpecValidation(null);
-                        showToast?.('Fixed spec received — click Validate Spec');
-                      } catch (e) {
-                        showToast?.('Fix failed: ' + e.message, true);
-                      }
-                      setSpecAiRunning(false);
-                    }}
-                    disabled=${specAiRunning}>
-                    ${specAiRunning ? html`<span class="pf-gen-or-spinner"></span> Fixing...` : 'Fix with AI'}
-                  </button>
-                `}
-              </div>
-            </div>
-          `}
-          ${specValidation?.valid && html`
-            <div class="pf-gen-validation-passed">
-              <strong>✓ Spec Valid</strong>
-            </div>
-          `}
-        </div>
-      `}
+      ${hasSpec && html`<${SpecSection}
+        component=${component} project=${project} projectId=${projectId}
+        showToast=${showToast} onUpdate=${onUpdate} orSettings=${orSettings}
+        specPrompt=${specPrompt} specResult=${specResult} setSpecResult=${setSpecResult}
+        specAiRunning=${specAiRunning} setSpecAiRunning=${setSpecAiRunning}
+        specValidation=${specValidation} setSpecValidation=${setSpecValidation}
+        setGeneratedPrompt=${setGeneratedPrompt} />`}
 
       <!-- CODE PROMPT (AI Chat Mode) -->
       <div class="pf-gen-section">
@@ -944,69 +680,3 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
   `;
 }
 
-/* ── Test Scope & Results ────────────────────────────── */
-
-export function TestScopeSelector({ value, onChange, compact }) {
-  return html`<div class="pf-gen-test-scope ${compact ? 'pf-gen-test-scope-compact' : ''}">
-    ${!compact && html`<h4>${t('profile.generator.test_scope_title')}</h4>`}
-    ${['comprehensive', 'basic', 'none'].map(level => html`
-      <label class="pf-gen-or-radio-label" title=${t('profile.generator.test_scope_' + level)}>
-        <input type="radio" name="test-scope-${compact ? 'compact' : 'full'}" value=${level}
-          checked=${value === level}
-          onChange=${() => onChange(level)} />
-        ${compact
-          ? (level === 'comprehensive' ? '✓ ' + t('profile.generator.test_scope_comprehensive_short')
-            : level === 'basic' ? '○ ' + t('profile.generator.test_scope_basic_short')
-            : '— ' + t('profile.generator.test_scope_none_short'))
-          : t('profile.generator.test_scope_' + level)}
-      </label>
-    `)}
-  </div>`;
-}
-
-export function TestResultsView({ report, projectId, onFixRequest }) {
-  if (!report) return null;
-
-  const overallKey = report.overall === 'passed' ? 'test_passed'
-    : report.overall === 'partial' ? 'test_partial'
-    : 'test_failed';
-
-  return html`<div class="pf-gen-test-results">
-    <div class="pf-gen-test-overall pf-gen-test-${report.overall}">
-      ${t('profile.generator.' + overallKey)}
-    </div>
-    ${(report.components || []).map(c => html`
-      <div class="pf-gen-test-component pf-gen-test-${c.status}">
-        <strong>${c.label || c.componentId}</strong>
-        <span class="pf-gen-test-badge">${t('profile.generator.test_component_' + c.status)}</span>
-        ${c.fixRound > 0 && html`<span class="pf-gen-test-badge">${t('profile.generator.test_fix_round')} ${c.fixRound}</span>`}
-        ${c.errors && c.errors.length > 0
-          ? html`<span>${c.errors.length} ${t('profile.generator.test_errors_count')}</span>`
-          : html`<span>${c.passed}/${c.scenarios}</span>`}
-        ${c.errors && c.errors.length > 0 && html`<ul class="pf-gen-test-errors">
-          ${c.errors.map(e => html`<li>${e}</li>`)}
-        </ul>`}
-        ${c.screenshots && c.screenshots.length > 0 && html`<div class="pf-gen-test-screenshots">
-          <strong>${t('profile.generator.test_screenshots')}</strong>
-          <div class="pf-gen-screenshot-grid">
-            ${c.screenshots.map(s => html`
-              <img src=${screenshotUrl(projectId, s)} class="pf-gen-screenshot" alt=${s}
-                onClick=${() => window.open(screenshotUrl(projectId, s), '_blank')} />
-            `)}
-          </div>
-        </div>`}
-        ${c.status === 'failed' && onFixRequest && html`<div class="pf-gen-test-fix-actions">
-          <button class="btn-primary" onClick=${() => onFixRequest(c.componentId, 'auto')}>
-            ${t('profile.generator.test_fix_auto')}
-          </button>
-          <button class="btn-outline" onClick=${() => onFixRequest(c.componentId, 'manual')}>
-            ${t('profile.generator.test_fix_manual')}
-          </button>
-          <button class="btn-ghost" onClick=${() => onFixRequest(c.componentId, 'skip')}>
-            ${t('profile.generator.test_fix_skip')}
-          </button>
-        </div>`}
-      </div>
-    `)}
-  </div>`;
-}

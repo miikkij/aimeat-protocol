@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.1.0 — 2026-07-13 — Mount discoveryLinkHeaders() before bootstrapRouter (RFC 8288 agent discovery)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import express from 'express';
@@ -32,7 +33,7 @@ import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/lo
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
-import { wellknownRouter } from '../routes/wellknown.js';
+import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
 import { appGrantsRouter } from '../routes/app-grants.js';
@@ -243,6 +244,9 @@ export async function mountRoutes(
   // custom portal template (set via the admin Template Editor) instead of
   // always redirecting human visitors to the SPA. Reused by siteRouter below.
   const siteService = new SiteService(config, storage);
+  // RFC 8288 discovery Link headers (api-catalog + service-desc) on every GET/HEAD —
+  // must precede bootstrapRouter so the root response carries them too.
+  app.use(discoveryLinkHeaders());
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.

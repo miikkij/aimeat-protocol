@@ -5,155 +5,31 @@
  *   Handles step execution (generate, analyze, reflect, synthesize).
  * @structure
  *   - BatchCard (default export) — collapsed/expanded toggle, step execution
- *   - PasteBack — reusable paste-back textarea component
- *   - callModel — sends prompt to OpenRouter-compatible endpoint
- *   - extractJson — best-effort JSON extraction from LLM text
  *   - renderStep1 — Step 1 UI (Generation)
  *   - renderStep2 — Step 2 UI (Analysis)
  *   - renderStep3 — Step 3 UI (Reflection — dual columns)
- *   - renderStep4 — Step 4 UI (Synthesis — grouped proposals + A/B/C options)
+ *   Extracted to sibling modules (max-file-lines):
+ *   - callModel, extractJson, computeWeightedScore, scoreClass, formatDuration, PENDING_* consts,
+ *     PasteBack, CollapsiblePre (./calibrator-batch.helpers.js)
+ *   - Step4View — Step 4 UI (Synthesis — grouped proposals + A/B/C options) (./calibrator-batch.step4.js)
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial V2 implementation
  *   v1.0.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
+ *   v1.0.2 — 2026-07-13 — Split for max-file-lines: helpers + Step 4 render moved to sibling modules
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
-
-/** Weighted score: critical=3, major=2, minor=1. Returns 0-100 or null. */
-function computeWeightedScore(dims) {
-  if (!dims || dims.length === 0) return null;
-  const weights = { critical: 3, major: 2, minor: 1 };
-  let totalWeight = 0, passedWeight = 0;
-  for (const d of dims) {
-    const w = weights[d.severity] || 1;
-    totalWeight += w;
-    if (d.pass) passedWeight += w;
-  }
-  return totalWeight > 0 ? Math.round((passedWeight / totalWeight) * 100) : null;
-}
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { copyToClipboard } from '/js/utils.js';
 import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js';
-
-
-// ── Helpers ──
-
-async function callModel(projectId, prompt, modelId, { retries = 1, temperature, top_p, max_tokens } = /** @type {{ retries?: number, temperature?: number, top_p?: number, max_tokens?: number }} */ ({})) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
-    const headers = { 'Content-Type': 'application/json' };
-    const session = window.AIMEAT?.auth?.getSession?.();
-    if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
-    try {
-      const body = { projectId, prompt, model: modelId };
-      if (temperature !== undefined) body.temperature = temperature;
-      if (top_p !== undefined) body.top_p = top_p;
-      if (max_tokens !== undefined) body.max_tokens = max_tokens;
-      const raw = await fetch('/v1/openrouter/complete', {
-        method: 'POST', headers,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!raw.ok) {
-        let msg = `HTTP ${raw.status}`;
-        try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
-        // Retry on 502/503/429
-        if (attempt < retries && (raw.status === 502 || raw.status === 503 || raw.status === 429)) {
-          console.warn(`callModel retry ${attempt + 1}/${retries}: ${msg}`);
-          await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
-          continue;
-        }
-        throw new Error(msg);
-      }
-      const resp = await raw.json();
-      if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-      const content = resp.data?.content || '';
-      // Empty response = model didn't run properly. Retry if possible.
-      if (!content && attempt < retries) {
-        console.warn(`callModel retry ${attempt + 1}/${retries}: empty response from ${modelId}`);
-        await new Promise(r => setTimeout(r, 3000));
-        continue;
-      }
-      if (!content) {
-        throw new Error(`Model returned empty response (${modelId}). This usually means OpenRouter failed to route the request. Try again.`);
-      }
-      return content;
-    } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Request timed out (30 min)', { cause: e });
-      // Retry on network errors
-      if (attempt < retries && e.name === 'TypeError') {
-        console.warn(`callModel retry ${attempt + 1}/${retries}: network error`);
-        await new Promise(r => setTimeout(r, 3000));
-        continue;
-      }
-      throw e;
-    } finally { clearTimeout(timeoutId); }
-  }
-}
-
-function extractJson(text) {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
-}
-
-function scoreClass(score) {
-  if (score == null) return '';
-  if (score >= 80) return 'pass';
-  if (score >= 50) return 'mixed';
-  return 'fail';
-}
-
-function formatDuration(ms) {
-  if (!ms) return '';
-  if (ms < 1000) return ms + 'ms';
-  return (ms / 1000).toFixed(1) + 's';
-}
-
-const PENDING_ANALYSIS = { status: 'pending', dimensions: [], overallScore: null, analysis: null, error: null, promptSent: null, rawResponse: null };
-const PENDING_REFLECTION = { status: 'pending', judgeProposals: null, selfProposals: null, error: null };
-const PENDING_SYNTHESIS = { status: 'pending', groupedProposals: [], options: null, recommendation: null, analysis: null, error: null, promptSent: null, rawResponse: null };
-
-
-// ── PasteBack Component ──
-
-function PasteBack({ label, onSave }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState('');
-
-  if (!open) return html`<button class="btn-ghost btn-sm" onClick=${() => setOpen(true)}>${label}</button>`;
-  return html`
-    <div class="fnd-cal-paste">
-      <textarea value=${text} onInput=${e => setText(e.target.value)}
-        placeholder="Paste JSON response here..." />
-      <div class="fnd-cal-paste-actions">
-        <button class="btn-primary btn-sm" onClick=${() => { onSave(text); setOpen(false); setText(''); }}
-          disabled=${!text.trim()}>${t('profile.calibrator.save')}</button>
-        <button class="btn-ghost btn-sm" onClick=${() => { setOpen(false); setText(''); }}>${t('profile.calibrator.back')}</button>
-      </div>
-    </div>
-  `;
-}
-
-
-// ── Collapsible Pre Block ──
-
-function CollapsiblePre({ label, text }) {
-  if (!text) return null;
-  return html`
-    <details class="fnd-cal-collapsible">
-      <summary>${label}</summary>
-      <div class="fnd-cal-run-detail">
-        <pre>${text}</pre>
-      </div>
-    </details>
-  `;
-}
+import {
+  callModel, extractJson, computeWeightedScore, scoreClass, formatDuration,
+  PENDING_ANALYSIS, PENDING_REFLECTION, PENDING_SYNTHESIS, PasteBack, CollapsiblePre,
+} from './calibrator-batch.helpers.js';
+import { Step4View } from './calibrator-batch.step4.js';
 
 
 // ── BatchCard Component ──
@@ -788,101 +664,6 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     `;
   }
 
-  // ── Render: Step 4 (Synthesis) ──
-
-  function renderStep4() {
-    const models = detail?.models || [];
-    const anyReflected = models.some(m => m.step3_reflection?.status === 'done');
-    const synth = detail?.step4_synthesis;
-    const hasSynthesis = synth?.status === 'done';
-
-    return html`
-      <details class="fnd-cal-step" open=${hasSynthesis}>
-        <summary>${t('profile.calibrator.step4')}</summary>
-        <div class="fnd-cal-step-body">
-          ${synth?.error ? html`<div class="fnd-cal-warning" style="color:var(--danger)">Error: ${synth.error}</div>` : ''}
-          ${synth?.status === 'error' && synth?.analysis ? html`<div class="fnd-cal-hint" style="color:var(--danger)">${synth.analysis}</div>` : ''}
-
-          <!-- Grouped proposals -->
-          ${synth?.groupedProposals?.length > 0 ? html`
-            <div class="fnd-cal-synthesis">
-              <div class="fnd-cal-editor-label">${t('profile.calibrator.groupedProposals')}</div>
-              ${synth.groupedProposals.map((gp, i) => html`
-                <div class="fnd-cal-proposal-card" key=${gp.id || i}>
-                  <div>${gp.text || gp.proposal || JSON.stringify(gp)}</div>
-                  ${gp.sources ? html`<div class="fnd-cal-proposal-sources">${t('profile.calibrator.overlap')}: ${Array.isArray(gp.sources) ? gp.sources.join(', ') : gp.sources}</div>` : ''}
-                  ${gp.overlap ? html`<span class="fnd-cal-dim-badge ${gp.overlap > 1 ? 'pass' : 'fail'}">${t('profile.calibrator.overlap')}: ${gp.overlap}</span> ` : ''}
-                  ${gp.impact ? html`<span class="fnd-cal-proposal-impact ${gp.impact}">${t('profile.calibrator.impact')}: ${gp.impact}</span>` : ''}
-                </div>
-              `)}
-            </div>
-          ` : ''}
-
-          <!-- Options A/B/C -->
-          ${synth?.options ? html`
-            <div class="fnd-cal-options">
-              ${['A', 'B', 'C'].map(key => {
-                const opt = synth.options[key];
-                if (!opt) return null;
-                return html`
-                  <div class="fnd-cal-option ${selectedOption === key ? 'selected' : ''}"
-                    onClick=${() => setSelectedOption(key)}>
-                    <input type="radio" name="synth-option" value=${key}
-                      checked=${selectedOption === key}
-                      onChange=${() => setSelectedOption(key)} />
-                    <div>
-                      <div class="fnd-cal-option-label">${t('profile.calibrator.option' + key)}</div>
-                      ${opt.description ? html`<div class="fnd-cal-option-impact">${opt.description}</div>` : ''}
-                      ${opt.proposalIds ? html`<div class="fnd-cal-option-impact">${opt.proposalIds.length} ${t('profile.calibrator.proposals')}</div>` : ''}
-                    </div>
-                  </div>
-                `;
-              })}
-            </div>
-          ` : ''}
-
-          <!-- Recommendation -->
-          ${synth?.recommendation ? html`
-            <div class="fnd-cal-recommendation">
-              <strong>${t('profile.calibrator.recommendation')}:</strong> ${synth.recommendation}
-            </div>
-          ` : ''}
-
-          <!-- Apply / Copy actions -->
-          ${hasSynthesis && synth?.options ? html`
-            <div class="fnd-cal-step-actions">
-              <button class="btn-primary btn-sm" onClick=${handleApplySelected}
-                disabled=${applyingFixes || !hasReasoningModel}>
-                ${applyingFixes ? t('profile.calibrator.applyingFixes') : t('profile.calibrator.applySelected')}
-              </button>
-              <button class="btn-ghost btn-sm" onClick=${handleCopyPromptAndProposals}>
-                ${t('profile.calibrator.copyPromptAndProposals')}
-              </button>
-            </div>
-            ${applyingFixes ? html`
-              <div class="fnd-cal-progress">
-                ${t('profile.calibrator.applyingFixes')} ${applyElapsed}s — ${applyElapsed > 30 ? 'Large prompts take time. Do not close the browser.' : 'Rewriting prompt with selected proposals...'}
-              </div>
-            ` : ''}
-          ` : ''}
-
-          <!-- Collapsible prompt/response -->
-          ${synth?.promptSent ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewPromptSent')} text=${synth.promptSent} />` : ''}
-          ${synth?.rawResponse ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewRawResponse')} text=${synth.rawResponse} />` : ''}
-          <${PasteBack} label=${t('profile.calibrator.pasteSynthesis')} onSave=${handlePasteSynthesis} />
-
-          <!-- Run button -->
-          <div class="fnd-cal-step-actions">
-            <button class="btn-primary btn-sm" onClick=${() => handleStep4()} disabled=${running || !hasReasoningModel || !anyReflected}>
-              ${t('profile.calibrator.runStep4')}
-            </button>
-            ${!hasReasoningModel ? html`<span class="fnd-cal-hint">${t('profile.calibrator.setReasoningModel')}</span>` : ''}
-          </div>
-        </div>
-      </details>
-    `;
-  }
-
   // ── Main Render ──
 
   const b = batchSummary;
@@ -917,7 +698,12 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
           ${renderStep1()}
           ${renderStep2()}
           ${renderStep3()}
-          ${renderStep4()}
+          <${Step4View}
+            detail=${detail} selectedOption=${selectedOption} setSelectedOption=${setSelectedOption}
+            applyingFixes=${applyingFixes} hasReasoningModel=${hasReasoningModel}
+            handleApplySelected=${handleApplySelected} handleCopyPromptAndProposals=${handleCopyPromptAndProposals}
+            applyElapsed=${applyElapsed} handlePasteSynthesis=${handlePasteSynthesis}
+            running=${running} handleStep4=${handleStep4} />
         </div>
       ` : ''}
     </div>
