@@ -83,7 +83,7 @@
     "test:e2e:all-backends": "node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --all && node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts --all && node --env-file=.env.test.postgres --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:ci": "node --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:ci:filter": "node --import tsx test/run-e2e-ci.ts",
-    "lint": "eslint src/ public/",
+    "lint": "eslint src/ public/ --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
     "check:importmap": "tsx scripts/check-importmap.ts",
