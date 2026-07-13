@@ -20,6 +20,13 @@ import { escHtml } from '/js/utils.js';
 import { num, EconRow } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 
+/** Format a { EUR: 1500, USD: 900 } minor-units map as "15.00 EUR · 9.00 USD". */
+function fmtMoneyMap(m) {
+  const entries = Object.entries(m || {});
+  if (!entries.length) return '';
+  return entries.map(([cur, minor]) => `${(minor / 100).toFixed(2)} ${cur}`).join(' · ');
+}
+
 export default function EconomyTab({ data, reload }) {
   // Hooks must run unconditionally before any early return (Rules of Hooks).
   const [mintGaii, setMintGaii] = useState('');
@@ -75,6 +82,12 @@ export default function EconomyTab({ data, reload }) {
         <${EconRow} label=${t('dashboard.commerceSalesToday')} value=${num(e.commerce.sales_volume_today) + ' ' + t('dashboard.morselUnit')} />
         <${EconRow} label=${t('dashboard.commerceFeesAllTime')} value=${num(e.commerce.operator_fees_all_time) + ' ' + t('dashboard.morselUnit')} />
         <${EconRow} label=${t('dashboard.commerceFeesToday')} value=${num(e.commerce.operator_fees_today) + ' ' + t('dashboard.morselUnit')} />
+        ${Object.keys(e.commerce.money_volume || {}).length > 0 || Object.keys(e.commerce.operator_money_fees || {}).length > 0 ? html`
+          <div class="adm-subhead">${t('dashboard.commerceMoney')}</div>
+          <${EconRow} label=${t('dashboard.commerceMoneyVolume')} value=${fmtMoneyMap(e.commerce.money_volume) || '—'} />
+          <${EconRow} label=${t('dashboard.commerceMoneyFees')} value=${fmtMoneyMap(e.commerce.operator_money_fees) || '—'} />
+          <${EconRow} label=${t('dashboard.commercePlatformAccount')} value=${e.commerce.platform_connected ? (t('dashboard.on') || 'connected') : (t('dashboard.commercePlatformNone') || 'not connected — fees are invoice receivables')} />
+        ` : null}
       </div>`}
 
     <div class="adm-card">

@@ -395,14 +395,27 @@ export function adminRouter(
             }
         }
 
-        // Checkout-session lifecycle counts (commerce.session.* memory records, buyer-side truth).
+        // Checkout-session lifecycle counts (commerce.session.* memory records, buyer-side truth) +
+        // real-money (EUR/USD) volume per currency, kept entirely separate from morsels.
         const sessionCounts = { open: 0, completed: 0, cancelled: 0, expired: 0, total: 0 };
+        const moneyVolume: Record<string, number> = {};   // completed money-sale gross, by currency
+        const operatorMoneyFees: Record<string, number> = {}; // operator's platform-fee cut, by currency
         try {
             const { items: sessionRecs } = await storage.listAllMemory({ prefix: 'commerce.session.', limit: 2000 });
             for (const r of sessionRecs) {
-                const status = (r.value as { status?: string } | undefined)?.status ?? 'open';
+                const v = r.value as { status?: string; currency?: string; total?: number } | undefined;
+                const status = v?.status ?? 'open';
                 if (status in sessionCounts) sessionCounts[status as keyof typeof sessionCounts]++;
                 sessionCounts.total++;
+                if (status === 'completed' && v?.currency && v.currency !== 'morsel') {
+                    moneyVolume[v.currency] = (moneyVolume[v.currency] ?? 0) + (v.total ?? 0);
+                }
+            }
+            // Operator platform-fee records for money sales (commerce.platform-fee.*).
+            const { items: feeRecs } = await storage.listAllMemory({ prefix: 'commerce.platform-fee.', limit: 2000 });
+            for (const r of feeRecs) {
+                const v = r.value as { fee?: number; currency?: string } | undefined;
+                if (v?.currency && v.fee) operatorMoneyFees[v.currency] = (operatorMoneyFees[v.currency] ?? 0) + v.fee;
             }
         } catch { /* commerce metrics must never break the dashboard */ }
 
@@ -516,6 +529,12 @@ export function adminRouter(
                     sales_volume_today: salesVolumeToday,
                     operator_fees_all_time: operatorFeesAllTime,
                     operator_fees_today: operatorFeesToday,
+                    // Real-money commerce (minor units per ISO currency), separate from morsels.
+                    money_volume: moneyVolume,
+                    operator_money_fees: operatorMoneyFees,
+                    // The operator's Stripe Connect platform account (their OWN business account for
+                    // taking the platform cut via application-fee — routing, not custody).
+                    platform_connected: !!process.env.AIMEAT_PLATFORM_STRIPE_KEY,
                 },
             },
             config: {

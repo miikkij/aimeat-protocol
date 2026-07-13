@@ -145,6 +145,8 @@ export interface PaymentHandler {
     amount: number;
     currency: string;
     reference: string;
+    /** The operator's platform fee on this sale (minor units) — a Connect handler routes it as an application fee. */
+    fee: number;
     /** Opaque payment instrument from the adapter (e.g. a Stripe SPT); unused by morsels. */
     instrument?: unknown;
     /** The session's seller — money handlers charge on the SELLER's own PSP credentials (psp). */

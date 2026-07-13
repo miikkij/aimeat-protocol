@@ -23,7 +23,7 @@ import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext 
 import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
-import { commerceFeePercent, settleMarketplaceFee } from '../services/marketplace-fee.js';
+import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 
 export { CommerceError } from './errors.js';
@@ -146,6 +146,27 @@ export async function listOrders(storage: Storage, sellerGhii: string, limit = 5
     .map((r) => r.value as unknown as CheckoutSessionRecord)
     .filter((s) => s && s.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Record the operator's platform fee on a MONEY sale (never touches the morsel ledger). Stored as
+ * a memory record under the operator's GHII (or the seller's, if no operator resolves) so the admin
+ * dashboard can total the operator's real-money cut per currency. `mode` notes how it is collected:
+ * `connect` when the Stripe handler routed an application-fee, otherwise `receivable` (invoice).
+ */
+async function recordMoneyPlatformFee(
+  storage: Storage,
+  config: AimeatConfig,
+  args: { fee: number; currency: string; sellerGhii: string; buyerGhii: string; trackingCode: string; handler: string },
+): Promise<void> {
+  const operatorGhii = await resolveOperatorFeeGhii(storage, config);
+  const ownerGhii = operatorGhii ?? args.sellerGhii;
+  const mode = args.handler === 'com.stripe.spt' ? 'connect' : 'receivable';
+  await putRecord(storage, ownerGhii, `commerce.platform-fee.${args.trackingCode}`, {
+    fee: args.fee, currency: args.currency, mode, handler: args.handler,
+    sellerGhii: args.sellerGhii, buyerGhii: args.buyerGhii, trackingCode: args.trackingCode,
+    at: new Date().toISOString(),
+  });
 }
 
 function requireOpen(session: CheckoutSessionRecord): void {
@@ -271,7 +292,7 @@ export async function completeSession(
   // the SELLER's own PSP credentials (loaded by the resolver) — never on node-level keys.
   const seller = { ghii: session.sellerGhii, owner: session.sellerOwner, psp: sellables[0]?.psp };
   const collected = session.total > 0
-    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, instrument, seller })
+    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller })
     : { trackingCode: `comtx_free_${session.id}` };
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
@@ -300,10 +321,16 @@ export async function completeSession(
         await handler.payout(ctx, { toGhii: sellable.sellerGhii, amount: net, currency: session.currency, buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, reference: session.id });
       }
     }
-    // The morsel fee leg routes to operator|burn. Money-currency fees stay where the PSP
-    // collected them (Stripe application-fee model) — the receipt still records the number.
+    // Fee leg. Morsels: route to operator|burn on the ledger. Money: no ledger movement — record
+    // the operator's platform-fee entry (collected live via Stripe Connect application-fee, or an
+    // invoice receivable otherwise) so the operator's cut is ACCOUNTED and shows in the dashboard.
     if (session.currency === 'morsel') {
       await settleMarketplaceFee(storage, config, { fee: totalFee, payerGhii: session.buyerGhii, trackingCode: collected.trackingCode, source: 'commerce' });
+    } else if (totalFee > 0) {
+      await recordMoneyPlatformFee(storage, config, {
+        fee: totalFee, currency: session.currency, sellerGhii: session.sellerGhii,
+        buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, handler: handler.id,
+      });
     }
   }
 
