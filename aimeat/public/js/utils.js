@@ -15,6 +15,22 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
+/** Micros per whole currency unit — money amounts are 6-decimal micro-units (matches USDC/x402). */
+export const MONEY_UNIT = 1_000_000;
+
+/** Format money micro-units as "1.50 EUR" / "0.002 USD" (≥2 decimals, up to 6 when sub-cent). */
+export function fmtMoney(micros, currency) {
+  const s = ((Number(micros) || 0) / MONEY_UNIT).toFixed(6).replace(/(\.\d{2}\d*?)0+$/, '$1');
+  return currency ? `${s} ${currency}` : s;
+}
+
+/** Parse a major-unit input ("1.50", "0,002") into integer money micro-units; null if not positive. */
+export function microsFromInput(str) {
+  const n = parseFloat(String(str).replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * MONEY_UNIT);
+}
+
 /** HTML-escape a string (prevents XSS in user-generated content). */
 export function escHtml(s) {
   if (!s) return '';

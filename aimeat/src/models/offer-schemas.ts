@@ -145,7 +145,8 @@ export const OfferSchema = z.object({
   dependsOn: z.array(DependencySchema).max(20).optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
   price: PriceSchema.optional(),
-  // Money price (TARGET-033 phase 6): minor units + ISO code. Sellable through the commerce
+  // Money price (TARGET-033 phase 6): amount in 6-decimal MICRO-UNITS (1 EUR = 1_000_000 micros;
+  // matches USDC/x402, covers sub-cent per-call pricing) + ISO code. Sellable through the commerce
   // checkout when the SELLER has their own PSP credentials configured (commerce.psp) — funds land
   // on the seller's account, never the node's. Additive → existing docs validate unchanged.
   priceMoney: z.object({

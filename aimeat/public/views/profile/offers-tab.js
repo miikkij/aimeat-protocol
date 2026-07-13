@@ -35,7 +35,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, fmtMoney, microsFromInput } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferBadges, OfferExample, OfferRequirements, OfferDeliverable } from '/components/offer-card-view.js';
@@ -73,8 +73,8 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
   const [result, setResult] = useState(null);
   const [vis, setVis] = useState(offer.visibility || 'private');
   const [morsels, setMorsels] = useState(offer.price?.morsels ?? 0);
-  // Money price (minor units on the offer, shown/edited in major units). Needs the seller's own PSP key.
-  const [moneyAmt, setMoneyAmt] = useState(offer.priceMoney ? (offer.priceMoney.amount / 100).toFixed(2) : '');
+  // Money price (micro-units on the offer, shown/edited in major units). Needs the seller's own PSP key.
+  const [moneyAmt, setMoneyAmt] = useState(offer.priceMoney ? fmtMoney(offer.priceMoney.amount) : '');
   const [moneyCur, setMoneyCur] = useState(offer.priceMoney?.currency ?? 'EUR');
   const [savingBill, setSavingBill] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
@@ -138,8 +138,8 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
     setSavingBill(true);
     try {
       const price = Number(morsels) > 0 ? { morsels: Number(morsels), unit: 'per-call' } : null;
-      const amt = Math.round(parseFloat(String(moneyAmt).replace(',', '.')) * 100);
-      const priceMoney = Number.isFinite(amt) && amt > 0 ? { amount: amt, currency: moneyCur } : null;
+      const amt = microsFromInput(moneyAmt);
+      const priceMoney = amt ? { amount: amt, currency: moneyCur } : null;
       const r = await offersService.setOfferBilling(entry.agent, offer.id, { price, priceMoney, visibility: vis });
       if (r?.ok === false) showToast(r?.error?.message || (t('profile.offers.billSaveFailed') || 'Could not save'));
       else { showToast(t('profile.offers.billSaved') || 'Saved.'); onChanged?.(); }

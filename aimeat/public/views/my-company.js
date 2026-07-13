@@ -30,6 +30,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
+import { fmtMoney, microsFromInput } from '/js/utils.js';
 import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
@@ -62,7 +63,7 @@ function OrderRow({ o, view }) {
       </div>
       ${o.input && html`<div class="mc-order-input">${t('myCompany.orderedWhat')}: “${o.input}”</div>`}
       ${o.charged > 0 && html`<div class="mc-order-receipt">🧾 ${t('myCompany.receiptLabel')}: ${o.currency && o.currency !== 'morsel'
-        ? `${(o.charged / 100).toFixed(2)} ${o.currency}`
+        ? fmtMoney(o.charged, o.currency)
         : t('myCompany.charged').replace('{n}', o.charged)}${o.trackingCode ? html` · <span class="mc-mini">${o.trackingCode}</span>` : ''}</div>`}
       ${o.kind === 'result' && o.result != null && html`
         <div class="mc-result"><div class="mc-result-label">${t('myCompany.result')}</div><${DeliverableBody} value=${o.result} alt=${o.offerTitle} /></div>`}
@@ -435,8 +436,8 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
   const [editMode, setEditMode] = useState(false);
   const [price, setPrice] = useState(offer.price?.morsels ?? 0);
   const [vis, setVis] = useState(offer.visibility ?? 'private');
-  // Money price lives on the CATALOG REF (o.priceMoney, minor units) — edited in major units here.
-  const [moneyAmt, setMoneyAmt] = useState(o.priceMoney ? (o.priceMoney.amount / 100).toFixed(2) : '');
+  // Money price lives on the CATALOG REF (o.priceMoney, micro-units) — edited in major units here.
+  const [moneyAmt, setMoneyAmt] = useState(o.priceMoney ? fmtMoney(o.priceMoney.amount) : '');
   const [moneyCur, setMoneyCur] = useState(o.priceMoney?.currency ?? 'EUR');
   const [saving, setSaving] = useState(false);
 
@@ -459,9 +460,9 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
     try {
       const p = Number(price) > 0 ? { morsels: Math.floor(Number(price)), unit: 'per-call' } : null;
       await setOfferBilling(o.agentName, o.offerId, { price: p, visibility: vis });
-      // Money price (minor units) is saved on the company's catalog ref; empty clears it.
-      const amt = Math.round(parseFloat(String(moneyAmt).replace(',', '.')) * 100);
-      const priceMoney = Number.isFinite(amt) && amt > 0 ? { amount: amt, currency: moneyCur } : null;
+      // Money price (micro-units) is saved on the company's catalog ref; empty clears it.
+      const amt = microsFromInput(moneyAmt);
+      const priceMoney = amt ? { amount: amt, currency: moneyCur } : null;
       // record who last edited the company's listing (surfaced as "last saved by")
       await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId, priceMoney }).catch(() => {});
       setEditMode(false);
@@ -512,7 +513,7 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
         <div class="mc-config">
           ${!isOwn && html`<span class="mc-mini">${t('myCompany.byMember')}: <b>${o.agentOwner}</b></span>`}
           <span><b>${t('myCompany.visibilityLabel')}:</b> ${visLabel(offer.visibility)}</span>
-          <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}${o.priceMoney ? ` · ${(o.priceMoney.amount / 100).toFixed(2)} ${o.priceMoney.currency}` : ''}</span>
+          <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}${o.priceMoney ? ` · ${fmtMoney(o.priceMoney.amount, o.priceMoney.currency)}` : ''}</span>
           ${o.lastEditedBy
             ? html`<span class="mc-mini">${t('myCompany.lastSavedBy')}: <b>${ownerOf(o.lastEditedBy)}</b>${o.lastEditedAt ? ` · ${new Date(o.lastEditedAt).toLocaleString()}` : ''}</span>`
             : html`<span class="mc-mini">${t('myCompany.neverEdited')}</span>`}

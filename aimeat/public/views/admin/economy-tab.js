@@ -16,15 +16,15 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, fmtMoney } from '/js/utils.js';
 import { num, EconRow } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 
-/** Format a { EUR: 1500, USD: 900 } minor-units map as "15.00 EUR · 9.00 USD". */
+/** Format a { EUR: 15000000, USD: 9000000 } micro-units map as "15.00 EUR · 9.00 USD". */
 function fmtMoneyMap(m) {
   const entries = Object.entries(m || {});
   if (!entries.length) return '';
-  return entries.map(([cur, minor]) => `${(minor / 100).toFixed(2)} ${cur}`).join(' · ');
+  return entries.map(([cur, micros]) => fmtMoney(micros, cur)).join(' · ');
 }
 
 export default function EconomyTab({ data, reload }) {

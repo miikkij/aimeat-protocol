@@ -24,6 +24,7 @@ import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
+import { isMoneyCurrency } from './money.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 
 export { CommerceError } from './errors.js';
@@ -324,7 +325,7 @@ export async function completeSession(
     // Fee leg. Morsels: route to operator|burn on the ledger. Money: no ledger movement — record
     // the operator's platform-fee entry (collected live via Stripe Connect application-fee, or an
     // invoice receivable otherwise) so the operator's cut is ACCOUNTED and shows in the dashboard.
-    if (session.currency === 'morsel') {
+    if (!isMoneyCurrency(session.currency)) {
       await settleMarketplaceFee(storage, config, { fee: totalFee, payerGhii: session.buyerGhii, trackingCode: collected.trackingCode, source: 'commerce' });
     } else if (totalFee > 0) {
       await recordMoneyPlatformFee(storage, config, {
