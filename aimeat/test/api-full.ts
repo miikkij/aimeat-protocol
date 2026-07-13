@@ -1,5 +1,13 @@
-// Full API integration test for AIMEAT Phases 1-5
-// Run: cd aimeat && pnpm exec tsx test/api-full.ts
+/**
+ * @file test/api-full.ts
+ * @description Full API integration test for AIMEAT Phases 1-5 — bootstrap/discovery endpoints
+ *   (GET /, llms.txt, well-known set, Link headers), owner registration + auth, memory, and the
+ *   broad happy-path sweep across the core API surface.
+ * @usage cd aimeat && pnpm exec tsx test/api-full.ts
+ * @version-history
+ *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 api-catalog, and RFC 8288 Link-header tests
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -127,6 +135,39 @@ await test('GET /.well-known/aimeat', async () => {
     const { body } = await json('/.well-known/aimeat');
     assert(body.ok === true, 'ok');
     assert(body.protocol === 'aimeat', `protocol: ${body.protocol}`);
+});
+
+await test('GET /.well-known/mcp.json — MCP Server Card (SEP-1649)', async () => {
+    const res = await fetch(`${BASE}/.well-known/mcp.json`);
+    assert(res.status === 200, `status ${res.status}`);
+    const card = await res.json() as any;
+    assert(typeof card.protocolVersion === 'string', 'missing protocolVersion');
+    assert(card.serverInfo?.name?.includes('AIMEAT'), `serverInfo.name: ${card.serverInfo?.name}`);
+    assert(card.transport?.type === 'streamable-http', `transport.type: ${card.transport?.type}`);
+    assert(card.transport?.endpoint?.endsWith('/v1/mcp'), `transport.endpoint: ${card.transport?.endpoint}`);
+    assert(card.authentication?.required === true, 'MCP requires OAuth — authentication.required must be true');
+});
+
+await test('GET /.well-known/api-catalog — RFC 9727 linkset', async () => {
+    const res = await fetch(`${BASE}/.well-known/api-catalog`);
+    assert(res.status === 200, `status ${res.status}`);
+    const ct = res.headers.get('content-type') ?? '';
+    assert(ct.includes('application/linkset+json'), `content-type: ${ct}`);
+    const catalog = await res.json() as any;
+    assert(Array.isArray(catalog.linkset) && catalog.linkset.length > 0, 'linkset array missing/empty');
+    const root = catalog.linkset[0];
+    assert(root['service-desc']?.[0]?.href?.endsWith('/v1/spec'), `service-desc: ${JSON.stringify(root['service-desc'])}`);
+    const mcpEntry = catalog.linkset.find((e: any) => e.anchor?.endsWith('/v1/mcp'));
+    assert(mcpEntry?.['service-meta']?.[0]?.href?.endsWith('/.well-known/mcp.json'), 'MCP anchor missing service-meta → mcp.json');
+});
+
+await test('Discovery Link headers (RFC 8288) on GET responses', async () => {
+    for (const path of ['/', '/llms.txt']) {
+        const res = await fetch(`${BASE}${path}`, { redirect: 'manual' });
+        const link = res.headers.get('link') ?? '';
+        assert(link.includes('</.well-known/api-catalog>; rel="api-catalog"'), `${path}: missing api-catalog Link header (got: ${link})`);
+        assert(link.includes('</v1/spec>; rel="service-desc"'), `${path}: missing service-desc Link header (got: ${link})`);
+    }
 });
 
 await test('POST /v1/owners — register owner', async () => {

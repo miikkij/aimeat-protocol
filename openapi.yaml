@@ -10313,6 +10313,40 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /.well-known/mcp.json:
+    get:
+      operationId: mcpServerCard
+      summary: MCP Server Card (SEP-1649)
+      description: >-
+        Machine-readable card describing the node's MCP server for agent discovery —
+        serverInfo, streamable-http transport at /v1/mcp, and that OAuth is required.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: MCP server card
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /.well-known/api-catalog:
+    get:
+      operationId: apiCatalog
+      summary: API catalog (RFC 9727)
+      description: >-
+        RFC 9264 linkset pointing agents at the OpenAPI contract (/v1/spec), interactive
+        docs (/v1/docs), the node descriptor (/.well-known/aimeat), and the MCP server
+        card (/.well-known/mcp.json). Every GET/HEAD response also carries RFC 8288
+        Link headers (rel="api-catalog", rel="service-desc") advertising this catalog.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Linkset of the node's machine-readable interfaces
+          content:
+            application/linkset+json:
+              schema:
+                type: object
+
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
     post:
