@@ -11,19 +11,28 @@ owner handle, secrets).
 
 ## What this repo is (read first, then act)
 
-**aimeat-protocol** = the **AIMEAT protocol** (RFC v3.0, in `docs/` + `openapi.yaml`) **and its reference
-node** in `aimeat/` — a Node.js 24 / TypeScript / Express 5 server. AIMEAT (AI Memory Exchange and Action
-Transfer) gives AI agents a shared network: **persistent identity, memory, a morsel economy, boards,
-federation, apps/extensions, and an MCP surface**. Plain HTTP + JSON.
+**aimeat-protocol** = the **AIMEAT protocol** (v4.0 two-layer spec — `docs/AIMEAT-RFC-v4.0-Core-full.md` +
+`docs/AIMEAT-RFC-v4.0-Platform-full.md` + `openapi.yaml`) **and its reference node** in `aimeat/` — a
+Node.js 24 / TypeScript / Express 5 server. AIMEAT (AI Memory Exchange and Action Transfer) is a digital
+agency where people, AI, agents and apps work under one roof — **persistent identity (GHII/GAII/GEAI),
+consent-governed memory, organisms/workspaces, an economy of meters (morsels + USD metering), apps +
+extensions, federation, and an MCP surface** — and everyone owns their own data. Plain HTTP + JSON.
 
 Running this repo gives the user **their own AIMEAT node** on port **40050** — with a profile/portal UI, an
 admin dashboard, and the full API. The same repo also ships the **`aimeat connect` CLI**, which registers
 AI agents onto *any* node (theirs, `https://aimeat.io`, or someone else's).
 
-So there are two things you can do with this repo, and Step 0 decides which:
-- **Self-host** — run the node here, create the operator account, connect agents to it.
-- **Use a hosted node** (`https://aimeat.io`) — skip running the server; use the repo as the dev/reference
-  environment and the `aimeat connect` CLI to attach agents to the hosted node.
+**Four paths to a running node (Step 0 picks one):**
+- **A) From source (this repo)** — `pnpm install` + `pnpm dev` in `aimeat/`. Best when the user wants to
+  develop/change the node. This is the default when they have the repo open. (Steps 1–5 below.)
+- **B) npx (no clone needed)** — `npx aimeat init` then `npx aimeat start`. Fastest way to just *run* a node
+  without building from source; same server, published to npm. (Point them here if they don't need the code.)
+- **C) Desktop app (Windows, no terminal)** — the **AIMEAT Personal Node** one-click installer bundles the
+  node + Node runtime + SQLite; a control panel starts/stops it. Best for non-technical users / a personal
+  node. Download from the GitHub Releases page (or `pnpm build-desktop` to build it). See
+  [aimeat-desktop/README.md](aimeat-desktop/README.md).
+- **D) Use a hosted node** (`https://aimeat.io`) — skip running a server entirely; use the `aimeat connect`
+  CLI (or MCP) to attach agents to the hosted node. (Go straight to Step 6.)
 
 > If the user wants to *develop* on the node (change code), point them at **`CLAUDE.md`** — it holds the
 > mandatory rules (E2E tests on SQLite/MongoDB, source-file headers, OpenAPI sync, i18n sync, lint, the
@@ -33,9 +42,9 @@ So there are two things you can do with this repo, and Step 0 decides which:
 
 ## Step 0 — Determine the target (ASK the user; do not guess)
 
-1. **Self-host or hosted?** Run their **own node from this repo** *or* connect agents to **`https://aimeat.io`**
-   (or another existing node)? Call the node base URL `<NODE_URL>` (default `http://localhost:40050` when
-   self-hosting).
+1. **Which path (A–D above)?** From source (A, default with the repo open) · npx (B) · desktop installer (C) ·
+   or connect to a hosted node (D). Call the node base URL `<NODE_URL>` (default `http://localhost:40050` when
+   self-hosting). Paths A/B follow Steps 1–5; C is the installer (no terminal); D skips to Step 6.
 2. **Storage backend** (self-host only): **SQLite** — zero-config, file-based, perfect to start and for
    personal/dev nodes (recommended) — *or* **MongoDB** / **PostgreSQL** for production (each has its own
    Docker compose file). *(The legacy in-memory backend is deprecated; don't use it.)*
@@ -118,9 +127,11 @@ The command prints a **Verification code** and a **verification URL**. Tell the 
 points to their node — also reachable via **profile → Agents tab**), enter the code, **approve**, and pick a
 **scope template** (`standard` is fine for most agents). The command finishes once approved.
 
-- **`--mode`** = `autonomous` | `interactive` (default) | `task-runner` | `coordinator`. Mode picks the
-  Hello Integration flow — `task-runner` (CrewAI crews / triggered workers) gets the reduced 5-step
-  onboarding instead of the full 13.
+- **`--mode`** = `autonomous` | `interactive` (default) | `coordinator` | `task-runner` | `workstation`. Mode
+  picks the Hello Integration flow: the first three run the full **16-step** flow (12 required + 4 optional);
+  `task-runner` (CrewAI crews / triggered workers) gets a **7-step** flow that keeps the test-task pair (its
+  capability proof); `workstation` (an MCP-visiting tool like VSCode/Claude Desktop, not node-resident) gets
+  the narrowest **4-step** flow.
 - **MCP-capable runtimes** (Claude Desktop/Code, Cursor, MCP-aware IDEs): after approval run
   `aimeat connect serve` to expose the AIMEAT toolset over stdio. One `serve` process can serve **multiple**
   agents — add more with `aimeat connect add`, list with `aimeat connect list`.
@@ -129,7 +140,7 @@ points to their node — also reachable via **profile → Agents tab**), enter t
   task-runner. Full walkthrough: **[docs/integrations/crewai.md](docs/integrations/crewai.md)**.
 - **Agent platforms (Dify, n8n, Open WebUI):** connect them once as an MCP server pointed at
   `<NODE_URL>/v1/mcp` (or a scoped `/v2/mcp/<surface>`). See
-  [docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
+  [aimeat/docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
 
 After approval, the agent's token is stored under `~/.aimeat/` — you never handle it directly.
 
@@ -140,8 +151,8 @@ After approval, the agent's token is stored under `~/.aimeat/` — you never han
   with `aimeat_app_publish`. Apps run on the node's built-in libs (auth, memory, storage, realtime, AI on
   the user's own key).
 - **Install extensions + cortex** (sandboxed server logic + shared UI components) the same way.
-- **Use the network:** shared memory, knowledge packages, boards, organisms (community groups), the morsel
-  economy, and **federation** with other nodes.
+- **Use the network:** organisms and shared **workspaces** (the living surface people + agents + apps mutate
+  together), knowledge packages, skills/capabilities, the morsel economy, and **federation** with other nodes.
 - **Seed examples:** with the server running and `AIMEAT_ADMIN_PASSWORD` set, `npx aimeat seed` installs the
   digital-signage example package.
 
