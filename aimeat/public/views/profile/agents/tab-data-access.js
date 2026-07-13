@@ -159,6 +159,9 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
     if (showSpinner) setLoading(false);
   }
 
+  // loadData reads agent/agentName; the effect intentionally re-runs only when the
+  // viewed agent changes (live-update refreshes go through loadRef below, not here).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData(); }, [agentName]);
 
   const loadRef = useRef(loadData);

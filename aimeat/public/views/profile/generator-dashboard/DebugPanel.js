@@ -17,7 +17,7 @@
  *   v1.0.0 — 2026-03-23 — Initial implementation
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -32,11 +32,7 @@ export function DebugPanel({ projectId }) {
   const [fileContent, setFileContent] = useState(null);
   const [loadingFile, setLoadingFile] = useState(false);
 
-  useEffect(() => {
-    loadFiles();
-  }, [projectId]);
-
-  async function loadFiles() {
+  const loadFiles = useCallback(async () => {
     setLoading(true);
     try {
       const resp = await apiGet(`/v1/generator/debug/${projectId}/files`);
@@ -45,7 +41,11 @@ export function DebugPanel({ projectId }) {
       setFiles([]);
     }
     setLoading(false);
-  }
+  }, [projectId]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
   async function loadFile(path) {
     setSelectedFile(path);

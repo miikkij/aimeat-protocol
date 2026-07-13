@@ -41,6 +41,9 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
       setGrounded(existing?.sourceGrounded || false);
       setComment(existing?.comment || '');
     }
+    // Prefill from `existing` only on the open transition; adding the existing.* fields would
+    // re-run and wipe the user's in-progress edits whenever the parent record changes while open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   function handleSend() {
     if (!stars) return;

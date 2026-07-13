@@ -198,6 +198,10 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         await handleRunAllSteps(d);
       })();
     }
+    // One-shot auto-run when autoRunAll turns on, guarded by autoRunTriggered. The handler and the
+    // useState tuple are recreated each render, so depending on them (or `running`) would re-fire
+    // this effect on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRunAll]);
 
   // ── Step 1: Generate ──

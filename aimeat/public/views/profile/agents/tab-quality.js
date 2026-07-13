@@ -23,7 +23,7 @@
  */
 
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
@@ -79,7 +79,7 @@ export default function TabQuality({ agentName, showToast }) {
   const [rateTarget, setRateTarget] = useState(null); // task being rated, or null
   const [sendingRate, setSendingRate] = useState(false);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     // NB: do NOT blank `data`/`loading` here. The initial render shows the
     // loading state (loading starts true); every later call -- including
     // live-update refetches -- swaps in fresh data in place without flashing an
@@ -93,7 +93,7 @@ export default function TabQuality({ agentName, showToast }) {
       setDoneTasks(tasksResp?.data?.tasks || []);
     } catch { /* keep showing the last good data on a transient error */ }
     setLoading(false);
-  }
+  }, [agentName]);
 
   async function handleSubmitRate(body) {
     if (!rateTarget) return;
@@ -123,7 +123,7 @@ export default function TabQuality({ agentName, showToast }) {
     setSendingRate(false);
   }
 
-  useEffect(() => { loadData(); }, [agentName]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   // Live updates: refresh when a rating lands or tasks change.
   const loadRef = useRef(loadData);

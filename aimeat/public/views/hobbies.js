@@ -144,6 +144,7 @@ function SearchView({ goTo, initData }) {
 
   useEffect(() => {
     if (initData?.interest || initData?.city) doSearch(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs the initial search once on mount from the incoming initData; doSearch/initData must not re-fire it as the user edits the fields.
   }, []);
 
   const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(1); } };

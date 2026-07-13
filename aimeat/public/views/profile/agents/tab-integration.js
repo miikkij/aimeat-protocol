@@ -29,7 +29,7 @@
  */
 
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
@@ -61,7 +61,7 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [updatingBundle, setUpdatingBundle] = useState(false);
 
-  async function loadData({ showSpinner = true } = {}) {
+  const loadData = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
     try {
       const [whResp, sbResp, dlResp, obResp] = await Promise.all([
@@ -76,9 +76,9 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
       setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
     } catch { /* silent */ }
     if (showSpinner) setLoading(false);
-  }
+  }, [agentName]);
 
-  useEffect(() => { loadData(); }, [agentName]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const loadRef = useRef(loadData);
   loadRef.current = loadData;

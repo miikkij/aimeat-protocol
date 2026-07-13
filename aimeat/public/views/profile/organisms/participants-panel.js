@@ -13,7 +13,7 @@
  *     into ONE "retired from here" chip + Bring back, so contracts never used here don't read as history.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
@@ -120,8 +120,8 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     return () => { cancelled = true; off(); };
   }, [orgId, wsId]);
   const isManager = !!(data && (data.nodes || []).some(n => (n.owners || []).some(o => o.isSelf && o.isCreator)));
-  const loadAccess = () => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {});
-  useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data]);  if (!data || !(data.nodes || []).length) return null;
+  const loadAccess = useCallback(() => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {}), [orgId, wsId]);
+  useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data, loadAccess]);  if (!data || !(data.nodes || []).length) return null;
   const owners = [];
   for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
 

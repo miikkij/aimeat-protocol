@@ -158,6 +158,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     let cancelled = false;
     fetchReadme(agent).then(md => { if (!cancelled) setReadme(md); });
     return () => { cancelled = true; };
+    // README is keyed to agent identity (name); refetching on every agent-object reference change
+    // (parent reloads the list on live-update) would spam the memory endpoint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, agent.name]);
 
   const hasReadme = typeof readme === 'string' && readme.trim().length > 0;
@@ -171,6 +174,10 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     // first-tab/default slot instead of being beaten by the state default.
     if (readme === undefined) return;
     setActiveTab(hasReadme ? 'readme' : getDefaultTab(state));
+    // Lock the default tab once, on expand + README-resolve. hasReadme derives from readme (already
+    // a dep); adding `state` would re-run and override the resolved default when the detected state
+    // shifts under the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, readme]);
 
   // Deep-link: when the fleet "running now" panel requests this agent's Tasks
@@ -194,6 +201,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     if (!expanded) return;
     const key = TAB_CHANGE_KEY[activeTab];
     if (key && onTabSeen && changes?.[key]) onTabSeen(agent.name, key);
+    // Mark the active tracked tab seen as changes arrive; keyed to changes/activeTab, not the
+    // onTabSeen prop identity (the parent may recreate it each render → would re-fire needlessly).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, activeTab, changes, agent.name]);
 
   const handleCollapse = useCallback(() => {

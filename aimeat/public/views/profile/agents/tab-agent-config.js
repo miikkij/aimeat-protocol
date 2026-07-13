@@ -131,6 +131,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadFiles is a loader closing over agent/selectedFile; effect intentionally re-runs only when agentName changes.
   useEffect(() => { loadFiles(); }, [agentName]);
 
   const loadRef = useRef(loadFiles);

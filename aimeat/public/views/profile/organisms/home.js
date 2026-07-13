@@ -137,7 +137,12 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       && form.interests.join(' ') === prev.interests.join(' ');
     if (untouched) setForm(baseline);
     prevBaselineRef.current = baseline;
-  }, [baseline]);  const dirty = form.name !== baseline.name || form.description !== baseline.description
+    // Reconcile the form to fresher org data ONLY when a new baseline arrives — not on
+    // every keystroke. The form.* reads are an intentional untouched-check snapshot, so
+    // this effect deliberately keys on [baseline] alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline]);
+  const dirty = form.name !== baseline.name || form.description !== baseline.description
     || form.type !== baseline.type || form.join_policy !== baseline.join_policy
     || form.visibility !== baseline.visibility
     || form.member_visibility !== baseline.member_visibility

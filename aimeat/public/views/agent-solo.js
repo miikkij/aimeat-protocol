@@ -93,6 +93,10 @@ export default function AgentSolo() {
     connect(() => getSession()?.jwt);
     onUpdate(notify);
     return () => { offUpdate(notify); disconnect(); };
+    // Keyed on the stable owner id: getSession() returns a fresh object each render,
+    // so depending on `session` itself would tear down and reopen the SSE connection
+    // every render. loadRef.current always holds the latest load().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.owner]);
 
   if (!session) {

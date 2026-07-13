@@ -42,6 +42,9 @@ export default function LivingTab({ session, showToast }) {
   const [ledger, setLedger] = useState([]);
   const [picked, setPicked] = useState({});           // slotId → chosen history version (timeline)
 
+  // loadAll is re-created each render and closes over session; this effect intentionally loads only
+  // when the session changes. Including it would re-run every render (loop).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (session) loadAll(); }, [session]);
 
   async function loadAll() {

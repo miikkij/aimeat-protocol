@@ -11,7 +11,7 @@
  *     hand-rolled .modal-overlay markup.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -28,11 +28,7 @@ export default function WorkTab({ session, showToast, onStats }) {
   const [deliverModal, setDeliverModal] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
-  useEffect(() => {
-    if (session) loadData();
-  }, [session]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const inbox = await listInbox();
       setWorkInbox(inbox);
@@ -42,7 +38,11 @@ export default function WorkTab({ session, showToast, onStats }) {
       const sent = await listSent();
       setWorkSent(sent);
     } catch { setWorkSent([]); }
-  }
+  }, [onStats]);
+
+  useEffect(() => {
+    if (session) loadData();
+  }, [session, loadData]);
 
   async function handleRate(workId, rating, comment) {
     if (!rating) { showToast(t('profile.work.selectRating'), true); return; }

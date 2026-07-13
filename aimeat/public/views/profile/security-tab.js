@@ -5,7 +5,7 @@
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, flex-between, etc.)
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -25,11 +25,7 @@ export default function SecurityTab({ session, showToast }) {
   const [sessions, setSessions] = useState([]);
   const [revokingId, setRevokingId] = useState(null);
 
-  useEffect(() => {
-    if (session) loadData();
-  }, [session]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [agents, sessionsList] = await Promise.all([
@@ -41,7 +37,11 @@ export default function SecurityTab({ session, showToast }) {
       setSessions(sessionsList);
     } catch { setSecurityData({ ghii: {}, agents: [] }); }
     setLoading(false);
-  }
+  }, [session]);
+
+  useEffect(() => {
+    if (session) loadData();
+  }, [session, loadData]);
 
   async function saveGhiiCors(originsText) {
     const origins = originsText.trim()

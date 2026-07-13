@@ -60,7 +60,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
         showToast(t('profile.chatSessions.deleteError'));
       } finally { setDeleting(null); }
     }, { danger: true });
-  }, [showToast, loadData]);
+  }, [confirm, showToast, loadData]);
 
   const toggleExpand = useCallback((name) => {
     setExpanded(prev => prev === name ? null : name);

@@ -124,6 +124,9 @@ export default function CompaniesView() {
       const c = new URLSearchParams(location.search).get('c');
       if (c && c.includes('/')) { const [o, s] = c.split('/'); openCompany(o, s); }
     }
+    // One-shot deep-link when the directory finishes loading. Keyed to `companies` on purpose:
+    // re-running on `selected` changes would re-open the deep-linked company after the user closes it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companies]);
 
   if (companies === null) return html`<div class="cm-container"><div class="cm-center"><div class="spinner"></div></div></div>`;

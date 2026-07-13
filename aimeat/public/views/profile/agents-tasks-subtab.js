@@ -76,7 +76,7 @@
  *     the create state and the reopened state look the same.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
@@ -437,14 +437,14 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
     }
   }
 
-  async function fetchEvents({ silent = false } = {}) {
+  const fetchEvents = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadingEvents(true);
     try {
       const resp = await listEvents(agentName, task.id);
       setEvents(resp?.data?.events || []);
     } catch { setEvents([]); }
     if (!silent) setLoadingEvents(false);
-  }
+  }, [agentName, task.id]);
 
   async function handleExpand(e) {
     e.stopPropagation();
@@ -463,7 +463,7 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   useEffect(() => {
     if (!expanded) return;
     return onLiveUpdate(['agent-tasks'], () => fetchEvents({ silent: true }));
-  }, [expanded, task.id, agentName]);
+  }, [expanded, fetchEvents]);
 
   // Deep-link from the fleet "running now" panel: when autoOpen bumps to a new
   // nonce for this task, expand it, load its events, and scroll it into view.
@@ -478,7 +478,7 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
     requestAnimationFrame(() => {
       taskRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-  }, [autoOpen]);
+  }, [autoOpen, fetchEvents]);
 
   async function handleStart(e) {
     e.stopPropagation();
@@ -889,6 +889,10 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
   useEffect(() => {
     const id = setTimeout(() => loadTasks(), q ? 300 : 0);
     return () => clearTimeout(id);
+    // Debounced refetch driven by the query inputs; loadTasks closes over exactly
+    // agentName/bucket/timeChip/q (all listed). Listing it (new identity each render)
+    // would reset the debounce timer on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentName, bucket, timeChip, q]);
 
   const loadRef = useRef(loadTasks);

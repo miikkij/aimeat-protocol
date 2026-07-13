@@ -99,6 +99,11 @@ export function UsageChart({ type = 'bar', labels = [], datasets = [], stacked =
       cancelled = true;
       if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
     };
+    // `sig` is a JSON signature of the plotted data (type/stacked/legend/labels/
+    // datasets); rebuild only when it or height changes. datasets/labels get fresh
+    // identities every render and yFormat is display-only — listing them would
+    // destroy/recreate the chart on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, height]);
 
   return html`<div class="usage-chart" style="--usage-chart-h:${height}px"><canvas ref=${canvasRef}></canvas></div>`;

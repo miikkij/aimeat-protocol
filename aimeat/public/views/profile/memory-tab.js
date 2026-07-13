@@ -151,6 +151,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); }
+    // The loaders are plain functions re-created every render and closing over component state; this
+    // effect intentionally runs them only when the session changes — including them would re-run on
+    // every render (infinite loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   // Resolve organism UUIDs to display names for the grouped key list — nobody
@@ -201,6 +205,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) { loadMemories(); }
+    // loadMemories is re-created each render; this effect intentionally reloads only when the agent
+    // selection or archived filter changes. Adding it (or session) would loop / double-load — session
+    // is already covered by the mount effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgent, memArchived]);
 
   async function loadFedConsents() {

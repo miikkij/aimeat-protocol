@@ -113,6 +113,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
     }).catch(() => {});
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- org.name only feeds recordRecent's display sub; the workspace-name fetch is intentionally keyed to orgId/wsId.
   }, [orgId, wsId]);  // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
   // each independent. The window name is unique per document, so re-clicking focuses the open one.
   const popOut = (typeName, docId) => {
@@ -360,7 +361,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const next = { __base: new Date().toISOString() };
     try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }
     setSeen(next);
-  }, [seen, ws]);
+  }, [seen, ws, seenKey]);
   // Changes landing on the tab the user is LOOKING at are seen immediately — otherwise a draft
   // saved while you're on its space tab would raise that tab's own badge.
   useEffect(() => {
@@ -377,7 +378,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       await load();
     } catch (e) { showToast((e && e.message) || (t('organisms.setupError') || 'Failed to set up workspace')); }
     finally { setBusy(false); }
-  }, [orgId, org, showToast, load]);
+  }, [orgId, wsId, org, showToast, load]);
 
   // Validate the JSON first; save only if clean. On errors, surface them (+ a fix prompt for the AI).
   const validateAndApply = useCallback(async (jsonText, fromGenerator) => {
@@ -397,7 +398,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       await load();
     } catch (e) { setGenErrors([(e && e.message) || (t('organisms.applyError') || 'Could not apply — check the JSON.')]); }
     finally { setBusyFn(false); }
-  }, [orgId, showToast, load]);
+  }, [orgId, wsId, showToast, load]);
 
   const generate = useCallback(async () => {
     if (!genDesc.trim()) return;
@@ -494,7 +495,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setAddingSchema(null); await load(); }
     } catch (e) { showToast((e && e.message) || 'Failed to save draft'); }
     finally { setBusy(false); }
-  }, [orgId, showToast, load]);
+  }, [orgId, wsId, showToast, load]);
 
   // Documents are free-form markdown records ({id,title,markdown}) — same draft/publish path.
   // When created from a section, file the new id into that section's documents[].
@@ -516,13 +517,13 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       }
     } catch (e) { showToast((e && e.message) || 'Failed to save document'); }
     finally { setBusy(false); }
-  }, [orgId, sectionsByType, showToast, load]);
+  }, [orgId, wsId, sectionsByType, showToast, load]);
 
   // ── Section index ops (persist organism.{id}.meta.sections.{typeName}) ──
   const updateSections = useCallback(async (typeName, sections) => {
     setSectionsByType(s => ({ ...s, [typeName]: sections }));
     await orgService.saveSections(orgId, wsId, typeName, sections).catch(e => showToast((e && e.message) || 'Failed to save sections'));
-  }, [orgId, showToast]);
+  }, [orgId, wsId, showToast]);
   const addSection = (typeName, parentId) => {
     const id = 'sec-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     updateSections(typeName, [...(sectionsByType[typeName] || []), { id, name: '', parentId: parentId || null, documents: [] }]);
@@ -569,7 +570,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to publish'); }
     finally { setBusy(false); }
-  }, [orgId, showToast, load]);
+  }, [orgId, wsId, showToast, load]);
 
   // Reopen a published record for editing: server copies .latest → .draft, then the existing
   // edit → publish flow applies. The published version stays live until the edit is re-published.
@@ -638,10 +639,12 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       setSName(next.name); setSSummary(next.summary); setSAutonomy(next.autonomy);
       seededRef.current = next;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seeds only when the panel opens or ws changes; sName/sSummary/sAutonomy are read via the seededRef untouched-guard and must not re-seed on each keystroke.
   }, [showSettings, ws]);
   // Public sharing lives in its own tab — lazy-load the share state the first time it opens.
   useEffect(() => {
     if (tab === 'share' && share === null && ws?.manifest) loadShare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadShare is a stable lazy-loader defined below (adding it would refire every render until share resolves); effect intentionally loads share once when the Share tab first opens.
   }, [tab, ws]);
   // Dirty-check against the manifest: Save enables only on real changes (doubles as the
   // unsaved-changes indicator), Cancel resets the fields, and closing a dirty panel asks first.
@@ -673,7 +676,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to save settings'); }
     finally { setBusy(false); }
-  }, [ws, sName, sSummary, sAutonomy, orgId, showToast, load]);
+  }, [ws, sName, sSummary, sAutonomy, orgId, wsId, showToast, load]);
 
   // Wipe the workspace entirely (all data + schemas). The organism stays → back to "no workspace".
   // The typed-name field already gates the button; this adds a final "are you sure?" dialog.
@@ -695,7 +698,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       },
       { danger: true, title: t('organisms.deleteWorkspace') || 'Delete workspace' },
     );
-  }, [orgId, confirm, showToast, load]);
+  }, [orgId, wsId, confirm, showToast, onBack]);
 
   // Manual add / remove of object spaces (also doable by agents via the memory API).
   const addSpaceHandler = useCallback(async () => {
@@ -726,7 +729,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       },
       { danger: true, title: t('organisms.removeSpace') || 'Remove space' },
     );
-  }, [ws, orgId, confirm, showToast, load]);
+  }, [ws, orgId, wsId, confirm, showToast, load]);
 
   // Copy a ready prompt that teaches an AI/agent how to access + use THIS workspace (the MCP gap
   // bridge). 'human' = paste into a chat; 'agent' = imperative, assumes tool access.

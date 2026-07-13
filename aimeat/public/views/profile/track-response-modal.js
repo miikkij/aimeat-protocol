@@ -14,7 +14,7 @@
  *   v1.0.0 — 2026-06-21 — Extracted from inbox-tab.js so the Notebook can reuse it; + park-to-notebook.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -67,10 +67,14 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
       } finally { clearInterval(timer); }
     })();
     return () => { cancelled = true; clearInterval(timer); };
+    // defaultMode only seeds the initial replyMode; this effect runs the expensive AI triage and must
+    // re-run only when the modal opens / the message changes, never when defaultMode changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, msg]);
 
   const org = orgs.find(o => o.id === orgId);
-  const workspaces = org?.workspaces || [];
+  // Memoized so it is a stable dependency for the record-type effect below (else a fresh [] each render).
+  const workspaces = useMemo(() => org?.workspaces || [], [org]);
   const recTypes = workspaces.find(w => w.id === wsId)?.recordTypes || [];
 
   // Organism chosen → preselect the AI's suggested workspace when valid.
@@ -80,7 +84,7 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     if (!org.workspaces.some(w => w.id === wsId)) {
       setWsId(org.workspaces.some(w => w.id === sug.workspaceId) ? sug.workspaceId : (org.workspaces[0]?.id || ''));
     }
-  }, [orgId, orgs]);
+  }, [orgId, orgs, org, wsId]);
 
   // Workspace chosen → preselect the AI's suggested record type when valid.
   useEffect(() => {
@@ -89,7 +93,7 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     if (types.some(tp => tp.namespace === namespace)) return;
     const sug = sugRef.current;
     setNamespace(types.some(tp => tp.namespace === sug.namespace) ? sug.namespace : types[0].namespace);
-  }, [wsId, orgs]);
+  }, [wsId, orgs, namespace, workspaces]);
 
   const close = () => { if (!busy) onClose?.(); };
 

@@ -86,11 +86,16 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
     }
   }
 
+  // Reload when the selected agent changes. loadServices is recreated each render (it closes over the
+  // showToast prop); depending on it would refetch on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadServices(); }, [agentName]);
 
   useEffect(() => {
     // Silent refetch on live-update so the tab doesn't flash blank.
     return onLiveUpdate(['agents'], () => loadServices({ showSpinner: false }));
+    // Re-subscribe only on agent switch; loadServices is recreated each render (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentName]);
 
   if (loading) {

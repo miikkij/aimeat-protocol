@@ -15,7 +15,7 @@
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -40,10 +40,10 @@ function AppSkills({ owner, filename, showToast }) {
   const [busy, setBusy] = useState(false);
   const binding = `app:${owner}/${filename}`;
 
-  async function load() {
+  const load = useCallback(async () => {
     try { setSkills(await skillsService.listAppSkills(owner, filename)); } catch { setSkills([]); }
-  }
-  useEffect(() => { load(); }, [owner, filename]);
+  }, [owner, filename]);
+  useEffect(() => { load(); }, [load]);
 
   async function openPicker() {
     if (pickerOpen) { setPickerOpen(false); return; }
@@ -124,8 +124,12 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
 
+  // Reload the app lists when the session becomes available / changes. loadData closes over the
+  // optional onStats prop (not guaranteed memoized), so we key on session only to avoid re-running
+  // on every parent render.
   useEffect(() => {
     if (session) loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   async function loadData() {

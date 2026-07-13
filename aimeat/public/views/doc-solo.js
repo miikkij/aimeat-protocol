@@ -68,6 +68,7 @@ export default function DocSolo() {
     const notify = () => { window.dispatchEvent(new CustomEvent('aimeat-live-update')); loadRef.current(); };
     connect(() => getSession()?.jwt); onUpdate(notify);
     return () => { offUpdate(notify); disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- One SSE connection per session owner; session is re-read each render (fresh identity) so keying on it would reconnect every render; session?.owner is the stable signal.
   }, [session?.owner]);
 
   const save = useCallback(async (page) => {

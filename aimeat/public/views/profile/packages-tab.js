@@ -176,7 +176,7 @@ export default function PackagesTab({ session, showToast, navigate }) {
       } catch { /* federation may not be available */ }
     } catch { /* ignore */ }
     setLoading(false);
-  }, []);
+  }, [session?.owner]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

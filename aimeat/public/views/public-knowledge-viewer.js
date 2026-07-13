@@ -313,6 +313,10 @@ function BrowseView({ onSelect }) {
 
   useEffect(() => {
     loadPackages({ page: 1 });
+    // Reload from page 1 only when a filter (type/language/sort) changes. loadPackages also closes
+    // over search and page, which have their own load paths (debounced handleSearch, loadMore);
+    // including it would defeat the search debounce and reset pagination on every load-more.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentType, language, sort]);
 
   const handleSearch = useCallback((e) => {

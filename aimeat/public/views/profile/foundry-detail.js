@@ -427,6 +427,10 @@ export function ComponentDetail({ component, project, components, projectId, int
     loadUnits(projectId, component.id).then(u => setUnitMap(u || {})).catch(() => {});
     loadTestCode(projectId, component.id).then(tc => setPassTestCode(tc || '')).catch(() => {});
     loadReflectionHistory(projectId, component.id).then(h => setReflHistory(h || [])).catch(() => {});
+    // Reload multi-pass data only when the component identity/status changes (the intended trigger).
+    // projectId + isMultiPass are constant for a mounted component, and component.result is read only to
+    // seed the display — re-running on every result edit is not wanted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component.id, component.status]);
 
   // Generate pass prompt when current pass changes
@@ -445,6 +449,10 @@ export function ComponentDetail({ component, project, components, projectId, int
       console.error('[foundry] Pass prompt generation failed:', e);
       setPassPrompt('');
     }
+    // Regenerate the pass prompt on the pass/data triggers listed. component, interviewSpec,
+    // project.blueprint and isMultiPass are read to build the ctx but are constant for the mounted
+    // component; depending on the whole `component` object would re-run every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component.id, component.passes, skeleton, unitMap, passTestCode, reflHistory]);
 
   useEffect(() => {
@@ -484,6 +492,11 @@ export function ComponentDetail({ component, project, components, projectId, int
         interviewSpec,
       ).then(p => setGeneratedPrompt(p));
     }
+    // Sync local editor state + (re)build the prompt when the component's own fields change. The other
+    // reads (components, interviewSpec, project.*, projectId) are constant for the mounted component, and
+    // onUpdate is deliberately excluded: this effect calls onUpdate() after saveComponent(), so depending
+    // on an unstable onUpdate identity would re-trigger and loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
   const prompt = component.prompt || generatedPrompt || '';

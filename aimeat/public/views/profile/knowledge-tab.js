@@ -129,7 +129,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   // Live update listener
   const loadRef = useRef(loadPackages);
   loadRef.current = loadPackages;
-  useEffect(() => onLiveUpdate(['knowledge', 'federation'], () => { loadRef.current({ showSpinner: false }); loadFedConsents(); }), []);
+  useEffect(() => onLiveUpdate(['knowledge', 'federation'], () => { loadRef.current({ showSpinner: false }); loadFedConsents(); }), [loadFedConsents]);
 
   /* ── Load Discover ── */
   const loadDiscover = useCallback(async () => {
@@ -260,7 +260,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         showToast(t('knowledge.myKnowledge.deleteError') || 'Failed to delete package');
       } finally { setDeleting(null); }
     }, { danger: true });
-  }, [ghii, showToast, loadPackages]);
+  }, [ghii, showToast, loadPackages, confirm]);
 
   /* ── Export ── */
   const handleExport = useCallback(async (pkg) => {

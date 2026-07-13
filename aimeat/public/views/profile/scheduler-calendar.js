@@ -50,7 +50,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const anchor = new Date(anchorMs);
+  const anchor = useMemo(() => new Date(anchorMs), [anchorMs]);
   const now = new Date();
 
   const byId = useMemo(() => {
@@ -83,7 +83,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     }
     const s = startOfDay(anchor);
     return { start: s, end: addDays(s, 1), title: s.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) };
-  }, [mode, anchorMs]);
+  }, [mode, anchor]);
 
   // Fetch projected fire-times for the visible window (refetch on window change + data reload).
   const startMs = start.getTime();

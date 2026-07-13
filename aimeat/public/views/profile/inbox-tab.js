@@ -574,6 +574,11 @@ function Composer({ recipient, sendLabel, sending, onSend, initialText = '', dra
       if (inst) { try { inst.destroy(); } catch { /* noop */ } }
       editorRef.current = null;
     };
+    // Create the editor once when mode becomes 'rich': `seeded` is intentionally read only at
+    // construction (later initialText changes are applied by the effect below via setMarkdown, not a
+    // remount) and `saveDraft` is a stable-behavior closure over refs — adding either would destroy +
+    // recreate the editor on every render / initialText change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   // Seed the rich editor with an initial draft (e.g. a Tracked Response suggested reply) once it mounts.
@@ -659,11 +664,11 @@ function SchedulePanel({ agentName, onClose, showToast }) {
   const [cron, setCron] = useState('0 9 * * *');
   const [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false);
-  const load = async () => {
+  const load = useCallback(async () => {
     try { const r = await schedules.listAgentSchedules(agentName); setJobs(r?.data?.managed || []); }
     catch { setJobs([]); }
-  };
-  useEffect(() => { setJobs(null); load(); /* eslint-disable-next-line */ }, [agentName]);
+  }, [agentName]);
+  useEffect(() => { setJobs(null); load(); }, [load]);
   const create = async () => {
     if (!title.trim() || !cron.trim() || busy) return;
     setBusy(true);
@@ -894,6 +899,10 @@ export default function InboxTab({ showToast }) {
       if (!cancelled) setAwaitingDrafts(Object.fromEntries(entries));
     })();
     return () => { cancelled = true; };
+    // `awaitingIds` is the stable join of awaitingForConv ids — the intended trigger. Depending on the
+    // array itself (new identity every render) would re-fetch every draft on each render and loop via
+    // setAwaitingDrafts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaitingIds]);
 
   // markRead=true ONLY when the user opens the conversation. Marking read POSTs a receipt which itself
@@ -1020,7 +1029,7 @@ export default function InboxTab({ showToast }) {
     };
     window.addEventListener('aimeat-live-update', handler);
     return () => { window.removeEventListener('aimeat-live-update', handler); if (liveTimerRef.current) clearTimeout(liveTimerRef.current); };
-  }, []);
+  }, [loadTrackedOnly]);
 
   useEffect(() => {
     if (mode === 'thread' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
@@ -1150,6 +1159,11 @@ export default function InboxTab({ showToast }) {
     const convs = await messages.listConversations().catch(() => []);
     const conv = convs.find(c => c.conversationId === target);
     if (conv) openConversation(conv);
+    // openConversation is a non-memoized handler invoked imperatively here with its `conv` argument; it
+    // uses only stable setters/refs, so no stale-closure risk. Keeping it out of deps preserves
+    // consumeDeepLink's stability (loadLists is a []-useCallback) so the two subscribing effects below
+    // don't re-run every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadLists]);
   useEffect(() => { consumeDeepLink(); }, [consumeDeepLink]);
   useEffect(() => {

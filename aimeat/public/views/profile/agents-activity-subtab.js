@@ -189,9 +189,12 @@ export default function AgentActivitySubtab({ agentName }) {
     setLoading(false);
   }
 
+  // Reload on agent change. loadData also closes over selectedDays (driven separately by
+  // handleRangeChange), so we key on agentName only to avoid an extra reload on range changes.
   useEffect(() => {
     setLoading(true);
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentName]);
 
   // Live update listener

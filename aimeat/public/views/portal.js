@@ -1282,7 +1282,7 @@ export default function Portal({ navigate, locale }) {
       return prefix + (isExpanded ? t('portal.expand.userPrefixOpen') : t('portal.expand.userPrefix'));
     }
     return isExpanded ? t('portal.expand.btnOpen') : t('portal.expand.btn');
-  }, [session, isExpanded, locale]);
+  }, [session, isExpanded]);
 
   const handleExpand = useCallback(() => {
     if (!session) {

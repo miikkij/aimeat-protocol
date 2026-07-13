@@ -613,6 +613,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   useEffect(() => {
     if (session) { loadData(); loadPending(); }
+    // Fetch the fleet once the session is available. loadData/loadPending close over
+    // session and stable setters/refs; keyed on session intentionally (the live-update
+    // listener below handles subsequent refreshes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   // Pending device-auth requests — fetched once on mount and refreshed via the live-update

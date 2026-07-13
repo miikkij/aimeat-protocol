@@ -137,6 +137,10 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
   const [batches, setBatches] = useState([]);
   const [autoRunBatchId, setAutoRunBatchId] = useState(null);
 
+  // Reload when the selected projectId changes. loadProject closes over projectId
+  // (listed) and showToast (error path only) — showToast is an unstable prop, so it
+  // is intentionally not a trigger.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadProject(); }, [projectId]);
 
   // SSE live updates
@@ -144,6 +148,9 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     const handler = () => { reloadBatches(); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
+    // Subscribe to live updates once on mount; a single stable listener is
+    // intentional (not re-subscribing on every render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadProject() {

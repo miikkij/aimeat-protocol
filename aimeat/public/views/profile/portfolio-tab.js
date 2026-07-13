@@ -38,11 +38,14 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   // two buttons on 90% whitespace. CRITICAL: clear the profile's remembered-open-tab
   // first — otherwise every later /v1/profile visit restores this tab, which forwards
   // again, and the user can never reach the profile home (bounce loop).
+  // Forward to the builder once cfg resolves to "not published". Keyed on cfg only: navigate is a
+  // prop function of uncertain stability, and adding it could re-fire the forward before unmount.
   useEffect(() => {
     if (cfg !== undefined && !cfg?.enabled) {
       try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
       navigate('/v1/portfolio');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg]);
 
   if (cfg === undefined) return html`<${Spinner} text=${t('loading') || 'Loading…'} />`;

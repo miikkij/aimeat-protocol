@@ -185,13 +185,21 @@ export default function AgentMessagesSubtab({ agentName, showToast }) {
     }
   }
 
+  // Load threads + messages on mount and whenever the agent changes. loadThreads/loadMessages
+  // close over agentName/activeThread; keying on agentName only keeps thread-switch reloads on the
+  // dedicated effect below rather than double-firing here.
   useEffect(() => {
     loadThreads();
     loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentName]);
 
+  // Reload messages when the active thread changes; loadMessages reads the current thread/agent.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadMessages(); }, [activeThread]);
 
+  // Re-subscribe on agent/thread change; the loaders close over those and are intentionally omitted.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => onLiveUpdate(['agent-messages', 'messages'], () => { loadMessages(); loadThreads(); }), [agentName, activeThread]);
 
   useEffect(() => {

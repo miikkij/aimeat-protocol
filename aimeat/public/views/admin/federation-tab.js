@@ -118,9 +118,9 @@ export default function FederationTab({ data, reload }) {
     finally { setDirLoading(false); }
   }, []);
 
-  useEffect(() => { loadDirectory(''); }, []);
+  useEffect(() => { loadDirectory(''); }, [loadDirectory]);
 
-  useEffect(() => onLiveUpdate(['federation'], () => loadDirectory(dirSearch)), [dirSearch]);
+  useEffect(() => onLiveUpdate(['federation'], () => loadDirectory(dirSearch)), [dirSearch, loadDirectory]);
 
   const onDirSearchInput = useCallback((e) => {
     const val = e.target.value;
@@ -148,42 +148,42 @@ export default function FederationTab({ data, reload }) {
       try { await approvePeeringRequest(id); flash(t('dashboard.fedPeerApproved')); reload(); }
       catch (e) { flashErr(e.message); }
     });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doReject = useCallback((id) => {
     confirm(t('dashboard.fedRejectPeerConfirm'), async () => {
       try { await rejectPeeringRequest(id); flash(t('dashboard.fedPeerRejected')); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doDeleteRequest = useCallback((id) => {
     confirm(t('dashboard.fedDeleteRequestConfirm') || 'Delete this peering request?', async () => {
       try { await deletePeeringRequest(id); flash(t('dashboard.fedRequestDeleted') || 'Request deleted'); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doActivate = useCallback((nodeId) => {
     confirm(t('dashboard.fedActivateConfirm'), async () => {
       try { await activatePeer(nodeId); flash(t('dashboard.fedPeerActivated')); reload(); }
       catch (e) { flashErr(e.message); }
     });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doRemove = useCallback((nodeId) => {
     confirm(t('dashboard.fedRemoveConfirm'), async () => {
       try { await removePeer(nodeId); flash(t('dashboard.fedPeerRemoved')); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doEmergencyRemove = useCallback((nodeId) => {
     confirm(t('dashboard.fedEmergencyRemoveConfirm'), async () => {
       try { await removePeerEmergency(nodeId); flash(t('dashboard.fedPeerEmergencyRemoved')); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doUpdatePolicy = useCallback(async (nodeId, field, value) => {
     try {
@@ -213,7 +213,7 @@ export default function FederationTab({ data, reload }) {
     };
     if (p.promotion_eligible) confirm(t('dashboard.fedPromoteConfirm'), () => run(false));
     else run(false); // will 409 → prompts for forced override
-  }, [reload]);
+  }, [reload, confirm]);
 
   const doRebuildBook = useCallback(async () => {
     try { await rebuildFederationBook(); flash(t('dashboard.fedBookRebuilt') || 'Book rebuilt'); loadBook(); }

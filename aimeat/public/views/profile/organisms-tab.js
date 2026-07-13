@@ -286,7 +286,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         showToast(t('organisms.leaveError') || 'Failed to leave');
       }
     }, { danger: true });
-  }, [showToast, loadData]);
+  }, [showToast, loadData, confirm]);
 
   const handleDelete = useCallback(async (id, name) => {
     confirm(t('organisms.confirmDelete')?.replace('{name}', name) || `Delete "${name}"? This cannot be undone.`, async () => {
@@ -300,7 +300,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         showToast(t('organisms.deleteError') || 'Failed to delete');
       }
     }, { danger: true });
-  }, [showToast, loadData]);
+  }, [showToast, loadData, confirm]);
 
   // Archive / unarchive a whole organism (creator/admin). Archived organisms become read-only and
   // their content is excluded from AI materials (overview/read/search); the workspaces cascade-archive
