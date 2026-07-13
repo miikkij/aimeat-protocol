@@ -41,10 +41,15 @@ export async function publishOffers(name, doc) {
 /** Owner edits ONE offer's billing fields (price + visibility), preserving the rest of the doc.
  *  Re-reads the agent's current offers first (avoid clobbering a stale feed), patches, re-publishes.
  *  `price` is `{ morsels, unit }` or `null` (not for sale); `visibility` is private|unlisted|public. */
-export async function setOfferBilling(name, offerId, { price, visibility }) {
+/**
+ * @param {string} name
+ * @param {string} offerId
+ * @param {{ price?: any, priceMoney?: any, visibility?: string }} billing
+ */
+export async function setOfferBilling(name, offerId, { price, priceMoney, visibility } = {}) {
   const cur = await getAgentOffers(name);
   const offers = (cur?.data?.offers || []).map(o => o.id === offerId
-    ? { ...o, ...(price !== undefined ? { price } : {}), ...(visibility !== undefined ? { visibility } : {}) }
+    ? { ...o, ...(price !== undefined ? { price } : {}), ...(priceMoney !== undefined ? { priceMoney } : {}), ...(visibility !== undefined ? { visibility } : {}) }
     : o);
   return publishOffers(name, { offers });
 }

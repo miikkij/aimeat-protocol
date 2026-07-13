@@ -74,6 +74,43 @@ function PspSection() {
     </div>`;
 }
 
+/* "Money purchases & sales" — real-money (EUR/USD) checkout activity, separate from morsels.
+ * Purchases come from the buyer's checkout sessions, sales from received orders; both filtered to
+ * money currencies (minor units → major). Renders nothing when there is no money activity. */
+function MoneyActivity() {
+  const [data, setData] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      const [s, o] = await Promise.all([
+        apiGet('/v1/commerce/checkout-sessions?limit=100').catch(() => null),
+        apiGet('/v1/commerce/orders?limit=100').catch(() => null),
+      ]);
+      const money = (x) => x.currency && x.currency !== 'morsel';
+      const purchases = (s?.data?.sessions ?? []).filter(money);
+      const sales = (o?.data?.orders ?? []).filter(money);
+      setData({ purchases, sales });
+    } catch { setData({ purchases: [], sales: [] }); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!data || (!data.purchases.length && !data.sales.length)) return null;
+  const money = (amt, cur) => `${((amt || 0) / 100).toFixed(2)} ${cur}`;
+  const row = (x, isSale) => html`
+    <div class="tx-item" key=${x.id}>
+      <span>${(x.items?.[0]?.title) || (isSale ? t('profile.wallet.moneySale') : t('profile.wallet.moneyPurchase'))}
+        <span class="text-meta"> · ${x.status}</span></span>
+      <span class="tx-amount ${isSale ? 'success' : ''}">${isSale ? '+' : ''}${money(isSale ? (x.receipt?.earned ?? x.total) : x.total, x.currency)}</span>
+    </div>`;
+  return html`
+    <div class="section-title mt-2">${t('profile.wallet.moneyTitle')}</div>
+    <div class="section-desc">${t('profile.wallet.moneyDesc')}</div>
+    ${data.purchases.length ? html`
+      <div class="text-meta mb-1">${t('profile.wallet.moneyPurchases')}</div>
+      <div class="tx-list">${data.purchases.map(x => row(x, false))}</div>` : null}
+    ${data.sales.length ? html`
+      <div class="text-meta mb-1 mt-1">${t('profile.wallet.moneySales')}</div>
+      <div class="tx-list">${data.sales.map(x => row(x, true))}</div>` : null}`;
+}
+
 export default function WalletTab({ session, showToast, onStats }) {
   const [walletData, setWalletData] = useState(null);
   const [walletTx, setWalletTx] = useState(null);
@@ -183,6 +220,9 @@ export default function WalletTab({ session, showToast, onStats }) {
 
     <!-- Selling & payment provider (individual seller's own Stripe key; EE nodes only) -->
     <${PspSection} />
+
+    <!-- Real-money (EUR/USD) purchases & sales, separate from the morsel ledger -->
+    <${MoneyActivity} />
 
     <!-- Copy balance button -->
     <div class="mb-1">

@@ -19,6 +19,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
+import { listPaymentHandlers } from './payment-handlers.js';
 
 /** A raw line-item reference before resolution. `kind` defaults to 'offer'. */
 export interface SellableRef {
@@ -88,14 +89,18 @@ export function offerSellableResolver(): SellableResolver {
           unitPrice = Number(offer.price.morsels);
         }
       } else {
-        // Money: the offer must carry a matching money price, and the SELLER must have their own
-        // PSP credentials (commerce.psp under their GHII) — funds land on the seller's account.
+        // Money: the offer must carry a matching money price, and SOME registered handler must
+        // settle this currency (Community has only morsels → blocks money at creation). The
+        // seller's own PSP credentials (commerce.psp) are attached if present; the handler decides
+        // whether it needs them (Stripe does; invoice/manual does not). Funds land on the seller.
         if (!offer.priceMoney || offer.priceMoney.currency !== currency) {
           throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This offer has no ${currency} price`);
         }
+        if (!listPaymentHandlers().some((h) => h.currencies.includes(currency))) {
+          throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `No payment handler on this node settles ${currency}`);
+        }
         const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
-        if (!pspRec?.value) throw new CommerceError('PSP_NOT_CONFIGURED', 403, 'The seller has no payment-provider credentials configured for money sales');
-        psp = pspRec.value;
+        psp = pspRec?.value ?? undefined;
         unitPrice = Math.floor(offer.priceMoney.amount);
       }
       return {
