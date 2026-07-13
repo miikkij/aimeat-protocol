@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.2.0 — 2026-07-13 — Commerce core (TARGET-033): payment-handler registry + commerceRouter mount
  *   v1.1.0 — 2026-07-13 — Mount discoveryLinkHeaders() before bootstrapRouter (RFC 8288 agent discovery)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -30,6 +31,8 @@ import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
+import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
+import { commerceRouter } from '../routes/commerce.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -309,6 +312,16 @@ export async function mountRoutes(
   // Enterprise edition (open-core seam): load the active provider ONCE up front, then mount its routes
   // near the end of this function. Community degrades to the stub (ENTERPRISE_REQUIRED for gated namespaces).
   const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
+
+  // Commerce core (TARGET-033): register the Community morsel handler, then whatever payment
+  // handlers the active edition contributes (EE: real money) — one registry, advertised at
+  // /.well-known/ucp. resetPaymentHandlers keeps embedded test servers from double-registering.
+  resetPaymentHandlers();
+  registerPaymentHandler(morselPaymentHandler());
+  for (const handler of (await enterprise.getPaymentHandlers?.()) ?? []) {
+    registerPaymentHandler(handler);
+  }
+  app.use(commerceRouter(config, storage));
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));

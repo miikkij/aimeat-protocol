@@ -52,6 +52,8 @@ tags:
     description: Work queue dispute resolution (13 endpoints)
   - name: Economy
     description: Morsel wallet and transactions
+  - name: Commerce
+    description: Protocol-agnostic checkout sessions over agent offers (TARGET-033) + UCP discovery
   - name: Boards
     description: Notification boards for coordination
   - name: Catalogue
@@ -10346,6 +10348,149 @@ paths:
             application/linkset+json:
               schema:
                 type: object
+
+  /.well-known/ucp:
+    get:
+      operationId: ucpProfile
+      summary: UCP business profile (Universal Commerce Protocol)
+      description: >-
+        UCP (2026-04-08) discovery profile of the commerce core — REST + MCP transports, the
+        checkout capability endpoints, every payment handler registered on this node (a
+        Community node advertises only io.aimeat.morsels; an Enterprise node's real-money
+        handlers appear automatically), and the node's Ed25519 signing key as a JWK.
+      tags: [Commerce]
+      responses:
+        '200':
+          description: UCP profile
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── Commerce (TARGET-033) ─────────────────────────────────────
+  /v1/commerce/checkout-sessions:
+    post:
+      operationId: createCheckoutSession
+      summary: Open a checkout session
+      description: >-
+        Create a checkout session against one seller's offers. Line items reference agent
+        offers ({agent GAII, offer_id, quantity}); all items must belong to the same seller
+        owner. Prices are quoted in morsels from the live offer document at creation time
+        (cross-owner purchase requires the offer to declare a price; private offers are
+        owner-only; self-purchase is free). Sessions expire after one hour.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [agent, offer_id]
+                    properties:
+                      agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
+                      offer_id: { type: string }
+                      quantity: { type: integer, minimum: 1, maximum: 1000, default: 1 }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '402':
+          description: Insufficient balance (on complete)
+        '404':
+          description: Agent or offer not found
+        '422':
+          description: Offer not for sale / multi-seller cart
+
+  /v1/commerce/checkout-sessions/{id}:
+    get:
+      operationId: getCheckoutSession
+      summary: Read a checkout session (buyer only)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: Not found (including sessions owned by another buyer)
+    patch:
+      operationId: updateCheckoutSession
+      summary: Update items or cancel a checkout session
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: { type: object }
+                cancel: { type: boolean }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '409':
+          description: Session is not open
+
+  /v1/commerce/checkout-sessions/{id}/complete:
+    post:
+      operationId: completeCheckoutSession
+      summary: Complete a checkout session (charge + fulfill)
+      description: >-
+        Charges the buyer through the selected payment handler (default io.aimeat.morsels;
+        marketplace fee applies), creates one fulfillment TASK per line item on the seller
+        agent (the offer-ask path), writes the seller's order copy, and closes the session.
+        A fulfillment failure after a successful charge refunds and leaves the session open.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment:
+                  type: object
+                  properties:
+                    handler: { type: string, description: 'Payment handler id (default io.aimeat.morsels)' }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '402':
+          description: Insufficient balance
+        '409':
+          description: Session not open or expired
+        '422':
+          description: Unknown payment handler / currency mismatch
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
