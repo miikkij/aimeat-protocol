@@ -337,9 +337,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'prompt is required.'));
       }
 
-      // Verify project ownership (check generator, foundry, and calibrator namespaces)
+      // Verify project ownership (check generator and calibrator namespaces)
       const projectRecord = await storage.getMemory(gaii, `generator.${projectId}.project`)
-        || await storage.getMemory(gaii, `foundry.${projectId}.project`)
         || await storage.getMemory(gaii, `calibrator.${projectId}.project`);
       if (!projectRecord) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found or not owned by you.'));

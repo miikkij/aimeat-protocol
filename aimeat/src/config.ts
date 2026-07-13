@@ -454,11 +454,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Service Generator
     generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
 
-    // Foundry (prompt-driven service builder)
-    foundryEnabled: process.env.AIMEAT_FOUNDRY_ENABLED
-      ? process.env.AIMEAT_FOUNDRY_ENABLED !== 'false'
-      : (process.env.AIMEAT_GENERATOR_ENABLED !== 'false'),
-
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',
 

@@ -442,9 +442,6 @@ export interface AimeatConfig {
   // Service Generator
   generatorEnabled: boolean;
 
-  // Foundry (prompt-driven service builder)
-  foundryEnabled: boolean;
-
   // Prompt Calibrator
   calibratorEnabled: boolean;
 
