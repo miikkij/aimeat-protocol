@@ -16,7 +16,7 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 2. **What is AIMEAT** - Protocol overview
 3. **What You Can Build** - App examples
 4. **Two Ways to Start** - Anonymous or registered
-5. **Core Capabilities for App Building** - Memory, Storage, Realtime, Boards
+5. **Core Capabilities for App Building** - Memory, Storage, Realtime, AI
 6. **Building Apps on AIMEAT** - Data layer guide, detailed templates, SDK API reference
 7. **Core Concepts** - GHII, GAII, Morsels, Scopes
 8. **Connecting: Device Authorization** - AI agent connection flow
@@ -271,7 +271,7 @@ entry: index.html
 | aimeat-data | Always loaded | `AIMEAT.data.get/set/search/list/delete` |
 | aimeat-storage | `loadScript('/v1/libs/aimeat-storage.js')` | `AIMEAT.storage.upload/download/list` |
 | AimeatRealtime | `loadScript('/lib/realtime.js')` | P2P rooms, multiplayer, chat |
-| aimeat-social | `loadScript('/v1/libs/aimeat-social.js')` | Discussion boards |
+| aimeat-social | `loadScript('/v1/libs/aimeat-social.js')` | Boards — DEPRECATED, do not use in new apps (shared feeds/discussions = public Memory keys) |
 | aimeat-wallet | `loadScript('/v1/libs/aimeat-wallet.js')` | Morsel balance display |
 | aimeat-ai | `loadScript('/v1/libs/aimeat-ai.js')` | `AIMEAT.ai.complete/completeJson/isAvailable` — runs LLM completions using the user's own OpenRouter key (zero cost to AIMEAT, user-owned spend budget) |
 | aimeat-markdown | `loadScript('/v1/libs/aimeat-markdown.js')` | `AIMEAT.md.render(text, target)` — safe markdown INTO an element (returns an Element; never assign it to innerHTML — use the target param or `renderToString`). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid and LIVE data embeds (an `aimeat-memory` fence naming a memory key renders as a fresh table on every open) |
@@ -323,7 +323,7 @@ Examples of apps people build:
 - **Multiplayer drawing board** - Real-time P2P with AimeatRealtime + Storage
 - **Chat room** - Real-time messaging with AimeatRealtime
 - **Photo gallery** - Upload and browse images with Storage
-- **Hobby community board** - Discussion with Boards API
+- **Hobby community feed** - Shared entries via public Memory keys + getPublic reads
 - **Habit / expense tracker** - Structured data with Memory API
 
 ## Two Ways to Start
@@ -378,8 +378,10 @@ advanced features with their own dedicated tools in the user's profile.
 - WebRTC data channels for low-latency peer-to-peer
 - SSE for server-sent live update notifications
 
-**Social (if the app needs discussion features)**
-- Boards: discussion forums with threads, reactions, replies
+**Social / discussion features**
+- Build feeds, comments and discussions on public Memory keys (one key
+  per entry, `getPublic()` to read others') — NOT on Boards, which are
+  DEPRECATED and marked for removal in the v4.0 spec
 
 **Economy (if the app involves payments between users)**
 - Morsels: internal currency (100 welcome bonus, 50/day allowance)
@@ -462,23 +464,23 @@ of use cases with full flexibility and no structural constraints:
   documents). Use memory keys to reference storage keys. All storage
   requires auth, even public files (see storage auth gotcha below).
 
-**When to use Memory + Storage (most apps):**
+**When to use Memory + Storage (ALL apps):**
 - Sharing images, drawings, files between users
+- Shared feeds, journals, comments — each user writes their own
+  public keys (`app-name.entries.<id>`), everyone reads them
 - Multiplayer game state, room data, player lists
 - User preferences, app settings, saved state
 - Any structured data with custom schemas
 
-**When to use Boards (specific use case):**
-- Notification boards / announcement channels
-- Threaded discussions with replies and reactions
-- Agent-to-agent communication channels
-- Content that benefits from the board structure (posts, threads)
-
-Do NOT use Boards as a general data-sharing mechanism for apps.
-Boards have a fixed structure (posts with content, replies, reactions)
-and are designed for discussion/notification use cases. For custom
-data sharing (images, game state, user data), Memory + Storage is
-simpler, more flexible, and has no structural constraints.
+**Do NOT use Boards in apps.** Boards are DEPRECATED (marked for
+removal in the v4.0 spec) and were never an app data layer. Every
+sharing use case — feeds, discussions, comments, notifications —
+is built on Memory + Storage with visibility controls. If you are
+considering boards or organism workspaces for an app's shared data,
+stop: public memory keys per user + `getPublic()` reads are the
+pattern (see the Data Storage section of `/v1/prompts/build-app`).
+Server-enforced rules (only-author-can-delete, one-vote-per-user)
+go into an extension (`ext:` namespace) — not boards, not organisms.
 
 ### Client SDK Libraries
 
@@ -489,7 +491,7 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | aimeat-auth | `/v1/libs/aimeat-auth.js` | Login UI, Ed25519 auth, JWT lifecycle, session management |
 | aimeat-data | `/v1/libs/aimeat-data.js` | Memory API: get, set, search, getPublic, micro-memory |
 | aimeat-storage | `/v1/libs/aimeat-storage.js` | File upload/download, chunked upload, drag & drop helper |
-| aimeat-social | `/v1/libs/aimeat-social.js` | Boards: create, post, react, reply, subscribe |
+| aimeat-social | `/v1/libs/aimeat-social.js` | Boards (DEPRECATED — do not use in new apps; use Memory + Storage) |
 | aimeat-wallet | `/v1/libs/aimeat-wallet.js` | Morsel balance, transactions, UI badge |
 | aimeat-work | `/v1/libs/aimeat-work.js` | Actions, work requests, inbox, deliver, rate |
 | AimeatRealtime | `/lib/realtime.js` | WebSocket P2P rooms, WebRTC data channels, Yjs CRDT |
@@ -1098,7 +1100,10 @@ await AIMEAT.storage.abortUpload(uploadId) // cancel chunked upload
 await AIMEAT.storage.dropZone(el, { onUpload }) // drag & drop helper
 ```
 
-**AIMEAT.social** (`/v1/libs/aimeat-social.js`):
+**AIMEAT.social** (`/v1/libs/aimeat-social.js`) — DEPRECATED. Boards are
+marked for removal in the v4.0 spec; do NOT use them in new apps. This
+reference exists only for maintaining old apps. New shared feeds and
+discussions: public Memory keys + `getPublic()` (see Data Storage above).
 ```javascript
 await AIMEAT.social.createBoard({ name, visibility, description })
 await AIMEAT.social.listBoards()

@@ -56,8 +56,7 @@ export function buildAppPrompt(
   body += '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n';
   body += 'AI (prompt-driven — see the AI section below):\n';
   body += "- aimeat-ai.js — LLM completions on the USER's own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n";
-  body += 'Social & economy:\n';
-  body += '- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n';
+  body += 'Economy & agents:\n';
   body += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
   body += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
   body += "- aimeat-agents.js — commission & watch the owner's AI agents (`AIMEAT.agents`)\n";
@@ -115,7 +114,8 @@ export function buildAppPrompt(
   body += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
   body += 'const results = await AIMEAT.data.search("query");\n';
   body += '```\n';
-  body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n\n';
+  body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
+  body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n\n';
 
   // AI
   body += '### AI (prompt-driven)\n';
