@@ -306,6 +306,8 @@ The catalogue of traps we've hit — organised by the KIND of problem (build/bun
 
 ### Generator pipeline notes
 
+**Two separate app-building prompt systems — never confuse them:** (1) the SPA **service generator** (`public/js/services/generator-prompts-*.js`) produces full ext+cortex+app SERVICE stacks via the portal's generator pipeline; (2) the **app-catalog "Create new app"** prompt builds single-file HTML apps — its canonical text is **node-served** at `GET /v1/prompts/build-app` (source of truth: `src/services/build-app-prompt.ts`; the app-catalog fetches it, and `src/static/app-catalog/js/cortex.js` keeps only an offline fallback). Agent-facing discovery: `/llms.txt` + bootstrap `app_building` point to the build prompt and `/v1/app-templates`. Improve app-building guidance in the NODE service, never in the catalog fallback. (See `docs/pitfalls.md` §1.)
+
 When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
 
 ## Naming Convention — AIMEAT Only

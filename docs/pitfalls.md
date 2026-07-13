@@ -32,6 +32,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **`app-catalog.html` is GENERATED — never edit it directly.** Edit the sources under `aimeat/src/static/app-catalog/`, then `pnpm build:app-catalog`. A freshness gate (`check:app-catalog`) in the pre-commit hook + CI fails if the built file is stale.
 - **New shared `/js` module → add it to the importmap** in `public/spa.html` (identity entry `"/js/services/foo.js": "/js/services/foo.js"`), or `check:importmap` fails and it 404s at runtime. Relative imports, bare specifiers, and CSS need no entry. `portal.ts` stamps `?v=BUILD_ID`.
 - **Public JS edits seem to have no effect.** `pnpm dev` is NOT a watcher for everything — `BUILD_ID` cache-busting means a public JS change needs a `pnpm dev` restart; `src/static/*` + `public/*` are served fresh on F5, but backend `src/` edits need a restart.
+- **TWO separate app-building prompt systems — never confuse them.** (1) The SPA **service generator** (`public/js/services/generator-prompts-*.js`, ~215 KB) produces full ext+cortex+app SERVICE stacks through the portal's generator pipeline. (2) The **app-catalog "Create new app"** prompt builds single-file HTML apps; its canonical text is NODE-SERVED at `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts` — the single source of truth; `src/static/app-catalog/js/cortex.js` keeps only an offline fallback that may lag). Agent-facing discovery: `/llms.txt` + the bootstrap `app_building` block point to the build prompt + `/v1/app-templates`. When improving app-building guidance, edit the NODE service, not the catalog fallback.
 
 ## 2. Routing (Express + SPA)
 *Symptoms: 404 on a route that exists, a param that's an array, F5 → 404 on a SPA view.*
@@ -69,6 +70,9 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **GHII (`owner@node`) vs GAII (`agent#owner@node`) — never confuse them.** The human owns everything (morsels, profile); the agent has scoped permissions. Morsels live only on `GHIIRecord.morselBalance`.
 - **Anonymous requests can carry a truthy shared identity** — an `if (!req.auth)` guard can pass for anon because a shared anon identity is injected. Gate on the real principal / membership, not just presence of `req.auth`.
 - **New identity-touching feature → ship cross-owner and cross-scope "→403" E2E tests** (Rule 1 + Rule 10).
+- **On an app origin `AIMEAT.auth.login()` is SILENT-only** — it restores an existing session (via the H-2 SSO bridge) and returns `null` otherwise; it never opens UI. The ONLY interactive sign-in path is the login bar's own click handler (`mountLoginButton`). A hand-rolled "Sign in" button that calls `login()` does nothing when silent SSO fails — a custom button must delegate its click to the bar's button. *(Bit us in PULSE v2.0.1, found by the user on first prod use.)*
+- **`*.apps.localhost` is CROSS-SITE with `localhost`** (eTLD+1 `apps.localhost` ≠ `localhost`), so the silent-SSO iframe carries no apex cookie locally and app-origin auto-login fails — while working fine in prod (`*.apps.aimeat.io` is same-site with `aimeat.io`). Local app-origin verification: sign in with `AIMEAT.auth.loginWithPassword(...)` evaluated on the app origin, and don't reload (app-origin `login()` ignores the persisted session — bridge-only by design).
+- **App-grant tokens are role `app`, strictly** — they never pass `requireRole('agent')` gates (organism create/join, workspace structure ops), regardless of scopes. Published apps needing server-side rules use an extension (`ext:` namespace + action checks), not organism primitives.
 
 ## 7. Storage & multi-backend
 *Symptoms: a field that works on SQLite but not Mongo, an upgrade crash-loop, a stale badge on a record.*
@@ -86,6 +90,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **`session.fetch` returns PARSED JSON** — use `resp.data`; do NOT call `resp.json()`.
 - **Cortex register API is `{ libs: { "file.js": code } }`** — not `{ lib: {...} }`.
 - **Cortex re-activate = deactivate first, then activate.**
+- **Extension manifests are strict:** identity fields live under `metadata:` (`name/version/description/author` all required) and EVERY action needs `id` + `method` + `path` + `script` — a missing `method`/`path` fails the whole install. Cortex manifests are k8s-style: `apiVersion: cortex.aimeat.org/v1`, `kind: Extension`, `metadata.name` + `metadata.namespace`, libs as `spec.components` `type: lib` entries (with `exports` + `api_surface`, or agents can't discover the lib). Copy the examples from `docs/guides/building-extension-cortex-app-stack.md` (fixed 2026-07-13) — older guide copies drift.
 - **Translations + settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`.
 
 ## 9. AI / LLM calls
