@@ -141,7 +141,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       ucp: {
         version: '2026-04-08',
         services: {
-          rest: { endpoint: `${b}/v1/commerce`, spec: `${b}/v1/spec` },
+          rest: { endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` },
           mcp: { endpoint: `${b}/v1/mcp` },
         },
         capabilities: config.commerceEnabled ? [
@@ -149,9 +149,9 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
             name: 'dev.ucp.shopping.checkout',
             version: '1',
             endpoints: {
-              create: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions` },
-              update: { method: 'PATCH', url: `${b}/v1/commerce/checkout-sessions/{id}` },
-              complete: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions/{id}/complete` },
+              create: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions` },
+              update: { method: 'PATCH', url: `${b}/ucp/v1/checkout-sessions/{id}` },
+              complete: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions/{id}/complete` },
             },
           },
         ] : [],

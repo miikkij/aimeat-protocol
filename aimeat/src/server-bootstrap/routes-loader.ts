@@ -32,7 +32,10 @@ import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
 import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
+import { registerSellableResolver, resetSellableResolvers, offerSellableResolver } from '../commerce/sellable-resolvers.js';
 import { commerceRouter } from '../routes/commerce.js';
+import { commerceUcpRouter } from '../routes/commerce-ucp.js';
+import { commerceAcpRouter } from '../routes/commerce-acp.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -313,15 +316,23 @@ export async function mountRoutes(
   // near the end of this function. Community degrades to the stub (ENTERPRISE_REQUIRED for gated namespaces).
   const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
 
-  // Commerce core (TARGET-033): register the Community morsel handler, then whatever payment
-  // handlers the active edition contributes (EE: real money) — one registry, advertised at
-  // /.well-known/ucp. resetPaymentHandlers keeps embedded test servers from double-registering.
+  // Commerce core (TARGET-033): register the Community morsel handler + the core offer resolver,
+  // then whatever payment handlers / sellable resolvers the active edition contributes (EE: real
+  // money + org offerings) — one registry each, advertised at /.well-known/ucp. The resets keep
+  // embedded test servers from double-registering.
   resetPaymentHandlers();
   registerPaymentHandler(morselPaymentHandler());
+  resetSellableResolvers();
+  registerSellableResolver(offerSellableResolver());
   for (const handler of (await enterprise.getPaymentHandlers?.()) ?? []) {
     registerPaymentHandler(handler);
   }
+  for (const resolver of (await enterprise.getSellableResolvers?.()) ?? []) {
+    registerSellableResolver(resolver);
+  }
   app.use(commerceRouter(config, storage));
+  app.use(commerceUcpRouter(config, storage));
+  app.use(commerceAcpRouter(config, storage));
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));

@@ -96,7 +96,7 @@ await test('1. GET /.well-known/ucp — profile advertises checkout + the morsel
     assert(res.status === 200, `status ${res.status}`);
     const profile = await res.json() as any;
     assert(typeof profile.ucp?.version === 'string', 'missing ucp.version');
-    assert(profile.ucp.services?.rest?.endpoint?.endsWith('/v1/commerce'), `rest endpoint: ${profile.ucp.services?.rest?.endpoint}`);
+    assert(profile.ucp.services?.rest?.endpoint?.endsWith('/ucp/v1'), `rest endpoint: ${profile.ucp.services?.rest?.endpoint}`);
     assert(profile.ucp.services?.mcp?.endpoint?.endsWith('/v1/mcp'), 'missing mcp transport');
     const checkout = (profile.ucp.capabilities || []).find((c: any) => String(c.name).includes('checkout'));
     assert(!!checkout?.endpoints?.create, 'missing checkout capability endpoints');
@@ -228,7 +228,76 @@ await test('13. Seller order list shows the received order; buyer\'s order list 
     assert(!buyerIds.includes(sessionId), 'the order copy belongs to the seller, not the buyer');
 });
 
-await test('14. Anonymous requests are rejected (401)', async () => {
+await test('14. UCP adapter: create + complete via /ucp/v1 with the ucp envelope', async () => {
+    const create = await json('/ucp/v1/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:translate-doc` }, quantity: 1 }] }),
+    });
+    assert(create.status === 201, `ucp create ${create.status}: ${JSON.stringify(create.body)}`);
+    assert(create.body.ucp?.version === '2026-04-08', `ucp.version: ${JSON.stringify(create.body.ucp)}`);
+    assert((create.body.ucp.capabilities || []).some((c: any) => c.name === 'dev.ucp.shopping.checkout'), 'ucp.capabilities echoed');
+    const cs = create.body.checkout_session;
+    assert(cs.status === 'open' && cs.totals?.grand_total === PRICE, `ucp session: ${JSON.stringify(cs)}`);
+    assert(cs.line_items?.[0]?.item?.id === `offer:${vendorGaii}:translate-doc`, 'ucp item id round-trips');
+    const done = await json(`/ucp/v1/checkout-sessions/${cs.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200, `ucp complete ${done.status}: ${JSON.stringify(done.body)}`);
+    assert(done.body.checkout_session?.status === 'completed', `ucp completed: ${done.body.checkout_session?.status}`);
+    assert(done.body.checkout_session?.payment?.receipt?.charged === PRICE, 'ucp receipt present');
+});
+
+await test('15. ACP surface: discovery doc + feed lists the public priced offer', async () => {
+    const disc = await fetch(`${BASE}/.well-known/acp.json`);
+    assert(disc.status === 200, `acp.json ${disc.status}`);
+    const doc = await disc.json() as any;
+    assert(doc.feed?.url?.endsWith('/v1/commerce/feed') && doc.checkout?.base_url?.endsWith('/acp/v1/checkout_sessions'), `acp doc: ${JSON.stringify(doc)}`);
+    const feedRes = await fetch(`${BASE}/v1/commerce/feed`);
+    assert(feedRes.status === 200, `feed ${feedRes.status}`);
+    const feed = await feedRes.json() as any;
+    const entry = (feed.products || []).find((p: any) => p.id === `offer:${vendorGaii}:translate-doc`);
+    assert(!!entry, `public priced offer in feed (${feed.total} products)`);
+    assert(entry.price?.amount === PRICE && entry.price?.currency === 'MORSEL', `feed price: ${JSON.stringify(entry.price)}`);
+    assert(!(feed.products || []).some((p: any) => p.id.endsWith(':secret-work')), 'private offers stay out of the feed');
+});
+
+await test('16. ACP checkout: create by sku + complete (morsel settlement)', async () => {
+    const create = await json('/acp/v1/checkout_sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:translate-doc`, quantity: 1 }] }),
+    });
+    assert(create.status === 201, `acp create ${create.status}: ${JSON.stringify(create.body)}`);
+    assert(create.body.status === 'ready_for_payment', `acp status: ${create.body.status}`);
+    const done = await json(`/acp/v1/checkout_sessions/${create.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200 && done.body.status === 'completed', `acp complete: ${done.status} ${done.body.status}`);
+    // The stripe provider maps to the (absent on Community) EE handler → 422.
+    const create2 = await json('/acp/v1/checkout_sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:translate-doc` }] }) });
+    const stripe = await json(`/acp/v1/checkout_sessions/${create2.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment_data: { provider: 'stripe' } }) });
+    assert(stripe.status === 422 && stripe.body.error?.code === 'UNKNOWN_PAYMENT_HANDLER', `stripe on Community: ${stripe.status} ${stripe.body.error?.code}`);
+});
+
+await test('17. 402 responses carry the x402-style accepts block', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc', quantity: 1000 }] }),
+    });
+    const r = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(r.status === 402, `402 expected, got ${r.status}`);
+    assert(Array.isArray(r.body.accepts) && r.body.accepts.some((a: any) => a.scheme === 'aimeat-checkout' && a.handler === 'io.aimeat.morsels'), `accepts: ${JSON.stringify(r.body.accepts)}`);
+});
+
+await test('18. Community node rejects org-offering items (no EE resolver) and money currencies', async () => {
+    const r = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'org-offering', org: 'x/y', agent: 'a', offer_id: 'o' }] }),
+    });
+    assert(r.status === 422 && r.body.error?.code === 'UNKNOWN_ITEM_KIND', `org-offering on Community: ${r.status} ${r.body.error?.code}`);
+    const eur = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ currency: 'EUR', items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }),
+    });
+    assert(eur.status === 422 && eur.body.error?.code === 'CURRENCY_NOT_SUPPORTED', `EUR offer on Community: ${eur.status} ${eur.body.error?.code}`);
+});
+
+await test('19. Anonymous requests are rejected (401)', async () => {
     const r = await json('/v1/commerce/checkout-sessions', { method: 'POST', body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }) });
     assert(r.status === 401, `expected 401, got ${r.status}`);
 });

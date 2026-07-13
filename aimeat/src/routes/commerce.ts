@@ -11,6 +11,8 @@
  *   - PATCH  /v1/commerce/checkout-sessions/:id        replace items OR { cancel: true }
  *   - POST   /v1/commerce/checkout-sessions/:id/complete  charge + fulfill (payment.handler optional)
  * @version-history
+ *   v1.2.0 — 2026-07-13 — Item kinds via the sellable-resolver registry (org-offering) + x402-style 402 accepts (phases 4–5)
+ *   v1.1.0 — 2026-07-13 — List endpoints, commerceEnabled gate, config TTL (phase 2)
  *   v1.0.0 — 2026-07-13 — Initial native checkout adapter (TARGET-033 phase 1)
  */
 import { Router } from 'express';
@@ -27,16 +29,20 @@ import {
 } from '../commerce/session-service.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
+import { paymentChallenge } from '../commerce/x402.js';
 
 const ItemsSchema = z.array(z.object({
-  agent: z.string().min(1).max(300),
+  kind: z.enum(['offer', 'org-offering']).optional(),
+  agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100),
+  org: z.string().max(200).optional(),
   quantity: z.number().int().positive().max(1000).optional(),
 })).min(1).max(20);
 
 const CreateSchema = z.object({
   items: ItemsSchema,
   note: z.string().max(2000).optional(),
+  currency: z.string().min(3).max(10).optional(),
 });
 
 const PatchSchema = z.object({
@@ -48,13 +54,17 @@ const CompleteSchema = z.object({
   payment: z.object({ handler: z.string().max(100).optional() }).optional(),
 });
 
-function sendCommerceError(res: Response, nodeId: string, err: unknown): void {
+function sendCommerceError(res: Response, config: AimeatConfig, err: unknown): void {
   if (err instanceof CommerceError || err instanceof PaymentError) {
-    res.status(err.statusCode).json(error(nodeId, err.code, err.message));
+    // 402 carries the x402-style `accepts` block so a paying agent knows how it could settle.
+    res.status(err.statusCode).json({
+      ...error(config.nodeId, err.code, err.message),
+      ...(err.statusCode === 402 ? paymentChallenge(config) : {}),
+    });
     return;
   }
   const e = err as { message?: string };
-  res.status(500).json(error(nodeId, 'COMMERCE_ERROR', e.message ?? 'Unexpected commerce error'));
+  res.status(500).json(error(config.nodeId, 'COMMERCE_ERROR', e.message ?? 'Unexpected commerce error'));
 }
 
 export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
@@ -88,12 +98,13 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: parsed.data.items,
         note: parsed.data.note,
+        currency: parsed.data.currency,
       });
       res.status(201).json(success(config.nodeId, { session }, [
         { description: 'Complete checkout', method: 'POST', url: `/v1/commerce/checkout-sessions/${session.id}/complete` },
         { description: 'Update items', method: 'PATCH', url: `/v1/commerce/checkout-sessions/${session.id}` },
       ]));
-    } catch (err) { sendCommerceError(res, config.nodeId, err); }
+    } catch (err) { sendCommerceError(res, config, err); }
   });
 
   // GET /v1/commerce/checkout-sessions — the buyer's sessions (purchases), newest first.
@@ -117,7 +128,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       const session = await loadOwnSession(req);
       res.json(success(config.nodeId, { session }));
-    } catch (err) { sendCommerceError(res, config.nodeId, err); }
+    } catch (err) { sendCommerceError(res, config, err); }
   });
 
   // PATCH /v1/commerce/checkout-sessions/:id — replace the cart, or cancel.
@@ -130,7 +141,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         ? await cancelSession(storage, session)
         : await updateSessionItems(storage, config, session, parsed.data.items!);
       res.json(success(config.nodeId, { session }));
-    } catch (err) { sendCommerceError(res, config.nodeId, err); }
+    } catch (err) { sendCommerceError(res, config, err); }
   });
 
   // POST /v1/commerce/checkout-sessions/:id/complete — charge + fulfill.
@@ -143,7 +154,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));
-    } catch (err) { sendCommerceError(res, config.nodeId, err); }
+    } catch (err) { sendCommerceError(res, config, err); }
   });
 
   return router;

@@ -10501,6 +10501,149 @@ paths:
         '409':
           description: Session is not open
 
+  /v1/commerce/feed:
+    get:
+      operationId: commerceFeed
+      summary: Public product feed (ACP-shaped)
+      description: >-
+        Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
+        (sku "offer:<agentGaii>:<offerId>", price in morsels). Discovery: /.well-known/acp.json.
+      tags: [Commerce]
+      responses:
+        '200':
+          description: Product feed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /.well-known/acp.json:
+    get:
+      operationId: acpDiscovery
+      summary: ACP merchant discovery document
+      description: Points agentic-commerce clients at the product feed and the /acp/v1 checkout base URL.
+      tags: [Commerce]
+      responses:
+        '200':
+          description: Discovery document
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /ucp/v1/checkout-sessions:
+    post:
+      operationId: ucpCreateCheckoutSession
+      summary: UCP checkout — create session
+      description: >-
+        Universal Commerce Protocol (2026-04-08) shaped checkout over the commerce core. Every
+        response carries ucp.version + ucp.capabilities; the UCP-Agent header (platform profile
+        URL) is fetched best-effort for capability negotiation. Item ids:
+        "offer:<agentGaii>:<offerId>" or "org-offering:<owner>/<slug>:<agentGaii>:<offerId>".
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [line_items]
+              properties:
+                line_items:
+                  type: array
+                  items: { type: object }
+                note: { type: string }
+                currency: { type: string, description: "'morsel' (default) or a money code an EE handler supports" }
+      responses:
+        '201':
+          description: UCP checkout session
+        '402':
+          description: Payment required (x402-style accepts block)
+
+  /ucp/v1/checkout-sessions/{id}:
+    get:
+      operationId: ucpGetCheckoutSession
+      summary: UCP checkout — read session (buyer only)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: UCP checkout session }
+    patch:
+      operationId: ucpUpdateCheckoutSession
+      summary: UCP checkout — update line items or cancel
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: UCP checkout session }
+
+  /ucp/v1/checkout-sessions/{id}/complete:
+    post:
+      operationId: ucpCompleteCheckoutSession
+      summary: UCP checkout — complete (charge + fulfill)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Completed UCP checkout session }
+        '402': { description: Payment required (x402-style accepts block) }
+
+  /acp/v1/checkout_sessions:
+    post:
+      operationId: acpCreateCheckoutSession
+      summary: ACP checkout — create session by sku
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: { type: object }
+      responses:
+        '201': { description: ACP checkout session (status ready_for_payment) }
+
+  /acp/v1/checkout_sessions/{id}:
+    get:
+      operationId: acpGetCheckoutSession
+      summary: ACP checkout — read session (buyer only)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: ACP checkout session }
+
+  /acp/v1/checkout_sessions/{id}/complete:
+    post:
+      operationId: acpCompleteCheckoutSession
+      summary: ACP checkout — complete (payment_data.provider maps to a payment handler)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Completed ACP checkout session }
+        '402': { description: Payment required (x402-style accepts block) }
+        '422': { description: Unknown payment handler (e.g. stripe on a Community node) }
+
   /v1/commerce/checkout-sessions/{id}/complete:
     post:
       operationId: completeCheckoutSession

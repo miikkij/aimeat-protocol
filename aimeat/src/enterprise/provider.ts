@@ -20,6 +20,8 @@ import type { requireAuth as requireAuthFn, requireRole as requireRoleFn } from 
 import type { resolveIdentity as resolveIdentityFn, buildGAII as buildGAIIFn } from '../utils/gaii.js';
 import type { logger as loggerInst } from '../utils/logger.js';
 import type { PaymentHandler } from '../commerce/types.js';
+import type { SellableResolver } from '../commerce/sellable-resolvers.js';
+import type { safeFetch as safeFetchFn } from '../utils/url-validator.js';
 
 /**
  * Everything the EE module needs, injected by core. The EE module is plain ESM JS in a separate
@@ -52,6 +54,10 @@ export interface EnterpriseContext {
   }>;
   /** The effective checkout fee percent (commerce override, inheriting the marketplace percent). */
   commerceFeePercent: () => number;
+  /** SSRF-guarded outbound HTTP (Rule 10: all non-constant outbound HTTP goes through safeFetch). */
+  safeFetch: typeof safeFetchFn;
+  /** Typed commerce error factory — EE-thrown errors keep their status codes through the adapters. */
+  commerceError: (code: string, statusCode: number, message: string) => Error;
   logger: typeof loggerInst;
 }
 
@@ -70,6 +76,12 @@ export interface EnterpriseProvider {
    * /.well-known/ucp profile automatically.
    */
   getPaymentHandlers?(): PaymentHandler[] | Promise<PaymentHandler[]>;
+  /**
+   * Sellable resolvers this edition contributes to the checkout core (TARGET-033 phase 4).
+   * EE registers `org-offering` — company-catalog items with commission-split distribution —
+   * making org offerings purchasable through the same checkout sessions and protocol adapters.
+   */
+  getSellableResolvers?(): SellableResolver[] | Promise<SellableResolver[]>;
 }
 
 /** HTTP status used when a gated namespace is hit on a node without the EE module. */
