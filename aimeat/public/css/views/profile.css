@@ -213,6 +213,12 @@
 .pf .wallet-card .amount.positive{color:var(--success,#22c55e)}
 .pf .wallet-card .amount.neutral{color:var(--accent,#E8564A)}
 .pf .wallet-card .wlabel{font-size:.75rem;color:var(--text-dim,#6B7280);text-transform:uppercase;margin-top:.2rem}
+.pf .wallet-psp{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.5rem}
+.pf .wallet-psp-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.pf .wallet-psp-input{flex:1;min-width:240px}
+.pf .pf-psp-chip{display:inline-block;padding:.1rem .55rem;border-radius:var(--radius-full,999px);border:1px solid var(--border);font-size:.72rem;width:fit-content}
+.pf .pf-psp-chip--ok{color:var(--success,#22c55e);border-color:var(--success,#22c55e)}
+.pf .pf-psp-chip--warn{color:var(--warning,#f59e0b);border-color:var(--warning,#f59e0b)}
 .pf .tx-list{max-height:400px;overflow-y:auto}
 .pf .tx-item{display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;border-bottom:1px solid rgba(232,86,74,.08);font-size:.85rem}
 .pf .tx-item:last-child{border-bottom:none}

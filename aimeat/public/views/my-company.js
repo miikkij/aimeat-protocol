@@ -61,7 +61,9 @@ function OrderRow({ o, view }) {
         <span class="mc-mini">${new Date(o.createdAt).toLocaleString()}</span>
       </div>
       ${o.input && html`<div class="mc-order-input">${t('myCompany.orderedWhat')}: “${o.input}”</div>`}
-      ${o.charged > 0 && html`<div class="mc-order-receipt">🧾 ${t('myCompany.receiptLabel')}: ${t('myCompany.charged').replace('{n}', o.charged)}${o.trackingCode ? html` · <span class="mc-mini">${o.trackingCode}</span>` : ''}</div>`}
+      ${o.charged > 0 && html`<div class="mc-order-receipt">🧾 ${t('myCompany.receiptLabel')}: ${o.currency && o.currency !== 'morsel'
+        ? `${(o.charged / 100).toFixed(2)} ${o.currency}`
+        : t('myCompany.charged').replace('{n}', o.charged)}${o.trackingCode ? html` · <span class="mc-mini">${o.trackingCode}</span>` : ''}</div>`}
       ${o.kind === 'result' && o.result != null && html`
         <div class="mc-result"><div class="mc-result-label">${t('myCompany.result')}</div><${DeliverableBody} value=${o.result} alt=${o.offerTitle} /></div>`}
     </li>`;
@@ -226,17 +228,49 @@ function SettingsPanel({ org, onSaved }) {
  * automatically once the node's EE edition registers them — no UI change needed. */
 function PaymentsPanel({ org }) {
   const [profile, setProfile] = useState(null);
+  const [psp, setPsp] = useState(null);
+  const [keyIn, setKeyIn] = useState('');
+  const [pspBusy, setPspBusy] = useState(false);
+  const [pspMsg, setPspMsg] = useState('');
+  const loadPsp = useCallback(() => {
+    apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`).then(r => setPsp(r.data?.psp ?? { configured: false })).catch(() => setPsp(false));
+  }, [org.slug]);
   useEffect(() => {
     let alive = true;
     fetch('/.well-known/ucp').then(r => r.json()).then(p => { if (alive) setProfile(p); }).catch(() => { if (alive) setProfile(false); });
+    loadPsp();
     return () => { alive = false; };
-  }, []);
+  }, [loadPsp]);
+  async function savePsp() {
+    setPspBusy(true); setPspMsg('');
+    try { await apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`, { secret_key: keyIn.trim() }); setKeyIn(''); setPspMsg(t('myCompany.pspSaved')); loadPsp(); }
+    catch (e) { setPspMsg(e.message || 'Save failed'); }
+    finally { setPspBusy(false); }
+  }
+  async function removePsp() {
+    setPspBusy(true); setPspMsg('');
+    try { await apiDelete(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`); setPspMsg(t('myCompany.pspRemoved')); loadPsp(); }
+    catch (e) { setPspMsg(e.message || 'Remove failed'); }
+    finally { setPspBusy(false); }
+  }
   if (profile === null) return html`<p class="mc-empty">${t('myCompany.loading')}</p>`;
   const handlers = (profile && profile.ucp && profile.ucp.payment_handlers) || [];
   const checkoutOn = !!(profile && profile.ucp && (profile.ucp.capabilities || []).length);
   const hasKybPre = !!org.businessId;
   return html`
     <div class="mc-payments">
+      <div class="mc-label">${t('myCompany.pspTitle')}
+        ${psp && psp.configured
+          ? html`<span class="mc-chip mc-chip-ok">${t('myCompany.pspConfigured')} ${psp.keyHint || ''}</span>`
+          : html`<span class="mc-chip mc-chip-warn">${t('myCompany.pspMissing')}</span>`}
+      </div>
+      <span class="mc-mini">${t('myCompany.pspHint')}</span>
+      <div class="flex-row-wrap mc-manage-row">
+        <input class="input-field input-sm mc-psp-input" type="password" placeholder="sk_live_…" value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
+        <button class="btn-primary btn-sm" disabled=${pspBusy || keyIn.trim().length < 8} onClick=${savePsp}>${t('myCompany.pspSave')}</button>
+        ${psp && psp.configured && html`<button class="btn-ghost btn-sm mc-remove" disabled=${pspBusy} onClick=${removePsp}>${t('myCompany.pspRemove')}</button>`}
+      </div>
+      ${pspMsg && html`<span class="mc-mini">${pspMsg}</span>`}
       <div class="mc-label">${t('myCompany.paymentsCheckout')}
         <span class="mc-chip ${checkoutOn ? 'mc-chip-ok' : 'mc-chip-warn'}">${checkoutOn ? t('myCompany.paymentsOn') : t('myCompany.paymentsOff')}</span>
       </div>
@@ -401,6 +435,9 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
   const [editMode, setEditMode] = useState(false);
   const [price, setPrice] = useState(offer.price?.morsels ?? 0);
   const [vis, setVis] = useState(offer.visibility ?? 'private');
+  // Money price lives on the CATALOG REF (o.priceMoney, minor units) — edited in major units here.
+  const [moneyAmt, setMoneyAmt] = useState(o.priceMoney ? (o.priceMoney.amount / 100).toFixed(2) : '');
+  const [moneyCur, setMoneyCur] = useState(o.priceMoney?.currency ?? 'EUR');
   const [saving, setSaving] = useState(false);
 
   const visLabel = (v) => t('myCompany.vis' + (v || 'private').charAt(0).toUpperCase() + (v || 'private').slice(1));
@@ -422,8 +459,11 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
     try {
       const p = Number(price) > 0 ? { morsels: Math.floor(Number(price)), unit: 'per-call' } : null;
       await setOfferBilling(o.agentName, o.offerId, { price: p, visibility: vis });
+      // Money price (minor units) is saved on the company's catalog ref; empty clears it.
+      const amt = Math.round(parseFloat(String(moneyAmt).replace(',', '.')) * 100);
+      const priceMoney = Number.isFinite(amt) && amt > 0 ? { amount: amt, currency: moneyCur } : null;
       // record who last edited the company's listing (surfaced as "last saved by")
-      await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId }).catch(() => {});
+      await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId, priceMoney }).catch(() => {});
       setEditMode(false);
       if (onChanged) await onChanged();
     } catch (e) { setErr(e.message || 'Save failed'); }
@@ -450,6 +490,11 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
           </select>
           <input class="input-field input-sm mc-price-input" type="number" min="0" value=${price} onInput=${(e) => setPrice(e.target.value)} />
           <span class="mc-mini">${t('myCompany.morsels')}</span>
+          <input class="input-field input-sm mc-price-input" type="text" inputmode="decimal" placeholder="0.00" value=${moneyAmt} onInput=${(e) => setMoneyAmt(e.target.value)} />
+          <select class="input-field input-sm" value=${moneyCur} onChange=${(e) => setMoneyCur(e.target.value)}>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+          </select>
           <button class="btn-primary btn-sm" disabled=${saving} onClick=${saveBilling}>${t('myCompany.savePrice')}</button>
           <button class="btn-ghost btn-sm" disabled=${saving} onClick=${() => { setEditMode(false); setPrice(offer.price?.morsels ?? 0); setVis(offer.visibility ?? 'private'); }}>${t('myCompany.cancel')}</button>
         </div>
@@ -467,7 +512,7 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
         <div class="mc-config">
           ${!isOwn && html`<span class="mc-mini">${t('myCompany.byMember')}: <b>${o.agentOwner}</b></span>`}
           <span><b>${t('myCompany.visibilityLabel')}:</b> ${visLabel(offer.visibility)}</span>
-          <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}</span>
+          <span><b>${t('myCompany.priceLabel')}:</b> ${offer.price?.morsels ? `${offer.price.morsels} ${t('myCompany.morsels')}` : t('myCompany.notForSale')}${o.priceMoney ? ` · ${(o.priceMoney.amount / 100).toFixed(2)} ${o.priceMoney.currency}` : ''}</span>
           ${o.lastEditedBy
             ? html`<span class="mc-mini">${t('myCompany.lastSavedBy')}: <b>${ownerOf(o.lastEditedBy)}</b>${o.lastEditedAt ? ` · ${new Date(o.lastEditedAt).toLocaleString()}` : ''}</span>`
             : html`<span class="mc-mini">${t('myCompany.neverEdited')}</span>`}

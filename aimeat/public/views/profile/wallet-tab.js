@@ -18,6 +18,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getWallet, getTransactions, requestMorsels } from '/js/services/wallet.js';
+import { apiGet, apiPut, apiDelete } from '/js/api.js';
 
 /**
  * Map backend transaction type to a display label.
@@ -30,6 +31,47 @@ function txTypeLabel(tx) {
   if (type === 'spent') return t('profile.wallet.spent');
   // Fallback based on amount sign
   return tx.amount > 0 ? t('profile.wallet.earned') : t('profile.wallet.shared');
+}
+
+/* "Selling & payments" — the individual seller's own PSP credentials (/v1/me/psp, EE).
+ * Money sales settle on the SELLER's own Stripe account; the node never holds keys or funds.
+ * Hidden when the node has no EE module (404/501 from the endpoint). */
+function PspSection() {
+  const [psp, setPsp] = useState(null);
+  const [keyIn, setKeyIn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = useCallback(() => {
+    apiGet('/v1/me/psp').then(r => setPsp(r.data?.psp ?? { configured: false })).catch(() => setPsp(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (psp === null || psp === false) return null; // Community node or still loading — nothing to show
+  async function save() {
+    setBusy(true); setMsg('');
+    try { await apiPut('/v1/me/psp', { secret_key: keyIn.trim() }); setKeyIn(''); setMsg(t('profile.wallet.pspSaved')); load(); }
+    catch (e) { setMsg(e.message || 'Save failed'); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    setBusy(true); setMsg('');
+    try { await apiDelete('/v1/me/psp'); setMsg(t('profile.wallet.pspRemoved')); load(); }
+    catch (e) { setMsg(e.message || 'Remove failed'); }
+    finally { setBusy(false); }
+  }
+  return html`
+    <div class="section-title mt-2">${t('profile.wallet.pspTitle')}</div>
+    <div class="section-desc">${t('profile.wallet.pspDesc')}</div>
+    <div class="wallet-psp">
+      ${psp.configured
+        ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.pspConfigured')} ${psp.keyHint || ''}</span>`
+        : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.pspMissing')}</span>`}
+      <div class="wallet-psp-row">
+        <input class="input-field input-sm wallet-psp-input" type="password" placeholder="sk_live_…" value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
+        <button class="btn-primary btn-sm" disabled=${busy || keyIn.trim().length < 8} onClick=${save}>${t('profile.wallet.pspSave')}</button>
+        ${psp.configured && html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${remove}>${t('profile.wallet.pspRemove')}</button>`}
+      </div>
+      ${msg && html`<span class="text-meta">${msg}</span>`}
+    </div>`;
 }
 
 export default function WalletTab({ session, showToast, onStats }) {
@@ -138,6 +180,9 @@ export default function WalletTab({ session, showToast, onStats }) {
         <div class="wlabel">${t('profile.wallet.dailyAllowance')}</div>
       </div>
     </div>
+
+    <!-- Selling & payment provider (individual seller's own Stripe key; EE nodes only) -->
+    <${PspSection} />
 
     <!-- Copy balance button -->
     <div class="mb-1">
