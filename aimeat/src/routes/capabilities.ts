@@ -5,9 +5,10 @@
  *   v1.0.0 - 2026-05-02 - Initial capability layer endpoints
  */
 import { Router } from 'express';
+import type { Request } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import type { Storage, CapabilityRecord, CapabilityFilter } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -15,17 +16,17 @@ import { resolveIdentity } from '../utils/gaii.js';
 function redactInput(input: Record<string, unknown>, redactedFields: string[]): Record<string, unknown> {
   if (!redactedFields.length) return input;
   if (redactedFields.includes('*')) return { _redacted: true, _hash: createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 16) };
-  const copy = JSON.parse(JSON.stringify(input));
+  const copy = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
   for (const field of redactedFields) {
     const parts = field.split('.');
-    let obj = copy;
+    let obj: Record<string, unknown> | null = copy;
     for (let i = 0; i < parts.length - 1; i++) {
-      if (obj && typeof obj === 'object' && parts[i] in obj) obj = obj[parts[i]] as any;
-      else { obj = null as any; break; }
+      if (obj && typeof obj === 'object' && parts[i] in obj) obj = obj[parts[i]] as Record<string, unknown> | null;
+      else { obj = null; break; }
     }
     if (obj && typeof obj === 'object') {
       const last = parts[parts.length - 1];
-      if (last in obj) (obj as any)[last] = '[REDACTED]';
+      if (last in obj) obj[last] = '[REDACTED]';
     }
   }
   return copy;
@@ -33,12 +34,12 @@ function redactInput(input: Record<string, unknown>, redactedFields: string[]): 
 
 export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const resolve = (req: any) => resolveIdentity(req.auth!, config.nodeId);
+  const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
 
   // ── Discovery (Tier 0 for public, Tier 1 for private) ──
 
   router.get('/v1/capabilities', async (req, res) => {
-    const filters: any = {};
+    const filters: CapabilityFilter = {};
     if (req.query.search) filters.search = req.query.search as string;
     if (req.query.tags) filters.tags = (req.query.tags as string).split(',');
     if (req.query.callable !== undefined) filters.callable = req.query.callable === 'true';
@@ -167,8 +168,9 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     try {
       const created = await storage.createCapability(record);
       res.status(201).json(success(config.nodeId, created));
-    } catch (err: any) {
-      if (err.message?.includes('UNIQUE') || err.message?.includes('duplicate')) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('UNIQUE') || message.includes('duplicate')) {
         return res.status(409).json(error(config.nodeId, 'CAPABILITY_EXISTS', `Capability '${record.id}' already exists`));
       }
       throw err;
@@ -237,22 +239,24 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       }).catch(() => {});
 
       res.json(success(config.nodeId, result));
-    } catch (err: any) {
-      const statusCode = err.statusCode || 500;
-      const code = err.code || 'INVOKE_FAILED';
+    } catch (err) {
+      const e = err as { statusCode?: number; code?: string; message?: string };
+      const statusCode = e.statusCode || 500;
+      const code = e.code || 'INVOKE_FAILED';
+      const message = err instanceof Error ? err.message : String(err);
 
       storage.incrementCapabilityStats(cap.id, {
-        success: 0, error: 1, totalMs: 0, lastError: err.message,
+        success: 0, error: 1, totalMs: 0, lastError: message,
       }).catch(() => {});
 
       // On error, log full input for debugging (regardless of redaction)
       storage.addCapabilityLog({
         id: randomUUID(), capabilityId: cap.id, callerGhii,
         input, status: 'error', durationMs: 0,
-        error: err.message, timestamp: new Date().toISOString(),
+        error: message, timestamp: new Date().toISOString(),
       }).catch(() => {});
 
-      res.status(statusCode).json(error(config.nodeId, code, err.message));
+      res.status(statusCode).json(error(config.nodeId, code, message));
     }
   });
 
@@ -308,8 +312,8 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     try {
       const result = await invokeCapability(config, storage, cap, req.body.input || {}, resolve(req), jwt, 'normal');
       res.json(success(config.nodeId, { status: 'success', result: result.result, duration_ms: result.duration_ms }));
-    } catch (err: any) {
-      res.json(success(config.nodeId, { status: 'error', error: err.message, duration_ms: 0 }));
+    } catch (err) {
+      res.json(success(config.nodeId, { status: 'error', error: err instanceof Error ? err.message : String(err), duration_ms: 0 }));
     }
   });
 

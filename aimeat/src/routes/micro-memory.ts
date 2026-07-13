@@ -20,6 +20,7 @@ import { checkOtkSession } from './auth.js';
 import { checkMicroMemoryQuota } from '../services/quota.js';
 
 const VALID_VISIBILITY = ['private', 'public_read', 'shared_read', 'shared_write', 'public_write'] as const;
+type MicroMemoryVisibility = typeof VALID_VISIBILITY[number];
 const MAX_BATCH_PAIRS = 100; // Max key-value pairs to scan in batch GET query params
 
 /** Resolve value from query — supports plain `value` and base64-encoded `value64` */
@@ -189,7 +190,7 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
         const op = req.query.op as string;
         const set = req.query.set as string;
         const key = req.query.key as string;
-        const value = resolveValue(req as any);
+        const value = resolveValue({ query: req.query as Record<string, unknown> });
 
         if (!op) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'op query parameter is required (add, del, mod, list, config, batch)'));
@@ -332,7 +333,7 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     return;
                 }
                 const access = (req.query.access as string) ?? (req.query.visibility as string);
-                if (!access || !VALID_VISIBILITY.includes(access as any)) {
+                if (!access || !(VALID_VISIBILITY as readonly string[]).includes(access)) {
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `access must be one of: ${VALID_VISIBILITY.join(', ')}`));
                     return;
                 }
@@ -343,9 +344,9 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                 }
                 let record4 = await storage.getMicroMemory(gaii, set);
                 if (!record4) {
-                    record4 = { gaii, set, entries: {}, visibility: access as any, accessCode, updatedAt: new Date().toISOString() };
+                    record4 = { gaii, set, entries: {}, visibility: access as MicroMemoryVisibility, accessCode, updatedAt: new Date().toISOString() };
                 } else {
-                    record4.visibility = access as any;
+                    record4.visibility = access as MicroMemoryVisibility;
                     record4.accessCode = accessCode;
                     record4.updatedAt = new Date().toISOString();
                 }
@@ -455,7 +456,7 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                 return;
             }
             const key = req.query.key as string;
-            const value = resolveValue(req as any);
+            const value = resolveValue({ query: req.query as Record<string, unknown> });
             if (writeOp === 'add' || writeOp === 'mod') {
                 if (!key || value === undefined) {
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and value (or value64) required'));

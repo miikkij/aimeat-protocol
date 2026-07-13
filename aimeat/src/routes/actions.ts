@@ -13,7 +13,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, ActionRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
@@ -99,8 +99,8 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'Update this action', method: 'PUT', url: `/v1/actions/${action.id}` },
       ]));
       emitChange('actions');
-    } catch (e: any) {
-      if (e.message === 'ACTION_EXISTS') {
+    } catch (e) {
+      if (e instanceof Error && e.message === 'ACTION_EXISTS') {
         res.status(409).json(error(config.nodeId, 'CONFLICT', `Action "${id}" already exists for this agent`));
         return;
       }
@@ -164,7 +164,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     const id = req.params.id as string;
     const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, semantic, federate } = req.body ?? {};
 
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    const updates: Partial<ActionRecord> = { updatedAt: new Date().toISOString() };
     if (display_name !== undefined) updates.displayName = display_name;
     if (description !== undefined) updates.description = description;
     if (category !== undefined) updates.category = category;
@@ -182,7 +182,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     if (semantic !== undefined) updates.semantic = semantic;
     if (typeof federate === 'boolean') updates.federate = federate;
 
-    const updated = await storage.updateAction(id, gaii, updates as any);
+    const updated = await storage.updateAction(id, gaii, updates);
     if (!updated) {
       res.status(404).json(error(config.nodeId, 'ACTION_NOT_FOUND', `Action not found: ${id}`));
       return;

@@ -33,7 +33,7 @@ import { Router } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, PackageComponent, TemplateListingRecord } from '../storage/interface.js';
+import type { Storage, PackageRecord, PackageComponent, PackageComponentType, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -50,6 +50,16 @@ function generateVersion(): string {
 /** SHA-256 hash of content for change detection. */
 function hashContent(content: string): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+/** Raw, client-supplied component shape from a request body (pre-validation). */
+interface RawComponentInput {
+  id: string;
+  type: string;
+  label?: string;
+  content?: string;
+  contentHash?: string;
+  dependencies?: string[];
 }
 
 const MAX_PACKAGES_PER_AUTHOR = 100;
@@ -104,8 +114,9 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         busboy.on('error', reject);
         req.pipe(busboy);
       });
-    } catch (e: any) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', e.message ?? 'Failed to parse multipart upload'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', msg || 'Failed to parse multipart upload'));
       return;
     }
 
@@ -207,12 +218,13 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
       ]));
       emitChange('packages');
-    } catch (e: any) {
-      if (e.message === 'PACKAGE_EXISTS' || e.code === 'SQLITE_CONSTRAINT_UNIQUE' || e.code === 'P2002') {
+    } catch (e) {
+      const err = e as { message?: string; code?: string };
+      if (err.message === 'PACKAGE_EXISTS' || err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'P2002') {
         res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${parsed.name}" already exists for this author`));
         return;
       }
-      res.status(500).json(error(config.nodeId, 'IMPORT_FAILED', e.message ?? 'Import failed'));
+      res.status(500).json(error(config.nodeId, 'IMPORT_FAILED', err.message ?? 'Import failed'));
     }
   });
 
@@ -275,7 +287,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Check total size
-    const totalSizeBytes = components.reduce((sum: number, c: any) =>
+    const totalSizeBytes = components.reduce((sum: number, c: RawComponentInput) =>
       sum + Buffer.byteLength(c.content ?? '', 'utf-8'), 0);
     const maxSizeBytes = config.packageMaxSizeMb * 1024 * 1024;
     if (totalSizeBytes > maxSizeBytes) {
@@ -306,9 +318,9 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     const version = generateVersion();
     const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
-    const processedComponents: PackageComponent[] = components.map((c: any) => ({
+    const processedComponents: PackageComponent[] = components.map((c: RawComponentInput) => ({
       id: c.id,
-      type: c.type,
+      type: c.type as PackageComponentType,
       label: c.label ?? '',
       content: c.content ?? '',
       contentHash: hashContent(c.content ?? ''),
@@ -341,8 +353,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
       ]));
       emitChange('packages');
-    } catch (e: any) {
-      if (e.message === 'PACKAGE_EXISTS') {
+    } catch (e) {
+      if (e instanceof Error && e.message === 'PACKAGE_EXISTS') {
         res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${name}" already exists for this author`));
         return;
       }
@@ -446,9 +458,9 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       version = `${version}-${sameMinute.length + 1}`;
     }
 
-    const processedComponents: PackageComponent[] = (components ?? anyVersion.components).map((c: any) => ({
+    const processedComponents: PackageComponent[] = (components ?? anyVersion.components).map((c: RawComponentInput) => ({
       id: c.id,
-      type: c.type,
+      type: c.type as PackageComponentType,
       label: c.label ?? '',
       content: c.content ?? '',
       contentHash: c.contentHash ?? hashContent(c.content ?? ''),

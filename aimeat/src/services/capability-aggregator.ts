@@ -11,7 +11,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 function makeSchemaHash(input: unknown, output: unknown): string {
@@ -47,14 +47,14 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         if (!existing) {
           const cap: CapabilityRecord = {
             id: ref, name: `${ext.name}: ${action.id}`,
-            summary: (action as any).description || ext.description || '',
+            summary: (action as { description?: string }).description || ext.description || '',
             ownerGhii: ext.installedBy || `operator@${config.nodeId}`,
             visibility: 'public', scope: 'local', status: 'active',
             rejectionReason: null, deprecationMessage: null, replacedBy: null,
             source: { type: 'extension', ref, version: ext.version },
             authRequired: 'registered', callable: true,
-            inputSchema: (action as any).inputSchema || null,
-            outputSchema: (action as any).outputSchema || null,
+            inputSchema: action.inputSchema || null,
+            outputSchema: action.outputSchema || null,
             exports: null,
             usage: `await AIMEAT.capabilities.invoke('${ref}', input)`,
             whenToUse: '', whenNotToUse: '',
@@ -71,16 +71,16 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           await storage.updateCapability(existing.id, {
             status: 'active',
             source: { type: 'extension', ref, version: ext.version },
-            inputSchema: (action as any).inputSchema || null,
-            outputSchema: (action as any).outputSchema || null,
+            inputSchema: action.inputSchema || null,
+            outputSchema: action.outputSchema || null,
             schemaHash, updatedAt: now,
           });
           updated++;
         } else if (existing.source.version !== ext.version || existing.schemaHash !== schemaHash) {
           await storage.updateCapability(existing.id, {
             source: { type: 'extension', ref, version: ext.version },
-            inputSchema: (action as any).inputSchema || null,
-            outputSchema: (action as any).outputSchema || null,
+            inputSchema: action.inputSchema || null,
+            outputSchema: action.outputSchema || null,
             schemaHash, updatedAt: now,
           });
           updated++;
@@ -136,16 +136,17 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
       const existing = await storage.getCapabilityBySourceRef(ref);
 
       // Extract lib component exports and API surface from cortex manifest
-      const components = (cortex as any).components || [];
-      const libComponents = components.filter((c: any) => c.type === 'lib');
-      const promptComponents = components.filter((c: any) => c.type === 'prompt');
+      const components = cortex.components || [];
+      const libComponents = components.filter((c): c is CortexLibComponent => c.type === 'lib');
+      const promptComponents = components.filter((c): c is CortexPromptComponent => c.type === 'prompt');
 
       let apiSurface = '';
       let libExports: string[] = [];
       let libFilename = `${cortex.name}.js`;
       for (const lib of libComponents) {
         if (lib.exports) libExports = libExports.concat(lib.exports);
-        if (lib.apiSurface || lib.api_surface) apiSurface += (lib.apiSurface || lib.api_surface) + '\n';
+        const surface = (lib as { apiSurface?: string }).apiSurface || lib.api_surface;
+        if (surface) apiSurface += surface + '\n';
         if (lib.filename) libFilename = lib.filename;
       }
 

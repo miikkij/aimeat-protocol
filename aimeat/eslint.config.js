@@ -40,7 +40,9 @@ export default tseslint.config(
       aimeat: aimeatPlugin,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Cleaned to zero on 2026-07-13 and ratcheted to 'error'. The Prisma storage provider
+      // keeps 3 documented per-line disables (dynamic dual client); everything else is typed.
+      '@typescript-eslint/no-explicit-any': 'error',
       // Cleaned to zero on 2026-07-13 and ratcheted to 'error' — unused imports/vars/params
       // now fail the pre-commit hook + CI instead of accumulating. Unused args prefixed with `_`.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -63,7 +65,8 @@ export default tseslint.config(
       'no-undef': 'off',
       // Preact uses the same hook contract as React, so these rules apply. Warn-level for now
       // (gradual adoption) — surfaces missing/incorrect effect deps and hook-ordering issues.
-      'react-hooks/rules-of-hooks': 'warn',
+      // rules-of-hooks cleaned to zero on 2026-07-13 and ratcheted to 'error'.
+      'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       // Legacy-frontend findings surfaced when lint coverage was extended to public/
       // (2026-06-19). Cleaned to zero on 2026-07-13 and ratcheted to 'error' so new

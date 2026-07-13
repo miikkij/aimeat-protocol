@@ -207,7 +207,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         }
         // Return credentials and immediately clear them
         const creds = request.agentCredentials;
-        await storage.updateDeviceAuth(device_code, { agentCredentials: null as any });
+        await storage.updateDeviceAuth(device_code, { agentCredentials: undefined });
 
         const baseUrl = config.baseUrl;
         const agentName = request.agentName;
@@ -1769,7 +1769,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const offerName = providerGaii.split('#')[0];
     const rec = await storage.getMemory(providerGaii, `agents.${offerName}.offers`);
-    const offers = ((rec?.value as { offers?: Array<Record<string, any>> } | undefined)?.offers) ?? [];
+    const offers = ((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
     const offer = offers.find((o) => o.id === offerId);
     if (!offer) { res.status(404).json(error(config.nodeId, 'OFFER_NOT_FOUND', `Offer not found: ${offerId}`)); return; }
 
@@ -1804,9 +1804,10 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       const { invokeCapability } = await import('../services/capability-invoke.js');
       result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode);
-    } catch (err: any) {
+    } catch (err) {
       if (price > 0) await storage.creditBalance(callerGhii, price); // refund the reservation
-      res.status(err.statusCode || 502).json(error(config.nodeId, err.code || 'OFFER_INVOKE_FAILED', err.message || 'Offer invocation failed')); return;
+      const e = err as { statusCode?: number; code?: string; message?: string };
+      res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'OFFER_INVOKE_FAILED', e.message || 'Offer invocation failed')); return;
     }
 
     // Success → settle: credit the provider (price minus the marketplace fee) + record the audit trail.

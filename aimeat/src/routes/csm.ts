@@ -165,7 +165,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // Extract federate flag (Phase 3.4 — auto-distribute to federation peers)
-    const federate = !!(req.body.federate ?? (definition as any).federate);
+    const federate = !!(req.body.federate ?? (definition as { federate?: boolean }).federate);
 
     // Store CSM record
     const record = await storage.createCsm({

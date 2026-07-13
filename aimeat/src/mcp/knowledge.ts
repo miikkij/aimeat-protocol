@@ -23,6 +23,24 @@ import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
+/** An entry reference stored in a knowledge-package manifest's `entries` list. */
+interface KnowledgeEntryRef {
+    key: string;
+    title?: string;
+    visibility?: string;
+}
+
+/** Shape of a stored knowledge-package manifest value (memory record `value`). */
+interface KnowledgeManifestValue {
+    name?: string;
+    content_type?: string;
+    tags?: string[];
+    sharing?: { catalog_listed?: boolean };
+    entries?: KnowledgeEntryRef[];
+    created?: string;
+    updated?: string;
+}
+
 export function registerKnowledgeTools(
     mcp: McpServer,
     storage: Storage,
@@ -69,7 +87,7 @@ export function registerKnowledgeTools(
                 const manifests = entries.filter(e => e.key.endsWith('/manifest'));
                 return {
                     resources: manifests.map(m => {
-                        const pkg = m.value as any;
+                        const pkg = m.value as KnowledgeManifestValue;
                         const packageId = m.key.replace('packages/', '').replace('/manifest', '');
                         return {
                             uri: `aimeat://knowledge/${encodeURIComponent(packageId)}`,
@@ -120,7 +138,7 @@ export function registerKnowledgeTools(
             const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
             const packages = manifests.map(m => {
-                const pkg = m.value as any;
+                const pkg = m.value as KnowledgeManifestValue;
                 const packageId = m.key.replace('packages/', '').replace('/manifest', '');
                 return {
                     package_id: packageId,
@@ -233,10 +251,10 @@ export function registerKnowledgeTools(
             });
 
             // Update manifest's entries list if entry is new
-            const manifestValue = manifest.value as any;
-            const manifestEntries: any[] = manifestValue?.entries ?? [];
+            const manifestValue = manifest.value as KnowledgeManifestValue;
+            const manifestEntries: KnowledgeEntryRef[] = manifestValue?.entries ?? [];
             const entryExists = manifestEntries.some(
-                (e: any) => e.key === fullEntryKey || e.key === entry_key,
+                (e) => e.key === fullEntryKey || e.key === entry_key,
             );
             if (!entryExists) {
                 manifestEntries.push({

@@ -6,7 +6,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, CapabilityFilter } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 
@@ -15,7 +15,7 @@ export function adminCapabilitiesRouter(config: AimeatConfig, storage: Storage):
   const auth = [requireAuth(), requireRole('operator')];
 
   router.get('/v1/admin/capabilities', ...auth, async (req, res) => {
-    const filters: any = {};
+    const filters: CapabilityFilter = {};
     if (req.query.owner) filters.ownerGhii = req.query.owner as string;
     if (req.query.source_type) filters.sourceType = req.query.source_type as string;
     if (req.query.status) filters.status = req.query.status as string;

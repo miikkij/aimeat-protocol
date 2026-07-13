@@ -135,8 +135,12 @@ import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '.
 // Prisma client will be imported dynamically at runtime
 // import { PrismaClient } from '@prisma/client';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma rows are dynamically typed; two generated clients (mongo/postgres) with different shapes, so no single static row type applies.
+type PrismaRow = any;
+
 export class PrismaStorage implements Storage {
-    private prisma: any; // PrismaClient — typed as any (loaded dynamically; two generated clients exist)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma client loaded dynamically; two generated clients (mongo/postgres) with different types, so no single static type applies.
+    private prisma: any; // PrismaClient — loaded dynamically; two generated clients exist
     private chunkedUploads = new Map<string, ChunkedUploadRecord>(); // kept in-memory (transient)
     readonly ready: Promise<void>;
 
@@ -162,10 +166,11 @@ export class PrismaStorage implements Storage {
     private async init(databaseUrl: string) {
         this.syncSchema(databaseUrl);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma client loaded dynamically; two generated clients (mongo/postgres) with different types, so no single static type applies.
         let PrismaClient: any;
         try {
             ({ PrismaClient } = await import(this.prismaClientSpecifier()));
-        } catch (err: any) {
+        } catch (err) {
             throw new Error(
                 `Failed to load the Prisma client (${this.prismaClientSpecifier()}). ` +
                 `Generate it first — run "pnpm db:generate:postgres" for PostgreSQL or ` +
@@ -191,14 +196,14 @@ export class PrismaStorage implements Storage {
         if (!this.prisma) return;
         for (const collection of ['Memory', 'Organism']) {
             try {
-                const res: any = await this.prisma.$runCommandRaw({
+                const res: { nModified?: number; n?: number } = await this.prisma.$runCommandRaw({
                     update: collection,
                     updates: [{ q: { archived: { $exists: false } }, u: { $set: { archived: false } }, multi: true }],
                 });
                 const n = res?.nModified ?? res?.n ?? 0;
                 if (n > 0) logger.info(`Archive backfill: set archived=false on ${n} legacy ${collection} document(s)`);
-            } catch (err: any) {
-                logger.warn(`Archive backfill skipped for ${collection}: ${err?.message ?? err}`);
+            } catch (err) {
+                logger.warn(`Archive backfill skipped for ${collection}: ${(err as { message?: string })?.message ?? err}`);
             }
         }
     }
@@ -222,9 +227,9 @@ export class PrismaStorage implements Storage {
                 timeout: 30_000,
             });
             logger.info('Prisma schema synced');
-        } catch (err: any) {
-            const stderr = err.stderr?.toString() ?? '';
-            logger.warn(`Auto schema sync skipped — run "pnpm db:push" manually if needed. ${stderr || err.message}`);
+        } catch (err) {
+            const stderr = (err as { stderr?: { toString(): string } }).stderr?.toString() ?? '';
+            logger.warn(`Auto schema sync skipped — run "pnpm db:push" manually if needed. ${stderr || (err instanceof Error ? err.message : String(err))}`);
         }
     }
 
@@ -270,7 +275,7 @@ export class PrismaStorage implements Storage {
     async listOwners(): Promise<OwnerRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.owner.findMany();
-        return rows.map((r: any) => this.toOwnerRecord(r));
+        return rows.map((r: PrismaRow) => this.toOwnerRecord(r));
     }
 
     async updateOwner(name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null> {
@@ -286,7 +291,7 @@ export class PrismaStorage implements Storage {
         try {
             // 1. Get all agents belonging to this owner
             const agents = await this.prisma.agent.findMany({ where: { owner: name }, select: { gaii: true } });
-            const agentGaiis = agents.map((a: any) => a.gaii);
+            const agentGaiis = agents.map((a: PrismaRow) => a.gaii);
 
             // 2. Cascade delete all agent-related data for each agent
             for (const gaii of agentGaiis) {
@@ -301,7 +306,7 @@ export class PrismaStorage implements Storage {
 
             // 5. Delete personal nodes and their mailbox items & push subscriptions (Prisma)
             const personalNodes = await this.prisma.personalNode.findMany({ where: { ownerName: name }, select: { id: true } });
-            const personalNodeIds = personalNodes.map((n: any) => n.id);
+            const personalNodeIds = personalNodes.map((n: PrismaRow) => n.id);
             if (personalNodeIds.length > 0) {
                 await this.prisma.mailboxItem.deleteMany({ where: { personalNodeId: { in: personalNodeIds } } });
                 await this.prisma.personalPushSubscription.deleteMany({ where: { personalNodeId: { in: personalNodeIds } } });
@@ -357,16 +362,16 @@ export class PrismaStorage implements Storage {
                 allowedOrigins: agent.allowedOrigins ?? [],
                 defaultScopes: agent.defaultScopes ?? ['*'],
                 federate: agent.federate ?? false,
-                technicalCapabilities: agent.technicalCapabilities as any ?? null,
-                domainCapabilities: agent.domainCapabilities as any ?? null,
-                activityStats: agent.activityStats as any ?? null,
-                modulesLoaded: agent.modulesLoaded as any ?? null,
-                agentLimitations: agent.agentLimitations as any ?? null,
-                languages: agent.languages as any ?? null,
+                technicalCapabilities: agent.technicalCapabilities ?? null,
+                domainCapabilities: agent.domainCapabilities ?? null,
+                activityStats: agent.activityStats ?? null,
+                modulesLoaded: agent.modulesLoaded ?? null,
+                agentLimitations: agent.agentLimitations ?? null,
+                languages: agent.languages ?? null,
                 mode: agent.mode ?? 'interactive',
                 maxConcurrentTasks: agent.maxConcurrentTasks ?? 1,
                 dailySpendLimit: agent.dailySpendLimit ?? null,
-                scheduleConstraintDefaults: agent.scheduleConstraintDefaults as any ?? null,
+                scheduleConstraintDefaults: agent.scheduleConstraintDefaults ?? null,
                 webhookUrl: agent.webhookUrl ?? null,
                 webhookSecret: agent.webhookSecret ?? null,
                 webhookEnabled: agent.webhookEnabled ?? false,
@@ -399,7 +404,7 @@ export class PrismaStorage implements Storage {
     async getAgentsByOwner(owner: string): Promise<AgentRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.agent.findMany({ where: { owner } });
-        return rows.map((r: any) => this.toAgentRecord(r));
+        return rows.map((r: PrismaRow) => this.toAgentRecord(r));
     }
 
     async updateAgent(gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
@@ -505,7 +510,7 @@ export class PrismaStorage implements Storage {
     async listAgents(): Promise<AgentRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.agent.findMany();
-        return rows.map((r: any) => this.toAgentRecord(r));
+        return rows.map((r: PrismaRow) => this.toAgentRecord(r));
     }
 
     /**
@@ -596,7 +601,7 @@ export class PrismaStorage implements Storage {
         if (!fromGhii || !toGhii) return false;
         if (fromGhii === toGhii) return true; // Same owner — no-op
         try {
-            await this.prisma.$transaction(async (tx: any) => {
+            await this.prisma.$transaction(async (tx: PrismaRow) => {
                 const from = await tx.ghii.findUnique({ where: { ghii: fromGhii }, select: { morselBalance: true } });
                 const fromBalance = from?.morselBalance ?? 0;
                 if (fromBalance < amount) throw new Error('INSUFFICIENT');
@@ -624,7 +629,7 @@ export class PrismaStorage implements Storage {
                 where: { ownerGaii_key_version: { ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version } },
                 create: {
                     ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version,
-                    value: existing.value as any,
+                    value: existing.value,
                     actor: this.memoryAnnotation(existing.value, '_actor'),
                     event: this.memoryAnnotation(existing.value, '_event'),
                     recordedAt: new Date(existing.updatedAt),
@@ -634,10 +639,10 @@ export class PrismaStorage implements Storage {
         }
         // `as any` on the data objects: workspaceRef is new in the Prisma schema; the generated client
         // gets it on the next `prisma generate` (deploy). Matches the storage-file writes above.
-        const memCreate: any = {
+        const memCreate: Record<string, unknown> = {
             key: record.key,
             ownerGaii: record.ownerGaii,
-            value: record.value as any,
+            value: record.value,
             visibility: record.visibility,
             groupId: record.groupId ?? null,
             workspaceRef: record.workspaceRef ?? null,
@@ -651,8 +656,8 @@ export class PrismaStorage implements Storage {
             createdAt: new Date(record.createdAt),
             updatedAt: new Date(record.updatedAt),
         };
-        const memUpdate: any = {
-            value: record.value as any,
+        const memUpdate: Record<string, unknown> = {
+            value: record.value,
             visibility: record.visibility,
             groupId: record.groupId ?? null,
             workspaceRef: record.workspaceRef ?? null,
@@ -680,7 +685,7 @@ export class PrismaStorage implements Storage {
             orderBy: { version: 'desc' },
             take: opts?.limit ?? 200,
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             ownerGaii: r.ownerGaii,
             key: r.key,
             version: r.version,
@@ -694,8 +699,8 @@ export class PrismaStorage implements Storage {
     async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
         this.ensureReady();
         // Atomic version-checked update using raw MongoDB $set + version filter
-        const cvData: any = {
-            value: record.value as any,
+        const cvData: Record<string, unknown> = {
+            value: record.value,
             visibility: record.visibility,
             groupId: record.groupId ?? null,
             workspaceRef: record.workspaceRef ?? null,
@@ -738,18 +743,18 @@ export class PrismaStorage implements Storage {
 
     async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: import('../../interface.js').ArchiveFilter }): Promise<MemoryRecord[]> {
         this.ensureReady();
-        const where: any = { ownerGaii, ...this.archivedWhere(opts?.archived) };
+        const where: Record<string, unknown> = { ownerGaii, ...this.archivedWhere(opts?.archived) };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.tags?.length) where.tags = { hasSome: opts.tags };
 
         const rows = await this.prisma.memory.findMany({ where });
         return rows
-            .filter((r: any) => {
+            .filter((r: PrismaRow) => {
                 if (!r.ttlHours) return true;
                 return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
             })
-            .map((r: any) => this.toMemoryRecord(r))
+            .map((r: PrismaRow) => this.toMemoryRecord(r))
             .filter((r: MemoryRecord) => {
                 if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) return false;
                 return true;
@@ -759,7 +764,7 @@ export class PrismaStorage implements Storage {
     async countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: import('../../interface.js').ArchiveFilter }): Promise<number> {
         this.ensureReady();
         if (ownerGaiis.length === 0) return 0;
-        const where: any = { ownerGaii: { in: ownerGaiis }, ...this.archivedWhere(opts?.archived) };
+        const where: Record<string, unknown> = { ownerGaii: { in: ownerGaiis }, ...this.archivedWhere(opts?.archived) };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
         // DISTINCT keys (mirrors listOwnerScopeMemory's cross-identity key-dedup); loads only the
@@ -770,7 +775,7 @@ export class PrismaStorage implements Storage {
 
     async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: import('../../interface.js').ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = { ...this.archivedWhere(opts?.archived) };
+        const where: Record<string, unknown> = { ...this.archivedWhere(opts?.archived) };
         if (opts?.ownerPrefix) where.ownerGaii = { startsWith: opts.ownerPrefix };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
@@ -786,11 +791,11 @@ export class PrismaStorage implements Storage {
         ]);
 
         const items = rows
-            .filter((r: any) => {
+            .filter((r: PrismaRow) => {
                 if (!r.ttlHours) return true;
                 return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
             })
-            .map((r: any) => this.toMemoryRecord(r));
+            .map((r: PrismaRow) => this.toMemoryRecord(r));
 
         return { items, total };
     }
@@ -821,25 +826,25 @@ export class PrismaStorage implements Storage {
     async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: import('../../interface.js').ArchiveFilter; limit?: number }): Promise<MemoryRecord[]> {
         this.ensureReady();
         // MongoDB text search — search keys and string values
-        const where: any = { ownerGaii, ...this.archivedWhere(opts?.archived) };
+        const where: Record<string, unknown> = { ownerGaii, ...this.archivedWhere(opts?.archived) };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
 
         const rows = await this.prisma.memory.findMany({ where });
         const q = query.toLowerCase();
         const out = rows
-            .filter((r: any) => {
+            .filter((r: PrismaRow) => {
                 if (r.key.toLowerCase().includes(q)) return true;
                 const valStr = JSON.stringify(r.value).toLowerCase();
                 if (valStr.includes(q)) return true;
                 if (r.tags.some((t: string) => t.toLowerCase().includes(q))) return true;
                 return false;
             })
-            .filter((r: any) => {
+            .filter((r: PrismaRow) => {
                 if (!r.ttlHours) return true;
                 return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
             })
-            .map((r: any) => this.toMemoryRecord(r))
+            .map((r: PrismaRow) => this.toMemoryRecord(r))
             .filter((r: MemoryRecord) => {
                 if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) return false;
                 return true;
@@ -877,7 +882,7 @@ export class PrismaStorage implements Storage {
         if (opts?.keyPrefix) where.key = { startsWith: opts.keyPrefix };
         const limit = opts?.limit ?? 50;
 
-        const rows = await this.prisma.memory.findMany({ where, take: limit * 4 }) as any[];
+        const rows = await this.prisma.memory.findMany({ where, take: limit * 4 }) as PrismaRow[];
 
         // Rank: more distinct tokens matched first, then most-recently updated. (No bm25 here; the
         // librarian's value is finding the right records, and an AI rerank can follow — design §4.)
@@ -897,7 +902,7 @@ export class PrismaStorage implements Storage {
     async archiveMemoryByKey(keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
         this.ensureReady();
         const match = opts.match ?? 'prefix';
-        const where: any = { archived: { not: true } };
+        const where: Record<string, unknown> = { archived: { not: true } };
         if (match === 'exact') where.key = keyOrPrefix;
         else if (match === 'subtree') where.OR = [{ key: keyOrPrefix }, { key: { startsWith: keyOrPrefix + '.' } }];
         else where.key = { startsWith: keyOrPrefix };
@@ -920,7 +925,7 @@ export class PrismaStorage implements Storage {
     async unarchiveMemoryByKey(keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
         this.ensureReady();
         const match = opts?.match ?? 'subtree';
-        const where: any = { archived: true };
+        const where: Record<string, unknown> = { archived: true };
         if (match === 'exact') where.key = keyOrPrefix;
         else if (match === 'subtree') where.OR = [{ key: keyOrPrefix }, { key: { startsWith: keyOrPrefix + '.' } }];
         else where.key = { startsWith: keyOrPrefix };
@@ -959,12 +964,12 @@ export class PrismaStorage implements Storage {
                 inputSchema: action.inputSchema,
                 outputSchema: action.outputSchema,
                 pricingBaseMorsels: action.pricing.baseMorsels,
-                pricingPerUnit: action.pricing.perUnit as any,
+                pricingPerUnit: action.pricing.perUnit,
                 estimatedTimeSeconds: action.estimatedTimeSeconds,
                 maxInputSizeBytes: action.maxInputSizeBytes,
                 tags: action.tags,
                 webhookUrl: action.webhookUrl ?? null,
-                semantic: action.semantic as any ?? null,
+                semantic: action.semantic ?? null,
                 federate: action.federate ?? false,
                 createdAt: new Date(action.createdAt),
                 updatedAt: new Date(action.updatedAt),
@@ -983,10 +988,10 @@ export class PrismaStorage implements Storage {
 
     async listActions(opts?: { search?: string; category?: string }): Promise<ActionRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.category) where.category = opts.category;
         const rows = await this.prisma.action.findMany({ where });
-        let results = rows.map((r: any) => this.toActionRecord(r));
+        let results = rows.map((r: PrismaRow) => this.toActionRecord(r));
         if (opts?.search) {
             const q = opts.search.toLowerCase();
             results = results.filter((a: ActionRecord) =>
@@ -1017,16 +1022,16 @@ export class PrismaStorage implements Storage {
     async listActionsByProvider(gaii: string): Promise<ActionRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.action.findMany({ where: { providerGaii: gaii } });
-        return rows.map((r: any) => this.toActionRecord(r));
+        return rows.map((r: PrismaRow) => this.toActionRecord(r));
     }
 
     async updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates, updatedAt: new Date() };
+            const data: Record<string, unknown> = { ...updates, updatedAt: new Date() };
             if (updates.pricing) {
                 data.pricingBaseMorsels = updates.pricing.baseMorsels;
-                data.pricingPerUnit = updates.pricing.perUnit as any;
+                data.pricingPerUnit = updates.pricing.perUnit;
                 delete data.pricing;
             }
             delete data.id;
@@ -1050,7 +1055,7 @@ export class PrismaStorage implements Storage {
                 actionId: work.actionId,
                 providerGaii: work.providerGaii,
                 requesterGaii: work.requesterGaii,
-                input: work.input as any,
+                input: work.input,
                 costBasePrice: work.cost.basePrice,
                 costNetworkFee: work.cost.networkFee,
                 costTotal: work.cost.total,
@@ -1073,9 +1078,9 @@ export class PrismaStorage implements Storage {
     async updateWork(trackingCode: string, updates: Partial<WorkRecord>): Promise<WorkRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
-            if (updates.output) data.output = updates.output as any;
+            if (updates.output) data.output = updates.output;
             if (updates.updatedAt) data.updatedAt = new Date(updates.updatedAt);
             if (updates.rating) {
                 data.ratingScore = updates.rating.score;
@@ -1089,19 +1094,19 @@ export class PrismaStorage implements Storage {
     async listWorkByProvider(gaii: string): Promise<WorkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.work.findMany({ where: { providerGaii: gaii } });
-        return rows.map((r: any) => this.toWorkRecord(r));
+        return rows.map((r: PrismaRow) => this.toWorkRecord(r));
     }
 
     async listWorkByRequester(gaii: string): Promise<WorkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.work.findMany({ where: { requesterGaii: gaii } });
-        return rows.map((r: any) => this.toWorkRecord(r));
+        return rows.map((r: PrismaRow) => this.toWorkRecord(r));
     }
 
     async listAllWork(limit = 10000): Promise<WorkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.work.findMany({ take: Math.min(limit, 10000), orderBy: { createdAt: 'desc' } });
-        return rows.map((r: any) => this.toWorkRecord(r));
+        return rows.map((r: PrismaRow) => this.toWorkRecord(r));
     }
 
     // ── Transactions ────────────────────────────────────────────
@@ -1129,7 +1134,7 @@ export class PrismaStorage implements Storage {
             orderBy: { timestamp: 'desc' },
             take: limit,
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.txId,
             gaii: r.gaii,
             type: r.type,
@@ -1146,7 +1151,7 @@ export class PrismaStorage implements Storage {
             take: Math.min(limit, 10000),
             orderBy: { timestamp: 'desc' },
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.txId,
             gaii: r.gaii,
             type: r.type,
@@ -1190,11 +1195,11 @@ export class PrismaStorage implements Storage {
 
     async listBoards(opts?: { visibility?: string; ownerGaii?: string }): Promise<BoardRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.ownerGaii) where.ownerGaii = opts.ownerGaii;
         const rows = await this.prisma.board.findMany({ where });
-        return rows.map((r: any) => this.toBoardRecord(r));
+        return rows.map((r: PrismaRow) => this.toBoardRecord(r));
     }
 
     async updateBoardVisibility(id: string, visibility: string, federate?: boolean): Promise<import('../../interface.js').BoardRecord | null> {
@@ -1236,7 +1241,7 @@ export class PrismaStorage implements Storage {
                 category: post.category,
                 tags: post.tags,
                 ttlExpiresAt: post.ttlExpiresAt ? new Date(post.ttlExpiresAt) : null,
-                reactions: post.reactions as any,
+                reactions: post.reactions,
                 replyTo: post.replyTo ?? null,
                 createdAt: new Date(post.createdAt),
             },
@@ -1252,7 +1257,7 @@ export class PrismaStorage implements Storage {
 
     async listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {
         this.ensureReady();
-        const where: any = { boardId, replyTo: null };
+        const where: Record<string, unknown> = { boardId, replyTo: null };
         if (opts?.category) where.category = opts.category;
         const rows = await this.prisma.boardPost.findMany({
             where,
@@ -1260,8 +1265,8 @@ export class PrismaStorage implements Storage {
             take: opts?.limit ?? 20,
         });
         return rows
-            .filter((r: any) => !r.ttlExpiresAt || new Date(r.ttlExpiresAt).getTime() > Date.now())
-            .map((r: any) => this.toPostRecord(r));
+            .filter((r: PrismaRow) => !r.ttlExpiresAt || new Date(r.ttlExpiresAt).getTime() > Date.now())
+            .map((r: PrismaRow) => this.toPostRecord(r));
     }
 
     async deletePost(boardId: string, postId: string): Promise<boolean> {
@@ -1279,7 +1284,7 @@ export class PrismaStorage implements Storage {
         if (!reactions[emoji].includes(gaii)) reactions[emoji].push(gaii);
         await this.prisma.boardPost.update({
             where: { postId },
-            data: { reactions: reactions as any },
+            data: { reactions: reactions },
         });
         return true;
     }
@@ -1290,8 +1295,8 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         await this.prisma.boardSubscription.upsert({
             where: { boardId_gaii: { boardId: sub.boardId, gaii: sub.gaii } },
-            create: { id: sub.id, boardId: sub.boardId, gaii: sub.gaii, callbackUrl: sub.callbackUrl, filters: sub.filters as any ?? null, createdAt: new Date(sub.createdAt) },
-            update: { callbackUrl: sub.callbackUrl, filters: sub.filters as any ?? null },
+            create: { id: sub.id, boardId: sub.boardId, gaii: sub.gaii, callbackUrl: sub.callbackUrl, filters: sub.filters ?? null, createdAt: new Date(sub.createdAt) },
+            update: { callbackUrl: sub.callbackUrl, filters: sub.filters ?? null },
         });
         return sub;
     }
@@ -1305,13 +1310,13 @@ export class PrismaStorage implements Storage {
     async listBoardSubscriptions(boardId: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.boardSubscription.findMany({ where: { boardId } });
-        return rows.map((r: any) => this.toBoardSubscriptionRecord(r));
+        return rows.map((r: PrismaRow) => this.toBoardSubscriptionRecord(r));
     }
 
     async listSubscriptionsByAgent(gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.boardSubscription.findMany({ where: { gaii } });
-        return rows.map((r: any) => this.toBoardSubscriptionRecord(r));
+        return rows.map((r: PrismaRow) => this.toBoardSubscriptionRecord(r));
     }
 
     async deleteBoardSubscription(boardId: string, gaii: string): Promise<boolean> {
@@ -1322,7 +1327,7 @@ export class PrismaStorage implements Storage {
         } catch { return false; }
     }
 
-    private toBoardSubscriptionRecord(row: any): import('../../interface.js').BoardSubscriptionRecord {
+    private toBoardSubscriptionRecord(row: PrismaRow): import('../../interface.js').BoardSubscriptionRecord {
         return {
             id: row.id,
             boardId: row.boardId,
@@ -1342,7 +1347,7 @@ export class PrismaStorage implements Storage {
                 key: otk.key,
                 ownerGaii: otk.ownerGaii,
                 action: otk.action,
-                params: otk.params as any,
+                params: otk.params,
                 expiresAt: new Date(otk.expiresAt),
                 used: otk.used,
                 createdAt: new Date(otk.createdAt),
@@ -1351,7 +1356,7 @@ export class PrismaStorage implements Storage {
         return otk;
     }
 
-    private toOtkRecord(row: any): OtkRecord {
+    private toOtkRecord(row: PrismaRow): OtkRecord {
         return {
             key: row.key,
             ownerGaii: row.ownerGaii,
@@ -1380,7 +1385,7 @@ export class PrismaStorage implements Storage {
             if (!row) return null;
 
             // Initial OTK: timer hasn't started yet — activate on first use
-            if ((row as any).initial && !row.used) {
+            if (row.initial && !row.used) {
                 const updated = await this.prisma.otk.update({
                     where: { key },
                     data: { used: true, usedAt: new Date(), expiresAt: new Date(Date.now() + graceMs) },
@@ -1412,7 +1417,7 @@ export class PrismaStorage implements Storage {
     async listOtksBySession(sessionId: string): Promise<OtkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.otk.findMany({ where: { sessionId } });
-        return rows.map((r: any) => this.toOtkRecord(r));
+        return rows.map((r: PrismaRow) => this.toOtkRecord(r));
     }
 
     async expireSessionOtks(sessionId: string): Promise<number> {
@@ -1454,9 +1459,9 @@ export class PrismaStorage implements Storage {
     async updateDispute(id: string, updates: Partial<DisputeRecord>): Promise<DisputeRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
-            if (updates.ruling) data.ruling = updates.ruling as any;
+            if (updates.ruling) data.ruling = updates.ruling;
             if (updates.updatedAt) data.updatedAt = new Date(updates.updatedAt);
             const row = await this.prisma.dispute.update({ where: { disputeId: id }, data });
             return this.toDisputeRecord(row);
@@ -1472,7 +1477,7 @@ export class PrismaStorage implements Storage {
                 event: entry.event,
                 actor: entry.actor,
                 timestamp: new Date(entry.timestamp),
-                data: entry.data as any,
+                data: entry.data,
                 hash: entry.hash,
                 previousHash: entry.previousHash,
             },
@@ -1486,7 +1491,7 @@ export class PrismaStorage implements Storage {
             where: { disputeId },
             orderBy: { sequence: 'asc' },
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             sequence: r.sequence,
             event: r.event,
             actor: r.actor,
@@ -1504,16 +1509,16 @@ export class PrismaStorage implements Storage {
             where: { providerGaii: gaii },
             select: { trackingCode: true },
         });
-        const tcs = workItems.map((w: any) => w.trackingCode);
+        const tcs = workItems.map((w: PrismaRow) => w.trackingCode);
         if (tcs.length === 0) return [];
         const rows = await this.prisma.dispute.findMany({ where: { trackingCode: { in: tcs } } });
-        return rows.map((r: any) => this.toDisputeRecord(r));
+        return rows.map((r: PrismaRow) => this.toDisputeRecord(r));
     }
 
     async listAllDisputes(limit = 10000): Promise<DisputeRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.dispute.findMany({ take: Math.min(limit, 10000), orderBy: { createdAt: 'desc' } });
-        return rows.map((r: any) => this.toDisputeRecord(r));
+        return rows.map((r: PrismaRow) => this.toDisputeRecord(r));
     }
 
     // ── Micro-Memory ────────────────────────────────────────────
@@ -1525,13 +1530,13 @@ export class PrismaStorage implements Storage {
             create: {
                 gaii: record.gaii,
                 setName: record.set,
-                entries: record.entries as any,
+                entries: record.entries,
                 visibility: record.visibility,
                 accessCode: record.accessCode,
                 updatedAt: new Date(record.updatedAt),
             },
             update: {
-                entries: record.entries as any,
+                entries: record.entries,
                 visibility: record.visibility,
                 accessCode: record.accessCode,
                 updatedAt: new Date(record.updatedAt),
@@ -1546,13 +1551,13 @@ export class PrismaStorage implements Storage {
             where: { gaii_setName: { gaii, setName: set } },
         });
         if (!row) return null;
-        return { gaii: row.gaii, set: row.setName, entries: row.entries as Record<string, string>, visibility: row.visibility as any, accessCode: row.accessCode ?? undefined, updatedAt: row.updatedAt.toISOString() };
+        return { gaii: row.gaii, set: row.setName, entries: row.entries as Record<string, string>, visibility: row.visibility, accessCode: row.accessCode ?? undefined, updatedAt: row.updatedAt.toISOString() };
     }
 
     async listMicroMemorySets(gaii: string): Promise<MicroMemoryRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.microMemory.findMany({ where: { gaii } });
-        return rows.map((r: any) => ({ gaii: r.gaii, set: r.setName, entries: r.entries as Record<string, string>, visibility: r.visibility as any, accessCode: r.accessCode ?? undefined, updatedAt: r.updatedAt.toISOString() }));
+        return rows.map((r: PrismaRow) => ({ gaii: r.gaii, set: r.setName, entries: r.entries as Record<string, string>, visibility: r.visibility, accessCode: r.accessCode ?? undefined, updatedAt: r.updatedAt.toISOString() }));
     }
 
     async deleteMicroMemory(gaii: string, set: string): Promise<boolean> {
@@ -1582,7 +1587,7 @@ export class PrismaStorage implements Storage {
             },
         });
         if (!row) return null;
-        return { gaii: row.gaii, set: row.setName, entries: row.entries as Record<string, string>, visibility: row.visibility as any, accessCode: row.accessCode ?? undefined, updatedAt: row.updatedAt.toISOString() };
+        return { gaii: row.gaii, set: row.setName, entries: row.entries as Record<string, string>, visibility: row.visibility, accessCode: row.accessCode ?? undefined, updatedAt: row.updatedAt.toISOString() };
     }
 
     // ── Storage Files ───────────────────────────────────────────
@@ -1606,7 +1611,7 @@ export class PrismaStorage implements Storage {
                 groupId: file.groupId ?? null,
                 workspaceRef: file.workspaceRef ?? null,
                 createdAt: new Date(file.createdAt),
-            } as any,
+            },
             update: {
                 visibility: file.visibility,
                 mimeType: file.mimeType,
@@ -1617,7 +1622,7 @@ export class PrismaStorage implements Storage {
                 groupId: file.groupId ?? null,
                 workspaceRef: file.workspaceRef ?? null,
                 createdAt: new Date(file.createdAt),
-            } as any,
+            },
         });
         return file;
     }
@@ -1628,16 +1633,16 @@ export class PrismaStorage implements Storage {
             where: { ownerGaii_key: { ownerGaii, key } },
         });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, groupId: row.groupId ?? undefined, workspaceRef: (row as any).workspaceRef ?? undefined, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility, groupId: row.groupId ?? undefined, workspaceRef: row.workspaceRef ?? undefined, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: row.tags || [], federate: row.federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
     async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.storageFile.findMany({
             where: { ownerGaii },
-            select: { key: true, ownerGaii: true, visibility: true, groupId: true, workspaceRef: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true } as any,
+            select: { key: true, ownerGaii: true, visibility: true, groupId: true, workspaceRef: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
         }));
     }
@@ -1663,7 +1668,7 @@ export class PrismaStorage implements Storage {
     async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null> {
         this.ensureReady();
         // workspaceRef undefined → visibility only; provided → set both (bind the file to its org/ws).
-        const data: any = workspaceRef === undefined ? { visibility } : { visibility, workspaceRef: workspaceRef || null };
+        const data: Record<string, unknown> = workspaceRef === undefined ? { visibility } : { visibility, workspaceRef: workspaceRef || null };
         const updated = await this.prisma.storageFile.updateMany({ where: { ownerGaii, key }, data });
         if (updated.count === 0) return null;
         return this.getStorageFile(ownerGaii, key);
@@ -1699,10 +1704,10 @@ export class PrismaStorage implements Storage {
 
     async listPeeringRequests(status?: string): Promise<PeeringRequestRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (status) where.status = status;
         const rows = await this.prisma.peeringRequest.findMany({ where });
-        return rows.map((r: any) => this.toPeeringRecord(r));
+        return rows.map((r: PrismaRow) => this.toPeeringRecord(r));
     }
 
     async updatePeeringRequest(id: string, updates: Partial<PeeringRequestRecord>): Promise<PeeringRequestRecord | null> {
@@ -1766,16 +1771,16 @@ export class PrismaStorage implements Storage {
 
     // ── Record Mappers ──────────────────────────────────────────
 
-    private toOwnerRecord(row: any): OwnerRecord {
+    private toOwnerRecord(row: PrismaRow): OwnerRecord {
         return { name: row.name, displayName: row.displayName ?? undefined, publicKey: row.publicKey, roles: row.roles, createdAt: row.createdAt.toISOString() };
     }
 
-    private toAgentRecord(row: any): AgentRecord {
+    private toAgentRecord(row: PrismaRow): AgentRecord {
         return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, languages: row.languages ?? undefined, activityStats: row.activityStats ?? undefined, modulesLoaded: row.modulesLoaded ?? undefined, agentLimitations: row.agentLimitations ?? undefined, webhookUrl: row.webhookUrl ?? undefined, webhookSecret: row.webhookSecret ?? undefined, webhookEnabled: row.webhookEnabled ?? false, webhookLastSuccess: row.webhookLastSuccess ? row.webhookLastSuccess.toISOString() : undefined, webhookLastFailure: row.webhookLastFailure ? row.webhookLastFailure.toISOString() : undefined, webhookFailCount: row.webhookFailCount ?? 0, platform: row.platform ?? undefined, platformVersion: row.platformVersion ?? undefined, platformDetectedBy: row.platformDetectedBy ?? undefined, tags: row.tags?.length ? row.tags : undefined, mode: (row.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: row.maxConcurrentTasks ?? 1, dailySpendLimit: row.dailySpendLimit ?? undefined, scheduleConstraintDefaults: row.scheduleConstraintDefaults ?? undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
-    private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, workspaceRef: row.workspaceRef ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? row.archivedAt.toISOString() : undefined, archivedBy: row.archivedBy ?? undefined, archivedRoot: row.archivedRoot ?? undefined };
+    private toMemoryRecord(row: PrismaRow): MemoryRecord {
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility, groupId: row.groupId ?? undefined, workspaceRef: row.workspaceRef ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, trackable: row.trackable ? true : undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? row.archivedAt.toISOString() : undefined, archivedBy: row.archivedBy ?? undefined, archivedRoot: row.archivedRoot ?? undefined };
     }
 
     /** Prisma `where` fragment restricting memory rows by archive filter. Default `exclude` uses
@@ -1797,33 +1802,33 @@ export class PrismaStorage implements Storage {
         return null;
     }
 
-    private toActionRecord(row: any): ActionRecord {
-        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit as any }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, webhookUrl: row.webhookUrl ?? undefined, semantic: row.semantic as any ?? undefined, federate: row.federate ?? false, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    private toActionRecord(row: PrismaRow): ActionRecord {
+        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, webhookUrl: row.webhookUrl ?? undefined, semantic: row.semantic ?? undefined, federate: row.federate ?? false, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
-    private toWorkRecord(row: any): WorkRecord {
+    private toWorkRecord(row: PrismaRow): WorkRecord {
         return { trackingCode: row.trackingCode, status: row.status, actionId: row.actionId, providerGaii: row.providerGaii, requesterGaii: row.requesterGaii, input: row.input as Record<string, unknown>, output: row.output as Record<string, unknown> | undefined, cost: { basePrice: row.costBasePrice, networkFee: row.costNetworkFee, total: row.costTotal, inEscrow: row.costInEscrow }, ttlExpiresAt: row.ttlExpiresAt.toISOString(), callbackUrl: row.callbackUrl ?? undefined, rating: row.ratingScore != null ? { score: row.ratingScore, comment: row.ratingComment ?? undefined } : undefined, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
-    private toBoardRecord(row: any): BoardRecord {
-        return { id: row.boardId, name: row.name, description: row.description ?? undefined, visibility: row.visibility as any, ownerGaii: row.ownerGaii, allowedGaiis: row.allowedGaiis, federate: row.federate ?? false, createdAt: row.createdAt.toISOString() };
+    private toBoardRecord(row: PrismaRow): BoardRecord {
+        return { id: row.boardId, name: row.name, description: row.description ?? undefined, visibility: row.visibility, ownerGaii: row.ownerGaii, allowedGaiis: row.allowedGaiis, federate: row.federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
-    private toPostRecord(row: any): BoardPostRecord {
+    private toPostRecord(row: PrismaRow): BoardPostRecord {
         return { id: row.postId, boardId: row.boardId, authorGaii: row.authorGaii, title: row.title, body: row.body, category: row.category ?? undefined, tags: row.tags, ttlExpiresAt: row.ttlExpiresAt?.toISOString(), reactions: row.reactions as Record<string, string[]>, replyTo: row.replyTo ?? undefined, createdAt: row.createdAt.toISOString() };
     }
 
-    private toDisputeRecord(row: any): DisputeRecord {
-        return { id: row.disputeId, trackingCode: row.trackingCode, status: row.status as any, openedBy: row.openedBy, reason: row.reason, ruling: row.ruling as any, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    private toDisputeRecord(row: PrismaRow): DisputeRecord {
+        return { id: row.disputeId, trackingCode: row.trackingCode, status: row.status, openedBy: row.openedBy, reason: row.reason, ruling: row.ruling, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
-    private toPeeringRecord(row: any): PeeringRequestRecord {
-        return { id: row.requestId, fromNodeUrl: row.fromNodeUrl, fromNodeId: row.fromNodeId ?? undefined, toNodeId: row.toNodeId ?? undefined, targetUrl: row.targetUrl ?? undefined, publicKey: row.publicKey ?? undefined, message: row.message ?? undefined, status: row.status as any, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    private toPeeringRecord(row: PrismaRow): PeeringRequestRecord {
+        return { id: row.requestId, fromNodeUrl: row.fromNodeUrl, fromNodeId: row.fromNodeId ?? undefined, toNodeId: row.toNodeId ?? undefined, targetUrl: row.targetUrl ?? undefined, publicKey: row.publicKey ?? undefined, message: row.message ?? undefined, status: row.status, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
     // ── GHII (persisted via Prisma) ──
 
-    private toGHIIRecord(row: any): GHIIRecord {
+    private toGHIIRecord(row: PrismaRow): GHIIRecord {
         return {
             username: row.username,
             nodeId: row.nodeId,
@@ -1907,8 +1912,8 @@ export class PrismaStorage implements Storage {
                 },
             });
             return this.toGHIIRecord(row);
-        } catch (e: any) {
-            if (e?.code === 'P2002') throw new Error('GHII_TAKEN', { cause: e });
+        } catch (e) {
+            if ((e as { code?: string })?.code === 'P2002') throw new Error('GHII_TAKEN', { cause: e });
             throw e;
         }
     }
@@ -1972,7 +1977,7 @@ export class PrismaStorage implements Storage {
 
     async listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.q) {
             const q = opts.q;
             where.OR = [
@@ -1985,7 +1990,7 @@ export class PrismaStorage implements Storage {
             where.verificationLevel = { gte: opts.level };
         }
         const rows = await this.prisma.ghii.findMany({ where });
-        return rows.map((r: any) => this.toGHIIRecord(r));
+        return rows.map((r: PrismaRow) => this.toGHIIRecord(r));
     }
 
     async deleteGHII(ghii: string): Promise<boolean> {
@@ -2014,18 +2019,18 @@ export class PrismaStorage implements Storage {
 
     async listChatInstances(opts?: { ownerName?: string; platform?: string; ghii?: string }): Promise<ChatInstanceRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.ownerName) where.ownerName = opts.ownerName;
         if (opts?.platform) where.platform = opts.platform;
         if (opts?.ghii) where.ghii = opts.ghii;
         const rows = await this.prisma.chatInstance.findMany({ where });
-        return rows.map((r: any) => this.toChatInstanceRecord(r));
+        return rows.map((r: PrismaRow) => this.toChatInstanceRecord(r));
     }
 
     async updateChatInstance(id: string, updates: Partial<ChatInstanceRecord>): Promise<ChatInstanceRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.lastSeen) data.lastSeen = new Date(updates.lastSeen);
             if (updates.platform) data.platform = updates.platform;
             if (updates.appName) data.appName = updates.appName;
@@ -2041,7 +2046,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.chatInstance.delete({ where: { id } }); return true; } catch { return false; }
     }
 
-    private toChatInstanceRecord(row: any): ChatInstanceRecord {
+    private toChatInstanceRecord(row: PrismaRow): ChatInstanceRecord {
         return { id: row.id, platform: row.platform, appName: row.appName, ownerName: row.ownerName, ghii: row.ghii, nodeId: row.nodeId, isAnonymous: row.isAnonymous, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen, agentGaii: row.agentGaii || undefined, mcpClientId: row.mcpClientId || undefined };
     }
 
@@ -2069,16 +2074,16 @@ export class PrismaStorage implements Storage {
 
     async listPersonalNodes(opts?: { status?: string }): Promise<PersonalNodeRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.personalNode.findMany({ where });
-        return rows.map((r: any) => this.toPersonalNodeRecord(r));
+        return rows.map((r: PrismaRow) => this.toPersonalNodeRecord(r));
     }
 
     async updatePersonalNode(nodeId: string, updates: Partial<PersonalNodeRecord>): Promise<PersonalNodeRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             delete data.nodeId;
             if (data.lastSeen && typeof data.lastSeen === 'string') data.lastSeen = new Date(data.lastSeen);
             if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
@@ -2092,7 +2097,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.personalNode.delete({ where: { id: nodeId } }); return true; } catch { return false; }
     }
 
-    private toPersonalNodeRecord(row: any): PersonalNodeRecord {
+    private toPersonalNodeRecord(row: PrismaRow): PersonalNodeRecord {
         return { nodeId: row.id, ownerName: row.ownerName, anchorNodeId: row.anchorNodeId, publicKey: row.publicKey, status: row.status, agentGaiis: row.agentGaiis, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen, mailboxQuotaBytes: row.mailboxQuotaBytes, mailboxUsedBytes: row.mailboxUsedBytes, visibility: row.visibility, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
@@ -2116,10 +2121,10 @@ export class PrismaStorage implements Storage {
 
     async listMailboxItems(personalNodeId: string, opts?: { type?: string; limit?: number }): Promise<MailboxItemRecord[]> {
         this.ensureReady();
-        const where: any = { personalNodeId };
+        const where: Record<string, unknown> = { personalNodeId };
         if (opts?.type) where.type = opts.type;
         const rows = await this.prisma.mailboxItem.findMany({ where, orderBy: { createdAt: 'asc' }, take: opts?.limit });
-        return rows.map((r: any) => this.toMailboxItemRecord(r));
+        return rows.map((r: PrismaRow) => this.toMailboxItemRecord(r));
     }
 
     async deleteMailboxItem(id: string): Promise<boolean> {
@@ -2162,7 +2167,7 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
-    private toMailboxItemRecord(row: any): MailboxItemRecord {
+    private toMailboxItemRecord(row: PrismaRow): MailboxItemRecord {
         return { id: row.id, personalNodeId: row.personalNodeId, type: row.type, fromGaii: row.fromGaii, toGaii: row.toGaii, payload: row.payload, sizeBytes: row.sizeBytes, retentionDays: row.retentionDays, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
@@ -2191,8 +2196,8 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         await this.prisma.schemaLock.upsert({
             where: { applyTo_keyPattern: { applyTo: record.applyTo, keyPattern: record.keyPattern } },
-            create: { keyPattern: record.keyPattern, applyTo: record.applyTo, schemaJson: record.schemaJson as any, schemaMode: record.schemaMode, lockedBy: record.lockedBy, setAt: new Date(record.setAt), semanticContext: record.semanticContext as any ?? null },
-            update: { schemaJson: record.schemaJson as any, schemaMode: record.schemaMode, lockedBy: record.lockedBy, semanticContext: record.semanticContext as any ?? null },
+            create: { keyPattern: record.keyPattern, applyTo: record.applyTo, schemaJson: record.schemaJson, schemaMode: record.schemaMode, lockedBy: record.lockedBy, setAt: new Date(record.setAt), semanticContext: record.semanticContext ?? null },
+            update: { schemaJson: record.schemaJson, schemaMode: record.schemaMode, lockedBy: record.lockedBy, semanticContext: record.semanticContext ?? null },
         });
         return record;
     }
@@ -2219,10 +2224,10 @@ export class PrismaStorage implements Storage {
 
     async listSchemas(prefix?: string): Promise<SchemaRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (prefix) where.keyPattern = { startsWith: prefix };
         const rows = await this.prisma.schemaLock.findMany({ where });
-        return rows.map((r: any) => this.toSchemaRecord(r));
+        return rows.map((r: PrismaRow) => this.toSchemaRecord(r));
     }
 
     async findApplicableSchema(memoryKey: string): Promise<SchemaRecord | null> {
@@ -2233,7 +2238,7 @@ export class PrismaStorage implements Storage {
 
         // 2. Load all prefix schemas for pattern matching
         const prefixSchemas = await this.prisma.schemaLock.findMany({ where: { applyTo: 'prefix' } });
-        const allPrefixRecords = prefixSchemas.map((r: any) => this.toSchemaRecord(r));
+        const allPrefixRecords = prefixSchemas.map((r: PrismaRow) => this.toSchemaRecord(r));
 
         // 2a. Wildcard pattern match — supports profile.*.interests style (dot-separated)
         let bestWildcard: SchemaRecord | null = null;
@@ -2268,7 +2273,7 @@ export class PrismaStorage implements Storage {
         return null;
     }
 
-    private toSchemaRecord(row: any): SchemaRecord {
+    private toSchemaRecord(row: PrismaRow): SchemaRecord {
         return { keyPattern: row.keyPattern, applyTo: row.applyTo, schemaJson: row.schemaJson as Record<string, unknown>, schemaMode: row.schemaMode, lockedBy: row.lockedBy, setAt: row.setAt instanceof Date ? row.setAt.toISOString() : row.setAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semanticContext: row.semanticContext ?? undefined };
     }
 
@@ -2277,7 +2282,7 @@ export class PrismaStorage implements Storage {
     async createConsent(record: ConsentRecord): Promise<ConsentRecord> {
         this.ensureReady();
         await this.prisma.consent.create({
-            data: { id: record.id, ownerGaii: record.ownerGaii, dataPattern: record.dataPattern, recipient: record.recipient, purpose: record.purpose, scope: record.scope, expires: record.expires ? new Date(record.expires) : null, status: record.status, grantedAt: new Date(record.grantedAt), revokedAt: record.revokedAt ? new Date(record.revokedAt) : null, metadata: record.metadata as any ?? null },
+            data: { id: record.id, ownerGaii: record.ownerGaii, dataPattern: record.dataPattern, recipient: record.recipient, purpose: record.purpose, scope: record.scope, expires: record.expires ? new Date(record.expires) : null, status: record.status, grantedAt: new Date(record.grantedAt), revokedAt: record.revokedAt ? new Date(record.revokedAt) : null, metadata: record.metadata ?? null },
         });
         return record;
     }
@@ -2290,21 +2295,21 @@ export class PrismaStorage implements Storage {
 
     async listConsents(ownerGaii: string, opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }): Promise<ConsentRecord[]> {
         this.ensureReady();
-        const where: any = { ownerGaii };
+        const where: Record<string, unknown> = { ownerGaii };
         if (opts?.status) where.status = opts.status;
         if (opts?.recipient) where.recipient = opts.recipient;
         const rows = await this.prisma.consent.findMany({ where });
-        return rows.map((r: any) => this.toConsentRecord(r));
+        return rows.map((r: PrismaRow) => this.toConsentRecord(r));
     }
 
     async updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.revokedAt) data.revokedAt = new Date(updates.revokedAt);
             if (updates.expires !== undefined) data.expires = updates.expires ? new Date(updates.expires) : null;
-            if (updates.metadata !== undefined) data.metadata = updates.metadata as any;
+            if (updates.metadata !== undefined) data.metadata = updates.metadata;
             const row = await this.prisma.consent.update({ where: { id }, data });
             return this.toConsentRecord(row);
         } catch { return null; }
@@ -2364,15 +2369,15 @@ export class PrismaStorage implements Storage {
 
     async listConsentAudit(ownerGaii: string, opts?: { days?: number; consentId?: string; accessorGaii?: string }): Promise<ConsentAuditEntry[]> {
         this.ensureReady();
-        const where: any = { ownerGaii };
+        const where: Record<string, unknown> = { ownerGaii };
         if (opts?.days) where.timestamp = { gte: new Date(Date.now() - opts.days * 86400000) };
         if (opts?.consentId) where.consentId = opts.consentId;
         if (opts?.accessorGaii) where.accessorGaii = opts.accessorGaii;
         const rows = await this.prisma.consentAudit.findMany({ where, orderBy: { timestamp: 'desc' } });
-        return rows.map((r: any) => ({ id: r.id, consentId: r.consentId, ownerGaii: r.ownerGaii, accessorGaii: r.accessorGaii, memoryKey: r.memoryKey, action: r.action, timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp, allowed: r.allowed }));
+        return rows.map((r: PrismaRow) => ({ id: r.id, consentId: r.consentId, ownerGaii: r.ownerGaii, accessorGaii: r.accessorGaii, memoryKey: r.memoryKey, action: r.action, timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp, allowed: r.allowed }));
     }
 
-    private toConsentRecord(row: any): ConsentRecord {
+    private toConsentRecord(row: PrismaRow): ConsentRecord {
         return { id: row.id, ownerGaii: row.ownerGaii, dataPattern: row.dataPattern, recipient: row.recipient, purpose: row.purpose, scope: row.scope, expires: row.expires ? (row.expires instanceof Date ? row.expires.toISOString() : row.expires) : null, status: row.status, grantedAt: row.grantedAt instanceof Date ? row.grantedAt.toISOString() : row.grantedAt, revokedAt: row.revokedAt ? (row.revokedAt instanceof Date ? row.revokedAt.toISOString() : row.revokedAt) : null, metadata: row.metadata ?? undefined };
     }
 
@@ -2382,7 +2387,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         try {
             await this.prisma.csm.create({
-                data: { name: record.name, definition: record.definition as any, jsonSchemaKey: record.jsonSchemaKey, serviceType: record.serviceType, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), semantic: record.semantic as any ?? null, federate: record.federate ?? false },
+                data: { name: record.name, definition: record.definition, jsonSchemaKey: record.jsonSchemaKey, serviceType: record.serviceType, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), semantic: record.semantic ?? null, federate: record.federate ?? false },
             });
             return record;
         } catch { throw new Error('CSM_NAME_TAKEN'); }
@@ -2396,19 +2401,19 @@ export class PrismaStorage implements Storage {
 
     async listCsms(opts?: { serviceType?: string }): Promise<CsmRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.serviceType) where.serviceType = opts.serviceType;
         const rows = await this.prisma.csm.findMany({ where });
-        return rows.map((r: any) => this.toCsmRecord(r));
+        return rows.map((r: PrismaRow) => this.toCsmRecord(r));
     }
 
     async updateCsm(name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
-            if (updates.definition) data.definition = updates.definition as any;
+            const data: Record<string, unknown> = {};
+            if (updates.definition) data.definition = updates.definition;
             if (updates.serviceType) data.serviceType = updates.serviceType;
-            if (updates.semantic !== undefined) data.semantic = updates.semantic as any;
+            if (updates.semantic !== undefined) data.semantic = updates.semantic;
             if (updates.federate !== undefined) data.federate = updates.federate;
             const row = await this.prisma.csm.update({ where: { name }, data });
             return this.toCsmRecord(row);
@@ -2420,7 +2425,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.csm.delete({ where: { name } }); return true; } catch { return false; }
     }
 
-    private toCsmRecord(row: any): CsmRecord {
+    private toCsmRecord(row: PrismaRow): CsmRecord {
         return { name: row.name, definition: row.definition as Record<string, unknown>, jsonSchemaKey: row.jsonSchemaKey, serviceType: row.serviceType, registeredBy: row.registeredBy, registeredAt: row.registeredAt instanceof Date ? row.registeredAt.toISOString() : row.registeredAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semantic: row.semantic ?? undefined, federate: row.federate ?? undefined };
     }
 
@@ -2430,7 +2435,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         try {
             await this.prisma.msm.create({
-                data: { name: record.name, definition: record.definition as any, category: record.category, authType: record.authType, actionsCount: record.actionsCount, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), federate: record.federate ?? false },
+                data: { name: record.name, definition: record.definition, category: record.category, authType: record.authType, actionsCount: record.actionsCount, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), federate: record.federate ?? false },
             });
             return record;
         } catch { throw new Error('MSM_NAME_TAKEN'); }
@@ -2444,17 +2449,17 @@ export class PrismaStorage implements Storage {
 
     async listMsms(opts?: { category?: string }): Promise<MsmRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.category) where.category = opts.category;
         const rows = await this.prisma.msm.findMany({ where });
-        return rows.map((r: any) => this.toMsmRecord(r));
+        return rows.map((r: PrismaRow) => this.toMsmRecord(r));
     }
 
     async updateMsm(name: string, updates: Partial<MsmRecord>): Promise<MsmRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
-            if (updates.definition) data.definition = updates.definition as any;
+            const data: Record<string, unknown> = {};
+            if (updates.definition) data.definition = updates.definition;
             if (updates.category) data.category = updates.category;
             if (updates.authType) data.authType = updates.authType;
             if (updates.actionsCount !== undefined) data.actionsCount = updates.actionsCount;
@@ -2469,7 +2474,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.msm.delete({ where: { name } }); return true; } catch { return false; }
     }
 
-    private toMsmRecord(row: any): MsmRecord {
+    private toMsmRecord(row: PrismaRow): MsmRecord {
         return { name: row.name, definition: row.definition as Record<string, unknown>, category: row.category, authType: row.authType, actionsCount: row.actionsCount, registeredBy: row.registeredBy, registeredAt: row.registeredAt instanceof Date ? row.registeredAt.toISOString() : row.registeredAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, federate: row.federate ?? undefined };
     }
 
@@ -2498,7 +2503,7 @@ export class PrismaStorage implements Storage {
     async updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.attempts !== undefined) data.attempts = updates.attempts;
             if (updates.verifiedAt) data.verifiedAt = new Date(updates.verifiedAt);
@@ -2513,7 +2518,7 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
-    private toEmailVerificationRecord(row: any): EmailVerificationRecord {
+    private toEmailVerificationRecord(row: PrismaRow): EmailVerificationRecord {
         return { id: row.id, ownerName: row.ownerName, emailHash: row.emailHash, code: row.code, purpose: row.purpose, status: row.status, attempts: row.attempts, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, verifiedAt: row.verifiedAt ? (row.verifiedAt instanceof Date ? row.verifiedAt.toISOString() : row.verifiedAt) : null };
     }
 
@@ -2534,7 +2539,7 @@ export class PrismaStorage implements Storage {
     async getFlagsByTarget(targetType: string, targetId: string): Promise<import('../../interface.js').FlagRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.flag.findMany({ where: { targetType, targetId } });
-        return rows.map((r: any) => this.toFlagRecord(r));
+        return rows.map((r: PrismaRow) => this.toFlagRecord(r));
     }
 
     async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<import('../../interface.js').FlagRecord | null> {
@@ -2560,7 +2565,7 @@ export class PrismaStorage implements Storage {
     async updateFlag(id: string, updates: Partial<import('../../interface.js').FlagRecord>): Promise<import('../../interface.js').FlagRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
             if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
@@ -2573,14 +2578,14 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.status) where.status = opts.status;
         if (opts?.targetType) where.targetType = opts.targetType;
         const rows = await this.prisma.flag.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
-        return rows.map((r: any) => this.toFlagRecord(r));
+        return rows.map((r: PrismaRow) => this.toFlagRecord(r));
     }
 
-    private toFlagRecord(row: any): import('../../interface.js').FlagRecord {
+    private toFlagRecord(row: PrismaRow): import('../../interface.js').FlagRecord {
         return { id: row.id, targetType: row.targetType, targetId: row.targetId, flaggedBy: row.flaggedBy, reason: row.reason, description: row.description ?? undefined, status: row.status, reviewedBy: row.reviewedBy ?? undefined, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
@@ -2588,7 +2593,7 @@ export class PrismaStorage implements Storage {
 
     async createMatch(record: import('../../interface.js').MatchRecord): Promise<import('../../interface.js').MatchRecord> {
         this.ensureReady();
-        await this.prisma.match.create({ data: { id: record.id, profileA: record.profileA, profileB: record.profileB, score: record.score, breakdown: record.breakdown as any, status: record.status, notifiedAt: record.notifiedAt ? new Date(record.notifiedAt) : null, respondedAt: record.respondedAt ? new Date(record.respondedAt) : null, expiresAt: new Date(record.expiresAt), createdAt: new Date(record.createdAt) } });
+        await this.prisma.match.create({ data: { id: record.id, profileA: record.profileA, profileB: record.profileB, score: record.score, breakdown: record.breakdown, status: record.status, notifiedAt: record.notifiedAt ? new Date(record.notifiedAt) : null, respondedAt: record.respondedAt ? new Date(record.respondedAt) : null, expiresAt: new Date(record.expiresAt), createdAt: new Date(record.createdAt) } });
         return record;
     }
 
@@ -2608,16 +2613,16 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 10;
-        const where: any = { OR: [{ profileA: profile }, { profileB: profile }] };
+        const where: Record<string, unknown> = { OR: [{ profileA: profile }, { profileB: profile }] };
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.match.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
-        return rows.map((r: any) => this.toMatchRecord(r));
+        return rows.map((r: PrismaRow) => this.toMatchRecord(r));
     }
 
     async updateMatch(id: string, updates: Partial<import('../../interface.js').MatchRecord>): Promise<import('../../interface.js').MatchRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.notifiedAt) data.notifiedAt = new Date(updates.notifiedAt);
             if (updates.respondedAt) data.respondedAt = new Date(updates.respondedAt);
@@ -2641,18 +2646,18 @@ export class PrismaStorage implements Storage {
     async listAllMatches(limit = 10000): Promise<import('../../interface.js').MatchRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.match.findMany({ take: Math.min(limit, 10000) });
-        return rows.map((r: any) => this.toMatchRecord(r));
+        return rows.map((r: PrismaRow) => this.toMatchRecord(r));
     }
 
-    private toMatchRecord(row: any): import('../../interface.js').MatchRecord {
-        return { id: row.id, profileA: row.profileA, profileB: row.profileB, score: row.score, breakdown: row.breakdown as any, status: row.status, notifiedAt: row.notifiedAt ? (row.notifiedAt instanceof Date ? row.notifiedAt.toISOString() : row.notifiedAt) : null, respondedAt: row.respondedAt ? (row.respondedAt instanceof Date ? row.respondedAt.toISOString() : row.respondedAt) : null, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
+    private toMatchRecord(row: PrismaRow): import('../../interface.js').MatchRecord {
+        return { id: row.id, profileA: row.profileA, profileB: row.profileB, score: row.score, breakdown: row.breakdown, status: row.status, notifiedAt: row.notifiedAt ? (row.notifiedAt instanceof Date ? row.notifiedAt.toISOString() : row.notifiedAt) : null, respondedAt: row.respondedAt ? (row.respondedAt instanceof Date ? row.respondedAt.toISOString() : row.respondedAt) : null, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
     // ── Organisms (Phase 2.2) ──
 
     async createOrganism(record: import('../../interface.js').OrganismRecord): Promise<import('../../interface.js').OrganismRecord> {
         this.ensureReady();
-        await this.prisma.organism.create({ data: { id: record.id, name: record.name, description: record.description, type: record.type, location: record.location as any ?? null, interests: record.interests, creatorGhii: record.creatorGhii, admins: record.admins, members: record.members, agentGaiis: record.agentGaiis, boardId: record.boardId, joinPolicy: record.joinPolicy, maxMembers: record.maxMembers, visibility: record.visibility, memberVisibility: record.memberVisibility ?? null, moderationConfig: record.moderationConfig as any, memoryNamespace: record.memoryNamespace, semantic: record.semantic as any ?? null, archived: record.archived ?? false, archivedAt: record.archivedAt ? new Date(record.archivedAt) : null, archivedBy: record.archivedBy ?? null, createdAt: new Date(record.createdAt) } });
+        await this.prisma.organism.create({ data: { id: record.id, name: record.name, description: record.description, type: record.type, location: record.location ?? null, interests: record.interests, creatorGhii: record.creatorGhii, admins: record.admins, members: record.members, agentGaiis: record.agentGaiis, boardId: record.boardId, joinPolicy: record.joinPolicy, maxMembers: record.maxMembers, visibility: record.visibility, memberVisibility: record.memberVisibility ?? null, moderationConfig: record.moderationConfig, memoryNamespace: record.memoryNamespace, semantic: record.semantic ?? null, archived: record.archived ?? false, archivedAt: record.archivedAt ? new Date(record.archivedAt) : null, archivedBy: record.archivedBy ?? null, createdAt: new Date(record.createdAt) } });
         return record;
     }
 
@@ -2666,7 +2671,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.type) where.type = opts.type;
         if (opts?.visibility) where.visibility = opts.visibility;
         // Archive filter — default include; `{ not: true }` for exclude also matches legacy docs that
@@ -2675,10 +2680,10 @@ export class PrismaStorage implements Storage {
         else if (opts?.archived === 'only') where.archived = true;
         // city and interest filtering done post-query (JSON field)
         const rows = await this.prisma.organism.findMany({ where, orderBy: { createdAt: 'desc' } });
-        let results = rows.map((r: any) => this.toOrganismRecord(r));
-        if (opts?.city) results = results.filter((o: any) => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
-        if (opts?.interest) results = results.filter((o: any) => o.interests.some((i: string) => i.toLowerCase() === opts.interest!.toLowerCase()));
-        if (opts?.member) results = results.filter((o: any) => o.members.includes(opts.member!));
+        let results = rows.map((r: PrismaRow) => this.toOrganismRecord(r));
+        if (opts?.city) results = results.filter((o: PrismaRow) => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+        if (opts?.interest) results = results.filter((o: PrismaRow) => o.interests.some((i: string) => i.toLowerCase() === opts.interest!.toLowerCase()));
+        if (opts?.member) results = results.filter((o: PrismaRow) => o.members.includes(opts.member!));
         const start = (page - 1) * perPage;
         return results.slice(start, start + perPage);
     }
@@ -2686,11 +2691,11 @@ export class PrismaStorage implements Storage {
     async updateOrganism(id: string, updates: Partial<import('../../interface.js').OrganismRecord>): Promise<import('../../interface.js').OrganismRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             delete data.id;
-            if (data.location) data.location = data.location as any;
-            if (data.moderationConfig) data.moderationConfig = data.moderationConfig as any;
-            if (data.semantic) data.semantic = data.semantic as any;
+            if (data.location) data.location = data.location as unknown;
+            if (data.moderationConfig) data.moderationConfig = data.moderationConfig as unknown;
+            if (data.semantic) data.semantic = data.semantic as unknown;
             if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
             if (data.archivedAt && typeof data.archivedAt === 'string') data.archivedAt = new Date(data.archivedAt);
             const row = await this.prisma.organism.update({ where: { id }, data });
@@ -2727,8 +2732,8 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.organism.delete({ where: { id } }); return true; } catch { return false; }
     }
 
-    private toOrganismRecord(row: any): import('../../interface.js').OrganismRecord {
-        return { id: row.id, name: row.name, description: row.description, type: row.type, location: row.location ?? undefined, interests: row.interests, creatorGhii: row.creatorGhii, admins: row.admins, members: row.members, agentGaiis: row.agentGaiis, boardId: row.boardId, joinPolicy: row.joinPolicy, maxMembers: row.maxMembers, visibility: row.visibility, memberVisibility: row.memberVisibility ?? undefined, moderationConfig: row.moderationConfig as any, memoryNamespace: row.memoryNamespace, semantic: row.semantic ?? undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? (row.archivedAt instanceof Date ? row.archivedAt.toISOString() : row.archivedAt) : undefined, archivedBy: row.archivedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
+    private toOrganismRecord(row: PrismaRow): import('../../interface.js').OrganismRecord {
+        return { id: row.id, name: row.name, description: row.description, type: row.type, location: row.location ?? undefined, interests: row.interests, creatorGhii: row.creatorGhii, admins: row.admins, members: row.members, agentGaiis: row.agentGaiis, boardId: row.boardId, joinPolicy: row.joinPolicy, maxMembers: row.maxMembers, visibility: row.visibility, memberVisibility: row.memberVisibility ?? undefined, moderationConfig: row.moderationConfig, memoryNamespace: row.memoryNamespace, semantic: row.semantic ?? undefined, archived: row.archived ? true : undefined, archivedAt: row.archivedAt ? (row.archivedAt instanceof Date ? row.archivedAt.toISOString() : row.archivedAt) : undefined, archivedBy: row.archivedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
     async createMembership(record: import('../../interface.js').OrganismMembershipRecord): Promise<import('../../interface.js').OrganismMembershipRecord> {
@@ -2745,23 +2750,23 @@ export class PrismaStorage implements Storage {
 
     async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
         this.ensureReady();
-        const where: any = { organismId };
+        const where: Record<string, unknown> = { organismId };
         if (opts?.role) where.role = opts.role;
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.organismMembership.findMany({ where });
-        return rows.map((r: any) => this.toMembershipRecord(r));
+        return rows.map((r: PrismaRow) => this.toMembershipRecord(r));
     }
 
     async listMembershipsByGhii(ghii: string): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.organismMembership.findMany({ where: { ghii } });
-        return rows.map((r: any) => this.toMembershipRecord(r));
+        return rows.map((r: PrismaRow) => this.toMembershipRecord(r));
     }
 
     async updateMembership(id: string, updates: Partial<import('../../interface.js').OrganismMembershipRecord>): Promise<import('../../interface.js').OrganismMembershipRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.role) data.role = updates.role;
             if (updates.status) data.status = updates.status;
             const row = await this.prisma.organismMembership.update({ where: { id }, data });
@@ -2774,7 +2779,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.organismMembership.delete({ where: { id } }); return true; } catch { return false; }
     }
 
-    private toMembershipRecord(row: any): import('../../interface.js').OrganismMembershipRecord {
+    private toMembershipRecord(row: PrismaRow): import('../../interface.js').OrganismMembershipRecord {
         return { id: row.id, organismId: row.organismId, ghii: row.ghii, role: row.role, status: row.status, joinedAt: row.joinedAt instanceof Date ? row.joinedAt.toISOString() : row.joinedAt, invitedBy: row.invitedBy ?? undefined };
     }
 
@@ -2792,16 +2797,16 @@ export class PrismaStorage implements Storage {
 
     async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<import('../../interface.js').JoinRequestRecord[]> {
         this.ensureReady();
-        const where: any = { organismId };
+        const where: Record<string, unknown> = { organismId };
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.joinRequest.findMany({ where });
-        return rows.map((r: any) => this.toJoinRequestRecord(r));
+        return rows.map((r: PrismaRow) => this.toJoinRequestRecord(r));
     }
 
     async updateJoinRequest(id: string, updates: Partial<import('../../interface.js').JoinRequestRecord>): Promise<import('../../interface.js').JoinRequestRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
             if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
@@ -2810,7 +2815,7 @@ export class PrismaStorage implements Storage {
         } catch { return null; }
     }
 
-    private toJoinRequestRecord(row: any): import('../../interface.js').JoinRequestRecord {
+    private toJoinRequestRecord(row: PrismaRow): import('../../interface.js').JoinRequestRecord {
         return { id: row.id, organismId: row.organismId, ghii: row.ghii, message: row.message ?? undefined, status: row.status, reviewedBy: row.reviewedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined };
     }
 
@@ -2820,7 +2825,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         await this.prisma.pendingApproval.create({ data: {
             id: record.id, organismId: record.organismId, flowGateId: record.flowGateId ?? null, stageId: record.stageId ?? null,
-            actor: record.actor, action: record.action, arguments: (record.arguments ?? undefined) as any, risk: record.risk,
+            actor: record.actor, action: record.action, arguments: (record.arguments ?? undefined), risk: record.risk,
             approverRole: record.approverRole, prompt: record.prompt ?? null, status: record.status,
             decidedBy: record.decidedBy ?? null, decidedAt: record.decidedAt ? new Date(record.decidedAt) : null,
             resolutionNote: record.resolutionNote ?? null, deadline: record.deadline ? new Date(record.deadline) : null,
@@ -2837,21 +2842,21 @@ export class PrismaStorage implements Storage {
 
     async listPendingApprovals(organismId: string, opts?: { status?: string }): Promise<import('../../interface.js').PendingApprovalRecord[]> {
         this.ensureReady();
-        const where: any = { organismId };
+        const where: Record<string, unknown> = { organismId };
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.pendingApproval.findMany({ where, orderBy: { createdAt: 'desc' } });
-        return rows.map((r: any) => this.toPendingApprovalRecord(r));
+        return rows.map((r: PrismaRow) => this.toPendingApprovalRecord(r));
     }
 
     async updatePendingApproval(id: string, updates: Partial<import('../../interface.js').PendingApprovalRecord>): Promise<import('../../interface.js').PendingApprovalRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status !== undefined) data.status = updates.status;
             if (updates.decidedBy !== undefined) data.decidedBy = updates.decidedBy;
             if (updates.decidedAt !== undefined) data.decidedAt = updates.decidedAt ? new Date(updates.decidedAt) : null;
             if (updates.resolutionNote !== undefined) data.resolutionNote = updates.resolutionNote;
-            if (updates.arguments !== undefined) data.arguments = updates.arguments as any;
+            if (updates.arguments !== undefined) data.arguments = updates.arguments;
             if (updates.deadline !== undefined) data.deadline = updates.deadline ? new Date(updates.deadline) : null;
             data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
             const row = await this.prisma.pendingApproval.update({ where: { id }, data });
@@ -2865,10 +2870,10 @@ export class PrismaStorage implements Storage {
         // in MongoDB a bare `{ lt: date }` also matches null deadlines, which would wrongly expire
         // gates that have no deadline (e.g. publish gates).
         const rows = await this.prisma.pendingApproval.findMany({ where: { status: 'pending', deadline: { not: null, lt: new Date(nowIso) } } });
-        return rows.map((r: any) => this.toPendingApprovalRecord(r));
+        return rows.map((r: PrismaRow) => this.toPendingApprovalRecord(r));
     }
 
-    private toPendingApprovalRecord(row: any): import('../../interface.js').PendingApprovalRecord {
+    private toPendingApprovalRecord(row: PrismaRow): import('../../interface.js').PendingApprovalRecord {
         return {
             id: row.id, organismId: row.organismId, flowGateId: row.flowGateId ?? undefined, stageId: row.stageId ?? undefined,
             actor: row.actor, action: row.action, arguments: row.arguments ?? undefined, risk: row.risk,
@@ -2906,16 +2911,16 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.appeal.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
-        return rows.map((r: any) => this.toAppealRecord(r));
+        return rows.map((r: PrismaRow) => this.toAppealRecord(r));
     }
 
     async updateAppeal(id: string, updates: Partial<import('../../interface.js').AppealRecord>): Promise<import('../../interface.js').AppealRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
             if (updates.reviewNote) data.reviewNote = updates.reviewNote;
@@ -2925,7 +2930,7 @@ export class PrismaStorage implements Storage {
         } catch { return null; }
     }
 
-    private toAppealRecord(row: any): import('../../interface.js').AppealRecord {
+    private toAppealRecord(row: PrismaRow): import('../../interface.js').AppealRecord {
         return { id: row.id, flagId: row.flagId, appealedBy: row.appealedBy, reason: row.reason, status: row.status, reviewedBy: row.reviewedBy ?? undefined, reviewNote: row.reviewNote ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined };
     }
 
@@ -2933,7 +2938,7 @@ export class PrismaStorage implements Storage {
 
     async createListing(record: import('../../interface.js').ListingRecord): Promise<import('../../interface.js').ListingRecord> {
         this.ensureReady();
-        await this.prisma.listing.create({ data: { id: record.id, ownerName: record.ownerName, sellerGhii: record.sellerGhii, title: record.title, description: record.description, category: record.category, priceMorsels: record.priceMorsels, condition: record.condition, availability: record.availability, location: record.location as any ?? null, tags: record.tags ?? [], images: record.images ?? [], status: record.status, memoryKey: record.memoryKey, flagCount: record.flagCount, createdAt: new Date(record.createdAt), semantic: record.semantic as any ?? null } });
+        await this.prisma.listing.create({ data: { id: record.id, ownerName: record.ownerName, sellerGhii: record.sellerGhii, title: record.title, description: record.description, category: record.category, priceMorsels: record.priceMorsels, condition: record.condition, availability: record.availability, location: record.location ?? null, tags: record.tags ?? [], images: record.images ?? [], status: record.status, memoryKey: record.memoryKey, flagCount: record.flagCount, createdAt: new Date(record.createdAt), semantic: record.semantic ?? null } });
         return record;
     }
 
@@ -2947,19 +2952,19 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.category) where.category = opts.category;
         if (opts?.status) where.status = opts.status;
         if (opts?.sellerOwner) where.ownerName = opts.sellerOwner;
         if (opts?.minPrice !== undefined || opts?.maxPrice !== undefined) {
             where.priceMorsels = {};
-            if (opts?.minPrice !== undefined) where.priceMorsels.gte = opts.minPrice;
-            if (opts?.maxPrice !== undefined) where.priceMorsels.lte = opts.maxPrice;
+            if (opts?.minPrice !== undefined) (where.priceMorsels as Record<string, unknown>).gte = opts.minPrice;
+            if (opts?.maxPrice !== undefined) (where.priceMorsels as Record<string, unknown>).lte = opts.maxPrice;
         }
         const rows = await this.prisma.listing.findMany({ where, orderBy: { createdAt: 'desc' } });
-        let results = rows.map((r: any) => this.toListingRecord(r));
+        let results = rows.map((r: PrismaRow) => this.toListingRecord(r));
         // city filtering post-query (JSON field)
-        if (opts?.city) results = results.filter((l: any) => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+        if (opts?.city) results = results.filter((l: PrismaRow) => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
         const start = (page - 1) * perPage;
         return results.slice(start, start + perPage);
     }
@@ -2967,10 +2972,10 @@ export class PrismaStorage implements Storage {
     async updateListing(id: string, updates: Partial<import('../../interface.js').ListingRecord>): Promise<import('../../interface.js').ListingRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             delete data.id;
-            if (data.location) data.location = data.location as any;
-            if (data.semantic) data.semantic = data.semantic as any;
+            if (data.location) data.location = data.location as unknown;
+            if (data.semantic) data.semantic = data.semantic as unknown;
             if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
             if (data.updatedAt && typeof data.updatedAt === 'string') data.updatedAt = new Date(data.updatedAt);
             const row = await this.prisma.listing.update({ where: { id }, data });
@@ -2983,7 +2988,7 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.listing.delete({ where: { id } }); return true; } catch { return false; }
     }
 
-    private toListingRecord(row: any): import('../../interface.js').ListingRecord {
+    private toListingRecord(row: PrismaRow): import('../../interface.js').ListingRecord {
         return { id: row.id, ownerName: row.ownerName, sellerGhii: row.sellerGhii, title: row.title, description: row.description, category: row.category, priceMorsels: row.priceMorsels, condition: row.condition ?? undefined, availability: row.availability ?? undefined, location: row.location ?? undefined, tags: row.tags ?? undefined, images: row.images ?? undefined, status: row.status, memoryKey: row.memoryKey, flagCount: row.flagCount, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semantic: row.semantic ?? undefined };
     }
 
@@ -3002,19 +3007,19 @@ export class PrismaStorage implements Storage {
     async listPurchasesByBuyer(buyerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.purchase.findMany({ where: { buyerOwner }, orderBy: { createdAt: 'desc' } });
-        return rows.map((r: any) => this.toPurchaseRecord(r));
+        return rows.map((r: PrismaRow) => this.toPurchaseRecord(r));
     }
 
     async listPurchasesBySeller(sellerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.purchase.findMany({ where: { sellerOwner }, orderBy: { createdAt: 'desc' } });
-        return rows.map((r: any) => this.toPurchaseRecord(r));
+        return rows.map((r: PrismaRow) => this.toPurchaseRecord(r));
     }
 
     async updatePurchase(id: string, updates: Partial<import('../../interface.js').PurchaseRecord>): Promise<import('../../interface.js').PurchaseRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status) data.status = updates.status;
             if (updates.rating) { data.ratingScore = updates.rating.score; data.ratingComment = updates.rating.comment; }
             if (updates.completedAt) data.completedAt = new Date(updates.completedAt);
@@ -3023,7 +3028,7 @@ export class PrismaStorage implements Storage {
         } catch { return null; }
     }
 
-    private toPurchaseRecord(row: any): import('../../interface.js').PurchaseRecord {
+    private toPurchaseRecord(row: PrismaRow): import('../../interface.js').PurchaseRecord {
         return { id: row.id, listingId: row.listingId, buyerOwner: row.buyerOwner, sellerOwner: row.sellerOwner, priceMorsels: row.priceMorsels, transactionFeeMorsels: row.transactionFeeMorsels, totalCostMorsels: row.totalCostMorsels, status: row.status, rating: row.ratingScore != null ? { score: row.ratingScore, comment: row.ratingComment ?? undefined } : undefined, trackingCode: row.trackingCode, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, completedAt: row.completedAt ? (row.completedAt instanceof Date ? row.completedAt.toISOString() : row.completedAt) : undefined };
     }
 
@@ -3099,16 +3104,16 @@ export class PrismaStorage implements Storage {
     }
     async listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.type) where.type = opts.type;
         const rows = await this.prisma.trustedIssuer.findMany({ where });
-        return rows.map((r: any) => this.toTrustedIssuerRecord(r));
+        return rows.map((r: PrismaRow) => this.toTrustedIssuerRecord(r));
     }
     async deleteTrustedIssuer(id: string): Promise<boolean> {
         this.ensureReady();
         try { await this.prisma.trustedIssuer.delete({ where: { id } }); return true; } catch { return false; }
     }
-    private toTrustedIssuerRecord(row: any): TrustedIssuerRecord {
+    private toTrustedIssuerRecord(row: PrismaRow): TrustedIssuerRecord {
         return { id: row.id, name: row.name, url: row.url, publicKey: row.publicKey, type: row.type, trusted: row.trusted, addedBy: row.addedBy, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
@@ -3179,15 +3184,15 @@ export class PrismaStorage implements Storage {
     }
     async listGenesisPeers(opts?: { status?: string }): Promise<import('../../interface.js').GenesisPeerRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.genesisPeer.findMany({ where });
-        return rows.map((r: any) => this.toGenesisPeerRecord(r));
+        return rows.map((r: PrismaRow) => this.toGenesisPeerRecord(r));
     }
     async updateGenesisPeer(id: string, updates: Partial<import('../../interface.js').GenesisPeerRecord>): Promise<import('../../interface.js').GenesisPeerRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             delete data.id;
             if (data.lastSyncAt && typeof data.lastSyncAt === 'string') data.lastSyncAt = new Date(data.lastSyncAt);
             if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
@@ -3199,7 +3204,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         try { await this.prisma.genesisPeer.delete({ where: { id } }); return true; } catch { return false; }
     }
-    private toGenesisPeerRecord(row: any): import('../../interface.js').GenesisPeerRecord {
+    private toGenesisPeerRecord(row: PrismaRow): import('../../interface.js').GenesisPeerRecord {
         return { id: row.id, genesisNodeId: row.genesisNodeId, genesisUrl: row.genesisUrl, publicKey: row.publicKey, status: row.status, lastSyncAt: row.lastSyncAt instanceof Date ? row.lastSyncAt.toISOString() : row.lastSyncAt, catalogueHash: row.catalogueHash, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
@@ -3209,8 +3214,8 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         await this.prisma.organismReputation.upsert({
             where: { organismId: record.organismId },
-            create: { organismId: record.organismId, score: record.score, breakdown: record.breakdown as any, calculatedAt: new Date(record.calculatedAt) },
-            update: { score: record.score, breakdown: record.breakdown as any, calculatedAt: new Date(record.calculatedAt) },
+            create: { organismId: record.organismId, score: record.score, breakdown: record.breakdown, calculatedAt: new Date(record.calculatedAt) },
+            update: { score: record.score, breakdown: record.breakdown, calculatedAt: new Date(record.calculatedAt) },
         });
         return record;
     }
@@ -3218,7 +3223,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const row = await this.prisma.organismReputation.findUnique({ where: { organismId } });
         if (!row) return null;
-        return { organismId: row.organismId, score: row.score, breakdown: row.breakdown as any, calculatedAt: row.calculatedAt instanceof Date ? row.calculatedAt.toISOString() : row.calculatedAt };
+        return { organismId: row.organismId, score: row.score, breakdown: row.breakdown, calculatedAt: row.calculatedAt instanceof Date ? row.calculatedAt.toISOString() : row.calculatedAt };
     }
 
     // ── Realtime rooms (MongoDB-backed via Prisma) ──
@@ -3275,7 +3280,7 @@ export class PrismaStorage implements Storage {
         if (filter?.appType) where.appType = filter.appType;
         if (filter?.isPublic !== undefined) where.isPublic = filter.isPublic;
         const rows = await this.prisma.realtimeRoom.findMany({ where });
-        return rows.map((row: any) => ({
+        return rows.map((row: PrismaRow) => ({
             id: row.id,
             appType: row.appType,
             name: row.name,
@@ -3347,7 +3352,7 @@ export class PrismaStorage implements Storage {
             take: limit,
             ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.id,
             action: r.action,
             summary: r.summary,
@@ -3358,7 +3363,7 @@ export class PrismaStorage implements Storage {
 
     // ── Node Extensions ──────────────────────────────────────────
 
-    private toExtensionRecord(row: any): ExtensionRecord {
+    private toExtensionRecord(row: PrismaRow): ExtensionRecord {
         return {
             name: row.name,
             version: row.version,
@@ -3387,11 +3392,11 @@ export class PrismaStorage implements Storage {
                 author: record.author,
                 status: record.status,
                 requiredApis: record.requiredApis,
-                actions: record.actions as any,
-                config: record.config as any,
-                limits: record.limits as any,
-                federation: record.federation as any,
-                instances: record.instances ? record.instances as any : undefined,
+                actions: record.actions,
+                config: record.config,
+                limits: record.limits,
+                federation: record.federation,
+                instances: record.instances ? record.instances : undefined,
                 installedBy: record.installedBy,
                 installedAt: new Date(record.installedAt),
                 activatedAt: record.activatedAt ? new Date(record.activatedAt) : null,
@@ -3410,20 +3415,20 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const where = opts?.status ? { status: opts.status } : {};
         const rows = await this.prisma.extension.findMany({ where });
-        return rows.map((r: any) => this.toExtensionRecord(r));
+        return rows.map((r: PrismaRow) => this.toExtensionRecord(r));
     }
 
     async updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             if (data.activatedAt && typeof data.activatedAt === 'string') {
                 data.activatedAt = new Date(data.activatedAt);
             }
-            if (data.actions) data.actions = data.actions as any;
-            if (data.config) data.config = data.config as any;
-            if (data.limits) data.limits = data.limits as any;
-            if (data.federation) data.federation = data.federation as any;
+            if (data.actions) data.actions = data.actions as unknown;
+            if (data.config) data.config = data.config as unknown;
+            if (data.limits) data.limits = data.limits as unknown;
+            if (data.federation) data.federation = data.federation as unknown;
             const row = await this.prisma.extension.update({ where: { name }, data });
             return this.toExtensionRecord(row);
         } catch {
@@ -3443,7 +3448,7 @@ export class PrismaStorage implements Storage {
 
     // ── Generic Escrow ───────────────────────────────────────────
 
-    private toEscrowHoldRecord(row: any): EscrowHoldRecord {
+    private toEscrowHoldRecord(row: PrismaRow): EscrowHoldRecord {
         return {
             holdId: row.holdId,
             fromGaii: row.fromGaii,
@@ -3483,10 +3488,10 @@ export class PrismaStorage implements Storage {
 
     async listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
         this.ensureReady();
-        const where: any = { fromGaii };
+        const where: Record<string, unknown> = { fromGaii };
         if (opts?.status) where.status = opts.status;
         const rows = await this.prisma.escrowHold.findMany({ where });
-        return rows.map((r: any) => this.toEscrowHoldRecord(r));
+        return rows.map((r: PrismaRow) => this.toEscrowHoldRecord(r));
     }
 
     async releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
@@ -3531,7 +3536,7 @@ export class PrismaStorage implements Storage {
     async createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord> {
         this.ensureReady();
         try {
-            await this.prisma.cortexExtension.create({ data: { name: record.name, namespace: record.namespace, shortName: record.shortName, apiVersion: record.apiVersion, version: record.version, description: record.description, author: record.author, license: record.license, tags: record.tags, labels: record.labels as any, aimeatCompat: record.aimeatCompat, status: record.status, visibility: record.visibility, installedAt: new Date(record.installedAt), activatedAt: record.activatedAt ? new Date(record.activatedAt) : null, installedBy: record.installedBy, manifest: record.manifest, components: record.components as any, activationArtifacts: record.activationArtifacts as any } });
+            await this.prisma.cortexExtension.create({ data: { name: record.name, namespace: record.namespace, shortName: record.shortName, apiVersion: record.apiVersion, version: record.version, description: record.description, author: record.author, license: record.license, tags: record.tags, labels: record.labels, aimeatCompat: record.aimeatCompat, status: record.status, visibility: record.visibility, installedAt: new Date(record.installedAt), activatedAt: record.activatedAt ? new Date(record.activatedAt) : null, installedBy: record.installedBy, manifest: record.manifest, components: record.components, activationArtifacts: record.activationArtifacts } });
             return record;
         } catch { throw new Error(`Cortex extension "${record.name}" already exists`); }
     }
@@ -3544,23 +3549,23 @@ export class PrismaStorage implements Storage {
 
     async listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.status) where.status = opts.status;
         if (opts?.namespace) where.namespace = opts.namespace;
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.installedBy) where.installedBy = opts.installedBy;
         const rows = await this.prisma.cortexExtension.findMany({ where });
-        return rows.map((r: any) => this.toCortexExtensionRecord(r));
+        return rows.map((r: PrismaRow) => this.toCortexExtensionRecord(r));
     }
 
     async updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { ...updates };
+            const data: Record<string, unknown> = { ...updates };
             delete data.name;
-            if (data.labels) data.labels = data.labels as any;
-            if (data.components) data.components = data.components as any;
-            if (data.activationArtifacts) data.activationArtifacts = data.activationArtifacts as any;
+            if (data.labels) data.labels = data.labels as unknown;
+            if (data.components) data.components = data.components as unknown;
+            if (data.activationArtifacts) data.activationArtifacts = data.activationArtifacts as unknown;
             if (data.activatedAt && typeof data.activatedAt === 'string') data.activatedAt = new Date(data.activatedAt);
             if (data.installedAt && typeof data.installedAt === 'string') data.installedAt = new Date(data.installedAt);
             const row = await this.prisma.cortexExtension.update({ where: { name }, data });
@@ -3573,8 +3578,8 @@ export class PrismaStorage implements Storage {
         try { await this.prisma.cortexExtension.delete({ where: { name } }); return true; } catch { return false; }
     }
 
-    private toCortexExtensionRecord(row: any): CortexExtensionRecord {
-        return { name: row.name, namespace: row.namespace, shortName: row.shortName, apiVersion: row.apiVersion, version: row.version, description: row.description, author: row.author, license: row.license ?? undefined, tags: row.tags, labels: row.labels as Record<string, string>, aimeatCompat: row.aimeatCompat ?? undefined, status: row.status, visibility: row.visibility, installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt, activatedAt: row.activatedAt ? (row.activatedAt instanceof Date ? row.activatedAt.toISOString() : row.activatedAt) : undefined, installedBy: row.installedBy, manifest: row.manifest, components: row.components as any, activationArtifacts: row.activationArtifacts as any };
+    private toCortexExtensionRecord(row: PrismaRow): CortexExtensionRecord {
+        return { name: row.name, namespace: row.namespace, shortName: row.shortName, apiVersion: row.apiVersion, version: row.version, description: row.description, author: row.author, license: row.license ?? undefined, tags: row.tags, labels: row.labels as Record<string, string>, aimeatCompat: row.aimeatCompat ?? undefined, status: row.status, visibility: row.visibility, installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt, activatedAt: row.activatedAt ? (row.activatedAt instanceof Date ? row.activatedAt.toISOString() : row.activatedAt) : undefined, installedBy: row.installedBy, manifest: row.manifest, components: row.components, activationArtifacts: row.activationArtifacts };
     }
 
     async setCortexLibFile(extName: string, libName: string, content: string): Promise<void> {
@@ -3601,7 +3606,7 @@ export class PrismaStorage implements Storage {
 
     async createPersonalPushSubscription(record: PersonalPushSubscriptionRecord): Promise<PersonalPushSubscriptionRecord> {
         this.ensureReady();
-        await this.prisma.personalPushSubscription.create({ data: { id: record.id, personalNodeId: record.personalNodeId, ownerName: record.ownerName, endpoint: record.endpoint, keys: record.keys as any, failureCount: record.failureCount, createdAt: new Date(record.createdAt), lastUsedAt: record.lastUsedAt ? new Date(record.lastUsedAt) : null } });
+        await this.prisma.personalPushSubscription.create({ data: { id: record.id, personalNodeId: record.personalNodeId, ownerName: record.ownerName, endpoint: record.endpoint, keys: record.keys, failureCount: record.failureCount, createdAt: new Date(record.createdAt), lastUsedAt: record.lastUsedAt ? new Date(record.lastUsedAt) : null } });
         return record;
     }
 
@@ -3614,17 +3619,17 @@ export class PrismaStorage implements Storage {
     async listPersonalPushSubscriptions(personalNodeId: string): Promise<PersonalPushSubscriptionRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.personalPushSubscription.findMany({ where: { personalNodeId } });
-        return rows.map((r: any) => this.toPersonalPushSubRecord(r));
+        return rows.map((r: PrismaRow) => this.toPersonalPushSubRecord(r));
     }
 
     async updatePersonalPushSubscription(id: string, updates: Partial<PersonalPushSubscriptionRecord>): Promise<boolean> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.failureCount !== undefined) data.failureCount = updates.failureCount;
             if (updates.lastUsedAt) data.lastUsedAt = new Date(updates.lastUsedAt);
             if (updates.endpoint) data.endpoint = updates.endpoint;
-            if (updates.keys) data.keys = updates.keys as any;
+            if (updates.keys) data.keys = updates.keys;
             await this.prisma.personalPushSubscription.update({ where: { id }, data });
             return true;
         } catch { return false; }
@@ -3646,23 +3651,23 @@ export class PrismaStorage implements Storage {
         return await this.prisma.personalPushSubscription.count({ where: { personalNodeId } });
     }
 
-    private toPersonalPushSubRecord(row: any): PersonalPushSubscriptionRecord {
-        return { id: row.id, personalNodeId: row.personalNodeId, ownerName: row.ownerName, endpoint: row.endpoint, keys: row.keys as any, failureCount: row.failureCount, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastUsedAt: row.lastUsedAt ? (row.lastUsedAt instanceof Date ? row.lastUsedAt.toISOString() : row.lastUsedAt) : null };
+    private toPersonalPushSubRecord(row: PrismaRow): PersonalPushSubscriptionRecord {
+        return { id: row.id, personalNodeId: row.personalNodeId, ownerName: row.ownerName, endpoint: row.endpoint, keys: row.keys, failureCount: row.failureCount, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastUsedAt: row.lastUsedAt ? (row.lastUsedAt instanceof Date ? row.lastUsedAt.toISOString() : row.lastUsedAt) : null };
     }
 
     async getNotificationPreferences(personalNodeId: string): Promise<NotificationPreferences | null> {
         this.ensureReady();
         const row = await this.prisma.notificationPreference.findUnique({ where: { personalNodeId } });
         if (!row) return null;
-        return { personalNodeId: row.personalNodeId, enabled: row.enabled, channels: row.channels as any, notifyTypes: row.notifyTypes, cooldownMinutes: row.cooldownMinutes, quietHoursUtc: row.quietHoursUtc as any ?? null, email: row.email, locale: row.locale ?? undefined };
+        return { personalNodeId: row.personalNodeId, enabled: row.enabled, channels: row.channels, notifyTypes: row.notifyTypes, cooldownMinutes: row.cooldownMinutes, quietHoursUtc: row.quietHoursUtc ?? null, email: row.email, locale: row.locale ?? undefined };
     }
 
     async upsertNotificationPreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
         this.ensureReady();
         await this.prisma.notificationPreference.upsert({
             where: { personalNodeId: prefs.personalNodeId },
-            create: { personalNodeId: prefs.personalNodeId, enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc as any ?? null, email: prefs.email, locale: prefs.locale },
-            update: { enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc as any ?? null, email: prefs.email, locale: prefs.locale },
+            create: { personalNodeId: prefs.personalNodeId, enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc ?? null, email: prefs.email, locale: prefs.locale },
+            update: { enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc ?? null, email: prefs.email, locale: prefs.locale },
         });
         return prefs;
     }
@@ -4035,8 +4040,8 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
-    private toInvitationRecord(row: any): import('../../../storage/repositories/invitation.repository.js').InvitationRecord {
-        const toIso = (v: any): string | null => (v ? (v instanceof Date ? v.toISOString() : v) : null);
+    private toInvitationRecord(row: PrismaRow): import('../../../storage/repositories/invitation.repository.js').InvitationRecord {
+        const toIso = (v: Date | string | null | undefined): string | null => (v ? (v instanceof Date ? v.toISOString() : v) : null);
         return {
             id: row.id,
             tokenHash: row.tokenHash,
@@ -4085,13 +4090,13 @@ export class PrismaStorage implements Storage {
 
     // ── App Catalog (Prisma-persisted) ──
 
-    private toAppRecord(row: any): AppRecord {
+    private toAppRecord(row: PrismaRow): AppRecord {
         return {
             ownerGaii: row.ownerGaii,
             ownerName: row.ownerName,
             filename: row.filename,
             versionNumber: row.versionNumber,
-            manifest: row.manifest as any,
+            manifest: row.manifest,
             mimeType: row.mimeType,
             size: row.size,
             data: row.data,
@@ -4116,7 +4121,7 @@ export class PrismaStorage implements Storage {
                 ownerName: record.ownerName,
                 filename: record.filename,
                 versionNumber: record.versionNumber,
-                manifest: record.manifest as any,
+                manifest: record.manifest,
                 mimeType: record.mimeType,
                 size: record.size,
                 data: record.data,
@@ -4144,7 +4149,7 @@ export class PrismaStorage implements Storage {
                 ownerGaii: record.ownerGaii,
                 ownerName: record.ownerName,
                 filename: record.filename,
-                manifest: record.manifest as any,
+                manifest: record.manifest,
                 mimeType: record.mimeType,
                 size: record.size,
                 data: record.data,
@@ -4152,7 +4157,7 @@ export class PrismaStorage implements Storage {
             },
             update: {
                 ownerName: record.ownerName,
-                manifest: record.manifest as any,
+                manifest: record.manifest,
                 mimeType: record.mimeType,
                 size: record.size,
                 data: record.data,
@@ -4171,7 +4176,7 @@ export class PrismaStorage implements Storage {
             ownerGaii: row.ownerGaii,
             ownerName: row.ownerName,
             filename: row.filename,
-            manifest: row.manifest as any,
+            manifest: row.manifest,
             mimeType: row.mimeType,
             size: row.size,
             data: row.data as Buffer,
@@ -4220,15 +4225,15 @@ export class PrismaStorage implements Storage {
     async listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
         this.ensureReady();
         // Fetch all apps, then deduplicate to latest version per owner+filename
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (opts?.ownerGaii) where.ownerGaii = opts.ownerGaii;
         const allRows = await this.prisma.app.findMany({ where, orderBy: { versionNumber: 'desc' } });
-        const latestMap = new Map<string, any>();
+        const latestMap = new Map<string, PrismaRow>();
         for (const r of allRows) {
             const key = `${r.ownerGaii}:${r.filename}`;
             if (!latestMap.has(key)) latestMap.set(key, r);
         }
-        let apps = Array.from(latestMap.values()).map((r: any) => this.toAppRecord(r));
+        let apps = Array.from(latestMap.values()).map((r: PrismaRow) => this.toAppRecord(r));
         if (opts?.category) apps = apps.filter((a: AppRecord) => a.manifest.category === opts.category);
         if (opts?.tag) apps = apps.filter((a: AppRecord) => a.manifest.tags.includes(opts.tag!));
         if (opts?.q) {
@@ -4258,7 +4263,7 @@ export class PrismaStorage implements Storage {
             where: { ownerGaii, filename },
             orderBy: { versionNumber: 'desc' },
         });
-        return rows.map((r: any) => this.toAppRecord(r));
+        return rows.map((r: PrismaRow) => this.toAppRecord(r));
     }
 
     async getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number> {
@@ -4310,13 +4315,13 @@ export class PrismaStorage implements Storage {
         });
         if (rows.length === 0) return false;
         const latest = rows[0];
-        const manifest = { ...(latest.manifest as any) } as AppManifest;
+        const manifest = { ...(latest.manifest) } as AppManifest;
         if (meta.name !== undefined) manifest.name = meta.name;
         if (meta.description !== undefined) manifest.description = meta.description;
         if (meta.protection !== undefined) manifest.protection = meta.protection;
         await this.prisma.app.update({
             where: { ownerGaii_filename_versionNumber: { ownerGaii, filename, versionNumber: latest.versionNumber } },
-            data: { manifest: manifest as any },
+            data: { manifest: manifest },
         });
         return true;
     }
@@ -4408,7 +4413,7 @@ export class PrismaStorage implements Storage {
             where: { sourceOwnerGaii, sourceFilename },
             orderBy: { forkedAt: 'desc' },
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.id,
             sourceOwnerGaii: r.sourceOwnerGaii,
             sourceOwnerName: r.sourceOwnerName,
@@ -4481,7 +4486,7 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    private toSubdomainSiteRecord(row: any): SubdomainSiteRecord {
+    private toSubdomainSiteRecord(row: PrismaRow): SubdomainSiteRecord {
         return {
             subdomain: row.subdomain,
             kind: row.kind as SubdomainSiteRecord['kind'],
@@ -4561,7 +4566,7 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    private toAppGrantRecord(row: any): AppGrantRecord {
+    private toAppGrantRecord(row: PrismaRow): AppGrantRecord {
         return {
             grantId: row.grantId,
             app: row.app,
@@ -4699,7 +4704,7 @@ export class PrismaStorage implements Storage {
 
     // ── App Marketplace (Prisma-persisted purchase receipts) ──
 
-    private toAppPurchaseRecord(row: any): AppPurchaseRecord {
+    private toAppPurchaseRecord(row: PrismaRow): AppPurchaseRecord {
         return {
             transactionId: row.transactionId,
             buyerGaii: row.buyerGaii,
@@ -4714,7 +4719,7 @@ export class PrismaStorage implements Storage {
             transactionFeeMorsels: row.transactionFeeMorsels,
             purchasedAt: row.purchasedAt instanceof Date ? row.purchasedAt.toISOString() : row.purchasedAt,
             appContent: row.appContent,
-            appManifest: row.appManifest as any,
+            appManifest: row.appManifest,
             appScreenshot: row.appScreenshot ?? undefined,
             signature: row.signature,
             nodeId: row.nodeId,
@@ -4739,7 +4744,7 @@ export class PrismaStorage implements Storage {
                 transactionFeeMorsels: record.transactionFeeMorsels,
                 purchasedAt: new Date(record.purchasedAt),
                 appContent: record.appContent,
-                appManifest: record.appManifest as any,
+                appManifest: record.appManifest,
                 appScreenshot: record.appScreenshot,
                 signature: record.signature,
                 nodeId: record.nodeId,
@@ -4761,7 +4766,7 @@ export class PrismaStorage implements Storage {
             where: { buyerGaii },
             orderBy: { purchasedAt: 'desc' },
         });
-        return rows.map((r: any) => this.toAppPurchaseRecord(r));
+        return rows.map((r: PrismaRow) => this.toAppPurchaseRecord(r));
     }
 
     async listAppPurchasesBySeller(sellerGaii: string): Promise<AppPurchaseRecord[]> {
@@ -4770,12 +4775,12 @@ export class PrismaStorage implements Storage {
             where: { sellerGaii },
             orderBy: { purchasedAt: 'desc' },
         });
-        return rows.map((r: any) => this.toAppPurchaseRecord(r));
+        return rows.map((r: PrismaRow) => this.toAppPurchaseRecord(r));
     }
 
     async hasValidLicense(buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
         this.ensureReady();
-        const where: any = { buyerGaii, sellerGaii, appFilename: filename };
+        const where: Record<string, unknown> = { buyerGaii, sellerGaii, appFilename: filename };
         if (licenseType === 'lifetime') where.licenseType = 'lifetime';
         const count = await this.prisma.appPurchase.count({ where });
         return count > 0;
@@ -4819,7 +4824,7 @@ export class PrismaStorage implements Storage {
     // ── Knowledge: Memory Links ──
     // ══════════════════════════════════════════════════════════
 
-    private toMemoryLinkRecord(row: any): MemoryLinkRecord {
+    private toMemoryLinkRecord(row: PrismaRow): MemoryLinkRecord {
         return {
             source: row.source,
             target: row.target,
@@ -4856,13 +4861,13 @@ export class PrismaStorage implements Storage {
     async listLinks(key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
         this.ensureReady();
         const dir = opts?.direction ?? 'both';
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (dir === 'outgoing') where.source = key;
         else if (dir === 'incoming') where.target = key;
         else where.OR = [{ source: key }, { target: key }];
         if (opts?.relation) where.relation = opts.relation;
         const rows = await this.prisma.knowledgeLink.findMany({ where });
-        return rows.map((r: any) => this.toMemoryLinkRecord(r));
+        return rows.map((r: PrismaRow) => this.toMemoryLinkRecord(r));
     }
 
     async deleteLink(source: string, target: string): Promise<boolean> {
@@ -4897,7 +4902,7 @@ export class PrismaStorage implements Storage {
     // ── Knowledge: Operator Reviews (Prisma-persisted) ──
     // ══════════════════════════════════════════════════════════
 
-    private toOperatorReviewRecord(row: any): OperatorReviewRecord {
+    private toOperatorReviewRecord(row: PrismaRow): OperatorReviewRecord {
         return {
             id: row.id,
             packageId: row.packageId,
@@ -4928,7 +4933,7 @@ export class PrismaStorage implements Storage {
     async listReviews(packageId: string): Promise<OperatorReviewRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.knowledgeReview.findMany({ where: { packageId } });
-        return rows.map((r: any) => this.toOperatorReviewRecord(r));
+        return rows.map((r: PrismaRow) => this.toOperatorReviewRecord(r));
     }
 
     async listAllReviews(opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
@@ -4940,7 +4945,7 @@ export class PrismaStorage implements Storage {
             skip: (page - 1) * perPage,
             take: perPage,
         });
-        return rows.map((r: any) => this.toOperatorReviewRecord(r));
+        return rows.map((r: PrismaRow) => this.toOperatorReviewRecord(r));
     }
 
     async deleteReviewsByOperator(gaii: string): Promise<number> {
@@ -4953,7 +4958,7 @@ export class PrismaStorage implements Storage {
     // ── Scheduler: Scheduled Jobs ──
     // ══════════════════════════════════════════════════════════
 
-    private toScheduledJobRecord(row: any): ScheduledJobRecord {
+    private toScheduledJobRecord(row: PrismaRow): ScheduledJobRecord {
         return {
             id: row.id,
             name: row.name,
@@ -4999,7 +5004,7 @@ export class PrismaStorage implements Storage {
                 coreHandler: record.coreHandler,
                 cron: record.cron,
                 enabled: record.enabled,
-                input: record.input as any,
+                input: record.input,
                 lastRunAt: record.lastRunAt ? new Date(record.lastRunAt) : null,
                 lastRunResult: record.lastRunResult,
                 lastRunError: record.lastRunError,
@@ -5016,7 +5021,7 @@ export class PrismaStorage implements Storage {
                 description: record.description,
                 purpose: record.purpose,
                 timezone: record.timezone,
-                constraints: record.constraints as any,
+                constraints: record.constraints,
                 runCount: record.runCount ?? 0,
             },
         });
@@ -5031,21 +5036,21 @@ export class PrismaStorage implements Storage {
 
     async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean; ownerScope?: string; agentGaii?: string }): Promise<ScheduledJobRecord[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter?.type !== undefined) where.type = filter.type;
         if (filter?.extensionName !== undefined) where.extensionName = filter.extensionName;
         if (filter?.enabled !== undefined) where.enabled = filter.enabled;
         if (filter?.ownerScope !== undefined) where.ownerScope = filter.ownerScope;
         if (filter?.agentGaii !== undefined) where.agentGaii = filter.agentGaii;
         const rows = await this.prisma.scheduledJob.findMany({ where });
-        return rows.map((r: any) => this.toScheduledJobRecord(r));
+        return rows.map((r: PrismaRow) => this.toScheduledJobRecord(r));
     }
 
     async updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null> {
         this.ensureReady();
         const existing = await this.prisma.scheduledJob.findUnique({ where: { id } });
         if (!existing) return null;
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.name !== undefined) data.name = updates.name;
         if (updates.type !== undefined) data.type = updates.type;
         if (updates.extensionName !== undefined) data.extensionName = updates.extensionName;
@@ -5054,7 +5059,7 @@ export class PrismaStorage implements Storage {
         if (updates.coreHandler !== undefined) data.coreHandler = updates.coreHandler;
         if (updates.cron !== undefined) data.cron = updates.cron;
         if (updates.enabled !== undefined) data.enabled = updates.enabled;
-        if (updates.input !== undefined) data.input = updates.input as any;
+        if (updates.input !== undefined) data.input = updates.input;
         if (updates.lastRunAt !== undefined) data.lastRunAt = updates.lastRunAt ? new Date(updates.lastRunAt) : null;
         if (updates.lastRunResult !== undefined) data.lastRunResult = updates.lastRunResult;
         if (updates.lastRunError !== undefined) data.lastRunError = updates.lastRunError;
@@ -5068,7 +5073,7 @@ export class PrismaStorage implements Storage {
         if (updates.description !== undefined) data.description = updates.description;
         if (updates.purpose !== undefined) data.purpose = updates.purpose;
         if (updates.timezone !== undefined) data.timezone = updates.timezone;
-        if (updates.constraints !== undefined) data.constraints = updates.constraints as any;
+        if (updates.constraints !== undefined) data.constraints = updates.constraints;
         if (updates.runCount !== undefined) data.runCount = updates.runCount;
         const row = await this.prisma.scheduledJob.update({ where: { id }, data });
         return this.toScheduledJobRecord(row);
@@ -5098,8 +5103,8 @@ export class PrismaStorage implements Storage {
                 result: entry.result,
                 errorMessage: entry.errorMessage,
                 durationMs: entry.durationMs,
-                memoryReads: entry.memoryReads as any,
-                memoryWrites: entry.memoryWrites as any,
+                memoryReads: entry.memoryReads,
+                memoryWrites: entry.memoryWrites,
                 taskId: entry.taskId,
                 createdAt: new Date(entry.createdAt),
             },
@@ -5112,7 +5117,7 @@ export class PrismaStorage implements Storage {
         limit?: number; offset?: number;
     }): Promise<ExecutionLogEntry[]> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter?.jobId) where.jobId = filter.jobId;
         if (filter?.extensionName) where.extensionName = filter.extensionName;
         if (filter?.trigger) where.trigger = filter.trigger;
@@ -5123,14 +5128,14 @@ export class PrismaStorage implements Storage {
             take: filter?.limit ?? 100,
             skip: filter?.offset ?? 0,
         });
-        return rows.map((r: any) => this.toExecutionLogEntry(r));
+        return rows.map((r: PrismaRow) => this.toExecutionLogEntry(r));
     }
 
     async countExecutionLogs(filter?: {
         jobId?: string; extensionName?: string; trigger?: string; result?: string;
     }): Promise<number> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter?.jobId) where.jobId = filter.jobId;
         if (filter?.extensionName) where.extensionName = filter.extensionName;
         if (filter?.trigger) where.trigger = filter.trigger;
@@ -5146,7 +5151,7 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
-    private toExecutionLogEntry(row: any): ExecutionLogEntry {
+    private toExecutionLogEntry(row: PrismaRow): ExecutionLogEntry {
         return {
             id: row.id,
             jobId: row.jobId,
@@ -5169,7 +5174,7 @@ export class PrismaStorage implements Storage {
     // ── Extension Instances (Prisma-persisted) ──
     // ══════════════════════════════════════════════════════════
 
-    private toExtensionInstanceRecord(row: any): ExtensionInstanceRecord {
+    private toExtensionInstanceRecord(row: PrismaRow): ExtensionInstanceRecord {
         return {
             id: row.instanceId,
             extensionName: row.extensionName,
@@ -5189,9 +5194,9 @@ export class PrismaStorage implements Storage {
             data: {
                 instanceId: record.id,
                 extensionName: record.extensionName,
-                config: record.config as any,
+                config: record.config,
                 status: record.status,
-                translations: record.translations ? record.translations as any : undefined,
+                translations: record.translations ? record.translations : undefined,
                 createdBy: record.createdBy,
                 createdByAgent: record.createdByAgent ?? null,
                 createdAt: new Date(record.createdAt),
@@ -5214,16 +5219,16 @@ export class PrismaStorage implements Storage {
             where: { extensionName },
             orderBy: { createdAt: 'desc' },
         });
-        return rows.map((r: any) => this.toExtensionInstanceRecord(r));
+        return rows.map((r: PrismaRow) => this.toExtensionInstanceRecord(r));
     }
 
     async updateExtensionInstance(extensionName: string, instanceId: string, updates: Partial<ExtensionInstanceRecord>): Promise<ExtensionInstanceRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
-            if (updates.config !== undefined) data.config = updates.config as any;
+            const data: Record<string, unknown> = {};
+            if (updates.config !== undefined) data.config = updates.config;
             if (updates.status !== undefined) data.status = updates.status;
-            if (updates.translations !== undefined) data.translations = updates.translations as any;
+            if (updates.translations !== undefined) data.translations = updates.translations;
             const row = await this.prisma.extensionInstance.update({
                 where: { extensionName_instanceId: { extensionName, instanceId } },
                 data,
@@ -5268,7 +5273,7 @@ export class PrismaStorage implements Storage {
     async listFederationPeers(): Promise<FederationPeerRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.federationPeer.findMany();
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             nodeId: r.nodeId,
             url: r.url,
             publicKey: r.publicKey,
@@ -5332,7 +5337,7 @@ export class PrismaStorage implements Storage {
             orderBy: { createdAt: 'asc' },
             take: limit,
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.id,
             type: r.type,
             targetPeers: r.targetPeers,
@@ -5414,7 +5419,7 @@ export class PrismaStorage implements Storage {
 
     async updateDeviceAuth(deviceCode: string, updates: Partial<DeviceAuthorizationRecord>): Promise<void> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.status !== undefined) data.status = updates.status;
         if (updates.scopes !== undefined) data.scopes = updates.scopes;
         if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
@@ -5437,7 +5442,7 @@ export class PrismaStorage implements Storage {
             where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },
         });
-        return rows.map((row: any) => this.toDeviceAuthRecord(row));
+        return rows.map((row: PrismaRow) => this.toDeviceAuthRecord(row));
     }
 
     async cleanupExpiredDeviceAuth(): Promise<number> {
@@ -5466,16 +5471,16 @@ export class PrismaStorage implements Storage {
                 description: app.description ?? null,
                 publicKey: app.publicKey,
                 scopes: app.scopes ?? [],
-                dataAreas: (app.dataAreas as any) ?? null,
+                dataAreas: (app.dataAreas) ?? null,
                 boundRef: app.boundRef ?? null,
                 status: app.status,
                 morselBalance: app.morselBalance ?? 0,
-                capabilities: (app.capabilities as any) ?? undefined,
-                automation: (app.automation as any) ?? undefined,
-                setup: (app.setup as any) ?? undefined,
+                capabilities: (app.capabilities) ?? undefined,
+                automation: (app.automation) ?? undefined,
+                setup: (app.setup) ?? undefined,
                 createdAt: new Date(app.createdAt),
                 lastSeen: new Date(app.lastSeen),
-            } as any,
+            },
         });
         return this.toEcosystemAppRecord(row);
     }
@@ -5495,25 +5500,25 @@ export class PrismaStorage implements Storage {
     async getEcosystemAppsByOwner(owner: string): Promise<EcosystemAppRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.ecosystemApp.findMany({ where: { owner } });
-        return rows.map((r: any) => this.toEcosystemAppRecord(r));
+        return rows.map((r: PrismaRow) => this.toEcosystemAppRecord(r));
     }
 
     async updateEcosystemApp(geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.app !== undefined) data.app = updates.app;
         if (updates.owner !== undefined) data.owner = updates.owner;
         if (updates.displayName !== undefined) data.displayName = updates.displayName;
         if (updates.description !== undefined) data.description = updates.description;
         if (updates.publicKey !== undefined) data.publicKey = updates.publicKey;
         if (updates.scopes !== undefined) data.scopes = updates.scopes;
-        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas as any) ?? null;
+        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas) ?? null;
         if (updates.boundRef !== undefined) data.boundRef = updates.boundRef;
         if (updates.status !== undefined) data.status = updates.status;
         if (updates.morselBalance !== undefined) data.morselBalance = updates.morselBalance;
-        if (updates.capabilities !== undefined) data.capabilities = (updates.capabilities as any) ?? null;
-        if (updates.automation !== undefined) data.automation = (updates.automation as any) ?? null;
-        if (updates.setup !== undefined) data.setup = (updates.setup as any) ?? null;
+        if (updates.capabilities !== undefined) data.capabilities = (updates.capabilities) ?? null;
+        if (updates.automation !== undefined) data.automation = (updates.automation) ?? null;
+        if (updates.setup !== undefined) data.setup = (updates.setup) ?? null;
         if (updates.lastSeen !== undefined) data.lastSeen = new Date(updates.lastSeen);
         try {
             const row = await this.prisma.ecosystemApp.update({ where: { geai }, data });
@@ -5545,19 +5550,19 @@ export class PrismaStorage implements Storage {
                 status: req.status,
                 publicKey: req.publicKey ?? null,
                 scopes: req.scopes ?? [],
-                dataAreas: (req.dataAreas as any) ?? null,
+                dataAreas: (req.dataAreas) ?? null,
                 boundRef: req.boundRef ?? null,
                 createdAt: new Date(req.createdAt),
                 expiresAt: new Date(req.expiresAt),
                 lastPolledAt: req.lastPolledAt ? new Date(req.lastPolledAt) : null,
                 pollInterval: req.pollInterval,
                 approvedBy: req.approvedBy,
-                validationResult: (req.validationResult as any) ?? undefined,
-                capabilities: (req.capabilities as any) ?? undefined,
-                automation: (req.automation as any) ?? undefined,
-                setup: (req.setup as any) ?? undefined,
-                appCredentials: (req.appCredentials as any) ?? undefined,
-            } as any,
+                validationResult: (req.validationResult) ?? undefined,
+                capabilities: (req.capabilities) ?? undefined,
+                automation: (req.automation) ?? undefined,
+                setup: (req.setup) ?? undefined,
+                appCredentials: (req.appCredentials) ?? undefined,
+            },
         });
     }
 
@@ -5575,10 +5580,10 @@ export class PrismaStorage implements Storage {
 
     async updateEcoAuth(deviceCode: string, updates: Partial<EcoAuthorizationRecord>): Promise<void> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.status !== undefined) data.status = updates.status;
         if (updates.scopes !== undefined) data.scopes = updates.scopes;
-        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas as any) ?? null;
+        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas) ?? null;
         if (updates.boundRef !== undefined) data.boundRef = updates.boundRef;
         if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
         if (updates.pollInterval !== undefined) data.pollInterval = updates.pollInterval;
@@ -5600,7 +5605,7 @@ export class PrismaStorage implements Storage {
             where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },
         });
-        return rows.map((row: any) => this.toEcoAuthRecord(row));
+        return rows.map((row: PrismaRow) => this.toEcoAuthRecord(row));
     }
 
     async cleanupExpiredEcoAuth(): Promise<number> {
@@ -5617,24 +5622,24 @@ export class PrismaStorage implements Storage {
     // workaround the Phase-2 capabilities/automation columns use above.
     async getAutomationRecipe(owner: string, app: string): Promise<EcoAutomationRecipe | null> {
         this.ensureReady();
-        const row = await (this.prisma as any).ecoAutomationRecipe.findFirst({ where: { owner, app } });
+        const row = await (this.prisma).ecoAutomationRecipe.findFirst({ where: { owner, app } });
         return row ? this.toAutomationRecipe(row) : null;
     }
 
     async upsertAutomationRecipe(recipe: EcoAutomationRecipe): Promise<EcoAutomationRecipe> {
         this.ensureReady();
-        const data: any = {
+        const data: Record<string, unknown> = {
             owner: recipe.owner,
             app: recipe.app,
-            trigger: recipe.trigger as any,
-            agents: recipe.agents as any,
+            trigger: recipe.trigger,
+            agents: recipe.agents,
             organism: recipe.organism ?? null,
             email: !!recipe.email,
             requireApproval: !!recipe.requireApproval,
             enabled: recipe.enabled,
             updatedAt: new Date(recipe.updatedAt),
         };
-        const row = await (this.prisma as any).ecoAutomationRecipe.upsert({
+        const row = await (this.prisma).ecoAutomationRecipe.upsert({
             where: { owner_app: { owner: recipe.owner, app: recipe.app } },
             update: data,
             create: { ...data, createdAt: new Date(recipe.createdAt) },
@@ -5645,18 +5650,18 @@ export class PrismaStorage implements Storage {
     async deleteAutomationRecipe(owner: string, app: string): Promise<boolean> {
         this.ensureReady();
         try {
-            await (this.prisma as any).ecoAutomationRecipe.delete({ where: { owner_app: { owner, app } } });
+            await (this.prisma).ecoAutomationRecipe.delete({ where: { owner_app: { owner, app } } });
             return true;
         } catch { return false; }
     }
 
     async listAutomationRecipesByOwner(owner: string): Promise<EcoAutomationRecipe[]> {
         this.ensureReady();
-        const rows = await (this.prisma as any).ecoAutomationRecipe.findMany({ where: { owner } });
-        return rows.map((r: any) => this.toAutomationRecipe(r));
+        const rows = await (this.prisma).ecoAutomationRecipe.findMany({ where: { owner } });
+        return rows.map((r: PrismaRow) => this.toAutomationRecipe(r));
     }
 
-    private toAutomationRecipe(row: any): EcoAutomationRecipe {
+    private toAutomationRecipe(row: PrismaRow): EcoAutomationRecipe {
         return {
             id: row.id,
             owner: row.owner,
@@ -5672,7 +5677,7 @@ export class PrismaStorage implements Storage {
         };
     }
 
-    private toEcosystemAppRecord(row: any): EcosystemAppRecord {
+    private toEcosystemAppRecord(row: PrismaRow): EcosystemAppRecord {
         const record: EcosystemAppRecord = {
             geai: row.geai,
             app: row.app,
@@ -5686,15 +5691,15 @@ export class PrismaStorage implements Storage {
         };
         if (row.displayName) record.displayName = row.displayName;
         if (row.description) record.description = row.description;
-        if (row.dataAreas) record.dataAreas = row.dataAreas as any;
+        if (row.dataAreas) record.dataAreas = row.dataAreas;
         if (row.boundRef) record.boundRef = row.boundRef;
-        if (row.capabilities) record.capabilities = row.capabilities as any;
-        if (row.automation) record.automation = row.automation as any;
-        if (row.setup) record.setup = row.setup as any;
+        if (row.capabilities) record.capabilities = row.capabilities;
+        if (row.automation) record.automation = row.automation;
+        if (row.setup) record.setup = row.setup;
         return record;
     }
 
-    private toEcoAuthRecord(row: any): EcoAuthorizationRecord {
+    private toEcoAuthRecord(row: PrismaRow): EcoAuthorizationRecord {
         return {
             deviceCode: row.deviceCode,
             userCode: row.userCode,
@@ -5720,7 +5725,7 @@ export class PrismaStorage implements Storage {
         };
     }
 
-    private toDeviceAuthRecord(row: any): DeviceAuthorizationRecord {
+    private toDeviceAuthRecord(row: PrismaRow): DeviceAuthorizationRecord {
         return {
             deviceCode: row.deviceCode,
             userCode: row.userCode,
@@ -5781,7 +5786,7 @@ export class PrismaStorage implements Storage {
     async listOAuthClients(): Promise<OAuthClientRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.oAuthClient.findMany({ orderBy: { createdAt: 'desc' } });
-        return rows.map((row: any) => ({
+        return rows.map((row: PrismaRow) => ({
             clientId: row.clientId,
             clientSecret: row.clientSecret,
             clientName: row.clientName,
@@ -5889,7 +5894,7 @@ export class PrismaStorage implements Storage {
     async listOAuthApprovalsByOwner(owner: string): Promise<OAuthApprovalRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.oAuthApproval.findMany({ where: { owner }, orderBy: { approvedAt: 'desc' } });
-        return rows.map((row: any) => ({
+        return rows.map((row: PrismaRow) => ({
             clientId: row.clientId,
             gaii: row.gaii,
             owner: row.owner,
@@ -5907,7 +5912,7 @@ export class PrismaStorage implements Storage {
             where,
             orderBy: [{ group: 'asc' }, { name: 'asc' }],
         });
-        return rows.map((r: any) => this.toSystemPromptRecord(r));
+        return rows.map((r: PrismaRow) => this.toSystemPromptRecord(r));
     }
 
     async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
@@ -5945,7 +5950,7 @@ export class PrismaStorage implements Storage {
             where: { promptId },
             orderBy: { version: 'desc' },
         });
-        return rows.map((r: any) => this.toSystemPromptVersionRecord(r));
+        return rows.map((r: PrismaRow) => this.toSystemPromptVersionRecord(r));
     }
 
     async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
@@ -5981,7 +5986,7 @@ export class PrismaStorage implements Storage {
             take: keepCount,
             select: { version: true },
         });
-        const keepVersions = keep.map((r: any) => r.version);
+        const keepVersions = keep.map((r: PrismaRow) => r.version);
         if (keepVersions.length === 0) return 0;
         const result = await this.prisma.systemPromptVersion.deleteMany({
             where: { promptId, version: { notIn: keepVersions } },
@@ -5995,7 +6000,7 @@ export class PrismaStorage implements Storage {
         await this.prisma.systemPrompt.deleteMany({});
     }
 
-    private toSystemPromptRecord(row: any): SystemPromptRecord {
+    private toSystemPromptRecord(row: PrismaRow): SystemPromptRecord {
         return {
             id: row.id,
             group: row.group,
@@ -6012,7 +6017,7 @@ export class PrismaStorage implements Storage {
         };
     }
 
-    private toSystemPromptVersionRecord(row: any): SystemPromptVersionRecord {
+    private toSystemPromptVersionRecord(row: PrismaRow): SystemPromptVersionRecord {
         return {
             promptId: row.promptId,
             version: row.version,
@@ -6042,15 +6047,15 @@ export class PrismaStorage implements Storage {
                     tags: record.tags,
                     visibility: record.visibility,
                     status: record.status,
-                    components: record.components as any,
+                    components: record.components,
                     manifest: record.manifest,
                     createdAt: new Date(record.createdAt),
                     updatedAt: new Date(record.updatedAt),
                 },
             });
             return this.toPackageRecord(row);
-        } catch (e: any) {
-            if (e.code === 'P2002') {
+        } catch (e) {
+            if ((e as { code?: string }).code === 'P2002') {
                 throw new Error('PACKAGE_EXISTS', { cause: e });
             }
             throw e;
@@ -6080,7 +6085,7 @@ export class PrismaStorage implements Storage {
 
     async listPackages(filter: PackageFilter): Promise<{ packages: PackageRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter.author) where.author = filter.author;
         if (filter.category) where.category = filter.category;
         if (filter.status) where.status = filter.status;
@@ -6100,7 +6105,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.package.count({ where }),
         ]);
-        return { packages: rows.map((r: any) => this.toPackageRecord(r)), total };
+        return { packages: rows.map((r: PrismaRow) => this.toPackageRecord(r)), total };
     }
 
     async listVersions(groupId: string, limit?: number, offset?: number): Promise<{ versions: PackageRecord[]; total: number }> {
@@ -6115,12 +6120,12 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.package.count({ where }),
         ]);
-        return { versions: rows.map((r: any) => this.toPackageRecord(r)), total };
+        return { versions: rows.map((r: PrismaRow) => this.toPackageRecord(r)), total };
     }
 
     async updatePackage(id: string, updates: Partial<PackageRecord>): Promise<PackageRecord | null> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.name !== undefined) data.name = updates.name;
         if (updates.description !== undefined) data.description = updates.description;
         if (updates.changelog !== undefined) data.changelog = updates.changelog;
@@ -6128,7 +6133,7 @@ export class PrismaStorage implements Storage {
         if (updates.tags !== undefined) data.tags = updates.tags;
         if (updates.visibility !== undefined) data.visibility = updates.visibility;
         if (updates.status !== undefined) data.status = updates.status;
-        if (updates.components !== undefined) data.components = updates.components as any;
+        if (updates.components !== undefined) data.components = updates.components;
         if (updates.manifest !== undefined) data.manifest = updates.manifest;
         data.updatedAt = new Date();
         try {
@@ -6158,7 +6163,7 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
-    private toPackageRecord(row: any): PackageRecord {
+    private toPackageRecord(row: PrismaRow): PackageRecord {
         return {
             id: row.id,
             packageGroupId: row.packageGroupId,
@@ -6231,7 +6236,7 @@ export class PrismaStorage implements Storage {
 
     async listTemplateListings(filter: TemplateFilter): Promise<{ listings: TemplateListingRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter.category) where.category = filter.category;
         if (filter.status) where.status = filter.status;
         if (filter.featured !== undefined) where.featured = filter.featured;
@@ -6242,7 +6247,7 @@ export class PrismaStorage implements Storage {
                 { description: { contains: filter.search, mode: 'insensitive' } },
             ];
         }
-        let orderBy: any = { createdAt: 'desc' };
+        let orderBy: Record<string, unknown> = { createdAt: 'desc' };
         if (filter.sort === 'rating') orderBy = { rating: 'desc' };
         else if (filter.sort === 'installs') orderBy = { installCount: 'desc' };
         else if (filter.sort === 'newest') orderBy = { createdAt: 'desc' };
@@ -6256,12 +6261,12 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.templateListing.count({ where }),
         ]);
-        return { listings: rows.map((r: any) => this.toTemplateListingRecord(r)), total };
+        return { listings: rows.map((r: PrismaRow) => this.toTemplateListingRecord(r)), total };
     }
 
     async updateTemplateListing(id: string, updates: Partial<TemplateListingRecord>): Promise<TemplateListingRecord | null> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.title !== undefined) data.title = updates.title;
         if (updates.description !== undefined) data.description = updates.description;
         if (updates.screenshots !== undefined) data.screenshots = updates.screenshots;
@@ -6312,7 +6317,7 @@ export class PrismaStorage implements Storage {
             skip: offset,
             take: limit,
         });
-        return rows.map((r: any) => this.toTemplateListingRecord(r));
+        return rows.map((r: PrismaRow) => this.toTemplateListingRecord(r));
     }
 
     // ── Reviews ──
@@ -6351,7 +6356,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.templateReview.count({ where }),
         ]);
-        return { reviews: rows.map((r: any) => this.toTemplateReview(r)), total };
+        return { reviews: rows.map((r: PrismaRow) => this.toTemplateReview(r)), total };
     }
 
     async getReviewByAuthor(listingId: string, authorGhii: string): Promise<TemplateReview | null> {
@@ -6364,7 +6369,7 @@ export class PrismaStorage implements Storage {
 
     async updateReview(id: string, updates: Partial<TemplateReview>): Promise<TemplateReview | null> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.rating !== undefined) data.rating = updates.rating;
         if (updates.comment !== undefined) data.comment = updates.comment;
         if (updates.authorName !== undefined) data.authorName = updates.authorName;
@@ -6406,7 +6411,7 @@ export class PrismaStorage implements Storage {
         return { rating, reviewCount };
     }
 
-    private toTemplateReview(row: any): TemplateReview {
+    private toTemplateReview(row: PrismaRow): TemplateReview {
         return {
             id: row.id,
             listingId: row.listingId,
@@ -6447,7 +6452,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.templateDiscussion.count({ where }),
         ]);
-        return { discussions: rows.map((r: any) => this.toTemplateDiscussion(r)), total };
+        return { discussions: rows.map((r: PrismaRow) => this.toTemplateDiscussion(r)), total };
     }
 
     async deleteDiscussion(id: string): Promise<boolean> {
@@ -6460,7 +6465,7 @@ export class PrismaStorage implements Storage {
         }
     }
 
-    private toTemplateListingRecord(row: any): TemplateListingRecord {
+    private toTemplateListingRecord(row: PrismaRow): TemplateListingRecord {
         return {
             id: row.id,
             packageGroupId: row.packageGroupId,
@@ -6489,7 +6494,7 @@ export class PrismaStorage implements Storage {
         };
     }
 
-    private toTemplateDiscussion(row: any): TemplateDiscussion {
+    private toTemplateDiscussion(row: PrismaRow): TemplateDiscussion {
         return {
             id: row.id,
             listingId: row.listingId,
@@ -6513,7 +6518,7 @@ export class PrismaStorage implements Storage {
                 owner: record.owner,
                 ownerGhii: record.ownerGhii,
                 label: record.label,
-                installedComponents: record.installedComponents as any,
+                installedComponents: record.installedComponents,
                 status: record.status,
                 installedAt: new Date(record.installedAt),
                 updatedAt: new Date(record.updatedAt),
@@ -6534,7 +6539,7 @@ export class PrismaStorage implements Storage {
 
     async listInstances(filter: InstanceFilter): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter.owner) where.owner = filter.owner;
         if (filter.ownerGhii) where.ownerGhii = filter.ownerGhii;
         if (filter.packageGroupId) where.packageGroupId = filter.packageGroupId;
@@ -6548,15 +6553,15 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.packageInstance.count({ where }),
         ]);
-        return { instances: rows.map((r: any) => this.toPackageInstanceRecord(r)), total };
+        return { instances: rows.map((r: PrismaRow) => this.toPackageInstanceRecord(r)), total };
     }
 
     async updateInstance(id: string, updates: Partial<PackageInstanceRecord>): Promise<PackageInstanceRecord | null> {
         this.ensureReady();
-        const data: any = {};
+        const data: Record<string, unknown> = {};
         if (updates.label !== undefined) data.label = updates.label;
         if (updates.status !== undefined) data.status = updates.status;
-        if (updates.installedComponents !== undefined) data.installedComponents = updates.installedComponents as any;
+        if (updates.installedComponents !== undefined) data.installedComponents = updates.installedComponents;
         if (updates.packageVersion !== undefined) data.packageVersion = updates.packageVersion;
         if (updates.packageRecordId !== undefined) data.packageRecordId = updates.packageRecordId;
         data.updatedAt = new Date();
@@ -6585,10 +6590,10 @@ export class PrismaStorage implements Storage {
             this.prisma.packageInstance.findMany({ where, orderBy: { installedAt: 'desc' } }),
             this.prisma.packageInstance.count({ where }),
         ]);
-        return { instances: rows.map((r: any) => this.toPackageInstanceRecord(r)), total };
+        return { instances: rows.map((r: PrismaRow) => this.toPackageInstanceRecord(r)), total };
     }
 
-    private toPackageInstanceRecord(row: any): PackageInstanceRecord {
+    private toPackageInstanceRecord(row: PrismaRow): PackageInstanceRecord {
         return {
             id: row.id,
             packageGroupId: row.packageGroupId,
@@ -6606,7 +6611,7 @@ export class PrismaStorage implements Storage {
 
     // ── Capability Layer ──────────────────────────────────────────────
 
-    private toCapabilityRecord(row: any): CapabilityRecord {
+    private toCapabilityRecord(row: PrismaRow): CapabilityRecord {
         return {
             id: row.id,
             name: row.name,
@@ -6659,9 +6664,9 @@ export class PrismaStorage implements Storage {
                 examples: record.examples, dependencies: record.dependencies,
                 schemaHash: record.schemaHash, webhookUrl: record.webhookUrl,
                 cost: record.cost ?? undefined, trustRequired: record.trustRequired,
-                trust: record.trust as any, redactedFields: record.redactedFields,
+                trust: record.trust, redactedFields: record.redactedFields,
                 operatorOverride: record.operatorOverride ?? undefined,
-                stats: record.stats as any, tags: record.tags,
+                stats: record.stats, tags: record.tags,
             },
         });
         return this.toCapabilityRecord(row);
@@ -6675,7 +6680,7 @@ export class PrismaStorage implements Storage {
 
     async updateCapability(id: string, updates: Partial<CapabilityRecord>): Promise<CapabilityRecord | null> {
         this.ensureReady();
-        const data: any = { ...updates };
+        const data: Record<string, unknown> = { ...updates };
         if (updates.source) {
             data.sourceType = updates.source.type;
             data.sourceRef = updates.source.ref;
@@ -6698,7 +6703,7 @@ export class PrismaStorage implements Storage {
 
     async listCapabilities(filters: CapabilityFilter): Promise<{ capabilities: CapabilityRecord[]; total: number }> {
         this.ensureReady();
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filters.ownerGhii) where.ownerGhii = filters.ownerGhii;
         if (filters.visibility) where.visibility = filters.visibility;
         if (filters.publicOrOwner) where.AND = [{ OR: [{ visibility: 'public' }, { ownerGhii: filters.publicOrOwner }] }];
@@ -6722,7 +6727,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.capability.count({ where }),
         ]);
-        let caps = rows.map((r: any) => this.toCapabilityRecord(r));
+        let caps = rows.map((r: PrismaRow) => this.toCapabilityRecord(r));
         if (filters.tags?.length) {
             caps = caps.filter((c: CapabilityRecord) => filters.tags!.some(t => c.tags.includes(t)));
         }
@@ -6732,7 +6737,7 @@ export class PrismaStorage implements Storage {
     async listCapabilitiesByOwner(ownerGhii: string): Promise<CapabilityRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.capability.findMany({ where: { ownerGhii }, orderBy: { updatedAt: 'desc' } });
-        return rows.map((r: any) => this.toCapabilityRecord(r));
+        return rows.map((r: PrismaRow) => this.toCapabilityRecord(r));
     }
 
     async getCapabilityBySourceRef(sourceRef: string): Promise<CapabilityRecord | null> {
@@ -6744,7 +6749,7 @@ export class PrismaStorage implements Storage {
     async listCapabilitiesBySourceType(sourceType: string): Promise<CapabilityRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.capability.findMany({ where: { sourceType } });
-        return rows.map((r: any) => this.toCapabilityRecord(r));
+        return rows.map((r: PrismaRow) => this.toCapabilityRecord(r));
     }
 
     async incrementCapabilityStats(id: string, delta: { success: number; error: number; totalMs: number; lastError?: string }): Promise<void> {
@@ -6770,7 +6775,7 @@ export class PrismaStorage implements Storage {
         await this.prisma.capabilityLog.create({
             data: {
                 capabilityId: entry.capabilityId, callerGhii: entry.callerGhii,
-                input: entry.input as any, status: entry.status,
+                input: entry.input, status: entry.status,
                 durationMs: entry.durationMs, error: entry.error,
                 timestamp: new Date(entry.timestamp),
             },
@@ -6779,7 +6784,7 @@ export class PrismaStorage implements Storage {
 
     async listCapabilityLogs(capabilityId: string, filters: { status?: 'success' | 'error'; page?: number; perPage?: number }): Promise<{ logs: CapabilityLogEntry[]; total: number }> {
         this.ensureReady();
-        const where: any = { capabilityId };
+        const where: Record<string, unknown> = { capabilityId };
         if (filters.status) where.status = filters.status;
         const page = filters.page || 1;
         const perPage = filters.perPage || 50;
@@ -6790,7 +6795,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.capabilityLog.count({ where }),
         ]);
-        const logs: CapabilityLogEntry[] = rows.map((r: any) => ({
+        const logs: CapabilityLogEntry[] = rows.map((r: PrismaRow) => ({
             id: r.id,
             capabilityId: r.capabilityId,
             callerGhii: r.callerGhii,
@@ -6818,21 +6823,21 @@ export class PrismaStorage implements Storage {
         const cap = await this.getCapability(id);
         if (!cap) return;
         const merged = { ...cap.trust, ...trustUpdates };
-        await this.prisma.capability.update({ where: { id }, data: { trust: merged as any } });
+        await this.prisma.capability.update({ where: { id }, data: { trust: merged } });
     }
 
     async incrementVouchCount(id: string): Promise<void> {
         const cap = await this.getCapability(id);
         if (!cap) return;
         const trust = { ...cap.trust, vouchCount: cap.trust.vouchCount + 1 };
-        await this.prisma.capability.update({ where: { id }, data: { trust: trust as any } });
+        await this.prisma.capability.update({ where: { id }, data: { trust: trust } });
     }
 
     async decrementVouchCount(id: string): Promise<void> {
         const cap = await this.getCapability(id);
         if (!cap) return;
         const trust = { ...cap.trust, vouchCount: Math.max(0, cap.trust.vouchCount - 1) };
-        await this.prisma.capability.update({ where: { id }, data: { trust: trust as any } });
+        await this.prisma.capability.update({ where: { id }, data: { trust: trust } });
     }
 
     // ── Stats Persistence ──
@@ -6892,7 +6897,7 @@ export class PrismaStorage implements Storage {
 
     // ── Agent Tasks ──
 
-    private toTaskRecord(row: any): AgentTaskRecord {
+    private toTaskRecord(row: PrismaRow): AgentTaskRecord {
         return {
             id: row.id,
             agentGaii: row.agentGaii,
@@ -6919,7 +6924,7 @@ export class PrismaStorage implements Storage {
         };
     }
 
-    private toTaskEventRecord(row: any): AgentTaskEventRecord {
+    private toTaskEventRecord(row: PrismaRow): AgentTaskEventRecord {
         return {
             id: row.id,
             taskId: row.taskId,
@@ -6939,23 +6944,23 @@ export class PrismaStorage implements Storage {
                 ownerGaii: record.ownerGaii,
                 title: record.title,
                 description: record.description,
-                scope: record.scope as any,
-                rules: record.rules as any,
-                verification: record.verification as any,
-                resources: record.resources as any ?? null,
-                todos: record.todos as any,
+                scope: record.scope,
+                rules: record.rules,
+                verification: record.verification,
+                resources: record.resources ?? null,
+                todos: record.todos,
                 status: record.status,
                 parentTaskId: record.parentTaskId ?? null,
                 workTrackingCode: record.workTrackingCode ?? null,
-                telemetry: record.telemetry as any ?? null,
+                telemetry: record.telemetry ?? null,
                 lastEventAt: record.lastEventAt ? new Date(record.lastEventAt) : null,
                 createdAt: new Date(record.createdAt),
                 completedAt: record.completedAt ? new Date(record.completedAt) : null,
                 deliverableKey: record.deliverableKey ?? null,
-                rating: record.rating as any ?? null,
+                rating: record.rating ?? null,
                 triage: record.triage ?? null,
-                automation: record.automation as any ?? null,
-            } as any,
+                automation: record.automation ?? null,
+            },
         });
         return record;
     }
@@ -6970,7 +6975,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = { agentGaii };
+        const where: Record<string, unknown> = { agentGaii };
         if (opts?.status) where.status = opts.status;
 
         const [rows, total] = await Promise.all([
@@ -6982,14 +6987,14 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.agentTask.count({ where }),
         ]);
-        return { tasks: rows.map((r: any) => this.toTaskRecord(r)), total };
+        return { tasks: rows.map((r: PrismaRow) => this.toTaskRecord(r)), total };
     }
 
     async listAgentTasksByOwner(ownerGaii: string, opts?: { status?: string; agentGaii?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = { ownerGaii };
+        const where: Record<string, unknown> = { ownerGaii };
         if (opts?.agentGaii) where.agentGaii = opts.agentGaii;
         if (opts?.status) where.status = opts.status;
 
@@ -7002,7 +7007,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.agentTask.count({ where }),
         ]);
-        return { tasks: rows.map((r: any) => this.toTaskRecord(r)), total };
+        return { tasks: rows.map((r: PrismaRow) => this.toTaskRecord(r)), total };
     }
 
     async updateAgentTask(id: string, updates: Partial<AgentTaskRecord>): Promise<AgentTaskRecord | null> {
@@ -7025,22 +7030,22 @@ export class PrismaStorage implements Storage {
                 data: {
                     title: merged.title,
                     description: merged.description,
-                    scope: merged.scope as any,
-                    rules: merged.rules as any,
-                    verification: merged.verification as any,
-                    resources: merged.resources as any ?? null,
-                    todos: merged.todos as any,
+                    scope: merged.scope,
+                    rules: merged.rules,
+                    verification: merged.verification,
+                    resources: merged.resources ?? null,
+                    todos: merged.todos,
                     status: merged.status,
                     parentTaskId: merged.parentTaskId ?? null,
                     workTrackingCode: merged.workTrackingCode ?? null,
-                    telemetry: merged.telemetry as any ?? null,
+                    telemetry: merged.telemetry ?? null,
                     lastEventAt: merged.lastEventAt ? new Date(merged.lastEventAt) : null,
                     completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
                     deliverableKey: merged.deliverableKey ?? null,
-                    rating: merged.rating as any ?? null,
+                    rating: merged.rating ?? null,
                     triage: merged.triage ?? null,
-                    automation: merged.automation as any ?? null,
-                } as any,
+                    automation: merged.automation ?? null,
+                },
             });
             return this.toTaskRecord(row);
         } catch { return null; }
@@ -7070,7 +7075,7 @@ export class PrismaStorage implements Storage {
                 taskId: event.taskId,
                 type: event.type,
                 message: event.message,
-                details: event.details as any ?? null,
+                details: event.details ?? null,
                 timestamp: new Date(event.timestamp),
             },
         });
@@ -7092,7 +7097,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.agentTaskEvent.count({ where }),
         ]);
-        return { events: rows.map((r: any) => this.toTaskEventRecord(r)), total };
+        return { events: rows.map((r: PrismaRow) => this.toTaskEventRecord(r)), total };
     }
 
     async countTasksByAgent(agentGaii: string): Promise<{ queued: number; active: number; done: number; failed: number }> {
@@ -7154,12 +7159,12 @@ export class PrismaStorage implements Storage {
                 lastEventAt: { not: null, lt: threshold },
             },
         });
-        return rows.map((r: any) => this.toTaskRecord(r));
+        return rows.map((r: PrismaRow) => this.toTaskRecord(r));
     }
 
     // ── Sharing Groups ──
 
-    private toSharingGroupRecord(row: any): SharingGroupRecord {
+    private toSharingGroupRecord(row: PrismaRow): SharingGroupRecord {
         const record: SharingGroupRecord = {
             id: row.id,
             name: row.name,
@@ -7181,8 +7186,8 @@ export class PrismaStorage implements Storage {
                 name: record.name,
                 description: record.description ?? null,
                 ownerGaii: record.ownerGaii,
-                members: record.members as any,
-                defaultPermissions: record.defaultPermissions as any,
+                members: record.members,
+                defaultPermissions: record.defaultPermissions,
                 createdAt: new Date(record.createdAt),
             },
         });
@@ -7201,7 +7206,7 @@ export class PrismaStorage implements Storage {
             where: { ownerGaii },
             orderBy: { createdAt: 'desc' },
         });
-        return rows.map((r: any) => this.toSharingGroupRecord(r));
+        return rows.map((r: PrismaRow) => this.toSharingGroupRecord(r));
     }
 
     async listSharingGroupsByMember(identifier: string): Promise<SharingGroupRecord[]> {
@@ -7209,11 +7214,11 @@ export class PrismaStorage implements Storage {
         // MongoDB JSON arrays can't be queried with SQL json_each; filter in memory
         const allGroups = await this.prisma.sharingGroup.findMany();
         return allGroups
-            .filter((g: any) => {
+            .filter((g: PrismaRow) => {
                 const members = g.members as Array<{ identifier: string }>;
                 return Array.isArray(members) && members.some(m => m.identifier === identifier);
             })
-            .map((r: any) => this.toSharingGroupRecord(r));
+            .map((r: PrismaRow) => this.toSharingGroupRecord(r));
     }
 
     async updateSharingGroup(id: string, updates: Partial<SharingGroupRecord>): Promise<SharingGroupRecord | null> {
@@ -7235,8 +7240,8 @@ export class PrismaStorage implements Storage {
                 data: {
                     name: merged.name,
                     description: merged.description ?? null,
-                    members: merged.members as any,
-                    defaultPermissions: merged.defaultPermissions as any,
+                    members: merged.members,
+                    defaultPermissions: merged.defaultPermissions,
                 },
             });
             return this.toSharingGroupRecord(row);
@@ -7262,7 +7267,7 @@ export class PrismaStorage implements Storage {
 
     // ── Agent Directives ──
 
-    private toDirectivesRecord(row: any): AgentDirectivesRecord {
+    private toDirectivesRecord(row: PrismaRow): AgentDirectivesRecord {
         const record: AgentDirectivesRecord = {
             agentGaii: row.agentGaii,
             purpose: row.purpose,
@@ -7275,7 +7280,7 @@ export class PrismaStorage implements Storage {
         return record;
     }
 
-    private toOwnerDefaultsRecord(row: any): OwnerAgentDefaults {
+    private toOwnerDefaultsRecord(row: PrismaRow): OwnerAgentDefaults {
         const record: OwnerAgentDefaults = {
             ownerGaii: row.ownerGaii,
             rules: row.rules as OwnerAgentDefaults['rules'],
@@ -7300,17 +7305,17 @@ export class PrismaStorage implements Storage {
                 id: `dir-${record.agentGaii}`,
                 agentGaii: record.agentGaii,
                 purpose: record.purpose,
-                rules: record.rules as any,
-                memoryAreas: record.memoryAreas as any,
-                resources: record.resources as any,
-                budgetLimits: record.budgetLimits as any ?? null,
+                rules: record.rules,
+                memoryAreas: record.memoryAreas,
+                resources: record.resources,
+                budgetLimits: record.budgetLimits ?? null,
             },
             update: {
                 purpose: record.purpose,
-                rules: record.rules as any,
-                memoryAreas: record.memoryAreas as any,
-                resources: record.resources as any,
-                budgetLimits: record.budgetLimits as any ?? null,
+                rules: record.rules,
+                memoryAreas: record.memoryAreas,
+                resources: record.resources,
+                budgetLimits: record.budgetLimits ?? null,
             },
         });
         return this.toDirectivesRecord(row);
@@ -7337,14 +7342,14 @@ export class PrismaStorage implements Storage {
             create: {
                 id: `owd-${record.ownerGaii}`,
                 ownerGaii: record.ownerGaii,
-                rules: record.rules as any,
+                rules: record.rules,
                 defaultTokenBudget: record.defaultTokenBudget ?? null,
-                defaultMemoryAreas: record.defaultMemoryAreas as any ?? [],
+                defaultMemoryAreas: record.defaultMemoryAreas ?? [],
             },
             update: {
-                rules: record.rules as any,
+                rules: record.rules,
                 defaultTokenBudget: record.defaultTokenBudget ?? null,
-                defaultMemoryAreas: record.defaultMemoryAreas as any ?? [],
+                defaultMemoryAreas: record.defaultMemoryAreas ?? [],
             },
         });
         return this.toOwnerDefaultsRecord(row);
@@ -7352,7 +7357,7 @@ export class PrismaStorage implements Storage {
 
     // ── Agent Activity ──
 
-    private toActivityRecord(row: any): AgentActivityRecord {
+    private toActivityRecord(row: PrismaRow): AgentActivityRecord {
         return {
             agentGaii: row.agentGaii,
             date: row.date,
@@ -7401,7 +7406,7 @@ export class PrismaStorage implements Storage {
                 _sum: { value: true },
                 orderBy: { date: 'asc' },
             });
-            return rows.map((r: any) => ({
+            return rows.map((r: PrismaRow) => ({
                 agentGaii: r.agentGaii,
                 date: r.date,
                 hour: 0,
@@ -7415,7 +7420,7 @@ export class PrismaStorage implements Storage {
             where: { agentGaii, date: { gte: cutoffStr } },
             orderBy: [{ date: 'asc' }, { hour: 'asc' }],
         });
-        return rows.map((r: any) => this.toActivityRecord(r));
+        return rows.map((r: PrismaRow) => this.toActivityRecord(r));
     }
 
     // ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
@@ -7487,17 +7492,17 @@ export class PrismaStorage implements Storage {
 
     async queryUsageDaily(filter: UsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
         this.ensureReady();
-        const where: any = { ownerGhii: filter.ownerGhii };
+        const where: Record<string, unknown> = { ownerGhii: filter.ownerGhii };
         if (filter.agentGaii) where.agentGaii = filter.agentGaii;
         if (filter.organismId !== undefined) where.organismId = filter.organismId;
         if (filter.workspaceId !== undefined) where.workspaceId = filter.workspaceId;
         if (filter.from || filter.to) {
             where.date = {};
-            if (filter.from) where.date.gte = filter.from;
-            if (filter.to) where.date.lte = filter.to;
+            if (filter.from) (where.date as Record<string, unknown>).gte = filter.from;
+            if (filter.to) (where.date as Record<string, unknown>).lte = filter.to;
         }
         const rows = await this.prisma.agentUsageDaily.findMany({ where, orderBy: { date: 'asc' } });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             date: r.date,
             agentGaii: r.agentGaii,
             ownerGhii: r.ownerGhii,
@@ -7517,14 +7522,14 @@ export class PrismaStorage implements Storage {
     async queryUsageDailyAllOwners(filter: AdminUsageDailyFilter): Promise<AgentUsageDailyRecord[]> {
         this.ensureReady();
         // OPERATOR-ONLY: no ownerGhii filter — the route gates on the operator role.
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (filter.from || filter.to) {
             where.date = {};
-            if (filter.from) where.date.gte = filter.from;
-            if (filter.to) where.date.lte = filter.to;
+            if (filter.from) (where.date as Record<string, unknown>).gte = filter.from;
+            if (filter.to) (where.date as Record<string, unknown>).lte = filter.to;
         }
         const rows = await this.prisma.agentUsageDaily.findMany({ where, orderBy: { date: 'asc' } });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             date: r.date,
             agentGaii: r.agentGaii,
             ownerGhii: r.ownerGhii,
@@ -7543,15 +7548,15 @@ export class PrismaStorage implements Storage {
 
     async listUsageEvents(filter: UsageEventFilter): Promise<AgentUsageEvent[]> {
         this.ensureReady();
-        const where: any = { ownerGhii: filter.ownerGhii };
+        const where: Record<string, unknown> = { ownerGhii: filter.ownerGhii };
         if (filter.agentGaii) where.agentGaii = filter.agentGaii;
         if (filter.runId) where.runId = filter.runId;
         if (filter.capabilityId) where.capabilityId = filter.capabilityId;
         if (filter.hasCapability) where.capabilityId = { not: null };
         if (filter.from || filter.to) {
             where.ts = {};
-            if (filter.from) where.ts.gte = filter.from;
-            if (filter.to) where.ts.lte = filter.to;
+            if (filter.from) (where.ts as Record<string, unknown>).gte = filter.from;
+            if (filter.to) (where.ts as Record<string, unknown>).lte = filter.to;
         }
         const limit = Math.min(Math.max(filter.limit ?? 200, 1), 1000);
         const rows = await this.prisma.agentUsageEvent.findMany({
@@ -7559,7 +7564,7 @@ export class PrismaStorage implements Storage {
             orderBy: { ts: 'desc' },
             take: limit,
         });
-        return rows.map((r: any) => ({
+        return rows.map((r: PrismaRow) => ({
             id: r.id,
             ts: r.ts,
             agentGaii: r.agentGaii,
@@ -7582,7 +7587,7 @@ export class PrismaStorage implements Storage {
 
     // ── Agent Messages ──
 
-    private toMessageRecord(row: any): AgentMessageRecord {
+    private toMessageRecord(row: PrismaRow): AgentMessageRecord {
         const record: AgentMessageRecord = {
             id: row.id,
             agentGaii: row.agentGaii,
@@ -7611,7 +7616,7 @@ export class PrismaStorage implements Storage {
                 content: record.content,
                 status: record.status,
                 linkedTaskId: record.linkedTaskId ?? null,
-                metadata: record.metadata as any ?? null,
+                metadata: record.metadata ?? null,
                 createdAt: new Date(record.createdAt),
                 processedAt: record.processedAt ? new Date(record.processedAt) : null,
             },
@@ -7629,7 +7634,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = { agentGaii };
+        const where: Record<string, unknown> = { agentGaii };
         if (opts?.direction) where.direction = opts.direction;
         if (opts?.threadId) where.threadId = opts.threadId;
 
@@ -7642,7 +7647,7 @@ export class PrismaStorage implements Storage {
             }),
             this.prisma.agentMessage.count({ where }),
         ]);
-        return { messages: rows.map((r: any) => this.toMessageRecord(r)), total };
+        return { messages: rows.map((r: PrismaRow) => this.toMessageRecord(r)), total };
     }
 
     async countMessagesByAgents(agentGaiis: string[]): Promise<Record<string, { total: number; lastMessageAt: string | null }>> {
@@ -7671,13 +7676,13 @@ export class PrismaStorage implements Storage {
             where: { agentGaii, status: 'pending', direction: 'inbound' },
             orderBy: { createdAt: 'asc' },
         });
-        return rows.map((r: any) => this.toMessageRecord(r));
+        return rows.map((r: PrismaRow) => this.toMessageRecord(r));
     }
 
     async updateMessageStatus(id: string, status: string, processedAt?: string): Promise<AgentMessageRecord | null> {
         this.ensureReady();
         try {
-            const data: any = { status };
+            const data: Record<string, unknown> = { status };
             if (processedAt) data.processedAt = new Date(processedAt);
             const row = await this.prisma.agentMessage.update({
                 where: { id },
@@ -7725,7 +7730,7 @@ export class PrismaStorage implements Storage {
     /** Composite _id for a contact-consent record. */
     private contactDocId(ownerGhii: string, contactId: string): string { return `${ownerGhii}::${contactId}`; }
 
-    private toDirectMessageRecord(row: any): DirectMessageRecord {
+    private toDirectMessageRecord(row: PrismaRow): DirectMessageRecord {
         const record: DirectMessageRecord = {
             id: row.mid,
             ownerGhii: row.ownerGhii,
@@ -7751,7 +7756,7 @@ export class PrismaStorage implements Storage {
         return record;
     }
 
-    private toContactRecord(row: any): ContactConsentRecord {
+    private toContactRecord(row: PrismaRow): ContactConsentRecord {
         const record: ContactConsentRecord = {
             ownerGhii: row.ownerGhii,
             contactId: row.contactId,
@@ -7775,8 +7780,8 @@ export class PrismaStorage implements Storage {
                 senderGhii: record.senderGhii,
                 recipientGhii: record.recipientGhii,
                 body: record.body,
-                attachments: (record.attachments as any) ?? null,
-                interactive: (record.interactive as any) ?? null,
+                attachments: (record.attachments) ?? null,
+                interactive: (record.interactive) ?? null,
                 broadcastId: record.broadcastId ?? null,
                 respondable: record.respondable ?? null,
                 status: record.status,
@@ -7803,7 +7808,7 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const where: any = { ownerGhii, direction: 'inbound' };
+        const where: Record<string, unknown> = { ownerGhii, direction: 'inbound' };
         if (opts?.unreadOnly) where.readAt = null;
 
         const [rows, total, unread] = await Promise.all([
@@ -7811,7 +7816,7 @@ export class PrismaStorage implements Storage {
             this.prisma.directMessage.count({ where }),
             this.prisma.directMessage.count({ where: { ownerGhii, direction: 'inbound', readAt: null } }),
         ]);
-        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total, unread };
+        return { messages: rows.map((r: PrismaRow) => this.toDirectMessageRecord(r)), total, unread };
     }
 
     async listConversation(ownerGhii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
@@ -7823,7 +7828,7 @@ export class PrismaStorage implements Storage {
             this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
             this.prisma.directMessage.count({ where }),
         ]);
-        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+        return { messages: rows.map((r: PrismaRow) => this.toDirectMessageRecord(r)), total };
     }
 
     async listDmsAddressedTo(recipientGhii: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
@@ -7835,7 +7840,7 @@ export class PrismaStorage implements Storage {
             this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
             this.prisma.directMessage.count({ where }),
         ]);
-        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+        return { messages: rows.map((r: PrismaRow) => this.toDirectMessageRecord(r)), total };
     }
 
     async listAgentDmThread(agentGaii: string, conversationId: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
@@ -7854,7 +7859,7 @@ export class PrismaStorage implements Storage {
             this.prisma.directMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage }),
             this.prisma.directMessage.count({ where }),
         ]);
-        return { messages: rows.map((r: any) => this.toDirectMessageRecord(r)), total };
+        return { messages: rows.map((r: PrismaRow) => this.toDirectMessageRecord(r)), total };
     }
 
     async listDmsByBroadcast(broadcastId: string, ownerGhii: string): Promise<DirectMessageRecord[]> {
@@ -7862,7 +7867,7 @@ export class PrismaStorage implements Storage {
         const rows = await this.prisma.directMessage.findMany({
             where: { broadcastId, ownerGhii }, orderBy: { createdAt: 'asc' },
         });
-        return rows.map((r: any) => this.toDirectMessageRecord(r));
+        return rows.map((r: PrismaRow) => this.toDirectMessageRecord(r));
     }
 
     async listConversations(ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
@@ -7931,7 +7936,7 @@ export class PrismaStorage implements Storage {
         // Delivery status lives on the sender's (outbound) copy.
         const outbound = await this.prisma.directMessage.findFirst({ where: { mid: id, direction: 'outbound' } });
         if (!outbound) return null;
-        const data: any = { status };
+        const data: Record<string, unknown> = { status };
         if (extra?.deliveredAt) data.deliveredAt = new Date(extra.deliveredAt);
         if (extra?.error !== undefined) data.error = extra.error;
         const row = await this.prisma.directMessage.update({ where: { id: outbound.id }, data });
@@ -7953,7 +7958,7 @@ export class PrismaStorage implements Storage {
             orderBy: { createdAt: 'asc' },
             take: limit,
         });
-        return rows.map((r: any) => this.toDirectMessageRecord(r));
+        return rows.map((r: PrismaRow) => this.toDirectMessageRecord(r));
     }
 
     async listInboundWithAttachments(limit = 200): Promise<DirectMessageRecord[]> {
@@ -7963,7 +7968,7 @@ export class PrismaStorage implements Storage {
             orderBy: { createdAt: 'asc' },
             take: limit,
         });
-        return rows.map((r: any) => this.toDirectMessageRecord(r));
+        return rows.map((r: PrismaRow) => this.toDirectMessageRecord(r));
     }
 
     async updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null> {
@@ -7971,7 +7976,7 @@ export class PrismaStorage implements Storage {
         try {
             const row = await this.prisma.directMessage.update({
                 where: { id: this.dmDocId(id, ownerGhii) },
-                data: { attachments: (attachments as any) ?? null },
+                data: { attachments: (attachments) ?? null },
             });
             return this.toDirectMessageRecord(row);
         } catch { return null; }
@@ -7996,7 +8001,7 @@ export class PrismaStorage implements Storage {
         });
     }
 
-    private toMessageDeliveryLog(row: any): MessageDeliveryLog {
+    private toMessageDeliveryLog(row: PrismaRow): MessageDeliveryLog {
         const rec: MessageDeliveryLog = {
             id: row.id, messageId: row.messageId, origin: row.origin, targetNodeId: row.targetNodeId,
             status: row.status, latencyMs: row.latencyMs ?? 0,
@@ -8010,7 +8015,7 @@ export class PrismaStorage implements Storage {
     async listMessageDeliveryLogs(limit = 100): Promise<MessageDeliveryLog[]> {
         this.ensureReady();
         const rows = await this.prisma.messageDeliveryLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
-        return rows.map((r: any) => this.toMessageDeliveryLog(r));
+        return rows.map((r: PrismaRow) => this.toMessageDeliveryLog(r));
     }
 
     async getMessageDeliveryStats(): Promise<MessageDeliveryStats> {
@@ -8027,7 +8032,7 @@ export class PrismaStorage implements Storage {
         for (const r of recent) { byStatus24h[r.status] = r._count._all; total24h += r._count._all; }
         const nodes = await this.prisma.messageDeliveryLog.groupBy({ by: ['targetNodeId'], _count: { _all: true } });
         const topTargetNodes = await Promise.all(
-            nodes.sort((a: any, b: any) => b._count._all - a._count._all).slice(0, 10).map(async (n: any) => ({
+            nodes.sort((a: PrismaRow, b: PrismaRow) => b._count._all - a._count._all).slice(0, 10).map(async (n: PrismaRow) => ({
                 nodeId: n.targetNodeId,
                 total: n._count._all,
                 failed: await this.prisma.messageDeliveryLog.count({ where: { targetNodeId: n.targetNodeId, status: { in: ['failed', 'undeliverable'] } } }),
@@ -8066,17 +8071,17 @@ export class PrismaStorage implements Storage {
 
     async listContacts(ownerGhii: string, opts?: { state?: ContactConsentRecord['state'] }): Promise<ContactConsentRecord[]> {
         this.ensureReady();
-        const where: any = { ownerGhii };
+        const where: Record<string, unknown> = { ownerGhii };
         if (opts?.state) where.state = opts.state;
         const rows = await this.prisma.contactConsent.findMany({ where, orderBy: { updatedAt: 'desc' } });
-        return rows.map((r: any) => this.toContactRecord(r));
+        return rows.map((r: PrismaRow) => this.toContactRecord(r));
     }
 
     // ══════════════════════════════════════════════════════════
     // ── Agent Onboarding ──
     // ══════════════════════════════════════════════════════════
 
-    private toOnboardingRecord(row: any): AgentOnboardingRecord {
+    private toOnboardingRecord(row: PrismaRow): AgentOnboardingRecord {
         return {
             agentGaii: row.agentGaii,
             status: row.status,
@@ -8103,16 +8108,16 @@ export class PrismaStorage implements Storage {
                 status: record.status,
                 startedAt: new Date(record.startedAt),
                 completedAt: record.completedAt ? new Date(record.completedAt) : null,
-                steps: record.steps as any,
+                steps: record.steps,
                 readinessScore: record.readinessScore ?? null,
                 readinessLevel: record.readinessLevel ?? null,
                 detectedPlatform: record.detectedPlatform ?? null,
                 installedRuntime: record.installedRuntime ?? null,
                 onboardingBaseline: record.onboardingBaseline ?? null,
                 operationalHealth: record.operationalHealth ?? null,
-                healthComponents: record.healthComponents as any ?? null,
+                healthComponents: record.healthComponents ?? null,
                 healthRecalculatedAt: record.healthRecalculatedAt ? new Date(record.healthRecalculatedAt) : null,
-                readinessOverride: record.readinessOverride as any ?? null,
+                readinessOverride: record.readinessOverride ?? null,
             },
         });
         return this.toOnboardingRecord(row);
@@ -8131,20 +8136,20 @@ export class PrismaStorage implements Storage {
     async updateOnboarding(agentGaii: string, updates: Partial<AgentOnboardingRecord>): Promise<AgentOnboardingRecord | null> {
         this.ensureReady();
         try {
-            const data: any = {};
+            const data: Record<string, unknown> = {};
             if (updates.status !== undefined) data.status = updates.status;
             if (updates.startedAt !== undefined) data.startedAt = new Date(updates.startedAt);
             if (updates.completedAt !== undefined) data.completedAt = updates.completedAt ? new Date(updates.completedAt) : null;
-            if (updates.steps !== undefined) data.steps = updates.steps as any;
+            if (updates.steps !== undefined) data.steps = updates.steps;
             if (updates.readinessScore !== undefined) data.readinessScore = updates.readinessScore ?? null;
             if (updates.readinessLevel !== undefined) data.readinessLevel = updates.readinessLevel ?? null;
             if (updates.detectedPlatform !== undefined) data.detectedPlatform = updates.detectedPlatform ?? null;
             if (updates.installedRuntime !== undefined) data.installedRuntime = updates.installedRuntime ?? null;
             if (updates.onboardingBaseline !== undefined) data.onboardingBaseline = updates.onboardingBaseline ?? null;
             if (updates.operationalHealth !== undefined) data.operationalHealth = updates.operationalHealth ?? null;
-            if (updates.healthComponents !== undefined) data.healthComponents = updates.healthComponents as any ?? null;
+            if (updates.healthComponents !== undefined) data.healthComponents = updates.healthComponents ?? null;
             if (updates.healthRecalculatedAt !== undefined) data.healthRecalculatedAt = updates.healthRecalculatedAt ? new Date(updates.healthRecalculatedAt) : null;
-            if (updates.readinessOverride !== undefined) data.readinessOverride = updates.readinessOverride as any ?? null;
+            if (updates.readinessOverride !== undefined) data.readinessOverride = updates.readinessOverride ?? null;
             const row = await this.prisma.agentOnboarding.update({ where: { agentGaii }, data });
             return this.toOnboardingRecord(row);
         } catch {
@@ -8168,7 +8173,7 @@ export class PrismaStorage implements Storage {
             where: { agentGaii: { contains: `#${owner}@` } },
             orderBy: { startedAt: 'desc' },
         });
-        return rows.map((r: any) => this.toOnboardingRecord(r));
+        return rows.map((r: PrismaRow) => this.toOnboardingRecord(r));
     }
 
     async listOnboardingByStatus(status: string): Promise<AgentOnboardingRecord[]> {
@@ -8177,12 +8182,12 @@ export class PrismaStorage implements Storage {
             where: { status },
             orderBy: { startedAt: 'desc' },
         });
-        return rows.map((r: any) => this.toOnboardingRecord(r));
+        return rows.map((r: PrismaRow) => this.toOnboardingRecord(r));
     }
 
     // ── Agent Telemetry ──
 
-    private toTelemetryEvent(row: any): TelemetryEvent {
+    private toTelemetryEvent(row: PrismaRow): TelemetryEvent {
         return {
             id: row.id,
             agentGaii: row.agentGaii,
@@ -8211,7 +8216,7 @@ export class PrismaStorage implements Storage {
 
     async listTelemetry(agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]> {
         this.ensureReady();
-        const where: any = { agentGaii };
+        const where: Record<string, unknown> = { agentGaii };
         if (opts.type) where.type = opts.type;
         if (opts.since) where.createdAt = { gt: new Date(opts.since) };
         const rows = await this.prisma.telemetryEvent.findMany({
@@ -8219,12 +8224,12 @@ export class PrismaStorage implements Storage {
             orderBy: { createdAt: 'desc' },
             take: opts.limit ?? 50,
         });
-        return rows.map((r: any) => this.toTelemetryEvent(r));
+        return rows.map((r: PrismaRow) => this.toTelemetryEvent(r));
     }
 
     // ── Webhook Delivery Log ──
 
-    private toDeliveryLog(row: any): WebhookDeliveryLog {
+    private toDeliveryLog(row: PrismaRow): WebhookDeliveryLog {
         return {
             id: row.id,
             agentGaii: row.agentGaii,
@@ -8264,7 +8269,7 @@ export class PrismaStorage implements Storage {
             orderBy: { createdAt: 'desc' },
             take: limit ?? 50,
         });
-        return rows.map((r: any) => this.toDeliveryLog(r));
+        return rows.map((r: PrismaRow) => this.toDeliveryLog(r));
     }
 
     async pruneDeliveryLog(agentGaii: string, keepCount: number): Promise<number> {

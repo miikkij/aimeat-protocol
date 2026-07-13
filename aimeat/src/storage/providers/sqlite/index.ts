@@ -499,7 +499,7 @@ export class SqliteStorage implements Storage {
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
-    record.federate = (row as any).federate === 1;
+    record.federate = row.federate === 1;
     if (row.technicalCapabilities) record.technicalCapabilities = JSON.parse(row.technicalCapabilities as string);
     if (row.domainCapabilities) record.domainCapabilities = JSON.parse(row.domainCapabilities as string);
     if (row.activityStats) record.activityStats = JSON.parse(row.activityStats as string);
@@ -508,7 +508,7 @@ export class SqliteStorage implements Storage {
     if (row.languages) record.languages = JSON.parse(row.languages as string);
     if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
     if (row.webhookSecret) record.webhookSecret = row.webhookSecret as string;
-    record.webhookEnabled = (row as any).webhookEnabled === 1;
+    record.webhookEnabled = row.webhookEnabled === 1;
     if (row.webhookLastSuccess) record.webhookLastSuccess = row.webhookLastSuccess as string;
     if (row.webhookLastFailure) record.webhookLastFailure = row.webhookLastFailure as string;
     record.webhookFailCount = (row.webhookFailCount as number) ?? 0;
@@ -917,7 +917,7 @@ export class SqliteStorage implements Storage {
     if (row.maxInputSizeBytes !== null) record.maxInputSizeBytes = row.maxInputSizeBytes as number;
     if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
-    record.federate = (row as any).federate === 1;
+    record.federate = row.federate === 1;
     return record;
   }
 
@@ -1176,7 +1176,7 @@ export class SqliteStorage implements Storage {
     };
     if (row.description) record.description = row.description as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
-    record.federate = (row as any).federate === 1;
+    record.federate = row.federate === 1;
     return record;
   }
 
@@ -1533,7 +1533,7 @@ export class SqliteStorage implements Storage {
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.groupId) record.groupId = row.groupId as string;
     if (row.workspaceRef) record.workspaceRef = row.workspaceRef as string;
-    record.federate = (row as any).federate === 1;
+    record.federate = row.federate === 1;
     return record;
   }
 
@@ -1553,7 +1553,7 @@ export class SqliteStorage implements Storage {
       if (r.accessCode) record.accessCode = r.accessCode as string;
       if (r.groupId) record.groupId = r.groupId as string;
       if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
-      record.federate = (r as any).federate === 1;
+      record.federate = r.federate === 1;
       return record;
     });
   }
@@ -5044,7 +5044,7 @@ export class SqliteStorage implements Storage {
   }
 
   async getLink(source: string, target: string): Promise<MemoryLinkRecord | null> {
-    const row = this.db.prepare('SELECT * FROM knowledge_links WHERE source = ? AND target = ?').get(source, target) as any;
+    const row = this.db.prepare('SELECT * FROM knowledge_links WHERE source = ? AND target = ?').get(source, target) as MemoryLinkRecord | undefined;
     return row ?? null;
   }
 
@@ -5955,8 +5955,8 @@ export class SqliteStorage implements Storage {
         record.status, JSON.stringify(record.components), record.manifest,
         record.createdAt, record.updatedAt,
       );
-    } catch (e: any) {
-      if (e.message?.includes('UNIQUE constraint failed')) {
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('UNIQUE constraint failed')) {
         throw new Error('PACKAGE_EXISTS', { cause: e });
       }
       throw e;

@@ -45,7 +45,7 @@ export function getStorageFile(db: Database.Database, ownerGaii: string, key: st
   };
   if (row.accessCode) record.accessCode = row.accessCode as string;
   if (row.groupId) record.groupId = row.groupId as string;
-  record.federate = (row as any).federate === 1;
+  record.federate = row.federate === 1;
   return record;
 }
 
@@ -64,7 +64,7 @@ export function listStorageFiles(db: Database.Database, ownerGaii: string): Stor
     };
     if (r.accessCode) record.accessCode = r.accessCode as string;
     if (r.groupId) record.groupId = r.groupId as string;
-    record.federate = (r as any).federate === 1;
+    record.federate = r.federate === 1;
     return record;
   });
 }

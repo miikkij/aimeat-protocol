@@ -89,8 +89,10 @@ const asArr = (v: unknown) => Array.isArray(v) ? v.filter(x => typeof x === 'str
 
 /** Coerce an arbitrary stored/received value into a valid policy doc (per-field fallback to defaults). */
 export function coercePolicy(value: unknown): NetworkPolicyDoc {
-  const v = (value && typeof value === 'object') ? value as Record<string, any> : {};
-  const aa = v.auto_admit ?? {}, caps = v.visiting_permission_caps ?? {}, pc = v.promotion_criteria ?? {};
+  const v: Record<string, unknown> = (value && typeof value === 'object') ? value as Record<string, unknown> : {};
+  const aa = (v.auto_admit ?? {}) as Record<string, unknown>,
+    caps = (v.visiting_permission_caps ?? {}) as Record<string, unknown>,
+    pc = (v.promotion_criteria ?? {}) as Record<string, unknown>;
   const D = DEFAULT_NETWORK_POLICY;
   return {
     policy_version: asNum(v.policy_version, D.policy_version),

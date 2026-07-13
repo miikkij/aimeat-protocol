@@ -121,7 +121,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       const featuredParam = req.query.featured as string | undefined;
       const featured = featuredParam === 'true' ? true : featuredParam === 'false' ? false : undefined;
       const sortParam = req.query.sort as string | undefined;
-      const sort = sortParam && VALID_SORTS.includes(sortParam as any) ? sortParam as typeof VALID_SORTS[number] : undefined;
+      const sort = sortParam && VALID_SORTS.includes(sortParam as typeof VALID_SORTS[number]) ? sortParam as typeof VALID_SORTS[number] : undefined;
       const search = req.query.search as string | undefined;
       const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);

@@ -135,7 +135,7 @@ export function adminConfigRouter(
                 continue;
             }
             const oldValue = config[mapping.key];
-            (config as any)[mapping.key] = value;
+            (config as unknown as Record<string, unknown>)[mapping.key] = value;
             applied.push({ path, old_value: oldValue, new_value: value });
 
             // Persist to database as raw string
@@ -230,7 +230,7 @@ export function adminConfigRouter(
         let exported = 0;
         for (const [dotPath, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
             try {
-                const value = (config as any)[field.key];
+                const value = (config as unknown as Record<string, unknown>)[field.key];
                 await consulService.set(dotPath, serializeConfigValue(value));
                 exported++;
             } catch { /* skip individual failures */ }

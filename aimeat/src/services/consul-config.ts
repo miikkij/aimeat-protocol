@@ -53,7 +53,7 @@ export function createConsulConfigService(config: AimeatConfig): ConsulConfigSer
   return {
     async loadAll(): Promise<Record<string, string>> {
       try {
-        const keys = await consul.kv.get({ key: prefix, recurse: true }) as any[];
+        const keys = await consul.kv.get({ key: prefix, recurse: true }) as Array<{ Key: string; Value: string }> | undefined;
         if (!keys) return {};
         const result: Record<string, string> = {};
         for (const entry of keys) {
@@ -116,7 +116,7 @@ export function applyConsulValues(
     try {
       const value = parseConfigValue(field, rawValue);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
-      (config as any)[field.key] = value;
+      (config as unknown as Record<string, unknown>)[field.key] = value;
       applied.push(dotPath);
     } catch { skipped.push(dotPath); }
   }
