@@ -186,6 +186,28 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_BURN_RATE', message: 'Not set. Default: 0.10' });
   }
 
+  // ── Marketplace fee policy (TARGET-033) ──
+  const feeMode = env.AIMEAT_MARKETPLACE_FEE_MODE;
+  if (feeMode !== undefined && feeMode !== 'operator' && feeMode !== 'burn') {
+    results.push({ level: 'error', variable: 'AIMEAT_MARKETPLACE_FEE_MODE', message: `Invalid value "${feeMode}". Use "operator" or "burn".` });
+  }
+  const commerceFee = env.AIMEAT_COMMERCE_FEE_PERCENT;
+  if (commerceFee !== undefined && commerceFee !== '') {
+    const cf = parseInt(commerceFee, 10);
+    if (isNaN(cf)) {
+      results.push({ level: 'error', variable: 'AIMEAT_COMMERCE_FEE_PERCENT', message: `Non-numeric value "${commerceFee}".` });
+    } else if (cf < 0 || cf > 50) {
+      results.push({ level: 'error', variable: 'AIMEAT_COMMERCE_FEE_PERCENT', message: `Fee percent ${cf} is outside valid range 0-50.` });
+    }
+  }
+  const commerceTtl = env.AIMEAT_COMMERCE_SESSION_TTL_MINUTES;
+  if (commerceTtl !== undefined) {
+    const ttl = parseInt(commerceTtl, 10);
+    if (isNaN(ttl) || ttl < 5 || ttl > 10080) {
+      results.push({ level: 'error', variable: 'AIMEAT_COMMERCE_SESSION_TTL_MINUTES', message: `Invalid value "${commerceTtl}". Use minutes in range 5-10080.` });
+    }
+  }
+
   // ── Cookie Consent ──
   const ccEnabled = env.AIMEAT_COOKIE_CONSENT_ENABLED;
   if (ccEnabled === 'true') {

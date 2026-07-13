@@ -357,6 +357,12 @@ export function adminRouter(
         let networkFeesToday = 0;
         let burnedToday = 0;
         let dailyAllowancesIssuedToday = 0;
+        // Commerce / marketplace sales (TARGET-033): every morsel sale flow's spend leg + the fee leg.
+        const SALE_SPEND_TYPES = new Set(['commerce_spend', 'offer_spend', 'org_offer_spend', 'app_purchase']);
+        let salesVolumeAllTime = 0;
+        let salesVolumeToday = 0;
+        let operatorFeesAllTime = 0;
+        let operatorFeesToday = 0;
 
         for (const tx of allTx) {
             const txDate = new Date(tx.timestamp);
@@ -370,6 +376,14 @@ export function adminRouter(
                 totalBurned += Math.abs(tx.amount);
                 if (txDate >= thirtyDaysAgo) burned30d += Math.abs(tx.amount);
             }
+            if (SALE_SPEND_TYPES.has(tx.type)) {
+                salesVolumeAllTime += Math.abs(tx.amount);
+                if (isToday) salesVolumeToday += Math.abs(tx.amount);
+            }
+            if (tx.type === 'marketplace_fee') {
+                operatorFeesAllTime += tx.amount;
+                if (isToday) operatorFeesToday += tx.amount;
+            }
 
             // Daily aggregations
             if (isToday) {
@@ -380,6 +394,17 @@ export function adminRouter(
                 if (tx.type === 'daily_allowance') dailyAllowancesIssuedToday++;
             }
         }
+
+        // Checkout-session lifecycle counts (commerce.session.* memory records, buyer-side truth).
+        const sessionCounts = { open: 0, completed: 0, cancelled: 0, expired: 0, total: 0 };
+        try {
+            const { items: sessionRecs } = await storage.listAllMemory({ prefix: 'commerce.session.', limit: 2000 });
+            for (const r of sessionRecs) {
+                const status = (r.value as { status?: string } | undefined)?.status ?? 'open';
+                if (status in sessionCounts) sessionCounts[status as keyof typeof sessionCounts]++;
+                sessionCounts.total++;
+            }
+        } catch { /* commerce metrics must never break the dashboard */ }
 
         // Inflation rate = net new morsels over 30d as % of current supply
         const netNew30d = minted30d - burned30d;
@@ -482,6 +507,16 @@ export function adminRouter(
                 daily_allowance_cap: config.dailyAllowanceCap,
                 burn_rate: config.burnRate,
                 max_operator_mint_per_day: config.maxOperatorMintPerDay,
+                commerce: {
+                    enabled: config.commerceEnabled,
+                    fee_mode: config.marketplaceFeeMode,
+                    fee_percent: config.commerceFeePercent ?? config.marketplaceTransactionFeePercent,
+                    checkout_sessions: sessionCounts,
+                    sales_volume_all_time: salesVolumeAllTime,
+                    sales_volume_today: salesVolumeToday,
+                    operator_fees_all_time: operatorFeesAllTime,
+                    operator_fees_today: operatorFeesToday,
+                },
             },
             config: {
                 port: config.port,

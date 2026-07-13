@@ -100,7 +100,7 @@ import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
-  ContinueCard, AgentsCard, CortexSection, InboxNavButton,
+  CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
   SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS,
 } from "./landing-page.cards.js";
 
@@ -375,6 +375,7 @@ export default function LandingPage({ tier, stats, session, showToast, renderTab
             <${UsageCard} switchTab=${(id) => open(id, 'main')} />
             <${AiSpendCard} />
             <${AgentLedgerCard} />
+            <${CommerceCard} />
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} />
           </div>

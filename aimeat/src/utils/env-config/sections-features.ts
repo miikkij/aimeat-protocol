@@ -372,6 +372,41 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
       ],
     },
     {
+      title: 'Commerce (TARGET-033)',
+      entries: [
+        {
+          envVar: 'AIMEAT_COMMERCE_ENABLED',
+          description: 'Checkout sessions (/v1/commerce) + UCP checkout capability',
+          value: config.commerceEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_MARKETPLACE_FEE_MODE',
+          description: 'Fee destination: operator (credited) or burn (removed from supply)',
+          value: config.marketplaceFeeMode,
+          defaultVal: 'operator',
+        },
+        {
+          envVar: 'AIMEAT_OPERATOR_FEE_ACCOUNT',
+          description: 'Owner receiving operator-mode fees (empty = first operator-role owner)',
+          value: config.operatorFeeAccount ?? '',
+          defaultVal: '',
+        },
+        {
+          envVar: 'AIMEAT_COMMERCE_FEE_PERCENT',
+          description: 'Checkout fee % (empty inherits marketplace tx fee percent)',
+          value: config.commerceFeePercent != null ? String(config.commerceFeePercent) : '',
+          defaultVal: '',
+        },
+        {
+          envVar: 'AIMEAT_COMMERCE_SESSION_TTL_MINUTES',
+          description: 'Open checkout-session lifetime in minutes',
+          value: String(config.commerceSessionTtlMinutes),
+          defaultVal: '60',
+        },
+      ],
+    },
+    {
       title: 'EUDIW / Identity Verification',
       entries: [
         {

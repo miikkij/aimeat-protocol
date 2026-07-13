@@ -20,8 +20,8 @@ import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext 
 import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 
-/** Default lifetime of an open session (lazy expiry — checked on read and on complete). */
-const SESSION_TTL_MS = 60 * 60 * 1000;
+/** Lifetime of an open session (lazy expiry — checked on read and on complete). */
+const sessionTtlMs = (config: AimeatConfig) => (config.commerceSessionTtlMinutes || 60) * 60 * 1000;
 
 const sessionKey = (id: string) => `commerce.session.${id}`;
 const orderKey = (id: string) => `commerce.order.${id}`;
@@ -131,7 +131,7 @@ export async function createSession(
     note: args.note,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
+    expiresAt: new Date(now.getTime() + sessionTtlMs(config)).toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), session);
   return session;
@@ -152,6 +152,24 @@ export async function getSession(
     await putRecord(storage, buyerGhii, sessionKey(id), session);
   }
   return session;
+}
+
+/** The buyer's sessions, newest first (lazy expiry NOT applied here — status shown as stored). */
+export async function listSessions(storage: Storage, buyerGhii: string, limit = 50): Promise<CheckoutSessionRecord[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'commerce.session.', ownerPrefix: buyerGhii, limit });
+  return items
+    .map((r) => r.value as unknown as CheckoutSessionRecord)
+    .filter((s) => s && s.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** The seller's received orders (completed sessions mirrored under their GHII), newest first. */
+export async function listOrders(storage: Storage, sellerGhii: string, limit = 50): Promise<CheckoutSessionRecord[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'commerce.order.', ownerPrefix: sellerGhii, limit });
+  return items
+    .map((r) => r.value as unknown as CheckoutSessionRecord)
+    .filter((s) => s && s.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 function requireOpen(session: CheckoutSessionRecord): void {

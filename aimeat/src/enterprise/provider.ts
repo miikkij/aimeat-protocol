@@ -42,6 +42,16 @@ export interface EnterpriseContext {
     jwt: string,
     mode: 'normal' | 'raw',
   ) => Promise<unknown>;
+  /**
+   * Route an already-computed marketplace fee to its configured destination (operator | burn,
+   * per AIMEAT_MARKETPLACE_FEE_MODE). The seller/org legs are the EE module's business; the fee
+   * leg goes through this so Community and EE sales share one fee policy (TARGET-033).
+   */
+  settleMarketplaceFee: (args: { fee: number; payerGhii: string; trackingCode: string; source: string }) => Promise<{
+    fee: number; destination: 'operator' | 'burn' | 'none'; operatorGhii: string | null;
+  }>;
+  /** The effective checkout fee percent (commerce override, inheriting the marketplace percent). */
+  commerceFeePercent: () => number;
   logger: typeof loggerInst;
 }
 

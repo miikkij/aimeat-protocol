@@ -211,6 +211,51 @@ export function UsageCard({ switchTab }) {
  * retained per-day ai-usage records). Hidden until there is any spend, so it never shows an empty
  * chart to users who don't run AI apps. */
 
+/* "Commerce" — the owner's marketplace status: purchases (checkout sessions), sales received,
+ * and morsels moved, from /v1/commerce. Hidden when commerce is disabled on the node (503). */
+export function CommerceCard() {
+  const [stats, setStats] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      const [s, o] = await Promise.all([
+        apiGet('/v1/commerce/checkout-sessions?limit=100'),
+        apiGet('/v1/commerce/orders?limit=100'),
+      ]);
+      const sessions = s?.data?.sessions ?? [];
+      const orders = o?.data?.orders ?? [];
+      const completed = sessions.filter((x) => x.status === 'completed');
+      setStats({
+        bought: completed.length,
+        open: sessions.filter((x) => x.status === 'open').length,
+        spent: completed.reduce((n, x) => n + ((x.receipt && x.receipt.charged) || 0), 0),
+        sold: orders.length,
+        earned: orders.reduce((n, x) => n + ((x.receipt && x.receipt.earned) || 0), 0),
+      });
+    } catch { setStats(null); /* commerce disabled or unreachable — render nothing */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => onLiveUpdate(['agent-tasks', 'memory'], () => liveRef.current()), []);
+
+  if (!stats) return null;
+  const chip = (label, main, sub) => html`
+    <div class="pf-ai-win">
+      <span class="pf-ai-win-label">${label}</span>
+      <span class="pf-ai-win-cost">${main}</span>
+      <span class="pf-ai-win-sub">${sub}</span>
+    </div>`;
+  const morsels = t('profile.landing.commerceMorsels') || 'morsels';
+  return html`
+    <div class="pf-home-card pf-commerce-card">
+      <div class="pf-home-card-title">${t('profile.landing.commerceTitle') || 'Commerce'}</div>
+      <div class="pf-ai-windows">
+        ${chip(t('profile.landing.commerceBought') || 'Purchases', String(stats.bought), `${stats.spent} ${morsels}`)}
+        ${chip(t('profile.landing.commerceSold') || 'Sales', String(stats.sold), `${stats.earned} ${morsels}`)}
+        ${chip(t('profile.landing.commerceOpen') || 'Open carts', String(stats.open), t('profile.landing.commerceOpenSub') || 'checkout sessions')}
+      </div>
+    </div>`;
+}
+
 export function AiSpendCard() {
   const [data, setData] = useState(null);
   const load = useCallback(async () => {

@@ -87,6 +87,29 @@ export async function askEconomySettings(
   );
   if (postCostKb !== '2') settings.AIMEAT_BOARD_POST_COST_PER_KB = postCostKb;
 
+  const feeMode = checkCancel(
+    await p.select({
+      message: t('init.marketplaceFeeMode'),
+      options: [
+        { value: 'operator', label: t('init.marketplaceFeeModeOperator'), hint: t('init.marketplaceFeeModeOperatorDesc') },
+        { value: 'burn', label: t('init.marketplaceFeeModeBurn'), hint: t('init.marketplaceFeeModeBurnDesc') },
+      ],
+      initialValue: cfg.marketplaceFeeMode,
+    }),
+    t,
+  ) as string;
+  if (feeMode !== 'operator') settings.AIMEAT_MARKETPLACE_FEE_MODE = feeMode;
+
+  const commerceFee = checkCancel(
+    await p.text({
+      message: t('init.commerceFeePercent'),
+      defaultValue: cfg.commerceFeePercent != null ? String(cfg.commerceFeePercent) : '',
+      validate: val => (val === '' ? undefined : validatePositiveNum(val, t)),
+    }),
+    t,
+  );
+  if (commerceFee !== '') settings.AIMEAT_COMMERCE_FEE_PERCENT = commerceFee;
+
   return settings;
 }
 

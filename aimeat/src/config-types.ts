@@ -311,6 +311,16 @@ export interface AimeatConfig {
   marketplaceTransactionFeePercent: number;
   marketplaceEscrowEnabled: boolean;
 
+  // Commerce core + fee policy (TARGET-033)
+  /** Where marketplace fees go: credited to the operator's GHII, or burned out of supply. */
+  marketplaceFeeMode: 'operator' | 'burn';
+  /** Owner name whose GHII receives operator-mode fees; null → first owner with the operator role. */
+  operatorFeeAccount: string | null;
+  /** Checkout-session fee percent; null inherits marketplaceTransactionFeePercent. */
+  commerceFeePercent: number | null;
+  commerceEnabled: boolean;
+  commerceSessionTtlMinutes: number;
+
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;
   vapidPublicKey: string | null;

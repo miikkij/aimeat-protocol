@@ -23,6 +23,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   createSession, getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
+  listSessions, listOrders,
 } from '../commerce/session-service.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
@@ -59,6 +60,15 @@ function sendCommerceError(res: Response, nodeId: string, err: unknown): void {
 export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
+  // Kill-switch: AIMEAT_COMMERCE_ENABLED=false turns the whole surface off (503, machine-readable).
+  router.use('/v1/commerce', (_req, res, next) => {
+    if (!config.commerceEnabled) {
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Commerce checkout is disabled on this node (AIMEAT_COMMERCE_ENABLED=false)'));
+      return;
+    }
+    next();
+  });
+
   /** Buyer-owner guard: load the caller's session or 404/403 (a foreign id is indistinguishable from missing). */
   async function loadOwnSession(req: Request): Promise<CheckoutSessionRecord> {
     const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
@@ -84,6 +94,22 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'Update items', method: 'PATCH', url: `/v1/commerce/checkout-sessions/${session.id}` },
       ]));
     } catch (err) { sendCommerceError(res, config.nodeId, err); }
+  });
+
+  // GET /v1/commerce/checkout-sessions — the buyer's sessions (purchases), newest first.
+  router.get('/v1/commerce/checkout-sessions', requireAuth(), async (req, res) => {
+    const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const sessions = await listSessions(storage, buyerGhii, limit);
+    res.json(success(config.nodeId, { sessions, total: sessions.length }));
+  });
+
+  // GET /v1/commerce/orders — the seller's received orders (completed sessions), newest first.
+  router.get('/v1/commerce/orders', requireAuth(), async (req, res) => {
+    const sellerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const orders = await listOrders(storage, sellerGhii, limit);
+    res.json(success(config.nodeId, { orders, total: orders.length }));
   });
 
   // GET /v1/commerce/checkout-sessions/:id — buyer reads their session (lazy expiry applies).
