@@ -11,6 +11,9 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-07-13 -- aimeat_cortex_install description states the CREATE-ONLY contract:
+ *     re-installing an existing name fails (PROCESSING_FAILED on the ZIP path); updates go through
+ *     PUT /v1/cortex/{name} (idempotent redeploy) or delete + reinstall. Found in TARGET-032.
  *   v1.x -- 2026-07-02 -- aimeat_workspace_write / aimeat_memory_write / aimeat_organism_update
  *     descriptions teach the aimeat-memory LIVE data fence (embed a memory key in document markdown;
  *     current value renders fresh on every open) alongside the existing mermaid guidance.
@@ -1640,7 +1643,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_install',
-        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE — provide the manifest YAML string plus a libs map directly. Activate afterwards with aimeat_cortex_activate.',
+        description: 'Install a NEW cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE — provide the manifest YAML string plus a libs map directly. Activate afterwards with aimeat_cortex_activate. CREATE-ONLY: installing a name that already exists FAILS (the ZIP upload path returns PROCESSING_FAILED) — update an existing cortex with PUT /v1/cortex/{name} instead (JSON body { manifest, libs }, cortex:write scope; idempotent redeploy that bumps the version and keeps it active), or delete it first with aimeat_cortex_delete.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
