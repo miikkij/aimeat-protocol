@@ -117,6 +117,18 @@ export function buildAppPrompt(
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
   body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n\n';
 
+  // Images & files — the cross-user display pattern (the #1 storage mistake is base64 embeds)
+  body += '### Images & files (cross-user display)\n';
+  body += 'Upload files with `visibility: "public"` and display them to OTHER users via the anonymous public URL. Never embed images as base64 data URLs inside memory values — store the file once, reference its URL.\n';
+  body += '```javascript\n';
+  body += 'const key = "myapp/img-" + Date.now() + ".png";\n';
+  body += 'await AIMEAT.storage.upload(file, { key, visibility: "public" });\n';
+  body += '// The URL ANYONE (other users, even signed-out) can load in <img src>:\n';
+  body += 'const url = "' + nodeUrl + '/v1/pub/" + encodeURIComponent(session.ghii) + "/" + key;\n';
+  body += "// Save that url (or { owner: session.ghii, key }) in the entry's memory record.\n";
+  body += '```\n';
+  body += "Gotcha: `AIMEAT.storage.publicUrl(key)` returns the OWNER's `/v1/storage/...` URL, which requires the owner's auth — it will NOT load for other users. Cross-user image display always uses `/v1/pub/<owner-ghii>/<key>`.\n\n";
+
   // AI
   body += '### AI (prompt-driven)\n';
   body += "aimeat-ai runs an LLM on the LOGGED-IN USER's own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every \"Use AI\" control on isAvailable().\n";
@@ -170,6 +182,10 @@ export function buildAppPrompt(
   body += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
   body += "- Theme with CSS variables; respect the user's AIMEAT light/dark choice (localStorage \"aimeat-theme\") with an OS-preference fallback\n";
   body += '- Include error handling and loading states for API calls\n\n';
+
+  // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.
+  body += '### If you are an agentic coder with AIMEAT MCP tools\n';
+  body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n\n';
 
   // After-build publish walkthrough (new-app mode only)
   if (!isImprove) {
