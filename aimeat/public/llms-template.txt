@@ -577,7 +577,9 @@ a call — the app becomes a seller on the same commerce core (TARGET-034):
    tools also appear in `GET /v1/commerce/feed` with sku
    `app-tool:<owner>/<appId>:<tool>` and `fulfillment: 'call' | 'task'`, and as
    a WebMCP-shaped listing at `GET /v1/apps/{owner}/{appId}/webmcp` (tool
-   descriptors + payment contract). In-browser agents (Chrome/Edge WebMCP) get
+   descriptors + payment contract). The node-wide priced-tool catalog lives at
+   `GET /v1/commerce/tools` and rides on the MCP Server Card
+   (`/.well-known/mcp.json` → `commerce_tools`, inline by default). In-browser agents (Chrome/Edge WebMCP) get
    them natively when the app page calls
    `AIMEAT.webmcp.exposeAppTools({ owner, appId })` (lib
    `/v1/libs/aimeat-webmcp.js`) — priced tool execute() pays through the

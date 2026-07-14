@@ -2,6 +2,7 @@
  * @file src/utils/env-config/sections-features.ts
  * @description Indexing, personal-node, site, consent, push, email, TOTP, matching, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-14 — AIMEAT_MCP_CARD_COMMERCE_TOOLS in the Commerce section (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
 
@@ -379,6 +380,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'Checkout sessions (/v1/commerce) + UCP checkout capability',
           value: config.commerceEnabled ? 'true' : 'false',
           defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_MCP_CARD_COMMERCE_TOOLS',
+          description: 'MCP Server Card commerce_tools: inline (embed priced app-tool catalog) or pointer (link /v1/commerce/tools)',
+          value: config.mcpCardCommerceTools,
+          defaultVal: 'inline',
         },
         {
           envVar: 'AIMEAT_MARKETPLACE_FEE_MODE',

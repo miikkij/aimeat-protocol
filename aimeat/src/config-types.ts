@@ -5,6 +5,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools: MCP card commerce_tools mode (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Extracted from config.ts (max-file-lines)
  */
 
@@ -320,6 +321,8 @@ export interface AimeatConfig {
   commerceFeePercent: number | null;
   commerceEnabled: boolean;
   commerceSessionTtlMinutes: number;
+  /** MCP Server Card commerce_tools block: embed the priced app-tool catalog or point at /v1/commerce/tools. */
+  mcpCardCommerceTools: 'inline' | 'pointer';
 
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;
