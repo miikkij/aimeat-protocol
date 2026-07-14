@@ -8,6 +8,7 @@ import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, BoardRecord, BoardPostRecord, DisputeRecord, StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, ChatInstanceRecord, PersonalNodeRecord, MailboxItemRecord, SchemaRecord
 } from '../../../interface.js';
 import { mongoMatchWildcardPattern, mongoMatchGlobPattern } from './helpers.js';
+import { getCachedSchemaLocks, setCachedSchemaLocks, invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 import type { PrismaStorage, PrismaRow } from '../index.js';
 
 export const identityMethods = {
@@ -629,6 +630,7 @@ export const identityMethods = {
             create: { keyPattern: record.keyPattern, applyTo: record.applyTo, schemaJson: record.schemaJson, schemaMode: record.schemaMode, lockedBy: record.lockedBy, setAt: new Date(record.setAt), semanticContext: record.semanticContext ?? null },
             update: { schemaJson: record.schemaJson, schemaMode: record.schemaMode, lockedBy: record.lockedBy, semanticContext: record.semanticContext ?? null },
         });
+        invalidateSchemaLockCache();
         return record;
     },
 
@@ -649,6 +651,7 @@ export const identityMethods = {
         let deleted = false;
         try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern } } }); deleted = true; } catch { /* best-effort */ }
         try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern } } }); deleted = true; } catch { /* best-effort */ }
+        if (deleted) invalidateSchemaLockCache();
         return deleted;
     },
 
@@ -662,13 +665,18 @@ export const identityMethods = {
 
     async findApplicableSchema(this: PrismaStorage, memoryKey: string): Promise<SchemaRecord | null> {
         this.ensureReady();
-        // 1. Exact match — highest priority
-        const exact = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern: memoryKey } } });
-        if (exact) return this.toSchemaRecord(exact);
+        // Resolve against the process-cached lock set (loaded once, invalidated on setSchema/deleteSchema)
+        // — findApplicableSchema runs on every write; hitting the DB for the exact key + all prefix locks +
+        // per-segment probes each time was ~8 round-trips/write. Matching in memory makes it 0 after warm-up.
+        let locks = getCachedSchemaLocks();
+        if (!locks) { locks = await this.listSchemas(); setCachedSchemaLocks(locks); }
 
-        // 2. Load all prefix schemas for pattern matching
-        const prefixSchemas = await this.prisma.schemaLock.findMany({ where: { applyTo: 'prefix' } });
-        const allPrefixRecords = prefixSchemas.map((r: PrismaRow) => this.toSchemaRecord(r));
+        // 1. Exact match — highest priority
+        const exact = locks.find(l => l.applyTo === 'exact' && l.keyPattern === memoryKey);
+        if (exact) return exact;
+
+        // 2. Prefix schemas for pattern matching
+        const allPrefixRecords = locks.filter(l => l.applyTo === 'prefix');
 
         // 2a. Wildcard pattern match — supports profile.*.interests style (dot-separated)
         let bestWildcard: SchemaRecord | null = null;
@@ -693,12 +701,12 @@ export const identityMethods = {
         }
         if (bestGlob) return bestGlob;
 
-        // 3. Simple prefix match — longest prefix wins
+        // 3. Simple prefix match — longest prefix wins (in-memory over the cached prefix locks)
         const parts = memoryKey.split('.');
         for (let i = parts.length - 1; i >= 1; i--) {
             const pfx = parts.slice(0, i).join('.');
-            const pfxRow = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern: pfx } } });
-            if (pfxRow) return this.toSchemaRecord(pfxRow);
+            const pfxRow = allPrefixRecords.find(l => l.keyPattern === pfx);
+            if (pfxRow) return pfxRow;
         }
         return null;
     },

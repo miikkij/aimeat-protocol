@@ -10,6 +10,7 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { matchWildcardPattern, consentMatchPattern } from '../../../pattern-utils.js';
+import { getCachedSchemaLocks, setCachedSchemaLocks, invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 import { matchesRecipient } from '../../../../services/consent.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
 
@@ -178,6 +179,7 @@ export const governanceMethods = {
       record.lockedBy, record.setAt, record.updatedAt,
       record.semanticContext ? JSON.stringify(record.semanticContext) : null,
     );
+    invalidateSchemaLockCache();
     return record;
   },
 
@@ -195,6 +197,7 @@ export const governanceMethods = {
 
   async deleteSchema(this: SqliteStorage, keyPattern: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM schemas WHERE keyPattern = ?').run(keyPattern);
+    if (result.changes > 0) invalidateSchemaLockCache();
     return result.changes > 0;
   },
 
@@ -207,16 +210,20 @@ export const governanceMethods = {
   },
 
   async findApplicableSchema(this: SqliteStorage, memoryKey: string): Promise<SchemaRecord | null> {
+    // Resolve against the process-cached lock set (loaded once, invalidated on setSchema/deleteSchema).
+    // findApplicableSchema runs on every write; matching in memory keeps it off the DB after warm-up.
+    let locks = getCachedSchemaLocks();
+    if (!locks) { locks = await this.listSchemas(); setCachedSchemaLocks(locks); }
+
     // 1. Exact match -- highest priority
-    const exactRow = this.db.prepare('SELECT * FROM schemas WHERE keyPattern = ? AND applyTo = ?').get(memoryKey, 'exact') as Record<string, unknown> | undefined;
-    if (exactRow) return this.deserializeSchema(exactRow);
+    const exact = locks.find(l => l.applyTo === 'exact' && l.keyPattern === memoryKey);
+    if (exact) return exact;
 
     // 2. Wildcard pattern match -- supports profile.*.interests style
-    const prefixSchemas = this.db.prepare('SELECT * FROM schemas WHERE applyTo = ?').all('prefix') as Record<string, unknown>[];
+    const allPrefixRecords = locks.filter(l => l.applyTo === 'prefix');
     let bestWildcard: SchemaRecord | null = null;
     let bestSegments = 0;
-    for (const row of prefixSchemas) {
-      const record = this.deserializeSchema(row);
+    for (const record of allPrefixRecords) {
       if (!record.keyPattern.includes('*')) continue;
       if (matchWildcardPattern(record.keyPattern, memoryKey)) {
         const segments = record.keyPattern.split('.').length;
@@ -228,12 +235,12 @@ export const governanceMethods = {
     }
     if (bestWildcard) return bestWildcard;
 
-    // 3. Simple prefix match -- longest prefix wins
+    // 3. Simple prefix match -- longest prefix wins (in-memory over the cached prefix locks)
     const parts = memoryKey.split('.');
     for (let i = parts.length - 1; i >= 1; i--) {
       const prefix = parts.slice(0, i).join('.');
-      const prefixRow = this.db.prepare('SELECT * FROM schemas WHERE keyPattern = ? AND applyTo = ?').get(prefix, 'prefix') as Record<string, unknown> | undefined;
-      if (prefixRow) return this.deserializeSchema(prefixRow);
+      const prefixRow = allPrefixRecords.find(l => l.keyPattern === prefix);
+      if (prefixRow) return prefixRow;
     }
 
     return null;
