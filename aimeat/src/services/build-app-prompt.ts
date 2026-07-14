@@ -12,6 +12,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   v1.1.0 — 2026-07-14 — aimeat-commerce.js added to the Economy & agents library group
+ *     (checkout sessions, offer prices, micro-unit money formatting; TARGET-033)
  *   v1.0.0 — 2026-07-13 — ported verbatim from app-catalog buildPromptFromBuilder() (cortex.js)
  *     so the node becomes the single source of truth (AEB pilot finding: the best app-building
  *     accelerator was locked inside the browser bundle, invisible to agentic coders).
@@ -63,7 +65,8 @@ export function buildAppPrompt(
   body += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
   body += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
   body += "- aimeat-agents.js — commission & watch the owner's AI agents (`AIMEAT.agents`)\n";
-  body += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n';
+  body += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n';
+  body += '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public priced-offer `feed()`, price reading (`getOffer`, `priceOf`) and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; morsels stay plain integers (`fmtAmount` is currency-aware). A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth.\n\n';
   body += 'Media & misc:\n';
   body += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
   body += '- aimeat-speech.js — text-to-speech / speech helpers\n';

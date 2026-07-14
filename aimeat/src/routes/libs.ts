@@ -4,6 +4,11 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.35.0 - 2026-07-14 - New library aimeat-commerce.js (TARGET-033): checkout sessions over
+ *   /v1/commerce/*, offer price reading, money formatting in 6-decimal micro-units (same
+ *   convention as utils.js fmtMoney), x402-style 402 accepts surfaced on thrown errors, and the
+ *   TARGET-034 app-tool draft convention (manifest read + forward-compatible invoke). Registered
+ *   as a route, in the /v1/libs catalogue, and in the dev test-harness.
  * v1.34.0 - 2026-07-13 - aimeatAuthLib source extracted to src/routes/libs/auth-lib*.ts
  *   (max-file-lines); libsRouter routes + /v1/libs catalogue unchanged.
  * v1.33.0 - 2026-07-10 - aimeat-auth.js: first-social-login dead ends explained. The username-choice
@@ -137,6 +142,7 @@ import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
 import { aimeatOrganismLib } from './lib-organism.js';
 import { aimeatEditorLib } from './lib-editor.js';
 import { aimeatLiveLib } from './lib-live.js';
+import { aimeatCommerceLib } from './lib-commerce.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -243,6 +249,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-live.js — realtime live-updates (SSE subscribe helper, TARGET-012)
   router.get('/v1/libs/aimeat-live.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatLiveLib(config));
+  });
+
+  // GET /v1/libs/aimeat-commerce.js — checkout sessions, offer prices, money formatting (TARGET-033)
+  router.get('/v1/libs/aimeat-commerce.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatCommerceLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -373,6 +384,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>\n<script src="${config.baseUrl}/v1/libs/aimeat-editor.js"></script>`,
         },
         {
+          name: 'aimeat-commerce',
+          url: '/v1/libs/aimeat-commerce.js',
+          description: 'Commerce: open/complete checkout sessions (/v1/commerce), buy an agent offer in one call (buyOffer), read offer + app-tool prices, and format money micro-units ("1.50 EUR" — 1 unit = 1,000,000 micros; morsels stay integers). 402 errors carry the x402-style accepts block (err.paymentRequired, err.accepts). Carries no secrets — seller PSP credentials stay server-side.',
+          size_estimate: '~7KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-commerce.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
           name: 'aimeat-live',
           url: '/v1/libs/aimeat-live.js',
           description: 'Realtime live-updates: subscribe to server-pushed change domains (agent-tasks, agents, organisms, notifications, memory, ...) over one shared, owner-scoped SSE connection. Re-fetch only what changed, no polling or F5. AIMEAT.live.subscribe([\'agent-tasks\'], reload).',
@@ -401,6 +420,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <script src="/v1/libs/aimeat-tunnel.js"></script>
 <script src="/v1/libs/aimeat-audio.js"></script>
 <script src="/v1/libs/aimeat-speech.js"></script>
+<script src="/v1/libs/aimeat-commerce.js"></script>
 </head>
 <body>
 <h1 id="title">AIMEAT Test Harness</h1>
@@ -411,7 +431,7 @@ window.tlog = function(msg) {
   window.__testLog.push(msg);
   document.getElementById('log').textContent = window.__testLog.join('\\n');
 };
-window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel + ' audio=' + !!AIMEAT.audio + ' speech=' + !!AIMEAT.speech);
+window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel + ' audio=' + !!AIMEAT.audio + ' speech=' + !!AIMEAT.speech + ' commerce=' + !!AIMEAT.commerce);
 window.__ready = true;
 </script>
 </body></html>`);

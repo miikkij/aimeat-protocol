@@ -95,7 +95,7 @@ Operator-mapped `<sub>.<apex>` → published-app serving; the app-origin machine
 
 ### 1.5 The Served Browser SDK
 
-The node **serves browser libraries** to apps and cortex — effectively "the AIMEAT browser SDK," an undocumented protocol surface until now. `aimeat-auth.js` (session/login, required by every app), plus `aimeat-data`, `-storage`, `-social`, `-wallet`, `-work`, `-capabilities`, `-organism`, `-markdown`, `-editor`, `-live`, `-ai`, `-tunnel`, and `/lib/realtime.js` (WebSocket/WebRTC/Yjs). New shared modules require an importmap entry in `spa.html`. Key app rules: mount the login bar; `session.fetch()` returns parsed JSON; all API paths relative; never add manual token fields. Cache-busting is `?v=BUILD_ID` stamped automatically.
+The node **serves browser libraries** to apps and cortex — effectively "the AIMEAT browser SDK," an undocumented protocol surface until now. `aimeat-auth.js` (session/login, required by every app), plus `aimeat-data`, `-storage`, `-social`, `-wallet`, `-work`, `-capabilities`, `-organism`, `-markdown`, `-editor`, `-live`, `-ai`, `-commerce` (checkout sessions, offer/app-tool prices, micro-unit money formatting, x402-style 402 `accepts`), `-tunnel`, and `/lib/realtime.js` (WebSocket/WebRTC/Yjs). New shared modules require an importmap entry in `spa.html`. Key app rules: mount the login bar; `session.fetch()` returns parsed JSON; all API paths relative; never add manual token fields. Cache-busting is `?v=BUILD_ID` stamped automatically.
 
 **Trust chain (unchanged, load-bearing):** the extension is sovereign over its storage/format; cortex trusts the extension API; the app trusts cortex; no layer bypasses the one below.
 

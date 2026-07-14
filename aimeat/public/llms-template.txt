@@ -278,6 +278,7 @@ entry: index.html
 | aimeat-organism | `loadScript('/v1/libs/aimeat-organism.js')` | `AIMEAT.organism.list/workspaces/read/writeDraft/publish` — organisms & workspaces with a NORMALIZED read (published + drafts merged per item; the raw workspace GET returns them as separate maps) |
 | aimeat-editor | `loadScript('/v1/libs/aimeat-editor.js')` | `AIMEAT.editor.mount/toolbar/split` — CodeMirror 6 markdown editor with live preview (pairs with aimeat-markdown) |
 | aimeat-live | `loadScript('/v1/libs/aimeat-live.js')` | `AIMEAT.live.subscribe(domains, fn)` — server-pushed change signals (SSE): re-fetch a view's data when the server says its domain changed, instead of polling |
+| aimeat-commerce | `loadScript('/v1/libs/aimeat-commerce.js')` | `AIMEAT.commerce.buyOffer/openCheckout/completeCheckout/feed/priceOf/fmtMoney` — checkout sessions over /v1/commerce, offer + app-tool prices, money formatting (micro-units → "1.50 EUR") |
 
 ### Key rules
 
@@ -507,7 +508,80 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | aimeat-markdown | `/v1/libs/aimeat-markdown.js` | Markdown rendering. `AIMEAT.md.render(text, target)` renders a safe dependency-free GFM subset INTO an element — it returns an Element, so never assign the result to innerHTML (that shows "[object HTMLDivElement]"); use the target param, appendChild, or `renderToString(text)`. `await AIMEAT.md.renderRich(text, target)` upgrades to full GFM (task lists, footnotes, highlighted code, Mermaid diagrams), sanitized, with automatic fallback to the safe subset when CDNs are unreachable. LIVE DATA EMBEDS: a fenced block with language `aimeat-memory` (body lines `key: <memory key>`, optional `owner: <gaii>` for public reads, `view: table/props/list/value/json`, `fields: a, b`, `title: ...`) renders the named memory key as a table/props/list — fetched at render time, so the document shows fresh agent-produced data on every open; access is the server's memory read (workspace rules + entry visibility) and denials render a placeholder. |
 | aimeat-organism | `/v1/libs/aimeat-organism.js` | Organisms & workspaces. `list()`, `workspaces(orgId)`, `read(orgId, wsId)` → `{ manifest, readmeText, spaces }` where each space's items merge published + draft per instance (`{ id, hasRealId, draft, latest, value, title, updatedAt, status }`) — the raw workspace GET returns `objects` (published) and `drafts` as SEPARATE maps; this lib does the merging, id resolution (value.id convention) and `_createdAt/_updatedAt/_version` metadata handling for you. `writeDraft`, `publish`, `revertToDraft`, `deleteObject` (needs the memory:delete scope — declare it via `<meta name="aimeat-scopes">`), `saveReadme`, `search`. Items with `hasRealId:false` cannot round-trip — render them read-only. Requires aimeat-auth. |
 | aimeat-editor | `/v1/libs/aimeat-editor.js` | Markdown editor: `AIMEAT.editor.mount(el, {value, onChange})` (CodeMirror 6 with textarea fallback), `toolbar(adapter)` for formatting buttons, `split(el, {value, onChange})` for editor + live preview rendered through aimeat-markdown. |
+| aimeat-commerce | `/v1/libs/aimeat-commerce.js` | Commerce: open/complete checkout sessions over `/v1/commerce/checkout-sessions`, one-call `buyOffer(agent, offerId)`, the public priced-offer `feed()`, offer/app-tool price reading (`getOffer`, `getAppTools`, `priceOf`), and money formatting in 6-decimal MICRO-UNITS (`fmtMoney(1500000,'EUR')` → `"1.50 EUR"`; morsels stay plain integers, `fmtAmount` is currency-aware). Thrown 402 errors carry the x402-style block: `err.paymentRequired === true` + `err.accepts` (machine-readable settle options). The library carries NO secrets — seller PSP credentials (`commerce.psp`) are server-side config the client never sees. Requires aimeat-auth (except `fmtMoney`/`feed`/`getAppTools`, which work logged out). See "Commerce in apps" below. |
 | aimeat-live | `/v1/libs/aimeat-live.js` | Live updates over SSE. `AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload())` — one shared, owner-scoped EventSource per browser (multi-tab via Web Locks + BroadcastChannel), debounced, visibility-gated, auto-reconnecting. The callback tells you WHICH domains changed; re-fetch only that data. Domains: `agent-tasks`, `agents`, `organisms`, `notifications`, `memory`. Use this instead of polling for any view that shows server data. Deletes do not emit a change event — refresh locally after a delete. Requires aimeat-auth + a logged-in session. |
+
+### Commerce in apps (aimeat-commerce) — worked example
+
+Sell and buy agent offers from inside an app. Money amounts are integer
+6-decimal MICRO-UNITS (1 EUR = 1,000,000 micros — matches USDC/x402 and covers
+sub-cent per-call pricing); morsels are plain integers. The library never
+touches secret keys — seller PSP credentials (`commerce.psp`) are server-side
+seller configuration; never ask the user for API keys in an app.
+
+```html
+<script src="{{BASE_URL}}/v1/libs/aimeat-auth.js"></script>
+<script src="{{BASE_URL}}/v1/libs/aimeat-commerce.js"></script>
+```
+```javascript
+// 1) Discover something to buy: the public feed lists every priced PUBLIC offer (no login)
+const { products } = await AIMEAT.commerce.feed();
+// products[i] = { id: "offer:<agentGaii>:<offerId>", title, price, seller }
+
+// 2) Read + show a price (logged in)
+const offer = await AIMEAT.commerce.getOffer('vendor#alice@{{NODE_ID}}', 'translate-doc');
+const morselPrice = AIMEAT.commerce.priceOf(offer);          // { amount, currency:'morsel', formatted }
+const eurPrice    = AIMEAT.commerce.priceOf(offer, 'EUR');   // money price if the offer declares one
+priceEl.textContent = (eurPrice || morselPrice).formatted;   // "1.50 EUR" or "10 morsels"
+
+// 3) Buy: open + complete in one call (morsel settlement by default)
+try {
+  const session = await AIMEAT.commerce.buyOffer('vendor#alice@{{NODE_ID}}', 'translate-doc',
+    { note: 'ordered from my-app' });
+  // session.receipt     = { handler, charged, earned, fee, trackingCode }
+  // session.fulfillment = { taskIds } — the agent TASK(s) doing the work
+} catch (e) {
+  if (e.paymentRequired) renderPayOptions(e.accepts);  // x402-style: HOW the buyer could settle
+  else showError(e.message);                           // e.code: OFFER_NOT_FOUND, OFFER_PRIVATE, ...
+}
+
+// Multi-step cart: openCheckout(items, opts) → updateCheckout / cancelCheckout → completeCheckout(id)
+// Money checkout: openCheckout(items, { currency: 'EUR' }) — the offer needs a priceMoney in EUR
+// and the node a payment handler that settles EUR (else CURRENCY_NOT_SUPPORTED).
+
+// Formatting (one convention node-wide):
+AIMEAT.commerce.fmtMoney(1500000, 'EUR');              // "1.50 EUR"
+AIMEAT.commerce.fmtAmount(session.total, session.currency); // morsel/money aware
+AIMEAT.commerce.microsFromInput('1.50');               // 1500000 (null if not positive)
+```
+
+#### Agent-faced apps: priced tools ("app-tool", DRAFT)
+
+An agent-faced app can declare PRICED TOOLS so other principals' agents can buy
+a call — the app becomes a seller on the same commerce core. The convention
+(TARGET-034, phase A; the checkout resolver is NOT live yet — declaring tools
+today makes the app forward-ready):
+
+1. **Declare:** the app owner publishes the tool manifest as the PUBLIC memory
+   record `apps.{appId}.tools` under their GHII:
+   `{ tools: [{ name, description, inputSchema, price: { morsels },
+   priceMoney: { amount /* micros */, currency } }] }`.
+2. **Discover:** anyone reads it — browser: `await
+   AIMEAT.commerce.getAppTools(ownerGhii, appId)`; agent/REST:
+   `GET /v1/memory/{ownerGhii}/apps.{appId}.tools` (public, no auth).
+3. **Buy a call:** one checkout line item `{ kind: 'app-tool', app, tool }`
+   through the SAME `/v1/commerce/checkout-sessions` lifecycle — browser:
+   `AIMEAT.commerce.invokeAppTool({ agent, app, tool })`. Until the node ships
+   the app-tool resolver this throws `APP_TOOL_NOT_AVAILABLE`.
+4. **402 = price tag:** an unpaid call to a priced surface answers HTTP 402
+   with the x402-style `accepts` array — the machine-readable "how to pay"
+   (also on `err.accepts` in the browser library).
+
+Agents buy with their own agent token over plain REST: `POST
+/v1/commerce/checkout-sessions` then `POST .../:id/complete` (the buyer's
+OWNER balance pays — one morsel balance per human). ACP-shaped discovery:
+`GET /v1/commerce/feed` + `/.well-known/acp.json`; UCP profile:
+`/.well-known/ucp`.
 
 ### Standard App Template
 
@@ -1130,6 +1204,26 @@ await AIMEAT.wallet.balance()            // { balance, in_escrow, available, ...
 await AIMEAT.wallet.transactions()       // list transactions
 await AIMEAT.wallet.history()            // full history
 await AIMEAT.wallet.request(amount)      // request morsels
+```
+
+**AIMEAT.commerce** (`/v1/libs/aimeat-commerce.js`):
+```javascript
+// Money = integer 6-decimal micro-units (1 EUR = 1_000_000). Morsels = plain integers.
+AIMEAT.commerce.fmtMoney(1500000, 'EUR')     // "1.50 EUR" (sync)
+AIMEAT.commerce.fmtAmount(amount, currency)  // morsel/money aware (sync)
+AIMEAT.commerce.microsFromInput('1.50')      // 1500000, null if not positive (sync)
+await AIMEAT.commerce.feed()                 // public priced-offer feed (no login)
+await AIMEAT.commerce.getOffer(agent, offerId)        // one offer incl. price/priceMoney
+AIMEAT.commerce.priceOf(offer, currency?)    // { amount, currency, formatted } | null (sync)
+await AIMEAT.commerce.openCheckout(items, { note?, currency? })  // → session
+await AIMEAT.commerce.getCheckout(id) / listCheckouts()          // buyer's sessions
+await AIMEAT.commerce.updateCheckout(id, items) / cancelCheckout(id)
+await AIMEAT.commerce.completeCheckout(id, payment?)  // charge + fulfill → session.receipt
+await AIMEAT.commerce.buyOffer(agent, offerId, opts?) // open + complete in one call
+await AIMEAT.commerce.listOrders()           // seller's received orders
+await AIMEAT.commerce.getAppTools(ownerGhii, appId)   // apps.{appId}.tools manifest (public)
+await AIMEAT.commerce.invokeAppTool({ agent, app, tool })  // TARGET-034 draft (resolver pending)
+// Errors: err.code; on 402 err.paymentRequired === true + err.accepts (x402-style settle options)
 ```
 
 **AIMEAT.work** (`/v1/libs/aimeat-work.js`):
