@@ -199,12 +199,21 @@ await test('1. OAuth metadata discovery', async () => {
     assert(aa.credential_types_supported.includes('ed25519_keypair'), 'ed25519 credential type');
     assert(aa.approval?.required === true && aa.approval?.by === 'owner', 'owner approval declared');
     assert(Array.isArray(aa.scopes_default) && aa.scopes_default.length > 0, 'scopes_default present');
-    const idTypes = (aa.identity_types_supported ?? []).map((t: any) => t.type);
+    // One COMPLETE registration method in the scanner's vocabulary: "anonymous" requires
+    // identity_types_supported to carry the method id + a per-method block with
+    // credential_types_supported, plus a claim_uri.
+    assert(Array.isArray(aa.identity_types_supported) && aa.identity_types_supported.includes('anonymous'),
+        `identity_types_supported: ${JSON.stringify(aa.identity_types_supported)}`);
+    assert(Array.isArray(aa.anonymous?.credential_types_supported) && aa.anonymous.credential_types_supported.length > 0,
+        'anonymous.credential_types_supported present');
+    assert(aa.anonymous.claim_uri.endsWith('/v1/agents/device-token'), `anonymous.claim_uri: ${aa.anonymous?.claim_uri}`);
+    // AIMEAT extension: the concrete identity formats live under aimeat_identity_types.
+    const idTypes = (aa.aimeat_identity_types ?? []).map((t: any) => t.type);
     assert(JSON.stringify([...idTypes].sort()) === JSON.stringify(['GAII', 'GEAI', 'GHII']),
-        `identity types: ${JSON.stringify(idTypes)}`);
-    const gaiiType = aa.identity_types_supported.find((t: any) => t.type === 'GAII');
+        `aimeat identity types: ${JSON.stringify(idTypes)}`);
+    const gaiiType = aa.aimeat_identity_types.find((t: any) => t.type === 'GAII');
     assert(gaiiType.register_uri.endsWith('/v1/agents/device-authorize'), 'GAII register_uri');
-    const geaiType = aa.identity_types_supported.find((t: any) => t.type === 'GEAI');
+    const geaiType = aa.aimeat_identity_types.find((t: any) => t.type === 'GEAI');
     assert(geaiType.register_uri.endsWith('/v1/ecosystem-apps/hello'), 'GEAI register_uri');
 });
 
