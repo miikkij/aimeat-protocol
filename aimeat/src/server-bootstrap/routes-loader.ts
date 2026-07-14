@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.3.0 — 2026-07-14 — Register the app-tool sellable resolver (TARGET-034 phase A)
  *   v1.2.0 — 2026-07-13 — Commerce core (TARGET-033): payment-handler registry + commerceRouter mount
  *   v1.1.0 — 2026-07-13 — Mount discoveryLinkHeaders() before bootstrapRouter (RFC 8288 agent discovery)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -32,7 +33,7 @@ import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
 import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
-import { registerSellableResolver, resetSellableResolvers, offerSellableResolver } from '../commerce/sellable-resolvers.js';
+import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver } from '../commerce/sellable-resolvers.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
@@ -324,6 +325,7 @@ export async function mountRoutes(
   registerPaymentHandler(morselPaymentHandler());
   resetSellableResolvers();
   registerSellableResolver(offerSellableResolver());
+  registerSellableResolver(appToolSellableResolver());
   for (const handler of (await enterprise.getPaymentHandlers?.()) ?? []) {
     registerPaymentHandler(handler);
   }

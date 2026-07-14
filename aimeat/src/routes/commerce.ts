@@ -11,6 +11,8 @@
  *   - PATCH  /v1/commerce/checkout-sessions/:id        replace items OR { cancel: true }
  *   - POST   /v1/commerce/checkout-sessions/:id/complete  charge + fulfill (payment.handler optional)
  * @version-history
+ *   v1.3.0 — 2026-07-14 — app-tool line items ({kind:'app-tool', app:'owner/appId', tool, input})
+ *     + caller JWT threaded into completeSession for callable fulfillment (TARGET-034 phase A)
  *   v1.2.0 — 2026-07-13 — Item kinds via the sellable-resolver registry (org-offering) + x402-style 402 accepts (phases 4–5)
  *   v1.1.0 — 2026-07-13 — List endpoints, commerceEnabled gate, config TTL (phase 2)
  *   v1.0.0 — 2026-07-13 — Initial native checkout adapter (TARGET-033 phase 1)
@@ -32,12 +34,19 @@ import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge } from '../commerce/x402.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'org-offering']).optional(),
+  kind: z.enum(['offer', 'org-offering', 'app-tool']).optional(),
   agent: z.string().min(1).max(300).optional(),
-  offer_id: z.string().min(1).max(100),
+  offer_id: z.string().min(1).max(100).optional(),
+  /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */
+  tool: z.string().min(1).max(100).optional(),
   org: z.string().max(200).optional(),
+  /** app-tool: "ownerName/appId" — locates the tool manifest. */
+  app: z.string().min(3).max(300).optional(),
+  /** app-tool: the buyer's tool input, forwarded to the capability invoke at completion. */
+  input: z.record(z.string(), z.unknown()).optional(),
   quantity: z.number().int().positive().max(1000).optional(),
-})).min(1).max(20);
+}).refine((i) => !!(i.offer_id || i.tool), { message: 'Each line item needs offer_id (offers) or tool (app-tools)' }))
+  .min(1).max(20);
 
 const CreateSchema = z.object({
   items: ItemsSchema,
@@ -153,7 +162,8 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
       const session = await loadOwnSession(req);
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument);
+      const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
+      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt);
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));

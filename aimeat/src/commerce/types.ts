@@ -6,10 +6,12 @@
  *   methods implement (core ships morsels; EE registers real-money handlers via the
  *   EnterpriseProvider seam). Protocol adapters (native REST, UCP, ACP, x402) are thin shells over
  *   these — see doc-t033-commerce-spec in the dev organism's design space.
- * @structure Sellable · CheckoutLineItem · CheckoutReceipt · CheckoutSessionRecord ·
- *   PaymentContext · PaymentResult · PaymentHandler
+ * @structure Sellable · FulfillArgs · FulfillOutcome · CheckoutLineItem · CheckoutReceipt ·
+ *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.1.0 — 2026-07-14 — Fulfill seam (Sellable.fulfill) + app-tool line-item fields (app, input)
+ *     + per-item fulfillment results on the session record (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial commerce core types (TARGET-033 phase 1)
  */
 import type { AimeatConfig } from '../config.js';
@@ -52,6 +54,26 @@ export interface Sellable {
    * org-wallet cut per commission %). Runs after the buyer charge; the fee leg is already routed.
    */
   distribute?: (ctx: PaymentContext, args: DistributeArgs) => Promise<void>;
+  /**
+   * Custom fulfillment replacing the default agent-TASK path (e.g. app-tool: invoke the backing
+   * capability synchronously and return its result on the receipt). A throw here refunds the
+   * collect and leaves the session open for retry — exactly like the default path.
+   */
+  fulfill?: (ctx: PaymentContext, args: FulfillArgs) => Promise<FulfillOutcome>;
+}
+
+/** What a custom fulfillment sees for one line item. */
+export interface FulfillArgs {
+  session: CheckoutSessionRecord;
+  item: CheckoutLineItem;
+  /** The buyer's bearer token, threaded from the completing request (capability invokes need it). */
+  callerJwt?: string;
+}
+
+/** A custom fulfillment yields a TASK id and/or an inline result (surfaced on the session). */
+export interface FulfillOutcome {
+  taskId?: string;
+  result?: unknown;
 }
 
 /** One line of a checkout session, resolved against the live offer at creation/update time. */
@@ -63,6 +85,10 @@ export interface CheckoutLineItem {
   offerId: string;
   /** org-offering: "creatorOwner/slug" so the resolver can find the catalog again. */
   org?: string;
+  /** app-tool: "ownerName/appId" so the resolver can find the tool manifest again. */
+  app?: string;
+  /** app-tool: the buyer's tool input, persisted with the quote and passed to the invoke. */
+  input?: Record<string, unknown>;
   quantity: number;
   /** Snapshot fields resolved from the offer (price may change later; the session keeps its quote). */
   title: string;
@@ -99,8 +125,9 @@ export interface CheckoutSessionRecord {
   total: number;
   note?: string;
   receipt?: CheckoutReceipt;
-  /** Fulfillment result: the agent tasks created on completion (offer-ask → TASK path). */
-  fulfillment?: { taskIds: string[] };
+  /** Fulfillment: agent tasks created on completion (offer-ask → TASK path) and/or inline
+   *  results from custom fulfillments (app-tool capability invokes). */
+  fulfillment?: { taskIds: string[]; results?: Array<{ sku: string; result: unknown }> };
   createdAt: string;
   updatedAt: string;
   /** Open sessions expire lazily after this instant (checked on read + on complete). */

@@ -10419,11 +10419,14 @@ paths:
       operationId: createCheckoutSession
       summary: Open a checkout session
       description: >-
-        Create a checkout session against one seller's offers. Line items reference agent
-        offers ({agent GAII, offer_id, quantity}); all items must belong to the same seller
-        owner. Prices are quoted in morsels from the live offer document at creation time
-        (cross-owner purchase requires the offer to declare a price; private offers are
-        owner-only; self-purchase is free). Sessions expire after one hour.
+        Create a checkout session against one seller's sellables. Line items reference agent
+        offers ({agent GAII, offer_id, quantity}) or priced app-tools ({kind:'app-tool',
+        app:'ownerName/appId', tool, input} — one call per line item; the tool manifest lives in
+        the public memory record apps.{appId}.tools and the tool must bind a capability via
+        action_id). All items must belong to the same seller owner. Prices are quoted from the
+        live offer/tool document at creation time (cross-owner purchase requires a declared
+        price; private offers are owner-only; self-purchase is free) — morsels are integers,
+        money currencies are 6-decimal micro-units. Sessions expire after one hour.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -10440,12 +10443,18 @@ paths:
                   maxItems: 20
                   items:
                     type: object
-                    required: [agent, offer_id]
+                    description: Needs offer_id (offers) or tool (app-tools).
                     properties:
+                      kind: { type: string, enum: [offer, org-offering, app-tool], default: offer }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
-                      quantity: { type: integer, minimum: 1, maximum: 1000, default: 1 }
+                      tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools' }
+                      org: { type: string, description: 'org-offering: "creatorOwner/slug"' }
+                      app: { type: string, description: 'app-tool: "ownerName/appId"' }
+                      input: { type: object, description: 'app-tool: buyer input forwarded to the capability invoke at completion' }
+                      quantity: { type: integer, minimum: 1, maximum: 1000, default: 1, description: app-tool items are limited to 1 }
                 note: { type: string, maxLength: 2000 }
+                currency: { type: string, description: "'morsel' (default) or a money code with a registered handler (amounts in 6-decimal micro-units)" }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -10507,7 +10516,9 @@ paths:
       summary: Public product feed (ACP-shaped)
       description: >-
         Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
-        (sku "offer:<agentGaii>:<offerId>", price in morsels). Discovery: /.well-known/acp.json.
+        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every callable, priced
+        app-tool from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
+        money prices in 6-decimal micro-units). Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
         '200':
@@ -10650,9 +10661,11 @@ paths:
       summary: Complete a checkout session (charge + fulfill)
       description: >-
         Charges the buyer through the selected payment handler (default io.aimeat.morsels;
-        marketplace fee applies), creates one fulfillment TASK per line item on the seller
-        agent (the offer-ask path), writes the seller's order copy, and closes the session.
-        A fulfillment failure after a successful charge refunds and leaves the session open.
+        marketplace fee applies), fulfills each line item — offers create a TASK on the seller
+        agent (the offer-ask path); app-tools invoke the tool's backing capability with the
+        buyer's persisted input, the result landing on session.fulfillment.results — writes the
+        seller's order copy, and closes the session. A fulfillment failure after a successful
+        charge refunds and leaves the session open.
       tags: [Commerce]
       security:
         - BearerAuth: []
