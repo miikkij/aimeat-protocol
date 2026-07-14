@@ -10,9 +10,10 @@
  * @structure commerceFeePercent · resolveOperatorFeeGhii · settleMarketplaceFee ·
  *   resetOperatorFeeCache (multi-node test seam)
  * @usage
- *   const fee = Math.ceil(price * commerceFeePercent(config) / 100);
+ *   const fee = percentFee(price, commerceFeePercent(config)); // from ../commerce/money.js
  *   await settleMarketplaceFee(storage, config, { fee, payerGhii, trackingCode, source: 'commerce' });
  * @version-history
+ *   v1.0.1 — 2026-07-14 — Usage example points at the money.ts chokepoint (percentFee), not an inline formula
  *   v1.0.0 — 2026-07-13 — Initial fee policy service (TARGET-033 phase 2)
  */
 import { randomUUID } from 'node:crypto';

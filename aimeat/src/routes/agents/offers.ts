@@ -2,6 +2,7 @@
  * @file src/routes/agents/offers.ts
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-07-14 — Fee rounding through the money.ts chokepoint (percentFee)
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -15,6 +16,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
 import { settleMarketplaceFee } from '../../services/marketplace-fee.js';
+import { percentFee } from '../../commerce/money.js';
 import { listWorkflows } from '../../services/workflow/store.js';
 
 export function registerOffersRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -168,7 +170,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     if (price > 0) {
       const providerGhii = `${agent.owner}@${config.nodeId}`;
       const feePercent = config.marketplaceTransactionFeePercent ?? 5;
-      const fee = Math.ceil(price * feePercent / 100);
+      const fee = percentFee(price, feePercent);
       const earnings = price - fee;
       await storage.creditBalance(providerGhii, earnings);
       const now = new Date().toISOString();

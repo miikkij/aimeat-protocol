@@ -12,6 +12,7 @@
  *   registerSellableResolver(offerSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.0.1 — 2026-07-14 — Money-amount coercion through the money.ts chokepoint (integerMicros)
  *   v1.0.0 — 2026-07-13 — Initial resolver registry + core offer resolver (TARGET-033 phase 4)
  */
 import type { AimeatConfig } from '../config.js';
@@ -20,6 +21,7 @@ import type { Offer } from '../models/offer-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
+import { integerMicros } from './money.js';
 
 /** A raw line-item reference before resolution. `kind` defaults to 'offer'. */
 export interface SellableRef {
@@ -101,7 +103,7 @@ export function offerSellableResolver(): SellableResolver {
         }
         const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
         psp = pspRec?.value ?? undefined;
-        unitPrice = Math.floor(offer.priceMoney.amount);
+        unitPrice = integerMicros(offer.priceMoney.amount);
       }
       return {
         kind: 'offer', agentGaii, agentName, offerId: ref.offer_id,

@@ -16,8 +16,10 @@
  *   - PRICE_REF            -- version tag stamped onto table-priced events
  *   - priceUsd(input)      -- { costUsd, priceRef } for one call
  * @version-history
+ *   v1.0.1 -- 2026-07-14 -- 6-decimal USD rounding through the money.ts chokepoint (roundToMoneyScale)
  *   v1.0.0 -- 2026-07-10 -- Initial seed table for LEDGER TARGET-016
  */
+import { roundToMoneyScale } from '../commerce/money.js';
 
 /** Bump when the seeded rates below change, so historical price_refs stay meaningful. */
 export const PRICE_REF = 'poi003@2026-07-10';
@@ -65,11 +67,6 @@ export interface PriceResult {
   priceRef: string | null;
 }
 
-/** Round to 6 decimal places (sub-cent LLM costs) to avoid float noise in aggregates. */
-function round6(n: number): number {
-  return Math.round(n * 1e6) / 1e6;
-}
-
 /**
  * Price one LLM call. See file header for precedence. A provider-reported cost always
  * wins over the table (it reflects the actual charge, incl. discounts/routing).
@@ -81,7 +78,7 @@ export function priceUsd(input: PriceInput): PriceResult {
 
   const reported = input.providerCostUsd;
   if (typeof reported === 'number' && isFinite(reported) && reported >= 0) {
-    return { costUsd: round6(reported), priceRef: `provider:${input.provider}` };
+    return { costUsd: roundToMoneyScale(reported), priceRef: `provider:${input.provider}` };
   }
 
   const model = (input.model || '').toLowerCase();
@@ -89,7 +86,7 @@ export function priceUsd(input: PriceInput): PriceResult {
   if (rate) {
     const cost = (input.promptTokens / 1e6) * rate.promptPerM
       + (input.completionTokens / 1e6) * rate.completionPerM;
-    return { costUsd: round6(cost), priceRef: PRICE_REF };
+    return { costUsd: roundToMoneyScale(cost), priceRef: PRICE_REF };
   }
 
   return { costUsd: null, priceRef: null };
