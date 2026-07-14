@@ -19,10 +19,13 @@
  *     60s TTL in-memory cache, for the profile Home usage card.
  *   v1.1.0 — 2026-06-22 — Migrate the hand-rolled Map cache onto the generic cache layer
  *     (services/cache.ts): same 60s TTL, now invalidated precisely by event-bus tags.
+ *   v1.2.0 — 2026-07-14 — Perf: memory bytes via a single sumMemoryBytesForOwners aggregate; the
+ *     storage/micro/actions/counts fan-outs run concurrently (Promise.all) instead of ~500 serial
+ *     round-trips per cache-miss.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { getMemoryTotalBytes, getMicroMemoryTotalBytes } from './quota.js';
+import { getMicroMemoryTotalBytes } from './quota.js';
 import { cached, invalidateKey, TTL } from './cache.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps
@@ -83,38 +86,47 @@ async function computeOwnerUsageSummary(
   // the writer, so the owner's true footprint is the union (mirrors GET /v1/memory owner-scope).
   const identities = [ghii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
 
-  // ── Memory (keys cheap via COUNT DISTINCT; bytes are a full scan per identity) ──
+  // ── Memory (keys cheap via COUNT DISTINCT; bytes summed DB-side across ALL identities in one go) ──
+  // Previously: countMemory + one sumMemoryBytes PER identity (an owner with ~100 agents = ~100 serial
+  // round-trips just for the byte total). Now a single cross-identity aggregate.
   const usedKeys = await storage.countMemory(identities);
-  let memBytes = 0;
-  for (const id of identities) memBytes += await getMemoryTotalBytes(storage, id);
+  const memBytes = await storage.sumMemoryBytesForOwners(identities);
   const memMax = config.memoryQuotaMb * 1024 * 1024;
 
-  // ── Storage files (sum size + count across identities) ──
-  let storageBytes = 0, storageFiles = 0;
-  for (const id of identities) {
-    const files = await storage.listStorageFiles(id);
-    storageFiles += files.length;
-    for (const f of files) storageBytes += f.size;
-  }
+  // ── Storage files / micro-memory / actions ──
+  // These still enumerate per identity, but CONCURRENTLY (Promise.all) rather than one-await-at-a-time,
+  // so the whole fan-out costs ~one round-trip of latency instead of summing ~400 serial ones (the bulk
+  // of the old ~1.3s cache-miss). Row volumes per identity are small (files/actions/micro-sets), so a
+  // load-then-count here is not a scale risk the way the memory value-scan was.
   const storageMax = config.storageQuotaMb * 1024 * 1024;
-
-  // ── Micro-memory (sum bytes + set count) ──
-  let microBytes = 0, microSets = 0;
-  for (const id of identities) {
-    microBytes += await getMicroMemoryTotalBytes(storage, id);
-    microSets += (await storage.listMicroMemorySets(id)).length;
-  }
   const microMax = config.microMemoryQuotaKb * 1024;
 
-  // ── Counts ──
-  const organisms = (await storage.listOrganisms({ member: ownerName, perPage: 10000 })).length;
-  const apps = (await storage.listApps({ ownerGaii: ghii, limit: 1 })).total;
-  const extensions = (await storage.listExtensions()).filter(e => e.installedBy === ownerName).length;
-  const cortexes = (await storage.listCortexExtensions({ installedBy: ownerName })).length;
-  let services = 0;
-  for (const a of agents) services += (await storage.listActionsByProvider(a.gaii)).length;
+  const [
+    fileLists, microByteList, microSetLists, actionLists,
+    organismsList, appsResult, extensionsList, cortexesList, ghiiRecord,
+  ] = await Promise.all([
+    Promise.all(identities.map(id => storage.listStorageFiles(id))),
+    Promise.all(identities.map(id => getMicroMemoryTotalBytes(storage, id))),
+    Promise.all(identities.map(id => storage.listMicroMemorySets(id))),
+    Promise.all(agents.map(a => storage.listActionsByProvider(a.gaii))),
+    storage.listOrganisms({ member: ownerName, perPage: 10000 }),
+    storage.listApps({ ownerGaii: ghii, limit: 1 }),
+    storage.listExtensions(),
+    storage.listCortexExtensions({ installedBy: ownerName }),
+    storage.getGHIIByOwner(ownerName),
+  ]);
 
-  const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+  let storageBytes = 0, storageFiles = 0;
+  for (const files of fileLists) { storageFiles += files.length; for (const f of files) storageBytes += f.size; }
+  const microBytes = microByteList.reduce((a, b) => a + b, 0);
+  const microSets = microSetLists.reduce((a, sets) => a + sets.length, 0);
+  const services = actionLists.reduce((a, list) => a + list.length, 0);
+
+  // ── Counts ──
+  const organisms = organismsList.length;
+  const apps = appsResult.total;
+  const extensions = extensionsList.filter(e => e.installedBy === ownerName).length;
+  const cortexes = cortexesList.length;
 
   return {
     owner: ownerName,

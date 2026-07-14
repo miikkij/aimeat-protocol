@@ -3,6 +3,8 @@
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-14 — Perf: ?include=meta uses a META fast path (listMemoryMeta / owner-scope meta)
+ *     that never loads or serialises values; used_bytes sums the stored byteSize.
  */
 
 import type { Router } from 'express';
@@ -24,7 +26,7 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
-import { listOwnerScopeMemory } from '../../services/owner-memory.js';
+import { listOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../../services/owner-memory.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 
@@ -322,6 +324,48 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // META FAST PATH (?include=meta): the profile Memory tab lists keys + sizes for grouping/filtering
+    // and fetches values per-row on expand. Read META rows (metadata + stored byteSize) so NO value is
+    // ever loaded or serialised — a keyspace of thousands of keys lists cheaply, and used_bytes sums the
+    // stored byteSize instead of JSON.stringify-ing every value. (The old meta path loaded all values
+    // just to omit them from the response and total the bytes in JS.)
+    if (metaOnly) {
+      const metaRows = (ownerScope && !agentParam)
+        ? await listOwnerScopeMemoryMeta(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
+        : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived });
+      if (req.query.count === 'true') {
+        res.json(success(config.nodeId, { count: metaRows.length }));
+        return;
+      }
+      let totalBytes = 0;
+      for (const r of metaRows) totalBytes += r.byteSize;
+      res.json(success(config.nodeId, {
+        items: metaRows.map(r => ({
+          key: r.key,
+          owner_gaii: r.ownerGaii,
+          bytes: r.byteSize,
+          visibility: r.visibility,
+          zone: visibilityToZone(r.visibility),
+          tags: r.tags,
+          version: r.version,
+          flagCount: r.flagCount ?? 0,
+          created_at: r.createdAt,
+          updated_at: r.updatedAt,
+        })),
+        total: metaRows.length,
+        quota: {
+          max_keys: config.memoryMaxKeysPerAgent,
+          used_keys: metaRows.length,
+          max_bytes: config.memoryQuotaMb * 1024 * 1024,
+          used_bytes: totalBytes,
+        },
+      }, [
+        { description: 'Write a new memory entry', method: 'POST', url: '/v1/memory',
+          example_body: { key: 'example-key', value: 'example-value', visibility: 'private' } },
+      ]));
+      return;
+    }
+
     let records: MemoryRecord[];
     if (ownerScope && !agentParam) {
       // Owner-scope: GHII + all the owner's agents (deduped, GHII first). Shared helper so the
@@ -337,20 +381,18 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // Calculate total size for quota reporting (and per-record bytes when meta-only)
+    // Calculate total size for quota reporting. (The ?include=meta path returns earlier via the META
+    // fast path and never reaches here, so this always carries values.)
     let totalBytes = 0;
-    const recordBytes = new Map<MemoryRecord, number>();
     for (const r of records) {
-      const b = Buffer.byteLength(JSON.stringify(r.value), 'utf8');
-      totalBytes += b;
-      if (metaOnly) recordBytes.set(r, b);
+      totalBytes += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
     }
 
     res.json(success(config.nodeId, {
       items: records.map(r => ({
         key: r.key,
         owner_gaii: r.ownerGaii,
-        ...(metaOnly ? { bytes: recordBytes.get(r) ?? 0 } : { value: r.value }),
+        value: r.value,
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
@@ -403,26 +445,28 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Optional prefix — scopes the content search to one namespace/group (e.g. "organism.{id}.")
     // so the profile Memory tab can search within an expanded group.
     const prefix = req.query.prefix as string | undefined;
-    const searchOpts = { visibility, maxFlags, prefix };
+    // Result cap — honours the documented `per_page`, or `limit` as an alias (default 200, hard max 500).
+    const limitParam = (req.query.limit ?? req.query.per_page) as string | undefined;
+    const limit = limitParam !== undefined ? Math.min(500, Math.max(1, parseInt(limitParam, 10) || 200)) : 200;
 
-    let results: MemoryRecord[];
+    // Resolve the identity set to search. Owner sessions cover GHII + every agent + every ecosystem app;
+    // an agent/eco session (or ?agent=) searches just that one identity.
+    let ownerGaiis: string[];
     if (isOwnerSession && !agentParam) {
-      // Owner session: search across GHII + all agents + all ecosystem apps (GEAIs)
       const callerOwner = req.auth!.owner as string;
-      const ownerGhii = `${callerOwner}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(callerOwner);
       const ecoApps = await storage.getEcosystemAppsByOwner(callerOwner);
-      results = [];
-      results.push(...await storage.searchMemory(ownerGhii, q, searchOpts));
-      for (const agent of agents) {
-        results.push(...await storage.searchMemory(agent.gaii, q, searchOpts));
-      }
-      for (const app of ecoApps) {
-        results.push(...await storage.searchMemory(app.geai, q, searchOpts));
-      }
+      ownerGaiis = [`${callerOwner}@${config.nodeId}`, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
     } else {
-      results = await storage.searchMemory(gaii, q, searchOpts);
+      ownerGaiis = [gaii];
     }
+
+    // ONE indexed query across the whole identity set via the librarian's searchText primitive (SQLite
+    // FTS5 / Mongo searchBlob), instead of a searchMemory call PER identity — each of which loaded every
+    // one of that identity's rows and JSON.stringify'd every value (owner search was 1 + #agents + #eco
+    // full scans; on a fleet of ~100 agents that was ~100× the already-O(n) scan). Ranked best-first.
+    const hits = await storage.searchText(q, { ownerGaiis, keyPrefix: prefix, visibility, maxFlags, limit });
+    const results: MemoryRecord[] = hits.map(h => h.record);
 
     res.json(success(config.nodeId, {
       results: results.map(r => ({

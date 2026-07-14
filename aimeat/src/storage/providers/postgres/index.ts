@@ -20,6 +20,8 @@ import { PrismaStorage } from '../mongodb/index.js';
 export class PostgresStorage extends PrismaStorage {
     protected schemaFileName(): string { return 'schema.postgres.prisma'; }
 
+    protected backendKind(): 'mongodb' | 'postgresql' { return 'postgresql'; }
+
     protected prismaClientSpecifier(): string {
         // Resolve the custom-output Postgres client by absolute path so it works
         // both in tsx-dev (under src/) and after build (under dist/src/).

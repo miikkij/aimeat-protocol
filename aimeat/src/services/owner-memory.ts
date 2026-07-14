@@ -15,8 +15,10 @@
  *     signal evaluator (fix: signals must read owner-scope, not the owner GHII keyspace alone).
  *   v1.1.0 — 2026-06-14 — Fold the owner's ecosystem apps (GEAIs) into the owner-scope union
  *     (ecosystem-apps foundation, chunk 1).
+ *   v1.2.0 — 2026-07-14 — Add listOwnerScopeMemoryMeta (value-free owner-scope listing) for ?include=meta.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
 
 export interface OwnerScopeListOpts {
   prefix?: string;
@@ -45,6 +47,30 @@ export async function listOwnerScopeMemory(
   const out: MemoryRecord[] = [];
   for (const id of identities) {
     const recs = await storage.listMemory(id, opts);
+    for (const r of recs) {
+      if (!seen.has(r.key)) { seen.add(r.key); out.push(r); }
+    }
+  }
+  return out;
+}
+
+/**
+ * Owner-scope META listing — the same union + key-dedup as {@link listOwnerScopeMemory}, but each
+ * identity is read with `listMemoryMeta` so NO value is ever loaded (backs `?include=meta`). Returns
+ * lightweight rows carrying the stored `byteSize`, so the caller can total quota usage without
+ * serialising anything.
+ */
+export async function listOwnerScopeMemoryMeta(
+  storage: Storage, nodeId: string, ownerName: string, opts?: OwnerScopeListOpts,
+): Promise<MemoryMetaRow[]> {
+  const ownerGhii = `${ownerName}@${nodeId}`;
+  const agents = await storage.getAgentsByOwner(ownerName);
+  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  const identities = [ownerGhii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+  const seen = new Set<string>();
+  const out: MemoryMetaRow[] = [];
+  for (const id of identities) {
+    const recs = await storage.listMemoryMeta(id, opts);
     for (const r of recs) {
       if (!seen.has(r.key)) { seen.add(r.key); out.push(r); }
     }
