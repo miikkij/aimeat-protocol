@@ -4,6 +4,11 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.36.0 - 2026-07-14 - New library aimeat-agentface.js (Agent Face phase 2): publish the app's
+ *   markdown read-surface (the public apps.{filename}.agentface record, served on the app URL for
+ *   Accept: text/markdown) in one call — AIMEATAgentFace.publish(markdown | { title, sections }),
+ *   filename from an explicit { app } option / <meta name="aimeat-app"> / the /v1/apps path.
+ *   Registered as a route, in the /v1/libs catalogue, and in the dev test-harness.
  * v1.35.0 - 2026-07-14 - New library aimeat-commerce.js (TARGET-033): checkout sessions over
  *   /v1/commerce/*, offer price reading, money formatting in 6-decimal micro-units (same
  *   convention as utils.js fmtMoney), x402-style 402 accepts surfaced on thrown errors, and the
@@ -144,6 +149,7 @@ import { aimeatEditorLib } from './lib-editor.js';
 import { aimeatLiveLib } from './lib-live.js';
 import { aimeatCommerceLib } from './lib-commerce.js';
 import { aimeatWebmcpLib } from './lib-webmcp.js';
+import { aimeatAgentFaceLib } from './lib-agentface.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -169,6 +175,12 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // priced tools pay through the commerce checkout). TARGET-034 phase C.
   router.get('/v1/libs/aimeat-webmcp.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatWebmcpLib(config));
+  });
+
+  // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (the markdown read-surface
+  // served on the app URL for Accept: text/markdown) in one call from inside the running app.
+  router.get('/v1/libs/aimeat-agentface.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatAgentFaceLib(config));
   });
 
   // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +
@@ -399,6 +411,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           requires: 'aimeat-auth',
         },
         {
+          name: 'aimeat-agentface',
+          url: '/v1/libs/aimeat-agentface.js',
+          description: 'Agent Face: publish this app\'s markdown read-surface for agents (served on the app URL for Accept: text/markdown with a node-generated affordances footer) in one call — AIMEATAgentFace.publish(markdown) or publish({ title, sections }). Writes the public apps.{filename}.agentface record as the signed-in app owner; pass { app: "file.html" } on subdomain origins.',
+          size_estimate: '~3KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-agentface.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
           name: 'aimeat-live',
           url: '/v1/libs/aimeat-live.js',
           description: 'Realtime live-updates: subscribe to server-pushed change domains (agent-tasks, agents, organisms, notifications, memory, ...) over one shared, owner-scoped SSE connection. Re-fetch only what changed, no polling or F5. AIMEAT.live.subscribe([\'agent-tasks\'], reload).',
@@ -428,6 +448,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <script src="/v1/libs/aimeat-audio.js"></script>
 <script src="/v1/libs/aimeat-speech.js"></script>
 <script src="/v1/libs/aimeat-commerce.js"></script>
+<script src="/v1/libs/aimeat-agentface.js"></script>
 </head>
 <body>
 <h1 id="title">AIMEAT Test Harness</h1>
@@ -438,7 +459,7 @@ window.tlog = function(msg) {
   window.__testLog.push(msg);
   document.getElementById('log').textContent = window.__testLog.join('\\n');
 };
-window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel + ' audio=' + !!AIMEAT.audio + ' speech=' + !!AIMEAT.speech + ' commerce=' + !!AIMEAT.commerce);
+window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel + ' audio=' + !!AIMEAT.audio + ' speech=' + !!AIMEAT.speech + ' commerce=' + !!AIMEAT.commerce + ' agentface=' + !!AIMEAT.agentface);
 window.__ready = true;
 </script>
 </body></html>`);

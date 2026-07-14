@@ -35,6 +35,9 @@
  *     app URL serves converted HTML + the agent-affordances footer; a PUBLIC
  *     apps.{filename}.agentface record replaces the converted body; a non-public face behaves
  *     exactly like no face; Accept: text/html stays byte-exact; markdown headers asserted.
+ *   v1.9.0 — 2026-07-14 — add Phase 12 aimeat-agentface served library: served as JS, carries the
+ *     convention key + public-visibility write + the unauthenticated/missing-auth errors, and is
+ *     listed in the /v1/libs catalogue.
  */
 
 import * as ed from '@noble/ed25519';
@@ -672,6 +675,32 @@ await test('Accept: text/html keeps exactly today\'s behavior (byte-exact HTML, 
     assert((res.headers.get('content-type') ?? '').includes('html'), `content-type html, got ${res.headers.get('content-type')}`);
     assert(res.headers.get('x-markdown-tokens') === null, 'no x-markdown-tokens on the HTML response');
     assert((await res.text()) === HTML_V1, 'HTML body byte-exact (raw download unchanged)');
+});
+
+// ── Phase 12: aimeat-agentface served library (Agent Face phase 2) ──
+// The publish library is node-served like the other app libs (aimeat-webmcp.js precedent):
+// assert it serves as JavaScript, carries the convention key + public write, and is catalogued.
+console.log('\nPhase 12: aimeat-agentface served library');
+
+await test('GET /v1/libs/aimeat-agentface.js serves the library as JavaScript', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-agentface.js`);
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('javascript'), `content-type ${res.headers.get('content-type')}`);
+    const src = await res.text();
+    assert(src.includes(".agentface"), 'writes the convention key apps.{filename}.agentface');
+    assert(src.includes("visibility: 'public'"), "publishes with visibility 'public'");
+    assert(src.includes('AIMEATAgentFace'), 'exposes the AIMEATAgentFace global');
+    assert(src.includes('AIMEAT.auth is required'), 'clear error when aimeat-auth is missing');
+    assert(src.includes('Not signed in'), 'clear error when called unauthenticated');
+});
+
+await test('/v1/libs catalogue lists aimeat-agentface (requires aimeat-auth)', async () => {
+    const { status, body } = await json('/v1/libs');
+    assert(status === 200, `status ${status}`);
+    const lib = (body.libraries ?? []).find((l: any) => l.name === 'aimeat-agentface');
+    assert(!!lib, 'aimeat-agentface listed in the catalogue');
+    assert(lib.url === '/v1/libs/aimeat-agentface.js', `url ${lib.url}`);
+    assert(lib.requires === 'aimeat-auth', `requires ${lib.requires}`);
 });
 
 // ── Summary ──
