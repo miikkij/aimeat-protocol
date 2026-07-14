@@ -9,29 +9,81 @@
  *   The machine-readable companion is the agent_auth block on
  *   /.well-known/oauth-authorization-server (src/mcp/oauth.ts) — keep the two in sync.
  * @structure
- *   - buildAuthMd(config): string — the complete markdown document
+ *   - buildAgentAuthMetadata(config) — the agent_auth object, the SINGLE source of truth
+ *     shared by the RFC 8414 metadata route (src/mcp/oauth.ts) and the embedded JSON block
+ *   - buildAuthMd(config): string — the complete markdown document (embeds the block)
  * @usage
- *   import { buildAuthMd } from '../services/auth-md.js';
+ *   import { buildAuthMd, buildAgentAuthMetadata } from '../services/auth-md.js';
  *   const authMd = buildAuthMd(config);  // once per boot; serve as text/markdown
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Embed the agent_auth JSON block IN the document (the workos
+ *     reference AUTH.md carries it inline and the isitagentready validator scans the
+ *     markdown for it); agent_auth construction extracted to buildAgentAuthMetadata,
+ *     shared with the RFC 8414 route so the two surfaces cannot drift
  *   v1.1.0 — 2026-07-14 — H1 carries the literal "auth.md" token (isitagentready validator
  *     marks the document valid by an H1 containing "auth.md")
  *   v1.0.0 — 2026-07-14 — Initial: auth.md agent-registration document (agent readiness)
  */
 import type { AimeatConfig } from '../config.js';
 
+/**
+ * The agent_auth discovery object (auth.md convention, github.com/workos/auth.md):
+ * how agents get identities on this node. Served on /.well-known/oauth-authorization-server
+ * AND embedded as a JSON block inside /auth.md — always build it here, never inline it.
+ */
+export function buildAgentAuthMetadata(config: AimeatConfig): Record<string, unknown> {
+  const b = config.baseUrl;
+  return {
+    skill: `${b}/auth.md`,
+    documentation: `${b}/auth.md`,
+    register_uri: `${b}/v1/agents/device-authorize`,
+    claim_uri: `${b}/v1/agents/device-token`,
+    verification_uri: `${b}/v1/agents/verify`,
+    token_uri: `${b}/v1/auth/token`,
+    revocation_uri: `${b}/v1/auth/revoke`,
+    grant_types_supported: ['urn:ietf:params:oauth:grant-type:device_code'],
+    credential_types_supported: ['ed25519_keypair', 'bearer_jwt'],
+    approval: { required: true, by: 'owner', where: `${b}/v1/profile` },
+    scopes_default: config.defaultAgentScopes,
+    identity_types_supported: [
+      {
+        type: 'GHII', format: '{owner}@{node-id}', principal: 'human owner',
+        register_uri: `${b}/v1/owners`,
+      },
+      {
+        type: 'GAII', format: '{agent}#{owner}@{node-id}', principal: 'AI agent',
+        register_uri: `${b}/v1/agents/device-authorize`,
+        claim_uri: `${b}/v1/agents/device-token`,
+      },
+      {
+        type: 'GEAI', format: 'eco:{app}#{owner}@{node-id}', principal: 'ecosystem app',
+        register_uri: `${b}/v1/ecosystem-apps/hello`,
+        claim_uri: `${b}/v1/ecosystem-apps/token`,
+      },
+    ],
+  };
+}
+
 /** The complete /auth.md document for this node. Built once per boot (config is static). */
 export function buildAuthMd(config: AimeatConfig): string {
   const b = config.baseUrl;
   const scopes = config.defaultAgentScopes.join(', ');
+  const agentAuthJson = JSON.stringify({ agent_auth: buildAgentAuthMetadata(config) }, null, 2);
   return `# auth.md — agent authentication for AIMEAT node \`${config.nodeId}\`
 
 > This document is for AI agents. Humans: use the portal at ${b}/ instead.
 
 This node speaks the AIMEAT protocol. Agents get their own identity (a **GAII**,
 \`agent#owner@node-id\`) with owner-approved scopes — agents are never created implicitly,
-and no step here requires you to handle a human's password. Machine-readable metadata for
-everything below: \`GET ${b}/.well-known/oauth-authorization-server\` (the \`agent_auth\` block).
+and no step here requires you to handle a human's password.
+
+## Machine-readable metadata (\`agent_auth\`)
+
+The same block is served on \`GET ${b}/.well-known/oauth-authorization-server\`:
+
+\`\`\`json
+${agentAuthJson}
+\`\`\`
 
 ## Identity types on this node
 
