@@ -131,6 +131,20 @@ await test('GET /llms.txt — contains builder guide', async () => {
     assert(text.includes('/v1/memory'), 'missing memory endpoint');
 });
 
+await test('GET /robots.txt — Content Signals Policy directive, consistent with per-bot rules', async () => {
+    const res = await fetch(`${BASE}/robots.txt`);
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    // Default directive (AIMEAT_CONTENT_SIGNAL): search + ai-input allowed, ai-train disallowed —
+    // the machine-readable statement of the stance the per-bot rules below it already express.
+    assert(/^Content-Signal: search=yes, ai-input=yes, ai-train=no$/m.test(text), `Content-Signal directive missing/altered: ${text.split('\n').find(l => l.startsWith('Content-Signal')) ?? '(none)'}`);
+    assert(text.includes('content signals'), 'policy preamble comment present');
+    // Consistency: the training crawlers stay disallowed, search bots allowed.
+    assert(/User-agent: GPTBot\s*\r?\nDisallow: \//.test(text), 'GPTBot stays disallowed');
+    assert(/User-agent: ClaudeBot\s*\r?\nDisallow: \//.test(text), 'ClaudeBot stays disallowed');
+    assert(/User-agent: OAI-SearchBot\s*\r?\nAllow: \//.test(text), 'OAI-SearchBot stays allowed');
+});
+
 await test('GET /.well-known/aimeat', async () => {
     const { body } = await json('/.well-known/aimeat');
     assert(body.ok === true, 'ok');

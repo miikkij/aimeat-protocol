@@ -358,6 +358,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
     // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
     mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
+    // Content Signals Policy directive served in robots.txt (contentsignals.org). Default matches
+    // the per-bot stance already in the file (search bots allowed, GPTBot/ClaudeBot training
+    // crawlers disallowed, user-initiated AI fetches allowed). 'off' removes the directive.
+    contentSignal: (process.env.AIMEAT_CONTENT_SIGNAL ?? 'search=yes, ai-input=yes, ai-train=no').trim(),
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,

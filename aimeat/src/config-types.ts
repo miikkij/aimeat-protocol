@@ -323,6 +323,8 @@ export interface AimeatConfig {
   commerceSessionTtlMinutes: number;
   /** MCP Server Card commerce_tools block: embed the priced app-tool catalog or point at /v1/commerce/tools. */
   mcpCardCommerceTools: 'inline' | 'pointer';
+  /** robots.txt Content Signals Policy directive ("search=yes, ai-input=yes, ai-train=no"); 'off' removes it. */
+  contentSignal: string;
 
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;
