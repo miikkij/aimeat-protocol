@@ -8,6 +8,9 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.2.0 — 2026-07-14 — App-tool TASK path (TARGET-034 phase B): unbound tools purchasable —
+ *     TASK queued for the manifest agent / owner GHII, buyer input on the task, feed fulfillment
+ *     hint; the phase-A unbound-422 gate is gone
  *   v1.1.0 — 2026-07-14 — App-tool purchases (TARGET-034 phase A): manifest + feed listing +
  *     paid capability invoke with result on fulfillment, failure gates (404/422/400), refund on
  *     missing capability, free self-purchase
@@ -308,7 +311,9 @@ await test('19. Anonymous requests are rejected (401)', async () => {
 // ─── App-tool purchases (TARGET-034 phase A): priced tool calls on agent-faced apps ───
 
 const extName = `apptoolext${Date.now().toString(36)}`;
-const appId = 'demoapp';
+// Dotted appId on purpose: published filenames carry ".html", and the feed's manifest-key match
+// must survive dots (regression: the phase-A [^.]+ pattern silently skipped every real app).
+const appId = 'demoapp.html';
 const echoCapId = `ext:${extName}:echo`;
 let appRef = '';
 
@@ -366,7 +371,9 @@ limits:
         tools: [
             { name: 'echo', description: 'Echo a message back (paid per call)', action_id: echoCapId, price: { morsels: 3, unit: 'per-call' } },
             { name: 'unpriced-echo', description: 'Callable but free-listed', action_id: echoCapId },
-            { name: 'no-binding', description: 'Priced but no capability binding', price: { morsels: 1 } },
+            // Task-path tools (phase B): no action_id → fulfillment queues an agent TASK.
+            { name: 'concierge', description: 'Long-running white-glove run (task path)', price: { morsels: 5 }, agent: 'vendor' },
+            { name: 'no-binding', description: 'Priced, no binding and no agent (task to the owner)', price: { morsels: 1 } },
             { name: 'broken', description: 'Priced, bound to a missing capability', action_id: 'ext:no-such-ext:nope', price: { morsels: 1 } },
         ],
     };
@@ -377,14 +384,18 @@ limits:
     assert(write.status === 200 || write.status === 201, `manifest write ${write.status}: ${JSON.stringify(write.body.error)}`);
 });
 
-await test('21. Feed lists the callable, priced app-tool (sku app-tool:<owner>/<appId>:<tool>)', async () => {
+await test('21. Feed lists priced app-tools with the fulfillment hint (call vs task)', async () => {
     const feedRes = await fetch(`${BASE}/v1/commerce/feed`);
     const feed = await feedRes.json() as any;
     const sku = `app-tool:${appRef}:echo`;
     const entry = (feed.products || []).find((p: any) => p.id === sku);
     assert(!!entry, `app-tool in feed: ${sku} (${feed.total} products)`);
     assert(entry.price?.amount === 3 && entry.price?.currency === 'MORSEL', `feed price: ${JSON.stringify(entry.price)}`);
-    assert(!(feed.products || []).some((p: any) => p.id === `app-tool:${appRef}:no-binding`), 'unbound tools stay out of the feed');
+    assert(entry.fulfillment === 'call', `callable tool fulfillment hint: ${entry.fulfillment}`);
+    // Phase B: unbound priced tools are purchasable on the task path and list too.
+    const taskEntry = (feed.products || []).find((p: any) => p.id === `app-tool:${appRef}:concierge`);
+    assert(!!taskEntry && taskEntry.fulfillment === 'task', `task tool in feed with hint: ${JSON.stringify(taskEntry)}`);
+    assert(!(feed.products || []).some((p: any) => p.id === `app-tool:${appRef}:unpriced-echo`), 'unpriced tools stay out of the feed');
 });
 
 await test('22. Buy an app-tool call → charged, capability invoked, result on fulfillment.results', async () => {
@@ -409,12 +420,10 @@ await test('22. Buy an app-tool call → charged, capability invoked, result on 
     assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'app owner credited (minus fee)');
 });
 
-await test('23. App-tool failure gates: unknown tool 404, unbound 422, unpriced 422, quantity>1 400, bad app ref 400', async () => {
+await test('23. App-tool failure gates: unknown tool 404, unpriced 422, quantity>1 400, bad app ref 400', async () => {
     const post = (items: unknown) => json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items }) });
     const ghost = await post([{ kind: 'app-tool', app: appRef, tool: 'no-such-tool' }]);
     assert(ghost.status === 404 && ghost.body.error?.code === 'TOOL_NOT_FOUND', `ghost: ${ghost.status} ${ghost.body.error?.code}`);
-    const unbound = await post([{ kind: 'app-tool', app: appRef, tool: 'no-binding' }]);
-    assert(unbound.status === 422 && unbound.body.error?.code === 'TOOL_NOT_CALLABLE', `unbound: ${unbound.status} ${unbound.body.error?.code}`);
     const unpriced = await post([{ kind: 'app-tool', app: appRef, tool: 'unpriced-echo' }]);
     assert(unpriced.status === 422 && unpriced.body.error?.code === 'TOOL_NOT_FOR_SALE', `unpriced: ${unpriced.status} ${unpriced.body.error?.code}`);
     const multi = await post([{ kind: 'app-tool', app: appRef, tool: 'echo', quantity: 2 }]);
@@ -449,6 +458,48 @@ await test('25. Self-purchase of an own app-tool is free and still invokes', asy
     assert(done.status === 200 && done.body.data.session.status === 'completed', `self complete ${done.status}`);
     assert(done.body.data.session.fulfillment?.results?.[0]?.result?.echoed === 'Echo: self call', 'self-call result returned');
     assert(await balance(seller.token) === sellerBefore, 'no charge on self-purchase');
+});
+
+// ─── App-tool TASK path (TARGET-034 phase B): unbound tools fulfill as an agent TASK ───
+
+await test('26. Buy an unbound app-tool → charged, TASK queued for the manifest agent, input on the task', async () => {
+    const buyerBefore = await balance(buyer.token);
+    const sellerBefore = await balance(seller.token);
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'concierge', input: { brief: 'weekly digest' } }], note: 'need it by friday' }),
+    });
+    assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const s0 = create.body.data.session;
+    assert(s0.total === 5, `task-tool session total: ${s0.total}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${s0.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+    const s = done.body.data.session;
+    assert(s.status === 'completed' && s.receipt?.charged === 5, `receipt: ${JSON.stringify(s.receipt)}`);
+    assert(s.receipt.charged === s.receipt.earned + s.receipt.fee, 'fee arithmetic on the task path');
+    assert((s.fulfillment?.taskIds || []).length === 1, `taskIds: ${JSON.stringify(s.fulfillment)}`);
+    assert(!(s.fulfillment?.results || []).length, 'task fulfillment returns no inline result');
+    assert(await balance(buyer.token) === buyerBefore - 5, 'buyer debited');
+    assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'app owner credited (minus fee)');
+    // The TASK landed on the manifest-declared agent (vendor) with the app-tool scope + buyer input.
+    const tasks = await json('/v1/agents/vendor/tasks', { headers: auth(seller.token) });
+    const task = (tasks.body.data.tasks || []).find((t: any) => t.id === s.fulfillment.taskIds[0]);
+    assert(!!task && task.status === 'queued', `task queued for vendor: ${JSON.stringify(task?.status)}`);
+    assert((task.scope || []).some((sc: any) => sc.name === 'app_tool' && sc.value === 'concierge'), `app_tool scope: ${JSON.stringify(task.scope)}`);
+    assert((task.scope || []).some((sc: any) => sc.name === 'commerce_session' && sc.value === s.id), 'commerce_session scope');
+    assert(String(task.description).includes('weekly digest'), 'buyer input rides on the task description');
+});
+
+await test('27. Unbound tool with NO manifest agent → TASK assigned to the app owner GHII', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'no-binding' }] }),
+    });
+    assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+    const s = done.body.data.session;
+    assert(s.status === 'completed' && (s.fulfillment?.taskIds || []).length === 1, `owner-task fulfillment: ${JSON.stringify(s.fulfillment)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

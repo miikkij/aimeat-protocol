@@ -15,6 +15,8 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Feed lists unbound priced tools too (task path) + per-product
+ *     `fulfillment: 'call' | 'task'` hint (TARGET-034 phase B)
  *   v1.1.0 — 2026-07-14 — app-tool products in the feed (sku "app-tool:<owner>/<appId>:<tool>")
  *     + app-tool sku checkout + caller JWT threaded into completeSession (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial ACP merchant surface (TARGET-033 phase 5)
@@ -146,17 +148,21 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       if (products.length >= FEED_CAP) break;
     }
     // Priced app-tools (TARGET-034): every PUBLIC apps.{appId}.tools manifest contributes its
-    // callable, priced tools as products (sku "app-tool:<owner>/<appId>:<tool>").
+    // priced tools as products (sku "app-tool:<owner>/<appId>:<tool>"). `fulfillment` tells the
+    // buyer what completion does: 'call' = the backing capability runs synchronously and the
+    // result rides on the session; 'task' = an agent TASK is queued for the app owner (phase B).
     if (products.length < FEED_CAP) {
       const toolRecs = await storage.listAllMemory({ prefix: 'apps.', limit: 2000 });
       for (const rec of toolRecs.items) {
-        if (!/^apps\.[^.]+\.tools$/.test(rec.key) || rec.visibility !== 'public') continue;
+        // appIds are published filenames and nearly always carry dots ("aimeat-pages.html") —
+        // match greedily between the fixed "apps." prefix and ".tools" suffix.
+        const keyMatch = /^apps\.(.+)\.tools$/.exec(rec.key);
+        if (!keyMatch || rec.visibility !== 'public') continue;
         const parsed = AppToolsDocSchema.safeParse(rec.value);
         if (!parsed.success) continue;
-        const appId = rec.key.split('.')[1] as string;
+        const appId = keyMatch[1] as string;
         const ownerName = rec.ownerGaii.split('@')[0] as string;
         for (const tool of parsed.data.tools) {
-          if (!tool.action_id) continue;
           const morsels = tool.price?.morsels ?? 0;
           if (morsels <= 0 && !tool.priceMoney) continue;
           products.push({
@@ -167,6 +173,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
               ? { amount: morsels, currency: 'MORSEL', unit: 'per-call' }
               : { amount: tool.priceMoney!.amount, currency: tool.priceMoney!.currency, unit: 'per-call', scale: 6 },
             availability: 'in_stock',
+            fulfillment: tool.action_id ? 'call' : 'task',
             seller: { app: `${ownerName}/${appId}` },
           });
           if (products.length >= FEED_CAP) break;

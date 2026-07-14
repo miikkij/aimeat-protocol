@@ -11,6 +11,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.1.0 — 2026-07-14 — Task path (phase B): optional `agent` (task assignee); tools without an
+ *     action_id binding are now purchasable — fulfilled as an agent TASK instead of a capability call
  *   v1.0.0 — 2026-07-14 — Initial app-tool manifest schema (TARGET-034 phase A)
  */
 import { z } from 'zod';
@@ -24,11 +26,16 @@ export const AppToolSchema = z.object({
   /** Free-form JSON-schema-ish shape of the tool input (documentation for buyers). */
   inputSchema: z.record(z.string(), z.unknown()).optional(),
   /**
-   * Phase A fulfillment binding: the backing capability invoked on checkout completion
-   * (e.g. "ext:my-extension:summarize"). Tools without a binding are declarable (forward-ready
-   * for the TASK path, a later phase) but not yet purchasable.
+   * Callable fulfillment binding: the backing capability invoked on checkout completion
+   * (e.g. "ext:my-extension:summarize"). Without a binding the tool is fulfilled as an agent
+   * TASK (phase B) — assigned to `agent`, or to the app owner's GHII when no agent is named.
    */
   action_id: z.string().max(200).optional(),
+  /**
+   * Task-path assignee (phase B): the bare name of the app owner's agent that receives the
+   * fulfillment TASK when the tool has no action_id binding. Ignored for callable tools.
+   */
+  agent: z.string().max(100).optional(),
   /** Morsel price per call. Absent/0 = not for sale cross-owner in morsels. */
   price: z.object({
     morsels: z.number().int().nonnegative(),

@@ -558,29 +558,32 @@ AIMEAT.commerce.microsFromInput('1.50');               // 1500000 (null if not p
 #### Agent-faced apps: priced tools ("app-tool")
 
 An agent-faced app can declare PRICED TOOLS so other principals' agents can buy
-a call — the app becomes a seller on the same commerce core (TARGET-034 phase A,
-callable tools):
+a call — the app becomes a seller on the same commerce core (TARGET-034):
 
 1. **Declare:** the app owner publishes the tool manifest as the PUBLIC memory
    record `apps.{appId}.tools` under their GHII:
-   `{ tools: [{ name, description, inputSchema, action_id, price: { morsels },
-   priceMoney: { amount /* micros */, currency } }] }`. `action_id` binds the
-   tool to a backing capability (e.g. `ext:my-extension:summarize`) — a tool
-   without it is declarable but not yet purchasable (the TASK-fulfillment path
-   is a later phase).
+   `{ tools: [{ name, description, inputSchema, action_id?, agent?,
+   price: { morsels }, priceMoney: { amount /* micros */, currency } }] }`.
+   `action_id` binds the tool to a backing capability (e.g.
+   `ext:my-extension:summarize`) for a synchronous call; a tool WITHOUT it is
+   fulfilled as an agent TASK instead — assigned to the manifest `agent` (bare
+   name of the owner's agent), or to the owner themselves when none is named.
+   The app owner edits all of this in the app-catalog Detail view → Monetize.
 2. **Discover:** anyone reads it — browser: `await
    AIMEAT.commerce.getAppTools(ownerGhii, appId)`; agent/REST:
    `GET /v1/memory/{ownerGhii}/apps.{appId}.tools` (public, no auth). Priced
-   callable tools also appear in `GET /v1/commerce/feed` with sku
-   `app-tool:<owner>/<appId>:<tool>`.
+   tools also appear in `GET /v1/commerce/feed` with sku
+   `app-tool:<owner>/<appId>:<tool>` and `fulfillment: 'call' | 'task'`.
 3. **Buy a call:** one checkout line item `{ kind: 'app-tool',
    app: 'ownerName/appId', tool, input }` through the SAME
    `/v1/commerce/checkout-sessions` lifecycle (one call per line item) —
    browser: `await AIMEAT.commerce.invokeAppTool({ app, tool, input })`. On
-   completion the node charges the buyer, invokes the tool's capability with
-   your `input`, and returns the result on
-   `session.fulfillment.results[0].result` (receipt shows the charge). A
-   failed invoke refunds automatically and leaves the session open.
+   completion the node charges the buyer, then fulfills: a callable tool runs
+   with your `input` and returns the result on
+   `session.fulfillment.results[0].result`; a task tool queues the order as an
+   agent TASK (`session.fulfillment.taskIds[0]`) and the deliverable arrives
+   through the seller's task flow. The receipt shows the charge either way. A
+   failed capability invoke refunds automatically and leaves the session open.
 4. **402 = price tag:** an unpaid call to a priced surface answers HTTP 402
    with the x402-style `accepts` array — the machine-readable "how to pay"
    (also on `err.accepts` in the browser library).
