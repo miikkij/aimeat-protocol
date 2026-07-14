@@ -6,7 +6,8 @@
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
  *   v1.1.0 -- 2026-07-14 -- Phase 5b: Agent Skills discovery index (/.well-known/agent-skills,
- *     RFC v0.2.0) — $schema + entry shape, sha256 digest match, members-only non-leak, 404s
+ *     RFC v0.2.0) — $schema + entry shape, sha256 digest match, members-only non-leak, 404s,
+ *     seeded public aimeat-node-guide present + digest-consistent
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2a)
  */
 
@@ -611,6 +612,11 @@ await test('27b. index.json serves $schema + RFC-shaped entries; public node ski
         assert(typeof s.url === 'string' && s.url.length > 0, `bad url on ${s.name}`);
         assert(/^sha256:[0-9a-f]{64}$/.test(s.digest), `bad digest on ${s.name}: ${s.digest}`);
     }
+    // The seeded public "start here" skill guarantees the index is never empty on any node.
+    assert(idx.skills.some((s: any) => s.name === 'aimeat-node-guide'),
+        `seeded aimeat-node-guide missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
+    // Members-visibility builtin seeds must NOT leak into the public index.
+    assert(!idx.skills.some((s: any) => s.name === 'manage-my-agents'), 'members-only builtin skill leaked into the index');
     if (discoveryIsOperator) {
         const entry = idx.skills.find((s: any) => s.name === 'discovery-pub');
         assert(entry, `discovery-pub missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
@@ -619,6 +625,21 @@ await test('27b. index.json serves $schema + RFC-shaped entries; public node ski
         // The members-visibility node skill from test 27 must NOT leak into the public index.
         assert(!idx.skills.some((s: any) => s.name === 'node-runbook'), 'members-only node skill leaked into the index');
     }
+});
+
+await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash to the index digest', async () => {
+    const idxRes = await rawFetch('/.well-known/agent-skills/index.json');
+    const idx = await idxRes.json() as any;
+    const entry = idx.skills.find((s: any) => s.name === 'aimeat-node-guide');
+    assert(entry, 'aimeat-node-guide missing from index');
+    const res = await rawFetch('/.well-known/agent-skills/aimeat-node-guide/SKILL.md');
+    assert(res.status === 200, `status ${res.status}`);
+    const body = await res.text();
+    const actual = `sha256:${createHash('sha256').update(body, 'utf8').digest('hex')}`;
+    assert(actual === entry.digest, `served bytes hash ${actual} != index digest ${entry.digest}`);
+    assert(body.includes('device-authorize'), 'guide covers agent connection');
+    assert(body.includes('/v1/prompts/build-app'), 'guide covers app building');
+    assert(body.includes('handbook'), 'guide covers handbooks');
 });
 
 await test('27c. SKILL.md URL serves the digested bytes anonymously; members-only + unknown skills 404', async () => {
