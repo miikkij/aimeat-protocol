@@ -9,7 +9,7 @@
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ArchiveFilter
 } from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord, MemoryMetaRow } from '../../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -562,46 +562,6 @@ export const ownerMethods = {
       results.push(record);
     }
     return results;
-  },
-
-  async listMemoryMeta(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
-    // META projection: select metadata + byteSize, NEVER the `value` column (the whole point — a
-    // keyspace of thousands of keys lists without loading/serialising any value). ttlHours + createdAt
-    // are read only to prune lazily-expired rows, then dropped from the result.
-    let sql = 'SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory WHERE ownerGaii = ?';
-    const params: unknown[] = [ownerGaii];
-    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
-    if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
-    sql += archivedSql(opts?.archived);
-
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    const out: MemoryMetaRow[] = [];
-    for (const row of rows) {
-      const ttlHours = row.ttlHours as number | null;
-      if (ttlHours) {
-        const expiresAt = new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000;
-        if (Date.now() > expiresAt) {
-          this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, row.key);
-          continue;
-        }
-      }
-      const tags = JSON.parse((row.tags as string) ?? '[]') as string[];
-      const flagCount = (row.flagCount as number | null) ?? 0;
-      if (opts?.tags?.length && !opts.tags.every(t => tags.includes(t))) continue;
-      if (opts?.maxFlags !== undefined && flagCount > opts.maxFlags) continue;
-      out.push({
-        key: row.key as string,
-        ownerGaii: row.ownerGaii as string,
-        visibility: row.visibility as MemoryMetaRow['visibility'],
-        tags,
-        version: row.version as number,
-        flagCount,
-        byteSize: (row.byteSize as number | null) ?? 0,
-        createdAt: row.createdAt as string,
-        updatedAt: row.updatedAt as string,
-      });
-    }
-    return out;
   },
 
   async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {

@@ -19,5 +19,7 @@ export interface ActionRepository {
   deleteAction(id: string, providerGaii: string): Promise<boolean>;
   deleteActionsByProvider(gaii: string): Promise<number>;
   listActionsByProvider(gaii: string): Promise<ActionRecord[]>;
+  /** COUNT of actions across MANY provider GAIIs in one query (owner-scope "services used" figure). */
+  countActionsForProviders(providerGaiis: string[]): Promise<number>;
   updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null>;
 }

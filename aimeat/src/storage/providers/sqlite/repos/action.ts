@@ -95,6 +95,15 @@ export function listActionsByProvider(db: Database.Database, gaii: string): Acti
   return rows.map(r => deserializeAction(r));
 }
 
+/** COUNT of actions across MANY provider GAIIs in one query — the owner-scope "services used" figure
+ *  for the usage summary (replaces one listActionsByProvider-then-.length per agent). */
+export function countActionsForProviders(db: Database.Database, providerGaiis: string[]): number {
+  if (providerGaiis.length === 0) return 0;
+  const ph = providerGaiis.map(() => '?').join(',');
+  const row = db.prepare(`SELECT COUNT(*) AS c FROM actions WHERE providerGaii IN (${ph})`).get(...providerGaiis) as { c: number };
+  return row.c;
+}
+
 export function updateAction(db: Database.Database, id: string, providerGaii: string, updates: Partial<ActionRecord>): ActionRecord | null {
   const existing = getAction(db, id, providerGaii);
   if (!existing) return null;

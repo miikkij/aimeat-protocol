@@ -68,6 +68,15 @@ export const identityMethods = {
         }));
     },
 
+    async sumStorageBytesForOwners(this: PrismaStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {
+        this.ensureReady();
+        if (ownerGaiis.length === 0) return { bytes: 0, count: 0 };
+        // ONE aggregate (sum of size + row count) across all identities — the owner-scope storage
+        // footprint for the usage summary, instead of listStorageFiles-then-sum PER identity.
+        const agg = await this.prisma.storageFile.aggregate({ where: { ownerGaii: { in: ownerGaiis } }, _sum: { size: true }, _count: true });
+        return { bytes: agg._sum.size ?? 0, count: agg._count ?? 0 };
+    },
+
     async deleteStorageFile(this: PrismaStorage, ownerGaii: string, key: string): Promise<boolean> {
         this.ensureReady();
         try {

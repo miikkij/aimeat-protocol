@@ -43,14 +43,20 @@ export async function listOwnerScopeMemory(
   // writes into its own eco: namespace (resolveIdentity returns its sub verbatim), so its writes are
   // only visible to the owner through this union.
   const identities = [ownerGhii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+  // ONE query across all identities (was one listMemory per identity), then dedup by key GHII-first.
+  const rows = await storage.listMemoryForOwners(identities, opts);
+  return dedupGhiiFirst(rows, identities);
+}
+
+/** Order rows by identity priority (GHII first, then agents, then eco apps — the `identities` order)
+ *  and keep the first occurrence of each key, so the GHII copy wins when a key exists under several
+ *  identities. Mirrors the old per-identity loop's GHII-first dedup. */
+function dedupGhiiFirst<T extends { key: string; ownerGaii: string }>(rows: T[], identities: string[]): T[] {
+  const priority = new Map(identities.map((id, i) => [id, i]));
+  const ranked = [...rows].sort((a, b) => (priority.get(a.ownerGaii) ?? identities.length) - (priority.get(b.ownerGaii) ?? identities.length));
   const seen = new Set<string>();
-  const out: MemoryRecord[] = [];
-  for (const id of identities) {
-    const recs = await storage.listMemory(id, opts);
-    for (const r of recs) {
-      if (!seen.has(r.key)) { seen.add(r.key); out.push(r); }
-    }
-  }
+  const out: T[] = [];
+  for (const r of ranked) { if (!seen.has(r.key)) { seen.add(r.key); out.push(r); } }
   return out;
 }
 
@@ -67,15 +73,9 @@ export async function listOwnerScopeMemoryMeta(
   const agents = await storage.getAgentsByOwner(ownerName);
   const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
   const identities = [ownerGhii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
-  const seen = new Set<string>();
-  const out: MemoryMetaRow[] = [];
-  for (const id of identities) {
-    const recs = await storage.listMemoryMeta(id, opts);
-    for (const r of recs) {
-      if (!seen.has(r.key)) { seen.add(r.key); out.push(r); }
-    }
-  }
-  return out;
+  // ONE value-free query across all identities, then dedup by key GHII-first.
+  const rows = await storage.listMemoryMetaForOwners(identities, opts);
+  return dedupGhiiFirst(rows, identities);
 }
 
 /** Read ONE key across the owner's GHII + all the owner's agents (GHII first). null if found nowhere. */

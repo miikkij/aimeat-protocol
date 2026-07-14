@@ -72,6 +72,7 @@ import type { Storage, ChunkedUploadRecord } from '../../interface.js';
 
 import type { PrismaInternals } from './methods/internal.js';
 import { ownerMethods } from './methods/owners.js';
+import { ownerMemoryScopeMethods } from './methods/owner-memory-scope.js';
 import { workMethods } from './methods/work.js';
 import { identityMethods } from './methods/identity.js';
 import { governanceMethods } from './methods/governance.js';
@@ -135,11 +136,32 @@ export class PrismaStorage {
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
         await this.backfillArchiveFlag();
+        await this.ensureMemoryTextIndex();
         // byteSize backfill runs in the BACKGROUND — it may touch every legacy row, so it must not
         // delay readiness. Rows self-heal within moments of startup; the quota + meta listing read the
         // exact size once a row is backfilled (or on its next write). Best-effort.
         void this.backfillMemoryByteSize().catch(err =>
             logger.warn(`byteSize backfill failed: ${(err as { message?: string })?.message ?? err}`));
+    }
+
+    /**
+     * Ensure the MongoDB `$text` index on Memory.searchBlob exists so searchText() runs an INDEXED text
+     * search instead of a per-token regex full-scan (which was ~650ms over one owner's ~12k rows).
+     * Idempotent createIndexes — a no-op once the index is present. MongoDB-only (Postgres uses its own
+     * search path); best-effort, so a failure just leaves searchText on its scan fallback. Fast on any
+     * realistic collection; awaited so search is indexed immediately after startup.
+     */
+    private async ensureMemoryTextIndex(): Promise<void> {
+        if (!this.prisma || this.backendKind() !== 'mongodb') return;
+        try {
+            await this.prisma.$runCommandRaw({
+                createIndexes: 'Memory',
+                indexes: [{ key: { searchBlob: 'text' }, name: 'searchBlob_text' }],
+            });
+            logger.info('Memory searchBlob $text index ensured');
+        } catch (err) {
+            logger.warn(`Memory $text index not created (searchText uses its scan fallback): ${(err as { message?: string })?.message ?? err}`);
+        }
     }
 
     /**
@@ -262,6 +284,7 @@ export interface PrismaStorage extends Storage, PrismaInternals {}
 Object.assign(
   PrismaStorage.prototype,
   ownerMethods,
+  ownerMemoryScopeMethods,
   workMethods,
   identityMethods,
   governanceMethods,

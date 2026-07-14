@@ -86,6 +86,14 @@ export interface MemoryRepository {
    */
   listMemoryMeta(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]>;
   /**
+   * List memory across MANY owner identities in ONE query (ownerGaii IN …) — the owner-scope union in
+   * a single round-trip instead of one {@link listMemory} per identity (an owner with ~100 agents was
+   * ~65 serial reads). Rows may contain the same key under several identities; the caller
+   * (services/owner-memory.ts) dedups GHII-first. `*Meta` is the value-free variant for ?include=meta.
+   */
+  listMemoryForOwners(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
+  listMemoryMetaForOwners(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]>;
+  /**
    * Count DISTINCT memory keys across the given owner identities (GHII + agents + GEAIs) — cheap
    * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
    * (e.g. "N Muistit") that need only the number, not the records.

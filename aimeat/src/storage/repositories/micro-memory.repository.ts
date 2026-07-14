@@ -16,6 +16,9 @@ export interface MicroMemoryRepository {
   setMicroMemory(record: MicroMemoryRecord): Promise<MicroMemoryRecord>;
   getMicroMemory(gaii: string, set: string): Promise<MicroMemoryRecord | null>;
   listMicroMemorySets(gaii: string): Promise<MicroMemoryRecord[]>;
+  /** Total micro-memory bytes + set count across MANY identities in ONE query (usage summary; keeps it
+   *  off a per-identity fan-out over this deprecated subsystem). */
+  getMicroMemoryTotalForOwners(gaiis: string[]): Promise<{ bytes: number; sets: number }>;
   deleteMicroMemory(gaii: string, set: string): Promise<boolean>;
   deleteMicroMemoryEntry(gaii: string, set: string, key: string): Promise<boolean>;
   findMicroMemoryByAccessCode(set: string, accessCode: string): Promise<MicroMemoryRecord | null>;

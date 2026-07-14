@@ -157,6 +157,29 @@ export function listMicroMemorySets(db: Database.Database, gaii: string): MicroM
   return rows.map(r => deserializeMicroMemory(r));
 }
 
+/** Total storage bytes + file count across MANY owner identities in ONE SQL query — the owner-scope
+ *  footprint for the usage summary (replaces one listStorageFiles-then-sum per identity). */
+export function sumStorageBytesForOwners(db: Database.Database, ownerGaiis: string[]): { bytes: number; count: number } {
+  if (ownerGaiis.length === 0) return { bytes: 0, count: 0 };
+  const ph = ownerGaiis.map(() => '?').join(',');
+  const row = db.prepare(`SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS count FROM storage_files WHERE ownerGaii IN (${ph})`).get(...ownerGaiis) as { bytes: number; count: number };
+  return { bytes: row.bytes, count: row.count };
+}
+
+/** Total micro-memory bytes + set count across MANY identities in ONE query (deprecated subsystem;
+ *  this keeps the usage summary off a per-identity fan-out over it). */
+export function getMicroMemoryTotalForOwners(db: Database.Database, gaiis: string[]): { bytes: number; sets: number } {
+  if (gaiis.length === 0) return { bytes: 0, sets: 0 };
+  const ph = gaiis.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT entries FROM micro_memory WHERE gaii IN (${ph})`).all(...gaiis) as Array<{ entries: string | null }>;
+  let bytes = 0;
+  for (const r of rows) {
+    const entries = JSON.parse(r.entries ?? '{}') as Record<string, unknown>;
+    for (const [k, v] of Object.entries(entries)) bytes += Buffer.byteLength(k, 'utf8') + Buffer.byteLength(String(v), 'utf8');
+  }
+  return { bytes, sets: rows.length };
+}
+
 export function deleteMicroMemory(db: Database.Database, gaii: string, set: string): boolean {
   const result = db.prepare('DELETE FROM micro_memory WHERE gaii = ? AND setName = ?').run(gaii, set);
   return result.changes > 0;

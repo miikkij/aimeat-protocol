@@ -90,6 +90,27 @@ export const workMethods = {
         return rows.map((r: PrismaRow) => this.toActionRecord(r));
     },
 
+    async countActionsForProviders(this: PrismaStorage, providerGaiis: string[]): Promise<number> {
+        this.ensureReady();
+        if (providerGaiis.length === 0) return 0;
+        // One count across all the owner's agents — the "services used" figure for the usage summary.
+        return this.prisma.action.count({ where: { providerGaii: { in: providerGaiis } } });
+    },
+
+    async getMicroMemoryTotalForOwners(this: PrismaStorage, gaiis: string[]): Promise<{ bytes: number; sets: number }> {
+        this.ensureReady();
+        if (gaiis.length === 0) return { bytes: 0, sets: 0 };
+        // One query over the (deprecated) micro-memory sets for all identities, summed in JS — keeps the
+        // usage summary off a per-identity fan-out. Sets are tiny; loading them once is cheap.
+        const rows = await this.prisma.microMemory.findMany({ where: { gaii: { in: gaiis } }, select: { entries: true } });
+        let bytes = 0;
+        for (const r of rows) {
+            const entries = (r.entries ?? {}) as Record<string, unknown>;
+            for (const [k, v] of Object.entries(entries)) bytes += Buffer.byteLength(k, 'utf8') + Buffer.byteLength(String(v), 'utf8');
+        }
+        return { bytes, sets: rows.length };
+    },
+
     async updateAction(this: PrismaStorage, id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null> {
         this.ensureReady();
         try {

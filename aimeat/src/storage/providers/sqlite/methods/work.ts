@@ -9,6 +9,8 @@ import type {
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord, BoardSubscriptionRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { countActionsForProviders as countActionsForProvidersRepo } from '../repos/action.js';
+import { getMicroMemoryTotalForOwners as getMicroMemoryTotalForOwnersRepo } from '../repos/storage-file.js';
 
 export const workMethods = {
   // ── Actions ──
@@ -72,6 +74,14 @@ export const workMethods = {
   async listActionsByProvider(this: SqliteStorage, gaii: string): Promise<ActionRecord[]> {
     const rows = this.db.prepare('SELECT * FROM actions WHERE providerGaii = ?').all(gaii) as Record<string, unknown>[];
     return rows.map(r => this.deserializeAction(r));
+  },
+
+  async countActionsForProviders(this: SqliteStorage, providerGaiis: string[]): Promise<number> {
+    return countActionsForProvidersRepo(this.db, providerGaiis);
+  },
+
+  async getMicroMemoryTotalForOwners(this: SqliteStorage, gaiis: string[]): Promise<{ bytes: number; sets: number }> {
+    return getMicroMemoryTotalForOwnersRepo(this.db, gaiis);
   },
 
   async updateAction(this: SqliteStorage, id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null> {
