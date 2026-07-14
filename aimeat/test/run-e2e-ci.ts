@@ -123,6 +123,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-consent.ts',
     'test/e2e-mcp-chat-instances.ts',
     'test/e2e-mcp-flags.ts',
+    'test/e2e-mcp-commerce.ts',
     'test/e2e-mcp-prompts.ts',
     'test/e2e-packages.ts',
     'test/e2e-micro-memory.ts',

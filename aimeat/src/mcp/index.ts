@@ -49,6 +49,7 @@ import { registerCatalogueTools } from './catalogue.js';
 import { registerMemoryExtendedTools } from './memory-extended.js';
 import { registerWalletExtendedTools } from './wallet-extended.js';
 import { registerConsentTools } from './consent.js';
+import { registerCommerceTools } from './commerce.js';
 import { registerChatInstancesTools } from './chat-instances.js';
 import { registerFlagsTools } from './flags.js';
 import { registerPromptsTools } from './prompts.js';
@@ -144,6 +145,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

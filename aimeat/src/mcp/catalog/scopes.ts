@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.4.0 -- 2026-07-14 -- Commerce scopes (commerce:sell / commerce:buy) for the MCP commerce
+ *     tools — deliberately stricter than the requireAuth-only REST commerce routes (documented
+ *     divergence: PSP secrets + owner-balance spending warrant least-privilege on the agent surface).
  *   v1.3.0 -- 2026-06-25 -- Specialist scope-consent (declare→consent→grant): SPECIALIST_REQUESTED_SCOPES
  *     (the extras a role would LIKE beyond the conservative baseline), SCOPE_DESCRIPTIONS (plain-language
  *     consent vocabulary), requestedExtras()/describeScopes(). The granted-by-default MCP_SCOPE_PROFILES
@@ -99,6 +102,21 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_dm_send_as_owner: 'messages:send-as-owner',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
+
+    // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
+    // today — these MCP tools are gated STRICTER than REST on purpose (selling config touches
+    // PSP secrets; buying spends the owner's balance). commerce:sell = seller-side config (PSP,
+    // app-tool manifests, offer pricing); commerce:buy = spending through checkout sessions.
+    // Owner-attached '*' agents get both; granular agents opt in per scope.
+    aimeat_commerce_psp_set: 'commerce:sell',
+    aimeat_commerce_psp_status: 'commerce:sell',
+    aimeat_commerce_psp_delete: 'commerce:sell',
+    aimeat_app_tools_publish: 'commerce:sell',
+    aimeat_offer_price_set: 'commerce:sell',
+    // aimeat_app_tools_get is intentionally ungated — it reads PUBLIC manifests (own always).
+    aimeat_checkout_open: 'commerce:buy',
+    aimeat_checkout_complete: 'commerce:buy',
+    aimeat_checkout_list: 'commerce:buy',
 };
 
 /** The scope required to use a tool, or undefined if the tool is not scope-gated. */
