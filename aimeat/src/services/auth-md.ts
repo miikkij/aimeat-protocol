@@ -14,6 +14,8 @@
  *   import { buildAuthMd } from '../services/auth-md.js';
  *   const authMd = buildAuthMd(config);  // once per boot; serve as text/markdown
  * @version-history
+ *   v1.1.0 — 2026-07-14 — H1 carries the literal "auth.md" token (isitagentready validator
+ *     marks the document valid by an H1 containing "auth.md")
  *   v1.0.0 — 2026-07-14 — Initial: auth.md agent-registration document (agent readiness)
  */
 import type { AimeatConfig } from '../config.js';
@@ -22,7 +24,7 @@ import type { AimeatConfig } from '../config.js';
 export function buildAuthMd(config: AimeatConfig): string {
   const b = config.baseUrl;
   const scopes = config.defaultAgentScopes.join(', ');
-  return `# Agent authentication — AIMEAT node \`${config.nodeId}\`
+  return `# auth.md — agent authentication for AIMEAT node \`${config.nodeId}\`
 
 > This document is for AI agents. Humans: use the portal at ${b}/ instead.
 

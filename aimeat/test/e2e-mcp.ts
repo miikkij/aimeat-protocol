@@ -190,6 +190,7 @@ await test('1. OAuth metadata discovery', async () => {
     assert(typeof body.skill === 'string' && body.skill.endsWith('/auth.md'), `skill pointer: ${body.skill}`);
     const aa = body.agent_auth;
     assert(aa && typeof aa === 'object', 'has agent_auth block');
+    assert(typeof aa.skill === 'string' && aa.skill.endsWith('/auth.md'), `agent_auth.skill: ${aa.skill}`);
     assert(aa.register_uri.endsWith('/v1/agents/device-authorize'), `register_uri: ${aa.register_uri}`);
     assert(aa.claim_uri.endsWith('/v1/agents/device-token'), `claim_uri: ${aa.claim_uri}`);
     assert(aa.token_uri.endsWith('/v1/auth/token'), `token_uri: ${aa.token_uri}`);
@@ -213,6 +214,9 @@ await test('1b. /auth.md serves agent-registration instructions as text/markdown
     const ct = res.headers.get('content-type') ?? '';
     assert(ct.includes('text/markdown'), `content-type ${ct}`);
     const md = await res.text();
+    // The validator recognizes the document by an H1 containing "auth.md".
+    const h1 = md.split('\n').find(l => l.startsWith('# ')) ?? '';
+    assert(h1.toLowerCase().includes('auth.md'), `H1 must contain "auth.md": ${h1}`);
     // The document must describe THIS node's real flow, not boilerplate.
     assert(md.includes(NODE_ID), 'names this node');
     assert(md.includes('/v1/agents/device-authorize'), 'covers device-authorize');
