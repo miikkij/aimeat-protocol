@@ -16,6 +16,7 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.1.1 — 2026-07-14 — Fee rounding through the money.ts chokepoint (percentFee)
  *   v1.1.0 — 2026-07-13 — Fee leg routed via settleMarketplaceFee (operator|burn), TARGET-033 phase 2
  *   v1.0.0 — 2026-03-13 — Renamed from marketplace.ts to app-store.ts; routes /v1/marketplace/* → /v1/app-store/*
  */
@@ -28,6 +29,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 import { settleMarketplaceFee } from '../services/marketplace-fee.js';
+import { percentFee } from '../commerce/money.js';
 
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -82,7 +84,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
         // Transaction fee
         const feePercent = config.marketplaceTransactionFeePercent ?? 5;
-        const transactionFee = Math.ceil(price * feePercent / 100);
+        const transactionFee = percentFee(price, feePercent);
         const totalCost = price;
 
         // Debit buyer (atomic — resolves GAII to GHII internally)

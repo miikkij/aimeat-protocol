@@ -27,9 +27,12 @@
  *   v2.3.0 -- 2026-06-16 -- Richer Offerings: deliverable `format` gains `'json'` (structured render of
  *     the sample + live deliverables); offers gain `dependsOn` (upstream-offer / signal prerequisites)
  *     surfaced + gated on the card. Both additive/optional → existing docs validate unchanged.
+ *   v2.4.0 -- 2026-07-14 -- priceMoney currency enum sourced from the money.ts chokepoint
+ *     (MONEY_CURRENCIES) instead of an inline ['EUR','USD'] literal. Same accepted values.
  */
 import { z } from 'zod';
 import { SignalSchema } from './workflow-schemas.js';
+import { MONEY_CURRENCIES } from '../commerce/money.js';
 
 // ── v2: billable / listable / callable ──────────────────────────────────────
 // Concrete morsel price for cross-owner invocation. `null`/absent = not for sale (self-use only).
@@ -151,7 +154,7 @@ export const OfferSchema = z.object({
   // on the seller's account, never the node's. Additive → existing docs validate unchanged.
   priceMoney: z.object({
     amount: z.number().int().positive(),
-    currency: z.enum(['EUR', 'USD']),
+    currency: z.enum(MONEY_CURRENCIES),
   }).nullable().optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time
   callable: CallableSchema.optional(),

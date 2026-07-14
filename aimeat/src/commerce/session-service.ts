@@ -13,6 +13,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.0.1 — 2026-07-14 — Fee rounding through the money.ts chokepoint (percentFee)
  *   v2.0.0 — 2026-07-13 — Resolver registry + collect/payout orchestration + distribute seam (phase 4)
  *   v1.0.0 — 2026-07-13 — Initial session service (TARGET-033 phase 1)
  */
@@ -24,7 +25,7 @@ import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
-import { isMoneyCurrency } from './money.js';
+import { isMoneyCurrency, percentFee } from './money.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 
 export { CommerceError } from './errors.js';
@@ -282,7 +283,7 @@ export async function completeSession(
   const feePct = commerceFeePercent(config);
   const lines = session.items.map((item) => {
     const gross = item.unitPrice * item.quantity;
-    const fee = Math.ceil(gross * feePct / 100);
+    const fee = percentFee(gross, feePct);
     return { item, gross, fee, net: gross - fee };
   });
   const totalFee = lines.reduce((n, l) => n + l.fee, 0);

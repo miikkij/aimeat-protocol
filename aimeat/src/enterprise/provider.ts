@@ -9,6 +9,8 @@
  * @usage const provider = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
  *        await provider.mountRoutes(app);
  * @version-history
+ *   v0.3.0 — 2026-07-14 — add ctx.money: the commerce money chokepoint (src/commerce/money.ts)
+ *     injected whole, so the EE module never does inline micros math (TARGET-033 phase 7c)
  *   v0.2.0 — 2026-07-13 — add optional getPaymentHandlers() (commerce core seam, TARGET-033)
  *   v0.1.0 — 2026-06-23 — initial enterprise seam (experiment skeleton)
  */
@@ -22,6 +24,7 @@ import type { logger as loggerInst } from '../utils/logger.js';
 import type { PaymentHandler } from '../commerce/types.js';
 import type { SellableResolver } from '../commerce/sellable-resolvers.js';
 import type { safeFetch as safeFetchFn } from '../utils/url-validator.js';
+import type * as moneyChokepoint from '../commerce/money.js';
 
 /**
  * Everything the EE module needs, injected by core. The EE module is plain ESM JS in a separate
@@ -58,6 +61,13 @@ export interface EnterpriseContext {
   safeFetch: typeof safeFetchFn;
   /** Typed commerce error factory — EE-thrown errors keep their status codes through the adapters. */
   commerceError: (code: string, statusCode: number, message: string) => Error;
+  /**
+   * The commerce money chokepoint (src/commerce/money.ts), injected whole: micros↔Stripe minor,
+   * micros↔USDC raw, percent fee/cut rounding, currency validation, formatting. ALL money math in
+   * the EE module goes through this — never inline ÷10000/×1e6 (invariant: money = 6-decimal
+   * micro-units at storage, rail precision only at settlement).
+   */
+  money: typeof moneyChokepoint;
   logger: typeof loggerInst;
 }
 

@@ -7,7 +7,9 @@
  *   dependency on the EE module — it is resolved at runtime by filesystem path.
  * @structure buildEnterpriseContext() · loadEnterpriseProvider()
  * @usage const provider = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
- * @version-history v0.1.0 — 2026-06-23 — initial enterprise loader (experiment skeleton)
+ * @version-history
+ *   v0.2.0 — 2026-07-14 — inject the money chokepoint (ctx.money) into the enterprise context
+ *   v0.1.0 — 2026-06-23 — initial enterprise loader (experiment skeleton)
  */
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -20,6 +22,7 @@ import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { settleMarketplaceFee, commerceFeePercent } from '../services/marketplace-fee.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { CommerceError } from '../commerce/errors.js';
+import * as money from '../commerce/money.js';
 import { logger } from '../utils/logger.js';
 import { stubEnterpriseProvider, type EnterpriseContext, type EnterpriseProvider } from './provider.js';
 
@@ -43,6 +46,7 @@ export function buildEnterpriseContext(config: AimeatConfig, storage: Storage): 
     commerceFeePercent: () => commerceFeePercent(config),
     safeFetch,
     commerceError: (code, statusCode, message) => new CommerceError(code, statusCode, message),
+    money,
     logger,
   };
 }
