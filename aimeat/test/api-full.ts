@@ -5,6 +5,8 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Markdown for Agents tests: Accept: text/markdown negotiation on
+ *     / + /v1/portal + /v1/connect (content-type, x-markdown-tokens, Vary), HTML/JSON unchanged
  *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 api-catalog, and RFC 8288 Link-header tests
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -116,6 +118,57 @@ await test('GET / bootstrap', async () => {
     assert(d.getting_started, 'missing getting_started (backward compat)');
     assert(d.core_system, 'missing core_system');
     assert(d.this_node, 'missing this_node');
+});
+
+await test('GET / with Accept: text/markdown — Markdown for Agents landing', async () => {
+    const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/markdown' } });
+    assert(res.status === 200, `status ${res.status}`);
+    const ct = res.headers.get('content-type') ?? '';
+    assert(ct.includes('text/markdown'), `content-type: ${ct}`);
+    const tokens = Number(res.headers.get('x-markdown-tokens'));
+    assert(Number.isInteger(tokens) && tokens > 0, `x-markdown-tokens: ${res.headers.get('x-markdown-tokens')}`);
+    assert((res.headers.get('vary') ?? '').toLowerCase().includes('accept'), `vary: ${res.headers.get('vary')}`);
+    const md = await res.text();
+    assert(md.startsWith('# '), 'body is markdown (starts with a heading)');
+    assert(md.includes('/llms.txt'), 'landing links the agent manual');
+    assert(md.includes('/auth.md'), 'landing links agent registration');
+});
+
+await test('GET / with Accept: text/html — browsers still get HTML', async () => {
+    const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' }, redirect: 'manual' });
+    if (res.status === 302) {
+        // Default portal: humans are redirected to the SPA.
+        assert((res.headers.get('location') ?? '').includes('/v1/portal'), `location: ${res.headers.get('location')}`);
+    } else {
+        // Custom operator template: served inline as HTML.
+        assert(res.status === 200, `status ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('text/html'), `content-type: ${res.headers.get('content-type')}`);
+    }
+});
+
+await test('GET /v1/portal negotiates markdown; HTML and API JSON stay untouched', async () => {
+    const md = await fetch(`${BASE}/v1/portal`, { headers: { Accept: 'text/markdown' } });
+    assert(md.status === 200, `md status ${md.status}`);
+    assert((md.headers.get('content-type') ?? '').includes('text/markdown'), `md content-type: ${md.headers.get('content-type')}`);
+    assert(Number(md.headers.get('x-markdown-tokens')) > 0, 'x-markdown-tokens present');
+    const html = await fetch(`${BASE}/v1/portal`, { headers: { Accept: 'text/html' } });
+    assert(html.status === 200, `html status ${html.status}`);
+    assert((html.headers.get('content-type') ?? '').includes('text/html'), `html content-type: ${html.headers.get('content-type')}`);
+    // API JSON endpoints never markdown-negotiate.
+    const api = await fetch(`${BASE}/v1/health`, { headers: { Accept: 'text/markdown' } });
+    assert((api.headers.get('content-type') ?? '').includes('application/json'), `api content-type: ${api.headers.get('content-type')}`);
+});
+
+await test('GET /v1/connect negotiates markdown (static info page HTML→md conversion)', async () => {
+    const res = await fetch(`${BASE}/v1/connect`, { headers: { Accept: 'text/markdown' } });
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('text/markdown'), `content-type: ${res.headers.get('content-type')}`);
+    assert(Number(res.headers.get('x-markdown-tokens')) > 0, 'x-markdown-tokens present');
+    assert(Number(res.headers.get('x-original-tokens')) > 0, 'x-original-tokens present (converted from HTML)');
+    const md = await res.text();
+    assert(!/<(script|style|div|body)\b/i.test(md), 'no HTML tags leak into the markdown');
+    const browser = await fetch(`${BASE}/v1/connect`, { headers: { Accept: 'text/html' } });
+    assert((browser.headers.get('content-type') ?? '').includes('text/html'), `browser content-type: ${browser.headers.get('content-type')}`);
 });
 
 await test('GET /llms.txt — contains builder guide', async () => {

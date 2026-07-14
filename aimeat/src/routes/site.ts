@@ -13,6 +13,8 @@
  *            (currently { secretary }) so the SPA shell can hide optional surfaces when disabled.
  *   v1.4.0 — 2026-07-14 — WebMCP bridge note: the script injection lives in SiteService
  *            .getPortalHtml (the chokepoint both GET / routes share), not here (TARGET-034 C).
+ *   v1.5.0 — 2026-07-14 — Markdown for Agents: GET / converts the portal HTML to markdown
+ *            when Accept prefers text/markdown; Vary: Accept.
  */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -22,6 +24,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
 import { injectCspNonce } from '../utils/csp-nonce.js';
+import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
     const router = Router();
@@ -37,16 +40,22 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         next();
     };
 
-    // GET / — Serve the portal HTML
+    // GET / — Serve the portal HTML (Markdown for Agents: Accept: text/markdown gets a
+    // markdown rendering of the same portal content; browsers keep the HTML).
     router.get('/', async (req, res) => {
         if (!config.siteEnabled) {
             res.status(404).send('Portal not enabled');
             return;
         }
         try {
+            res.vary('Accept');
             const langParam = req.query.lang as string | undefined;
             const html = await site.getPortalHtml(langParam, req.headers.cookie, req.headers['accept-language']);
             res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
+            if (prefersMarkdown(req)) {
+                sendMarkdown(res, htmlToMarkdown(html), html);
+                return;
+            }
             // Stamp the per-request CSP nonce so operator-template inline <script> runs.
             res.type('text/html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
         } catch (err) {

@@ -4577,13 +4577,22 @@ paths:
       operationId: bootstrap
       summary: Bootstrap endpoint
       description: |
-        Entry point for AI self-integration. Returns protocol info, capabilities,
-        and onboarding hints. No authentication required.
+        Entry point for AI self-integration. Content-negotiated (Vary: Accept):
+        Accept: text/html serves the human portal (custom template or SPA redirect);
+        Accept: text/markdown (Markdown for Agents convention, or ?format=md) serves a
+        markdown landing page with x-markdown-tokens / x-original-tokens estimate headers;
+        everything else (and ?format=json) returns this JSON bootstrap document with
+        protocol info, capabilities, and onboarding hints. No authentication required.
+        The same markdown negotiation covers the public info pages /v1/portal,
+        /v1/privacy, /v1/terms, and /v1/connect (+ /fi variants).
       tags: [Bootstrap]
       responses:
         '200':
-          description: Node bootstrap information
+          description: Node bootstrap information (JSON), portal HTML, or markdown landing per Accept
           content:
+            text/markdown:
+              schema:
+                type: string
             application/json:
               schema:
                 allOf:

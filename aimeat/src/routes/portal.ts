@@ -33,6 +33,10 @@
  *   v1.8.0 — 2026-06-20 — Add /v1/app-grant SPA route (H-2 consent page) and inject
  *     window.__APP_ORIGIN_ENABLED into the SPA shell so launchers open apps top-level when
  *     the app origin is provisioned.
+ *   v1.9.0 — 2026-07-14 — Markdown for Agents: /v1/portal and the static info pages
+ *     (privacy/terms/connect) negotiate Accept: text/markdown — the portal serves the
+ *     authored landing markdown, static pages an HTML→markdown conversion; Vary: Accept.
+ *     Authenticated SPA app routes stay HTML-only by design.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -48,6 +52,7 @@ import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -345,8 +350,16 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     res.type('application/javascript').send(buildStandaloneSnippetJs(config));
   });
 
-  // GET /v1/portal — serve the SPA shell (handles both main portal and ?view=dev)
+  // GET /v1/portal — serve the SPA shell (handles both main portal and ?view=dev).
+  // Markdown for Agents: the shell has no readable content, so Accept: text/markdown
+  // gets the authored landing markdown instead. Only this public landing negotiates —
+  // the authenticated SPA app routes below stay HTML-only.
   router.get('/v1/portal', (_req, res) => {
+    res.vary('Accept');
+    if (prefersMarkdown(_req)) {
+      sendMarkdown(res, buildLandingMarkdown(config));
+      return;
+    }
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
       serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
@@ -587,6 +600,14 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     if (isPrivacyPage || isTermsPage || isConnectPage) {
       const vars = templateVars(config, locale);
       html = html.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => vars[key] ?? `{{${key}}}`);
+    }
+
+    // Markdown for Agents: these are public info pages — serve a markdown rendering of
+    // the substituted page when the client prefers text/markdown.
+    res.vary('Accept');
+    if (prefersMarkdown(_req)) {
+      sendMarkdown(res, htmlToMarkdown(html), html);
+      return;
     }
 
     const nonce = res.locals.cspNonce as string || '';
