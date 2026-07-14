@@ -10446,6 +10446,26 @@ paths:
         '404':
           description: Unknown skill, or one not publicly readable
 
+  /auth.md:
+    get:
+      operationId: authMd
+      summary: Agent registration instructions (auth.md convention)
+      description: >-
+        Markdown document (workos.com/auth.md convention) telling an AI agent how to get an
+        identity on this node: the RFC 8628 device-authorization flow (device-authorize →
+        owner approves in the portal Agents tab → device-token claim), how to use and re-mint
+        the credential (Ed25519-signed /v1/auth/token), scopes, revocation, GEAI ecosystem-app
+        onboarding, and an error/retry table. Generated from node config — endpoints and scope
+        defaults are this node's real values. Machine-readable companion: the `agent_auth`
+        block on /.well-known/oauth-authorization-server.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Agent registration instructions
+          content:
+            text/markdown:
+              schema: { type: string }
+
   # ── Commerce (TARGET-033) ─────────────────────────────────────
   /v1/commerce/orders:
     get:
@@ -13953,12 +13973,19 @@ paths:
   /.well-known/oauth-authorization-server:
     get:
       operationId: oauthServerMetadata
-      summary: OAuth 2.0 Authorization Server Metadata
-      description: RFC 8414 discovery document for MCP OAuth integration.
+      summary: OAuth 2.0 Authorization Server Metadata + agent registration discovery
+      description: >-
+        RFC 8414 discovery document for MCP OAuth integration, extended per the auth.md
+        convention (github.com/workos/auth.md) with a `skill` pointer to /auth.md and an
+        `agent_auth` block: register_uri (RFC 8628 device-authorize), claim_uri
+        (device-token), verification_uri, token_uri (Ed25519 re-auth), revocation_uri,
+        device_code grant, credential types (ed25519_keypair, bearer_jwt), the owner-approval
+        requirement, the node's default agent scopes, and the three identity types
+        (GHII / GAII / GEAI) with their registration + claim entry points.
       tags: [MCP]
       responses:
         '200':
-          description: OAuth server metadata
+          description: OAuth server metadata (with agent_auth block)
           content:
             application/json:
               schema:
