@@ -8,6 +8,8 @@
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
  *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
+ *   v1.2.0 — 2026-07-14 — Perf: GET /v1/catalogue/knowledge finds manifests via ONE listAllMemory key
+ *     scan + cache, instead of a listMemory per owner AND per agent on every (uncached) request.
  */
 import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
@@ -308,41 +310,31 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const language = req.query.language as string | undefined;
     const sort = (req.query.sort as string) || 'recent';
 
-    // Find all public package manifests across GHIIs and agents
-    const seen = new Set<string>();
-    let manifests: Array<{ key: string; value: KnowledgePackageManifest; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
-
-    const collectManifests = async (gaii: string) => {
-      const records = await storage.listMemory(gaii, {
-        prefix: 'packages/',
-        visibility: 'public',
-        tags: ['knowledge-package'],
-      });
-      for (const m of records) {
-        if (m.key.endsWith('/manifest') && !seen.has(m.key) && (m.value as KnowledgePackageManifest)?.type === 'knowledge-package') {
-          seen.add(m.key);
-          manifests.push({
-            key: m.key,
-            value: m.value as KnowledgePackageManifest,
-            ownerGaii: m.ownerGaii,
-            tags: m.tags,
-            createdAt: m.createdAt,
-            updatedAt: m.updatedAt,
-          });
+    // All public knowledge-package manifests on the node, found by ONE key-indexed query over the
+    // `packages/` public keyspace (was a listMemory PER owner AND PER agent — 100+ scans on every hit
+    // of this uncached public route). Cached like the sibling catalogue lists; invalidated on any memory
+    // write. Memory is keyed `packages/{...}/manifest` by the WRITER (owner GHII or agent GAII), so a
+    // node-wide key scan surfaces every publisher's packages in one pass.
+    const allManifests = await cached(
+      'cat:knowledge:manifests', TTL.catalogue,
+      async () => {
+        const { items } = await storage.listAllMemory({ prefix: 'packages/', visibility: 'public', limit: 10000 });
+        const seen = new Set<string>();
+        const out: Array<{ key: string; value: KnowledgePackageManifest; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
+        for (const m of items) {
+          if (m.key.endsWith('/manifest') && !seen.has(m.key)
+            && m.tags?.includes('knowledge-package')
+            && (m.value as KnowledgePackageManifest)?.type === 'knowledge-package') {
+            seen.add(m.key);
+            out.push({ key: m.key, value: m.value as KnowledgePackageManifest, ownerGaii: m.ownerGaii, tags: m.tags, createdAt: m.createdAt, updatedAt: m.updatedAt });
+          }
         }
-      }
-    };
-
-    // Search owner (GHII) namespaces — packages imported via web UI
-    const allOwners = await storage.listOwners();
-    for (const owner of allOwners) {
-      await collectManifests(`${owner.name}@${config.nodeId}`);
-    }
-    // Search agent (GAII) namespaces — packages imported via MCP/agent API
-    const allAgents = await storage.listAgents();
-    for (const agent of allAgents) {
-      await collectManifests(agent.gaii);
-    }
+        return out;
+      },
+      ['domain:memory', 'domain:catalogue'],
+    );
+    // Copy before per-request filter/sort so an in-place sort never mutates the shared cached array.
+    let manifests = [...allManifests];
 
     // Apply filters
     if (contentType) {
