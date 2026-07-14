@@ -12,6 +12,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Agent face section (Agent Face phase 3): the three agent surfaces
+ *     (read=face, act=WebMCP tools, learn=bound skill), the six face rules, and the
+ *     AIMEATAgentFace.publish snippet (aimeat-agentface.js, phase 2)
  *   v1.1.0 — 2026-07-14 — aimeat-commerce.js added to the Economy & agents library group
  *     (checkout sessions, offer prices, micro-unit money formatting; TARGET-033)
  *   v1.0.0 — 2026-07-13 — ported verbatim from app-catalog buildPromptFromBuilder() (cortex.js)
@@ -176,6 +179,35 @@ export function buildAppPrompt(
   body += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
   body += '```\n';
   body += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
+
+  // Agent face — the markdown read-surface agents get on the app URL
+  body += '### Agent face (markdown read-surface for agents)\n';
+  body += 'A published app has THREE surfaces for AI agents: READ — its agent face, the markdown document the node serves on the app URL when a request prefers text/markdown (Accept header, or ?format=md); ACT — its WebMCP tools (GET /v1/apps/{owner}/{filename}/webmcp); LEARN — its bound skill (GET /v1/apps/{owner}/{filename}/skills). Give your app a good face and agents can use it without scraping the DOM.\n';
+  body += 'The face is ONE public memory record, apps.{filename}.agentface, published by the app owner. When the app declares none, the node falls back to converting the app HTML; either way the node appends an "Agent affordances" footer (tools, skills, catalog, agent registration) automatically — never write that footer yourself.\n';
+  body += 'Rules:\n';
+  body += '- State lives in records, not the DOM — the face points agents at the public keys, it does not screenshot the UI\n';
+  body += '- Update the face on the SAME writes that update the visible view, so agents and humans always see the same state\n';
+  body += '- Content + affordances only — headings, data, links; no UI chrome, buttons, or styling talk\n';
+  body += '- Public data only — the face is served to anonymous readers; never put private values in it\n';
+  body += '- Actions go through tools — link the WebMCP tools for anything an agent should DO, never describe clicks\n';
+  body += '- Bind a skill for anything longer than the face can teach (app-bound skills, metadata.binding)\n';
+  body += '```html\n';
+  body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
+  body += '<script src="' + nodeUrl + '/v1/libs/aimeat-agentface.js"></' + 'script>\n';
+  body += '```\n';
+  body += '```javascript\n';
+  body += '// In the same function that saves data and re-renders the view:\n';
+  body += 'await AIMEAT.data.set("myapp.entries." + entry.id, entry, { visibility: "public" });\n';
+  body += 'await AIMEATAgentFace.publish({\n';
+  body += '  title: "My App",\n';
+  body += '  sections: [\n';
+  body += '    { heading: "Latest entries", body: entries.map(e => "- " + e.title).join("\\n") },\n';
+  body += '    { heading: "Data", body: "Entries are public records under myapp.entries.* — read with AIMEAT.data.getPublic(ownerGaii, key)." },\n';
+  body += '  ],\n';
+  body += '}, { app: "my-app.html" });\n';
+  body += '// A plain markdown string works too: AIMEATAgentFace.publish("# My App\\n...", { app: "my-app.html" })\n';
+  body += '```\n';
+  body += 'Pass { app: "my-app.html" } (your published filename) explicitly — on per-app subdomain origins the filename cannot be derived from the URL (alternatively add <meta name="aimeat-app" content="my-app.html"> to the page). publish() requires a signed-in session (aimeat-auth), and the node serves ONLY the record written by the APP OWNER — a visitor\'s publish lands in their own namespace and is never served, so it is safe to call on every save.\n\n';
 
   // Design guidelines
   body += '### Design Guidelines\n';

@@ -9,6 +9,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.2.0 -- 2026-07-14 -- aimeat-node-guide app section: the agent-face paragraph (Accept:
+ *     text/markdown on an app URL → the app's markdown read-surface + affordances footer).
+ *     Seeding is create-if-missing, so existing nodes need an operator republish to pick this up.
  *   v1.1.0 -- 2026-07-14 -- aimeat-node-guide: the public "start here" skill (visibility public,
  *     listed in the /.well-known/agent-skills discovery index) + per-skill visibility field
  *   v1.0.0 -- 2026-07-05 -- Initial: 4 runbooks (Skills feature Phase 2b)
@@ -113,6 +116,13 @@ from the node library.
 - \`GET /v1/app-templates\` — starter scaffolds. Publish with \`POST /v1/apps\`;
   browse the catalog at \`/app-catalog.html\`. Apps can bind skills that teach agents to
   drive them — check \`GET /v1/apps/{owner}/{filename}/skills\` before operating any app.
+
+Every published app also has an **agent face** — request its URL with
+\`Accept: text/markdown\` (or \`?format=md\`) and the node serves the app's markdown
+read-surface instead of HTML: the app's declared face record when it publishes one, else
+the converted page, always ending in an "Agent affordances" footer that links the app's
+WebMCP tools, its bound skills, and agent registration. Read the face first; act through
+the tools; load the bound skill for anything deeper — never scrape the app's HTML.
 
 ## Everything else
 
