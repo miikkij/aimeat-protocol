@@ -13,6 +13,8 @@
  *     aimeat-organism (normalized workspace read + draft/publish) and aimeat-editor (CM6 markdown editor)
  *   v1.3.0 -- 2026-07-14 -- sdk_libraries: add aimeat-commerce (TARGET-033 checkout client, micro-unit
  *     money formatting, x402-style 402 accepts)
+ *   v1.4.0 -- 2026-07-14 -- Markdown for Agents: GET / negotiates Accept: text/markdown (or
+ *     ?format=md) — custom template converted, else the authored landing markdown; Vary: Accept
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -26,6 +28,7 @@ import { injectCspNonce } from '../utils/csp-nonce.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -89,6 +92,28 @@ export function bootstrapRouter(
   });
 
   router.get('/', async (_req, res) => {
+    // The root negotiates three ways: text/markdown (agents, Markdown for Agents
+    // convention), text/html (browsers), everything else JSON. Declare it cache-wise.
+    res.vary('Accept');
+
+    // Markdown for Agents: Accept: text/markdown (or ?format=md) serves the markdown
+    // landing — the operator's custom template converted when one is set, the authored
+    // landing document otherwise (the default HTML path is an SPA redirect with nothing
+    // to convert). ?format=json still forces the JSON bootstrap.
+    if (_req.query.format === 'md' || (_req.query.format === undefined && prefersMarkdown(_req))) {
+      if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
+        const customHtml = await siteService.getPortalHtml(
+          _req.query.lang as string | undefined,
+          _req.headers.cookie,
+          _req.headers['accept-language'] as string | undefined,
+        );
+        sendMarkdown(res, htmlToMarkdown(customHtml), customHtml);
+        return;
+      }
+      sendMarkdown(res, buildLandingMarkdown(config));
+      return;
+    }
+
     // Browsers send Accept: text/html — serve a custom portal template if the
     // operator has set one (so the Template Editor actually changes what visitors
     // see), otherwise redirect humans to the onboarding portal SPA.
