@@ -10387,6 +10387,65 @@ paths:
               schema:
                 type: object
 
+  /.well-known/agent-skills/index.json:
+    get:
+      operationId: agentSkillsIndex
+      summary: Agent Skills discovery index (RFC v0.2.0)
+      description: >-
+        Agent Skills Discovery index (agentskills.io RFC v0.2.0) generated from the skills
+        registry — never hand-maintained. Enumerates every node-scope skill that is anonymously
+        readable (visibility 'public'); each entry carries name, type ('skill-md'), description
+        (capped at 1024 chars), a resolvable SKILL.md URL, and a sha256 digest
+        ("sha256:{64-hex}") of the exact SKILL.md bytes that URL serves. Cached in-process
+        (30s TTL) and invalidated on any registry write.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Discovery index ($schema + skills[])
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [$schema, skills]
+                properties:
+                  $schema:
+                    type: string
+                    example: https://schemas.agentskills.io/discovery/0.2.0/schema.json
+                  skills:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, type, description, url, digest]
+                      properties:
+                        name: { type: string }
+                        type: { type: string, enum: [skill-md, archive] }
+                        description: { type: string, maxLength: 1024 }
+                        url: { type: string }
+                        digest: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+
+  /.well-known/agent-skills/{name}/SKILL.md:
+    get:
+      operationId: agentSkillsSkillMd
+      summary: Canonical SKILL.md of an indexed public node skill
+      description: >-
+        The exact bytes the index entry's sha256 digest covers, served as text/markdown.
+        Only node-scope skills with visibility 'public' resolve here; members-only and
+        unknown skills both answer 404 (existence is not disclosed to anonymous callers).
+      tags: [Catalogue]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$' }
+      responses:
+        '200':
+          description: The skill's SKILL.md content
+          content:
+            text/markdown:
+              schema: { type: string }
+        '404':
+          description: Unknown skill, or one not publicly readable
+
   # ── Commerce (TARGET-033) ─────────────────────────────────────
   /v1/commerce/orders:
     get:

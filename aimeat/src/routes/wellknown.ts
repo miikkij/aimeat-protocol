@@ -14,6 +14,7 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.6.0 — 2026-07-14 — api-catalog links the Agent Skills discovery index (/.well-known/agent-skills/index.json)
  *   v1.5.0 — 2026-07-14 — Web Bot Auth key directory at /.well-known/http-message-signatures-directory
  *     (node Ed25519 JWKS, signed response; draft-meunier-http-message-signatures-directory)
  *   v1.4.0 — 2026-07-14 — mcp.json commerce_tools block (inline | pointer via AIMEAT_MCP_CARD_COMMERCE_TOOLS) (TARGET-034 phase D)
@@ -173,6 +174,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
           'service-meta': [
             { href: `${b}/.well-known/aimeat`, type: 'application/json' },
             { href: `${b}/.well-known/ucp`, type: 'application/json' },
+            { href: `${b}/.well-known/agent-skills/index.json`, type: 'application/json' },
           ],
         },
         {

@@ -5,6 +5,8 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   v1.1.0 -- 2026-07-14 -- Phase 5b: Agent Skills discovery index (/.well-known/agent-skills,
+ *     RFC v0.2.0) — $schema + entry shape, sha256 digest match, members-only non-leak, 404s
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2a)
  */
 
@@ -574,6 +576,66 @@ await test('27. Node-scope publish is operator-gated (403 for non-operator, 201+
     } else {
         assert(status === 403, `expected 403 or 201, got ${status}: ${JSON.stringify(body)}`);
     }
+});
+
+// ─── Phase 5b: Agent Skills discovery index (/.well-known/agent-skills, RFC v0.2.0) ───
+console.log('\nPhase 5b -- Agent Skills discovery index');
+
+// Whether owner A turned out to be the node operator (fresh test DB) — set in 27b,
+// gates the presence assertions that need a public node-scope skill to exist.
+let discoveryIsOperator = false;
+const DISCOVERY_MD = SKILL_MD.replace('research-briefs', 'discovery-pub');
+const DISCOVERY_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
+
+await test('27b. index.json serves $schema + RFC-shaped entries; public node skill listed with matching sha256', async () => {
+    // Publish a PUBLIC node-scope skill (201 only when owner A is the operator).
+    const pub = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: DISCOVERY_MD, scope: 'node', visibility: 'public' }),
+    });
+    discoveryIsOperator = pub.status === 201;
+    assert(discoveryIsOperator || pub.status === 403, `expected 201 or 403, got ${pub.status}`);
+
+    // The index is anonymous — no Authorization header.
+    const res = await rawFetch('/.well-known/agent-skills/index.json');
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('application/json'), `content-type ${res.headers.get('content-type')}`);
+    const idx = await res.json() as any;
+    assert(idx.$schema === DISCOVERY_SCHEMA, `$schema ${idx.$schema}`);
+    assert(Array.isArray(idx.skills), 'skills is an array');
+    for (const s of idx.skills) {
+        assert(typeof s.name === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s.name), `bad name: ${s.name}`);
+        assert(s.type === 'skill-md' || s.type === 'archive', `bad type: ${s.type}`);
+        assert(typeof s.description === 'string' && s.description.length <= 1024, `bad description on ${s.name}`);
+        assert(typeof s.url === 'string' && s.url.length > 0, `bad url on ${s.name}`);
+        assert(/^sha256:[0-9a-f]{64}$/.test(s.digest), `bad digest on ${s.name}: ${s.digest}`);
+    }
+    if (discoveryIsOperator) {
+        const entry = idx.skills.find((s: any) => s.name === 'discovery-pub');
+        assert(entry, `discovery-pub missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
+        const expected = `sha256:${createHash('sha256').update(DISCOVERY_MD, 'utf8').digest('hex')}`;
+        assert(entry.digest === expected, `digest ${entry.digest} != ${expected}`);
+        // The members-visibility node skill from test 27 must NOT leak into the public index.
+        assert(!idx.skills.some((s: any) => s.name === 'node-runbook'), 'members-only node skill leaked into the index');
+    }
+});
+
+await test('27c. SKILL.md URL serves the digested bytes anonymously; members-only + unknown skills 404', async () => {
+    if (discoveryIsOperator) {
+        const res = await rawFetch('/.well-known/agent-skills/discovery-pub/SKILL.md');
+        assert(res.status === 200, `status ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('markdown'), `content-type ${res.headers.get('content-type')}`);
+        const body = await res.text();
+        assert(body === DISCOVERY_MD, 'served SKILL.md differs from the published content');
+        // members-only node skill (test 27) is not served anonymously
+        const hidden = await rawFetch('/.well-known/agent-skills/node-runbook/SKILL.md');
+        assert(hidden.status === 404, `members-only skill status ${hidden.status}, expected 404`);
+    }
+    const missing = await rawFetch('/.well-known/agent-skills/no-such-skill/SKILL.md');
+    assert(missing.status === 404, `unknown skill status ${missing.status}, expected 404`);
+    const badName = await rawFetch('/.well-known/agent-skills/Not--Valid/SKILL.md');
+    assert(badName.status === 404, `invalid name status ${badName.status}, expected 404`);
 });
 
 // ─── Phase 6: Discover ───

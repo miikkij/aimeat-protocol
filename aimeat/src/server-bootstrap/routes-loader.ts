@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.4.0 — 2026-07-14 — Mount agentSkillsDiscoveryRouter (/.well-known/agent-skills, RFC v0.2.0)
  *   v1.3.0 — 2026-07-14 — Register the app-tool sellable resolver (TARGET-034 phase A)
  *   v1.2.0 — 2026-07-13 — Commerce core (TARGET-033): payment-handler registry + commerceRouter mount
  *   v1.1.0 — 2026-07-13 — Mount discoveryLinkHeaders() before bootstrapRouter (RFC 8288 agent discovery)
@@ -43,6 +44,7 @@ import { commerceAcpRouter } from '../routes/commerce-acp.js';
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
+import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
 import { appGrantsRouter } from '../routes/app-grants.js';
@@ -264,6 +266,7 @@ export async function mountRoutes(
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
+  app.use(agentSkillsDiscoveryRouter(config, storage));  // /.well-known/agent-skills (RFC v0.2.0)
 
   // IndexNow key verification file (serves /{key}.txt for Bing/Yandex)
   if (config.indexNowKey) {
