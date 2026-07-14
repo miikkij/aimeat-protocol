@@ -138,12 +138,17 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       const offers = ((rec.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
       for (const offer of offers) {
         if ((offer.visibility ?? 'private') !== 'public') continue;
-        if (!offer.price || offer.price.morsels <= 0) continue;
+        // Listable when priced in morsels OR money (a money-only offer belongs in the feed too).
+        const hasMorsel = !!offer.price && offer.price.morsels > 0;
+        if (!hasMorsel && !offer.priceMoney) continue;
+        const price = hasMorsel
+          ? { amount: offer.price!.morsels, currency: 'MORSEL', unit: offer.price!.unit ?? 'per-call' }
+          : { amount: offer.priceMoney!.amount, currency: offer.priceMoney!.currency, unit: 'per-call', scale: 6 };
         products.push({
           id: `offer:${rec.ownerGaii}:${offer.id}`,
           title: offer.title,
           description: offer.ask,
-          price: { amount: offer.price.morsels, currency: 'MORSEL', unit: offer.price.unit ?? 'per-call' },
+          price,
           availability: 'in_stock',
           seller: { agent: rec.ownerGaii },
           ...(offer.tags?.length ? { tags: offer.tags } : {}),
