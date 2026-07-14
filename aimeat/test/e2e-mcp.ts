@@ -217,6 +217,17 @@ await test('1b. /auth.md serves agent-registration instructions as text/markdown
     // The validator recognizes the document by an H1 containing "auth.md".
     const h1 = md.split('\n').find(l => l.startsWith('# ')) ?? '';
     assert(h1.toLowerCase().includes('auth.md'), `H1 must contain "auth.md": ${h1}`);
+    // …and scans the markdown itself for the embedded agent_auth block (workos reference
+    // AUTH.md carries it inline). It must parse and match the well-known metadata exactly.
+    const fence = md.match(/```json\n([\s\S]*?)\n```/);
+    assert(fence, 'embedded json block present');
+    const embedded = JSON.parse(fence![1]);
+    assert(embedded.agent_auth?.register_uri?.endsWith('/v1/agents/device-authorize'),
+        `embedded agent_auth.register_uri: ${embedded.agent_auth?.register_uri}`);
+    assert(typeof embedded.agent_auth?.skill === 'string', 'embedded agent_auth.skill');
+    const wellKnown = await json('/.well-known/oauth-authorization-server');
+    assert(JSON.stringify(embedded.agent_auth) === JSON.stringify(wellKnown.body.agent_auth),
+        'embedded agent_auth matches the well-known metadata byte-for-byte');
     // The document must describe THIS node's real flow, not boilerplate.
     assert(md.includes(NODE_ID), 'names this node');
     assert(md.includes('/v1/agents/device-authorize'), 'covers device-authorize');

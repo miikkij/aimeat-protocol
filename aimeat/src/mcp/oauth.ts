@@ -10,6 +10,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-07-14 — agent_auth object construction moved to services/auth-md.ts
+ *     (buildAgentAuthMetadata) — /auth.md embeds the same block inline, one source of truth
  *   v1.2.0 — 2026-07-14 — agent_auth carries its own `skill` field (isitagentready expects it
  *     inside the block, not only at the metadata top level)
  *   v1.1.0 — 2026-07-14 — RFC 8414 metadata extended with the auth.md convention: `skill`
@@ -25,6 +27,7 @@ import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
+import { buildAgentAuthMetadata } from '../services/auth-md.js';
 
 // OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
 // Clients, refresh tokens, and approvals are persisted to storage.
@@ -502,35 +505,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             code_challenge_methods_supported: ['S256'],
             scopes_supported: ['aimeat:full'],
             skill: `${baseUrl}/auth.md`,
-            agent_auth: {
-                skill: `${baseUrl}/auth.md`,
-                documentation: `${baseUrl}/auth.md`,
-                register_uri: `${baseUrl}/v1/agents/device-authorize`,
-                claim_uri: `${baseUrl}/v1/agents/device-token`,
-                verification_uri: `${baseUrl}/v1/agents/verify`,
-                token_uri: `${baseUrl}/v1/auth/token`,
-                revocation_uri: `${baseUrl}/v1/auth/revoke`,
-                grant_types_supported: ['urn:ietf:params:oauth:grant-type:device_code'],
-                credential_types_supported: ['ed25519_keypair', 'bearer_jwt'],
-                approval: { required: true, by: 'owner', where: `${baseUrl}/v1/profile` },
-                scopes_default: config.defaultAgentScopes,
-                identity_types_supported: [
-                    {
-                        type: 'GHII', format: '{owner}@{node-id}', principal: 'human owner',
-                        register_uri: `${baseUrl}/v1/owners`,
-                    },
-                    {
-                        type: 'GAII', format: '{agent}#{owner}@{node-id}', principal: 'AI agent',
-                        register_uri: `${baseUrl}/v1/agents/device-authorize`,
-                        claim_uri: `${baseUrl}/v1/agents/device-token`,
-                    },
-                    {
-                        type: 'GEAI', format: 'eco:{app}#{owner}@{node-id}', principal: 'ecosystem app',
-                        register_uri: `${baseUrl}/v1/ecosystem-apps/hello`,
-                        claim_uri: `${baseUrl}/v1/ecosystem-apps/token`,
-                    },
-                ],
-            },
+            agent_auth: buildAgentAuthMetadata(config),
         });
     });
 }
