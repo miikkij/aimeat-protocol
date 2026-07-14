@@ -14,6 +14,7 @@
 import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
+import { instrumentStorage } from '../services/perf-trace.js';
 import { ConfigProvenance } from '../services/config-provenance.js';
 import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config-schema.js';
 import { createConsulConfigService, applyConsulValues } from '../services/consul-config.js';
@@ -38,12 +39,13 @@ export async function initializeConfig(
   config: AimeatConfig,
   configSources?: ConfigSources,
 ): Promise<ConfigInitResult> {
-  // Storage — select based on config
-  const storage = await createStorage({
+  // Storage — select based on config. Wrap in the perf-trace Proxy only when config.perfTrace is on
+  // (env AIMEAT_PERF_TRACE=true, read via loadConfig like every other flag); a no-op otherwise.
+  const storage = instrumentStorage(await createStorage({
     provider: config.storageProvider,
     sqlitePath: config.sqlitePath,
     dbUrl: config.dbUrl ?? undefined,
-  });
+  }), config.perfTrace);
   const storageLabels: Record<string, string> = {
     memory: 'in-memory (data will not persist across restarts)',
     sqlite: `SQLite (${config.sqlitePath})`,

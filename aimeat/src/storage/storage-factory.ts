@@ -13,7 +13,6 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { Storage } from './interface.js';
-import { instrumentStorage } from '../services/perf-trace.js';
 
 export type StorageProvider = 'memory' | 'sqlite' | 'mongodb' | 'postgresql';
 
@@ -40,25 +39,25 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
     case 'sqlite': {
       try {
         const { SqliteStorage } = await import('./providers/sqlite/index.js');
-        return instrumentStorage(new SqliteStorage(opts.sqlitePath ?? './data/aimeat.db'));
+        return new SqliteStorage(opts.sqlitePath ?? './data/aimeat.db');
       } catch (err) { sqliteLoadFailed(err); break; }
     }
     case 'mongodb': {
       const { MongoStorage } = await import('./providers/mongodb/index.js');
       const mongo = new MongoStorage(opts.dbUrl!);
       await mongo.ready;
-      return instrumentStorage(mongo);
+      return mongo;
     }
     case 'postgresql': {
       const { PostgresStorage } = await import('./providers/postgres/index.js');
       const pg = new PostgresStorage(opts.dbUrl!);
       await pg.ready;
-      return instrumentStorage(pg);
+      return pg;
     }
     default: {
       try {
         const { SqliteStorage } = await import('./providers/sqlite/index.js');
-        return instrumentStorage(new SqliteStorage(':memory:'));
+        return new SqliteStorage(':memory:');
       } catch (err) { sqliteLoadFailed(err); }
     }
   }

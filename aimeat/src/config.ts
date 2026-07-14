@@ -211,6 +211,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
     testMode: process.env.AIMEAT_TEST_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
+    perfTrace: process.env.AIMEAT_PERF_TRACE === 'true',
     securityProfile,
     allowPrivateEgress,
     aiProviderAllowlist,

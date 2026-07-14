@@ -1,27 +1,29 @@
 /**
  * @file src/services/perf-trace.ts
- * @description Opt-in per-request storage profiler. When AIMEAT_PERF_TRACE=1, the Storage instance is
- *   wrapped in a Proxy that times and counts every top-level method call, accumulating the totals into
- *   an AsyncLocalStorage context established per request. A request opts into tracing with `?trace=1`
- *   or the `x-aimeat-trace: 1` header; the summary (query count, DB ms, wall ms, hottest methods) is
- *   returned in the `X-Aimeat-Perf` response header and logged. This is how we SEE what one operation
- *   actually costs — how many DB round-trips, where the time goes, which routes fan out N+1 — instead
- *   of guessing. Disabled → the storage is returned untouched and the middleware is a no-op (zero
- *   production overhead). Posture-driven config (Rule 10): safe-off default, documented local override.
+ * @description Opt-in per-request storage profiler. Gated by config.perfTrace (env AIMEAT_PERF_TRACE,
+ *   read through loadConfig() like every other flag — NOT a bespoke process.env read here). When on,
+ *   the Storage instance is wrapped in a Proxy that times and counts every top-level method call,
+ *   accumulating the totals into an AsyncLocalStorage context established per request. A request opts in
+ *   with `?trace=1` or the `x-aimeat-trace: 1` header; the summary (query count, DB ms, wall ms, hottest
+ *   methods) is returned in the `X-Aimeat-Perf` response header and logged. This is how we SEE what one
+ *   operation actually costs — how many DB round-trips, where the time goes, which routes fan out N+1 —
+ *   instead of guessing. Off → storage returned untouched and the middleware is a no-op (zero overhead).
  * @structure
- *   - isPerfTraceEnabled() / setPerfTraceEnabled() — the compile-in gate (env AIMEAT_PERF_TRACE=1)
- *   - instrumentStorage(storage) — wrap Storage so calls record into the active trace (no-op if off)
- *   - perfTraceMiddleware — establishes the per-request ALS context + emits the summary
- *   - getActiveTrace() — the current request's accumulator (for callers that want to annotate it)
+ *   - instrumentStorage(storage, enabled) — wrap Storage so calls record into the active trace (no-op if off)
+ *   - perfTraceMiddleware(enabled) — factory → per-request ALS middleware that emits the summary
+ *   - traceOperation(fn) / formatTrace(store) / getActiveTrace() — programmatic profiling helpers
  * @usage
- *   storage = instrumentStorage(storage);            // in the storage factory
- *   app.use(perfTraceMiddleware);                     // outermost middleware
+ *   storage = instrumentStorage(storage, config.perfTrace);   // in config-init (has config)
+ *   app.use(perfTraceMiddleware(config.perfTrace));            // outermost middleware
  *   curl -D - 'http://localhost:40050/v1/memory?trace=1' -H 'authorization: Bearer …'  # see X-Aimeat-Perf
  * @version-history
  *   v1.0.0 — 2026-07-14 — Initial per-request storage profiler (perf audit follow-up).
+ *   v1.1.0 — 2026-07-14 — Config-driven: gate on config.perfTrace passed in, instead of reading
+ *     process.env directly (which could be read before .env was applied). Same mechanism as every
+ *     other AIMEAT_* flag.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -38,21 +40,6 @@ export interface TraceStore {
 
 const als = new AsyncLocalStorage<TraceStore>();
 
-/** Parse the AIMEAT_PERF_TRACE flag tolerantly: trim surrounding whitespace / a stray CR (a `.env`
- *  saved with CRLF line endings yields the value "1\r", which an exact `=== '1'` would miss), and
- *  accept the usual truthy spellings. This is the difference between "I set it and nothing happened". */
-function readPerfTraceFlag(): boolean {
-  const v = (process.env.AIMEAT_PERF_TRACE ?? '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
-}
-
-/** Compile-in gate. Off unless AIMEAT_PERF_TRACE is truthy. Read once at load (env is populated before
- *  app code via `node --env-file`), so flipping it needs a restart — matching the other posture flags.
- *  Kept mutable only so tests can toggle it. */
-let enabled = readPerfTraceFlag();
-export function isPerfTraceEnabled(): boolean { return enabled; }
-export function setPerfTraceEnabled(v: boolean): void { enabled = v; }
-
 /** The active request's accumulator, or undefined outside a traced request. */
 export function getActiveTrace(): TraceStore | undefined { return als.getStore(); }
 
@@ -61,12 +48,12 @@ const NON_DB = new Set<string>(['ensureReady', 'ready']);
 
 /**
  * Wrap a Storage instance so every top-level method call is timed and counted into the active
- * request's trace (if one is running). Returns the storage UNCHANGED when tracing is disabled — no
+ * request's trace (if one is running). Returns the storage UNCHANGED when `enabled` is false — no
  * Proxy, no overhead, in production. `this` inside a wrapped method stays bound to the REAL storage,
  * so a method's own internal helper/DB calls are not double-counted; the number reported is the count
  * of Storage calls the route itself made (which is exactly the N+1 signal we want).
  */
-export function instrumentStorage(storage: Storage): Storage {
+export function instrumentStorage(storage: Storage, enabled: boolean): Storage {
   if (!enabled) return storage;
   return new Proxy(storage, {
     get(target, prop, receiver) {
@@ -105,9 +92,8 @@ export function instrumentStorage(storage: Storage): Storage {
 
 /**
  * Run `fn` inside a fresh trace context and return its result plus the accumulated trace. For
- * programmatic profiling (CLI/tests/benchmarks) without an HTTP request. Requires tracing enabled
- * (setPerfTraceEnabled(true)) AND the storage to have been wrapped by {@link instrumentStorage} while
- * enabled — otherwise the store simply comes back empty.
+ * programmatic profiling (CLI/tests/benchmarks) without an HTTP request. Requires the storage to have
+ * been wrapped by {@link instrumentStorage} with enabled=true — otherwise the store comes back empty.
  */
 export async function traceOperation<T>(fn: () => Promise<T>): Promise<{ result: T; store: TraceStore }> {
   const store: TraceStore = {
@@ -132,38 +118,40 @@ function summarize(store: TraceStore): string {
 }
 
 /**
- * Outermost middleware. When tracing is enabled AND the request opts in (`?trace=1` or
+ * Build the outermost middleware. When `enabled` and the request opts in (`?trace=1` or
  * `x-aimeat-trace: 1`), it runs the rest of the pipeline inside an ALS context so storage calls
  * accumulate, then writes the summary to the `X-Aimeat-Perf` header (before the body flushes) and logs
- * it. A no-op otherwise. Opt-in keeps ordinary traffic — and the header — untouched.
+ * it. Returns a pass-through no-op middleware when disabled. Opt-in keeps ordinary traffic untouched.
  */
-export function perfTraceMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (!enabled) { next(); return; }
-  const optedIn = req.query?.trace === '1' || req.headers['x-aimeat-trace'] === '1';
-  if (!optedIn) { next(); return; }
+export function perfTraceMiddleware(enabled: boolean): RequestHandler {
+  if (!enabled) return (_req: Request, _res: Response, next: NextFunction): void => next();
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const optedIn = req.query?.trace === '1' || req.headers['x-aimeat-trace'] === '1';
+    if (!optedIn) { next(); return; }
 
-  const store: TraceStore = {
-    httpMethod: req.method,
-    path: req.path,
-    calls: new Map(),
-    totalCalls: 0,
-    totalDbMs: 0,
-    startNs: process.hrtime.bigint(),
-  };
+    const store: TraceStore = {
+      httpMethod: req.method,
+      path: req.path,
+      calls: new Map(),
+      totalCalls: 0,
+      totalDbMs: 0,
+      startNs: process.hrtime.bigint(),
+    };
 
-  const origEnd = res.end.bind(res);
-  let emitted = false;
-  (res as unknown as { end: (...a: unknown[]) => unknown }).end = function patchedEnd(...args: unknown[]): unknown {
-    if (!emitted) {
-      emitted = true;
-      const summary = summarize(store);
-      if (!res.headersSent) {
-        try { res.setHeader('X-Aimeat-Perf', summary); } catch { /* headers already locked */ }
+    const origEnd = res.end.bind(res);
+    let emitted = false;
+    (res as unknown as { end: (...a: unknown[]) => unknown }).end = function patchedEnd(...args: unknown[]): unknown {
+      if (!emitted) {
+        emitted = true;
+        const summary = summarize(store);
+        if (!res.headersSent) {
+          try { res.setHeader('X-Aimeat-Perf', summary); } catch { /* headers already locked */ }
+        }
+        logger.info('[perf] %s %s — %s', req.method, req.originalUrl, summary);
       }
-      logger.info('[perf] %s %s — %s', req.method, req.originalUrl, summary);
-    }
-    return (origEnd as (...a: unknown[]) => unknown)(...args);
-  };
+      return (origEnd as (...a: unknown[]) => unknown)(...args);
+    };
 
-  als.run(store, () => next());
+    als.run(store, () => next());
+  };
 }
