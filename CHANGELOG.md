@@ -4,6 +4,44 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+**AIMEAT can now sell — agent services, company offerings, and app tools — over the agentic-commerce
+web.** A new protocol-agnostic **commerce core** (`src/commerce/`) turns any priced thing into a
+checkout: a `SellableResolver` registry (agent offers, EE company offerings, and priced **app-tool**
+calls), a `CheckoutSession` lifecycle, and a `PaymentHandler` contract (collect → payout → refund) so
+the same session settles in morsels or real money. Buyers reach it three ways from one core — the
+**native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/ucp/v1`, `/.well-known/ucp`),
+and an **ACP** merchant surface (product feed at `/v1/commerce/feed`, `/acp/v1`, `/.well-known/acp.json`) —
+and every payment-required response carries an **x402**-style `accepts` block telling an agent how to pay.
+
+Money is real and kept strictly apart from morsels. Amounts are **6-decimal micro-units** (1 EUR =
+1 000 000 micros — matches USDC/x402, so a sub-cent `0.002 EUR` per-call price never rounds to zero),
+integer-only, funnelled through one chokepoint (`src/commerce/money.ts`, consumed by the EE module via
+`ctx.money`) so morsels and money never mix and rounding only happens at the payment rail. Payment
+credentials are **seller-owned, never node-level**: a company's `org.{slug}.psp` or an individual's
+`commerce.psp`, so funds land on the seller's own Stripe account (they are merchant of record, Stripe's
+onboarding does their KYC/KYB) and the node holds no keys and no funds. The operator takes a configurable
+platform fee — credited on the morsel ledger (`operator | burn`), and on money via a **Stripe Connect**
+direct-charge + application-fee seam (the operator's own platform account, routing not custody) with the
+cut accounted and shown per currency in the admin dashboard; an **invoice** handler settles money offline
+where no PSP is wired. An EE **KYB** gate governs real-money selling.
+
+**Agent-faced apps can be monetized (TARGET-034, all four phases).** An app declares priced tools in a
+public `apps.{appId}.tools` manifest; the `app-tool` resolver sells a tool call through the same
+checkout (callable tools invoke a capability and return the result; unbound tools queue an agent TASK),
+an owner **Monetize** editor in the app catalog sets morsel/EUR/USD prices, a **WebMCP** bridge exposes
+the tools to browser agents (in-page `AIMEAT.webmcp` + `/v1/apps/{owner}/{appId}/webmcp`, unpaid priced
+calls answered with 402 + x402), and the priced catalog is advertised on the **MCP Server Card**
+(`/.well-known/mcp.json` `commerce_tools`, inline or pointer) and a dedicated `/v1/commerce/tools`.
+
+**Agent-readiness** discovery is now first-class: the MCP Server Card, an RFC 9727 **API Catalog** with
+RFC 8288 `Link` headers, a **Content Signals** policy in `robots.txt` (`search=yes, ai-input=yes,
+ai-train=no`, operator-overridable), and **Web Bot Auth** — a signed JWKS at
+`/.well-known/http-message-signatures-directory` built from the node's existing Ed25519 key, plus opt-in
+RFC 9421 signing of outbound requests so AIMEAT agents are cryptographically verifiable bots.
+
+A client library **`aimeat-commerce.js`** (`AIMEAT.commerce.*`) lets an app add checkout, money formatting,
+and app-tool calls in a few lines; the flow is documented in `/llms.txt`, the Handbook, and a skill.
+
 Push notifications now land where they came from. Clicking a push used to open a route that never
 existed (`/v1/portal/human/dashboard` — dangling since the initial commit); now every notification
 carries a deep link, the service worker routes the click into an already-open SPA window (tab switch
