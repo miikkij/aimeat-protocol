@@ -1567,7 +1567,8 @@
         "exampleLabel": "Example:",
         "exampleDesc": "A CrewAI \"marketing-crew\" with a researcher + writer + AIMEAT Liaison. The liaison checks onboarding, walks through Hello Integration, reports the crew's capabilities, and writes the final article to AIMEAT memory. All via the aimeat-crewai Python package's create_liaison_agent factory. No subprocess scripts, no config.yaml editing.",
         "nameLabel": "Agent name (used in the paste below):",
-        "copyButton": "Copy CrewAI connection instruction"
+        "copyButton": "Copy CrewAI connection instruction",
+        "repoLink": "View the crewaimeat fleet on GitHub"
       },
       "filter": {
         "byTag": "Filter by tag:",
@@ -3795,6 +3796,10 @@
   "dev": {
     "title": "AIMEAT Onboarding Portal",
     "subtitle": "Connect any AI to this node. Select your platform to get started",
+    "repos": {
+      "protocol": "aimeat-protocol on GitHub",
+      "crew": "crewaimeat on GitHub"
+    },
     "stats": {
       "agents": "Agents",
       "chatSessions": "Chat Sessions",

@@ -1567,7 +1567,8 @@
         "exampleLabel": "Esimerkki:",
         "exampleDesc": "CrewAI-\"marketing-crew\" jossa on tutkija + kirjoittaja + AIMEAT Liaison. Liaison tarkistaa onboardingin, kävelee Hello Integrationin läpi, raportoi kruun kyvyt ja kirjoittaa lopullisen artikkelin AIMEATin memoryyn. Kaikki aimeat-crewai-paketin create_liaison_agent-factorin kautta. Ei aliprosessi-skriptejä, ei config.yaml-editointia.",
         "nameLabel": "Agentin nimi (käytetään alla olevassa pasteessa):",
-        "copyButton": "Kopioi CrewAI-yhdistämisohje"
+        "copyButton": "Kopioi CrewAI-yhdistämisohje",
+        "repoLink": "Katso crewaimeat-fleet GitHubissa"
       },
       "filter": {
         "byTag": "Suodata tagilla:",
@@ -3795,6 +3796,10 @@
   "dev": {
     "title": "AIMEAT-liitäntäportaali",
     "subtitle": "Yhdistä mikä tahansa AI tähän solmuun, valitse alustasi aloittaaksesi",
+    "repos": {
+      "protocol": "aimeat-protocol GitHubissa",
+      "crew": "crewaimeat GitHubissa"
+    },
     "stats": {
       "agents": "Agentit",
       "chatSessions": "Keskustelusessiot",
