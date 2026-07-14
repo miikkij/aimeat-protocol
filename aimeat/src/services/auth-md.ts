@@ -16,6 +16,10 @@
  *   import { buildAuthMd, buildAgentAuthMetadata } from '../services/auth-md.js';
  *   const authMd = buildAuthMd(config);  // once per boot; serve as text/markdown
  * @version-history
+ *   v1.3.0 — 2026-07-14 — agent_auth speaks the scanner's registration-method vocabulary:
+ *     identity_types_supported: ["anonymous"] + anonymous{register/claim/credential types}
+ *     (the device flow IS the anonymous method + an owner-approval gate); the GHII/GAII/GEAI
+ *     descriptors move to the aimeat_identity_types extension key
  *   v1.2.0 — 2026-07-14 — Embed the agent_auth JSON block IN the document (the workos
  *     reference AUTH.md carries it inline and the isitagentready validator scans the
  *     markdown for it); agent_auth construction extracted to buildAgentAuthMetadata,
@@ -43,9 +47,24 @@ export function buildAgentAuthMetadata(config: AimeatConfig): Record<string, unk
     revocation_uri: `${b}/v1/auth/revoke`,
     grant_types_supported: ['urn:ietf:params:oauth:grant-type:device_code'],
     credential_types_supported: ['ed25519_keypair', 'bearer_jwt'],
+    // Registration method in the auth.md spec vocabulary: "anonymous" — the agent arrives
+    // with no prior identity assertion (no ID-JAG, no verified email), registers at
+    // register_uri, and claims credentials at claim_uri once the owner approves. The
+    // human-approval gate is AIMEAT's addition on top of the anonymous method, declared
+    // in `approval`. Scanners match the method by identity_types_supported + the
+    // per-method block, so these two fields keep the spec's exact shape.
+    identity_types_supported: ['anonymous'],
+    anonymous: {
+      register_uri: `${b}/v1/agents/device-authorize`,
+      claim_uri: `${b}/v1/agents/device-token`,
+      credential_types_supported: ['ed25519_keypair', 'bearer_jwt'],
+    },
     approval: { required: true, by: 'owner', where: `${b}/v1/profile` },
     scopes_default: config.defaultAgentScopes,
-    identity_types_supported: [
+    // AIMEAT extension: the concrete identity formats an agent ends up with (spec
+    // identity_types_supported carries the method vocabulary above, so the rich
+    // descriptors live under an AIMEAT-namespaced key).
+    aimeat_identity_types: [
       {
         type: 'GHII', format: '{owner}@{node-id}', principal: 'human owner',
         register_uri: `${b}/v1/owners`,
