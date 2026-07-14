@@ -1,4 +1,14 @@
-// T-2: MCP Tool + OAuth E2E Tests
+/**
+ * @file e2e-mcp.ts
+ * @description E2E tests for the MCP surface: OAuth 2.1 discovery + dynamic client
+ *   registration, the authorization-code flow, tool listing/invocation over streamable-http,
+ *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
+ *   /.well-known/oauth-authorization-server).
+ * @version-history
+ *   v1.1.0 -- 2026-07-14 -- Tests 1 + 1b: agent_auth block on the RFC 8414 metadata and the
+ *     /auth.md agent-registration document (agent readiness); header added (campsite rule)
+ *   v1.0.0 -- pre-2026-07 -- T-2: MCP tool + OAuth E2E tests
+ */
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -176,6 +186,43 @@ await test('1. OAuth metadata discovery', async () => {
     assert(typeof body.registration_endpoint === 'string', 'has registration_endpoint');
     assert(body.response_types_supported.includes('code'), 'supports code');
     assert(body.grant_types_supported.includes('authorization_code'), 'supports auth_code');
+    // auth.md convention: skill pointer + machine-readable agent_auth block
+    assert(typeof body.skill === 'string' && body.skill.endsWith('/auth.md'), `skill pointer: ${body.skill}`);
+    const aa = body.agent_auth;
+    assert(aa && typeof aa === 'object', 'has agent_auth block');
+    assert(aa.register_uri.endsWith('/v1/agents/device-authorize'), `register_uri: ${aa.register_uri}`);
+    assert(aa.claim_uri.endsWith('/v1/agents/device-token'), `claim_uri: ${aa.claim_uri}`);
+    assert(aa.token_uri.endsWith('/v1/auth/token'), `token_uri: ${aa.token_uri}`);
+    assert(aa.revocation_uri.endsWith('/v1/auth/revoke'), `revocation_uri: ${aa.revocation_uri}`);
+    assert(aa.grant_types_supported.includes('urn:ietf:params:oauth:grant-type:device_code'), 'device_code grant');
+    assert(aa.credential_types_supported.includes('ed25519_keypair'), 'ed25519 credential type');
+    assert(aa.approval?.required === true && aa.approval?.by === 'owner', 'owner approval declared');
+    assert(Array.isArray(aa.scopes_default) && aa.scopes_default.length > 0, 'scopes_default present');
+    const idTypes = (aa.identity_types_supported ?? []).map((t: any) => t.type);
+    assert(JSON.stringify([...idTypes].sort()) === JSON.stringify(['GAII', 'GEAI', 'GHII']),
+        `identity types: ${JSON.stringify(idTypes)}`);
+    const gaiiType = aa.identity_types_supported.find((t: any) => t.type === 'GAII');
+    assert(gaiiType.register_uri.endsWith('/v1/agents/device-authorize'), 'GAII register_uri');
+    const geaiType = aa.identity_types_supported.find((t: any) => t.type === 'GEAI');
+    assert(geaiType.register_uri.endsWith('/v1/ecosystem-apps/hello'), 'GEAI register_uri');
+});
+
+await test('1b. /auth.md serves agent-registration instructions as text/markdown', async () => {
+    const res = await fetch(`${BASE}/auth.md`);
+    assert(res.status === 200, `status ${res.status}`);
+    const ct = res.headers.get('content-type') ?? '';
+    assert(ct.includes('text/markdown'), `content-type ${ct}`);
+    const md = await res.text();
+    // The document must describe THIS node's real flow, not boilerplate.
+    assert(md.includes(NODE_ID), 'names this node');
+    assert(md.includes('/v1/agents/device-authorize'), 'covers device-authorize');
+    assert(md.includes('urn:ietf:params:oauth:grant-type:device_code'), 'covers the device_code grant');
+    assert(md.includes('/v1/agents/device-token'), 'covers the credential claim');
+    assert(md.includes('/v1/auth/token'), 'covers Ed25519 re-authentication');
+    assert(md.includes('/v1/auth/revoke'), 'covers revocation');
+    assert(md.includes('authorization_pending') && md.includes('slow_down'), 'covers polling errors');
+    assert(md.includes('GHII') && md.includes('GAII') && md.includes('GEAI'), 'covers identity types');
+    assert(md.toLowerCase().includes('scope'), 'covers scopes');
 });
 
 await test('2. Dynamic client registration', async () => {

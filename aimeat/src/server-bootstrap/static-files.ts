@@ -27,6 +27,9 @@
  *     before express.static. The raw static file has no per-script nonce, so the strict
  *     nonce-based CSP blocked all its inline scripts and a direct hit on /spa.html booted to a
  *     blank page; now it behaves like the /, /v1/portal, /v1/admin SPA routes.
+ *   v1.8.0 -- 2026-07-14 -- Serve /auth.md (workos.com/auth.md convention): agent-registration
+ *     instructions for this node, built from config (services/auth-md.ts), text/markdown,
+ *     registered before express.static like robots.txt.
  *   v1.7.0 -- 2026-07-14 -- Serve /robots.txt with the Content Signals Policy directive
  *     (contentsignals.org), operator-overridable via AIMEAT_CONTENT_SIGNAL ('off' removes it).
  */
@@ -36,6 +39,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { serveSpa } from '../routes/portal.js';
+import { buildAuthMd } from '../services/auth-md.js';
 
 /**
  * Resolve the public directory from multiple candidate paths.
@@ -79,6 +83,16 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     next();
+  });
+
+  // Serve /auth.md — agent-registration instructions (workos.com/auth.md convention) —
+  // BEFORE express.static so no static file can shadow it. Built once per boot from config
+  // (it only changes with a deploy); the machine-readable companion is the agent_auth block
+  // on /.well-known/oauth-authorization-server. text/markdown per the convention.
+  const authMd = buildAuthMd(config);
+  app.get('/auth.md', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.type('text/markdown; charset=utf-8').send(authMd);
   });
 
   const publicDir = publicCandidates.find(p => existsSync(p));

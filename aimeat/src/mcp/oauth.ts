@@ -10,6 +10,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-07-14 — RFC 8414 metadata extended with the auth.md convention: `skill`
+ *     pointer to /auth.md + `agent_auth` block (device-flow URIs, identity types GHII/GAII/GEAI,
+ *     credential types, approval + default scopes) (agent readiness)
  *   v1.0.0 — 2026-07-13 — Extracted from src/mcp/index.ts (max-file-lines)
  */
 
@@ -476,7 +479,13 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         });
     });
 
-    // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414)
+    // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414), extended with
+    // the agent-registration discovery of the auth.md convention (github.com/workos/auth.md):
+    // `skill` points at the human/agent-readable /auth.md document, and `agent_auth` is the
+    // machine-readable summary of how agents get identities on THIS node — the RFC 8628 device
+    // flow (register → owner approval → claim), the Ed25519 re-auth token endpoint, revocation,
+    // and the three identity types (GHII/GAII/GEAI) with their registration entry points.
+    // Keep in sync with services/auth-md.ts, which narrates the same flow.
     router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
         const baseUrl = config.baseUrl;
         res.json({
@@ -490,6 +499,35 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             token_endpoint_auth_methods_supported: ['client_secret_post'],
             code_challenge_methods_supported: ['S256'],
             scopes_supported: ['aimeat:full'],
+            skill: `${baseUrl}/auth.md`,
+            agent_auth: {
+                documentation: `${baseUrl}/auth.md`,
+                register_uri: `${baseUrl}/v1/agents/device-authorize`,
+                claim_uri: `${baseUrl}/v1/agents/device-token`,
+                verification_uri: `${baseUrl}/v1/agents/verify`,
+                token_uri: `${baseUrl}/v1/auth/token`,
+                revocation_uri: `${baseUrl}/v1/auth/revoke`,
+                grant_types_supported: ['urn:ietf:params:oauth:grant-type:device_code'],
+                credential_types_supported: ['ed25519_keypair', 'bearer_jwt'],
+                approval: { required: true, by: 'owner', where: `${baseUrl}/v1/profile` },
+                scopes_default: config.defaultAgentScopes,
+                identity_types_supported: [
+                    {
+                        type: 'GHII', format: '{owner}@{node-id}', principal: 'human owner',
+                        register_uri: `${baseUrl}/v1/owners`,
+                    },
+                    {
+                        type: 'GAII', format: '{agent}#{owner}@{node-id}', principal: 'AI agent',
+                        register_uri: `${baseUrl}/v1/agents/device-authorize`,
+                        claim_uri: `${baseUrl}/v1/agents/device-token`,
+                    },
+                    {
+                        type: 'GEAI', format: 'eco:{app}#{owner}@{node-id}', principal: 'ecosystem app',
+                        register_uri: `${baseUrl}/v1/ecosystem-apps/hello`,
+                        claim_uri: `${baseUrl}/v1/ecosystem-apps/token`,
+                    },
+                ],
+            },
         });
     });
 }
