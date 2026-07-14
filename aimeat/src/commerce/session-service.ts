@@ -13,6 +13,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.1.0 — 2026-07-14 — Fulfill seam: a sellable's custom fulfill() (app-tool capability invoke)
+ *     replaces the default TASK path per item; caller JWT threaded from the completing adapter;
+ *     app/input persisted on line items (TARGET-034 phase A)
  *   v2.0.1 — 2026-07-14 — Fee rounding through the money.ts chokepoint (percentFee)
  *   v2.0.0 — 2026-07-13 — Resolver registry + collect/payout orchestration + distribute seam (phase 4)
  *   v1.0.0 — 2026-07-13 — Initial session service (TARGET-033 phase 1)
@@ -76,7 +79,8 @@ async function resolveItems(
     }
     items.push({
       kind: sellable.kind, agent: sellable.agentGaii, offerId: sellable.offerId,
-      org: raw.org, quantity, title: sellable.title, unitPrice: sellable.priceMorsels,
+      org: raw.org, app: raw.app, input: raw.input,
+      quantity, title: sellable.title, unitPrice: sellable.priceMorsels,
     });
     total += sellable.priceMorsels * quantity;
   }
@@ -253,6 +257,9 @@ export async function completeSession(
   session: CheckoutSessionRecord,
   handlerId?: string,
   instrument?: unknown,
+  /** The buyer's bearer token from the completing request — custom fulfillments (app-tool
+   *  capability invokes) authenticate with it; the default TASK path ignores it. */
+  callerJwt?: string,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
   if (Date.now() > new Date(session.expiresAt).getTime()) {
@@ -275,7 +282,8 @@ export async function completeSession(
   const sellables: Sellable[] = [];
   for (const item of session.items) {
     sellables.push(await resolveOne(storage, config, {
-      kind: item.kind, agent: item.agent, offer_id: item.offerId, org: item.org, currency: session.currency,
+      kind: item.kind, agent: item.agent, offer_id: item.offerId, org: item.org, app: item.app,
+      currency: session.currency,
     }, session.buyerOwner));
   }
 
@@ -298,10 +306,23 @@ export async function completeSession(
     : { trackingCode: `comtx_free_${session.id}` };
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
+  //    Default: an agent TASK per line item. A sellable's custom fulfill() replaces it
+  //    (app-tool: synchronous capability invoke whose result rides on the session).
   const taskIds: string[] = [];
+  const results: Array<{ sku: string; result: unknown }> = [];
   try {
-    for (const item of session.items) {
-      taskIds.push(await createFulfillmentTask(storage, session, item));
+    for (let i = 0; i < session.items.length; i++) {
+      const item = session.items[i]!;
+      const sellable = sellables[i]!;
+      if (sellable.fulfill) {
+        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt });
+        if (outcome.taskId) taskIds.push(outcome.taskId);
+        if (outcome.result !== undefined) {
+          results.push({ sku: `${item.kind}:${item.agent}:${item.offerId}`, result: outcome.result });
+        }
+      } else {
+        taskIds.push(await createFulfillmentTask(storage, session, item));
+      }
     }
   } catch (err) {
     if (session.total > 0) {
@@ -340,7 +361,7 @@ export async function completeSession(
     ...session,
     status: 'completed',
     receipt: { handler: handler.id, charged: session.total, earned: totalNet, fee: totalFee, trackingCode: collected.trackingCode },
-    fulfillment: { taskIds },
+    fulfillment: { taskIds, ...(results.length ? { results } : {}) },
     updatedAt: new Date().toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);

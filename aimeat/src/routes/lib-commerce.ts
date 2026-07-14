@@ -12,12 +12,15 @@
  *   - emitted commerce.openCheckout/getCheckout/listCheckouts/updateCheckout/cancelCheckout/
  *     completeCheckout/listOrders: the /v1/commerce checkout lifecycle (buyOffer = open+complete)
  *   - emitted commerce.feed/getOffer/priceOf: offer discovery + price reading
- *   - emitted commerce.getAppTools/invokeAppTool: TARGET-034 app-tool draft convention
+ *   - emitted commerce.getAppTools/invokeAppTool: TARGET-034 app-tool purchases (manifest read +
+ *     one-call buy of a callable tool; result returns on session.fulfillment.results)
  *   - commerce errors carry err.code, err.status, and (on 402) err.paymentRequired + err.accepts
  *
  * @usage router.get('/v1/libs/aimeat-commerce.js', (_req, res) => sendJavascriptLibrary(res, aimeatCommerceLib(config)));
  *
  * @version-history
+ *   v1.1.0 — 2026-07-14 — invokeAppTool live against the phase-A resolver: buyer input forwarded to
+ *     the capability invoke, one call per line item, APP_TOOL_NOT_AVAILABLE kept as the older-node fallback
  *   v1.0.0 — 2026-07-14 — Initial commerce client library (TARGET-033 checkout + TARGET-034 app-tool draft)
  */
 import type { AimeatConfig } from '../config.js';
@@ -81,8 +84,9 @@ function normalizeItems(items) {
     if (i.kind) out.kind = i.kind;
     if (i.agent) out.agent = i.agent;
     if (i.org) out.org = i.org;
-    if (i.app) out.app = i.app;      // app-tool items (TARGET-034 draft)
+    if (i.app) out.app = i.app;      // app-tool items (TARGET-034)
     if (i.tool) out.tool = i.tool;
+    if (i.input) out.input = i.input; // app-tool: buyer input for the capability invoke
     if (i.quantity) out.quantity = i.quantity;
     return out;
   });
@@ -227,11 +231,11 @@ const commerce = {
     return res.data.orders;
   },
 
-  // ── App tools (TARGET-034 DRAFT convention — priced tools on agent-faced apps) ──
+  // ── App tools (TARGET-034 — priced tool calls on agent-faced apps) ──
 
   /**
    * Read an app's declared tool manifest: the public memory record apps.{appId}.tools under the
-   * app owner's GHII — { tools: [{ name, description, inputSchema, price?, priceMoney? }] }.
+   * app owner's GHII — { tools: [{ name, description, inputSchema, action_id, price?, priceMoney? }] }.
    * Returns null when the app declares no tools. Works logged out (public read).
    */
   async getAppTools(ownerGhii, appId) {
@@ -247,20 +251,23 @@ const commerce = {
   },
 
   /**
-   * Buy + invoke a priced app-tool through the checkout core (TARGET-034 phase A, DRAFT):
-   * opens a session with a { kind:'app-tool', app, tool } line item and completes it.
-   * Requires a node with the app-tool sellable resolver; on an older node this throws
+   * Buy + invoke a priced app-tool through the checkout core (TARGET-034 phase A):
+   * one { kind:'app-tool', app:'ownerName/appId', tool, input } line item, opened and
+   * completed in one call. The tool's backing capability runs with your input; the result
+   * comes back on session.fulfillment.results[0].result (receipt shows the charge).
+   * One call per invocation. On a node without the resolver this throws
    * with code 'APP_TOOL_NOT_AVAILABLE'.
    */
   async invokeAppTool(ref, opts) {
     try {
       const session = await commerce.openCheckout(
-        [{ kind: 'app-tool', agent: ref.agent, app: ref.app, tool: ref.tool,
-           offer_id: ref.tool, quantity: (ref.quantity || 1) }], opts);
+        [{ kind: 'app-tool', app: ref.app, tool: ref.tool, input: ref.input }], opts);
       return commerce.completeCheckout(session.id, opts && opts.payment);
     } catch (e) {
-      if (e.code === 'INVALID_CHECKOUT' || e.code === 'INVALID_ITEM') {
-        const err = new Error('This node does not sell app-tools yet (TARGET-034 app-tool resolver not enabled)');
+      // Older nodes reject the kind at validation (zod enum error naming "kind"); a node with the
+      // widened schema but no resolver answers UNKNOWN_ITEM_KIND. Both mean: not sellable here.
+      if (e.code === 'UNKNOWN_ITEM_KIND' || (e.code === 'INVALID_CHECKOUT' && /invalid enum|"kind"/i.test(String(e.message)))) {
+        const err = new Error('This node does not sell app-tools (app-tool resolver not enabled)');
         err.code = 'APP_TOOL_NOT_AVAILABLE';
         err.cause = e;
         throw err;

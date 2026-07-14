@@ -15,6 +15,8 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.1.0 — 2026-07-14 — app-tool products in the feed (sku "app-tool:<owner>/<appId>:<tool>")
+ *     + app-tool sku checkout + caller JWT threaded into completeSession (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial ACP merchant surface (TARGET-033 phase 5)
  */
 import { Router } from 'express';
@@ -23,6 +25,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
+import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
 import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -57,12 +60,15 @@ function handlerFor(paymentData?: { provider?: string; handler?: string }): stri
   return undefined; // default handler (morsels)
 }
 
-function parseSku(id: string): { kind: 'offer'; agent: string; offer_id: string } {
+function parseSku(id: string): { kind: 'offer'; agent: string; offer_id: string } | { kind: 'app-tool'; app: string; tool: string } {
   const parts = id.split(':');
-  if (parts[0] !== 'offer' || parts.length < 3) {
-    throw new CommerceError('INVALID_ITEM', 400, `Unparseable sku: ${id} (use "offer:<agentGaii>:<offerId>")`);
+  if (parts[0] === 'offer' && parts.length >= 3) {
+    return { kind: 'offer', agent: parts[1] as string, offer_id: parts.slice(2).join(':') };
   }
-  return { kind: 'offer', agent: parts[1] as string, offer_id: parts.slice(2).join(':') };
+  if (parts[0] === 'app-tool' && parts.length >= 3) {
+    return { kind: 'app-tool', app: parts[1] as string, tool: parts.slice(2).join(':') };
+  }
+  throw new CommerceError('INVALID_ITEM', 400, `Unparseable sku: ${id} (use "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>")`);
 }
 
 /** ACP status vocabulary over our lifecycle. */
@@ -76,7 +82,8 @@ function toAcpSession(s: CheckoutSessionRecord) {
     status: ACP_STATUS[s.status] ?? s.status,
     currency: s.currency,
     line_items: s.items.map((i) => ({
-      id: `offer:${i.agent}:${i.offerId}`, title: i.title, quantity: i.quantity,
+      id: i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}` : `offer:${i.agent}:${i.offerId}`,
+      title: i.title, quantity: i.quantity,
       unit_price: i.unitPrice, total: i.unitPrice * i.quantity,
     })),
     totals: [{ type: 'total', amount: s.total }],
@@ -138,6 +145,35 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       }
       if (products.length >= FEED_CAP) break;
     }
+    // Priced app-tools (TARGET-034): every PUBLIC apps.{appId}.tools manifest contributes its
+    // callable, priced tools as products (sku "app-tool:<owner>/<appId>:<tool>").
+    if (products.length < FEED_CAP) {
+      const toolRecs = await storage.listAllMemory({ prefix: 'apps.', limit: 2000 });
+      for (const rec of toolRecs.items) {
+        if (!/^apps\.[^.]+\.tools$/.test(rec.key) || rec.visibility !== 'public') continue;
+        const parsed = AppToolsDocSchema.safeParse(rec.value);
+        if (!parsed.success) continue;
+        const appId = rec.key.split('.')[1] as string;
+        const ownerName = rec.ownerGaii.split('@')[0] as string;
+        for (const tool of parsed.data.tools) {
+          if (!tool.action_id) continue;
+          const morsels = tool.price?.morsels ?? 0;
+          if (morsels <= 0 && !tool.priceMoney) continue;
+          products.push({
+            id: `app-tool:${ownerName}/${appId}:${tool.name}`,
+            title: `${appId} · ${tool.name}`,
+            description: tool.description ?? '',
+            price: morsels > 0
+              ? { amount: morsels, currency: 'MORSEL', unit: 'per-call' }
+              : { amount: tool.priceMoney!.amount, currency: tool.priceMoney!.currency, unit: 'per-call', scale: 6 },
+            availability: 'in_stock',
+            seller: { app: `${ownerName}/${appId}` },
+          });
+          if (products.length >= FEED_CAP) break;
+        }
+        if (products.length >= FEED_CAP) break;
+      }
+    }
     res.json({ version: 'draft', updated_at: new Date().toISOString(), products, total: products.length });
   });
 
@@ -182,10 +218,12 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
       const session = await loadOwnSession(req);
+      const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
       const completed = await completeSession(
         storage, config, session,
         handlerFor(parsed.data.payment_data),
         parsed.data.payment_data?.token,
+        callerJwt,
       );
       res.json(toAcpSession(completed));
     } catch (err) { sendAcpError(res, config, err); }

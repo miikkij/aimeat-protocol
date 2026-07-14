@@ -8,6 +8,9 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.1.0 — 2026-07-14 — App-tool purchases (TARGET-034 phase A): manifest + feed listing +
+ *     paid capability invoke with result on fulfillment, failure gates (404/422/400), refund on
+ *     missing capability, free self-purchase
  *   v1.0.0 — 2026-07-13 — Initial commerce checkout suite (TARGET-033 phase 1)
  */
 
@@ -300,6 +303,152 @@ await test('18. Community node rejects org-offering items (no EE resolver) and m
 await test('19. Anonymous requests are rejected (401)', async () => {
     const r = await json('/v1/commerce/checkout-sessions', { method: 'POST', body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }) });
     assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+// ─── App-tool purchases (TARGET-034 phase A): priced tool calls on agent-faced apps ───
+
+const extName = `apptoolext${Date.now().toString(36)}`;
+const appId = 'demoapp';
+const echoCapId = `ext:${extName}:echo`;
+let appRef = '';
+
+await test('20. Setup: seller installs an echo extension + declares the apps.{appId}.tools manifest', async () => {
+    appRef = `${seller.name}/${appId}`;
+    const manifest = `metadata:
+  name: ${extName}
+  version: 1.0.0
+  description: "Commerce e2e echo extension"
+  author: ${seller.name}
+
+required_apis:
+  - memory
+
+actions:
+  - id: echo
+    method: POST
+    path: /echo
+    script: actions/echo.js
+    description: "Echo input back"
+    auth: authenticated
+    input:
+      message:
+        type: string
+        required: true
+        description: "Message to echo"
+    output:
+      type: object
+      properties:
+        echoed: { type: string, description: "The echoed message" }
+
+limits:
+  memory_mb: 32
+  timeout_ms: 3000
+  max_api_calls: 5
+`;
+    const script = `export default async function(ctx, input) {
+  return { echoed: 'Echo: ' + (input.message || '(empty)') };
+}`;
+    const install = await json('/v1/extensions', {
+        method: 'POST', headers: auth(seller.token),
+        body: JSON.stringify({ manifest, scripts: { 'actions/echo.js': script } }),
+    });
+    assert(install.status === 201 || install.status === 200, `ext install ${install.status}: ${JSON.stringify(install.body.error)}`);
+    const act = await json(`/v1/extensions/${extName}/activate`, { method: 'POST', headers: auth(seller.token) });
+    assert(act.status === 200, `ext activate ${act.status}: ${JSON.stringify(act.body.error)}`);
+    // Capability aggregation (operator action) registers ext:{name}:echo in the capability registry.
+    const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(op.token) });
+    assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body.error)}`);
+    const cap = await json(`/v1/capabilities/${encodeURIComponent(echoCapId)}`);
+    assert(cap.status === 200 && cap.body.data?.callable === true, `capability ${cap.status}: ${JSON.stringify(cap.body.error ?? cap.body.data)}`);
+
+    // The tool manifest: PUBLIC memory record apps.{appId}.tools under the seller GHII.
+    const tools = {
+        tools: [
+            { name: 'echo', description: 'Echo a message back (paid per call)', action_id: echoCapId, price: { morsels: 3, unit: 'per-call' } },
+            { name: 'unpriced-echo', description: 'Callable but free-listed', action_id: echoCapId },
+            { name: 'no-binding', description: 'Priced but no capability binding', price: { morsels: 1 } },
+            { name: 'broken', description: 'Priced, bound to a missing capability', action_id: 'ext:no-such-ext:nope', price: { morsels: 1 } },
+        ],
+    };
+    const write = await json('/v1/memory', {
+        method: 'POST', headers: auth(seller.token),
+        body: JSON.stringify({ key: `apps.${appId}.tools`, value: tools, visibility: 'public' }),
+    });
+    assert(write.status === 200 || write.status === 201, `manifest write ${write.status}: ${JSON.stringify(write.body.error)}`);
+});
+
+await test('21. Feed lists the callable, priced app-tool (sku app-tool:<owner>/<appId>:<tool>)', async () => {
+    const feedRes = await fetch(`${BASE}/v1/commerce/feed`);
+    const feed = await feedRes.json() as any;
+    const sku = `app-tool:${appRef}:echo`;
+    const entry = (feed.products || []).find((p: any) => p.id === sku);
+    assert(!!entry, `app-tool in feed: ${sku} (${feed.total} products)`);
+    assert(entry.price?.amount === 3 && entry.price?.currency === 'MORSEL', `feed price: ${JSON.stringify(entry.price)}`);
+    assert(!(feed.products || []).some((p: any) => p.id === `app-tool:${appRef}:no-binding`), 'unbound tools stay out of the feed');
+});
+
+await test('22. Buy an app-tool call → charged, capability invoked, result on fulfillment.results', async () => {
+    const buyerBefore = await balance(buyer.token);
+    const sellerBefore = await balance(seller.token);
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'echo', input: { message: 'paid call' } }] }),
+    });
+    assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const s0 = create.body.data.session;
+    assert(s0.total === 3 && s0.sellerOwner === seller.name, `session: total ${s0.total}, seller ${s0.sellerOwner}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${s0.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+    const s = done.body.data.session;
+    assert(s.status === 'completed' && s.receipt?.charged === 3, `receipt: ${JSON.stringify(s.receipt)}`);
+    const result = s.fulfillment?.results?.[0];
+    assert(result?.sku === `app-tool:${appRef}:echo`, `result sku: ${JSON.stringify(s.fulfillment)}`);
+    assert(result?.result?.echoed === 'Echo: paid call', `capability result: ${JSON.stringify(result?.result)}`);
+    assert((s.fulfillment?.taskIds || []).length === 0, 'callable fulfillment creates no TASK');
+    assert(await balance(buyer.token) === buyerBefore - 3, 'buyer debited for the call');
+    assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'app owner credited (minus fee)');
+});
+
+await test('23. App-tool failure gates: unknown tool 404, unbound 422, unpriced 422, quantity>1 400, bad app ref 400', async () => {
+    const post = (items: unknown) => json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items }) });
+    const ghost = await post([{ kind: 'app-tool', app: appRef, tool: 'no-such-tool' }]);
+    assert(ghost.status === 404 && ghost.body.error?.code === 'TOOL_NOT_FOUND', `ghost: ${ghost.status} ${ghost.body.error?.code}`);
+    const unbound = await post([{ kind: 'app-tool', app: appRef, tool: 'no-binding' }]);
+    assert(unbound.status === 422 && unbound.body.error?.code === 'TOOL_NOT_CALLABLE', `unbound: ${unbound.status} ${unbound.body.error?.code}`);
+    const unpriced = await post([{ kind: 'app-tool', app: appRef, tool: 'unpriced-echo' }]);
+    assert(unpriced.status === 422 && unpriced.body.error?.code === 'TOOL_NOT_FOR_SALE', `unpriced: ${unpriced.status} ${unpriced.body.error?.code}`);
+    const multi = await post([{ kind: 'app-tool', app: appRef, tool: 'echo', quantity: 2 }]);
+    assert(multi.status === 400 && multi.body.error?.code === 'INVALID_ITEM', `quantity: ${multi.status} ${multi.body.error?.code}`);
+    const badRef = await post([{ kind: 'app-tool', app: 'no-slash-here', tool: 'echo' }]);
+    assert(badRef.status === 400 && badRef.body.error?.code === 'INVALID_ITEM', `bad app ref: ${badRef.status} ${badRef.body.error?.code}`);
+});
+
+await test('24. Fulfillment failure (missing capability) refunds the charge and leaves the session open', async () => {
+    const buyerBefore = await balance(buyer.token);
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'broken' }] }),
+    });
+    assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const id = create.body.data.session.id;
+    const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(r.status === 502 && r.body.error?.code === 'FULFILLMENT_FAILED', `expected 502 FULFILLMENT_FAILED, got ${r.status} ${r.body.error?.code}`);
+    assert(await balance(buyer.token) === buyerBefore, 'buyer refunded after failed fulfillment');
+    const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
+    assert(back.body.data.session.status === 'open', 'session stays open for retry');
+});
+
+await test('25. Self-purchase of an own app-tool is free and still invokes', async () => {
+    const sellerBefore = await balance(seller.token);
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(seller.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'echo', input: { message: 'self call' } }] }),
+    });
+    assert(create.status === 201 && create.body.data.session.total === 0, `self create: ${create.status} total ${create.body.data?.session?.total}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(seller.token), body: JSON.stringify({}) });
+    assert(done.status === 200 && done.body.data.session.status === 'completed', `self complete ${done.status}`);
+    assert(done.body.data.session.fulfillment?.results?.[0]?.result?.echoed === 'Echo: self call', 'self-call result returned');
+    assert(await balance(seller.token) === sellerBefore, 'no charge on self-purchase');
 });
 
 console.log(`\n${'═'.repeat(50)}`);

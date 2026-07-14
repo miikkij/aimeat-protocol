@@ -14,6 +14,8 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.1.0 — 2026-07-14 — app-tool item ids ("app-tool:<owner>/<appId>:<tool>") + inline ref form
+ *     + caller JWT threaded into completeSession (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial UCP adapter (TARGET-033 phase 4)
  */
 import { Router } from 'express';
@@ -41,11 +43,14 @@ const LineItemSchema = z.object({
   item: z.union([
     z.object({ id: z.string().min(1).max(500) }),
     z.object({
-      kind: z.enum(['offer', 'org-offering']).optional(),
+      kind: z.enum(['offer', 'org-offering', 'app-tool']).optional(),
       agent: z.string().max(300).optional(),
-      offer_id: z.string().min(1).max(100),
+      offer_id: z.string().min(1).max(100).optional(),
+      tool: z.string().min(1).max(100).optional(),
       org: z.string().max(200).optional(),
-    }),
+      app: z.string().min(3).max(300).optional(),
+      input: z.record(z.string(), z.unknown()).optional(),
+    }).refine((i) => !!(i.offer_id || i.tool), { message: 'Each item needs offer_id (offers) or tool (app-tools)' }),
   ]),
   quantity: z.number().int().positive().max(1000).optional(),
 });
@@ -71,7 +76,10 @@ function parseItemId(id: string): SellableRef {
   if (parts[0] === 'org-offering' && parts.length >= 4) {
     return { kind: 'org-offering', org: parts[1] as string, agent: parts[2] as string, offer_id: parts.slice(3).join(':') };
   }
-  throw new CommerceError('INVALID_ITEM', 400, `Unparseable item id: ${id} (use "offer:<agentGaii>:<offerId>")`);
+  if (parts[0] === 'app-tool' && parts.length >= 3) {
+    return { kind: 'app-tool', app: parts[1] as string, tool: parts.slice(2).join(':') };
+  }
+  throw new CommerceError('INVALID_ITEM', 400, `Unparseable item id: ${id} (use "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>")`);
 }
 
 function toRefs(lineItems: z.infer<typeof CreateSchema>['line_items']): SellableRef[] {
@@ -83,7 +91,9 @@ function toRefs(lineItems: z.infer<typeof CreateSchema>['line_items']): Sellable
 }
 
 const itemId = (i: CheckoutSessionRecord['items'][number]) =>
-  i.kind === 'org-offering' ? `org-offering:${i.org}:${i.agent}:${i.offerId}` : `offer:${i.agent}:${i.offerId}`;
+  i.kind === 'org-offering' ? `org-offering:${i.org}:${i.agent}:${i.offerId}`
+    : i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}`
+      : `offer:${i.agent}:${i.offerId}`;
 
 /** Map our session record onto a UCP-shaped checkout_session. */
 function toUcpSession(s: CheckoutSessionRecord) {
@@ -202,7 +212,8 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     if (!parsed.success) { res.status(400).json(ucpEnvelope(UCP_CAPABILITIES, error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message))); return; }
     try {
       const session = await loadOwnSession(req);
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument);
+      const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
+      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt);
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(completed) }));
     } catch (err) { sendUcpError(res, config, err); }
   });
