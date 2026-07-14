@@ -279,6 +279,7 @@ entry: index.html
 | aimeat-editor | `loadScript('/v1/libs/aimeat-editor.js')` | `AIMEAT.editor.mount/toolbar/split` — CodeMirror 6 markdown editor with live preview (pairs with aimeat-markdown) |
 | aimeat-live | `loadScript('/v1/libs/aimeat-live.js')` | `AIMEAT.live.subscribe(domains, fn)` — server-pushed change signals (SSE): re-fetch a view's data when the server says its domain changed, instead of polling |
 | aimeat-commerce | `loadScript('/v1/libs/aimeat-commerce.js')` | `AIMEAT.commerce.buyOffer/openCheckout/completeCheckout/feed/priceOf/fmtMoney` — checkout sessions over /v1/commerce, offer + app-tool prices, money formatting (micro-units → "1.50 EUR") |
+| aimeat-webmcp | `loadScript('/v1/libs/aimeat-webmcp.js')` | `AIMEAT.webmcp.exposeAppTools({owner, appId})/exposeNodeTools()` — register the app's priced tools on document/navigator.modelContext (WebMCP) for in-browser agents; priced tools pay through the checkout |
 
 ### Key rules
 
@@ -509,6 +510,7 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | aimeat-organism | `/v1/libs/aimeat-organism.js` | Organisms & workspaces. `list()`, `workspaces(orgId)`, `read(orgId, wsId)` → `{ manifest, readmeText, spaces }` where each space's items merge published + draft per instance (`{ id, hasRealId, draft, latest, value, title, updatedAt, status }`) — the raw workspace GET returns `objects` (published) and `drafts` as SEPARATE maps; this lib does the merging, id resolution (value.id convention) and `_createdAt/_updatedAt/_version` metadata handling for you. `writeDraft`, `publish`, `revertToDraft`, `deleteObject` (needs the memory:delete scope — declare it via `<meta name="aimeat-scopes">`), `saveReadme`, `search`. Items with `hasRealId:false` cannot round-trip — render them read-only. Requires aimeat-auth. |
 | aimeat-editor | `/v1/libs/aimeat-editor.js` | Markdown editor: `AIMEAT.editor.mount(el, {value, onChange})` (CodeMirror 6 with textarea fallback), `toolbar(adapter)` for formatting buttons, `split(el, {value, onChange})` for editor + live preview rendered through aimeat-markdown. |
 | aimeat-commerce | `/v1/libs/aimeat-commerce.js` | Commerce: open/complete checkout sessions over `/v1/commerce/checkout-sessions`, one-call `buyOffer(agent, offerId)`, the public priced-offer `feed()`, offer/app-tool price reading (`getOffer`, `getAppTools`, `priceOf`), and money formatting in 6-decimal MICRO-UNITS (`fmtMoney(1500000,'EUR')` → `"1.50 EUR"`; morsels stay plain integers, `fmtAmount` is currency-aware). Thrown 402 errors carry the x402-style block: `err.paymentRequired === true` + `err.accepts` (machine-readable settle options). The library carries NO secrets — seller PSP credentials (`commerce.psp`) are server-side config the client never sees. Requires aimeat-auth (except `fmtMoney`/`feed`/`getAppTools`, which work logged out). See "Commerce in apps" below. |
+| aimeat-webmcp | `/v1/libs/aimeat-webmcp.js` | WebMCP bridge (W3C draft): `exposeAppTools({owner, appId})` registers the app's declared tools on `document.modelContext`/`navigator.modelContext` for in-browser agents (feature-detected across draft shapes; no-op without an agent). Priced tools carry a `[PAID: …]` description tag and `execute()` pays through the commerce checkout for the signed-in user; signed out it returns the 402/x402 payment instructions. `exposeNodeTools()` registers node-level discovery tools (commerce feed, node info) — the portal homepage auto-loads it via `?expose=node`. HTTP mirror for non-browser agents: `GET /v1/apps/{owner}/{appId}/webmcp` (listing) + `POST …/webmcp/tools/{tool}` (invoke; priced → 402 + accepts). |
 | aimeat-live | `/v1/libs/aimeat-live.js` | Live updates over SSE. `AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload())` — one shared, owner-scoped EventSource per browser (multi-tab via Web Locks + BroadcastChannel), debounced, visibility-gated, auto-reconnecting. The callback tells you WHICH domains changed; re-fetch only that data. Domains: `agent-tasks`, `agents`, `organisms`, `notifications`, `memory`. Use this instead of polling for any view that shows server data. Deletes do not emit a change event — refresh locally after a delete. Requires aimeat-auth + a logged-in session. |
 
 ### Commerce in apps (aimeat-commerce) — worked example
@@ -573,7 +575,15 @@ a call — the app becomes a seller on the same commerce core (TARGET-034):
    AIMEAT.commerce.getAppTools(ownerGhii, appId)`; agent/REST:
    `GET /v1/memory/{ownerGhii}/apps.{appId}.tools` (public, no auth). Priced
    tools also appear in `GET /v1/commerce/feed` with sku
-   `app-tool:<owner>/<appId>:<tool>` and `fulfillment: 'call' | 'task'`.
+   `app-tool:<owner>/<appId>:<tool>` and `fulfillment: 'call' | 'task'`, and as
+   a WebMCP-shaped listing at `GET /v1/apps/{owner}/{appId}/webmcp` (tool
+   descriptors + payment contract). In-browser agents (Chrome/Edge WebMCP) get
+   them natively when the app page calls
+   `AIMEAT.webmcp.exposeAppTools({ owner, appId })` (lib
+   `/v1/libs/aimeat-webmcp.js`) — priced tool execute() pays through the
+   checkout for the signed-in user; calling
+   `POST /v1/apps/{owner}/{appId}/webmcp/tools/{tool}` unpaid answers 402 with
+   the x402-style `accepts` + a ready-made checkout line item.
 3. **Buy a call:** one checkout line item `{ kind: 'app-tool',
    app: 'ownerName/appId', tool, input }` through the SAME
    `/v1/commerce/checkout-sessions` lifecycle (one call per line item) —

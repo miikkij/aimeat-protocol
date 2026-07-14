@@ -143,6 +143,7 @@ import { aimeatOrganismLib } from './lib-organism.js';
 import { aimeatEditorLib } from './lib-editor.js';
 import { aimeatLiveLib } from './lib-live.js';
 import { aimeatCommerceLib } from './lib-commerce.js';
+import { aimeatWebmcpLib } from './lib-webmcp.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -162,6 +163,12 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-auth.js — Auth helper library
   router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatAuthLib(config));
+  });
+
+  // GET /v1/libs/aimeat-webmcp.js — WebMCP bridge (expose app/node tools to in-browser agents;
+  // priced tools pay through the commerce checkout). TARGET-034 phase C.
+  router.get('/v1/libs/aimeat-webmcp.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatWebmcpLib(config));
   });
 
   // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +

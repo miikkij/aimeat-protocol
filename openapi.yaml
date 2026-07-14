@@ -10338,7 +10338,8 @@ paths:
       summary: MCP Server Card (SEP-1649)
       description: >-
         Machine-readable card describing the node's MCP server for agent discovery —
-        serverInfo, streamable-http transport at /v1/mcp, and that OAuth is required.
+        serverInfo, streamable-http transport at /v1/mcp, that OAuth is required, and the
+        WebMCP bridge block (in-page tool library + per-app tool-listing URL template).
       tags: [Catalogue]
       responses:
         '200':
@@ -10533,7 +10534,9 @@ paths:
     get:
       operationId: acpDiscovery
       summary: ACP merchant discovery document
-      description: Points agentic-commerce clients at the product feed and the /acp/v1 checkout base URL.
+      description: >-
+        Points agentic-commerce clients at the product feed, the /acp/v1 checkout base URL,
+        and the WebMCP bridge (library + per-app tool listing).
       tags: [Commerce]
       responses:
         '200':
@@ -10542,6 +10545,66 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /v1/apps/{owner}/{filename}/webmcp:
+    get:
+      operationId: appWebmcpListing
+      summary: WebMCP-shaped tool listing of an app (public)
+      description: >-
+        The app's PUBLIC apps.{appId}.tools manifest served as WebMCP tool descriptors
+        (name, description, inputSchema — the fields document.modelContext.registerTool takes)
+        plus the AIMEAT payment contract per tool: fulfillment 'call' | 'task', and for priced
+        tools the morsel/micro-unit money price with a ready-made checkout line item. The page
+        itself registers the same tools in-browser via /v1/libs/aimeat-webmcp.js. 404 when the
+        app declares no public manifest (TARGET-034 phase C).
+      tags: [Commerce]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: WebMCP tool listing
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: No public tool manifest
+
+  /v1/apps/{owner}/{filename}/webmcp/tools/{tool}:
+    post:
+      operationId: appWebmcpInvoke
+      summary: Invoke an app tool over HTTP (priced tools answer 402)
+      description: >-
+        The HTTP half of the WebMCP bridge. A PRICED tool ALWAYS answers 402 with the x402-style
+        `accepts` block and a ready-made checkout line item — payment IS the invocation
+        (complete the checkout; a callable tool's result rides on session.fulfillment.results).
+        An unpriced tool with an action_id binding invokes directly for authenticated principals
+        (body: { input }); an unpriced unbound tool answers 422.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: tool, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input: { type: object, description: Tool input matching the tool's inputSchema }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '402':
+          description: Priced tool — pay via the checkout (x402-style accepts + checkout item)
+        '404':
+          description: No public manifest / unknown tool / missing backing capability
+        '422':
+          description: Unpriced tool with no capability binding
 
   /ucp/v1/checkout-sessions:
     post:
