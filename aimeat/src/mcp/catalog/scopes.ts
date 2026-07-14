@@ -119,18 +119,28 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_checkout_list: 'commerce:buy',
 };
 
+/**
+ * Dynamic tool→scope entries contributed at boot by the active edition (EnterpriseProvider
+ * getMcpTools → mcp/enterprise-tools.ts). Kept SEPARATE from the static core map: core entries
+ * always win on a name collision, so a module can never relax a core gate.
+ */
+let DYNAMIC_TOOL_SCOPES: Record<string, string> = {};
+export function setDynamicToolScopes(map: Record<string, string>): void {
+    DYNAMIC_TOOL_SCOPES = { ...map };
+}
+
 /** The scope required to use a tool, or undefined if the tool is not scope-gated. */
 export function requiredScopeForTool(toolName: string): string | undefined {
-    return TOOL_SCOPES[toolName];
+    return TOOL_SCOPES[toolName] ?? DYNAMIC_TOOL_SCOPES[toolName];
 }
 
 /**
  * Whether an agent holding `scopes` may use `toolName`. Wildcard semantics mirror
  * auth/middleware.ts:requireScope — global '*', domain wildcard 'memory:*', and exact match.
- * Ungated tools (no entry in TOOL_SCOPES) are always allowed.
+ * Ungated tools (no entry in the static or dynamic map) are always allowed.
  */
 export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
-    const required = TOOL_SCOPES[toolName];
+    const required = TOOL_SCOPES[toolName] ?? DYNAMIC_TOOL_SCOPES[toolName];
     if (!required) return true;
     if (scopes.includes('*')) return true;
     if (scopes.includes(required)) return true;

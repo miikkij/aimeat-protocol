@@ -7,6 +7,7 @@
  *     - agent    : the owner's personal agent (memory/task/message/knowledge/discovery)
  *     - service  : marketplace/provider (board/work/action/wallet/capabilities/organism)
  *     - admin    : operator + owner governance (admin/flag/group/consent/agent-mgmt)
+ *     - enterprise: company commerce (core commerce baseline + the ee/ module's org tools)
  *   v1/mcp stays full and frozen; these are opt-in. Surfaces are ALLOWLISTS over the same catalog —
  *   no forked handlers. instance_* is intentionally absent from v2 (auto-created session meta).
  * @structure
@@ -25,8 +26,8 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin';
-export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin'];
+export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'enterprise';
+export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'enterprise'];
 
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
@@ -116,6 +117,20 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_agent_mode_set', 'aimeat_agent_tags_set',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
+    // The company-commerce surface (/v2/mcp/enterprise): the CORE baseline below plus whatever
+    // the active edition contributes at boot (EnterpriseProvider.getMcpTools →
+    // setEnterpriseSurfaceExtras). On Community the surface exists with just this baseline —
+    // enterprise org tools appear only when the ee/ module is loaded.
+    enterprise: [
+        'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
+        'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
+        'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
+        'aimeat_storage_upload', 'aimeat_storage_download',
+        'aimeat_wallet_balance', 'aimeat_wallet_transactions',
+        'aimeat_discover',
+        'aimeat_handbook_get',
+    ],
 };
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
@@ -123,7 +138,17 @@ const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     agent: new Set(MCP_SURFACES.agent),
     service: new Set(MCP_SURFACES.service),
     admin: new Set(MCP_SURFACES.admin),
+    enterprise: new Set(MCP_SURFACES.enterprise),
 };
+
+/**
+ * Extend the enterprise surface with the edition's dynamically contributed tool names (boot time,
+ * from mcp/enterprise-tools.ts). Dynamic extras live OUTSIDE MCP_SURFACES so validateSurfaces()
+ * keeps checking only static core names against the catalog.
+ */
+export function setEnterpriseSurfaceExtras(names: string[]): void {
+    _surfaceSets.enterprise = new Set([...MCP_SURFACES.enterprise, ...names]);
+}
 
 /** The set of tool names exposed on a given v2 surface. */
 export function toolsForSurface(role: SurfaceRole): Set<string> {

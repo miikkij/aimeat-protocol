@@ -46,9 +46,10 @@ function parseSSE(text: string): any[] {
 /** One MCP session (OAuth token + streamable HTTP session id) with a tools/call helper. */
 class McpSession {
     token = ''; sessionId = ''; rpcId = 0;
+    constructor(private path: string = '/v1/mcp') {}
     async rpc(method: string, params: Record<string, any> = {}) {
         const id = ++this.rpcId;
-        const res = await fetch(`${BASE}/v1/mcp`, {
+        const res = await fetch(`${BASE}${this.path}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
@@ -92,7 +93,7 @@ class McpSession {
         this.token = tok.body.access_token;
         const init = await this.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'MCP Commerce E2E', version: '1.0.0' } });
         assert(init.status === 200 && init.body.result !== undefined, `initialize ${init.status}`);
-        await fetch(`${BASE}/v1/mcp`, {
+        await fetch(`${BASE}${this.path}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
@@ -128,6 +129,7 @@ let sellerOwner: Awaited<ReturnType<typeof setupOwner>>;
 const mcp = new McpSession();       // commerce-scoped agent
 const narrow = new McpSession();    // memory-only agent (scope filter check)
 let sellerAppRef = '';
+let traderGaii = '', traderKey = ''; // reused for the /v2/mcp/enterprise session
 
 await test('Setup: owners + commerce-scoped and narrow MCP agents + seller manifest', async () => {
     op = await setupOwner('o'); // fresh-DB operator self-heal catcher (fee neutrality)
@@ -140,7 +142,9 @@ await test('Setup: owners + commerce-scoped and narrow MCP agents + seller manif
         body: JSON.stringify({ name: 'trader', owner: buyerOwner.name, capabilities: ['commerce'], scopes: ['commerce:buy', 'commerce:sell', 'memory:read', 'memory:write'] }),
     });
     assert(a1.status === 201, `trader ${a1.status}: ${JSON.stringify(a1.body.error)}`);
-    await mcp.init(a1.body.data.agent.gaii, a1.body.data.private_key);
+    traderGaii = a1.body.data.agent.gaii;
+    traderKey = a1.body.data.private_key;
+    await mcp.init(traderGaii, traderKey);
 
     // Narrow agent: memory scopes only — commerce tools must be filtered from its surface.
     const a2 = await json('/v1/agents', {
@@ -293,6 +297,38 @@ await test('11. checkout_list shows the purchase; unknown session errors cleanly
     assert((r.data || []).some((s: any) => s.id === boughtSessionId), 'purchase in the list');
     const ghost = await mcp.call('aimeat_checkout_complete', { session_id: 'cs_no-such-session' });
     assert(ghost.isError && ghost.text.includes('SESSION_NOT_FOUND'), `ghost: ${ghost.text}`);
+});
+
+// ─── Phase 5: the /v2/mcp/enterprise surface (Community/stub edition in this suite) ───
+console.log('\nPhase 5 — Enterprise surface');
+
+await test('12. /v2/mcp/enterprise serves the core commerce baseline; EE org tools absent on Community', async () => {
+    const ent = new McpSession('/v2/mcp/enterprise');
+    await ent.init(traderGaii, traderKey);
+    const { body } = await ent.rpc('tools/list', {});
+    const names = new Set(body.result.tools.map((t: any) => t.name));
+    // Core baseline present (scope-permitting): commerce + wallet-free reads.
+    for (const n of ['aimeat_commerce_psp_status', 'aimeat_app_tools_publish', 'aimeat_checkout_open', 'aimeat_app_tools_get', 'aimeat_memory_read']) {
+        assert(names.has(n), `enterprise baseline missing ${n}`);
+    }
+    // EE-contributed org tools appear ONLY when the ee/ module is loaded (AIMEAT_EE_DISABLED
+    // forces the stub in this suite, so they must be absent).
+    assert(!names.has('aimeat_org_psp_set') && !names.has('aimeat_org_list'), 'EE org tools must be absent on Community');
+    // Surface discipline: unrelated core tools stay off this surface.
+    assert(!names.has('aimeat_board_post') && !names.has('aimeat_admin_mint'), 'non-commerce tools stay off the enterprise surface');
+    // The surface is fully usable, not just listable.
+    const st = await ent.call('aimeat_commerce_psp_status', {});
+    assert(!st.isError && st.data.configured === false, `psp status over enterprise surface: ${st.text}`);
+});
+
+await test('13. Unknown v2 role still rejects cleanly', async () => {
+    const res = await fetch(`${BASE}/v2/mcp/nonsense`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+    });
+    const body = await res.json() as any;
+    assert(res.status === 400 && String(body.error?.message).includes('enterprise'), `unknown role: ${res.status} ${JSON.stringify(body.error)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);
