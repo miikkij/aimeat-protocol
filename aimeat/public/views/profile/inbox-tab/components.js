@@ -7,6 +7,9 @@
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-07-14 — Composer: pasted/dropped images route to the file-attachment path (upload +
+ *     shown as an image) instead of Toast UI base64-inlining them into the body (which blew the 50k
+ *     body limit → 400 "Too big"). addImageBlobHook (rich) + onPaste (markdown fallback).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -292,6 +295,30 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   };
   const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };
 
+  // A pasted / dropped image is added to the SAME file-attachment queue as the 📎 button (uploaded to
+  // storage + rendered as an image on the bubble) — never base64-inlined into the body, which would
+  // blow the server's 50k body limit. Wrap a bare clipboard Blob in a named File so uploadAttachment
+  // (which needs .name) and the file chip both work. Functional setFiles avoids a stale closure in the
+  // editor hook (created once at construction).
+  const addPastedImage = (blob) => {
+    if (!blob) return;
+    const ext = (blob.type && blob.type.split('/')[1]) || 'png';
+    const name = (blob instanceof File && blob.name) ? blob.name
+      : `pasted-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const file = (blob instanceof File) ? blob : new File([blob], name, { type: blob.type || 'image/png' });
+    setFiles((prev) => [...prev, file]);
+  };
+  // Pull image files out of a clipboard/drop event; returns true if any were handled (caller preventDefaults).
+  const handleImagePaste = (e) => {
+    const items = Array.from(e.clipboardData?.items || e.dataTransfer?.items || []);
+    const imgs = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/'))
+      .map((it) => it.getAsFile()).filter(Boolean);
+    if (imgs.length === 0) return false;
+    e.preventDefault();
+    imgs.forEach(addPastedImage);
+    return true;
+  };
+
   useEffect(() => {
     if (mode !== 'rich') return undefined;
     let inst = null, cancelled = false;
@@ -310,6 +337,9 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
         // editorRef is set only AFTER construction, so the constructor's own change (initialValue) is
         // skipped — only real user edits auto-save the draft.
         events: { change: () => { if (editorRef.current) saveDraft(editorRef.current.getMarkdown()); } },
+        // Intercept pasted / dropped images: queue them as file attachments and DON'T call the callback,
+        // so Toast UI skips its default base64 <img> insertion into the markdown body.
+        hooks: { addImageBlobHook: (blob /* , callback, source */) => { addPastedImage(blob); } },
         toolbarItems: [
           ['bold', 'italic', 'strike'],
           ['ul', 'ol', 'task'],
@@ -355,7 +385,8 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
         : html`<div class="inbox-md-fallback">
             <textarea class="inbox-textarea" rows="3" placeholder=${t('inbox.bodyPlaceholder')}
-              value=${md} onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
+              value=${md} onPaste=${handleImagePaste}
+              onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="inbox-composer-bar">
