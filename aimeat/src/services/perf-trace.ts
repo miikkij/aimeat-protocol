@@ -38,9 +38,18 @@ export interface TraceStore {
 
 const als = new AsyncLocalStorage<TraceStore>();
 
-/** Compile-in gate. Off unless AIMEAT_PERF_TRACE=1. Read once at load — flipping it needs a restart,
- *  matching the other posture flags. Kept mutable only so tests can toggle it. */
-let enabled = process.env.AIMEAT_PERF_TRACE === '1';
+/** Parse the AIMEAT_PERF_TRACE flag tolerantly: trim surrounding whitespace / a stray CR (a `.env`
+ *  saved with CRLF line endings yields the value "1\r", which an exact `=== '1'` would miss), and
+ *  accept the usual truthy spellings. This is the difference between "I set it and nothing happened". */
+function readPerfTraceFlag(): boolean {
+  const v = (process.env.AIMEAT_PERF_TRACE ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+/** Compile-in gate. Off unless AIMEAT_PERF_TRACE is truthy. Read once at load (env is populated before
+ *  app code via `node --env-file`), so flipping it needs a restart — matching the other posture flags.
+ *  Kept mutable only so tests can toggle it. */
+let enabled = readPerfTraceFlag();
 export function isPerfTraceEnabled(): boolean { return enabled; }
 export function setPerfTraceEnabled(v: boolean): void { enabled = v; }
 
