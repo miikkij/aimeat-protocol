@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-07-14
+
 **AIMEAT can now sell — agent services, company offerings, and app tools — over the agentic-commerce
 web.** A new protocol-agnostic **commerce core** (`src/commerce/`) turns any priced thing into a
 checkout: a `SellableResolver` registry (agent offers, EE company offerings, and priced **app-tool**
@@ -38,6 +40,34 @@ RFC 8288 `Link` headers, a **Content Signals** policy in `robots.txt` (`search=y
 ai-train=no`, operator-overridable), and **Web Bot Auth** — a signed JWKS at
 `/.well-known/http-message-signatures-directory` built from the node's existing Ed25519 key, plus opt-in
 RFC 9421 signing of outbound requests so AIMEAT agents are cryptographically verifiable bots.
+
+**A node now advertises everything an arriving agent needs to discover it, register, and read it — the
+agent-readiness arc is complete** (a fresh node scores *Agent-Native* on isitagentready.com). Four new
+public surfaces, each generated from the node's own state, never hand-maintained: an **Agent Skills
+discovery index** (`/.well-known/agent-skills/index.json`, agentskills.io RFC v0.2.0) built from the
+skills registry — every public node-scope skill with a resolvable `SKILL.md` URL and a `sha256` digest
+of its exact bytes — seeded so it is never empty by a public **`aimeat-node-guide`** "start here" skill
+that teaches discovery, login, agent connection, memory, skills, handbooks, and app-building. An
+**`/auth.md`** agent-registration document (workos.com/auth.md convention) served at the site root as
+`text/markdown`, narrating this node's real RFC 8628 device-authorization flow (register → owner
+approves + selects scopes in the Agents tab → claim credentials), Ed25519 re-authentication, revocation,
+and GEAI ecosystem-app onboarding — with the machine-readable **`agent_auth`** block (built once, served
+on `/.well-known/oauth-authorization-server` and embedded in the document: the anonymous registration
+method, credential types, owner-approval gate, default scopes, and the GHII/GAII/GEAI identity formats).
+**Markdown for Agents** content negotiation: the public info pages (`/`, `/v1/portal`, privacy/terms/
+connect) answer `Accept: text/markdown` with a clean markdown rendering — `Content-Type: text/markdown`,
+`Vary: Accept`, and `x-markdown-tokens`/`x-original-tokens` estimates — while browsers still get HTML and
+API JSON and authenticated app routes never negotiate.
+
+**Published apps get an agent read-surface — the "Agent Face."** Requesting an app URL with
+`Accept: text/markdown` (or `?format=md`) returns markdown instead of the JavaScript shell: the app's
+own declared face record when it publishes one (a public `apps.{filename}.agentface` markdown record),
+otherwise a converted rendering — always ending in an **Agent affordances** footer the node generates
+that links the app's WebMCP tools, its bound skills, and agent registration, so an agent reads the app's
+state, acts through its tools, and learns from its skill without scraping HTML. A one-call client library
+**`aimeat-agentface.js`** (`AIMEAT.agentface.publish(...)`) lets an app publish its face in the same code
+path that writes its view data, and the paved path (build-app prompt + node guide) teaches the parity
+rule: everything a human can see and do in the pixels must be reachable through records and tools.
 
 A client library **`aimeat-commerce.js`** (`AIMEAT.commerce.*`) lets an app add checkout, money formatting,
 and app-tool calls in a few lines; the flow is documented in `/llms.txt`, the Handbook, and a skill.
@@ -106,6 +136,34 @@ agent's engagement for that workspace/contract is retired, so Retire actually st
   where each contract is active or retired. OpenAPI + en/fi in sync; `docs/agent-workspace-contracts.md` §7d;
   new `e2e-organism-workspace-engagements` suite (15/15). `aimeat-crewai` 0.14.0 gates the record-push loop on
   engagements (retired → skip; fail-open), making Retire a real off-switch.
+- **Agent Skills discovery index** — `GET /.well-known/agent-skills/index.json` (agentskills.io RFC v0.2.0:
+  `$schema` + `skills[]` with `name`, `type: skill-md`, `description`, `url`, and a `sha256:` digest) generated
+  from the skills registry via an anonymous `resolveSkillRef`, so it lists **only** public node-scope skills and
+  can never leak a members-only one; `GET /.well-known/agent-skills/{name}/SKILL.md` serves the exact digested
+  bytes. Linked from the api-catalog linkset, cached with `domain:skills` invalidation. A public built-in
+  **`aimeat-node-guide`** skill (new per-skill `visibility` on the built-in seeds) ships with every node so the
+  index is never empty and an arriving agent has a "start here."
+- **`/auth.md` agent registration** (workos.com/auth.md convention) — served at the site root as `text/markdown`
+  (before `express.static`, robots.txt-style), built from config so it documents this node's real flow. The
+  `/.well-known/oauth-authorization-server` metadata gains a `skill` pointer and an **`agent_auth`** block
+  (`buildAgentAuthMetadata`, the single source of truth, also embedded in the document): the `anonymous`
+  registration method (`register_uri`/`claim_uri`/`credential_types_supported`), owner-approval gate,
+  `scopes_default`, and the GHII/GAII/GEAI identity formats under `aimeat_identity_types`.
+- **Markdown for Agents** — `services/markdown-negotiation.ts` (`prefersMarkdown`/`sendMarkdown`, a
+  dependency-free `htmlToMarkdown`, `buildLandingMarkdown`, `estimateTokens`) drives `Accept: text/markdown`
+  (or `?format=md`) on `GET /`, `/v1/portal`, and the `/v1/privacy` · `/v1/terms` · `/v1/connect` (+ `/fi`) info
+  pages: `text/markdown; charset=utf-8`, `Vary: Accept`, and `x-markdown-tokens`/`x-original-tokens` headers.
+  HTML stays the default; JSON APIs and authenticated SPA app routes never negotiate.
+- **Agent Face for published apps** — an app URL requested with `Accept: text/markdown` (or `?format=md`) serves
+  the app's public `apps.{filename}.agentface` markdown record (256 KB cap, public-visibility only — any other
+  visibility is treated as absent, no disclosure), else a converted rendering, always with a node-generated
+  **Agent affordances** footer (WebMCP tools + bound skills + `/auth.md`). Applied on the app download route
+  (after the hidden/access-code/paid gates) and subdomain roots; cached per app-version. Client library
+  **`/v1/libs/aimeat-agentface.js`** (`AIMEAT.agentface.publish(markdown | { title, sections })`) publishes a
+  face in one call; the build-app prompt + `aimeat-node-guide` teach the read/act/learn parity rule.
+- **`EnterpriseProvider.getMcpTools` seam** + a `/v2/mcp/enterprise` surface — edition-contributed MCP tools are
+  installed once at boot (Community/stub: empty), so the enterprise MCP surface can extend the core baseline
+  without a code fork.
 
 ### Removed
 

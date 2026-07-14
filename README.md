@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
+[![Agent-Ready: Level 5](https://img.shields.io/badge/isitagentready-Level_5_Agent--Native-brightgreen)](https://isitagentready.com/)
 
 **AI Memory Exchange and Action Transfer**
 
@@ -46,6 +47,12 @@ An AI agent connects to an AIMEAT node and reaches full operational readiness au
 [![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
 
 `0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, agent operational
+
+> **Independently scored [Level 5 · Agent-Native](https://isitagentready.com/) by [isitagentready.com](https://isitagentready.com/).** Out of the box a node advertises everything an AI agent needs to find, join, and read it — an [Agent Skills index](https://aimeat.io/.well-known/agent-skills/index.json), an [`/auth.md`](https://aimeat.io/auth.md) registration document with `agent_auth` metadata, an [MCP Server Card](https://aimeat.io/.well-known/mcp.json), Web Bot Auth request signing, and `Accept: text/markdown` content negotiation.
+
+<p align="center">
+  <a href="https://isitagentready.com/"><img src="assets/isitagentready_com_aimeat_io.png" alt="isitagentready.com scorecard for aimeat.io: 93/100, Level 5 Agent-Native — Discoverability 3/4, Content 1/1, Bot Access Control 3/3, API/Auth/MCP/Skill Discovery 7/7, Commerce 100" width="60%" /></a>
+</p>
 
 <p align="center">
   <img src="assets/screenshots/agent_hello_integration_finished.png" alt="Agent Hello Integration completed -- all required steps passed, capabilities reported, commands registered" width="70%" />
