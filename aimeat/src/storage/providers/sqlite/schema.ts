@@ -169,6 +169,10 @@ export function initializeSchema(db: Database.Database): void {
   // safeAddColumn('memory','archived') ALTER above, or upgraded DBs crash with "no such column".
   db.exec('CREATE INDEX IF NOT EXISTS idx_memory_active ON memory(ownerGaii, key) WHERE archived = 0');
   db.exec('CREATE INDEX IF NOT EXISTS idx_memory_archived_root ON memory(archivedRoot) WHERE archived = 1');
+  // Owner-AGNOSTIC key-prefix lookups (listAllMemory: workspace-access, write-guards, publish, catalogue)
+  // filter by `key LIKE 'prefix%'` with no ownerGaii, so the (ownerGaii,key) index above can't serve them.
+  // A key-led index makes those prefix scans index-backed. Mirrors @@index([key]) on the Prisma backends.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_memory_key ON memory(key)');
 
   // Security audit — per-peer federation auth policy
   safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');

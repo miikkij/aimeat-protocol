@@ -105,6 +105,11 @@ model Memory {
   @@index([ownerGaii])
   @@index([archived, key])
   @@index([archivedRoot])
+  // Owner-agnostic key-prefix lookups (listAllMemory: workspace-access, write-guards, publish, catalogue)
+  // filter by key with an anchored `startsWith` and NO ownerGaii. Without a key-led index they fall to a
+  // collection scan (~110ms on ~12k docs) — the `archived {$ne:true}` filter can't carry the (archived,key)
+  // index because $ne is non-selective. A rooted regex on this index makes those ~ms. See perf audit.
+  @@index([key])
 }
 
 // Archived prior versions of TRACKABLE memory keys. Append-only; the latest value always lives in
