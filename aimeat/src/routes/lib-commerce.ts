@@ -19,6 +19,8 @@
  * @usage router.get('/v1/libs/aimeat-commerce.js', (_req, res) => sendJavascriptLibrary(res, aimeatCommerceLib(config)));
  *
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Task path (TARGET-034 phase B): unbound tools purchasable — invokeAppTool
+ *     may return fulfillment.taskIds instead of results; docs updated
  *   v1.1.0 — 2026-07-14 — invokeAppTool live against the phase-A resolver: buyer input forwarded to
  *     the capability invoke, one call per line item, APP_TOOL_NOT_AVAILABLE kept as the older-node fallback
  *   v1.0.0 — 2026-07-14 — Initial commerce client library (TARGET-033 checkout + TARGET-034 app-tool draft)
@@ -235,7 +237,7 @@ const commerce = {
 
   /**
    * Read an app's declared tool manifest: the public memory record apps.{appId}.tools under the
-   * app owner's GHII — { tools: [{ name, description, inputSchema, action_id, price?, priceMoney? }] }.
+   * app owner's GHII — { tools: [{ name, description, inputSchema, action_id?, agent?, price?, priceMoney? }] }.
    * Returns null when the app declares no tools. Works logged out (public read).
    */
   async getAppTools(ownerGhii, appId) {
@@ -251,10 +253,12 @@ const commerce = {
   },
 
   /**
-   * Buy + invoke a priced app-tool through the checkout core (TARGET-034 phase A):
+   * Buy + invoke a priced app-tool through the checkout core (TARGET-034):
    * one { kind:'app-tool', app:'ownerName/appId', tool, input } line item, opened and
-   * completed in one call. The tool's backing capability runs with your input; the result
-   * comes back on session.fulfillment.results[0].result (receipt shows the charge).
+   * completed in one call. A tool bound to a capability (action_id) runs with your input and
+   * the result comes back on session.fulfillment.results[0].result; an unbound tool queues an
+   * agent TASK for the app owner instead — session.fulfillment.taskIds[0] (the deliverable
+   * arrives via the seller's task flow). The receipt shows the charge either way.
    * One call per invocation. On a node without the resolver this throws
    * with code 'APP_TOOL_NOT_AVAILABLE'.
    */

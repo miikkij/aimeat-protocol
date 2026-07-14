@@ -14,6 +14,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Task path (phase B): tools without an action_id binding fulfill as an
+ *     agent TASK (manifest `agent`, else the owner GHII) instead of being rejected
  *   v1.1.0 — 2026-07-14 — app-tool resolver: priced tool calls on agent-faced apps, manifest at
  *     apps.{appId}.tools, callable fulfillment via the backing capability (TARGET-034 phase A)
  *   v1.0.1 — 2026-07-14 — Money-amount coercion through the money.ts chokepoint (integerMicros)
@@ -130,11 +132,13 @@ export function offerSellableResolver(): SellableResolver {
 /**
  * The app-tool resolver (TARGET-034 phase A): a priced TOOL CALL on an agent-faced app. The app
  * owner declares tools in the public memory record `apps.{appId}.tools` under their GHII; a line
- * item `{ kind:'app-tool', app:'ownerName/appId', tool:'<name>', input? }` buys one call. Phase A
- * fulfills the CALLABLE path only: the tool must bind a capability via `action_id`, invoked
- * synchronously on completion with the buyer's input — the result lands on the session's
- * fulfillment. Pricing/PSP rules mirror the offer resolver (self-purchase free, cross-owner needs
- * a price, money needs a matching priceMoney + a settling handler + the seller's own PSP).
+ * item `{ kind:'app-tool', app:'ownerName/appId', tool:'<name>', input? }` buys one call. Two
+ * fulfillment paths: a tool bound to a capability via `action_id` is invoked synchronously on
+ * completion with the buyer's input (the result lands on the session's fulfillment); an unbound
+ * tool becomes an agent TASK on the shared commerce task path (phase B — assignee = the manifest
+ * `agent`, else the app owner's GHII). Pricing/PSP rules mirror the offer resolver (self-purchase
+ * free, cross-owner needs a price, money needs a matching priceMoney + a settling handler + the
+ * seller's own PSP).
  */
 export function appToolSellableResolver(): SellableResolver {
   return {
@@ -160,9 +164,6 @@ export function appToolSellableResolver(): SellableResolver {
       if (!parsed.success) throw new CommerceError('INVALID_TOOL_MANIFEST', 422, `App "${appRef}" has a malformed tool manifest: ${parsed.error.message}`);
       const tool: AppTool | undefined = parsed.data.tools.find((t) => t.name === toolName);
       if (!tool) throw new CommerceError('TOOL_NOT_FOUND', 404, `Tool not found on app "${appRef}": ${toolName}`);
-      if (!tool.action_id) {
-        throw new CommerceError('TOOL_NOT_CALLABLE', 422, 'This tool declares no capability binding (action_id); the task-fulfillment path is not available yet');
-      }
 
       const isSelf = sellerOwner === buyerOwner;
       const currency = ref.currency ?? 'morsel';
@@ -188,15 +189,23 @@ export function appToolSellableResolver(): SellableResolver {
       }
 
       const actionId = tool.action_id;
+      // Task-path assignee (phase B): the manifest-declared agent of the app owner, or the owner's
+      // GHII itself when no agent is named (the task lands in the owner's own task space).
+      const taskAssignee = tool.agent ? `${tool.agent}#${sellerOwner}@${config.nodeId}` : sellerGhii;
       return {
         kind: 'app-tool',
         // The "agent" slots carry the app reference — skus render as app-tool:<owner>/<appId>:<tool>.
         agentGaii: appRef, agentName: appId, offerId: tool.name,
         title: `${appId} · ${tool.name}`, sellerOwner, sellerGhii,
         priceMorsels: unitPrice, psp,
-        // Callable fulfillment: invoke the backing capability with the buyer's persisted input.
-        // A throw refunds the collect and leaves the session open (session-service contract).
+        // Fulfillment — a throw refunds the collect and leaves the session open (session-service
+        // contract). Callable tools invoke the backing capability with the buyer's persisted input;
+        // unbound tools become an agent TASK on the shared commerce task path (phase B).
         async fulfill(ctx, { session, item, callerJwt }) {
+          if (!actionId) {
+            const { createFulfillmentTask } = await import('./fulfillment.js');
+            return { taskId: await createFulfillmentTask(ctx.storage, session, item, taskAssignee) };
+          }
           const cap = await ctx.storage.getCapability(actionId);
           if (!cap) {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);

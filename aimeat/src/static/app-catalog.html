@@ -2860,6 +2860,32 @@
       "detail.skillDetached": "Skill detached.",
       "detail.skillDetach": "Detach",
       "detail.skillAttachError": "Failed to attach skill",
+      "monetize.title": "💰 Monetize — sell tool calls",
+      "monetize.hint": "Declare tools agents can buy per call through the commerce checkout. A tool bound to a capability (action id) runs instantly and returns its result to the buyer; without a binding the purchase becomes a task for your agent. Priced tools are listed publicly in the commerce feed.",
+      "monetize.empty": "No tools declared yet.",
+      "monetize.addTool": "➕ Add tool",
+      "monetize.name": "Tool name",
+      "monetize.desc": "Description",
+      "monetize.priceCol": "Price / call",
+      "monetize.priceMorsels": "Price (morsels)",
+      "monetize.priceMoney": "Money price",
+      "monetize.currency": "Currency",
+      "monetize.actionId": "Capability binding (action id)",
+      "monetize.actionIdHint": "Optional. A capability id (e.g. ext:my-extension:summarize) invoked instantly on purchase. Leave empty to fulfill as an agent task instead.",
+      "monetize.agent": "Fulfilling agent",
+      "monetize.agentHint": "Task path only: the bare name of your agent that receives the order task. Empty = the task lands in your own task space.",
+      "monetize.fulfillCall": "Instant call",
+      "monetize.fulfillTask": "Agent task",
+      "monetize.taskToOwner": "task to you",
+      "monetize.notForSale": "not for sale",
+      "monetize.deleteHint": "Remove this tool from the manifest",
+      "monetize.confirmDelete": 'Remove tool "{name}" from the manifest?',
+      "monetize.nameInvalid": "Invalid tool name: use letters/numbers plus . _ - (must start alphanumeric).",
+      "monetize.nameTaken": "A tool with this name already exists on this app.",
+      "monetize.moneyInvalid": "Invalid money price: enter a positive amount like 0.002 or 1.50.",
+      "monetize.saved": "Tool manifest saved.",
+      "monetize.saveFailed": "Saving the tool manifest failed",
+      "monetize.needLogin": "Sign in to edit the tool manifest.",
       "detail.editAccess": "Access code",
       "detail.accessCodeHint": "Set or remove an optional code required to open this app.",
       "detail.accessCodeLabel": "Access code",
@@ -3223,6 +3249,32 @@
       "detail.skillAttaching": "Liitetään…",
       "detail.skillAttached": "Taito liitetty tähän sovellukseen.",
       "detail.skillDetached": "Taito irrotettu.",
+      "monetize.title": "💰 Kaupallista — myy työkalukutsuja",
+      "monetize.hint": "Julista työkalut, joita agentit voivat ostaa kutsu kerrallaan commerce-kassan kautta. Kyvykkyyteen sidottu työkalu (action id) ajetaan heti ja tulos palautuu ostajalle; ilman sidontaa ostosta syntyy tehtävä agentillesi. Hinnoitellut työkalut listataan julkisesti commerce-feedissä.",
+      "monetize.empty": "Ei vielä julistettuja työkaluja.",
+      "monetize.addTool": "➕ Lisää työkalu",
+      "monetize.name": "Työkalun nimi",
+      "monetize.desc": "Kuvaus",
+      "monetize.priceCol": "Hinta / kutsu",
+      "monetize.priceMorsels": "Hinta (morselit)",
+      "monetize.priceMoney": "Rahahinta",
+      "monetize.currency": "Valuutta",
+      "monetize.actionId": "Kyvykkyyssidonta (action id)",
+      "monetize.actionIdHint": "Valinnainen. Kyvykkyyden id (esim. ext:oma-laajennus:summarize), joka ajetaan heti oston yhteydessä. Jätä tyhjäksi, jos haluat toimittaa agenttitehtävänä.",
+      "monetize.agent": "Toimittava agentti",
+      "monetize.agentHint": "Vain tehtäväpolku: sen oman agenttisi nimi, jolle tilaustehtävä ohjataan. Tyhjä = tehtävä jää omaan tehtävätilaasi.",
+      "monetize.fulfillCall": "Välitön kutsu",
+      "monetize.fulfillTask": "Agenttitehtävä",
+      "monetize.taskToOwner": "tehtävä sinulle",
+      "monetize.notForSale": "ei myynnissä",
+      "monetize.deleteHint": "Poista tämä työkalu manifestista",
+      "monetize.confirmDelete": 'Poistetaanko työkalu "{name}" manifestista?',
+      "monetize.nameInvalid": "Virheellinen työkalun nimi: käytä kirjaimia/numeroita sekä . _ - (alkuun kirjain tai numero).",
+      "monetize.nameTaken": "Tämännimin työkalu on jo tässä sovelluksessa.",
+      "monetize.moneyInvalid": "Virheellinen rahahinta: anna positiivinen summa, esim. 0.002 tai 1.50.",
+      "monetize.saved": "Työkalumanifesti tallennettu.",
+      "monetize.saveFailed": "Työkalumanifestin tallennus epäonnistui",
+      "monetize.needLogin": "Kirjaudu sisään muokataksesi työkalumanifestia.",
       "detail.skillDetach": "Irrota",
       "detail.skillAttachError": "Taidon liittäminen epäonnistui",
       "detail.editAccess": "Pääsykoodi",
@@ -3833,1416 +3885,6 @@
     return html;
   }
 
-  // src/static/app-catalog/js/detail.js
-  var refreshAll;
-  var loadPublishedApps;
-  var renderApps;
-  var updateModeToggle;
-  var getCortexOwnerToken;
-  var launchApp;
-  var viewPublished;
-  var viewSource;
-  var generateId2;
-  var generateSharePrompt;
-  var openPromptBuilder;
-  var showPublishModal;
-  var getMainApps;
-  var getServerState;
-  var getServerManifests;
-  var getOwnProtection;
-  var setIframeUrl;
-  var isOperatorSession;
-  function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
-  }
-  var detailAppId = null;
-  var detailDraftBlob = null;
-  var detailAiAvailable = false;
-  var detailVersionsHtml = null;
-  var detailSkillsHtml = null;
-  var detailEditingAbout = false;
-  var detailEditAboutOnOpen = false;
-  var detailEditingAccessCode = false;
-  var detailSkillPickerOpen = false;
-  var detailMySkills = null;
-  var detailBoundSkills = [];
-  var detailSkillBusy = false;
-  function detailGetApp() {
-    for (var i = 0; i < getMainApps().length; i++) {
-      if (getMainApps()[i].id === detailAppId) return getMainApps()[i];
-    }
-    return null;
-  }
-  function detailServerOwner(app) {
-    var sess = currentOwnerName();
-    var stored = app && app.aimeatOwner || "";
-    if (!stored) {
-      var pu = app && (app.publishedUrl || app.viewUrl) || "";
-      var mm = pu.match(/\/v1\/apps\/([^/]+)\//);
-      stored = mm ? decodeURIComponent(mm[1]) : "";
-    }
-    if (sess && (!stored || stored === "anonymous" || stored === sess)) return sess;
-    return stored;
-  }
-  function detailIsOwnPublished(app) {
-    return !!(app && app.published && app.publishedFilename && getServerState()[app.publishedFilename] && currentOwnerName());
-  }
-  function blobToHtml(blob) {
-    try {
-      return decodeURIComponent(escape(atob(blob)));
-    } catch (e) {
-      return "";
-    }
-  }
-  function htmlToBlob(html) {
-    return btoa(unescape(encodeURIComponent(html)));
-  }
-  function serverMgmtInner(app) {
-    if (!app) return "";
-    var isUrlApp = app.source === "url" && !app.blob;
-    var svrState = app.publishedFilename && getServerState()[app.publishedFilename] || null;
-    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return "";
-    var fnArg = jsArg(app.publishedFilename);
-    var ownerArg2 = jsArg(svrState.owner || "");
-    var p = svrState.protection || {};
-    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-    var acLabel = (svrState.accessCode ? "🔒 " : "") + t("detail.editAccess");
-    var acEditor = detailEditingAccessCode ? '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="detail-ac-input">' + t("detail.accessCodeLabel") + '</label><input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t("detail.accessCodePh")) + '" style="margin:4px 0 6px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("detail.accessCodeRemoveHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAccessCodeSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAccessCodeCancel()") + '</div><div class="dtl-ai-status" id="detail-ac-status"></div></div>' : "";
-    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(acLabel, "window._launcher.detailAccessCodeEdit()", { title: t("detail.accessCodeHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
-    dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
-    // everyone else, so only show this to operators.
-    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div>" + acEditor + "</div>";
-  }
-  function refreshServerMgmt() {
-    var c = document.getElementById("detail-server-mgmt");
-    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
-  }
-  function openDetailView(appId) {
-    detailAppId = appId;
-    detailDraftBlob = null;
-    detailVersionsHtml = null;
-    detailSkillsHtml = null;
-    detailEditingAbout = false;
-    detailEditingAccessCode = false;
-    detailSkillPickerOpen = false;
-    detailMySkills = null;
-    detailBoundSkills = [];
-    var app = detailGetApp();
-    if (!app) return;
-    document.getElementById("detail-view").hidden = false;
-    renderDetailView();
-    detailCheckAiAvailability();
-    var owner = currentOwnerName();
-    if (app.published && app.publishedFilename && owner) {
-      detailLoadVersions(owner, app.publishedFilename);
-      detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
-    }
-    if (detailEditAboutOnOpen) {
-      detailEditAboutOnOpen = false;
-      detailAboutEdit();
-    }
-  }
-  function editAppDetails(owner, filename, localId, versionNumber) {
-    detailEditAboutOnOpen = true;
-    openPublishedDetail(owner, filename, localId, versionNumber);
-  }
-  function closeDetailView() {
-    document.getElementById("detail-view").hidden = true;
-    detailAppId = null;
-    detailDraftBlob = null;
-  }
-  function detailLaunch() {
-    var app = detailGetApp();
-    if (!app) return;
-    if (app.published && (app.publishedUrl || app.publishedFilename)) {
-      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
-      var url;
-      if (app.publishedUrl) {
-        url = base + app.publishedUrl;
-      } else {
-        var st = getServerState()[app.publishedFilename] || {};
-        var owner = st.owner || currentOwnerName() || "";
-        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
-      }
-      viewPublished(url + "?mode=inline", app.name);
-    } else {
-      launchApp(app.id, app.openMode || "tab");
-    }
-  }
-  function loadScriptOnce(src) {
-    return new Promise(function(resolve, reject) {
-      if (document.querySelector('script[src="' + src + '"]')) return resolve();
-      var s = document.createElement("script");
-      s.src = src;
-      s.onload = function() {
-        resolve();
-      };
-      s.onerror = function() {
-        reject(new Error("failed to load " + src));
-      };
-      document.head.appendChild(s);
-    });
-  }
-  function onAuthChanged() {
-    if (getDbMode() === "personal" && !currentOwnerName()) {
-      setDbMode("global");
-    }
-    closeDbInstance();
-    updateModeToggle();
-    try {
-      refreshAll();
-    } catch (e) {
-      try {
-        loadPublishedApps();
-      } catch (e2) {
-      }
-    }
-    var sub = document.getElementById("publish-submit-btn");
-    var st = document.getElementById("publish-status");
-    if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
-      if (getCortexOwnerToken()) {
-        sub.disabled = false;
-        if (st) st.textContent = "";
-      } else {
-        sub.disabled = true;
-        if (st) {
-          st.textContent = t("publish.loginRequired");
-          st.style.color = "var(--accent)";
-        }
-      }
-    }
-  }
-  async function mountLoginPill() {
-    try {
-      await loadScriptOnce("/v1/libs/aimeat-auth.js");
-      if (window.AIMEAT && window.AIMEAT.auth) {
-        try {
-          await window.AIMEAT.auth.login();
-        } catch (e) {
-        }
-        if (window.AIMEAT.auth.mountLoginButton) {
-          window.AIMEAT.auth.mountLoginButton("#headerAuth", {
-            onLogin: onAuthChanged,
-            onLogout: onAuthChanged,
-            i18n: {
-              loggedIn: t("auth.loggedIn"),
-              signInBtn: t("auth.signIn"),
-              logoutBtn: t("auth.logout")
-            }
-          });
-        }
-      }
-    } catch (e) {
-    }
-  }
-  function fmtSize(bytes) {
-    if (!bytes) return "—";
-    return bytes < 1024 ? bytes + " B" : bytes < 1048576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1048576).toFixed(1) + " MB";
-  }
-  function renderDetailView() {
-    var app = detailGetApp();
-    if (!app) return;
-    var config = loadConfig();
-    var hasServer = !!config.aimeatUrl;
-    var icon = app.icon || "📝";
-    var isUrlApp = app.source === "url" && !app.blob;
-    var canEditAbout = !!app.id && !isUrlApp;
-    document.getElementById("detail-title").innerHTML = '<span style="font-size:1.3rem">' + escapeHtml(icon) + "</span> " + escapeHtml(app.name || "App") + (canEditAbout && !detailEditingAbout ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t("detail.editDetails")) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : "");
-    var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0;
-    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : app.published ? "v?" : t("detail.notPublished");
-    var syncClass, syncText;
-    if (!app.published) {
-      syncClass = "none";
-      syncText = t("detail.notPublished");
-    } else if (detailDraftBlob) {
-      syncClass = "diff";
-      syncText = t("detail.localNewer");
-    } else {
-      syncClass = "ok";
-      syncText = t("detail.inSync");
-    }
-    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    var shotOwner = detailServerOwner(app);
-    var shotFile = app.publishedFilename || "";
-    var shotUrl = app.published && shotOwner && shotFile && aimeatBase ? aimeatBase + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
-    var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
-    var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
-    var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
-    var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
-    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
-    var favBtn = app.blob ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? "detail.unfavorite" : "detail.favorite")) + '" onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? "⭐" : "☆") + "</button>" : "";
-    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
-    var aboutBody;
-    if (detailEditingAbout) {
-      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
-    } else {
-      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
-      (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
-    }
-    var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
-    var aiHtml = '<div class="dtl-section"><h3>' + t("detail.editAi") + '</h3><p class="dtl-desc">' + t("detail.editAiHint") + "</p>";
-    if (isUrlApp) {
-      aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
-    } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
-      // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
-      // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
-      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) + dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("detail.test"), "window._launcher.detailAiTest()", { variant: "primary" })) + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()") + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
-    }
-    aiHtml += "</div>";
-    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
-    var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
-    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
-    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
-    var skillsHtml = "";
-    if (app.published) {
-      var ownPub = detailIsOwnPublished(app);
-      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div>" + // Own published app → offer attach/detach (a skill teaches agents this app). The detach ×
-      // on each user-scope skill is rendered by detailLoadSkills into the list above.
-      (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
-    }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
-  }
-  function detailLoadSkills(owner, filename) {
-    var config = loadConfig();
-    if (!config.aimeatUrl) return;
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t("detail.noSkills") || "No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.") + "</span>";
-    var skillHeaders = {};
-    try {
-      var jwt = window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt || JSON.parse(localStorage.getItem("aimeat_session") || "{}").jwt;
-      if (jwt) skillHeaders["Authorization"] = "Bearer " + jwt;
-    } catch (e) {
-    }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/skills", { headers: skillHeaders }).then(function(resp) {
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var listEl = document.getElementById("detail-skills-list");
-      var skills = json.data && json.data.skills ? json.data.skills : [];
-      detailBoundSkills = skills.map(function(s2) {
-        return s2.ref;
-      });
-      var ownPub = detailIsOwnPublished(detailGetApp());
-      if (skills.length === 0) {
-        detailSkillsHtml = noneHtml;
-        if (listEl) listEl.innerHTML = detailSkillsHtml;
-        return;
-      }
-      var out = "";
-      for (var i = 0; i < skills.length; i++) {
-        var s = skills[i];
-        var detach = ownPub && s.scope === "user" ? ' <button class="rename-pencil" title="' + escapeHtml(t("detail.skillDetach")) + `" onclick="window._launcher.detailSkillDetach('` + jsArg(s.name) + `')">×</button>` : "";
-        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + "</span>" + detach + '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
-      }
-      detailSkillsHtml = out;
-      if (listEl) listEl.innerHTML = detailSkillsHtml;
-    }).catch(function() {
-      detailBoundSkills = [];
-      detailSkillsHtml = noneHtml;
-      var listEl = document.getElementById("detail-skills-list");
-      if (listEl) listEl.innerHTML = detailSkillsHtml;
-    });
-  }
-  function detailAccessCodeEdit() {
-    var app = detailGetApp();
-    if (!detailIsOwnPublished(app)) return;
-    detailEditingAccessCode = true;
-    refreshServerMgmt();
-    var el = document.getElementById("detail-ac-input");
-    if (el) el.focus();
-  }
-  function detailAccessCodeCancel() {
-    detailEditingAccessCode = false;
-    refreshServerMgmt();
-  }
-  function detailAccessCodeSave() {
-    var app = detailGetApp();
-    if (!detailIsOwnPublished(app)) return;
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
-      return;
-    }
-    var input = document.getElementById("detail-ac-input");
-    var statusEl = document.getElementById("detail-ac-status");
-    var code = input ? input.value.trim() : "";
-    if (code && (code.length < 4 || code.length > 64)) {
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + t("detail.accessCodeLen");
-      }
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    var filename = app.publishedFilename;
-    if (statusEl) {
-      statusEl.style.color = "var(--text-muted)";
-      statusEl.textContent = t("detail.savingAccess");
-    }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
-      method: "PATCH",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify(code ? { access_code: code } : { access_code: null })
-    }).then(function(resp) {
-      return resp.json().then(function(j) {
-        return { ok: resp.ok, j };
-      });
-    }).then(function(res) {
-      if (res.ok && res.j && res.j.ok !== false) {
-        var st = getServerState()[filename];
-        if (st) st.accessCode = !!code;
-        detailEditingAccessCode = false;
-        loadPublishedApps();
-        refreshServerMgmt();
-        showNotice(code ? t("detail.accessCodeSet") : t("detail.accessCodeCleared"));
-      } else {
-        if (statusEl) {
-          statusEl.style.color = "var(--accent)";
-          statusEl.textContent = "✘ " + (res.j && res.j.error && res.j.error.message || "Failed");
-        }
-      }
-    }).catch(function(err) {
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + (err.message || "Error");
-      }
-    });
-  }
-  function detailSkillAttachInner() {
-    var toggleBtn = dtlBtn("+ " + t("detail.skillAttach"), "window._launcher.detailSkillAttachToggle()");
-    if (!detailSkillPickerOpen) return toggleBtn;
-    var picker;
-    if (detailMySkills === null) {
-      picker = '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
-    } else if (detailMySkills.length === 0) {
-      picker = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.skillNoneToAttach") + "</span>";
-    } else {
-      var opts = "";
-      for (var i = 0; i < detailMySkills.length; i++) {
-        var s = detailMySkills[i];
-        var desc = (s.description || "").slice(0, 50);
-        opts += '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + (desc ? " — " + escapeHtml(desc) : "") + "</option>";
-      }
-      picker = '<select id="detail-skill-select" class="modal-input" style="max-width:340px;margin:0">' + opts + "</select>" + dtlBtn(t("detail.skillAttachConfirm"), "window._launcher.detailSkillAttach()", { variant: "primary", disabled: detailSkillBusy });
-    }
-    return '<div class="dtl-btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">' + toggleBtn + picker + '</div><div class="dtl-ai-status" id="detail-skill-status"></div>';
-  }
-  function refreshSkillAttach() {
-    var c = document.getElementById("detail-skill-attach");
-    if (c) c.innerHTML = detailSkillAttachInner();
-  }
-  function detailSkillAttachToggle() {
-    var app = detailGetApp();
-    if (!detailIsOwnPublished(app)) return;
-    detailSkillPickerOpen = !detailSkillPickerOpen;
-    if (detailSkillPickerOpen && detailMySkills === null) {
-      refreshSkillAttach();
-      skillListMine().then(function(mine) {
-        var bound = {};
-        for (var i = 0; i < detailBoundSkills.length; i++) bound[detailBoundSkills[i]] = true;
-        detailMySkills = mine.filter(function(s) {
-          return !bound[s.ref];
-        });
-        refreshSkillAttach();
-      }).catch(function() {
-        detailMySkills = [];
-        refreshSkillAttach();
-      });
-    } else {
-      refreshSkillAttach();
-    }
-  }
-  function detailSkillAttach() {
-    var app = detailGetApp();
-    if (!detailIsOwnPublished(app)) return;
-    var sel = document.getElementById("detail-skill-select");
-    var name = sel ? sel.value : "";
-    if (!name || detailSkillBusy) return;
-    var statusEl = document.getElementById("detail-skill-status");
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    var binding = "app:" + owner + "/" + filename;
-    detailSkillBusy = true;
-    if (statusEl) {
-      statusEl.style.color = "var(--text-muted)";
-      statusEl.textContent = t("detail.skillAttaching");
-    }
-    skillSetBinding(name, binding).then(function() {
-      detailSkillBusy = false;
-      detailSkillPickerOpen = false;
-      detailMySkills = null;
-      detailLoadSkills(owner, filename);
-      refreshSkillAttach();
-      showNotice(t("detail.skillAttached"));
-    }).catch(function(err) {
-      detailSkillBusy = false;
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + t("detail.skillAttachError") + ": " + (err.message || err);
-      }
-    });
-  }
-  function detailSkillDetach(name) {
-    var app = detailGetApp();
-    if (!detailIsOwnPublished(app) || detailSkillBusy) return;
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    detailSkillBusy = true;
-    skillSetBinding(name, null).then(function() {
-      detailSkillBusy = false;
-      detailMySkills = null;
-      detailLoadSkills(owner, filename);
-      refreshSkillAttach();
-      showNotice(t("detail.skillDetached"));
-    }).catch(function(err) {
-      detailSkillBusy = false;
-      showNotice(t("detail.skillAttachError") + ": " + (err.message || err));
-    });
-  }
-  function skillApiBase() {
-    var cfg = loadConfig();
-    return cfg.aimeatUrl ? cfg.aimeatUrl.replace(/\/+$/, "") : "";
-  }
-  function skillAuthHeaders(withJson) {
-    var h = {};
-    var tok = getCortexOwnerToken();
-    if (tok) h["Authorization"] = "Bearer " + tok;
-    if (withJson) h["Content-Type"] = "application/json";
-    return h;
-  }
-  function skillListMine() {
-    var base = skillApiBase();
-    if (!base) return Promise.reject(new Error("No server configured"));
-    return fetch(base + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
-      return r.json();
-    }).then(function(j) {
-      return j.data && j.data.skills ? j.data.skills : [];
-    });
-  }
-  function skillGetMine(name) {
-    var base = skillApiBase();
-    return fetch(base + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
-      return r.json();
-    }).then(function(j) {
-      return j.data && j.data.skill || null;
-    });
-  }
-  function skillPublish(skillMd, files) {
-    var base = skillApiBase();
-    var body = { skill_md: skillMd };
-    if (files && Object.keys(files).length) body.files = files;
-    return fetch(base + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
-      return r.json().then(function(j) {
-        if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
-        return j.data && j.data.skill || null;
-      });
-    });
-  }
-  function skillSetBinding(name, binding) {
-    return skillGetMine(name).then(function(skill) {
-      if (!skill) throw new Error("Skill not found: " + name);
-      var md = skill.fileContents && skill.fileContents["SKILL.md"] || "";
-      var m = md.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/);
-      if (!m) throw new Error("SKILL.md has no frontmatter");
-      var fm = m[2];
-      var hasBindingLine = /^\s{2,}binding:.*$/m.test(fm);
-      var hasMetadata = /^metadata:\s*$/m.test(fm);
-      if (binding) {
-        if (hasBindingLine) fm = fm.replace(/^(\s{2,})binding:.*$/m, "$1binding: " + binding);
-        else if (hasMetadata) fm = fm.replace(/^metadata:\s*$/m, "metadata:\n  binding: " + binding);
-        else fm = fm + "\nmetadata:\n  binding: " + binding;
-      } else {
-        fm = fm.replace(/^\s{2,}binding:.*\r?\n?/m, "");
-        if (/^metadata:\s*$/m.test(fm) && !/^metadata:\s*\r?\n\s{2,}\S/m.test(fm)) {
-          fm = fm.replace(/^metadata:\s*\r?\n?/m, "");
-        }
-      }
-      var files = Object.assign({}, skill.fileContents);
-      delete files["SKILL.md"];
-      return skillPublish(m[1] + fm + m[3] + m[4], files);
-    });
-  }
-  function detailAboutEdit() {
-    if (!detailGetApp()) return;
-    detailEditingAbout = true;
-    renderDetailView();
-    var nameEl = document.getElementById("detail-name-input");
-    if (nameEl) {
-      nameEl.focus();
-      nameEl.select();
-    }
-  }
-  function detailAboutCancel() {
-    detailEditingAbout = false;
-    renderDetailView();
-  }
-  function detailToggleFavorite() {
-    var app = detailGetApp();
-    if (!app) return;
-    app.favorite = !app.favorite;
-    saveApp(app).then(function() {
-      renderApps();
-      renderDetailView();
-    });
-  }
-  function detailAboutSave() {
-    var app = detailGetApp();
-    if (!app) return;
-    var nameEl = document.getElementById("detail-name-input");
-    var descEl = document.getElementById("detail-desc-input");
-    var iconEl = document.getElementById("detail-icon-input");
-    var tagsEl = document.getElementById("detail-tags-input");
-    var newName = nameEl ? nameEl.value.trim() : "";
-    var newDesc = descEl ? descEl.value.trim() : "";
-    var newIcon = iconEl ? iconEl.value.trim() : app.icon || "";
-    var newTags = tagsEl ? tagsEl.value.split(",").map(function(s) {
-      return s.trim();
-    }).filter(Boolean) : app.tags || [];
-    if (!newName) {
-      showNotice(t("detail.nameRequired") || "Name cannot be empty.");
-      if (nameEl) nameEl.focus();
-      return;
-    }
-    if (app.published && !newDesc) {
-      showNotice(t("detail.descRequired") || "Description cannot be empty.");
-      if (descEl) descEl.focus();
-      return;
-    }
-    function finishLocal() {
-      app.name = newName;
-      app.description = newDesc;
-      app.icon = newIcon;
-      app.tags = newTags;
-      saveApp(app).then(function() {
-        detailEditingAbout = false;
-        renderApps();
-        loadPublishedApps();
-        renderDetailView();
-      });
-    }
-    if (!app.published || !app.publishedFilename) {
-      finishLocal();
-      return;
-    }
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    var owner = detailServerOwner(app);
-    var filename = app.publishedFilename;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
-      method: "PATCH",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, description: newDesc })
-    }).then(function(resp) {
-      return resp.json().then(function(j) {
-        return { ok: resp.ok, j };
-      });
-    }).then(function(res) {
-      if (res.ok && res.j && res.j.ok !== false) {
-        var key = owner + "\n" + filename;
-        getServerManifests()[key] = getServerManifests()[key] || {};
-        getServerManifests()[key].name = newName;
-        getServerManifests()[key].description = newDesc;
-        finishLocal();
-      } else {
-        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
-      }
-    }).catch(function(err) {
-      showNotice("Error: " + (err.message || err));
-    });
-  }
-  function detailSetScreenshot() {
-    var app = detailGetApp();
-    if (!app) return;
-    var filename = app.publishedFilename || "";
-    if (!filename) {
-      var pu = app.publishedUrl || app.viewUrl || "";
-      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
-      if (m) filename = decodeURIComponent(m[1]);
-    }
-    var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
-    if (!owner || !filename) {
-      showNotice("Publish the app first, then you can set a screenshot.");
-      return;
-    }
-    if (!token) {
-      showNotice("Sign in to set a screenshot.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    if (!aimeatUrl) {
-      showNotice("No server configured.");
-      return;
-    }
-    var input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = function() {
-      var file = input.files && input.files[0];
-      if (!file) return;
-      if (file.size > 2 * 1024 * 1024) {
-        showNotice("Image too large (max 2 MB).");
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function() {
-        var s = String(reader.result);
-        var base64 = s.indexOf(",") >= 0 ? s.slice(s.indexOf(",") + 1) : s;
-        fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-          body: JSON.stringify({ screenshot: base64, screenshot_mime_type: file.type || "image/png" })
-        }).then(function(r) {
-          return r.json().then(function(j) {
-            return { ok: r.ok, j };
-          });
-        }).then(function(res) {
-          if (res.ok) {
-            showNotice("Screenshot set. It will show in the catalogue and on the landing wall.");
-          } else {
-            showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
-          }
-        }).catch(function(e) {
-          showNotice("Failed: " + e.message);
-        });
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  }
-  async function detailRefreshScreenshot() {
-    var app = detailGetApp();
-    if (!app) return;
-    var filename = app.publishedFilename || "";
-    if (!filename) {
-      var pu = app.publishedUrl || app.viewUrl || "";
-      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
-      if (m) filename = decodeURIComponent(m[1]);
-    }
-    var owner = detailServerOwner(app);
-    var token = getCortexOwnerToken();
-    if (!owner || !filename) {
-      showNotice("Publish the app first, then you can refresh its screenshot.");
-      return;
-    }
-    if (!token) {
-      showNotice("Sign in to refresh the screenshot.");
-      return;
-    }
-    if (!await showConfirm(t("confirm.clearScreenshot"))) return;
-    var config = loadConfig();
-    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
-    if (!aimeatUrl) {
-      showNotice("No server configured.");
-      return;
-    }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
-      method: "DELETE",
-      headers: { "Authorization": "Bearer " + token }
-    }).then(function(r) {
-      return r.json().then(function(j) {
-        return { ok: r.ok, j };
-      });
-    }).then(function(res) {
-      if (res.ok) {
-        showNotice(res.j.data && res.j.data.note || "Screenshot cleared. A fresh one will be taken on the next scheduled run.");
-      } else {
-        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
-      }
-    }).catch(function(e) {
-      showNotice("Failed: " + e.message);
-    });
-  }
-  function metaItem(label, val) {
-    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
-  }
-  function detailAiUnavailableMsg() {
-    return getCortexOwnerToken() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
-  }
-  function detailCheckAiAvailability() {
-    detailAiAvailable = false;
-    var config = loadConfig();
-    var token = getCortexOwnerToken();
-    if (!config.aimeatUrl || !token) {
-      renderDetailView();
-      return;
-    }
-    var url = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(url + "/v1/openrouter/settings", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
-      return r.json();
-    }).then(function(j) {
-      detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
-      if (detailAppId) renderDetailView();
-    }).catch(function() {
-      detailAiAvailable = false;
-      if (detailAppId) renderDetailView();
-    });
-  }
-  function detailLoadVersions(owner, filename) {
-    var config = loadConfig();
-    if (!config.aimeatUrl) return;
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var listEl = document.getElementById("detail-versions-list");
-      if (!listEl) return;
-      var versions = json.data && json.data.versions ? json.data.versions : [];
-      if (versions.length === 0) {
-        detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
-        listEl.innerHTML = detailVersionsHtml;
-        return;
-      }
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
-      var html = "";
-      for (var i = 0; i < versions.length; i++) {
-        var v = versions[i];
-        var isLatest = i === 0;
-        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
-        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
-      }
-      detailVersionsHtml = html;
-      listEl.innerHTML = html;
-    }).catch(function() {
-      detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
-      var listEl = document.getElementById("detail-versions-list");
-      if (listEl) listEl.innerHTML = detailVersionsHtml;
-    });
-  }
-  function extractHtmlFromAi(content) {
-    if (!content) return null;
-    var text = String(content).trim();
-    var fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
-    if (fence && fence[1]) text = fence[1].trim();
-    var lower = text.toLowerCase();
-    var startDoc = lower.indexOf("<!doctype");
-    var startHtml = lower.indexOf("<html");
-    var start = startDoc !== -1 ? startDoc : startHtml;
-    if (start === -1) {
-      if (text.indexOf("<") !== -1 && text.indexOf(">") !== -1 && text.length > 30) return text;
-      return null;
-    }
-    return text.slice(start);
-  }
-  function detailAiRun() {
-    var app = detailGetApp();
-    if (!app) return;
-    var inputEl = document.getElementById("detail-ai-input");
-    var statusEl = document.getElementById("detail-ai-status");
-    var runBtn = document.getElementById("detail-ai-run");
-    var change = (inputEl.value || "").trim();
-    if (!change) {
-      inputEl.focus();
-      return;
-    }
-    var token = getCortexOwnerToken();
-    if (!token) {
-      statusEl.textContent = t("detail.aiLoginNeeded");
-      return;
-    }
-    var config = loadConfig();
-    if (!config.aimeatUrl) {
-      statusEl.textContent = t("detail.aiUnavailable");
-      return;
-    }
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var html = app.blob ? blobToHtml(app.blob) : "";
-    if (!html) {
-      statusEl.textContent = t("detail.urlCantEdit");
-      return;
-    }
-    var systemPrompt = "You are editing a single-file HTML web app that runs on the AIMEAT platform. You will be given the current full HTML source and a change request. Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. Preserve every existing AIMEAT integration (script tags loading /v1/libs/*, AIMEAT.* API calls, cortex extension scripts) unless the change specifically requires altering them. Keep the result a single self-contained file that supports both light and dark themes.";
-    var userPrompt = "Change request:\n" + change + "\n\nCurrent HTML source:\n" + html;
-    runBtn.disabled = true;
-    statusEl.style.color = "var(--text-muted)";
-    statusEl.textContent = t("detail.running");
-    fetch(aimeatUrl + "/v1/ai/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify({
-        prompt: userPrompt,
-        systemPrompt,
-        app_id: "app-catalog"
-      })
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      runBtn.disabled = false;
-      if (!json || !json.ok) {
-        var code = json && json.error && json.error.code || "";
-        var msg = json && json.error && json.error.message || "AI request failed";
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + (code ? "[" + code + "] " : "") + msg;
-        return;
-      }
-      var content = json.data && json.data.content ? json.data.content : "";
-      var newHtml = extractHtmlFromAi(content);
-      if (!newHtml) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + t("detail.aiNoHtml");
-        return;
-      }
-      detailDraftBlob = htmlToBlob(newHtml);
-      statusEl.style.color = "#34d399";
-      var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== "undefined" ? " · " + t("detail.aiUsage") + ": $" + Number(json.data.budget.spent_today_usd).toFixed(3) : "";
-      statusEl.textContent = "✔ " + t("detail.draftReady") + usage;
-      renderDetailView();
-      var s2 = document.getElementById("detail-ai-status");
-      if (s2) {
-        s2.style.color = "#34d399";
-        s2.textContent = "✔ " + t("detail.draftReady") + usage;
-      }
-    }).catch(function(err) {
-      runBtn.disabled = false;
-      statusEl.style.color = "var(--accent)";
-      statusEl.textContent = "✘ " + (err.message || "AI request failed");
-    });
-  }
-  function detailAiTest() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    var view = document.getElementById("iframe-view");
-    var iframe = document.getElementById("app-iframe");
-    var title = document.getElementById("iframe-title");
-    title.textContent = (app.name || "App") + " (draft)";
-    iframe.removeAttribute("src");
-    iframe.srcdoc = blobToHtml(detailDraftBlob);
-    setIframeUrl("");
-    delete iframe.dataset.appId;
-    view.hidden = false;
-  }
-  function detailAiKeep() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    app.blob = detailDraftBlob;
-    app.source = app.source === "url" ? "paste" : app.source || "paste";
-    app.url = app.url || null;
-    detailDraftBlob = null;
-    saveApp(app).then(function() {
-      renderApps();
-      renderDetailView();
-      var s2 = document.getElementById("detail-ai-status");
-      if (s2) {
-        s2.style.color = "#34d399";
-        s2.textContent = "✔ " + t("detail.kept");
-      }
-    });
-  }
-  function detailAiDiscard() {
-    detailDraftBlob = null;
-    renderDetailView();
-    var s2 = document.getElementById("detail-ai-status");
-    if (s2) s2.textContent = t("detail.discarded");
-  }
-  function draftApi(method, owner, filename, sub, body) {
-    var cfg = loadConfig();
-    if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
-    var base = cfg.aimeatUrl.replace(/\/+$/, "");
-    var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
-    return fetch(base + path, {
-      method,
-      headers: { "Authorization": "Bearer " + getCortexOwnerToken(), "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : void 0
-    }).then(function(resp) {
-      return resp.json().then(function(json) {
-        if (!json.ok) throw new Error(json.error && (json.error.message || json.error.code) || "HTTP " + resp.status);
-        return json.data;
-      });
-    });
-  }
-  function draftStageTarget(app, statusEl) {
-    if (!app || !app.published || !app.publishedFilename) {
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = t("detail.draftNeedsPublished");
-      } else showNotice(t("detail.draftNeedsPublished"));
-      return null;
-    }
-    if (!getCortexOwnerToken()) {
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = t("detail.draftNeedsSignin");
-      } else showNotice(t("detail.draftNeedsSignin"));
-      return null;
-    }
-    return { owner: detailServerOwner(app), filename: app.publishedFilename };
-  }
-  function stageDraftAndPreview(app, contentB64, statusEl) {
-    var tgt = draftStageTarget(app, statusEl);
-    if (!tgt) return Promise.resolve(false);
-    if (statusEl) {
-      statusEl.style.color = "var(--text-muted)";
-      statusEl.textContent = t("detail.draftUploading");
-    }
-    return draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
-      return draftApi("POST", tgt.owner, tgt.filename, "draft/preview-token");
-    }).then(function(data) {
-      window.open(data.preview_url, "_blank", "noopener");
-      if (statusEl) {
-        statusEl.style.color = "#34d399";
-        statusEl.textContent = "✔ " + t("detail.draftOpened");
-      }
-      return true;
-    }).catch(function(err) {
-      if (statusEl) {
-        statusEl.style.color = "var(--accent)";
-        statusEl.textContent = "✘ " + (err.message || "Draft preview failed");
-      }
-      return false;
-    });
-  }
-  function publishDraftBytes(app, contentB64, statusEl, onDone) {
-    var tgt = draftStageTarget(app, statusEl);
-    if (!tgt) return;
-    Promise.resolve(showConfirm(t("detail.draftPublishConfirm"))).then(function(ok) {
-      if (!ok) return;
-      if (statusEl) {
-        statusEl.style.color = "var(--text-muted)";
-        statusEl.textContent = t("detail.draftUploading");
-      }
-      draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
-        return draftApi("POST", tgt.owner, tgt.filename, "publish-draft");
-      }).then(function(data) {
-        if (statusEl) {
-          statusEl.style.color = "#34d399";
-          statusEl.textContent = t("detail.draftPublished").replace("{v}", data.version_number);
-        }
-        if (onDone) onDone(data);
-      }).catch(function(err) {
-        if (statusEl) {
-          statusEl.style.color = "var(--accent)";
-          statusEl.textContent = "✘ " + (err.message || "Publish failed");
-        }
-      });
-    });
-  }
-  function detailTestDraftLive() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    stageDraftAndPreview(app, detailDraftBlob, document.getElementById("detail-ai-status"));
-  }
-  function detailPublishTestedDraft() {
-    var app = detailGetApp();
-    if (!app || !detailDraftBlob) return;
-    publishDraftBytes(app, detailDraftBlob, document.getElementById("detail-ai-status"), function() {
-      detailDraftBlob = null;
-      refreshAll();
-      renderDetailView();
-    });
-  }
-  function sourceOverlayApp() {
-    var overlay = document.getElementById("source-overlay");
-    var id = overlay && overlay.dataset ? overlay.dataset.appId : "";
-    if (!id) return null;
-    var apps = getMainApps();
-    for (var i = 0; i < apps.length; i++) if (apps[i].id === id) return apps[i];
-    return null;
-  }
-  function sourceCurrentB64() {
-    var ta = document.getElementById("source-code");
-    if (!ta) return null;
-    try {
-      return btoa(unescape(encodeURIComponent(ta.value)));
-    } catch (e) {
-      return null;
-    }
-  }
-  function sourceTestDraftLive() {
-    var app = sourceOverlayApp();
-    var c = sourceCurrentB64();
-    if (!app || c == null) return;
-    stageDraftAndPreview(app, c, document.getElementById("source-draft-status"));
-  }
-  function sourcePublishTested() {
-    var app = sourceOverlayApp();
-    var c = sourceCurrentB64();
-    if (!app || c == null) return;
-    publishDraftBytes(app, c, document.getElementById("source-draft-status"), function() {
-      app.blob = c;
-      saveApp(app);
-      refreshAll();
-    });
-  }
-  function detailEditSource() {
-    var app = detailGetApp();
-    if (app) viewSource(app);
-  }
-  function detailImproveExternal() {
-    var app = detailGetApp();
-    if (app) openPromptBuilder(app);
-  }
-  function detailSharePrompt() {
-    var app = detailGetApp();
-    if (app) generateSharePrompt(app);
-  }
-  function detailPublish() {
-    if (detailAppId) showPublishModal(detailAppId);
-  }
-  async function detailDelete() {
-    var app = detailGetApp();
-    if (!app) return;
-    if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
-      return app.name || "this app";
-    }))) return;
-    var id = app.id;
-    deleteApp(id).then(function() {
-      closeDetailView();
-      renderApps();
-      loadPublishedApps();
-    });
-  }
-  function openPublishedDetail(owner, filename, localId, versionNumber) {
-    if (localId) {
-      openDetailView(localId);
-      return;
-    }
-    for (var i = 0; i < getMainApps().length; i++) {
-      if (getMainApps()[i].publishedFilename === filename) {
-        openDetailView(getMainApps()[i].id);
-        return;
-      }
-    }
-    var config = loadConfig();
-    if (!config.aimeatUrl) {
-      showNotice("Set the AIMEAT server URL in Settings first");
-      return;
-    }
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var meta = getServerManifests()[owner + "\n" + filename] || {};
-    fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
-      var app = {
-        id: generateId2(),
-        name: meta.name || filename.replace(/\.html?$/i, ""),
-        description: meta.description || "",
-        category: meta.category || "utility",
-        tags: meta.tags || [],
-        usesCortex: meta.usesCortex || [],
-        forkedFrom: meta.forkedFrom || null,
-        icon: meta.icon || "📝",
-        source: "aimeat",
-        url: null,
-        blob: b64,
-        favorite: false,
-        openMode: "tab",
-        addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        lastOpenedAt: null,
-        published: true,
-        publishedFilename: filename,
-        publishedUrl: "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename),
-        publishedVersionNumber: versionNumber || 1,
-        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        aimeatOwner: owner,
-        aimeatFilename: filename
-      };
-      return saveApp(app).then(function() {
-        getMainApps().push(app);
-        renderApps();
-        loadPublishedApps();
-        openDetailView(app.id);
-      });
-    }).catch(function(err) {
-      showNotice("Could not load the published app: " + (err.message || err));
-    });
-  }
-  function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
-    var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
-    var token = getCortexOwnerToken();
-    var headers = token ? { "Authorization": "Bearer " + token } : {};
-    return fetch(url, { headers }).then(function(resp) {
-      if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
-      return resp.arrayBuffer();
-    }).then(function(buf) {
-      var bytes = new Uint8Array(buf);
-      var binary = "";
-      var chunk = 32768;
-      for (var i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-      }
-      return btoa(binary);
-    });
-  }
-  function showLineageModal(owner, filename) {
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    if (!aimeatUrl) {
-      showNotice("Set AIMEAT server URL in Settings first");
-      return;
-    }
-    document.getElementById("lineage-title").textContent = filename;
-    var summaryEl = document.getElementById("lineage-summary");
-    var statusEl = document.getElementById("lineage-status");
-    var treeEl = document.getElementById("lineage-tree");
-    summaryEl.textContent = "";
-    statusEl.textContent = t("lineage.loading") || "Loading lineage…";
-    statusEl.style.color = "var(--text-muted)";
-    treeEl.innerHTML = "";
-    document.getElementById("lineage-overlay").hidden = false;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/lineage").then(function(resp) {
-      if (!resp.ok) throw new Error("Server returned " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var d = json.data || {};
-      var nodes = d.nodes || [], edges = d.edges || [];
-      statusEl.textContent = "";
-      summaryEl.textContent = (t("lineage.direct") || "Direct forks") + ": " + (d.directForkCount || 0) + " · " + (t("lineage.total") || "total descendants") + ": " + (d.descendantCount || 0);
-      if (nodes.length <= 1 && edges.length === 0) {
-        treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t("lineage.none") || "No forks yet — this app has not been forked.") + "</div>";
-        return;
-      }
-      treeEl.innerHTML = renderLineageTree(d);
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Failed to load lineage");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function renderLineageTree(d) {
-    var byId = {};
-    (d.nodes || []).forEach(function(n) {
-      byId[n.id] = n;
-    });
-    var children = {};
-    var hasParent = {};
-    (d.edges || []).forEach(function(e) {
-      (children[e.from] = children[e.from] || []).push(e.to);
-      hasParent[e.to] = true;
-    });
-    var roots = (d.nodes || []).filter(function(n) {
-      return !hasParent[n.id];
-    }).map(function(n) {
-      return n.id;
-    });
-    if (!roots.length && d.self) roots = [d.self];
-    var seen = {};
-    function renderNode(id, depth) {
-      if (seen[id]) return "";
-      seen[id] = true;
-      var n = byId[id];
-      if (!n) return "";
-      var isSelf = id === d.self;
-      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + "</span>" : "";
-      var statusTxt = t("lineage.status." + n.status) || n.status;
-      var line = '<div class="lineage-node' + (isSelf ? " self" : "") + '" style="margin-left:' + depth * 16 + 'px">' + (depth > 0 ? "↳ " : "") + escapeHtml(n.owner + "/" + n.filename) + (isSelf ? " ●" : "") + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + "</span>" + when + "</div>";
-      var kids = children[id] || [];
-      for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
-      return line;
-    }
-    var html = "";
-    for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
-    return html;
-  }
-  var protectionTarget = null;
-  function showProtectionModal(filename) {
-    protectionTarget = { filename };
-    var p = getOwnProtection()[filename] || {};
-    document.getElementById("protect-obfuscate").checked = !!p.obfuscate;
-    document.getElementById("protect-domainLock").checked = !!p.domainLock;
-    document.getElementById("protect-watermark").checked = !!p.watermark;
-    document.getElementById("protect-noRawDownload").checked = !!p.noRawDownload;
-    document.getElementById("protection-title").textContent = filename;
-    document.getElementById("protection-status").textContent = "";
-    document.getElementById("protection-overlay").hidden = false;
-  }
-  function saveProtection() {
-    if (!protectionTarget) return;
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in.");
-      return;
-    }
-    var protection = {
-      obfuscate: document.getElementById("protect-obfuscate").checked,
-      domainLock: document.getElementById("protect-domainLock").checked,
-      watermark: document.getElementById("protect-watermark").checked,
-      noRawDownload: document.getElementById("protect-noRawDownload").checked
-    };
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("protection-status");
-    statusEl.textContent = t("protect.saving") || "Saving…";
-    statusEl.style.color = "var(--text-muted)";
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(protectionTarget.filename), {
-      method: "PATCH",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ protection })
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        statusEl.textContent = "✔ " + (t("protect.saved") || "Saved");
-        statusEl.style.color = "#34d399";
-        loadPublishedApps();
-        setTimeout(function() {
-          document.getElementById("protection-overlay").hidden = true;
-        }, 800);
-      } else {
-        statusEl.textContent = "✘ " + (json.error && json.error.message || "Failed");
-        statusEl.style.color = "var(--accent)";
-      }
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Error");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function showVersionsModal(owner, filename) {
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    if (!aimeatUrl) {
-      showNotice("Set AIMEAT server URL in Settings first");
-      return;
-    }
-    document.getElementById("versions-title").textContent = filename;
-    var statusEl = document.getElementById("versions-status");
-    var listEl = document.getElementById("versions-list");
-    statusEl.textContent = "Loading versions…";
-    statusEl.style.color = "var(--text-muted)";
-    listEl.innerHTML = "";
-    document.getElementById("versions-overlay").hidden = false;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
-      if (!resp.ok) throw new Error("Server returned " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var versions = json.data && json.data.versions ? json.data.versions : [];
-      if (versions.length === 0) {
-        statusEl.textContent = "No versions found.";
-        return;
-      }
-      statusEl.textContent = versions.length + " " + t("versions.stored");
-      statusEl.style.color = "var(--text-muted)";
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
-      var html = "";
-      for (var i = 0; i < versions.length; i++) {
-        var v = versions[i];
-        var isLatest = i === 0;
-        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
-        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
-      }
-      listEl.innerHTML = html;
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Failed to load versions");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  async function restoreVersion(owner, filename, version) {
-    if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
-      return filename;
-    }))) return;
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice("You must be logged in as the owner to restore a version. Sign in first.");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("versions-status");
-    statusEl.textContent = "Restoring version " + version + "…";
-    statusEl.style.color = "#34d399";
-    var meta = getServerManifests()[owner + "\n" + filename] || {};
-    fetchAppContentBase64(aimeatUrl, owner, filename, version).then(function(b64) {
-      var body = {
-        filename,
-        content: b64,
-        mime_type: "text/html",
-        name: meta.name || filename.replace(/\.html?$/i, ""),
-        description: meta.description || "",
-        category: meta.category || "utility",
-        tags: meta.tags || [],
-        uses_cortex: meta.usesCortex || []
-      };
-      if (meta.icon) body.icon = meta.icon;
-      return fetch(aimeatUrl + "/v1/apps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-        body: JSON.stringify(body)
-      });
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        statusEl.textContent = "✔ Restored — now published as v" + (json.data.version_number || "?");
-        statusEl.style.color = "#34d399";
-        loadPublishedApps();
-        setTimeout(function() {
-          showVersionsModal(owner, filename);
-        }, 500);
-      } else {
-        statusEl.textContent = "✘ " + (json.error && json.error.message || "Restore failed");
-        statusEl.style.color = "var(--accent)";
-      }
-    }).catch(function(err) {
-      statusEl.textContent = "✘ " + (err.message || "Restore failed");
-      statusEl.style.color = "var(--accent)";
-    });
-  }
-  function forkVersion(owner, filename, version) {
-    var token = getCortexOwnerToken();
-    if (!token) {
-      showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
-      return;
-    }
-    var base = (filename || "app").replace(/\.html?$/i, "");
-    var suggested = base + "-fork.html";
-    var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
-    if (!newName) return;
-    newName = newName.trim();
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
-      showNotice("Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).");
-      return;
-    }
-    var config = loadConfig();
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var statusEl = document.getElementById("versions-status");
-    var inVersionsModal = !document.getElementById("versions-overlay").hidden;
-    if (inVersionsModal) {
-      statusEl.textContent = "Forking…";
-      statusEl.style.color = "#34d399";
-    }
-    var body = { new_filename: newName };
-    if (version) body.version = version;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify(body)
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + newName + '"';
-        if (inVersionsModal) {
-          statusEl.textContent = msg;
-          statusEl.style.color = "#34d399";
-        } else showNotice(msg);
-        loadPublishedApps();
-      } else {
-        var err = json.error && json.error.message || "Fork failed";
-        if (inVersionsModal) {
-          statusEl.textContent = "✘ " + err;
-          statusEl.style.color = "var(--accent)";
-        } else showNotice((t("fork.failed") || "Fork failed") + ": " + err);
-      }
-    }).catch(function(err) {
-      var m = err.message || "Fork failed";
-      if (inVersionsModal) {
-        statusEl.textContent = "✘ " + m;
-        statusEl.style.color = "var(--accent)";
-      } else showNotice("Error: " + m);
-    });
-  }
-
   // src/static/app-catalog/js/cortex.js
   var cortexToken = null;
   function cortexEsc(str) {
@@ -5356,7 +3998,7 @@
   var cortexEditorExtName = null;
   var cortexEditorWasActive = false;
   var cortexEditorLibCounter = 0;
-  function getCortexOwnerToken2() {
+  function getCortexOwnerToken() {
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
         return window.AIMEAT.auth.getSession().jwt;
@@ -5373,7 +4015,7 @@
   function openCortexEditor(encodedName) {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice("You must be logged in as an owner to edit extensions.");
       return;
@@ -5442,7 +4084,7 @@
   function cortexEditorSave() {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice("No auth token available.");
       return;
@@ -5513,7 +4155,7 @@
     cortexEditorExtName = null;
   }
   var pbSourceApp = null;
-  function openPromptBuilder2(app) {
+  function openPromptBuilder(app) {
     pbSourceApp = app || null;
     var overlay = document.getElementById("prompt-builder-overlay");
     var desc = document.getElementById("pb-description");
@@ -5768,6 +4410,1610 @@
   function updatePbPreview() {
     var preview = document.getElementById("pb-preview");
     preview.textContent = buildPromptFromBuilder();
+  }
+
+  // src/static/app-catalog/js/monetize.js
+  var NAME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
+  var MONEY_UNIT = 1e6;
+  var mzOwner = "";
+  var mzAppId = "";
+  var mzDoc = null;
+  var mzState = "off";
+  var mzEditing = -1;
+  var mzBusy = false;
+  function apiBase() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function toolsKey() {
+    return "apps." + mzAppId + ".tools";
+  }
+  function rerender() {
+    var el = document.getElementById("detail-monetize");
+    if (el) el.innerHTML = monetizeSectionInner();
+  }
+  function monetizeOnOpen(owner, appId, isOwn) {
+    mzEditing = -1;
+    mzBusy = false;
+    mzDoc = null;
+    if (!isOwn || !owner || !appId) {
+      mzState = "off";
+      mzOwner = "";
+      mzAppId = "";
+      return;
+    }
+    mzOwner = owner;
+    mzAppId = appId;
+    mzState = "loading";
+    var token = getCortexOwnerToken();
+    fetch(apiBase() + "/v1/memory/" + encodeURIComponent(toolsKey()), {
+      headers: token ? { "Authorization": "Bearer " + token } : {}
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      var value = res && res.ok && res.data && (res.data.value || res.data.record && res.data.record.value);
+      mzDoc = value && Array.isArray(value.tools) ? value : { tools: [] };
+      mzState = "ready";
+      rerender();
+    }).catch(function() {
+      mzDoc = { tools: [] };
+      mzState = "ready";
+      rerender();
+    });
+  }
+  function priceLabel(tool) {
+    var parts = [];
+    if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + " 🥩");
+    if (tool.priceMoney && tool.priceMoney.amount > 0) {
+      parts.push(tool.priceMoney.amount / MONEY_UNIT + " " + tool.priceMoney.currency);
+    }
+    return parts.length ? parts.join(" · ") : t("monetize.notForSale");
+  }
+  function toolRow(tool, i) {
+    var mode = tool.action_id ? t("monetize.fulfillCall") : t("monetize.fulfillTask");
+    var binding = tool.action_id ? escapeHtml(tool.action_id) : tool.agent ? "→ " + escapeHtml(tool.agent) : t("monetize.taskToOwner");
+    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div></div>";
+  }
+  function editorHtml(tool) {
+    var moneyMajor = tool.priceMoney && tool.priceMoney.amount > 0 ? String(tool.priceMoney.amount / MONEY_UNIT) : "";
+    var cur = tool.priceMoney && tool.priceMoney.currency || "EUR";
+    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + '</label><select id="mz-currency" class="modal-input" style="margin:4px 0 8px"><option value="EUR"' + (cur === "EUR" ? " selected" : "") + '>EUR</option><option value="USD"' + (cur === "USD" ? " selected" : "") + '>USD</option></select></div></div><label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
+  }
+  function monetizeSectionInner() {
+    if (mzState === "off") return "";
+    var html = "<h3>" + t("monetize.title") + '</h3><p class="dtl-desc">' + t("monetize.hint") + "</p>";
+    if (mzState === "loading") {
+      return html + '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+    }
+    var tools = mzDoc && mzDoc.tools || [];
+    if (!tools.length && mzEditing === -1) {
+      html += '<span class="dtl-sync none">' + t("monetize.empty") + "</span>";
+    } else {
+      for (var i = 0; i < tools.length; i++) {
+        html += mzEditing === i ? editorHtml(tools[i]) : toolRow(tools[i], i);
+      }
+    }
+    if (mzEditing === -2) {
+      html += editorHtml({});
+    } else if (mzEditing === -1) {
+      html += '<div class="dtl-btn-row" style="margin-top:10px">' + dtlBtn(t("monetize.addTool"), "window._launcher.monetizeAddTool()", { variant: "primary" }) + "</div>";
+    }
+    return html;
+  }
+  function monetizeAddTool() {
+    mzEditing = -2;
+    rerender();
+  }
+  function monetizeEditTool(i) {
+    mzEditing = i;
+    rerender();
+  }
+  function monetizeCancelEdit() {
+    mzEditing = -1;
+    rerender();
+  }
+  function readEditor() {
+    var name = (document.getElementById("mz-name").value || "").trim();
+    if (!NAME_RE.test(name)) {
+      showNotice(t("monetize.nameInvalid"), "error");
+      return null;
+    }
+    var tool = { name };
+    var desc = (document.getElementById("mz-desc").value || "").trim();
+    if (desc) tool.description = desc;
+    var morsels = parseInt(document.getElementById("mz-morsels").value, 10);
+    if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels, unit: "per-call" };
+    var moneyRaw = (document.getElementById("mz-money").value || "").trim();
+    if (moneyRaw) {
+      var major = parseFloat(moneyRaw.replace(",", "."));
+      if (!Number.isFinite(major) || major <= 0) {
+        showNotice(t("monetize.moneyInvalid"), "error");
+        return null;
+      }
+      tool.priceMoney = { amount: Math.round(major * MONEY_UNIT), currency: document.getElementById("mz-currency").value };
+    }
+    var actionId = (document.getElementById("mz-action").value || "").trim();
+    if (actionId) tool.action_id = actionId;
+    var agent = (document.getElementById("mz-agent").value || "").trim();
+    if (agent) tool.agent = agent;
+    return tool;
+  }
+  function writeManifest(doc) {
+    var token = getCortexOwnerToken();
+    if (!token) return Promise.reject(new Error(t("monetize.needLogin")));
+    doc.version = (doc.version || 0) + 1;
+    doc.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    return fetch(apiBase() + "/v1/memory", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ key: toolsKey(), value: doc, visibility: "public" })
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      if (!res.ok) throw new Error(res.error && res.error.message || "write failed");
+      return res;
+    });
+  }
+  function monetizeSaveTool() {
+    if (mzBusy || !mzDoc) return;
+    var tool = readEditor();
+    if (!tool) return;
+    var tools = mzDoc.tools.slice();
+    var dup = tools.findIndex(function(x, i) {
+      return x.name === tool.name && i !== mzEditing;
+    });
+    if (dup !== -1) {
+      showNotice(t("monetize.nameTaken"), "error");
+      return;
+    }
+    if (mzEditing >= 0) tools[mzEditing] = tool;
+    else tools.push(tool);
+    mzBusy = true;
+    var el = document.getElementById("mz-status");
+    if (el) el.textContent = "…";
+    var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools };
+    writeManifest(next).then(function() {
+      mzDoc = next;
+      mzEditing = -1;
+      mzBusy = false;
+      rerender();
+      showNotice(t("monetize.saved"), "success");
+    }).catch(function(e) {
+      mzBusy = false;
+      var st = document.getElementById("mz-status");
+      if (st) st.textContent = t("monetize.saveFailed") + ": " + e.message;
+      showNotice(t("monetize.saveFailed") + ": " + e.message, "error");
+    });
+  }
+  async function monetizeDeleteTool(i) {
+    if (mzBusy || !mzDoc || !mzDoc.tools[i]) return;
+    if (!await showConfirm(t("monetize.confirmDelete").replace("{name}", mzDoc.tools[i].name))) return;
+    var tools = mzDoc.tools.slice();
+    tools.splice(i, 1);
+    mzBusy = true;
+    var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools };
+    writeManifest(next).then(function() {
+      mzDoc = next;
+      mzEditing = -1;
+      mzBusy = false;
+      rerender();
+      showNotice(t("monetize.saved"), "success");
+    }).catch(function(e) {
+      mzBusy = false;
+      showNotice(t("monetize.saveFailed") + ": " + e.message, "error");
+    });
+  }
+
+  // src/static/app-catalog/js/detail.js
+  var refreshAll;
+  var loadPublishedApps;
+  var renderApps;
+  var updateModeToggle;
+  var getCortexOwnerToken2;
+  var launchApp;
+  var viewPublished;
+  var viewSource;
+  var generateId2;
+  var generateSharePrompt;
+  var openPromptBuilder2;
+  var showPublishModal;
+  var getMainApps;
+  var getServerState;
+  var getServerManifests;
+  var getOwnProtection;
+  var setIframeUrl;
+  var isOperatorSession;
+  function initDetail(deps) {
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+  }
+  var detailAppId = null;
+  var detailDraftBlob = null;
+  var detailAiAvailable = false;
+  var detailVersionsHtml = null;
+  var detailSkillsHtml = null;
+  var detailEditingAbout = false;
+  var detailEditAboutOnOpen = false;
+  var detailEditingAccessCode = false;
+  var detailSkillPickerOpen = false;
+  var detailMySkills = null;
+  var detailBoundSkills = [];
+  var detailSkillBusy = false;
+  function detailGetApp() {
+    for (var i = 0; i < getMainApps().length; i++) {
+      if (getMainApps()[i].id === detailAppId) return getMainApps()[i];
+    }
+    return null;
+  }
+  function detailServerOwner(app) {
+    var sess = currentOwnerName();
+    var stored = app && app.aimeatOwner || "";
+    if (!stored) {
+      var pu = app && (app.publishedUrl || app.viewUrl) || "";
+      var mm = pu.match(/\/v1\/apps\/([^/]+)\//);
+      stored = mm ? decodeURIComponent(mm[1]) : "";
+    }
+    if (sess && (!stored || stored === "anonymous" || stored === sess)) return sess;
+    return stored;
+  }
+  function detailIsOwnPublished(app) {
+    return !!(app && app.published && app.publishedFilename && getServerState()[app.publishedFilename] && currentOwnerName());
+  }
+  function blobToHtml(blob) {
+    try {
+      return decodeURIComponent(escape(atob(blob)));
+    } catch (e) {
+      return "";
+    }
+  }
+  function htmlToBlob(html) {
+    return btoa(unescape(encodeURIComponent(html)));
+  }
+  function serverMgmtInner(app) {
+    if (!app) return "";
+    var isUrlApp = app.source === "url" && !app.blob;
+    var svrState = app.publishedFilename && getServerState()[app.publishedFilename] || null;
+    if (!(app.published && app.publishedFilename && svrState && !isUrlApp)) return "";
+    var fnArg = jsArg(app.publishedFilename);
+    var ownerArg2 = jsArg(svrState.owner || "");
+    var p = svrState.protection || {};
+    var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
+    var acLabel = (svrState.accessCode ? "🔒 " : "") + t("detail.editAccess");
+    var acEditor = detailEditingAccessCode ? '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="detail-ac-input">' + t("detail.accessCodeLabel") + '</label><input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t("detail.accessCodePh")) + '" style="margin:4px 0 6px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("detail.accessCodeRemoveHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAccessCodeSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAccessCodeCancel()") + '</div><div class="dtl-ai-status" id="detail-ac-status"></div></div>' : "";
+    return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(acLabel, "window._launcher.detailAccessCodeEdit()", { title: t("detail.accessCodeHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
+    dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
+    // everyone else, so only show this to operators.
+    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div>" + acEditor + "</div>";
+  }
+  function refreshServerMgmt() {
+    var c = document.getElementById("detail-server-mgmt");
+    if (c) c.innerHTML = serverMgmtInner(detailGetApp());
+  }
+  function openDetailView(appId) {
+    detailAppId = appId;
+    detailDraftBlob = null;
+    detailVersionsHtml = null;
+    detailSkillsHtml = null;
+    detailEditingAbout = false;
+    detailEditingAccessCode = false;
+    detailSkillPickerOpen = false;
+    detailMySkills = null;
+    detailBoundSkills = [];
+    var app = detailGetApp();
+    if (!app) return;
+    monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    document.getElementById("detail-view").hidden = false;
+    renderDetailView();
+    detailCheckAiAvailability();
+    var owner = currentOwnerName();
+    if (app.published && app.publishedFilename && owner) {
+      detailLoadVersions(owner, app.publishedFilename);
+      detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
+    }
+    if (detailEditAboutOnOpen) {
+      detailEditAboutOnOpen = false;
+      detailAboutEdit();
+    }
+  }
+  function editAppDetails(owner, filename, localId, versionNumber) {
+    detailEditAboutOnOpen = true;
+    openPublishedDetail(owner, filename, localId, versionNumber);
+  }
+  function closeDetailView() {
+    document.getElementById("detail-view").hidden = true;
+    detailAppId = null;
+    detailDraftBlob = null;
+  }
+  function detailLaunch() {
+    var app = detailGetApp();
+    if (!app) return;
+    if (app.published && (app.publishedUrl || app.publishedFilename)) {
+      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      var url;
+      if (app.publishedUrl) {
+        url = base + app.publishedUrl;
+      } else {
+        var st = getServerState()[app.publishedFilename] || {};
+        var owner = st.owner || currentOwnerName() || "";
+        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+      }
+      viewPublished(url + "?mode=inline", app.name);
+    } else {
+      launchApp(app.id, app.openMode || "tab");
+    }
+  }
+  function loadScriptOnce(src) {
+    return new Promise(function(resolve, reject) {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function() {
+        resolve();
+      };
+      s.onerror = function() {
+        reject(new Error("failed to load " + src));
+      };
+      document.head.appendChild(s);
+    });
+  }
+  function onAuthChanged() {
+    if (getDbMode() === "personal" && !currentOwnerName()) {
+      setDbMode("global");
+    }
+    closeDbInstance();
+    updateModeToggle();
+    try {
+      refreshAll();
+    } catch (e) {
+      try {
+        loadPublishedApps();
+      } catch (e2) {
+      }
+    }
+    var sub = document.getElementById("publish-submit-btn");
+    var st = document.getElementById("publish-status");
+    if (sub && document.getElementById("publish-overlay") && !document.getElementById("publish-overlay").hidden) {
+      if (getCortexOwnerToken2()) {
+        sub.disabled = false;
+        if (st) st.textContent = "";
+      } else {
+        sub.disabled = true;
+        if (st) {
+          st.textContent = t("publish.loginRequired");
+          st.style.color = "var(--accent)";
+        }
+      }
+    }
+  }
+  async function mountLoginPill() {
+    try {
+      await loadScriptOnce("/v1/libs/aimeat-auth.js");
+      if (window.AIMEAT && window.AIMEAT.auth) {
+        try {
+          await window.AIMEAT.auth.login();
+        } catch (e) {
+        }
+        if (window.AIMEAT.auth.mountLoginButton) {
+          window.AIMEAT.auth.mountLoginButton("#headerAuth", {
+            onLogin: onAuthChanged,
+            onLogout: onAuthChanged,
+            i18n: {
+              loggedIn: t("auth.loggedIn"),
+              signInBtn: t("auth.signIn"),
+              logoutBtn: t("auth.logout")
+            }
+          });
+        }
+      }
+    } catch (e) {
+    }
+  }
+  function fmtSize(bytes) {
+    if (!bytes) return "—";
+    return bytes < 1024 ? bytes + " B" : bytes < 1048576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1048576).toFixed(1) + " MB";
+  }
+  function renderDetailView() {
+    var app = detailGetApp();
+    if (!app) return;
+    var config = loadConfig();
+    var hasServer = !!config.aimeatUrl;
+    var icon = app.icon || "📝";
+    var isUrlApp = app.source === "url" && !app.blob;
+    var canEditAbout = !!app.id && !isUrlApp;
+    document.getElementById("detail-title").innerHTML = '<span style="font-size:1.3rem">' + escapeHtml(icon) + "</span> " + escapeHtml(app.name || "App") + (canEditAbout && !detailEditingAbout ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t("detail.editDetails")) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : "");
+    var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0;
+    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : app.published ? "v?" : t("detail.notPublished");
+    var syncClass, syncText;
+    if (!app.published) {
+      syncClass = "none";
+      syncText = t("detail.notPublished");
+    } else if (detailDraftBlob) {
+      syncClass = "diff";
+      syncText = t("detail.localNewer");
+    } else {
+      syncClass = "ok";
+      syncText = t("detail.inSync");
+    }
+    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    var shotOwner = detailServerOwner(app);
+    var shotFile = app.publishedFilename || "";
+    var shotUrl = app.published && shotOwner && shotFile && aimeatBase ? aimeatBase + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
+    var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
+    var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
+    var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
+    var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
+    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
+    var favBtn = app.blob ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? "detail.unfavorite" : "detail.favorite")) + '" onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? "⭐" : "☆") + "</button>" : "";
+    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
+    var aboutBody;
+    if (detailEditingAbout) {
+      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
+    } else {
+      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
+      (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
+    }
+    var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
+    var aiHtml = '<div class="dtl-section"><h3>' + t("detail.editAi") + '</h3><p class="dtl-desc">' + t("detail.editAiHint") + "</p>";
+    if (isUrlApp) {
+      aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
+    } else {
+      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
+      // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
+      // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
+      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) + dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("detail.test"), "window._launcher.detailAiTest()", { variant: "primary" })) + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()") + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
+    }
+    aiHtml += "</div>";
+    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
+    var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
+    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
+    var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
+    var skillsHtml = "";
+    if (app.published) {
+      var ownPub = detailIsOwnPublished(app);
+      skillsHtml = '<div class="dtl-section"><h3>' + (t("detail.skills") || "Skills for this app") + '</h3><div id="detail-skills-list">' + (detailSkillsHtml !== null ? detailSkillsHtml : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') + "</div>" + // Own published app → offer attach/detach (a skill teaches agents this app). The detach ×
+      // on each user-scope skill is rendered by detailLoadSkills into the list above.
+      (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
+    }
+    var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + monetizeHtml + mgmtHtml + actionsHtml;
+  }
+  function detailLoadSkills(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t("detail.noSkills") || "No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.") + "</span>";
+    var skillHeaders = {};
+    try {
+      var jwt = window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt || JSON.parse(localStorage.getItem("aimeat_session") || "{}").jwt;
+      if (jwt) skillHeaders["Authorization"] = "Bearer " + jwt;
+    } catch (e) {
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/skills", { headers: skillHeaders }).then(function(resp) {
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var listEl = document.getElementById("detail-skills-list");
+      var skills = json.data && json.data.skills ? json.data.skills : [];
+      detailBoundSkills = skills.map(function(s2) {
+        return s2.ref;
+      });
+      var ownPub = detailIsOwnPublished(detailGetApp());
+      if (skills.length === 0) {
+        detailSkillsHtml = noneHtml;
+        if (listEl) listEl.innerHTML = detailSkillsHtml;
+        return;
+      }
+      var out = "";
+      for (var i = 0; i < skills.length; i++) {
+        var s = skills[i];
+        var detach = ownPub && s.scope === "user" ? ' <button class="rename-pencil" title="' + escapeHtml(t("detail.skillDetach")) + `" onclick="window._launcher.detailSkillDetach('` + jsArg(s.name) + `')">×</button>` : "";
+        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + "</span>" + detach + '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
+      }
+      detailSkillsHtml = out;
+      if (listEl) listEl.innerHTML = detailSkillsHtml;
+    }).catch(function() {
+      detailBoundSkills = [];
+      detailSkillsHtml = noneHtml;
+      var listEl = document.getElementById("detail-skills-list");
+      if (listEl) listEl.innerHTML = detailSkillsHtml;
+    });
+  }
+  function detailAccessCodeEdit() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    detailEditingAccessCode = true;
+    refreshServerMgmt();
+    var el = document.getElementById("detail-ac-input");
+    if (el) el.focus();
+  }
+  function detailAccessCodeCancel() {
+    detailEditingAccessCode = false;
+    refreshServerMgmt();
+  }
+  function detailAccessCodeSave() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
+      return;
+    }
+    var input = document.getElementById("detail-ac-input");
+    var statusEl = document.getElementById("detail-ac-status");
+    var code = input ? input.value.trim() : "";
+    if (code && (code.length < 4 || code.length > 64)) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.accessCodeLen");
+      }
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    var filename = app.publishedFilename;
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.savingAccess");
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(code ? { access_code: code } : { access_code: null })
+    }).then(function(resp) {
+      return resp.json().then(function(j) {
+        return { ok: resp.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok && res.j && res.j.ok !== false) {
+        var st = getServerState()[filename];
+        if (st) st.accessCode = !!code;
+        detailEditingAccessCode = false;
+        loadPublishedApps();
+        refreshServerMgmt();
+        showNotice(code ? t("detail.accessCodeSet") : t("detail.accessCodeCleared"));
+      } else {
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + (res.j && res.j.error && res.j.error.message || "Failed");
+        }
+      }
+    }).catch(function(err) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err.message || "Error");
+      }
+    });
+  }
+  function detailSkillAttachInner() {
+    var toggleBtn = dtlBtn("+ " + t("detail.skillAttach"), "window._launcher.detailSkillAttachToggle()");
+    if (!detailSkillPickerOpen) return toggleBtn;
+    var picker;
+    if (detailMySkills === null) {
+      picker = '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+    } else if (detailMySkills.length === 0) {
+      picker = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.skillNoneToAttach") + "</span>";
+    } else {
+      var opts = "";
+      for (var i = 0; i < detailMySkills.length; i++) {
+        var s = detailMySkills[i];
+        var desc = (s.description || "").slice(0, 50);
+        opts += '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + (desc ? " — " + escapeHtml(desc) : "") + "</option>";
+      }
+      picker = '<select id="detail-skill-select" class="modal-input" style="max-width:340px;margin:0">' + opts + "</select>" + dtlBtn(t("detail.skillAttachConfirm"), "window._launcher.detailSkillAttach()", { variant: "primary", disabled: detailSkillBusy });
+    }
+    return '<div class="dtl-btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">' + toggleBtn + picker + '</div><div class="dtl-ai-status" id="detail-skill-status"></div>';
+  }
+  function refreshSkillAttach() {
+    var c = document.getElementById("detail-skill-attach");
+    if (c) c.innerHTML = detailSkillAttachInner();
+  }
+  function detailSkillAttachToggle() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    detailSkillPickerOpen = !detailSkillPickerOpen;
+    if (detailSkillPickerOpen && detailMySkills === null) {
+      refreshSkillAttach();
+      skillListMine().then(function(mine) {
+        var bound = {};
+        for (var i = 0; i < detailBoundSkills.length; i++) bound[detailBoundSkills[i]] = true;
+        detailMySkills = mine.filter(function(s) {
+          return !bound[s.ref];
+        });
+        refreshSkillAttach();
+      }).catch(function() {
+        detailMySkills = [];
+        refreshSkillAttach();
+      });
+    } else {
+      refreshSkillAttach();
+    }
+  }
+  function detailSkillAttach() {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app)) return;
+    var sel = document.getElementById("detail-skill-select");
+    var name = sel ? sel.value : "";
+    if (!name || detailSkillBusy) return;
+    var statusEl = document.getElementById("detail-skill-status");
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    var binding = "app:" + owner + "/" + filename;
+    detailSkillBusy = true;
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.skillAttaching");
+    }
+    skillSetBinding(name, binding).then(function() {
+      detailSkillBusy = false;
+      detailSkillPickerOpen = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t("detail.skillAttached"));
+    }).catch(function(err) {
+      detailSkillBusy = false;
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.skillAttachError") + ": " + (err.message || err);
+      }
+    });
+  }
+  function detailSkillDetach(name) {
+    var app = detailGetApp();
+    if (!detailIsOwnPublished(app) || detailSkillBusy) return;
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    detailSkillBusy = true;
+    skillSetBinding(name, null).then(function() {
+      detailSkillBusy = false;
+      detailMySkills = null;
+      detailLoadSkills(owner, filename);
+      refreshSkillAttach();
+      showNotice(t("detail.skillDetached"));
+    }).catch(function(err) {
+      detailSkillBusy = false;
+      showNotice(t("detail.skillAttachError") + ": " + (err.message || err));
+    });
+  }
+  function skillApiBase() {
+    var cfg = loadConfig();
+    return cfg.aimeatUrl ? cfg.aimeatUrl.replace(/\/+$/, "") : "";
+  }
+  function skillAuthHeaders(withJson) {
+    var h = {};
+    var tok = getCortexOwnerToken2();
+    if (tok) h["Authorization"] = "Bearer " + tok;
+    if (withJson) h["Content-Type"] = "application/json";
+    return h;
+  }
+  function skillListMine() {
+    var base = skillApiBase();
+    if (!base) return Promise.reject(new Error("No server configured"));
+    return fetch(base + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      return j.data && j.data.skills ? j.data.skills : [];
+    });
+  }
+  function skillGetMine(name) {
+    var base = skillApiBase();
+    return fetch(base + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      return j.data && j.data.skill || null;
+    });
+  }
+  function skillPublish(skillMd, files) {
+    var base = skillApiBase();
+    var body = { skill_md: skillMd };
+    if (files && Object.keys(files).length) body.files = files;
+    return fetch(base + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
+        return j.data && j.data.skill || null;
+      });
+    });
+  }
+  function skillSetBinding(name, binding) {
+    return skillGetMine(name).then(function(skill) {
+      if (!skill) throw new Error("Skill not found: " + name);
+      var md = skill.fileContents && skill.fileContents["SKILL.md"] || "";
+      var m = md.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/);
+      if (!m) throw new Error("SKILL.md has no frontmatter");
+      var fm = m[2];
+      var hasBindingLine = /^\s{2,}binding:.*$/m.test(fm);
+      var hasMetadata = /^metadata:\s*$/m.test(fm);
+      if (binding) {
+        if (hasBindingLine) fm = fm.replace(/^(\s{2,})binding:.*$/m, "$1binding: " + binding);
+        else if (hasMetadata) fm = fm.replace(/^metadata:\s*$/m, "metadata:\n  binding: " + binding);
+        else fm = fm + "\nmetadata:\n  binding: " + binding;
+      } else {
+        fm = fm.replace(/^\s{2,}binding:.*\r?\n?/m, "");
+        if (/^metadata:\s*$/m.test(fm) && !/^metadata:\s*\r?\n\s{2,}\S/m.test(fm)) {
+          fm = fm.replace(/^metadata:\s*\r?\n?/m, "");
+        }
+      }
+      var files = Object.assign({}, skill.fileContents);
+      delete files["SKILL.md"];
+      return skillPublish(m[1] + fm + m[3] + m[4], files);
+    });
+  }
+  function detailAboutEdit() {
+    if (!detailGetApp()) return;
+    detailEditingAbout = true;
+    renderDetailView();
+    var nameEl = document.getElementById("detail-name-input");
+    if (nameEl) {
+      nameEl.focus();
+      nameEl.select();
+    }
+  }
+  function detailAboutCancel() {
+    detailEditingAbout = false;
+    renderDetailView();
+  }
+  function detailToggleFavorite() {
+    var app = detailGetApp();
+    if (!app) return;
+    app.favorite = !app.favorite;
+    saveApp(app).then(function() {
+      renderApps();
+      renderDetailView();
+    });
+  }
+  function detailAboutSave() {
+    var app = detailGetApp();
+    if (!app) return;
+    var nameEl = document.getElementById("detail-name-input");
+    var descEl = document.getElementById("detail-desc-input");
+    var iconEl = document.getElementById("detail-icon-input");
+    var tagsEl = document.getElementById("detail-tags-input");
+    var newName = nameEl ? nameEl.value.trim() : "";
+    var newDesc = descEl ? descEl.value.trim() : "";
+    var newIcon = iconEl ? iconEl.value.trim() : app.icon || "";
+    var newTags = tagsEl ? tagsEl.value.split(",").map(function(s) {
+      return s.trim();
+    }).filter(Boolean) : app.tags || [];
+    if (!newName) {
+      showNotice(t("detail.nameRequired") || "Name cannot be empty.");
+      if (nameEl) nameEl.focus();
+      return;
+    }
+    if (app.published && !newDesc) {
+      showNotice(t("detail.descRequired") || "Description cannot be empty.");
+      if (descEl) descEl.focus();
+      return;
+    }
+    function finishLocal() {
+      app.name = newName;
+      app.description = newDesc;
+      app.icon = newIcon;
+      app.tags = newTags;
+      saveApp(app).then(function() {
+        detailEditingAbout = false;
+        renderApps();
+        loadPublishedApps();
+        renderDetailView();
+      });
+    }
+    if (!app.published || !app.publishedFilename) {
+      finishLocal();
+      return;
+    }
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName, description: newDesc })
+    }).then(function(resp) {
+      return resp.json().then(function(j) {
+        return { ok: resp.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok && res.j && res.j.ok !== false) {
+        var key = owner + "\n" + filename;
+        getServerManifests()[key] = getServerManifests()[key] || {};
+        getServerManifests()[key].name = newName;
+        getServerManifests()[key].description = newDesc;
+        finishLocal();
+      } else {
+        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
+      }
+    }).catch(function(err) {
+      showNotice("Error: " + (err.message || err));
+    });
+  }
+  function detailSetScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || "";
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || "";
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
+    }
+    var owner = detailServerOwner(app);
+    var token = getCortexOwnerToken2();
+    if (!owner || !filename) {
+      showNotice("Publish the app first, then you can set a screenshot.");
+      return;
+    }
+    if (!token) {
+      showNotice("Sign in to set a screenshot.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    if (!aimeatUrl) {
+      showNotice("No server configured.");
+      return;
+    }
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = function() {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showNotice("Image too large (max 2 MB).");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function() {
+        var s = String(reader.result);
+        var base64 = s.indexOf(",") >= 0 ? s.slice(s.indexOf(",") + 1) : s;
+        fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ screenshot: base64, screenshot_mime_type: file.type || "image/png" })
+        }).then(function(r) {
+          return r.json().then(function(j) {
+            return { ok: r.ok, j };
+          });
+        }).then(function(res) {
+          if (res.ok) {
+            showNotice("Screenshot set. It will show in the catalogue and on the landing wall.");
+          } else {
+            showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
+          }
+        }).catch(function(e) {
+          showNotice("Failed: " + e.message);
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+  async function detailRefreshScreenshot() {
+    var app = detailGetApp();
+    if (!app) return;
+    var filename = app.publishedFilename || "";
+    if (!filename) {
+      var pu = app.publishedUrl || app.viewUrl || "";
+      var m = pu.match(/\/v1\/apps\/[^/]+\/([^/?]+)/);
+      if (m) filename = decodeURIComponent(m[1]);
+    }
+    var owner = detailServerOwner(app);
+    var token = getCortexOwnerToken2();
+    if (!owner || !filename) {
+      showNotice("Publish the app first, then you can refresh its screenshot.");
+      return;
+    }
+    if (!token) {
+      showNotice("Sign in to refresh the screenshot.");
+      return;
+    }
+    if (!await showConfirm(t("confirm.clearScreenshot"))) return;
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    if (!aimeatUrl) {
+      showNotice("No server configured.");
+      return;
+    }
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/screenshot", {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        return { ok: r.ok, j };
+      });
+    }).then(function(res) {
+      if (res.ok) {
+        showNotice(res.j.data && res.j.data.note || "Screenshot cleared. A fresh one will be taken on the next scheduled run.");
+      } else {
+        showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "HTTP error"));
+      }
+    }).catch(function(e) {
+      showNotice("Failed: " + e.message);
+    });
+  }
+  function metaItem(label, val) {
+    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
+  }
+  function detailAiUnavailableMsg() {
+    return getCortexOwnerToken2() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
+  }
+  function detailCheckAiAvailability() {
+    detailAiAvailable = false;
+    var config = loadConfig();
+    var token = getCortexOwnerToken2();
+    if (!config.aimeatUrl || !token) {
+      renderDetailView();
+      return;
+    }
+    var url = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(url + "/v1/openrouter/settings", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
+      if (detailAppId) renderDetailView();
+    }).catch(function() {
+      detailAiAvailable = false;
+      if (detailAppId) renderDetailView();
+    });
+  }
+  function detailLoadVersions(owner, filename) {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var listEl = document.getElementById("detail-versions-list");
+      if (!listEl) return;
+      var versions = json.data && json.data.versions ? json.data.versions : [];
+      if (versions.length === 0) {
+        detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
+        listEl.innerHTML = detailVersionsHtml;
+        return;
+      }
+      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var html = "";
+      for (var i = 0; i < versions.length; i++) {
+        var v = versions[i];
+        var isLatest = i === 0;
+        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
+        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
+      }
+      detailVersionsHtml = html;
+      listEl.innerHTML = html;
+    }).catch(function() {
+      detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
+      var listEl = document.getElementById("detail-versions-list");
+      if (listEl) listEl.innerHTML = detailVersionsHtml;
+    });
+  }
+  function extractHtmlFromAi(content) {
+    if (!content) return null;
+    var text = String(content).trim();
+    var fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    if (fence && fence[1]) text = fence[1].trim();
+    var lower = text.toLowerCase();
+    var startDoc = lower.indexOf("<!doctype");
+    var startHtml = lower.indexOf("<html");
+    var start = startDoc !== -1 ? startDoc : startHtml;
+    if (start === -1) {
+      if (text.indexOf("<") !== -1 && text.indexOf(">") !== -1 && text.length > 30) return text;
+      return null;
+    }
+    return text.slice(start);
+  }
+  function detailAiRun() {
+    var app = detailGetApp();
+    if (!app) return;
+    var inputEl = document.getElementById("detail-ai-input");
+    var statusEl = document.getElementById("detail-ai-status");
+    var runBtn = document.getElementById("detail-ai-run");
+    var change = (inputEl.value || "").trim();
+    if (!change) {
+      inputEl.focus();
+      return;
+    }
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      statusEl.textContent = t("detail.aiLoginNeeded");
+      return;
+    }
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      statusEl.textContent = t("detail.aiUnavailable");
+      return;
+    }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var html = app.blob ? blobToHtml(app.blob) : "";
+    if (!html) {
+      statusEl.textContent = t("detail.urlCantEdit");
+      return;
+    }
+    var systemPrompt = "You are editing a single-file HTML web app that runs on the AIMEAT platform. You will be given the current full HTML source and a change request. Return the COMPLETE updated HTML document and NOTHING else — no explanations, no commentary, no markdown code fences. Preserve every existing AIMEAT integration (script tags loading /v1/libs/*, AIMEAT.* API calls, cortex extension scripts) unless the change specifically requires altering them. Keep the result a single self-contained file that supports both light and dark themes.";
+    var userPrompt = "Change request:\n" + change + "\n\nCurrent HTML source:\n" + html;
+    runBtn.disabled = true;
+    statusEl.style.color = "var(--text-muted)";
+    statusEl.textContent = t("detail.running");
+    fetch(aimeatUrl + "/v1/ai/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({
+        prompt: userPrompt,
+        systemPrompt,
+        app_id: "app-catalog"
+      })
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      runBtn.disabled = false;
+      if (!json || !json.ok) {
+        var code = json && json.error && json.error.code || "";
+        var msg = json && json.error && json.error.message || "AI request failed";
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (code ? "[" + code + "] " : "") + msg;
+        return;
+      }
+      var content = json.data && json.data.content ? json.data.content : "";
+      var newHtml = extractHtmlFromAi(content);
+      if (!newHtml) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + t("detail.aiNoHtml");
+        return;
+      }
+      detailDraftBlob = htmlToBlob(newHtml);
+      statusEl.style.color = "#34d399";
+      var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== "undefined" ? " · " + t("detail.aiUsage") + ": $" + Number(json.data.budget.spent_today_usd).toFixed(3) : "";
+      statusEl.textContent = "✔ " + t("detail.draftReady") + usage;
+      renderDetailView();
+      var s2 = document.getElementById("detail-ai-status");
+      if (s2) {
+        s2.style.color = "#34d399";
+        s2.textContent = "✔ " + t("detail.draftReady") + usage;
+      }
+    }).catch(function(err) {
+      runBtn.disabled = false;
+      statusEl.style.color = "var(--accent)";
+      statusEl.textContent = "✘ " + (err.message || "AI request failed");
+    });
+  }
+  function detailAiTest() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    var view = document.getElementById("iframe-view");
+    var iframe = document.getElementById("app-iframe");
+    var title = document.getElementById("iframe-title");
+    title.textContent = (app.name || "App") + " (draft)";
+    iframe.removeAttribute("src");
+    iframe.srcdoc = blobToHtml(detailDraftBlob);
+    setIframeUrl("");
+    delete iframe.dataset.appId;
+    view.hidden = false;
+  }
+  function detailAiKeep() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    app.blob = detailDraftBlob;
+    app.source = app.source === "url" ? "paste" : app.source || "paste";
+    app.url = app.url || null;
+    detailDraftBlob = null;
+    saveApp(app).then(function() {
+      renderApps();
+      renderDetailView();
+      var s2 = document.getElementById("detail-ai-status");
+      if (s2) {
+        s2.style.color = "#34d399";
+        s2.textContent = "✔ " + t("detail.kept");
+      }
+    });
+  }
+  function detailAiDiscard() {
+    detailDraftBlob = null;
+    renderDetailView();
+    var s2 = document.getElementById("detail-ai-status");
+    if (s2) s2.textContent = t("detail.discarded");
+  }
+  function draftApi(method, owner, filename, sub, body) {
+    var cfg = loadConfig();
+    if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
+    var base = cfg.aimeatUrl.replace(/\/+$/, "");
+    var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
+    return fetch(base + path, {
+      method,
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken2(), "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : void 0
+    }).then(function(resp) {
+      return resp.json().then(function(json) {
+        if (!json.ok) throw new Error(json.error && (json.error.message || json.error.code) || "HTTP " + resp.status);
+        return json.data;
+      });
+    });
+  }
+  function draftStageTarget(app, statusEl) {
+    if (!app || !app.published || !app.publishedFilename) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = t("detail.draftNeedsPublished");
+      } else showNotice(t("detail.draftNeedsPublished"));
+      return null;
+    }
+    if (!getCortexOwnerToken2()) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = t("detail.draftNeedsSignin");
+      } else showNotice(t("detail.draftNeedsSignin"));
+      return null;
+    }
+    return { owner: detailServerOwner(app), filename: app.publishedFilename };
+  }
+  function stageDraftAndPreview(app, contentB64, statusEl) {
+    var tgt = draftStageTarget(app, statusEl);
+    if (!tgt) return Promise.resolve(false);
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.draftUploading");
+    }
+    return draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
+      return draftApi("POST", tgt.owner, tgt.filename, "draft/preview-token");
+    }).then(function(data) {
+      window.open(data.preview_url, "_blank", "noopener");
+      if (statusEl) {
+        statusEl.style.color = "#34d399";
+        statusEl.textContent = "✔ " + t("detail.draftOpened");
+      }
+      return true;
+    }).catch(function(err) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err.message || "Draft preview failed");
+      }
+      return false;
+    });
+  }
+  function publishDraftBytes(app, contentB64, statusEl, onDone) {
+    var tgt = draftStageTarget(app, statusEl);
+    if (!tgt) return;
+    Promise.resolve(showConfirm(t("detail.draftPublishConfirm"))).then(function(ok) {
+      if (!ok) return;
+      if (statusEl) {
+        statusEl.style.color = "var(--text-muted)";
+        statusEl.textContent = t("detail.draftUploading");
+      }
+      draftApi("PUT", tgt.owner, tgt.filename, "draft", { content: contentB64 }).then(function() {
+        return draftApi("POST", tgt.owner, tgt.filename, "publish-draft");
+      }).then(function(data) {
+        if (statusEl) {
+          statusEl.style.color = "#34d399";
+          statusEl.textContent = t("detail.draftPublished").replace("{v}", data.version_number);
+        }
+        if (onDone) onDone(data);
+      }).catch(function(err) {
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + (err.message || "Publish failed");
+        }
+      });
+    });
+  }
+  function detailTestDraftLive() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    stageDraftAndPreview(app, detailDraftBlob, document.getElementById("detail-ai-status"));
+  }
+  function detailPublishTestedDraft() {
+    var app = detailGetApp();
+    if (!app || !detailDraftBlob) return;
+    publishDraftBytes(app, detailDraftBlob, document.getElementById("detail-ai-status"), function() {
+      detailDraftBlob = null;
+      refreshAll();
+      renderDetailView();
+    });
+  }
+  function sourceOverlayApp() {
+    var overlay = document.getElementById("source-overlay");
+    var id = overlay && overlay.dataset ? overlay.dataset.appId : "";
+    if (!id) return null;
+    var apps = getMainApps();
+    for (var i = 0; i < apps.length; i++) if (apps[i].id === id) return apps[i];
+    return null;
+  }
+  function sourceCurrentB64() {
+    var ta = document.getElementById("source-code");
+    if (!ta) return null;
+    try {
+      return btoa(unescape(encodeURIComponent(ta.value)));
+    } catch (e) {
+      return null;
+    }
+  }
+  function sourceTestDraftLive() {
+    var app = sourceOverlayApp();
+    var c = sourceCurrentB64();
+    if (!app || c == null) return;
+    stageDraftAndPreview(app, c, document.getElementById("source-draft-status"));
+  }
+  function sourcePublishTested() {
+    var app = sourceOverlayApp();
+    var c = sourceCurrentB64();
+    if (!app || c == null) return;
+    publishDraftBytes(app, c, document.getElementById("source-draft-status"), function() {
+      app.blob = c;
+      saveApp(app);
+      refreshAll();
+    });
+  }
+  function detailEditSource() {
+    var app = detailGetApp();
+    if (app) viewSource(app);
+  }
+  function detailImproveExternal() {
+    var app = detailGetApp();
+    if (app) openPromptBuilder2(app);
+  }
+  function detailSharePrompt() {
+    var app = detailGetApp();
+    if (app) generateSharePrompt(app);
+  }
+  function detailPublish() {
+    if (detailAppId) showPublishModal(detailAppId);
+  }
+  async function detailDelete() {
+    var app = detailGetApp();
+    if (!app) return;
+    if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
+      return app.name || "this app";
+    }))) return;
+    var id = app.id;
+    deleteApp(id).then(function() {
+      closeDetailView();
+      renderApps();
+      loadPublishedApps();
+    });
+  }
+  function openPublishedDetail(owner, filename, localId, versionNumber) {
+    if (localId) {
+      openDetailView(localId);
+      return;
+    }
+    for (var i = 0; i < getMainApps().length; i++) {
+      if (getMainApps()[i].publishedFilename === filename) {
+        openDetailView(getMainApps()[i].id);
+        return;
+      }
+    }
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      showNotice("Set the AIMEAT server URL in Settings first");
+      return;
+    }
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
+      var app = {
+        id: generateId2(),
+        name: meta.name || filename.replace(/\.html?$/i, ""),
+        description: meta.description || "",
+        category: meta.category || "utility",
+        tags: meta.tags || [],
+        usesCortex: meta.usesCortex || [],
+        forkedFrom: meta.forkedFrom || null,
+        icon: meta.icon || "📝",
+        source: "aimeat",
+        url: null,
+        blob: b64,
+        favorite: false,
+        openMode: "tab",
+        addedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastOpenedAt: null,
+        published: true,
+        publishedFilename: filename,
+        publishedUrl: "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename),
+        publishedVersionNumber: versionNumber || 1,
+        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        aimeatOwner: owner,
+        aimeatFilename: filename
+      };
+      return saveApp(app).then(function() {
+        getMainApps().push(app);
+        renderApps();
+        loadPublishedApps();
+        openDetailView(app.id);
+      });
+    }).catch(function(err) {
+      showNotice("Could not load the published app: " + (err.message || err));
+    });
+  }
+  function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
+    var url = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + (version ? "?version=" + version : "");
+    var token = getCortexOwnerToken2();
+    var headers = token ? { "Authorization": "Bearer " + token } : {};
+    return fetch(url, { headers }).then(function(resp) {
+      if (!resp.ok) throw new Error("Could not fetch app content (HTTP " + resp.status + ")");
+      return resp.arrayBuffer();
+    }).then(function(buf) {
+      var bytes = new Uint8Array(buf);
+      var binary = "";
+      var chunk = 32768;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    });
+  }
+  function showLineageModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    if (!aimeatUrl) {
+      showNotice("Set AIMEAT server URL in Settings first");
+      return;
+    }
+    document.getElementById("lineage-title").textContent = filename;
+    var summaryEl = document.getElementById("lineage-summary");
+    var statusEl = document.getElementById("lineage-status");
+    var treeEl = document.getElementById("lineage-tree");
+    summaryEl.textContent = "";
+    statusEl.textContent = t("lineage.loading") || "Loading lineage…";
+    statusEl.style.color = "var(--text-muted)";
+    treeEl.innerHTML = "";
+    document.getElementById("lineage-overlay").hidden = false;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/lineage").then(function(resp) {
+      if (!resp.ok) throw new Error("Server returned " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var d = json.data || {};
+      var nodes = d.nodes || [], edges = d.edges || [];
+      statusEl.textContent = "";
+      summaryEl.textContent = (t("lineage.direct") || "Direct forks") + ": " + (d.directForkCount || 0) + " · " + (t("lineage.total") || "total descendants") + ": " + (d.descendantCount || 0);
+      if (nodes.length <= 1 && edges.length === 0) {
+        treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t("lineage.none") || "No forks yet — this app has not been forked.") + "</div>";
+        return;
+      }
+      treeEl.innerHTML = renderLineageTree(d);
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Failed to load lineage");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function renderLineageTree(d) {
+    var byId = {};
+    (d.nodes || []).forEach(function(n) {
+      byId[n.id] = n;
+    });
+    var children = {};
+    var hasParent = {};
+    (d.edges || []).forEach(function(e) {
+      (children[e.from] = children[e.from] || []).push(e.to);
+      hasParent[e.to] = true;
+    });
+    var roots = (d.nodes || []).filter(function(n) {
+      return !hasParent[n.id];
+    }).map(function(n) {
+      return n.id;
+    });
+    if (!roots.length && d.self) roots = [d.self];
+    var seen = {};
+    function renderNode(id, depth) {
+      if (seen[id]) return "";
+      seen[id] = true;
+      var n = byId[id];
+      if (!n) return "";
+      var isSelf = id === d.self;
+      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + "</span>" : "";
+      var statusTxt = t("lineage.status." + n.status) || n.status;
+      var line = '<div class="lineage-node' + (isSelf ? " self" : "") + '" style="margin-left:' + depth * 16 + 'px">' + (depth > 0 ? "↳ " : "") + escapeHtml(n.owner + "/" + n.filename) + (isSelf ? " ●" : "") + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + "</span>" + when + "</div>";
+      var kids = children[id] || [];
+      for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
+      return line;
+    }
+    var html = "";
+    for (var r = 0; r < roots.length; r++) html += renderNode(roots[r], 0);
+    return html;
+  }
+  var protectionTarget = null;
+  function showProtectionModal(filename) {
+    protectionTarget = { filename };
+    var p = getOwnProtection()[filename] || {};
+    document.getElementById("protect-obfuscate").checked = !!p.obfuscate;
+    document.getElementById("protect-domainLock").checked = !!p.domainLock;
+    document.getElementById("protect-watermark").checked = !!p.watermark;
+    document.getElementById("protect-noRawDownload").checked = !!p.noRawDownload;
+    document.getElementById("protection-title").textContent = filename;
+    document.getElementById("protection-status").textContent = "";
+    document.getElementById("protection-overlay").hidden = false;
+  }
+  function saveProtection() {
+    if (!protectionTarget) return;
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in.");
+      return;
+    }
+    var protection = {
+      obfuscate: document.getElementById("protect-obfuscate").checked,
+      domainLock: document.getElementById("protect-domainLock").checked,
+      watermark: document.getElementById("protect-watermark").checked,
+      noRawDownload: document.getElementById("protect-noRawDownload").checked
+    };
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("protection-status");
+    statusEl.textContent = t("protect.saving") || "Saving…";
+    statusEl.style.color = "var(--text-muted)";
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(protectionTarget.filename), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ protection })
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        statusEl.textContent = "✔ " + (t("protect.saved") || "Saved");
+        statusEl.style.color = "#34d399";
+        loadPublishedApps();
+        setTimeout(function() {
+          document.getElementById("protection-overlay").hidden = true;
+        }, 800);
+      } else {
+        statusEl.textContent = "✘ " + (json.error && json.error.message || "Failed");
+        statusEl.style.color = "var(--accent)";
+      }
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Error");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function showVersionsModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    if (!aimeatUrl) {
+      showNotice("Set AIMEAT server URL in Settings first");
+      return;
+    }
+    document.getElementById("versions-title").textContent = filename;
+    var statusEl = document.getElementById("versions-status");
+    var listEl = document.getElementById("versions-list");
+    statusEl.textContent = "Loading versions…";
+    statusEl.style.color = "var(--text-muted)";
+    listEl.innerHTML = "";
+    document.getElementById("versions-overlay").hidden = false;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+      if (!resp.ok) throw new Error("Server returned " + resp.status);
+      return resp.json();
+    }).then(function(json) {
+      var versions = json.data && json.data.versions ? json.data.versions : [];
+      if (versions.length === 0) {
+        statusEl.textContent = "No versions found.";
+        return;
+      }
+      statusEl.textContent = versions.length + " " + t("versions.stored");
+      statusEl.style.color = "var(--text-muted)";
+      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var html = "";
+      for (var i = 0; i < versions.length; i++) {
+        var v = versions[i];
+        var isLatest = i === 0;
+        var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
+        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
+      }
+      listEl.innerHTML = html;
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Failed to load versions");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  async function restoreVersion(owner, filename, version) {
+    if (!await showConfirm(t("confirm.restoreVersion").replace("{version}", String(version)).replace("{file}", function() {
+      return filename;
+    }))) return;
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      showNotice("You must be logged in as the owner to restore a version. Sign in first.");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("versions-status");
+    statusEl.textContent = "Restoring version " + version + "…";
+    statusEl.style.color = "#34d399";
+    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename, version).then(function(b64) {
+      var body = {
+        filename,
+        content: b64,
+        mime_type: "text/html",
+        name: meta.name || filename.replace(/\.html?$/i, ""),
+        description: meta.description || "",
+        category: meta.category || "utility",
+        tags: meta.tags || [],
+        uses_cortex: meta.usesCortex || []
+      };
+      if (meta.icon) body.icon = meta.icon;
+      return fetch(aimeatUrl + "/v1/apps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(body)
+      });
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        statusEl.textContent = "✔ Restored — now published as v" + (json.data.version_number || "?");
+        statusEl.style.color = "#34d399";
+        loadPublishedApps();
+        setTimeout(function() {
+          showVersionsModal(owner, filename);
+        }, 500);
+      } else {
+        statusEl.textContent = "✘ " + (json.error && json.error.message || "Restore failed");
+        statusEl.style.color = "var(--accent)";
+      }
+    }).catch(function(err) {
+      statusEl.textContent = "✘ " + (err.message || "Restore failed");
+      statusEl.style.color = "var(--accent)";
+    });
+  }
+  function forkVersion(owner, filename, version) {
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
+      return;
+    }
+    var base = (filename || "app").replace(/\.html?$/i, "");
+    var suggested = base + "-fork.html";
+    var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
+    if (!newName) return;
+    newName = newName.trim();
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
+      showNotice("Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
+    var statusEl = document.getElementById("versions-status");
+    var inVersionsModal = !document.getElementById("versions-overlay").hidden;
+    if (inVersionsModal) {
+      statusEl.textContent = "Forking…";
+      statusEl.style.color = "#34d399";
+    }
+    var body = { new_filename: newName };
+    if (version) body.version = version;
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(body)
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (json.ok) {
+        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + newName + '"';
+        if (inVersionsModal) {
+          statusEl.textContent = msg;
+          statusEl.style.color = "#34d399";
+        } else showNotice(msg);
+        loadPublishedApps();
+      } else {
+        var err = json.error && json.error.message || "Fork failed";
+        if (inVersionsModal) {
+          statusEl.textContent = "✘ " + err;
+          statusEl.style.color = "var(--accent)";
+        } else showNotice((t("fork.failed") || "Fork failed") + ": " + err);
+      }
+    }).catch(function(err) {
+      var m = err.message || "Fork failed";
+      if (inVersionsModal) {
+        statusEl.textContent = "✘ " + m;
+        statusEl.style.color = "var(--accent)";
+      } else showNotice("Error: " + m);
+    });
   }
 
   // src/static/app-catalog/js/settings.js
@@ -6187,7 +6433,7 @@
     switchTab("url");
   }
   function requireSignInThen(next) {
-    if (getCortexOwnerToken2()) {
+    if (getCortexOwnerToken()) {
       next();
       return;
     }
@@ -6547,7 +6793,7 @@
     document.getElementById("publish-access-code").value = "";
     var pubStatus = document.getElementById("publish-status");
     var pubSubmit = document.getElementById("publish-submit-btn");
-    if (!getCortexOwnerToken2()) {
+    if (!getCortexOwnerToken()) {
       pubStatus.textContent = t("publish.loginRequired");
       pubStatus.style.color = "var(--accent)";
       pubSubmit.disabled = true;
@@ -6602,7 +6848,7 @@
       statusEl.style.color = "var(--accent)";
       return;
     }
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       statusEl.textContent = t("publish.loginRequired");
       statusEl.style.color = "var(--accent)";
@@ -6691,7 +6937,7 @@
   }
   function getSessionRoles() {
     try {
-      var token = getCortexOwnerToken2();
+      var token = getCortexOwnerToken();
       if (!token) return [];
       var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       return payload.roles || [];
@@ -6715,7 +6961,7 @@
       return Promise.resolve();
     }
     return fetch(aimeatUrl + "/v1/admin/subdomains", {
-      headers: { "Authorization": "Bearer " + getCortexOwnerToken2() }
+      headers: { "Authorization": "Bearer " + getCortexOwnerToken() }
     }).then(function(resp) {
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
@@ -6755,7 +7001,7 @@
     return fetch(aimeatUrl + path, {
       method,
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken2(),
+        "Authorization": "Bearer " + getCortexOwnerToken(),
         "Content-Type": "application/json"
       },
       body: body ? JSON.stringify(body) : void 0
@@ -6903,7 +7149,7 @@
   }
   function exportBackupZip() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -6934,7 +7180,7 @@
   var backupInspectData = null;
   function importBackupPick() {
     document.getElementById("backup-menu").hidden = true;
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("backup.loginRequired"));
       return;
@@ -6954,7 +7200,7 @@
       return fetch(backupApiBase() + "/v1/apps/backup/inspect", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + getCortexOwnerToken2(),
+          "Authorization": "Bearer " + getCortexOwnerToken(),
           "Content-Type": "application/zip"
         },
         body: buf
@@ -7080,7 +7326,7 @@
     fetch(backupApiBase() + "/v1/apps/backup/restore", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + getCortexOwnerToken2(),
+        "Authorization": "Bearer " + getCortexOwnerToken(),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -7166,7 +7412,7 @@
         return;
       }
       var listHeaders = {};
-      var listTok = getCortexOwnerToken2();
+      var listTok = getCortexOwnerToken();
       if (listTok) listHeaders["Authorization"] = "Bearer " + listTok;
       fetchAllPublishedApps(aimeatUrl, listHeaders).then(function(json) {
         var serverApps = json.data && json.data.apps ? json.data.apps : [];
@@ -7257,7 +7503,7 @@
     if (!app || !app.publishedFilename) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7288,7 +7534,7 @@
   function toggleParkApp(filename, parked) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7314,7 +7560,7 @@
   function toggleForkApp(filename, forkable) {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
@@ -7343,7 +7589,7 @@
     }))) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var token = getCortexOwnerToken2();
+    var token = getCortexOwnerToken();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
       return;
@@ -7784,7 +8030,7 @@
         showPublishModal2(appId);
         break;
       case "improve-ai":
-        openPromptBuilder2(app);
+        openPromptBuilder(app);
         break;
       case "share-prompt":
         generateSharePrompt2(app);
@@ -8051,6 +8297,11 @@
     detailSkillAttachToggle,
     detailSkillAttach,
     detailSkillDetach,
+    monetizeAddTool,
+    monetizeEditTool,
+    monetizeCancelEdit,
+    monetizeSaveTool,
+    monetizeDeleteTool,
     editAppDetails,
     showSubdomainModal,
     openConsents,
@@ -8101,7 +8352,7 @@
     cortexEditorAddLib,
     cortexEditorSave,
     cortexEditorExport,
-    openPromptBuilder: openPromptBuilder2,
+    openPromptBuilder,
     closePbPanel,
     onCardDragStart,
     onCardDragEnd,
@@ -8127,13 +8378,13 @@
       loadPublishedApps: loadPublishedApps3,
       renderApps: renderApps5,
       updateModeToggle: updateModeToggle2,
-      getCortexOwnerToken: getCortexOwnerToken2,
+      getCortexOwnerToken,
       launchApp: launchApp2,
       viewPublished: viewPublished2,
       viewSource: viewSource2,
       generateId,
       generateSharePrompt: generateSharePrompt2,
-      openPromptBuilder: openPromptBuilder2,
+      openPromptBuilder,
       showPublishModal: showPublishModal2,
       getMainApps: function() {
         return allApps;
@@ -8236,7 +8487,7 @@
     });
     if (_params.get("create") === "1") {
       try {
-        openPromptBuilder2(null);
+        openPromptBuilder(null);
       } catch (e) {
       }
     }
@@ -8251,7 +8502,7 @@
     });
     document.getElementById("generate-btn").addEventListener("click", function() {
       closeCreateMenu();
-      openPromptBuilder2(null);
+      openPromptBuilder(null);
     });
     document.getElementById("settings-btn").addEventListener("click", function() {
       openSettings();
@@ -8513,7 +8764,7 @@
           break;
         }
       }
-      openPromptBuilder2(app);
+      openPromptBuilder(app);
     });
     document.getElementById("source-code").addEventListener("input", function() {
       var overlay = document.getElementById("source-overlay");

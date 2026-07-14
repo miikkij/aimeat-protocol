@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.2.0 — 2026-07-14 — Monetize section (TARGET-034 phase B): own published apps get the
+ *     apps.{appId}.tools tool editor (monetize.js) between Skills and Manage-on-server.
  *   v1.1.0 — 2026-07-11 — Own-published apps: "Edit Access Code" in serverMgmtInner + "Attach skill"
  *     in the Skills section (attach/detach one of the user's own skills; ports skills.js
  *     setSkillBinding frontmatter rewrite so the standalone bundle needs no SPA service layer).
@@ -18,6 +20,7 @@ import { saveApp, deleteApp, getDbMode, setDbMode, closeDbInstance } from './db.
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
+import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -154,6 +157,9 @@ function openDetailView(appId) {
   detailBoundSkills = [];
   var app = detailGetApp();
   if (!app) return;
+  // Monetize (TARGET-034): reset + async-load the apps.{appId}.tools manifest for OWN published
+  // apps before the first render so the section shell picks up the loading state.
+  monetizeOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   document.getElementById('detail-view').hidden = false;
   renderDetailView();
   // AI availability + published versions load asynchronously and re-render in place.
@@ -464,8 +470,14 @@ function renderDetailView() {
       '</div>';
   }
 
+  // ── MONETIZE (TARGET-034) — sell tool calls on this app (own published apps only) ──
+  // Stable container: monetize.js re-renders #detail-monetize in place after loads/saves.
+  var monetizeHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + '</div>'
+    : '';
+
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + monetizeHtml + mgmtHtml + actionsHtml;
 }
 
 // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.

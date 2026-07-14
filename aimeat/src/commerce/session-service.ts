@@ -13,6 +13,8 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.2.0 — 2026-07-14 — createFulfillmentTask extracted to fulfillment.ts so the app-tool task
+ *     path shares it (TARGET-034 phase B)
  *   v2.1.0 — 2026-07-14 — Fulfill seam: a sellable's custom fulfill() (app-tool capability invoke)
  *     replaces the default TASK path per item; caller JWT threaded from the completing adapter;
  *     app/input persisted on line items (TARGET-034 phase A)
@@ -22,14 +24,15 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext } from './types.js';
 import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
+import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 import { isMoneyCurrency, percentFee } from './money.js';
-import { emitChange, emitDelivery } from '../services/event-bus.js';
+import { emitChange } from '../services/event-bus.js';
 
 export { CommerceError } from './errors.js';
 
@@ -204,44 +207,6 @@ export async function cancelSession(
   const updated: CheckoutSessionRecord = { ...session, status: 'cancelled', updatedAt: new Date().toISOString() };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
   return updated;
-}
-
-/** Create the fulfillment TASK for one line item on the seller agent (the offer-ask path). */
-async function createFulfillmentTask(
-  storage: Storage,
-  session: CheckoutSessionRecord,
-  item: CheckoutLineItem,
-): Promise<string> {
-  const now = new Date().toISOString();
-  const record: AgentTaskRecord = {
-    id: randomUUID(),
-    agentGaii: item.agent,
-    ownerGaii: session.sellerGhii,
-    title: `Order: ${item.title}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`,
-    description: [
-      `Commerce order from checkout session ${session.id}.`,
-      `Buyer: ${session.buyerIdentity} (paid ${item.unitPrice * item.quantity} morsels).`,
-      session.note ? `Buyer note: ${session.note}` : '',
-      `Deliver the offer "${item.title}" (${item.offerId})${item.quantity > 1 ? ` ×${item.quantity}` : ''}.`,
-    ].filter(Boolean).join('\n'),
-    scope: [
-      { name: 'kind', value: 'commerce-order', type: 'text' },
-      { name: 'offer_id', value: item.offerId, type: 'text' },
-      { name: 'commerce_session', value: session.id, type: 'text' },
-      { name: 'buyer', value: session.buyerIdentity, type: 'text' },
-    ],
-    rules: [],
-    verification: { userExpects: `The deliverable of offer ${item.offerId} reaches the buyer ${session.buyerIdentity}`, technicalChecks: [] },
-    resources: {},
-    todos: [],
-    status: 'queued',
-    createdAt: now,
-    updatedAt: now,
-  };
-  const created = await storage.createAgentTask(record);
-  // Realtime push to the seller agent (tunnel replays from backlog when offline; no-op otherwise).
-  emitDelivery({ target: item.agent, kind: 'task_assigned', id: record.id, payload: created });
-  return record.id;
 }
 
 /**

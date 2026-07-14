@@ -10516,9 +10516,10 @@ paths:
       summary: Public product feed (ACP-shaped)
       description: >-
         Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
-        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every callable, priced
-        app-tool from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
-        money prices in 6-decimal micro-units). Discovery: /.well-known/acp.json.
+        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every priced app-tool
+        from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
+        money prices in 6-decimal micro-units; fulfillment 'call' = synchronous capability
+        invoke, 'task' = agent TASK for the app owner). Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
         '200':
@@ -10662,10 +10663,11 @@ paths:
       description: >-
         Charges the buyer through the selected payment handler (default io.aimeat.morsels;
         marketplace fee applies), fulfills each line item — offers create a TASK on the seller
-        agent (the offer-ask path); app-tools invoke the tool's backing capability with the
-        buyer's persisted input, the result landing on session.fulfillment.results — writes the
-        seller's order copy, and closes the session. A fulfillment failure after a successful
-        charge refunds and leaves the session open.
+        agent (the offer-ask path); app-tools with an action_id binding invoke the backing
+        capability with the buyer's persisted input (result on session.fulfillment.results),
+        unbound app-tools queue an agent TASK for the manifest agent or the app owner
+        (session.fulfillment.taskIds) — writes the seller's order copy, and closes the session.
+        A fulfillment failure after a successful charge refunds and leaves the session open.
       tags: [Commerce]
       security:
         - BearerAuth: []
