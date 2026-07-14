@@ -1,6 +1,13 @@
-// E2E tests for aimeat helper libraries (data, storage, social, wallet, work)
-// Tests the same API calls that the browser libraries make
-// Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-libs.ts
+/**
+ * @file test/e2e-libs.ts
+ * @description E2E tests for the served browser helper libraries (data, storage, social, wallet,
+ *   work, markdown, organism, editor, commerce): exercises the same API calls the libraries make
+ *   plus the /v1/libs catalogue and the generated JS sources themselves.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
+ * @version-history
+ *   v1.1.0 — 2026-07-14 — aimeat-commerce.js coverage (served source + catalogue entry)
+ *   v1.0.0 — 2026-07-14 — Header added; file pre-dates header standard
+ */
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -656,14 +663,29 @@ await test('GET /v1/libs/aimeat-editor.js — serves CM6 editor with fallback', 
     assert(text.includes('toolbar'), 'should include the toolbar builder');
 });
 
-await test('GET /v1/libs — catalogue lists markdown, organism and editor', async () => {
+await test('GET /v1/libs/aimeat-commerce.js — serves checkout + money-formatting client', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-commerce.js`);
+    assert(res.ok, `commerce lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('AIMEAT.commerce'), 'should expose AIMEAT.commerce');
+    assert(text.includes('buyOffer'), 'should include the one-call purchase');
+    assert(text.includes('/v1/commerce/checkout-sessions'), 'should call the checkout API');
+    assert(text.includes('paymentRequired'), 'should surface the x402-style 402 accepts block');
+    assert(text.includes('fmtMoney'), 'should include micro-unit money formatting');
+    assert(text.includes('getAppTools'), 'should include the app-tool manifest read (TARGET-034 draft)');
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+});
+
+await test('GET /v1/libs — catalogue lists markdown, organism, editor and commerce', async () => {
     const res = await fetch(`${BASE}/v1/libs`);
     assert(res.ok, `libs catalogue failed: ${res.status}`);
     const data = await res.json() as any;
     const names = (data.libraries ?? []).map((l: any) => l.name);
-    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor']) {
+    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor', 'aimeat-commerce']) {
         assert(names.includes(expected), `catalogue should list ${expected} (got: ${names.join(', ')})`);
     }
+    const commerce = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-commerce');
+    assert(commerce?.requires === 'aimeat-auth', 'aimeat-commerce must declare requires: aimeat-auth');
 });
 
 // ─── Results ───

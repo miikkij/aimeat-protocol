@@ -11,6 +11,8 @@
  *     drop stale "18 tools" wording
  *   v1.2.0 -- 2026-07-02 -- sdk_libraries: add aimeat-markdown (render-into-element + renderRich),
  *     aimeat-organism (normalized workspace read + draft/publish) and aimeat-editor (CM6 markdown editor)
+ *   v1.3.0 -- 2026-07-14 -- sdk_libraries: add aimeat-commerce (TARGET-033 checkout client, micro-unit
+ *     money formatting, x402-style 402 accepts)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -199,6 +201,7 @@ export function bootstrapRouter(
                 `${base}/v1/libs/aimeat-markdown.js - markdown rendering: AIMEAT.md.render(text, target) renders INTO an element (returns an Element - use the target param or renderToString, never innerHTML = render(...)); renderRich adds task lists, footnotes, code highlighting, Mermaid`,
                 `${base}/v1/libs/aimeat-organism.js - organisms & workspaces: normalized read (published + drafts merged per item), writeDraft, publish, README, search`,
                 `${base}/v1/libs/aimeat-editor.js - markdown editor: CodeMirror 6 + toolbar + live-preview split (pairs with aimeat-markdown)`,
+                `${base}/v1/libs/aimeat-commerce.js - commerce: buy/sell agent offers via checkout sessions (buyOffer/openCheckout/completeCheckout), public priced-offer feed, offer + app-tool price reading, money formatting in 6-decimal micro-units (fmtMoney(1500000,'EUR') -> "1.50 EUR"); 402 errors carry the x402-style accepts block`,
                 `${base}/lib/realtime.js - WebSocket P2P rooms, WebRTC, Yjs CRDT`,
               ],
               starter_templates: {
