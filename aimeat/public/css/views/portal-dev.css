@@ -52,6 +52,10 @@
 .dv-subtitle { color: var(--love4, #E8564A); font-size: .95rem; margin-bottom: 2rem; }
 .dv-node-badge { display: inline-flex; align-items: center; gap: .5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .8rem; font-size: .85rem; font-family: monospace; margin-bottom: 1.5rem; }
 /* .dv-dot removed — node-badge dot uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
+.dv-repos { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.dv-repo-link { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); text-decoration: none; font-size: .85rem; border: 1px solid var(--border); border-radius: 8px; padding: .4rem .8rem; background: var(--bg-card); }
+.dv-repo-link:hover { color: var(--love4, #E8564A); border-color: var(--love4, #E8564A); }
+.dv-repo-link .gh-mark { flex: none; }
 
 /* Stats — .dv-stat*/.dv-num/.dv-label removed; dev-portal stats use canonical
    .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
