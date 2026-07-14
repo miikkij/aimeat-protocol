@@ -107,6 +107,9 @@ model Memory {
   @@index([ownerGaii])
   @@index([archived, key])
   @@index([archivedRoot])
+  // Owner-agnostic key-prefix lookups (listAllMemory) filter by key with no ownerGaii; a key-led index
+  // keeps them off a full scan. (Postgres: a btree on key serves LIKE 'prefix%' with C/default collation.)
+  @@index([key])
 }
 
 // Archived prior versions of TRACKABLE memory keys. Append-only; the latest value always lives in
