@@ -14,6 +14,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.4.0 — 2026-07-14 — mcp.json commerce_tools block (inline | pointer via AIMEAT_MCP_CARD_COMMERCE_TOOLS) (TARGET-034 phase D)
+ *   v1.3.0 — 2026-07-14 — mcp.json + ucp webmcp bridge references (TARGET-034 phase C)
  *   v1.2.0 — 2026-07-13 — Add UCP business profile (TARGET-033 commerce core)
  *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 API catalog, and discovery Link headers (agent readiness)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -82,7 +84,24 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
 
   // MCP Server Card (SEP-1649) — lets agents discover the node's MCP server, its
   // transport, and that OAuth is required, without probing /v1/mcp blind.
-  router.get('/.well-known/mcp.json', (_req, res) => {
+  router.get('/.well-known/mcp.json', async (_req, res) => {
+    // commerce_tools (TARGET-034 phase D): the priced app-tool catalog on the card.
+    // AIMEAT_MCP_CARD_COMMERCE_TOOLS: 'inline' (default) embeds the entries — richest
+    // single-fetch discovery; 'pointer' keeps the card lean and links the catalog endpoint.
+    let commerceTools: Record<string, unknown> | undefined;
+    if (config.commerceEnabled) {
+      const url = `${config.baseUrl}/v1/commerce/tools`;
+      if (config.mcpCardCommerceTools === 'pointer') {
+        commerceTools = { mode: 'pointer', url, note: 'Priced app-tools sellable through the commerce checkout — fetch the catalog from `url`.' };
+      } else {
+        const { listPricedAppTools } = await import('../commerce/app-tool-catalog.js');
+        const tools = await listPricedAppTools(storage, config, 100);
+        commerceTools = {
+          mode: 'inline', url, tools, total: tools.length,
+          note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); unpaid HTTP invokes answer 402 with x402 accepts. Capped at 100 entries — `url` serves the full catalog.',
+        };
+      }
+    }
     res.json({
       $schema: 'https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json',
       version: '1.0',
@@ -112,6 +131,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         app_listing: `${config.baseUrl}/v1/apps/{owner}/{filename}/webmcp`,
         pages: [`${config.baseUrl}/`],
       },
+      ...(commerceTools ? { commerce_tools: commerceTools } : {}),
     });
   });
 

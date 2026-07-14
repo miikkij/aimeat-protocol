@@ -8,6 +8,8 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.4.0 — 2026-07-14 — MCP card commerce_tools (TARGET-034 phase D): /v1/commerce/tools
+ *     catalog shape + inline card embed + feed/card sku-drift guard
  *   v1.3.0 — 2026-07-14 — WebMCP bridge (TARGET-034 phase C): tool listing shape, 402→checkout→
  *     result round-trip, free-callable invoke + auth/404 gates, bridge lib serving
  *   v1.2.0 — 2026-07-14 — App-tool TASK path (TARGET-034 phase B): unbound tools purchasable —
@@ -555,6 +557,40 @@ await test('30. WebMCP invoke gates: free-callable needs auth then invokes; unkn
     assert(ghost.status === 404 && ghost.body.error?.code === 'TOOL_NOT_FOUND', `ghost tool: ${ghost.status} ${ghost.body.error?.code}`);
     const noManifest = await fetch(`${BASE}/v1/apps/${encodeURIComponent(buyer.name)}/nothing.html/webmcp`);
     assert(noManifest.status === 404, `no manifest ${noManifest.status}`);
+});
+
+// ─── MCP Server Card commerce_tools + the dedicated catalog (TARGET-034 phase D) ───
+
+await test('31. GET /v1/commerce/tools — normalized priced app-tool catalog', async () => {
+    const r = await fetch(`${BASE}/v1/commerce/tools`);
+    assert(r.status === 200, `catalog ${r.status}`);
+    const body = await r.json() as any;
+    const echo = (body.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
+    assert(!!echo, `echo in catalog (${body.total} tools)`);
+    assert(echo.fulfillment === 'call' && echo.price?.morsels === 3, `echo entry: ${JSON.stringify(echo)}`);
+    assert(echo.checkout_item?.kind === 'app-tool' && echo.checkout_item.tool === 'echo', 'ready-made checkout item');
+    assert(echo.webmcp?.invoke?.includes('/webmcp/tools/echo'), `webmcp invoke url: ${echo.webmcp?.invoke}`);
+    const task = (body.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:concierge`);
+    assert(task?.fulfillment === 'task' && task.price?.morsels === 5, `task entry: ${JSON.stringify(task)}`);
+    assert(!(body.tools || []).some((t: any) => t.name === 'unpriced-echo'), 'unpriced tools stay out');
+    assert(body.checkout?.create?.url?.endsWith('/v1/commerce/checkout-sessions'), 'checkout pointer present');
+});
+
+await test('32. MCP Server Card embeds the catalog inline (default mode) + keeps the pointer url', async () => {
+    const r = await fetch(`${BASE}/.well-known/mcp.json`);
+    assert(r.status === 200, `card ${r.status}`);
+    const card = await r.json() as any;
+    const ct = card.commerce_tools;
+    assert(ct?.mode === 'inline', `commerce_tools mode: ${JSON.stringify(ct?.mode)} (AIMEAT_MCP_CARD_COMMERCE_TOOLS default is inline)`);
+    assert(ct.url?.endsWith('/v1/commerce/tools'), `pointer url kept in inline mode: ${ct.url}`);
+    const echo = (ct.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
+    assert(!!echo && echo.inputSchema && echo.price?.morsels === 3, `echo inline on the card: ${JSON.stringify(echo)}`);
+    assert(ct.total === ct.tools.length, 'total matches inline entries');
+    // The feed and the card come from the SAME enumerator — sku sets must agree.
+    const feed = await (await fetch(`${BASE}/v1/commerce/feed`)).json() as any;
+    const feedSkus = (feed.products || []).filter((p: any) => p.id.startsWith('app-tool:')).map((p: any) => p.id).sort();
+    const cardSkus = (ct.tools || []).map((t: any) => t.sku).sort();
+    assert(JSON.stringify(feedSkus) === JSON.stringify(cardSkus), `feed/card sku drift: ${JSON.stringify({ feedSkus, cardSkus })}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

@@ -10,6 +10,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools row (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -147,6 +148,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'commerceFeePercent', dotPath: 'commerce.fee_percent', envVar: 'AIMEAT_COMMERCE_FEE_PERCENT', type: 'number', validate: v => v === null || (typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50), immutable: false, description: 'Checkout fee percentage (empty inherits marketplace tx fee percent)', range: '0-50' },
   { key: 'commerceEnabled', dotPath: 'commerce.enabled', envVar: 'AIMEAT_COMMERCE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Checkout sessions (/v1/commerce) enabled' },
   { key: 'commerceSessionTtlMinutes', dotPath: 'commerce.session_ttl_minutes', envVar: 'AIMEAT_COMMERCE_SESSION_TTL_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 10080, immutable: false, description: 'Open checkout-session lifetime in minutes', range: '5-10080' },
+  { key: 'mcpCardCommerceTools', dotPath: 'commerce.mcp_card_tools', envVar: 'AIMEAT_MCP_CARD_COMMERCE_TOOLS', type: 'string', validate: v => v === 'inline' || v === 'pointer', immutable: false, description: 'MCP Server Card commerce_tools mode: inline (embed priced app-tool catalog) or pointer (link /v1/commerce/tools)' },
 
   // ── Extensions (Phase 2.7, mutable) ──
   { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sandboxed extension system enabled' },

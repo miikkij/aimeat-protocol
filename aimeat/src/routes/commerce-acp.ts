@@ -10,11 +10,14 @@
  *   ready, discoverable at /.well-known/acp.json.
  * @structure
  *   - GET  /v1/commerce/feed                      public product feed (ACP-shaped entries)
+ *   - GET  /v1/commerce/tools                     priced app-tool catalog (MCP card pointer target)
  *   - GET  /.well-known/acp.json                  discovery document
  *   - POST /acp/v1/checkout_sessions              create ({ items: [{ id, quantity }] })
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.3.0 — 2026-07-14 — Feed app-tool scan extracted to the shared app-tool-catalog enumerator +
+ *     dedicated GET /v1/commerce/tools catalog endpoint (TARGET-034 phase D)
  *   v1.2.0 — 2026-07-14 — Feed lists unbound priced tools too (task path) + per-product
  *     `fulfillment: 'call' | 'task'` hint (TARGET-034 phase B)
  *   v1.1.0 — 2026-07-14 — app-tool products in the feed (sku "app-tool:<owner>/<appId>:<tool>")
@@ -27,7 +30,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
-import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
+import { listPricedAppTools } from '../commerce/app-tool-catalog.js';
 import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -153,37 +156,42 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     // priced tools as products (sku "app-tool:<owner>/<appId>:<tool>"). `fulfillment` tells the
     // buyer what completion does: 'call' = the backing capability runs synchronously and the
     // result rides on the session; 'task' = an agent TASK is queued for the app owner (phase B).
+    // One shared scanner (app-tool-catalog.ts) feeds this, /v1/commerce/tools, and the MCP card.
     if (products.length < FEED_CAP) {
-      const toolRecs = await storage.listAllMemory({ prefix: 'apps.', limit: 2000 });
-      for (const rec of toolRecs.items) {
-        // appIds are published filenames and nearly always carry dots ("aimeat-pages.html") —
-        // match greedily between the fixed "apps." prefix and ".tools" suffix.
-        const keyMatch = /^apps\.(.+)\.tools$/.exec(rec.key);
-        if (!keyMatch || rec.visibility !== 'public') continue;
-        const parsed = AppToolsDocSchema.safeParse(rec.value);
-        if (!parsed.success) continue;
-        const appId = keyMatch[1] as string;
-        const ownerName = rec.ownerGaii.split('@')[0] as string;
-        for (const tool of parsed.data.tools) {
-          const morsels = tool.price?.morsels ?? 0;
-          if (morsels <= 0 && !tool.priceMoney) continue;
-          products.push({
-            id: `app-tool:${ownerName}/${appId}:${tool.name}`,
-            title: `${appId} · ${tool.name}`,
-            description: tool.description ?? '',
-            price: morsels > 0
-              ? { amount: morsels, currency: 'MORSEL', unit: 'per-call' }
-              : { amount: tool.priceMoney!.amount, currency: tool.priceMoney!.currency, unit: 'per-call', scale: 6 },
-            availability: 'in_stock',
-            fulfillment: tool.action_id ? 'call' : 'task',
-            seller: { app: `${ownerName}/${appId}` },
-          });
-          if (products.length >= FEED_CAP) break;
-        }
-        if (products.length >= FEED_CAP) break;
+      for (const t of await listPricedAppTools(storage, config, FEED_CAP - products.length)) {
+        const appId = t.app.split('/').slice(1).join('/');
+        products.push({
+          id: t.sku,
+          title: `${appId} · ${t.name}`,
+          description: t.description,
+          price: t.price
+            ? { amount: t.price.morsels, currency: 'MORSEL', unit: t.price.unit }
+            : { amount: t.priceMoney!.amount, currency: t.priceMoney!.currency, unit: 'per-call', scale: 6 },
+          availability: 'in_stock',
+          fulfillment: t.fulfillment,
+          seller: { app: t.app },
+        });
       }
     }
     res.json({ version: 'draft', updated_at: new Date().toISOString(), products, total: products.length });
+  });
+
+  // The dedicated priced-app-tool catalog (TARGET-034 phase D): the MCP Server Card's
+  // commerce_tools target — full normalized entries (sku, schema, price, WebMCP invoke,
+  // ready-made checkout item) from the same shared scanner the feed uses. Public.
+  router.get('/v1/commerce/tools', async (_req, res) => {
+    if (!config.commerceEnabled) {
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Commerce is disabled on this node')); return;
+    }
+    const tools = await listPricedAppTools(storage, config, FEED_CAP);
+    res.json({
+      version: 'draft',
+      updated_at: new Date().toISOString(),
+      note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); a callable tool returns its result on session.fulfillment.results, a task tool queues the order. Unpaid HTTP invokes answer 402 with x402 accepts.',
+      checkout: { create: { method: 'POST', url: `${config.baseUrl}/v1/commerce/checkout-sessions` } },
+      tools,
+      total: tools.length,
+    });
   });
 
   // ── Checkout (authenticated — morsel settlement needs an AIMEAT principal) ──

@@ -21,6 +21,8 @@
  *   v1.2.0 -- 2026-07-10 -- Security posture: resolve securityProfile (local|public) + the
  *     allowPrivateEgress / aiProviderAllowlist knobs from env, normalise AIMEAT_ALLOW_PRIVATE_EGRESS
  *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
+ *   v1.3.0 -- 2026-07-14 -- mcpCardCommerceTools: AIMEAT_MCP_CARD_COMMERCE_TOOLS inline|pointer
+ *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
@@ -352,6 +354,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
         ? parseInt(process.env.AIMEAT_COMMERCE_FEE_PERCENT, 10) : null,
     commerceEnabled: process.env.AIMEAT_COMMERCE_ENABLED !== 'false',
     commerceSessionTtlMinutes: parseInt(process.env.AIMEAT_COMMERCE_SESSION_TTL_MINUTES ?? '60', 10),
+    // MCP Server Card commerce_tools block: 'inline' embeds the priced app-tool catalog in
+    // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
+    // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
+    mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,

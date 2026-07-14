@@ -10338,8 +10338,10 @@ paths:
       summary: MCP Server Card (SEP-1649)
       description: >-
         Machine-readable card describing the node's MCP server for agent discovery —
-        serverInfo, streamable-http transport at /v1/mcp, that OAuth is required, and the
-        WebMCP bridge block (in-page tool library + per-app tool-listing URL template).
+        serverInfo, streamable-http transport at /v1/mcp, that OAuth is required, the
+        WebMCP bridge block (in-page tool library + per-app tool-listing URL template),
+        and the commerce_tools block: the priced app-tool catalog, embedded inline
+        (default) or as a pointer to /v1/commerce/tools per AIMEAT_MCP_CARD_COMMERCE_TOOLS.
       tags: [Catalogue]
       responses:
         '200':
@@ -10545,6 +10547,27 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /v1/commerce/tools:
+    get:
+      operationId: commerceToolsCatalog
+      summary: Priced app-tool catalog (public)
+      description: >-
+        Every priced app-tool from every PUBLIC apps.{appId}.tools manifest, as normalized
+        entries — sku "app-tool:<owner>/<appId>:<tool>", inputSchema, fulfillment 'call'|'task',
+        morsel/micro-unit money price, the WebMCP listing/invoke URLs, and a ready-made
+        checkout_item. The MCP Server Card's commerce_tools block embeds (inline mode, default)
+        or links (pointer mode) this catalog (TARGET-034 phase D).
+      tags: [Commerce]
+      responses:
+        '200':
+          description: Priced app-tool catalog
+          content:
+            application/json:
+              schema:
+                type: object
+        '503':
+          description: Commerce disabled on this node
 
   /v1/apps/{owner}/{filename}/webmcp:
     get:
