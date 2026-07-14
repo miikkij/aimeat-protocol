@@ -27,6 +27,8 @@
  *     before express.static. The raw static file has no per-script nonce, so the strict
  *     nonce-based CSP blocked all its inline scripts and a direct hit on /spa.html booted to a
  *     blank page; now it behaves like the /, /v1/portal, /v1/admin SPA routes.
+ *   v1.7.0 -- 2026-07-14 -- Serve /robots.txt with the Content Signals Policy directive
+ *     (contentsignals.org), operator-overridable via AIMEAT_CONTENT_SIGNAL ('off' removes it).
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -136,6 +138,27 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     if (existsSync(spaFile)) {
       app.get('/spa.html', (_req, res) => {
         serveSpa(res, spaFile, config.appOriginEnabled && !!config.appHost);
+      });
+    }
+
+    // Serve /robots.txt with the operator's Content Signals Policy directive
+    // (contentsignals.org) BEFORE express.static. The static file carries the safe public
+    // default ("search=yes, ai-input=yes, ai-train=no" — matches the per-bot rules: search
+    // bots allowed, training crawlers disallowed); AIMEAT_CONTENT_SIGNAL overrides the
+    // directive line for operators on a different policy, and 'off' removes it. The file is
+    // read once per boot (it only changes with a deploy).
+    const robotsFile = join(publicDir, 'robots.txt');
+    if (existsSync(robotsFile)) {
+      let robotsTxt = readFileSync(robotsFile, 'utf-8');
+      const signal = config.contentSignal;
+      if (signal.toLowerCase() === 'off') {
+        robotsTxt = robotsTxt.replace(/^Content-Signal:.*\r?\n/m, '');
+      } else if (signal && signal !== 'search=yes, ai-input=yes, ai-train=no') {
+        robotsTxt = robotsTxt.replace(/^Content-Signal:.*$/m, `Content-Signal: ${signal}`);
+      }
+      app.get('/robots.txt', (_req, res) => {
+        res.set('Cache-Control', 'no-cache');
+        res.type('text/plain; charset=utf-8').send(robotsTxt);
       });
     }
 

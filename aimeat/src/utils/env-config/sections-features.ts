@@ -21,6 +21,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           value: config.indexNowKey ?? '(not set)',
           defaultVal: '(none)',
         },
+        {
+          envVar: 'AIMEAT_CONTENT_SIGNAL',
+          description: 'robots.txt Content Signals Policy directive (contentsignals.org); "off" removes it',
+          value: config.contentSignal,
+          defaultVal: 'search=yes, ai-input=yes, ai-train=no',
+        },
       ],
     },
     {
