@@ -7096,6 +7096,16 @@ paths:
           schema:
             type: string
           description: Scope the search to keys beginning with this prefix (e.g. a namespace/group like "organism.{id}.")
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            minimum: 1
+            maximum: 500
+          description: >-
+            Max ranked results to return (alias of per_page; default 200, hard max 500). Search runs as a
+            single indexed full-text query across the owner's GHII + agents + ecosystem apps.
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:

@@ -31,6 +31,22 @@ export interface MemoryVersionRecord {
   recordedAt: string;
 }
 
+/** Lightweight memory row WITHOUT the (potentially large) `value` — key + metadata + the stored
+ *  per-row `byteSize`. Backs the profile Memory tab's `?include=meta` listing so opening a keyspace of
+ *  thousands of keys never loads or serialises a single value: the DB projects these columns only. */
+export interface MemoryMetaRow {
+  key: string;
+  ownerGaii: string;
+  visibility: MemoryRecord['visibility'];
+  tags: string[];
+  version: number;
+  flagCount: number;
+  /** Byte size of the value (the stored per-row byteSize; 0 for legacy rows not yet rewritten). */
+  byteSize: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A single ranked full-text hit from {@link MemoryRepository.searchText}. */
 export interface MemoryTextHit {
   record: MemoryRecord;
@@ -62,6 +78,14 @@ export interface MemoryRepository {
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
   /**
+   * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the
+   * `value` NEVER loaded or transferred (the DB projects only the metadata columns). Backs
+   * `GET /v1/memory?include=meta`: the profile Memory tab lists thousands of keys + their sizes without
+   * paying to deserialise + re-serialise every value (the old meta path loaded all values just to omit
+   * them from the response and sum bytes in JS). Same filters as {@link listMemory}.
+   */
+  listMemoryMeta(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]>;
+  /**
    * Count DISTINCT memory keys across the given owner identities (GHII + agents + GEAIs) — cheap
    * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
    * (e.g. "N Muistit") that need only the number, not the records.
@@ -74,6 +98,12 @@ export interface MemoryRepository {
    * that load-all was O(N) per write / O(N²) per bulk import.
    */
   sumMemoryBytes(ownerGaii: string): Promise<number>;
+  /**
+   * Sum the byte size of memory VALUES across MANY owner identities (GHII + agents + GEAIs) in ONE
+   * DB-side aggregate — the owner-scope total-usage figure (profile Home). Replaces calling
+   * {@link sumMemoryBytes} once per identity (an owner with ~100 agents = ~100 serial round-trips).
+   */
+  sumMemoryBytesForOwners(ownerGaiis: string[]): Promise<number>;
   deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;

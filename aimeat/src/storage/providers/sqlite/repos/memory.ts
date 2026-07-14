@@ -149,6 +149,15 @@ export function sumMemoryBytes(db: Database.Database, ownerGaii: string): number
   return row.s;
 }
 
+/** Sum value bytes across MANY owner identities in one SQL SUM — the owner-scope total-usage figure
+ *  (replaces one sumMemoryBytes call per identity). */
+export function sumMemoryBytesForOwners(db: Database.Database, ownerGaiis: string[]): number {
+  if (ownerGaiis.length === 0) return 0;
+  const placeholders = ownerGaiis.map(() => '?').join(',');
+  const row = db.prepare(`SELECT COALESCE(SUM(byteSize), 0) AS s FROM memory WHERE ownerGaii IN (${placeholders})`).get(...ownerGaiis) as { s: number };
+  return row.s;
+}
+
 /** Archived prior versions of a trackable key, newest version first. Empty for non-trackable keys. */
 export function listMemoryHistory(db: Database.Database, ownerGaii: string, key: string, opts?: { limit?: number }): MemoryVersionRecord[] {
   const limit = opts?.limit ?? 200;

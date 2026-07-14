@@ -3,6 +3,10 @@
  * @description Owner, agent, and memory storage methods. Extracted from mongodb/index.ts (PrismaStorage) to satisfy max-file-lines; method bodies verbatim, bound to PrismaStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/mongodb/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-14 — Perf: countMemory single-identity uses a server-side count() instead of a
+ *     distinct-key findMany (the memory-write hot path was fetching every key per write → O(N²) import).
+ *   v1.2.0 — 2026-07-14 — Perf: add listMemoryMeta (select metadata + byteSize, never the value column)
+ *     backing ?include=meta.
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord
@@ -526,14 +530,49 @@ export const ownerMethods = {
             });
     },
 
+    async listMemoryMeta(this: PrismaStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: import('../../../interface.js').ArchiveFilter }): Promise<import('../../../repositories/memory.repository.js').MemoryMetaRow[]> {
+        this.ensureReady();
+        const where: Record<string, unknown> = { ownerGaii, ...this.archivedWhere(opts?.archived) };
+        if (opts?.prefix) where.key = { startsWith: opts.prefix };
+        if (opts?.visibility) where.visibility = opts.visibility;
+        if (opts?.tags?.length) where.tags = { hasSome: opts.tags };
+        // META projection: `select` the metadata + byteSize columns only — the (potentially large)
+        // `value` is NEVER read from the DB. ttlHours + createdAt come along only for lazy TTL pruning.
+        const rows = await this.prisma.memory.findMany({
+            where,
+            select: { key: true, ownerGaii: true, visibility: true, tags: true, version: true, flagCount: true, byteSize: true, ttlHours: true, createdAt: true, updatedAt: true },
+        });
+        return rows
+            .filter((r: PrismaRow) => !r.ttlHours || Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000)
+            .filter((r: PrismaRow) => opts?.maxFlags === undefined || (r.flagCount ?? 0) <= opts.maxFlags)
+            .map((r: PrismaRow) => ({
+                key: r.key,
+                ownerGaii: r.ownerGaii,
+                visibility: r.visibility,
+                tags: Array.isArray(r.tags) ? r.tags : [],
+                version: r.version,
+                flagCount: r.flagCount ?? 0,
+                byteSize: r.byteSize ?? 0,
+                createdAt: new Date(r.createdAt).toISOString(),
+                updatedAt: new Date(r.updatedAt).toISOString(),
+            }));
+    },
+
     async countMemory(this: PrismaStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: import('../../../interface.js').ArchiveFilter }): Promise<number> {
         this.ensureReady();
         if (ownerGaiis.length === 0) return 0;
-        const where: Record<string, unknown> = { ownerGaii: { in: ownerGaiis }, ...this.archivedWhere(opts?.archived) };
+        const single = ownerGaiis.length === 1;
+        const where: Record<string, unknown> = { ownerGaii: single ? ownerGaiis[0] : { in: ownerGaiis }, ...this.archivedWhere(opts?.archived) };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
         if (opts?.visibility) where.visibility = opts.visibility;
-        // DISTINCT keys (mirrors listOwnerScopeMemory's cross-identity key-dedup); loads only the
-        // key column, not values — far cheaper than materializing every record for a count.
+        // Single identity — the memory-write HOT PATH (new-key quota check on every write). Because
+        // (ownerGaii,key) is unique, a row count IS the distinct-key count, so a server-side count()
+        // returns the number with NO rows transferred. The old distinct-findMany fetched every one of
+        // the owner's keys on each write (O(N) per write → O(N²) for a bulk import into an owner who
+        // already holds N keys — the residual the byteSize fix left behind).
+        if (single) return this.prisma.memory.count({ where });
+        // Multi-identity (owner-scope count, a cached cold path) still needs DISTINCT to dedup keys that
+        // exist under both the owner's GHII and an agent; loads only the key column, not values.
         const rows = await this.prisma.memory.findMany({ where, distinct: ['key'], select: { key: true } });
         return rows.length;
     },
@@ -543,6 +582,15 @@ export const ownerMethods = {
         // DB-side SUM of the cached per-row byteSize — no records/values transferred. Replaces the old
         // load-all + re-serialise that ran on every write (O(N) per write / O(N²) per bulk import).
         const agg = await this.prisma.memory.aggregate({ where: { ownerGaii }, _sum: { byteSize: true } });
+        return agg._sum.byteSize ?? 0;
+    },
+
+    async sumMemoryBytesForOwners(this: PrismaStorage, ownerGaiis: string[]): Promise<number> {
+        this.ensureReady();
+        if (ownerGaiis.length === 0) return 0;
+        // ONE aggregate over all identities (owner-scope total). Legacy rows read byteSize 0 until the
+        // startup backfill (or their next write) sets the exact size — same self-heal as sumMemoryBytes.
+        const agg = await this.prisma.memory.aggregate({ where: { ownerGaii: { in: ownerGaiis } }, _sum: { byteSize: true } });
         return agg._sum.byteSize ?? 0;
     },
 

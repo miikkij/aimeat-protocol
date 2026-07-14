@@ -51,6 +51,9 @@
  *                          ≤800 lines; bodies byte-identical, `prisma`/`chunkedUploads`/
  *                          `ensureReady` widened to public for the groups, `PrismaRow`
  *                          exported, the 3 pattern helpers moved to ./methods/helpers.ts.
+ *   v1.11.0 — 2026-07-14 — Background byteSize backfill on startup (backendKind() branch): sets the
+ *                          exact per-row byteSize on legacy Memory rows so the total-size quota +
+ *                          ?include=meta listing read correct sizes without loading values.
  * @structure PrismaStorage keeps fields, constructor, schema hooks, and lifecycle
  *   (init/syncSchema/findPrismaSchema/backfillArchiveFlag/ensureReady); every domain
  *   method group lives in ./methods/<group>.ts as an exported object literal (method
@@ -110,6 +113,10 @@ export class PrismaStorage {
      */
     protected prismaClientSpecifier(): string { return '@prisma/client'; }
 
+    /** Which Prisma backend this instance is — lets backend-specific migrations (raw Mongo commands vs
+     *  SQL) branch. PostgresStorage overrides. */
+    protected backendKind(): 'mongodb' | 'postgresql' { return 'mongodb'; }
+
     private async init(databaseUrl: string) {
         this.syncSchema(databaseUrl);
 
@@ -128,6 +135,54 @@ export class PrismaStorage {
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
         await this.backfillArchiveFlag();
+        // byteSize backfill runs in the BACKGROUND — it may touch every legacy row, so it must not
+        // delay readiness. Rows self-heal within moments of startup; the quota + meta listing read the
+        // exact size once a row is backfilled (or on its next write). Best-effort.
+        void this.backfillMemoryByteSize().catch(err =>
+            logger.warn(`byteSize backfill failed: ${(err as { message?: string })?.message ?? err}`));
+    }
+
+    /**
+     * Backfill the per-row `byteSize` onto memory rows written BEFORE that column existed (they read as
+     * 0). Both the total-size quota (sumMemoryBytes) and the `?include=meta` listing sum this column
+     * DB-side WITHOUT loading values, so a 0 there under-counts usage and shows 0 bytes in the profile
+     * Memory tab. We set the EXACT `Buffer.byteLength(JSON.stringify(value))` — identical to what every
+     * new write stores and to the SQLite startup backfill — so legacy and fresh rows agree.
+     *
+     * MongoDB legacy docs LACK the field entirely; `@default(0)` applies only on READ, so a
+     * `where: { byteSize: 0 }` query would not match them — we first make the field explicit 0 with a
+     * raw `$set` (mirrors backfillArchiveFlag). Postgres got 0 from the add-column default already.
+     * No stored value serialises to 0 bytes, so byteSize === 0 reliably means "not yet computed."
+     * Runs in the background; idempotent (a completed backfill finds nothing to do).
+     */
+    private async backfillMemoryByteSize(): Promise<void> {
+        if (!this.prisma) return;
+        if (this.backendKind() === 'mongodb') {
+            try {
+                await this.prisma.$runCommandRaw({
+                    update: 'Memory',
+                    updates: [{ q: { byteSize: { $exists: false } }, u: { $set: { byteSize: 0 } }, multi: true }],
+                });
+            } catch (err) {
+                logger.warn(`byteSize backfill (field init) skipped: ${(err as { message?: string })?.message ?? err}`);
+                return;
+            }
+        }
+        const BATCH = 500;
+        let total = 0;
+        for (;;) {
+            const rows: Array<{ ownerGaii: string; key: string; value: unknown }> =
+                await this.prisma.memory.findMany({ where: { byteSize: 0 }, select: { ownerGaii: true, key: true, value: true }, take: BATCH });
+            if (!rows.length) break;
+            for (const r of rows) {
+                const bs = Buffer.byteLength(JSON.stringify(r.value ?? null), 'utf8') || 1; // never re-select a computed row
+                await this.prisma.memory.update({ where: { ownerGaii_key: { ownerGaii: r.ownerGaii, key: r.key } }, data: { byteSize: bs } });
+            }
+            total += rows.length;
+            if (rows.length < BATCH) break;
+            await new Promise(resolve => setTimeout(resolve, 50)); // gentle on the pool during a large backfill
+        }
+        if (total > 0) logger.info(`byteSize backfill: set exact byteSize on ${total} legacy Memory row(s)`);
     }
 
     /**
