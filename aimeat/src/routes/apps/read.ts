@@ -4,6 +4,9 @@
  *   and the app download (GET /v1/apps/:owner/:filename incl. draft preview + H-2 app-origin redirect +
  *   copy-protection). Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-14 — Agent Face: the download route negotiates text/markdown (Accept or
+ *     ?format=md) — serves the public apps.{filename}.agentface record (else converted HTML)
+ *     with the agent-affordances footer, after the hidden/access-code/paid gates.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -17,6 +20,8 @@ import { decodeStrictBase64 } from '../../utils/base64.js';
 import { injectAimeatBadge } from '../../utils/app-badge.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
+import { prefersMarkdown } from '../../services/markdown-negotiation.js';
+import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 
 export function registerReadRoutes(
@@ -368,6 +373,15 @@ export function registerReadRoutes(
                     return;
                 }
             }
+        }
+
+        // Agent Face: a request that prefers text/markdown (Accept negotiation, or an explicit
+        // ?format=md) gets the app's markdown read-surface — the public apps.{filename}.agentface
+        // record when declared, else the app HTML converted — with the node-generated affordances
+        // footer. Runs AFTER the hidden/access-code/paid gates so a restricted app stays exactly
+        // as restricted in markdown as in HTML. Browsers (Accept: text/html) are unaffected.
+        if (req.query.format === 'md' || (req.query.format === undefined && prefersMarkdown(req))) {
+            if (await serveAppAgentFace(res, config, storage, app)) return;
         }
 
         const mode = req.query.mode as string | undefined;

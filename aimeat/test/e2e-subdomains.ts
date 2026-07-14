@@ -1,5 +1,17 @@
-// E2E tests for subdomain routing (operator-only management + serving)
-// Run: cd aimeat && pnpm exec tsx test/e2e-subdomains.ts
+/**
+ * @file e2e-subdomains.ts
+ * @description E2E tests for subdomain routing: operator-only management CRUD
+ *   (/v1/admin/subdomains — auth guards, validation, reserved names, duplicates,
+ *   enable/disable, redirect targets) and root serving via the X-Subdomain header
+ *   (app HTML, markdown Agent Face negotiation, apex passthrough, uniform 404s).
+ * @usage
+ *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
+ *     test/run-e2e-ci.ts --test=subdomains
+ * @version-history
+ *   v1.1.0 — 2026-07-14 — Agent Face: subdomain root with Accept: text/markdown serves the
+ *     converted app markdown + the agent-affordances footer (file header added, campsite rule)
+ *   v1.0.0 — 2026-06-12 — Initial: management CRUD + serving
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -240,6 +252,16 @@ await test('Subdomain root serves the app HTML', async () => {
     assert(status === 200, `status ${status}`);
     assert((headers.get('content-type') ?? '').includes('text/html'), `content-type ${headers.get('content-type')}`);
     assert(typeof body._raw === 'string' && body._raw.includes('subdomain-e2e-marker'), 'app HTML served');
+});
+
+await test('Subdomain root negotiates text/markdown (Agent Face fallback + affordances footer)', async () => {
+    const { status, body, headers } = await json('/', { headers: { 'X-Subdomain': SUB, 'Accept': 'text/markdown' } });
+    assert(status === 200, `status ${status}`);
+    assert((headers.get('content-type') ?? '').startsWith('text/markdown'), `content-type ${headers.get('content-type')}`);
+    assert((headers.get('vary') ?? '').toLowerCase().includes('accept'), `Vary includes Accept, got ${headers.get('vary')}`);
+    assert(typeof body._raw === 'string' && body._raw.includes('subdomain-e2e-marker'), 'converted markdown carries the app content');
+    assert(body._raw.includes('## Agent affordances'), 'affordances footer present');
+    assert(body._raw.includes('/auth.md'), 'footer links agent registration');
 });
 
 await test('X-Subdomain header is case-insensitive', async () => {

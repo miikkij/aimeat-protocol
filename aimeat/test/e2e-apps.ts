@@ -31,6 +31,10 @@
  *   v1.7.0 — 2026-06-26 — add Phase 9b rename in place: PATCH { name, description } edits the latest
  *     version's manifest without re-publishing (no new version), the download URL is unchanged, the
  *     listing reflects the new name; empty/over-long values 400; cross-owner rename 404s.
+ *   v1.8.0 — 2026-07-14 — add Phase 11 Agent Face: Accept: text/markdown (and ?format=md) on the
+ *     app URL serves converted HTML + the agent-affordances footer; a PUBLIC
+ *     apps.{filename}.agentface record replaces the converted body; a non-public face behaves
+ *     exactly like no face; Accept: text/html stays byte-exact; markdown headers asserted.
  */
 
 import * as ed from '@noble/ed25519';
@@ -593,6 +597,81 @@ await test('Raw download (no mode) stays byte-exact — no badge', async () => {
     assert(res.status === 200, `status ${res.status}`);
     const text = await res.text();
     assert(!text.includes('aimeat-app-badge'), 'attachment download is unmodified (no badge)');
+});
+
+// ── Phase 11: Agent Face (markdown read-surface for agents) ──
+// A request that prefers text/markdown on the app URL serves the app's agent face: the PUBLIC
+// apps.{filename}.agentface memory record when declared, else the app HTML converted to markdown.
+// Both variants carry the node-generated "## Agent affordances" footer. A non-public face must be
+// indistinguishable from no face (anonymous reads — no existence disclosure). Browsers keep HTML.
+console.log('\nPhase 11: Agent Face (markdown read-surface)');
+
+const FACE_KEY = `apps.${FILENAME}.agentface`;
+const FACE_MD = '# Versions Demo — agent view\n\nCurrent state lives in public records.\n';
+const mdHeaders = { Accept: 'text/markdown' };
+
+await test('No face declared: Accept: text/markdown serves converted HTML + affordances footer', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    // Latest content is the restored v1 shell: <h1>version one</h1> → "# version one"
+    assert(text.includes('# version one'), `converted body carries the app heading, got: ${text.slice(0, 120)}`);
+    assert(text.includes('## Agent affordances'), 'affordances footer present');
+    assert(text.includes(`/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(FILENAME)}/webmcp`), 'footer links the WebMCP tool listing');
+    assert(text.includes(`/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(FILENAME)}/skills`), 'footer links the bound skills');
+    assert(text.includes('/auth.md'), 'footer links agent registration (/auth.md)');
+});
+
+await test('Markdown response headers: content-type, Vary: Accept, x-markdown-tokens', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').startsWith('text/markdown'), `content-type text/markdown, got ${res.headers.get('content-type')}`);
+    assert((res.headers.get('vary') ?? '').toLowerCase().includes('accept'), `Vary includes Accept, got ${res.headers.get('vary')}`);
+    const tokens = parseInt(res.headers.get('x-markdown-tokens') ?? '', 10);
+    assert(Number.isFinite(tokens) && tokens > 0, `x-markdown-tokens is a positive count, got ${res.headers.get('x-markdown-tokens')}`);
+});
+
+await test('?format=md serves the markdown variant without an Accept header', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?format=md`);
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').startsWith('text/markdown'), 'served as markdown');
+    assert((await res.text()).includes('## Agent affordances'), 'affordances footer present');
+});
+
+await test('A PUBLIC agentface record replaces the converted body (footer still appended)', async () => {
+    const write = await json('/v1/memory', authed({
+        method: 'POST',
+        body: JSON.stringify({ key: FACE_KEY, value: FACE_MD, visibility: 'public' }),
+    }));
+    assert(write.status === 200 || write.status === 201, `face write status ${write.status}: ${JSON.stringify(write.body)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('# Versions Demo — agent view'), 'serves the declared face markdown');
+    assert(!text.includes('# version one'), 'converted HTML body no longer served');
+    assert(text.includes('## Agent affordances'), 'affordances footer appended to the declared face too');
+});
+
+await test("A non-public face ('owner' visibility) behaves exactly like no face", async () => {
+    const write = await json('/v1/memory', authed({
+        method: 'POST',
+        body: JSON.stringify({ key: FACE_KEY, value: FACE_MD, visibility: 'owner' }),
+    }));
+    assert(write.status === 200 || write.status === 201, `face rewrite status ${write.status}: ${JSON.stringify(write.body)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(!text.includes('# Versions Demo — agent view'), 'non-public face content is NOT served');
+    assert(text.includes('# version one'), 'falls back to converted HTML (indistinguishable from no face)');
+    assert(text.includes('## Agent affordances'), 'affordances footer present on the fallback');
+});
+
+await test('Accept: text/html keeps exactly today\'s behavior (byte-exact HTML, no markdown headers)', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: { Accept: 'text/html' } });
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('html'), `content-type html, got ${res.headers.get('content-type')}`);
+    assert(res.headers.get('x-markdown-tokens') === null, 'no x-markdown-tokens on the HTML response');
+    assert((await res.text()) === HTML_V1, 'HTML body byte-exact (raw download unchanged)');
 });
 
 // ── Summary ──
