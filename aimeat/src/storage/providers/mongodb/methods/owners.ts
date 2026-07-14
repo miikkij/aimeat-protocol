@@ -401,6 +401,7 @@ export const ownerMethods = {
         }
         // `as any` on the data objects: workspaceRef is new in the Prisma schema; the generated client
         // gets it on the next `prisma generate` (deploy). Matches the storage-file writes above.
+        const byteSize = Buffer.byteLength(JSON.stringify(record.value ?? null), 'utf8');   // cached for the O(1) total-size quota sum
         const memCreate: Record<string, unknown> = {
             key: record.key,
             ownerGaii: record.ownerGaii,
@@ -414,6 +415,7 @@ export const ownerMethods = {
             flagCount: record.flagCount ?? 0,
             allowedOrigins: record.allowedOrigins ?? [],
             trackable,
+            byteSize,
             searchBlob: this.buildSearchBlob(record),
             createdAt: new Date(record.createdAt),
             updatedAt: new Date(record.updatedAt),
@@ -429,6 +431,7 @@ export const ownerMethods = {
             flagCount: record.flagCount ?? 0,
             allowedOrigins: record.allowedOrigins ?? [],
             trackable,
+            byteSize,
             searchBlob: this.buildSearchBlob(record),
             updatedAt: new Date(record.updatedAt),
         };
@@ -533,6 +536,14 @@ export const ownerMethods = {
         // key column, not values — far cheaper than materializing every record for a count.
         const rows = await this.prisma.memory.findMany({ where, distinct: ['key'], select: { key: true } });
         return rows.length;
+    },
+
+    async sumMemoryBytes(this: PrismaStorage, ownerGaii: string): Promise<number> {
+        this.ensureReady();
+        // DB-side SUM of the cached per-row byteSize — no records/values transferred. Replaces the old
+        // load-all + re-serialise that ran on every write (O(N) per write / O(N²) per bulk import).
+        const agg = await this.prisma.memory.aggregate({ where: { ownerGaii }, _sum: { byteSize: true } });
+        return agg._sum.byteSize ?? 0;
     },
 
     async listAllMemory(this: PrismaStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: import('../../../interface.js').ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {

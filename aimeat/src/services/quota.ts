@@ -18,14 +18,11 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 
 // ── Size calculators ──
 
-/** Calculate total memory size for an agent (all keys, JSON-serialised values). */
+/** Total memory size for an agent — summed DB-side (no values loaded). Previously this loaded EVERY
+ *  record and re-serialised each value on EVERY write (O(N) per write → O(N² for a bulk import); with
+ *  ~12k memories that was ~1s per write). Now a stored per-row byteSize is summed in the database. */
 export async function getMemoryTotalBytes(storage: Storage, gaii: string): Promise<number> {
-    const records = await storage.listMemory(gaii);
-    let total = 0;
-    for (const r of records) {
-        total += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
-    }
-    return total;
+    return storage.sumMemoryBytes(gaii);
 }
 
 /** Calculate total storage file size for an agent (sum of file.size). */
@@ -72,8 +69,8 @@ export async function enforceExtensionMemoryLimits(
     // Only count keys when adding a new one (updates to an existing key don't grow the count).
     const existing = await storage.getMemory(ownerGaii, key);
     if (!existing) {
-        const allKeys = await storage.listMemory(ownerGaii);
-        if (allKeys.length >= config.memoryMaxKeysPerAgent) {
+        const keyCount = await storage.countMemory([ownerGaii]);   // cheap DB count, not a value load-all
+        if (keyCount >= config.memoryMaxKeysPerAgent) {
             throw new Error(`QUOTA_EXCEEDED: memory key limit reached (${config.memoryMaxKeysPerAgent}). Delete unused keys first.`);
         }
     }

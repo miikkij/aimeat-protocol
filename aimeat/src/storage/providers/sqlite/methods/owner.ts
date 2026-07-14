@@ -9,7 +9,7 @@ import type {
 } from '../../../interface.js';
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import type { SqliteStorage } from '../index.js';
-import { searchTextMemory, countMemory as countMemoryRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
+import { searchTextMemory, countMemory as countMemoryRepo, sumMemoryBytes as sumMemoryBytesRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
 export const ownerMethods = {
   // ══════════════════════════════════════════════════════════
@@ -560,6 +560,10 @@ export const ownerMethods = {
 
   async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
     return countMemoryRepo(this.db, ownerGaiis, opts);
+  },
+
+  async sumMemoryBytes(this: SqliteStorage, ownerGaii: string): Promise<number> {
+    return sumMemoryBytesRepo(this.db, ownerGaii);
   },
 
   async listAllMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {

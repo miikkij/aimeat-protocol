@@ -144,8 +144,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     if (!existing) {
-      const allKeys = await storage.listMemory(gaii);
-      if (allKeys.length >= MAX_KEYS_PER_AGENT) {
+      // Cheap DB COUNT(DISTINCT key) — NOT listMemory (which loaded every record + value just to
+      // count them; that full scan on each new key was a big part of the per-write latency).
+      const keyCount = await storage.countMemory([gaii]);
+      if (keyCount >= MAX_KEYS_PER_AGENT) {
         res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Memory key limit reached (${MAX_KEYS_PER_AGENT}). Delete unused keys first.`));
         return;
       }
