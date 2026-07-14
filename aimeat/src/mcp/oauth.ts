@@ -10,6 +10,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-07-14 — agent_auth carries its own `skill` field (isitagentready expects it
+ *     inside the block, not only at the metadata top level)
  *   v1.1.0 — 2026-07-14 — RFC 8414 metadata extended with the auth.md convention: `skill`
  *     pointer to /auth.md + `agent_auth` block (device-flow URIs, identity types GHII/GAII/GEAI,
  *     credential types, approval + default scopes) (agent readiness)
@@ -501,6 +503,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             scopes_supported: ['aimeat:full'],
             skill: `${baseUrl}/auth.md`,
             agent_auth: {
+                skill: `${baseUrl}/auth.md`,
                 documentation: `${baseUrl}/auth.md`,
                 register_uri: `${baseUrl}/v1/agents/device-authorize`,
                 claim_uri: `${baseUrl}/v1/agents/device-token`,
