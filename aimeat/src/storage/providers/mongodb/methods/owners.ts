@@ -530,34 +530,6 @@ export const ownerMethods = {
             });
     },
 
-    async listMemoryMeta(this: PrismaStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: import('../../../interface.js').ArchiveFilter }): Promise<import('../../../repositories/memory.repository.js').MemoryMetaRow[]> {
-        this.ensureReady();
-        const where: Record<string, unknown> = { ownerGaii, ...this.archivedWhere(opts?.archived) };
-        if (opts?.prefix) where.key = { startsWith: opts.prefix };
-        if (opts?.visibility) where.visibility = opts.visibility;
-        if (opts?.tags?.length) where.tags = { hasSome: opts.tags };
-        // META projection: `select` the metadata + byteSize columns only — the (potentially large)
-        // `value` is NEVER read from the DB. ttlHours + createdAt come along only for lazy TTL pruning.
-        const rows = await this.prisma.memory.findMany({
-            where,
-            select: { key: true, ownerGaii: true, visibility: true, tags: true, version: true, flagCount: true, byteSize: true, ttlHours: true, createdAt: true, updatedAt: true },
-        });
-        return rows
-            .filter((r: PrismaRow) => !r.ttlHours || Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000)
-            .filter((r: PrismaRow) => opts?.maxFlags === undefined || (r.flagCount ?? 0) <= opts.maxFlags)
-            .map((r: PrismaRow) => ({
-                key: r.key,
-                ownerGaii: r.ownerGaii,
-                visibility: r.visibility,
-                tags: Array.isArray(r.tags) ? r.tags : [],
-                version: r.version,
-                flagCount: r.flagCount ?? 0,
-                byteSize: r.byteSize ?? 0,
-                createdAt: new Date(r.createdAt).toISOString(),
-                updatedAt: new Date(r.updatedAt).toISOString(),
-            }));
-    },
-
     async countMemory(this: PrismaStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: import('../../../interface.js').ArchiveFilter }): Promise<number> {
         this.ensureReady();
         if (ownerGaiis.length === 0) return 0;
@@ -696,12 +668,68 @@ export const ownerMethods = {
         this.ensureReady();
         const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu);
         if (!tokens || tokens.length === 0) return [];
+        const limit = opts?.limit ?? 50;
 
+        // MongoDB: use the `searchBlob` $text INDEX instead of a per-token regex full-scan (the scan
+        // was ~650ms over one owner's ~12k rows; the index makes it ~tens of ms and stays sub-second on
+        // millions). $text needs a text index; if it is missing / still building the command throws, so
+        // we fall through to the portable contains scan below. Two steps: (1) $text find projecting only
+        // {ownerGaii,key}, ranked by textScore — uses the index; (2) fetch the full rows by their unique
+        // (ownerGaii,key) for a clean typed mapping (findMany, not raw-doc parsing).
+        if (this.backendKind() === 'mongodb') {
+            try {
+                const arch = opts?.archived;
+                const filter: Record<string, unknown> = {
+                    $text: { $search: query },
+                    ...(arch === 'include' ? {} : arch === 'only' ? { archived: true } : { archived: { $ne: true } }),
+                };
+                if (opts?.ownerGaiis?.length) filter.ownerGaii = { $in: opts.ownerGaiis };
+                if (opts?.visibility) filter.visibility = opts.visibility;
+                if (opts?.keyPrefix) filter.key = { $regex: '^' + opts.keyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') };
+                const raw = await this.prisma.$runCommandRaw({
+                    find: 'Memory',
+                    filter,
+                    projection: { ownerGaii: 1, key: 1 },
+                    sort: { score: { $meta: 'textScore' } },
+                    limit: limit * 4,
+                }) as { cursor?: { firstBatch?: Array<{ ownerGaii: string; key: string }> } };
+                const hits = raw?.cursor?.firstBatch ?? [];
+                // $text matches whole words (+ stemming), NOT substrings/prefixes. When it finds
+                // nothing we fall through to the substring scan below, so a partial-term query
+                // ("qwopdoc" → "qwopdocterm", or typing a prefix) still resolves — just not indexed.
+                if (hits.length) {
+                const records = await this.prisma.memory.findMany({ where: { OR: hits.map(h => ({ ownerGaii: h.ownerGaii, key: h.key })) } });
+                // Two-level map (ownerGaii → key → row) so the (ownerGaii,key) lookup needs no composite
+                // string key / separator.
+                const byOwner = new Map<string, Map<string, PrismaRow>>();
+                for (const rec of records as PrismaRow[]) {
+                    let m = byOwner.get(rec.ownerGaii);
+                    if (!m) { m = new Map(); byOwner.set(rec.ownerGaii, m); }
+                    m.set(rec.key, rec);
+                }
+                const out: MemoryTextHit[] = [];
+                let rank = hits.length; // preserve textScore order; higher = better (contract)
+                for (const h of hits) {
+                    const r = byOwner.get(h.ownerGaii)?.get(h.key);
+                    rank--;
+                    if (!r) continue;
+                    if (r.ttlHours && Date.now() > new Date(r.createdAt).getTime() + r.ttlHours * 3600_000) continue;
+                    if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) continue;
+                    out.push({ record: this.toMemoryRecord(r), score: rank + 1 });
+                    if (out.length >= limit) break;
+                }
+                if (out.length) return out; // else fall through to the substring scan
+                }
+            } catch (err) {
+                logger.warn(`searchText $text path unavailable — falling back to scan: ${(err as { message?: string })?.message ?? err}`);
+            }
+        }
+
+        // Portable fallback (Postgres, or MongoDB before the text index exists): per-token contains scan.
         const where: Record<string, unknown> = { OR: tokens.map(tok => ({ searchBlob: { contains: tok, mode: 'insensitive' } })), ...this.archivedWhere(opts?.archived) };
         if (opts?.ownerGaiis?.length) where.ownerGaii = { in: opts.ownerGaiis };
         if (opts?.visibility) where.visibility = opts.visibility;
         if (opts?.keyPrefix) where.key = { startsWith: opts.keyPrefix };
-        const limit = opts?.limit ?? 50;
 
         const rows = await this.prisma.memory.findMany({ where, take: limit * 4 }) as PrismaRow[];
 

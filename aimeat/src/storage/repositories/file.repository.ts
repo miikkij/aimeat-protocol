@@ -17,6 +17,9 @@ export interface FileRepository {
   createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord>;
   getStorageFile(ownerGaii: string, key: string): Promise<StorageFileRecord | null>;
   listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]>;
+  /** Total storage bytes + file count across MANY owner identities in ONE DB-side aggregate (the
+   *  owner-scope footprint for the usage summary; replaces listStorageFiles-then-sum per identity). */
+  sumStorageBytesForOwners(ownerGaiis: string[]): Promise<{ bytes: number; count: number }>;
   deleteStorageFile(ownerGaii: string, key: string): Promise<boolean>;
   updateFileTagsByKey(ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null>;
   updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null>;

@@ -9,6 +9,7 @@ import type {
   MaintenanceState, EmailVerificationRecord, ChatInstanceRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { sumStorageBytesForOwners as sumStorageBytesForOwnersRepo } from '../repos/storage-file.js';
 
 export const identityNodesMethods = {
   // ── Storage (Binary Files) ──
@@ -45,6 +46,10 @@ export const identityNodesMethods = {
     if (row.workspaceRef) record.workspaceRef = row.workspaceRef as string;
     record.federate = row.federate === 1;
     return record;
+  },
+
+  async sumStorageBytesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {
+    return sumStorageBytesForOwnersRepo(this.db, ownerGaiis);
   },
 
   async listStorageFiles(this: SqliteStorage, ownerGaii: string): Promise<StorageFileRecord[]> {
