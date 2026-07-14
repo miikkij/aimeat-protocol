@@ -58,9 +58,9 @@ export interface ConfigSources {
 export async function createServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
 
-  // Per-request storage profiler (opt-in, AIMEAT_PERF_TRACE=1 + ?trace=1). Outermost so its wall-clock
-  // spans the whole pipeline; a no-op when disabled. See services/perf-trace.ts.
-  app.use(perfTraceMiddleware);
+  // Per-request storage profiler (opt-in: config.perfTrace + ?trace=1). Outermost so its wall-clock
+  // spans the whole pipeline; a no-op middleware when disabled. See services/perf-trace.ts.
+  app.use(perfTraceMiddleware(config.perfTrace));
 
   // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
   const trustProxy = process.env.AIMEAT_TRUST_PROXY;

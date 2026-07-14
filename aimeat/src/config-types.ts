@@ -136,6 +136,9 @@ export interface AimeatConfig {
   devMode: boolean;
   testMode: boolean;
   anonymousMode: boolean;
+  /** Diagnostics: when true, storage calls are timed+counted per request that opts in with ?trace=1
+   *  (env AIMEAT_PERF_TRACE=true). Off by default; safe-off posture flag. See services/perf-trace.ts. */
+  perfTrace: boolean;
   /** Security posture: `local` (localhost-flexible) or `public` (hardened). Sets safe DEFAULTS for
    *  the egress + AI-allowlist knobs below; any explicit AIMEAT_* var overrides. Resolved from
    *  AIMEAT_SECURITY_PROFILE, else the baseUrl host / nodeType. See security-development-dna.md. */
