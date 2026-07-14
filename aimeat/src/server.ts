@@ -36,6 +36,7 @@ import { initializeConfig } from './server-bootstrap/config-init.js';
 import { initializeServices } from './server-bootstrap/service-init.js';
 import { setupGuards } from './server-bootstrap/middleware-guards.js';
 import { mountRoutes } from './server-bootstrap/routes-loader.js';
+import { perfTraceMiddleware } from './services/perf-trace.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -56,6 +57,10 @@ export interface ConfigSources {
 
 export async function createServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
+
+  // Per-request storage profiler (opt-in, AIMEAT_PERF_TRACE=1 + ?trace=1). Outermost so its wall-clock
+  // spans the whole pipeline; a no-op when disabled. See services/perf-trace.ts.
+  app.use(perfTraceMiddleware);
 
   // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
   const trustProxy = process.env.AIMEAT_TRUST_PROXY;
