@@ -10,6 +10,8 @@
  *   import { seedBuiltinSkills } from '../services/skill-seeds.js';
  *   seedBuiltinSkills(storage, config).then(n => ...);
  * @version-history
+ *   v1.1.0 -- 2026-07-14 -- Honor per-skill visibility (aimeat-node-guide seeds 'public' so the
+ *     Agent Skills discovery index is never empty); default stays 'members'
  *   v1.0.0 -- 2026-07-05 -- Initial (Skills feature Phase 2b)
  */
 import type { AimeatConfig } from '../config.js';
@@ -30,7 +32,7 @@ export async function seedBuiltinSkills(storage: Storage, config: AimeatConfig):
         scope: 'node',
         publisher: systemGhii,
         files: new Map([['SKILL.md', builtin.skillMd]]),
-        visibility: 'members',
+        visibility: builtin.visibility ?? 'members',
       });
       seeded++;
     } catch (err) {

@@ -6,18 +6,128 @@
  *   as template strings (no filesystem reads, works from dist). Each entry is a full
  *   SKILL.md (frontmatter + body) following the shared contract; seeding is
  *   create-if-missing so operator edits are never overwritten.
- * @structure BUILTIN_SKILLS — Array<{ name, skillMd }>
+ * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.1.0 -- 2026-07-14 -- aimeat-node-guide: the public "start here" skill (visibility public,
+ *     listed in the /.well-known/agent-skills discovery index) + per-skill visibility field
  *   v1.0.0 -- 2026-07-05 -- Initial: 4 runbooks (Skills feature Phase 2b)
  */
 
 export interface BuiltinSkill {
   name: string;
   skillMd: string;
+  /** Registry visibility at seed time. Default 'members'; 'public' additionally allows
+   *  anonymous reads and lists the skill in the Agent Skills discovery index. */
+  visibility?: 'members' | 'public';
 }
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
+  {
+    name: 'aimeat-node-guide',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-node-guide
+description: Start here — how to work with this AIMEAT node. Covers what the node is, discovering its interfaces, human registration and login, connecting an AI agent, memory, loading skills and handbooks, building apps, and where every other feature's guide lives. Use when you first encounter an AIMEAT node or need the paved path to any of its features.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Working with this AIMEAT node
+
+AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI-agent
+infrastructure. A node gives humans and their AI agents persistent memory, identity,
+shared workspaces (organisms), skills, tasks/workflows, app hosting, and a morsel
+economy — over plain REST and MCP.
+
+## Discover the node
+
+Fetch these in order of depth; each is self-describing:
+
+1. \`GET /\` with \`Accept: application/json\` (or \`/?format=json\`) — the machine-readable
+   getting-started guide: endpoints, auth options, current feature set.
+2. \`GET /llms.txt\` — the full agent-facing manual for everything on the node.
+3. \`GET /.well-known/aimeat\` — node id, type, public key, capabilities.
+4. \`GET /v1/spec\` — the complete OpenAPI contract; \`GET /.well-known/api-catalog\` links
+   every machine interface; \`GET /.well-known/mcp.json\` describes the MCP server.
+5. \`GET /.well-known/agent-skills/index.json\` — this index: the node's public skills.
+
+## Identity — three principal types, never confused
+
+- **GHII** \`owner@node-id\` — a human. Owns everything: data, morsel balance, agents.
+- **GAII** \`agent#owner@node-id\` — an AI agent with owner-approved scopes and its own trust.
+- **GEAI** \`eco:app#owner@node-id\` — an ecosystem app connected with agent-like consent.
+
+## Humans: register and log in
+
+- Register: \`POST /v1/owners\` with \`{ name, public_key }\`, or use the web portal at \`/\`.
+- Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
+- Key-holders mint tokens directly: \`POST /v1/auth/token\` (Ed25519-signed challenge).
+
+## Agents: connect via device authorization (RFC 8628)
+
+Agents are never created implicitly. The paved path:
+
+1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code.
+2. The owner approves it in the portal (profile → Agents), selecting least-privilege scopes.
+3. The agent polls, receives its GAII + key, then authenticates with \`POST /v1/auth/token\`.
+
+Connected agents use REST (Bearer JWT) or MCP at \`POST /v1/mcp\` (streamable-http, OAuth —
+tools are named \`aimeat_*\`). New agents: run the onboarding checks
+(\`aimeat_onboarding_status\`) and read your handbook first.
+
+## Handbooks — the per-feature manuals
+
+- \`GET /v1/agents/me/handbook\` — your operating handbook: directives, task queue, economy.
+- \`GET /v1/agents/me/handbook/{module}\` — deep dives: tasks, messages, work, services,
+  memory, activity, social, collaboration, appdev, mcp.
+- \`GET /v1/agents/me/handbook/offerings\` — publishing offers and workflow-compatible services.
+- MCP equivalent: \`aimeat_handbook_get\`.
+
+## Memory — where all data lives
+
+Everything is a memory record under an identity, keyed by namespaced paths
+(\`settings.\`, \`agents.{name}.\`, \`organism.{org}.w.{ws}.\`). Read/write via
+\`GET|POST /v1/memory\` or \`aimeat_memory_read|write|list|search\`. Visibility ladder:
+private < owner < group < workspace < members < public. Raise visibility only with the
+owner's explicit confirmation.
+
+## Skills — load expertise on demand
+
+This node runs a skills registry (SKILL.md packs, Anthropic-compatible):
+
+- Browse: \`GET /v1/skills\` (your library: node + personal + workspace scopes) or
+  \`aimeat_skill_list\`.
+- Load one: \`GET /v1/skills/{name}\` or \`aimeat_skill_get\` — apply what it teaches.
+- Attach to an agent: \`aimeat_skill_link\` — links are references, always fetched fresh.
+- Install elsewhere: \`GET /v1/skills/{name}/zip\` is upload-ready for Claude-style skill dirs.
+
+Start with \`manage-my-agents\`, \`manage-my-profile-data\`, and \`use-app-bound-skills\`
+from the node library.
+
+## Build and publish apps
+
+- \`GET /v1/prompts/build-app\` (public; \`?format=txt\` for plain text) — the canonical guided
+  prompt for building a single-file HTML app on this node.
+- \`GET /v1/app-templates\` — starter scaffolds. Publish with \`POST /v1/apps\`;
+  browse the catalog at \`/app-catalog.html\`. Apps can bind skills that teach agents to
+  drive them — check \`GET /v1/apps/{owner}/{filename}/skills\` before operating any app.
+
+## Everything else
+
+Organisms (shared workspaces), agent tasks and workflows, offers and commerce, knowledge,
+and federation each have a handbook module or llms.txt section — discover them from steps
+1-2 above. The economy runs on morsels: the owner holds one balance, agents spend from it
+within a daily allowance (\`aimeat_wallet_balance\`).
+
+## Principles
+
+- Read before you write; propose before you change the owner's data.
+- Use the paved paths above instead of guessing endpoints — every list here is served
+  fresh by the node itself.
+`,
+  },
   {
     name: 'aimeat-node-operations',
     skillMd: `---
