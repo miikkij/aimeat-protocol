@@ -13196,11 +13196,25 @@ paths:
         app origin (`https://<sub>.apps.<apex>/` or `https://apps.<apex>/<owner>/<file>`), so runnable
         app HTML is never served same-origin as the authenticated SPA. Access-code/paid apps and the
         raw download form are unaffected.
+
+        **Agent Face (markdown for agents):** a request that prefers `text/markdown` (`Accept`
+        negotiation, or an explicit `?format=md`) receives the app's markdown read-surface instead
+        of HTML: the app's **public** `apps.{filename}.agentface` memory record (a markdown string,
+        ≤ 256 KB, published by the app under its owner's GHII) when one is declared, else the app
+        HTML converted to markdown. Both variants end with a node-generated `## Agent affordances`
+        footer (the app's WebMCP tool listing, its bound skills, the catalog, and `/auth.md`).
+        A face record with any non-public visibility is treated exactly like an absent one (fallback
+        conversion — no error, no existence disclosure). The markdown response carries
+        `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, and `x-markdown-tokens`
+        (plus `x-original-tokens` on the converted fallback). Browsers (`Accept: text/html`) keep
+        the exact HTML behavior. The same negotiation applies at mapped subdomain app roots
+        (`https://<sub>.<apex>/` and `https://<sub>.apps.<apex>/`).
       tags: [Apps]
       parameters:
         - { in: path, name: owner, required: true, schema: { type: string } }
         - { in: path, name: filename, required: true, schema: { type: string } }
         - { in: query, name: mode, required: false, schema: { type: string, enum: [inline] } }
+        - { in: query, name: format, required: false, schema: { type: string, enum: [md] }, description: "md forces the Agent Face markdown variant regardless of the Accept header" }
         - { in: query, name: version, required: false, schema: { type: integer } }
         - { in: query, name: code, required: false, schema: { type: string }, description: Access code for protected apps }
         - in: query
@@ -13213,7 +13227,7 @@ paths:
             untouched). On a node with the app origin enabled an apex request is 301-redirected to the
             isolated origin, preserving the token.
       responses:
-        '200': { description: App HTML (inline or attachment; the draft when a valid preview token is supplied) }
+        '200': { description: "App HTML (inline or attachment; the draft when a valid preview token is supplied), or text/markdown when the request prefers markdown (Agent Face)" }
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

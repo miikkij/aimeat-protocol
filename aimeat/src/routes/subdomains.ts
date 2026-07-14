@@ -33,6 +33,9 @@
  *   v1.6.1 — 2026-07-06 — appCsp font-src gains 'self' (fonts from the app origin's own
  *     /v1/pub public storage on the http dev origin) — completes the same addition made to
  *     the /v1/apps inline route in apps.ts v1.14.0; https: already covered prod.
+ *   v1.7.0 — 2026-07-14 — Agent Face: the subdomain app root negotiates text/markdown (Accept
+ *     or ?format=md) — serves the public apps.{filename}.agentface record (else converted app
+ *     HTML) with the agent-affordances footer; browsers keep the exact HTML behavior.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -44,6 +47,8 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
 import { verifyDraftToken, DraftTokenError } from '../services/draft-token.js';
+import { prefersMarkdown } from '../services/markdown-negotiation.js';
+import { serveAppAgentFace } from '../services/agent-face.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
@@ -375,6 +380,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     const app = await resolveAppTarget(storage, site.target);
     if (!app || appIsRestricted(config, app)) return notFound();
+
+    // Agent Face: an agent preferring text/markdown (Accept negotiation, or ?format=md) gets the
+    // app's markdown read-surface (public agentface record, else converted HTML) instead of the
+    // runnable page. Browsers (Accept: text/html) keep the exact HTML behavior below.
+    if (req.query.format === 'md' || (req.query.format === undefined && prefersMarkdown(req))) {
+      if (await serveAppAgentFace(res, config, storage, app)) return;
+    }
 
     serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
