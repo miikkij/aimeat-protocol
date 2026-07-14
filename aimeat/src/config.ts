@@ -358,6 +358,13 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
     // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
     mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
+    // Web Bot Auth (RFC 9421): sign the node's outbound safeFetch traffic with the node Ed25519
+    // key so peers/CDNs can verify AIMEAT's agent traffic against the key directory at
+    // /.well-known/http-message-signatures-directory. OFF by default: it stamps identifying
+    // Signature headers on EVERY outbound request (webhooks, federation, UCP profile fetches) —
+    // linkability + a small risk of strict/legacy endpoints rejecting unknown headers. The key
+    // DIRECTORY is always served; only outbound signing is gated.
+    webBotAuthSign: process.env.AIMEAT_WEB_BOT_AUTH_SIGN === 'true',
     // Content Signals Policy directive served in robots.txt (contentsignals.org). Default matches
     // the per-bot stance already in the file (search bots allowed, GPTBot/ClaudeBot training
     // crawlers disallowed, user-initiated AI fetches allowed). 'off' removes the directive.

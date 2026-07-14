@@ -325,6 +325,8 @@ export interface AimeatConfig {
   mcpCardCommerceTools: 'inline' | 'pointer';
   /** robots.txt Content Signals Policy directive ("search=yes, ai-input=yes, ai-train=no"); 'off' removes it. */
   contentSignal: string;
+  /** Web Bot Auth: sign outbound safeFetch requests (RFC 9421, node Ed25519 key). OFF by default. */
+  webBotAuthSign: boolean;
 
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;

@@ -33,6 +33,8 @@ import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
 import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
+import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
+import { setOutboundRequestSigner } from '../utils/url-validator.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver } from '../commerce/sellable-resolvers.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
@@ -322,6 +324,17 @@ export async function mountRoutes(
   // then whatever payment handlers / sellable resolvers the active edition contributes (EE: real
   // money + org offerings) — one registry each, advertised at /.well-known/ucp. The resets keep
   // embedded test servers from double-registering.
+  // Web Bot Auth (RFC 9421): reset the per-boot key state (embedded test servers), then arm the
+  // outbound signer on safeFetch when the operator opted in. The key DIRECTORY at
+  // /.well-known/http-message-signatures-directory is served regardless (wellknown.ts).
+  resetWebBotAuth();
+  setOutboundRequestSigner(config.webBotAuthSign
+    ? async (url) => {
+        const state = await getWebBotAuthState(storage, config);
+        return state ? signOutboundRequest(state, url) : null;
+      }
+    : null);
+
   resetPaymentHandlers();
   registerPaymentHandler(morselPaymentHandler());
   resetSellableResolvers();

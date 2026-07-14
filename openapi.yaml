@@ -10532,6 +10532,24 @@ paths:
               schema:
                 type: object
 
+  /.well-known/http-message-signatures-directory:
+    get:
+      operationId: httpMessageSignaturesDirectory
+      summary: Web Bot Auth key directory (JWKS)
+      description: >-
+        The key directory verifiers fetch to validate this node's RFC 9421-signed outbound
+        requests (Web Bot Auth, draft-meunier-http-message-signatures-directory). A JWKS built
+        from the node's Ed25519 key (kty OKP, crv Ed25519; kid = RFC 7638 JWK thumbprint — the
+        signature keyid). Served as application/http-message-signatures-directory+json with the
+        response itself signed (tag "http-message-signatures-directory"). Outbound signing is
+        gated by AIMEAT_WEB_BOT_AUTH_SIGN (default off); the directory is always served.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: JWKS key directory (signed response)
+        '404':
+          description: Node keypair not initialized yet
+
   /.well-known/acp.json:
     get:
       operationId: acpDiscovery
