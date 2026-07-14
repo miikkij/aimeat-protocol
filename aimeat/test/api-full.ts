@@ -151,6 +151,39 @@ await test('GET /.well-known/aimeat', async () => {
     assert(body.protocol === 'aimeat', `protocol: ${body.protocol}`);
 });
 
+await test('GET /.well-known/http-message-signatures-directory — Ed25519 JWKS, signed response', async () => {
+    const res = await fetch(`${BASE}/.well-known/http-message-signatures-directory`);
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('application/http-message-signatures-directory+json'), `media type: ${res.headers.get('content-type')}`);
+    const jwks = await res.json() as any;
+    assert(Array.isArray(jwks.keys) && jwks.keys.length === 1, `keys: ${JSON.stringify(jwks)}`);
+    const k = jwks.keys[0];
+    assert(k.kty === 'OKP' && k.crv === 'Ed25519' && k.use === 'sig', `key shape: ${JSON.stringify(k)}`);
+    const pub = Buffer.from(k.x, 'base64url');
+    assert(pub.length === 32, `Ed25519 public key must be 32 bytes, got ${pub.length}`);
+    // The JWKS key IS the node key did.json/.well-known/aimeat publish (one identity, one key).
+    const aimeatDoc = (await json('/.well-known/aimeat')).body;
+    assert(Buffer.from(aimeatDoc.data.public_key, 'base64').equals(pub), 'JWKS x matches the node public key');
+    // kid = RFC 7638 JWK thumbprint (sha256 over {"crv","kty","x"}, base64url).
+    const { createHash } = await import('node:crypto');
+    const expectKid = createHash('sha256').update(`{"crv":"Ed25519","kty":"OKP","x":"${k.x}"}`, 'utf8').digest('base64url');
+    assert(k.kid === expectKid, `kid is the JWK thumbprint: ${k.kid} vs ${expectKid}`);
+    // The directory RESPONSE is itself signed (tag "http-message-signatures-directory") — verify it.
+    const sigInput = res.headers.get('signature-input') ?? '';
+    const sigHeader = res.headers.get('signature') ?? '';
+    assert(sigInput.includes('tag="http-message-signatures-directory"') && sigInput.includes(`keyid="${k.kid}"`), `signature-input: ${sigInput}`);
+    const params = sigInput.replace(/^sig1=/, '');
+    const authority = new URL(BASE).host.toLowerCase();
+    const base = `"@authority";req: ${authority}\n"@signature-params": ${params}`;
+    const sigB64 = /:(.*):/.exec(sigHeader)?.[1] ?? '';
+    const ok = await ed.verifyAsync(
+        new Uint8Array(Buffer.from(sigB64, 'base64')),
+        new TextEncoder().encode(base),
+        new Uint8Array(pub),
+    );
+    assert(ok, 'directory response signature verifies against the served JWK');
+});
+
 await test('GET /.well-known/mcp.json — MCP Server Card (SEP-1649)', async () => {
     const res = await fetch(`${BASE}/.well-known/mcp.json`);
     assert(res.status === 200, `status ${res.status}`);

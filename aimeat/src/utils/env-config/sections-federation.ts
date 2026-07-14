@@ -2,6 +2,7 @@
  * @file src/utils/env-config/sections-federation.ts
  * @description Federation, work-queue, and rate-limit config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-14 — AIMEAT_WEB_BOT_AUTH_SIGN in the Federation section (Web Bot Auth)
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
 
@@ -42,6 +43,12 @@ export function federationSections(config: AimeatConfig): ConfigSection[] {
           description: 'How often to refresh peer key cache (minutes)',
           value: String(config.keyCacheRefreshMinutes),
           defaultVal: '5',
+        },
+        {
+          envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN',
+          description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth; key directory at /.well-known/http-message-signatures-directory is always served)',
+          value: config.webBotAuthSign ? 'true' : 'false',
+          defaultVal: 'false',
         },
         {
           envVar: 'AIMEAT_CROSS_FEDERATION_ENABLED',

@@ -8,6 +8,8 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.5.0 — 2026-07-14 — Web Bot Auth: outbound UCP profile fetch carries a verifiable RFC 9421
+ *     Ed25519 signature (verified against /.well-known/http-message-signatures-directory)
  *   v1.4.0 — 2026-07-14 — MCP card commerce_tools (TARGET-034 phase D): /v1/commerce/tools
  *     catalog shape + inline card embed + feed/card sku-drift guard
  *   v1.3.0 — 2026-07-14 — WebMCP bridge (TARGET-034 phase C): tool listing shape, 402→checkout→
@@ -591,6 +593,48 @@ await test('32. MCP Server Card embeds the catalog inline (default mode) + keeps
     const feedSkus = (feed.products || []).filter((p: any) => p.id.startsWith('app-tool:')).map((p: any) => p.id).sort();
     const cardSkus = (ct.tools || []).map((t: any) => t.sku).sort();
     assert(JSON.stringify(feedSkus) === JSON.stringify(cardSkus), `feed/card sku drift: ${JSON.stringify({ feedSkus, cardSkus })}`);
+});
+
+// ─── Web Bot Auth: outbound safeFetch traffic is signed (RFC 9421) and verifiable ───
+
+await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth signature', async () => {
+    // Local capture server plays the UCP platform profile the node fetches via safeFetch
+    // (AIMEAT_WEB_BOT_AUTH_SIGN=true in the test env; AIMEAT_DEV_MODE permits loopback egress).
+    const { createServer } = await import('node:http');
+    let captured: Record<string, string | string[] | undefined> = {};
+    const srv = createServer((req, res) => {
+        captured = { ...req.headers };
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ucp: { capabilities: [{ name: 'dev.ucp.shopping.checkout' }] } }));
+    });
+    await new Promise<void>(r => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+        const create = await json('/ucp/v1/checkout-sessions', {
+            method: 'POST', headers: { ...auth(buyer.token), 'UCP-Agent': `http://127.0.0.1:${port}/profile` },
+            body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:translate-doc` }, quantity: 1 }] }),
+        });
+        assert(create.status === 201, `ucp create ${create.status}: ${JSON.stringify(create.body)}`);
+        assert(typeof captured['signature'] === 'string' && typeof captured['signature-input'] === 'string' && typeof captured['signature-agent'] === 'string',
+            `outbound request signed: ${JSON.stringify(Object.keys(captured))}`);
+        const sigInput = String(captured['signature-input']);
+        assert(sigInput.includes('tag="web-bot-auth"') && sigInput.includes('alg="ed25519"') && sigInput.includes('nonce="'), `signature-input: ${sigInput}`);
+        // Verify against the served key directory: reconstruct the RFC 9421 base and check Ed25519.
+        const dir = await (await fetch(`${BASE}/.well-known/http-message-signatures-directory`)).json() as any;
+        const jwk = dir.keys[0];
+        assert(sigInput.includes(`keyid="${jwk.kid}"`), `keyid matches directory kid: ${sigInput}`);
+        const params = sigInput.replace(/^sig1=/, '');
+        const base = `"@authority": 127.0.0.1:${port}\n"signature-agent": ${String(captured['signature-agent'])}\n"@signature-params": ${params}`;
+        const sigB64 = /:(.*):/.exec(String(captured['signature']))?.[1] ?? '';
+        const ok = await ed.verifyAsync(
+            new Uint8Array(Buffer.from(sigB64, 'base64')),
+            new TextEncoder().encode(base),
+            new Uint8Array(Buffer.from(jwk.x, 'base64url')),
+        );
+        assert(ok, 'RFC 9421 signature verifies against the directory JWK');
+    } finally {
+        srv.close();
+    }
 });
 
 console.log(`\n${'═'.repeat(50)}`);

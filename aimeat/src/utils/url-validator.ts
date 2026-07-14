@@ -15,6 +15,9 @@
  *   v2.1.0 — 2026-07-10 — Loopback egress now gated by AIMEAT_ALLOW_PRIVATE_EGRESS (config resolves
  *     it from the security profile; AIMEAT_DEV_MODE kept as a back-compat alias). RFC1918/link-local
  *     stay blocked regardless.
+ *   v2.2.0 — 2026-07-14 — Web Bot Auth seam: an optional outbound-request signer
+ *     (setOutboundRequestSigner) stamps RFC 9421 Signature headers on every hop AFTER validation.
+ *     Best-effort and additive only — a signer failure never blocks the fetch, and no guard changes.
  */
 import { URL } from 'node:url';
 import { lookup } from 'node:dns/promises';
@@ -122,6 +125,19 @@ export interface SafeFetchInit extends RequestInit {
 }
 
 /**
+ * Web Bot Auth seam: when set (AIMEAT_WEB_BOT_AUTH_SIGN=true at boot), every safeFetch hop is
+ * stamped with the returned headers (RFC 9421 Signature / Signature-Input / Signature-Agent)
+ * AFTER URL validation. Per-hop because @authority changes across redirects. Best-effort: a
+ * signer error or null result leaves the request unsigned — signing must never break egress.
+ */
+type OutboundRequestSigner = (targetUrl: string) => Promise<Record<string, string> | null>;
+let outboundSigner: OutboundRequestSigner | null = null;
+
+export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): void {
+  outboundSigner = signer;
+}
+
+/**
  * SSRF-safe fetch. Validates the URL, then fetches with `redirect: 'manual'` and
  * re-validates every `Location` before following it — so a host that passes
  * validation cannot 3xx-redirect the request to an internal address. Throws
@@ -137,7 +153,18 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const check = await validateOutboundUrl(target);
     if (!check.valid) throw new Error(`Fetch blocked: ${check.reason}`);
-    const resp = await fetch(target, { ...fetchInit, redirect: 'manual' });
+    let hopInit: RequestInit = { ...fetchInit, redirect: 'manual' };
+    if (outboundSigner) {
+      try {
+        const sigHeaders = await outboundSigner(target);
+        if (sigHeaders) {
+          const headers = new Headers(fetchInit.headers);
+          for (const [k, v] of Object.entries(sigHeaders)) headers.set(k, v);
+          hopInit = { ...hopInit, headers };
+        }
+      } catch { /* unsigned is fine — signing is additive, never a gate */ }
+    }
+    const resp = await fetch(target, hopInit);
     if (resp.status >= 300 && resp.status < 400 && resp.headers.has('location')) {
       target = new URL(resp.headers.get('location') as string, target).toString();
       continue;

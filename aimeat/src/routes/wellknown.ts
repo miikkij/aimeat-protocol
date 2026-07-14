@@ -14,6 +14,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.5.0 — 2026-07-14 — Web Bot Auth key directory at /.well-known/http-message-signatures-directory
+ *     (node Ed25519 JWKS, signed response; draft-meunier-http-message-signatures-directory)
  *   v1.4.0 — 2026-07-14 — mcp.json commerce_tools block (inline | pointer via AIMEAT_MCP_CARD_COMMERCE_TOOLS) (TARGET-034 phase D)
  *   v1.3.0 — 2026-07-14 — mcp.json + ucp webmcp bridge references (TARGET-034 phase C)
  *   v1.2.0 — 2026-07-13 — Add UCP business profile (TARGET-033 commerce core)
@@ -28,6 +30,9 @@ import { success } from '../middleware/envelope.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { listPaymentHandlers } from '../commerce/payment-handlers.js';
+import {
+  getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
+} from '../services/web-bot-auth.js';
 
 /**
  * RFC 8288 discovery Link headers on every GET/HEAD response, so agents that land on
@@ -133,6 +138,26 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       },
       ...(commerceTools ? { commerce_tools: commerceTools } : {}),
     });
+  });
+
+  // Web Bot Auth key directory (draft-meunier-http-message-signatures-directory): the JWKS a
+  // verifier fetches to validate this node's RFC 9421-signed outbound requests. Built from the
+  // node's EXISTING Ed25519 key (the one did.json publishes); kid = RFC 7638 thumbprint. The
+  // response itself is signed (tag "http-message-signatures-directory") so verifiers can pin it.
+  // Served whether or not outbound signing (AIMEAT_WEB_BOT_AUTH_SIGN) is enabled — the directory
+  // is harmless alone and lets verification be adopted before signing is switched on.
+  router.get('/.well-known/http-message-signatures-directory', async (req, res) => {
+    const state = await getWebBotAuthState(storage, config);
+    if (!state) {
+      res.status(404).json({ error: 'Node keypair not initialized yet' });
+      return;
+    }
+    try {
+      const sigHeaders = await signDirectoryResponse(state, req.headers.host ?? new URL(config.baseUrl).host);
+      res.set(sigHeaders);
+    } catch { /* directory stays useful unsigned */ }
+    res.set('Cache-Control', 'max-age=86400');
+    res.type(SIGNATURES_DIRECTORY_MEDIA_TYPE).send(JSON.stringify(signatureDirectoryBody(state)));
   });
 
   // API Catalog (RFC 9727) — an RFC 9264 linkset pointing agents at the OpenAPI
