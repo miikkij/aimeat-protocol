@@ -9,6 +9,8 @@
  *   - CONFIG_WHITELIST + TAG_REGEX: safe config keys and the {{...}} tag grammar for substitution
  *
  * @version-history
+ *   v1.1.0 — 2026-07-14 — Inject the WebMCP bridge script into every portal HTML (custom or
+ *     default) at this chokepoint — both GET / routes call getPortalHtml (TARGET-034 phase C)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { randomBytes } from 'node:crypto';
@@ -75,6 +77,20 @@ export class SiteService {
         private storage: Storage,
     ) { }
 
+    /**
+     * WebMCP bridge (TARGET-034 phase C): every served homepage — operator-custom template or the
+     * default portal — carries the bridge script so in-browser agents + readiness scanners see
+     * the node-level tools on document/navigator.modelContext. Injected here, THE portal-HTML
+     * chokepoint (both `GET /` routes call this), so custom templates need no edits. Idempotent;
+     * same-origin script; a page without the agent API gets a no-op.
+     */
+    private withWebmcpTag(html: string): string {
+        if (html.includes('/v1/libs/aimeat-webmcp.js')) return html;
+        const tag = '<script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>';
+        const i = html.search(/<\/head>/i);
+        return i === -1 ? tag + html : html.slice(0, i) + tag + '\n' + html.slice(i);
+    }
+
     /** Serve the portal HTML — custom template or default fallback. */
     async getPortalHtml(
         langParam: string | undefined,
@@ -90,11 +106,11 @@ export class SiteService {
         const templateRecord = await this.storage.getStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
         if (!templateRecord) {
             // No custom template — use default portal
-            return this.renderDefault(langParam, cookieHeader, acceptLang);
+            return this.withWebmcpTag(await this.renderDefault(langParam, cookieHeader, acceptLang));
         }
 
         const raw = templateRecord.data.toString('utf-8');
-        const html = await this.resolveTemplate(raw);
+        const html = this.withWebmcpTag(await this.resolveTemplate(raw));
 
         // Cache resolved HTML
         this.cache = {

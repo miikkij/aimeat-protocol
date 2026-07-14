@@ -11,6 +11,8 @@
  *            operator-configurable header navigation links (visibility + order).
  *   v1.3.0 — 2026-07-01 — GET /v1/site/header-nav also returns a `features` map of node feature flags
  *            (currently { secretary }) so the SPA shell can hide optional surfaces when disabled.
+ *   v1.4.0 — 2026-07-14 — WebMCP bridge note: the script injection lives in SiteService
+ *            .getPortalHtml (the chokepoint both GET / routes share), not here (TARGET-034 C).
  */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';

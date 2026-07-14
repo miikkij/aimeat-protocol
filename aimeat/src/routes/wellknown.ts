@@ -8,7 +8,7 @@
  *   - wellknownRouter(config, storage): mounts the well-known GET endpoints
  *   - GET /.well-known/aimeat: node id/type, public key, capability set, federation settings, key endpoints
  *   - GET /.well-known/ai-plugin.json: ChatGPT-plugin manifest pointing at /v1/spec
- *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server
+ *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server + the WebMCP bridge
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
@@ -101,6 +101,17 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       authentication: {
         required: true,
       },
+      // WebMCP bridge (TARGET-034 phase C): pages on this node also expose tools IN-PAGE via
+      // document.modelContext (W3C Web Machine Learning CG draft). The portal registers node-level
+      // tools at load; published apps register their priced tool manifests through the bridge
+      // library. Non-browser agents read the same tools over HTTP from the listing endpoint —
+      // priced tools answer 402 + x402 accepts (payment = completing a commerce checkout).
+      webmcp: {
+        spec: 'https://github.com/webmachinelearning/webmcp',
+        library: `${config.baseUrl}/v1/libs/aimeat-webmcp.js`,
+        app_listing: `${config.baseUrl}/v1/apps/{owner}/{filename}/webmcp`,
+        pages: [`${config.baseUrl}/`],
+      },
     });
   });
 
@@ -143,6 +154,9 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         services: {
           rest: { endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` },
           mcp: { endpoint: `${b}/v1/mcp` },
+          // In-page tool surface (WebMCP bridge): app pages register their priced tools on
+          // document.modelContext; the HTTP listing mirrors them for non-browser agents.
+          webmcp: { library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` },
         },
         capabilities: config.commerceEnabled ? [
           {

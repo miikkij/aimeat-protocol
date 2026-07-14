@@ -138,6 +138,7 @@ import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { ledgerRouter } from '../routes/ledger.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { skillsRouter } from '../routes/skills.js';
+import { webmcpRouter } from '../routes/webmcp.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
 import { subdomainServeRouter, subdomainAdminRouter } from '../routes/subdomains.js';
@@ -351,6 +352,7 @@ export async function mountRoutes(
   app.use(ledgerRouter(config, storage));         // LEDGER (TARGET-016) — agent LLM usage/cost read API
   app.use(agentSkillBundleRouter(config, storage));
   app.use(skillsRouter(config, storage));  // Skills registry (dedicated system, Phase 2a)
+  app.use(webmcpRouter(config, storage));  // WebMCP bridge (TARGET-034 phase C) — before appsRouter (shares /v1/apps/:owner/:filename/*)
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));

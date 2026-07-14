@@ -8,6 +8,8 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.3.0 — 2026-07-14 — WebMCP bridge (TARGET-034 phase C): tool listing shape, 402→checkout→
+ *     result round-trip, free-callable invoke + auth/404 gates, bridge lib serving
  *   v1.2.0 — 2026-07-14 — App-tool TASK path (TARGET-034 phase B): unbound tools purchasable —
  *     TASK queued for the manifest agent / owner GHII, buyer input on the task, feed fulfillment
  *     hint; the phase-A unbound-422 gate is gone
@@ -500,6 +502,59 @@ await test('27. Unbound tool with NO manifest agent → TASK assigned to the app
     assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
     const s = done.body.data.session;
     assert(s.status === 'completed' && (s.fulfillment?.taskIds || []).length === 1, `owner-task fulfillment: ${JSON.stringify(s.fulfillment)}`);
+});
+
+// ─── WebMCP bridge (TARGET-034 phase C): app tools as a WebMCP surface + 402 payment flow ───
+
+await test('28. GET /v1/apps/:owner/:app/webmcp — public WebMCP-shaped tool listing', async () => {
+    const r = await fetch(`${BASE}/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp`);
+    assert(r.status === 200, `listing ${r.status}`);
+    const body = await r.json() as any;
+    assert(body.webmcp?.spec?.includes('webmachinelearning/webmcp'), `webmcp spec ref: ${JSON.stringify(body.webmcp)}`);
+    assert(body.library?.endsWith('/v1/libs/aimeat-webmcp.js'), `library: ${body.library}`);
+    const echo = (body.tools || []).find((t: any) => t.name === 'echo');
+    assert(!!echo && echo.inputSchema && echo.fulfillment === 'call', `echo tool: ${JSON.stringify(echo)}`);
+    assert(echo.payment?.required === true && echo.payment.price?.morsels === 3, `echo payment: ${JSON.stringify(echo.payment)}`);
+    assert(echo.payment.checkout?.items?.[0]?.kind === 'app-tool', 'ready-made checkout item');
+    const free = (body.tools || []).find((t: any) => t.name === 'unpriced-echo');
+    assert(free?.payment?.required === false, `unpriced tool payment: ${JSON.stringify(free?.payment)}`);
+    const task = (body.tools || []).find((t: any) => t.name === 'concierge');
+    assert(task?.fulfillment === 'task' && task.payment?.required === true, `task tool: ${JSON.stringify(task?.payment)}`);
+    // The bridge library itself is served and carries the modelContext feature detection.
+    const lib = await fetch(`${BASE}/v1/libs/aimeat-webmcp.js`);
+    assert(lib.status === 200, `lib ${lib.status}`);
+    const src = await lib.text();
+    assert(src.includes('modelContext') && src.includes('provideContext'), 'lib feature-detects the WebMCP API');
+});
+
+await test('29. Priced tool unpaid → 402 with x402 accepts; paying the hinted checkout returns the result', async () => {
+    const invokeUrl = `${BASE}/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/echo`;
+    const r = await fetch(invokeUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: { message: 'x' } }) });
+    assert(r.status === 402, `unpaid invoke ${r.status}`);
+    const body = await r.json() as any;
+    assert(Array.isArray(body.accepts) && body.accepts.some((a: any) => a.scheme === 'aimeat-checkout'), `accepts: ${JSON.stringify(body.accepts)}`);
+    assert(body.payment?.checkout?.items?.[0]?.tool === 'echo', `checkout hint: ${JSON.stringify(body.payment?.checkout)}`);
+    // Follow the hint: same item, real input, through the normal checkout → the result rides back.
+    const item = { ...body.payment.checkout.items[0], input: { message: 'paid via 402 flow' } };
+    const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [item] }) });
+    assert(create.status === 201, `create from hint ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+    assert(done.body.data.session.fulfillment?.results?.[0]?.result?.echoed === 'Echo: paid via 402 flow', `402→checkout→result: ${JSON.stringify(done.body.data.session.fulfillment)}`);
+});
+
+await test('30. WebMCP invoke gates: free-callable needs auth then invokes; unknown tool 404; no manifest 404', async () => {
+    const base = `${BASE}/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools`;
+    const anon = await fetch(`${base}/unpriced-echo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: { message: 'hi' } }) });
+    assert(anon.status === 401, `anon free invoke ${anon.status}`);
+    const authed = await json(`/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/unpriced-echo`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ input: { message: 'free call' } }),
+    });
+    assert(authed.status === 200 && authed.body.data?.result?.echoed === 'Echo: free call', `free invoke: ${authed.status} ${JSON.stringify(authed.body.data)}`);
+    const ghost = await json(`/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/no-such-tool`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(ghost.status === 404 && ghost.body.error?.code === 'TOOL_NOT_FOUND', `ghost tool: ${ghost.status} ${ghost.body.error?.code}`);
+    const noManifest = await fetch(`${BASE}/v1/apps/${encodeURIComponent(buyer.name)}/nothing.html/webmcp`);
+    assert(noManifest.status === 404, `no manifest ${noManifest.status}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

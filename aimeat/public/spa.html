@@ -45,6 +45,10 @@
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
+  <!-- WebMCP bridge (TARGET-034 phase C): registers node-level tools (commerce feed, node info)
+       on document/navigator.modelContext for in-browser agents + readiness scanners. No-op when
+       no agent API is present. -->
+  <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <meta name="theme-color" content="#FAFAF8">
   <!-- No-flash theme boot: set data-theme on <html> before first paint.
        Plain inline JS (NOT a module — modules defer and reintroduce the flash).
