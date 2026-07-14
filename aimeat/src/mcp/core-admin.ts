@@ -122,6 +122,14 @@ export function registerCoreAdminTools(
                         jwt_ttl_seconds: config.jwtTtlSeconds,
                         welcome_bonus: config.welcomeBonus, daily_allowance: config.dailyAllowance,
                         burn_rate: config.burnRate, max_operator_mint_per_day: config.maxOperatorMintPerDay,
+                        // Commerce + agent-readiness posture (READ-ONLY here: these are boot-time
+                        // env config — robots.txt is baked and the Web Bot Auth signer is armed at
+                        // startup, so a runtime setter would silently no-op until restart. Change
+                        // via AIMEAT_* env + restart.)
+                        commerce_enabled: config.commerceEnabled,
+                        mcp_card_commerce_tools: config.mcpCardCommerceTools,
+                        content_signal: config.contentSignal,
+                        web_bot_auth_sign: config.webBotAuthSign,
                     }, null, 2),
                 }],
             };

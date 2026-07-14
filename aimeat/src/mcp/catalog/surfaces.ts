@@ -79,6 +79,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
         'aimeat_handbook_get',
+        // Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
+        'aimeat_app_tools_get', 'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
     ],
     service: [
         'aimeat_discover',
@@ -100,6 +102,11 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
         'aimeat_handbook_get',
+        // Commerce, both sides: a marketplace/provider agent sells (PSP credentials, app-tool
+        // manifests, offer pricing) and buys (checkout) on the same commerce core.
+        'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
+        'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
+        'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
     ],
     admin: [
         'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',

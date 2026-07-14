@@ -251,6 +251,19 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_config: { title: 'Admin: Read Config', readOnlyHint: true },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+
+    // ── Commerce (TARGET-033/034 over MCP) ──
+    aimeat_commerce_psp_set: { title: 'Set Seller PSP Credentials', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_commerce_psp_status: { title: 'Check PSP Status (masked)', readOnlyHint: true },
+    aimeat_commerce_psp_delete: { title: 'Delete Seller PSP Credentials', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_app_tools_publish: { title: 'Publish App Tool Manifest', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_tools_get: { title: 'Read App Tool Manifest', readOnlyHint: true },
+    aimeat_offer_price_set: { title: 'Price an Agent Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_checkout_open: { title: 'Open Checkout Session', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    // destructiveHint: spends the owner's balance (irreversible financial action); openWorldHint:
+    // a callable app-tool's fulfillment may invoke sandboxed/third-party capability code.
+    aimeat_checkout_complete: { title: 'Complete Checkout (pay + fulfill)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    aimeat_checkout_list: { title: 'List My Checkout Sessions', readOnlyHint: true },
 };
 
 /**
