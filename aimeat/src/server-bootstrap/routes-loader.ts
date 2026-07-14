@@ -37,6 +37,7 @@ import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } fr
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver } from '../commerce/sellable-resolvers.js';
+import { setEnterpriseMcpTools } from '../mcp/enterprise-tools.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
@@ -349,6 +350,10 @@ export async function mountRoutes(
   for (const resolver of (await enterprise.getSellableResolvers?.()) ?? []) {
     registerSellableResolver(resolver);
   }
+  // Edition-contributed MCP tools (EnterpriseProvider.getMcpTools): installed once at boot —
+  // per-session registration + the /v2/mcp/enterprise surface extras + dynamic scope entries
+  // all read this registry. Community/stub: empty (the enterprise surface keeps its core baseline).
+  setEnterpriseMcpTools((await enterprise.getMcpTools?.()) ?? []);
   app.use(commerceRouter(config, storage));
   app.use(commerceUcpRouter(config, storage));
   app.use(commerceAcpRouter(config, storage));

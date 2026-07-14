@@ -50,6 +50,7 @@ import { registerMemoryExtendedTools } from './memory-extended.js';
 import { registerWalletExtendedTools } from './wallet-extended.js';
 import { registerConsentTools } from './consent.js';
 import { registerCommerceTools } from './commerce.js';
+import { registerEnterpriseMcpTools } from './enterprise-tools.js';
 import { registerChatInstancesTools } from './chat-instances.js';
 import { registerFlagsTools } from './flags.js';
 import { registerPromptsTools } from './prompts.js';
@@ -146,6 +147,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        // Edition-contributed tools (EnterpriseProvider.getMcpTools, installed at boot) — same
+        // scope gate via the dynamic map; no-op on Community.
+        registerEnterpriseMcpTools(mcp, storage, config, () => agentGaii);
         registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

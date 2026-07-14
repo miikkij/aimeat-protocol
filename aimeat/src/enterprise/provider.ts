@@ -9,6 +9,8 @@
  * @usage const provider = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
  *        await provider.mountRoutes(app);
  * @version-history
+ *   v0.4.0 — 2026-07-14 — add optional getMcpTools() + the declarative EnterpriseMcpTool contract
+ *     (EE contributes MCP tools without importing MCP machinery; /v2/mcp/enterprise surface)
  *   v0.3.0 — 2026-07-14 — add ctx.money: the commerce money chokepoint (src/commerce/money.ts)
  *     injected whole, so the EE module never does inline micros math (TARGET-033 phase 7c)
  *   v0.2.0 — 2026-07-13 — add optional getPaymentHandlers() (commerce core seam, TARGET-033)
@@ -92,6 +94,56 @@ export interface EnterpriseProvider {
    * making org offerings purchasable through the same checkout sessions and protocol adapters.
    */
   getSellableResolvers?(): SellableResolver[] | Promise<SellableResolver[]>;
+  /**
+   * MCP tools this edition contributes to the node's MCP server (registered on every session
+   * alongside the core tools; they also extend the /v2/mcp/enterprise surface). Declarative and
+   * dependency-free on the EE side: the module returns plain tool SPECS (name, description,
+   * field metadata, scope, annotations, async handler) and CORE does the zod/SDK work — the
+   * proprietary module never imports MCP machinery. Community/stub: absent.
+   */
+  getMcpTools?(): EnterpriseMcpTool[] | Promise<EnterpriseMcpTool[]>;
+}
+
+/** One input field of an enterprise MCP tool (core converts this metadata to a zod shape). */
+export interface EnterpriseMcpToolField {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  required?: boolean;
+  description?: string;
+  enum?: string[];
+}
+
+/** What an enterprise tool handler learns about the calling session (identity — never from input). */
+export interface EnterpriseMcpSession {
+  /** The calling agent's full GAII (MCP sessions are agent-authenticated). */
+  agentGaii: string;
+  /** Bare owner name derived from the session GAII. */
+  owner: string;
+  /** The owner's GHII (`owner@node`) — org records and memberships live at owner level. */
+  ownerGhii: string;
+  /** Runtime operator check (mirrors the core admin tools' self-gate). */
+  isOperator(): Promise<boolean>;
+}
+
+/**
+ * A declarative MCP tool contributed by the enterprise edition. `scope` plugs into the SAME
+ * per-session scope gate as core tools (catalog/scopes.ts dynamic map); an omitted scope means
+ * ungated (operator-only tools self-gate via session.isOperator instead, like core admin tools).
+ * The handler's return value is JSON-serialized into the tool result; a thrown
+ * { code?, statusCode?, message } becomes an isError result carrying the code.
+ */
+export interface EnterpriseMcpTool {
+  name: string;
+  description: string;
+  scope?: string;
+  annotations: {
+    title: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
+  input?: Record<string, EnterpriseMcpToolField>;
+  handler(args: Record<string, unknown>, session: EnterpriseMcpSession): Promise<unknown>;
 }
 
 /** HTTP status used when a gated namespace is hit on a node without the EE module. */
