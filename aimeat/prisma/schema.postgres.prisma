@@ -89,6 +89,10 @@ model Memory {
   // Opt-in version tracking: when true, the previous value is archived to MemoryVersion on overwrite
   // (latest stays here, history queried on demand). Default false → no change for existing keys.
   trackable  Boolean  @default(false)
+  // Cached UTF-8 byte size of the serialised value — SUM()'d DB-side for the memory total-size quota
+  // (§8.2) instead of loading every record and re-serialising on each write (that load-all was O(N)
+  // per write / O(N²) per bulk import). Set on every write; legacy rows read 0 until next rewrite.
+  byteSize   Int      @default(0)
   // Organism archive — read-only soft-archive flag. Archived rows are excluded from the bulk read/
   // search primitives by default (drop out of AI materials) yet stay resolvable by key. archivedRoot
   // records WHICH container's archival flagged the row, so unarchiving it restores only its cascade.

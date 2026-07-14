@@ -67,6 +67,13 @@ export interface MemoryRepository {
    * (e.g. "N Muistit") that need only the number, not the records.
    */
   countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): Promise<number>;
+  /**
+   * Sum the byte size of all of ONE owner's memory VALUES, computed DB-side (no values loaded/
+   * transferred). Backs the memory total-size quota (§8.2). Cheap and O(1)-ish via a stored
+   * per-row `byteSize`, unlike loading every record and re-serialising its value on each write —
+   * that load-all was O(N) per write / O(N²) per bulk import.
+   */
+  sumMemoryBytes(ownerGaii: string): Promise<number>;
   deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;

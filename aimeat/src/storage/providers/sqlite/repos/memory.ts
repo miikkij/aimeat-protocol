@@ -108,36 +108,45 @@ export function setMemory(db: Database.Database, record: MemoryRecord): MemoryRe
   // record being trackable — that's the version we keep.
   const trackable = record.trackable ?? existing?.trackable ?? false;
   record.trackable = trackable || undefined;
+  const valueStr = JSON.stringify(record.value);
+  const byteSize = Buffer.byteLength(valueStr, 'utf8');   // cached for the O(1) total-size quota sum
   if (existing) {
     if (existing.trackable) appendHistory(db, existing);   // keep the previous version before overwrite
     record.version = existing.version + 1;
     db.prepare(
       `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
-       createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ? WHERE ownerGaii = ? AND key = ?`
+       createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ? WHERE ownerGaii = ? AND key = ?`
     ).run(
-      JSON.stringify(record.value), record.visibility,
+      valueStr, record.visibility,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.createdAt, record.updatedAt,
       record.flagCount ?? 0,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
-      trackable ? 1 : 0,
+      trackable ? 1 : 0, byteSize,
       record.ownerGaii, record.key,
     );
   } else {
     db.prepare(
-      `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.key,
-      JSON.stringify(record.value), record.visibility,
+      valueStr, record.visibility,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.createdAt, record.updatedAt,
       record.flagCount ?? 0,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
-      trackable ? 1 : 0,
+      trackable ? 1 : 0, byteSize,
     );
   }
   return record;
+}
+
+/** Sum the byte size of one owner's memory values, computed entirely in SQLite (no rows/values
+ *  transferred to JS). Backs the memory total-size quota — replaces a load-all + re-serialise. */
+export function sumMemoryBytes(db: Database.Database, ownerGaii: string): number {
+  const row = db.prepare('SELECT COALESCE(SUM(byteSize), 0) AS s FROM memory WHERE ownerGaii = ?').get(ownerGaii) as { s: number };
+  return row.s;
 }
 
 /** Archived prior versions of a trackable key, newest version first. Empty for non-trackable keys. */

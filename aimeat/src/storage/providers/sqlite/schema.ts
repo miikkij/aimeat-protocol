@@ -16,7 +16,7 @@
  *     exists (was in block 1 → "no such column: googleSub" crash loop on 1.25→1.27).
  *   v1.1.0 — 2026-06-26 — Organism archive: memory.archived/archivedAt/archivedBy/archivedRoot +
  *     organisms.archived/At/By; partial index on the active set; FTS SPLIT (live memory_fts =
- *     active rows only, archived rows in memory_archive_fts, trigger-routed by archived).
+ *     active rows only, archived rows in memory_archive_fts, trigger-routed by archived).
  *   v1.2.0 — 2026-07-13 — Split DDL into schema-tables-1/2/3.ts (max-file-lines); pure
  *     extraction — table/index creation order and every SQL string are unchanged.
  */
@@ -80,6 +80,14 @@ export function initializeSchema(db: Database.Database): void {
   // the memory_history table (created in the DDL above) on overwrite. Default 0 → no behaviour change
   // for existing keys. No index needed on this column (filter happens at write time, not query time).
   safeAddColumn('memory', 'trackable', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Per-row value byte size — cached so the memory total-size quota sums it DB-side instead of loading
+  // every record and re-serialising its value on each write (that load-all was O(N) per write /
+  // O(N²) per bulk import). Set on every setMemory; backfilled once here for pre-existing rows so the
+  // quota is exact on upgraded DBs (LENGTH(CAST(value AS BLOB)) = the UTF-8 byte length of the stored
+  // JSON, which is exactly what the quota used to compute). No index needed (only SUM()'d per owner).
+  safeAddColumn('memory', 'byteSize', 'INTEGER NOT NULL DEFAULT 0');
+  db.prepare('UPDATE memory SET byteSize = LENGTH(CAST(value AS BLOB)) WHERE byteSize = 0').run();
 
   // Organism archive — read-only soft-archive flag. Archived rows are excluded from the bulk read/
   // search primitives by default (drop out of AI materials) yet stay resolvable by key and findable
