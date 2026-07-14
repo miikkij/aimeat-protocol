@@ -11,7 +11,7 @@ import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -26,6 +26,7 @@ import { importOrganism } from '../../services/organism-import.js';
 import { ZipSecurityError } from '../../services/safe-zip.js';
 import { recordSecurityIncident } from '../../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../../services/workspace-meta.js';
+import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
 import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
 import { isKeyArchived } from '../../services/archive.js';
@@ -299,6 +300,37 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         return;
       }
       res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', (e as Error).message || 'Could not update the workspace'));
+    }
+  });
+
+  /* ── POST /v1/organisms/:id/workspaces — CREATE a new workspace from a manifest + per-namespace JSON
+     schemas (locked strict). Any active member may create; agents/owners by role, published apps via the
+     organism:write scope (so an app can provision its own structured data space for its owner). The
+     workspace meta + schema locks are owned by the caller's OWNER GHII (resolveIdentity). Mirrors the MCP
+     aimeat_workspace_create — both share services/workspace-provision.ts. ── */
+  router.post('/v1/organisms/:id/workspaces', requireAuth(), requireRoleOrScope('agent', 'organism:write'), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const name = req.body?.name;
+    if (!name || typeof name !== 'string' || !name.trim()) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name is required')); return; }
+    const ownerName = req.auth!.owner as string;
+    try {
+      const result = await provisionWorkspace(storage, config, {
+        orgId: id, ownerName, ownerGhii: `${ownerName}@${config.nodeId}`,
+        name: name.trim(), manifest: req.body?.manifest, schemas: req.body?.schemas, readme: req.body?.readme,
+      });
+      emitChange('organisms');
+      void updateOrganismStructure(storage, config, id, { event: 'workspace created', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
+      res.status(201).json(success(config.nodeId, { created: true, ...result }));
+    } catch (e) {
+      if (e instanceof WorkspaceProvisionError || e instanceof WorkspaceMetaError) {
+        res.status(400).json(error(config.nodeId, (e as WorkspaceMetaError).code ?? 'INVALID_MANIFEST', e.message));
+        return;
+      }
+      res.status(500).json(error(config.nodeId, 'CREATE_FAILED', (e as Error).message || 'Could not create the workspace'));
     }
   });
 

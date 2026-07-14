@@ -412,6 +412,29 @@ export function requireLocalSession() {
  * Owner/operator role bypasses scope checks (they act as owners, not scoped agents).
  * Agents with explicit scopes are always enforced, even if their owner is an operator.
  */
+/**
+ * Pass if the caller satisfies requireRole(role) OR carries one of `scopes`. Generalizes the
+ * organism:invite pattern: a role-'app' (H-2) or ecosystem session with an explicit owner-granted
+ * scope may do what agents/owners can do by role — without weakening the role path (existing
+ * agent/owner/operator callers keep working regardless of their scopes). Used to let a published app
+ * provision an organism/workspace on its owner's behalf (organism:write) the same way it can invite
+ * (organism:invite).
+ */
+export function requireRoleOrScope(role: string, ...scopes: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) { res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required')); return; }
+    const roles = req.auth.roles;
+    // Role path — mirrors requireRole(role) exactly (owner/operator satisfy 'agent'; operator satisfies 'owner').
+    if (roles.includes(role) ||
+        (role === 'agent' && (roles.includes('owner') || roles.includes('operator'))) ||
+        (role === 'owner' && roles.includes('operator'))) { next(); return; }
+    // Scope path — any authenticated principal carrying the grant (wildcard-aware, mirrors requireScope).
+    const have = req.auth.scopes ?? [];
+    if (have.includes('*') || scopes.some(s => have.includes(s) || have.includes(`${s.split(':')[0]}:*`))) { next(); return; }
+    res.status(403).json(errorEnvelope('ACCESS_DENIED', `Requires role '${role}' or one of scopes: [${scopes.join(', ')}]`));
+  };
+}
+
 export function requireScope(...requiredScopes: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {

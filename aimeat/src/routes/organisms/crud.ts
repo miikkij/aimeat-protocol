@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, optionalAuth } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
@@ -25,8 +25,9 @@ import type { OrganismHelpers } from './shared.js';
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { wsRegPrefix } = H;
 
-  /* ── POST /v1/organisms — Create a new organism ── */
-  router.post('/v1/organisms', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── POST /v1/organisms — Create a new organism (agents/owners by role; published apps via the
+     organism:write scope, so an app can provision its own structured data space for its owner). ── */
+  router.post('/v1/organisms', requireAuth(), requireRoleOrScope('agent', 'organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility } = req.body ?? {};
 

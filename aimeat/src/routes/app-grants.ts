@@ -74,6 +74,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
+  'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',
 };
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s

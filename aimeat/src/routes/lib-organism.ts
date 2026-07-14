@@ -203,6 +203,33 @@ var organism = {
     return res.data !== undefined ? res.data : res;
   },
 
+  // Create a NEW organism (the signed-in owner becomes creator/member). Needs the organism:write app
+  // scope (declare it in <meta name="aimeat-scopes">). Returns { id, name, ... }. Use this + createWorkspace
+  // to let a multi-tenant app provision its own data space for each user on first use.
+  async create(name, opts) {
+    opts = opts || {};
+    var res = await authFetch('/v1/organisms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, type: opts.type || 'project', visibility: opts.visibility || 'private',
+        join_policy: opts.join_policy || 'invite_only', description: opts.description })
+    });
+    if (res.ok === false) throw fail(res, 'Failed to create organism');
+    return res.data !== undefined ? res.data : res;
+  },
+
+  // Create a NEW schema-locked workspace inside an organism from a manifest + per-namespace JSON schemas.
+  // manifest = { manifestVersion:'1', name, kind, objectTypes:[{ name, namespace, mode:'records',
+  // backing:'memory', writeRole:'member', schemaRef? }] }; schemas = { '<namespace>': <JSON Schema> }.
+  // Needs organism:write. Returns { ws, types, schemas_locked }.
+  async createWorkspace(orgId, name, manifest, schemas, readme) {
+    var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspaces', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, manifest: manifest, schemas: schemas, readme: readme })
+    });
+    if (res.ok === false) throw fail(res, 'Failed to create workspace');
+    return res.data !== undefined ? res.data : res;
+  },
+
   // List workspaces (access + enrichment counts included).
   async workspaces(orgId) {
     var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspaces?include=enrichment');
