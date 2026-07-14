@@ -138,19 +138,24 @@ export function perfTraceMiddleware(enabled: boolean): RequestHandler {
       startNs: process.hrtime.bigint(),
     };
 
-    const origEnd = res.end.bind(res);
-    let emitted = false;
-    (res as unknown as { end: (...a: unknown[]) => unknown }).end = function patchedEnd(...args: unknown[]): unknown {
-      if (!emitted) {
-        emitted = true;
-        const summary = summarize(store);
+    // Set the header by patching res.writeHead — the single point where headers are finalised, run
+    // just before they flush. Setting it in res.end is too late: compression (mounted after us) flushes
+    // headers before our end wrapper runs, so res.headersSent is already true and setHeader is a no-op.
+    // The trace store is complete by writeHead (the handler awaited its storage calls before responding).
+    const origWriteHead = res.writeHead.bind(res) as (...a: unknown[]) => Response;
+    let headerSet = false;
+    (res as unknown as { writeHead: (...a: unknown[]) => Response }).writeHead = function patchedWriteHead(...args: unknown[]): Response {
+      if (!headerSet) {
+        headerSet = true;
         if (!res.headersSent) {
-          try { res.setHeader('X-Aimeat-Perf', summary); } catch { /* headers already locked */ }
+          try { res.setHeader('X-Aimeat-Perf', summarize(store)); } catch { /* headers already locked */ }
         }
-        logger.info('[perf] %s %s — %s', req.method, req.originalUrl, summary);
       }
-      return (origEnd as (...a: unknown[]) => unknown)(...args);
+      return origWriteHead(...args);
     };
+    // Log independently of the header (survives header stripping by a reverse proxy). `finish` always
+    // fires once the response is fully sent. Plain string — the logger does NOT do printf %s.
+    res.on('finish', () => logger.info(`[perf] ${req.method} ${req.originalUrl} — ${summarize(store)}`));
 
     als.run(store, () => next());
   };
