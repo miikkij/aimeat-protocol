@@ -7,6 +7,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: owner/agent/ghii/auth-revoke on Postgres+Kysely.
  */
+import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../../interface.js';
 import type { Agent, Ghii, Owner } from '../db-types.js';
@@ -130,9 +131,24 @@ export const identityMethods = {
   async getAgentsByOwner(this: PostgresKyselyStorage, owner: string): Promise<AgentRecord[]> {
     return (await this.db.selectFrom('Agent').selectAll().where('owner', '=', owner).execute()).map(toAgentRecord);
   },
+  async listAgents(this: PostgresKyselyStorage): Promise<AgentRecord[]> {
+    return (await this.db.selectFrom('Agent').selectAll().execute()).map(toAgentRecord);
+  },
   async updateAgent(this: PostgresKyselyStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
+    // Json columns must be wrapped with jsonb(); Date columns need Date coercion. Everything else passes
+    // through. Build the SET map from only the keys present so a partial update touches nothing extra.
+    const jsonCols = new Set(['technicalCapabilities', 'domainCapabilities', 'activityStats', 'modulesLoaded', 'agentLimitations', 'languages', 'scheduleConstraintDefaults']);
+    const dateCols = new Set(['createdAt', 'lastSeen', 'webhookLastSuccess', 'webhookLastFailure']);
+    const data: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(updates)) {
+      if (v === undefined) continue;
+      if (jsonCols.has(k)) data[k] = jsonb((v ?? null) as Parameters<typeof jsonb>[0]);
+      else if (dateCols.has(k)) data[k] = v == null ? null : new Date(v as string);
+      else data[k] = v;
+    }
+    if (Object.keys(data).length === 0) return this.getAgent(gaii);
     try {
-      const rows = await this.db.updateTable('Agent').set(updates as never).where('gaii', '=', gaii).returningAll().execute();
+      const rows = await this.db.updateTable('Agent').set(data as never).where('gaii', '=', gaii).returningAll().execute();
       return rows[0] ? toAgentRecord(rows[0]) : null;
     } catch { return null; }
   },
@@ -187,12 +203,33 @@ export const identityMethods = {
     const r = await this.db.selectFrom('Ghii').selectAll().where('googleSub', '=', googleSub).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;
   },
+  async getGHIIByExternalId(this: PostgresKyselyStorage, provider: string, sub: string): Promise<GHIIRecord | null> {
+    // Google keeps its indexed mirror column; all providers also live in the externalIdentities JSON map.
+    if (provider === 'google') {
+      const byMirror = await this.db.selectFrom('Ghii').selectAll().where('googleSub', '=', sub).executeTakeFirst();
+      if (byMirror) return toGHIIRecord(byMirror);
+    }
+    const r = await this.db.selectFrom('Ghii').selectAll().where(sql<boolean>`"externalIdentities"->>${provider} = ${sub}`).executeTakeFirst();
+    return r ? toGHIIRecord(r) : null;
+  },
+  async listGHIIs(this: PostgresKyselyStorage, opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> {
+    let query = this.db.selectFrom('Ghii').selectAll();
+    if (opts?.q) {
+      const like = '%' + opts.q + '%';
+      query = query.where(eb => eb.or([
+        eb(sql`"username"`, 'ilike', like), eb(sql`"displayName"`, 'ilike', like), eb(sql`"bio"`, 'ilike', like),
+      ]));
+    }
+    if (opts?.level !== undefined) query = query.where('verificationLevel', '>=', opts.level);
+    return (await query.execute()).map(toGHIIRecord);
+  },
   async updateGHII(this: PostgresKyselyStorage, ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
     try {
       const data = { ...updates } as Record<string, unknown>;
       delete data.semantic; delete data.passwordFailedAttempts; delete data.passwordLockedUntil;   // not columns
       if (data.createdAt) data.createdAt = new Date(data.createdAt as string);
       if (data.updatedAt) data.updatedAt = new Date(data.updatedAt as string);
+      if ('externalIdentities' in data) data.externalIdentities = jsonb((data.externalIdentities ?? null) as Parameters<typeof jsonb>[0]);   // Json column
       const rows = await this.db.updateTable('Ghii').set(data as never).where('ghii', '=', ghii).returningAll().execute();
       return rows[0] ? toGHIIRecord(rows[0]) : null;
     } catch { return null; }

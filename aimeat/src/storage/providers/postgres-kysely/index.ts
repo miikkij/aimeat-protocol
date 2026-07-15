@@ -52,7 +52,13 @@ import { catalogueMethods } from './methods/catalogue.js';
 import { subdomainSiteMethods } from './methods/subdomain-sites.js';
 import { notificationMethods } from './methods/notifications.js';
 import { agentMessageMethods, disputeMethods, invitationMethods } from './methods/agent-msg-dispute-invite.js';
-import { startupCompatMethods } from './methods/startup-compat.js';
+import { nodeInfraMethods } from './methods/node-infra.js';
+import { nodeExtEscrowMethods } from './methods/node-ext-escrow.js';
+import { packageMethods } from './methods/packages.js';
+import { templateListingMethods } from './methods/template-listings.js';
+import { agentDirectiveMethods, agentActivityMethods, agentWebhookMethods, sharingGroupMethods } from './methods/agent-misc.js';
+import { identityExtraMethods } from './methods/identity-extras.js';
+import { systemPromptMethods, replicationQueueMethods } from './methods/system-extras.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -121,5 +127,15 @@ Object.assign(
   agentMessageMethods,
   disputeMethods,
   invitationMethods,
-  startupCompatMethods,
+  nodeInfraMethods,
+  nodeExtEscrowMethods,
+  packageMethods,
+  templateListingMethods,
+  agentDirectiveMethods,
+  agentActivityMethods,
+  agentWebhookMethods,
+  sharingGroupMethods,
+  identityExtraMethods,
+  systemPromptMethods,
+  replicationQueueMethods,
 );
