@@ -17860,6 +17860,61 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '413': { description: Too large for base64 mode }
 
+  /v1/organisms/{id}/workspace/records/publish:
+    post:
+      operationId: bulkPublishWorkspaceRecords
+      summary: Publish many workspace record drafts in one request
+      description: |
+        Batch publish: snapshots MANY drafted records (in one workspace + namespace) into new
+        `.version.N` + `.latest` in ONE operation instead of one publish call per record (a 520-record
+        import was ~11k separate operations). Behaviour is identical to the single publish per record —
+        schema + write-guard validation, the objectType's `versioned` flag, the unchanged-republish
+        change-guard (returns skipped), version/latest attribution and draft consumption — but the
+        namespace/manifest reads are amortised and the writes are committed together. Same authorization
+        as the single publish (active member; `meta.*` needs admin/creator; archived is read-only). When
+        the publish REVIEW gate is enabled this batch path is refused (409) — publish one at a time via
+        POST /v1/organisms/{id}/publish.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, instances]
+              properties:
+                ws: { type: string, description: Workspace id (omit for an organism-level namespace) }
+                namespace: { type: string, description: The objectType namespace the records live in }
+                instances:
+                  type: array
+                  maxItems: 1000
+                  items: { type: string }
+                  description: Instance ids whose drafts to publish
+                expected_versions:
+                  type: object
+                  additionalProperties: { type: integer }
+                  description: 'Optional per-instance optimistic lock (required by requires_expected_version namespaces): { <instance>: <version> }'
+      responses:
+        '200':
+          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code? }] }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: namespace or instances missing, or more than 1000 instances
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: not an active member, or meta.* without admin/creator
+        '404':
+          description: organism not found
+        '409':
+          description: the organism/workspace is archived, or the publish review gate is enabled
+
   /v1/organisms/{id}/workspace/records/delete:
     post:
       operationId: bulkDeleteWorkspaceRecords

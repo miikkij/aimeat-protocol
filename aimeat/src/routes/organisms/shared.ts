@@ -186,6 +186,83 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return { ok: true, version: n };
   };
 
+  // BATCH publish (data-access redesign, Phase 2): publish MANY drafts in ONE workspace+namespace as one
+  // operation. Semantics are byte-for-byte those of publishDraft above — schema/write-guard validation
+  // (viaPublish + optimistic lock), the `versioned` flag, the unchanged-republish change-guard, the
+  // .version.N (publisher-owned) + .latest (GHII-owned) attribution, the collapse of forked .latest
+  // copies, and draft consumption — but the shared reads are amortised (ONE namespace scan + ONE manifest
+  // read for the whole batch) and the writes/deletes are committed together (ONE bulkSetMemory + ONE
+  // bulkDeleteMemory), instead of the per-record scan + individual setMemory/deleteMemory pipeline that a
+  // 520-record CADENCE import ran as ~11k separate operations. Auth (membership, meta.* role, archive,
+  // publish gate) stays in the route; this is the data operation.
+  const publishDraftsBatch = async (
+    organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,
+    expectedVersions?: Record<string, number | null>,
+  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> }> => {
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const ownerGhii = ownerGhiiOf(publisher);
+    const nsPrefix = `${wsRoot}.${namespace}.`;
+    // ONE scan of the whole namespace + ONE manifest read (the `versioned` flag) for the entire batch.
+    const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 });
+    const mkey = `${wsRoot}.meta.manifest`;
+    const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
+    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const versioned = pubOt?.versioned !== false;
+
+    const now = new Date().toISOString();
+    const toUpsert: MemoryRecord[] = [];
+    const toDelete: { ownerGaii: string; key: string }[] = [];
+    const toEmit: Array<{ owner: string; key: string }> = [];
+    const results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> = [];
+
+    for (const instance of instances) {
+      const base = `${nsPrefix}${instance}`;
+      const items = allRows.filter(r => r.key === base || r.key.startsWith(`${base}.`));
+      const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      if (!draft) { results.push({ instance, ok: false, code: 'NO_DRAFT' }); continue; }
+      const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
+      const expectedVersion = expectedVersions?.[instance] ?? null;
+      const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
+      if (!validation.valid) { results.push({ instance, ok: false, code: 'INVALID', violations: validation.errors }); continue; }
+
+      let maxN = 0;
+      const vPrefix = `${base}.version.`;
+      for (const r of items) {
+        if (r.key.startsWith(vPrefix)) { const s = r.key.slice(vPrefix.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); }
+      }
+      const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      const vis = draft.visibility;
+      const tags = draft.tags ?? [];
+
+      // Change-guard: an unchanged re-publish just consumes the draft (no new version/latest, no side effect).
+      if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
+        toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });
+        results.push({ instance, ok: true, version: maxN, skipped: true });
+        continue;
+      }
+      const n = maxN + 1;
+      if (versioned) toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+      // .latest is owned by a member GHII (never a raw agent GAII) — ONE owner per key. A brand-new
+      // record is owned by the publisher's GHII; an existing one keeps its (GHII-normalised) owner. The
+      // explicit version is what setMemory INSERTs; on an in-place UPDATE setMemory recomputes it — same
+      // as publishDraft, since bulkSetMemory reuses setMemory verbatim.
+      const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
+      toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+      // Collapse: any pre-existing .latest copy under a DIFFERENT owner is removed (single-owner key).
+      for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
+      toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });   // consume the draft
+      toEmit.push({ owner: latestOwner, key: `${base}.latest` });
+      results.push({ instance, ok: true, version: n });
+    }
+
+    // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed copies).
+    if (toUpsert.length) { if (storage.bulkSetMemory) await storage.bulkSetMemory(toUpsert); else for (const r of toUpsert) await storage.setMemory(r); }
+    if (toDelete.length) { if (storage.bulkDeleteMemory) await storage.bulkDeleteMemory(toDelete); else for (const r of toDelete) await storage.deleteMemory(r.ownerGaii, r.key); }
+    // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
+    for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
+    return { results };
+  };
+
   // Reopen a published record for editing: copy organism.{id}.{ns}.{instance}.latest → .draft so the
   // existing edit → publish flow applies. The published .latest stays live (and keeps serving readers)
   // until the edited draft is re-published. Refuses to clobber an in-progress draft.
@@ -450,7 +527,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   };
 
   return {
-    memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft,
+    memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
     wsRegPrefix, bareOwner, findWsEntry, canReadWs, ensureConsent,
     setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
     readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, docsToMarkdown,

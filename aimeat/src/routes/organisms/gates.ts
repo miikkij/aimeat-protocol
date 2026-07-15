@@ -21,7 +21,7 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
+  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
 
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
   router.post('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
@@ -185,6 +185,63 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     emitChange('organisms');
     // Content growth changes the structure fingerprint (doc/record counts) → record a timeline snapshot.
     void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(() => { /* best-effort */ });
+  });
+
+  // POST /v1/organisms/:id/workspace/records/publish — BATCH publish (Phase 2, data-access redesign).
+  // Publishes MANY drafts in one workspace+namespace as ONE operation (a 520-record CADENCE import was
+  // ~11k separate ops); the data path (publishDraftsBatch) amortises the namespace/manifest reads and
+  // commits every version+latest in one bulk write. Same authorization as the single publish — active
+  // member, meta.* needs admin/creator, archived is read-only. The publish REVIEW gate is per-decision,
+  // so when it's enabled this batch path is refused (use POST /v1/organisms/:id/publish one at a time).
+  // Body: { ws?, namespace, instances: [], expected_versions?: { <instance>: <version> } }.
+  router.post('/v1/organisms/:id/workspace/records/publish', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const { namespace, instances, ws, expected_versions: expectedVersions } = req.body ?? {};
+    const wsId = typeof ws === 'string' ? ws : undefined;
+    if (typeof namespace !== 'string' || !namespace || !Array.isArray(instances) || instances.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace (string) and instances (non-empty array) are required'));
+      return;
+    }
+    if (instances.length > 1000) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 1000 instances per request')); return; }
+    if (!canWriteNamespace(role, namespace)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
+      return;
+    }
+    const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
+    if (pubGuard.archived) {
+      res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${pubGuard.level} is archived (read-only). Unarchive it before publishing.`));
+      return;
+    }
+    // The publish review gate is a per-decision workflow — a batch publish would bypass it, so refuse.
+    const cfg = await readConfig(id);
+    const pg = (cfg?.gates as Record<string, { enabled?: boolean }> | undefined)?.publish;
+    if (pg?.enabled === true) {
+      res.status(409).json(error(config.nodeId, 'GATE_ENABLED', 'The publish review gate is enabled — publish records one at a time via POST /v1/organisms/:id/publish'));
+      return;
+    }
+
+    const publisher = resolveIdentity(req.auth!, config.nodeId);
+    const ids = instances.filter((x: unknown): x is string => typeof x === 'string' && !!x);
+    const expMap = (expectedVersions && typeof expectedVersions === 'object') ? expectedVersions as Record<string, number | null> : undefined;
+    const { results } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap);
+
+    const published = results.filter(r => r.ok && !r.skipped);
+    if (published.length > 0) {
+      await writeDecision(id, publisher, `published ${published.length} record(s) in ${namespace}`, published.map(r => `${namespace}.${r.instance}`));
+      emitChange('organisms');
+      void updateOrganismStructure(storage, config, id, { event: 'content published (batch)', actor: publisher }).catch(() => { /* best-effort */ });
+    }
+    res.json(success(config.nodeId, {
+      published: published.length,
+      skipped: results.filter(r => r.ok && r.skipped).length,
+      failed: results.filter(r => !r.ok).length,
+      results,
+    }));
   });
 
   // POST /v1/organisms/:id/revert — reopen a published record for editing (copy .latest → .draft).
