@@ -9,9 +9,9 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: boot placeholders (normalizeAppOwnerNames, mergeForkedAppBuckets, listFederationPeers).
  */
 import type {
-  ActionRecord, CapabilityRecord, CortexExtensionRecord,
+  CortexExtensionRecord,
   DisputeRecord, EcosystemAppRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
-  FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord,
+  FederationPeerRecord, GHIIRecord, PersonalNodeRecord,
 } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
@@ -34,10 +34,7 @@ export const startupCompatMethods = {
   // their callers catch failures, but an empty result keeps the logs clean and the loops harmless until
   // the directory / actions / cortex / capabilities / scheduler domains land.
   async listGHIIs(this: PostgresKyselyStorage, _opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> { return []; },
-  async listActions(this: PostgresKyselyStorage, _opts?: { search?: string; category?: string }): Promise<ActionRecord[]> { return []; },
   async listCortexExtensions(this: PostgresKyselyStorage, _opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> { return []; },
-  async listCapabilitiesBySourceType(this: PostgresKyselyStorage, _sourceType: string): Promise<CapabilityRecord[]> { return []; },
-  async listScheduledJobs(this: PostgresKyselyStorage, _filter?: { type?: string; extensionName?: string; enabled?: boolean; ownerScope?: string; agentGaii?: string }): Promise<ScheduledJobRecord[]> { return []; },
 
   // Owner-scope identity resolution calls this on every owner-scoped memory op; empty until the
   // ecosystem-apps domain lands (a node with no connected ecosystem apps).

@@ -33,6 +33,12 @@ import { boardMethods } from './methods/boards.js';
 import { consentMethods } from './methods/consent.js';
 import { workMethods } from './methods/work.js';
 import { deviceAuthMethods } from './methods/device-auth.js';
+import { actionMethods } from './methods/actions.js';
+import { scheduleMethods } from './methods/schedules.js';
+import { agentTaskMethods } from './methods/agent-tasks.js';
+import { agentUsageMethods } from './methods/agent-usage.js';
+import { capabilityMethods } from './methods/capabilities.js';
+import { knowledgeMethods } from './methods/knowledge.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -81,5 +87,11 @@ Object.assign(
   consentMethods,
   workMethods,
   deviceAuthMethods,
+  actionMethods,
+  scheduleMethods,
+  agentTaskMethods,
+  agentUsageMethods,
+  capabilityMethods,
+  knowledgeMethods,
   startupCompatMethods,
 );
