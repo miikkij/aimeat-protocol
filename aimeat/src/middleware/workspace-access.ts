@@ -15,6 +15,9 @@
  *   v1.3.0 -- 2026-06-09 -- Workspace CONTENT writes require the creator's 'contributor' role grant only
  *     (revocable); 'viewer' is read-only. Flat organism namespaces still use the writer's own contribution
  *     consent. Splits the consent check by workspace key vs flat key.
+ *   v1.4.0 -- 2026-07-15 -- An org manager (creator/admin) bypasses the consent check for organism keys —
+ *     full read+write access to every workspace under the organism (the member.{owner}.* self-write and
+ *     meta.* admin-role gates still apply).
  */
 import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -92,6 +95,10 @@ export function workspaceAccessMiddleware(
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
       return;
     }
+    // An org manager (creator/admin) has automatic read+write access to every workspace under the
+    // organism — they already manage its access, invites, export and archive. So, like the human owner
+    // principal, their sessions (incl. their agents) do not need a per-workspace contributor consent.
+    const isOrgManager = membership.role === 'creator' || membership.role === 'admin';
 
     // --- Consent check (Phase 2.3) ---
     // Determine if consent is required for this operation.
@@ -132,9 +139,9 @@ export function workspaceAccessMiddleware(
       }
     }
 
-    // Consent needed unless writing your own member namespace, you're the human owner-principal, or
-    // you're an agent of the workspace's own creator.
-    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent;
+    // Consent needed unless writing your own member namespace, you're the human owner-principal, you're
+    // an agent of the workspace's own creator, or you're an org manager (creator/admin — full access).
+    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent && !isOrgManager;
 
     if (needsConsent) {
       let hasConsent = false;

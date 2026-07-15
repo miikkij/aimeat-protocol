@@ -6,6 +6,8 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) see every workspace in the agents/activity feed
+ *     (isOrgManager), matching their automatic workspace read access.
  */
 import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -32,6 +34,7 @@ import { activateEngagement, retireEngagement, listByWorkspace as listEngagement
 import { isKeyArchived } from '../../services/archive.js';
 import { checkDeleteGuard } from '../../services/write-guards.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { isOrgManager } from '../../services/workspace-access.js';
 import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -150,6 +153,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const ownerName = req.auth!.owner as string;
+    // An org manager (creator/admin) can read every workspace → skip the per-ws probe.
+    const manager = await isOrgManager(storage, id, ownerName);
     // Registry → readable workspaces + names.
     const reg = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
     const wss: Array<{ id: string; name: string }> = [];
@@ -160,7 +165,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         if (!w.id || seenWs.has(w.id)) continue;
         seenWs.add(w.id);
         const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
-        if (createdBy === ownerName || await canReadWs(id, w.id, callerGaii)) wss.push({ id: w.id, name: w.name ?? w.id });
+        if (createdBy === ownerName || manager || await canReadWs(id, w.id, callerGaii)) wss.push({ id: w.id, name: w.name ?? w.id });
       }
     }
     // Single scan of organism.{id}.w. → bucket by ws (per-ws fallback above the cap).
