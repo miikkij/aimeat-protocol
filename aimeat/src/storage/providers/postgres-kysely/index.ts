@@ -39,6 +39,12 @@ import { agentTaskMethods } from './methods/agent-tasks.js';
 import { agentUsageMethods } from './methods/agent-usage.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
+import { appMethods } from './methods/apps.js';
+import { oauthMethods } from './methods/oauth.js';
+import { ecosystemMethods } from './methods/ecosystem.js';
+import { patMethods } from './methods/pat.js';
+import { otkMethods } from './methods/otk.js';
+import { federationMethods } from './methods/federation.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -93,5 +99,11 @@ Object.assign(
   agentUsageMethods,
   capabilityMethods,
   knowledgeMethods,
+  appMethods,
+  oauthMethods,
+  ecosystemMethods,
+  patMethods,
+  otkMethods,
+  federationMethods,
   startupCompatMethods,
 );

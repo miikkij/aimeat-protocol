@@ -1054,6 +1054,7 @@ export interface Otk {
   createdAt: Generated<Timestamp>;
   expiresAt: Timestamp;
   id: Generated<string>;
+  initial: Generated<boolean>;
   key: string;
   ownerGaii: string;
   params: Json;

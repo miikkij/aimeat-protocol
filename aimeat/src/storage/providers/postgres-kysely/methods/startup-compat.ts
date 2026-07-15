@@ -10,35 +10,21 @@
  */
 import type {
   CortexExtensionRecord,
-  DisputeRecord, EcosystemAppRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
-  FederationPeerRecord, GHIIRecord, PersonalNodeRecord,
+  DisputeRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
+  GHIIRecord,
 } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
 export const startupCompatMethods = {
-  // App owner-name legacy normalisation / fork-bucket merge — data migrations that are no-ops until the
-  // apps domain (and any legacy rows) exist. Real impl lands with the apps slice.
-  async normalizeAppOwnerNames(this: PostgresKyselyStorage): Promise<number> { return 0; },
-  async mergeForkedAppBuckets(this: PostgresKyselyStorage): Promise<number> { return 0; },
-
-  // Approved federation peers — none on a fresh node; real impl lands with the federation slice.
-  async listFederationPeers(this: PostgresKyselyStorage): Promise<FederationPeerRecord[]> { return []; },
-
-  // Post-listen hooks (extension scheduler warm-up, personal-node reconnect) — empty on a fresh node.
-  // Real impls land with the extensions / personal-node slices.
+  // Post-listen hooks (extension scheduler warm-up) — empty until the extensions domain lands.
   async listExtensions(this: PostgresKyselyStorage): Promise<ExtensionRecord[]> { return []; },
   async listExtensionInstances(this: PostgresKyselyStorage, _extensionName: string): Promise<ExtensionInstanceRecord[]> { return []; },
-  async getPersonalNodeByOwner(this: PostgresKyselyStorage, _ownerName: string): Promise<PersonalNodeRecord | null> { return null; },
 
   // Periodic background scans (directory index, capability aggregator, scheduler) call these on intervals;
   // their callers catch failures, but an empty result keeps the logs clean and the loops harmless until
   // the directory / actions / cortex / capabilities / scheduler domains land.
   async listGHIIs(this: PostgresKyselyStorage, _opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> { return []; },
   async listCortexExtensions(this: PostgresKyselyStorage, _opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> { return []; },
-
-  // Owner-scope identity resolution calls this on every owner-scoped memory op; empty until the
-  // ecosystem-apps domain lands (a node with no connected ecosystem apps).
-  async getEcosystemAppsByOwner(this: PostgresKyselyStorage, _owner: string): Promise<EcosystemAppRecord[]> { return []; },
 
   // The DELETE /v1/owners/:name GDPR-export cascade lists across many domains before deleting; empty
   // until those domains (work / consent / boards / escrow / disputes) land — correct on a node with no
