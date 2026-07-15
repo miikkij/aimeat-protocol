@@ -11,7 +11,7 @@
 import type {
   ActionRecord, CapabilityRecord, CortexExtensionRecord,
   DisputeRecord, EcosystemAppRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
-  FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord, WorkRecord,
+  FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord,
 } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
@@ -46,8 +46,6 @@ export const startupCompatMethods = {
   // The DELETE /v1/owners/:name GDPR-export cascade lists across many domains before deleting; empty
   // until those domains (work / consent / boards / escrow / disputes) land — correct on a node with no
   // such data. Each is replaced by the real implementation with its domain slice.
-  async listWorkByProvider(this: PostgresKyselyStorage, _gaii: string): Promise<WorkRecord[]> { return []; },
-  async listWorkByRequester(this: PostgresKyselyStorage, _gaii: string): Promise<WorkRecord[]> { return []; },
   async listEscrowHolds(this: PostgresKyselyStorage, _fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> { return []; },
   async listAllDisputes(this: PostgresKyselyStorage, _limit?: number): Promise<DisputeRecord[]> { return []; },
 };
