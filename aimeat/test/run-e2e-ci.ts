@@ -321,7 +321,7 @@ async function startServer(): Promise<ChildProcess> {
     if (DB_TYPE === 'sqlite') {
         const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
         serverArgs.push('--db-path', dbPath);
-    } else if (DB_TYPE === 'mongodb' || DB_TYPE === 'postgresql') {
+    } else if (DB_TYPE === 'mongodb' || DB_TYPE === 'postgresql' || DB_TYPE === 'postgres-kysely') {
         const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
         if (dbUrl) serverArgs.push('--db-url', dbUrl);
     }
@@ -378,6 +378,26 @@ END $$;`);
     }
 }
 
+/** Empty every table for the Postgres+Kysely backend EXCEPT `_kysely_migrations` — so the schema and the
+ *  applied-migration ledger survive (the server's runMigrations skips them) while all data is cleared.
+ *  Uses the raw `pg` client (no Prisma). A no-op on a fresh DB where no tables exist yet. */
+async function resetKyselyPgTables(dbUrl: string): Promise<void> {
+    const pg = (await import('pg')).default;
+    const client = new pg.Client(dbUrl);
+    await client.connect();
+    try {
+        await client.query(`DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_kysely_migrations') LOOP
+    EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+  END LOOP;
+END $$;`);
+    } finally {
+        await client.end();
+    }
+}
+
 async function cleanDatabase(): Promise<void> {
     if (DB_TYPE === 'sqlite') {
         const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
@@ -403,6 +423,15 @@ async function cleanDatabase(): Promise<void> {
         if (dbUrl) {
             try {
                 await resetPostgresTables(dbUrl);
+            } catch (error) {
+                warnPostgresCleanupFailure(error);
+            }
+        }
+    } else if (DB_TYPE === 'postgres-kysely') {
+        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
+        if (dbUrl) {
+            try {
+                await resetKyselyPgTables(dbUrl);
             } catch (error) {
                 warnPostgresCleanupFailure(error);
             }
@@ -513,6 +542,20 @@ async function main() {
                 });
                 await resetPostgresTables(dbUrl);
                 console.log('PostgreSQL test database reset.');
+            } catch (error) {
+                warnPostgresCleanupFailure(error);
+            }
+        }
+    } else if (DB_TYPE === 'postgres-kysely') {
+        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
+        if (dbUrl) {
+            const dbName = new URL(dbUrl).pathname.replace('/', '');
+            console.log(`Resetting Postgres+Kysely test database "${dbName}"...`);
+            try {
+                // No prisma db push — the server's own migration runner builds the schema on boot. This just
+                // empties every table EXCEPT _kysely_migrations (so the recorded migrations aren't re-run).
+                await resetKyselyPgTables(dbUrl);
+                console.log('Postgres+Kysely test database reset.');
             } catch (error) {
                 warnPostgresCleanupFailure(error);
             }
