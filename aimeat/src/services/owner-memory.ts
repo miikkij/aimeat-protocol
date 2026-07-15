@@ -85,15 +85,17 @@ export async function getOwnerScopeMemory(
   const ownerGhii = `${ownerName}@${nodeId}`;
   const ghii = await storage.getMemory(ownerGhii, key);
   if (ghii) return ghii;
+  // Not under the owner's GHII — look across every agent + ecosystem app in ONE query. Previously this
+  // was one getMemory PER identity (an owner with ~60 agents = ~60 serial round-trips just to read one
+  // key that isn't there). `prefix: key` + an exact-key filter finds the key wherever it lives; GHII was
+  // already checked, so agents/eco keep their listing-order precedence.
   const agents = await storage.getAgentsByOwner(ownerName);
-  for (const agent of agents) {
-    const rec = await storage.getMemory(agent.gaii, key);
-    if (rec) return rec;
-  }
   const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
-  for (const app of ecoApps) {
-    const rec = await storage.getMemory(app.geai, key);
-    if (rec) return rec;
-  }
-  return null;
+  const others = [...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+  if (!others.length) return null;
+  const rows = (await storage.listMemoryForOwners(others, { prefix: key })).filter(r => r.key === key);
+  if (!rows.length) return null;
+  const priority = new Map(others.map((id, i) => [id, i]));
+  rows.sort((a, b) => (priority.get(a.ownerGaii) ?? others.length) - (priority.get(b.ownerGaii) ?? others.length));
+  return rows[0];
 }
