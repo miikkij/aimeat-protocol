@@ -98,6 +98,14 @@ export interface MemoryRepository {
    * CADENCE delete was thousands of round-trips). Returns the number of rows removed. Optional.
    */
   deleteMemorySubtree?(ownerGaii: string, baseKey: string): Promise<number>;
+  /**
+   * BULK PRIMITIVE — delete EVERY memory row whose key begins with `keyPrefix`, across ALL owners, in
+   * ONE statement (Phase 2). Backs the whole-workspace / whole-organism wipe (organism.{id}.[w.{ws}.]*),
+   * replacing its per-key deleteMemory loop over thousands of rows. Deletes active AND archived rows —
+   * a wipe removes the container entirely. Pass a prefix ending at a key boundary (e.g. `organism.{id}.`)
+   * so a sibling id can't be caught. Returns the number of rows removed. Optional.
+   */
+  deleteMemoryByPrefix?(keyPrefix: string): Promise<number>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the

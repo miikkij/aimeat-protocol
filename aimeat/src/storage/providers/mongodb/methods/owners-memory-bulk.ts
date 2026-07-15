@@ -62,4 +62,12 @@ export const ownerMemoryBulkMethods = {
         });
         return result.count;
     },
+
+    // BULK PRIMITIVE (Phase 2) — delete EVERY row under a key prefix, all owners, active AND archived, in
+    // ONE deleteMany. Backs the workspace/organism wipe, replacing its per-key deleteMemory loop.
+    async deleteMemoryByPrefix(this: PrismaStorage, keyPrefix: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.memory.deleteMany({ where: { key: { startsWith: keyPrefix } } });
+        return result.count;
+    },
 };

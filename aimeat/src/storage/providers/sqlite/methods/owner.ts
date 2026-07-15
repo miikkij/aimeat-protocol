@@ -666,6 +666,14 @@ export const ownerMethods = {
     return result.changes;
   },
 
+  // BULK PRIMITIVE (Phase 2) — delete EVERY row under a key prefix, all owners, active AND archived, in
+  // ONE statement (the AFTER DELETE trigger keeps both FTS tables in sync per row). Backs the workspace/
+  // organism wipe, replacing its per-key deleteMemory loop over thousands of rows.
+  async deleteMemoryByPrefix(this: SqliteStorage, keyPrefix: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM memory WHERE key LIKE ?').run(keyPrefix + '%');
+    return result.changes;
+  },
+
   async deleteAllMemory(this: SqliteStorage, ownerGaii: string): Promise<number> {
     const result = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(ownerGaii);
     return result.changes;

@@ -618,9 +618,16 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // the client, which removes the entry after this succeeds.
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const prefix = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
-    const { items } = await storage.listAllMemory({ prefix, limit: 100000 });
-    let memoryKeys = 0;
-    for (const r of items) { if (await storage.deleteMemory(r.ownerGaii, r.key)) memoryKeys++; }
+    // Data-access redesign (Phase 2): wipe the container in ONE statement (all rows under the prefix,
+    // active AND archived) instead of a per-key deleteMemory loop over thousands of rows.
+    let memoryKeys: number;
+    if (storage.deleteMemoryByPrefix) {
+      memoryKeys = await storage.deleteMemoryByPrefix(prefix);
+    } else {
+      const { items } = await storage.listAllMemory({ prefix, limit: 100000, archived: 'include' });
+      memoryKeys = 0;
+      for (const r of items) { if (await storage.deleteMemory(r.ownerGaii, r.key)) memoryKeys++; }
+    }
     let schemas = 0;
     for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
     res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));
