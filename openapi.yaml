@@ -17860,6 +17860,55 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '413': { description: Too large for base64 mode }
 
+  /v1/organisms/{id}/workspace/records/delete:
+    post:
+      operationId: bulkDeleteWorkspaceRecords
+      summary: Delete many workspace records in one request
+      description: |
+        Batched record-family delete: removes MANY workspace records at once instead of one
+        object-delete call per record (a 549-record teardown was 549 round-trips). Resolves the
+        organism, membership and the append-only guard ONCE, then removes each record's whole family
+        (bare / `.draft` / `.latest` / `.version.N`) that is owned by the CALLER'S OWN identity family —
+        cross-owner rows are never touched (a member can only delete their own records) — and commits the
+        deletions together. An append-only (create_only) namespace refuses the whole batch (409).
+        Active member of the organism.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, ids]
+              properties:
+                ws: { type: string, description: Workspace id (omit for an organism-level namespace) }
+                namespace: { type: string, description: The objectType namespace the records live in }
+                ids:
+                  type: array
+                  maxItems: 2000
+                  items: { type: string }
+                  description: Instance ids to delete
+      responses:
+        '200':
+          description: 'Result: { deleted: [{id, keys}], failed: [{id, reason}], rows_removed }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: namespace or ids missing, or more than 2000 ids
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: not an active member of the organism
+        '404':
+          description: organism not found
+        '409':
+          description: the namespace is append-only (create_only) — records cannot be deleted
+
   /v1/organisms/{id}/workspace/import:
     post:
       operationId: importWorkspace
