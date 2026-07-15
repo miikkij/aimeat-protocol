@@ -20,6 +20,13 @@ import type { MemoryRecord, Storage } from '../../interface.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
 import { memoryMethods } from './methods/memory.js';
+import { systemMethods } from './methods/system.js';
+import { identityMethods } from './methods/identity.js';
+import { walletMethods } from './methods/wallet.js';
+import { sessionMethods } from './methods/sessions.js';
+import { schemaMethods } from './methods/schema.js';
+import { agentOnboardingMethods } from './methods/agent-onboarding.js';
+import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -52,4 +59,11 @@ export interface PostgresKyselyStorage extends Storage, PgKyselyInternals {}
 Object.assign(
   PostgresKyselyStorage.prototype,
   memoryMethods,
+  systemMethods,
+  identityMethods,
+  walletMethods,
+  sessionMethods,
+  schemaMethods,
+  agentOnboardingMethods,
+  startupCompatMethods,
 );
