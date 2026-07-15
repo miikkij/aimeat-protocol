@@ -29,6 +29,8 @@ export default tseslint.config(
       'test/**',
       'src/static/**',
       'src/generated/**',
+      // kysely-codegen output (the typed DB schema) — generated, do not lint.
+      'src/storage/providers/*/db-types.ts',
       // Vendored / generated frontend bundles — not our source.
       'public/lib/**',
       'public/cortex-bundled/**',

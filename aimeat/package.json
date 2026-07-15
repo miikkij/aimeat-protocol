@@ -192,6 +192,7 @@
     "esbuild": "0.28.1",
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "kysely-codegen": "^0.20.0",
     "openapi-typescript": "^7.8.0",
     "prisma": "^6.9.0",
     "tsx": "^4.22.4",
