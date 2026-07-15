@@ -16,10 +16,106 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { listOwnerScopeMemory } from '../../services/owner-memory.js';
+import { createMemoryDbService } from '../../services/db/index.js';
+import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, stats, resolve } = ctx;
+  // Data-access redesign (Phase 1): the batched-write path runs through the Application-DB-Service so a
+  // bulk write is ONE operation (batched reads + one-transaction bulk upsert) instead of N single writes.
+  const memoryDb = createMemoryDbService(storage, config);
+
+  // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
+  // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
+  // enforcing the SAME per-value-size / key-count / total-quota limits + schema validation as the single
+  // POST /v1/memory (overage-morsel charging excluded — an over-quota entry fails). Scope guards: this
+  // path is for the caller's OWN flat keyspace — `organism.*` keys (workspace-guarded) and ecosystem
+  // principals go through their dedicated guarded paths and are refused here.
+  router.post('/v1/memory/bulk', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const body = req.body ?? {};
+    const rawEntries = Array.isArray(body.entries) ? body.entries : null;
+    if (!rawEntries) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'entries array is required'));
+      return;
+    }
+    if (rawEntries.length > 1000) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A bulk write may contain at most 1000 entries'));
+      return;
+    }
+    if (req.auth!.roles.includes('ecosystem')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Ecosystem apps write via their own data-area path, not /v1/memory/bulk'));
+      return;
+    }
+    const mode = body.mode === 'skip' ? 'skip' : 'overwrite';
+
+    // Resolve the target identity (owner sessions may target one of their agents via ?agent / body.agent).
+    let gaii = resolve(req);
+    const agentParam = body.agent as string | undefined;
+    if (agentParam && agentParam !== gaii) {
+      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      if (!isOwnerSession) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may bulk-write under a specific agent'));
+        return;
+      }
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only write memory to your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+
+    // Per-item protocol guards (mirror POST /v1/memory): drop bad entries into the failed list rather than
+    // aborting; the survivors go to the service. organism.* keys are refused (Phase 2 workspace path).
+    const items: BulkWriteItem[] = [];
+    const preFailed: { key: string; status: 'failed'; reason: string }[] = [];
+    for (const e of rawEntries) {
+      const key = e?.key;
+      if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
+      if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
+      if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
+      if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      items.push({
+        key,
+        value: e.value,
+        visibility: (['private', 'owner', 'group', 'members', 'public', 'workspace'].includes(e.visibility) ? e.visibility : 'private'),
+        tags: Array.isArray(e.tags) ? e.tags : [],
+        ttlHours: typeof e.ttl_hours === 'number' ? e.ttl_hours : null,
+        ...(e.group_id ? { groupId: e.group_id } : {}),
+      });
+    }
+
+    const result = await memoryDb.writeMany(gaii, items, {
+      mode,
+      quota: {
+        maxKeysPerOwner: config.memoryMaxKeysPerAgent,
+        maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
+        totalQuotaBytes: config.memoryQuotaMb * 1024 * 1024,
+      },
+      validate: (key, value) => validateMemoryWrite(key, value, storage),
+    });
+
+    // Fire the same reactive/live-update signals a single write does, for each entry actually written.
+    for (const it of result.items) {
+      if (it.status === 'created' || it.status === 'updated') {
+        emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(it.key)}`);
+        emitMemoryWritten(gaii, it.key, it.status);
+      }
+    }
+    if (result.created > 0) emitResourceListChanged(gaii);
+    if (result.created + result.updated > 0) emitChange('memory');
+    stats?.increment('memory_writes');
+
+    const failed = [...preFailed.map(f => ({ key: f.key, reason: f.reason })),
+                    ...result.items.filter(i => i.status === 'failed').map(i => ({ key: i.key, reason: i.reason ?? 'failed' }))];
+    res.json(success(config.nodeId, {
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      failed,
+    }));
+  });
 
   // GET /v1/memory/export — download all of the caller's memory entries (full values) as a JSON
   // backup. Owner sessions export across their GHII + agents + ecosystem apps (owner-scope); agent

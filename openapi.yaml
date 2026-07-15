@@ -7143,6 +7143,68 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/memory/bulk:
+    post:
+      operationId: bulkWriteMemory
+      summary: Write many memory entries in one request
+      description: >
+        Batched write of many memory entries as ONE operation — the existing-key lookup, byte-sum and
+        key-count are read in a single round-trip each and the valid rows are committed together, instead
+        of issuing N separate POST /v1/memory requests. Enforces the SAME per-value-size, key-count and
+        total-quota limits and schema validation as the single write; a failing entry is recorded in
+        `failed[]` and skipped without aborting the batch. Overage-morsel charging is NOT applied (an
+        over-quota entry fails). Scope: the caller's own flat keyspace only — `organism.*` keys
+        (workspace-guarded) and ecosystem principals are refused here and use their dedicated paths.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: object
+                    required: [key, value]
+                    properties:
+                      key: { type: string }
+                      value: {}
+                      visibility:
+                        type: string
+                        enum: [private, owner, group, members, public, workspace]
+                      tags:
+                        type: array
+                        items: { type: string }
+                      ttl_hours: { type: number }
+                      group_id: { type: string }
+                mode:
+                  type: string
+                  enum: [overwrite, skip]
+                  default: overwrite
+                  description: How to treat an entry whose key already exists
+                agent:
+                  type: string
+                  description: Write under a specific agent GAII (owner sessions only)
+      responses:
+        '200':
+          description: 'Summary: { created, updated, skipped, failed[] }'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: entries array missing or too large (>1000)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: ecosystem principal, or writing under an agent that is not the caller's
+
   /v1/memory/import:
     post:
       operationId: importMemory

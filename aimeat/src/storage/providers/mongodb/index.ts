@@ -72,6 +72,7 @@ import type { Storage, ChunkedUploadRecord } from '../../interface.js';
 
 import type { PrismaInternals } from './methods/internal.js';
 import { ownerMethods } from './methods/owners.js';
+import { ownerMemoryBulkMethods } from './methods/owners-memory-bulk.js';
 import { ownerMemoryScopeMethods } from './methods/owner-memory-scope.js';
 import { workMethods } from './methods/work.js';
 import { identityMethods } from './methods/identity.js';
@@ -293,6 +294,7 @@ export interface PrismaStorage extends Storage, PrismaInternals {}
 Object.assign(
   PrismaStorage.prototype,
   ownerMethods,
+  ownerMemoryBulkMethods,
   ownerMemoryScopeMethods,
   workMethods,
   identityMethods,
