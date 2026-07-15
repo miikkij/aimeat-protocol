@@ -70,4 +70,20 @@ export const ownerMemoryBulkMethods = {
         const result = await this.prisma.memory.deleteMany({ where: { key: { startsWith: keyPrefix } } });
         return result.count;
     },
+
+    // BULK PRIMITIVE (Phase 2) — delete many explicit (ownerGaii, key) rows via chunked deleteMany (OR of
+    // the pairs, 500 per statement so the query stays bounded). Backs the batched record-family delete.
+    async bulkDeleteMemory(this: PrismaStorage, refs: { ownerGaii: string; key: string }[]): Promise<number> {
+        this.ensureReady();
+        if (refs.length === 0) return 0;
+        let removed = 0;
+        for (let i = 0; i < refs.length; i += 500) {
+            const chunk = refs.slice(i, i + 500);
+            const result = await this.prisma.memory.deleteMany({
+                where: { OR: chunk.map(r => ({ ownerGaii: r.ownerGaii, key: r.key })) },
+            });
+            removed += result.count;
+        }
+        return removed;
+    },
 };

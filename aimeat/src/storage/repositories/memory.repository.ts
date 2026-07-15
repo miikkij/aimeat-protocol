@@ -106,6 +106,13 @@ export interface MemoryRepository {
    * so a sibling id can't be caught. Returns the number of rows removed. Optional.
    */
   deleteMemoryByPrefix?(keyPrefix: string): Promise<number>;
+  /**
+   * BULK PRIMITIVE — delete MANY rows addressed by explicit (ownerGaii, key) pairs in ONE unit (Phase 2:
+   * SQLite = one transaction; Prisma = chunked deleteMany). Backs the batched record-family delete
+   * (a caller-authorized set of rows collected across records that may span owner identities). Returns
+   * the number of rows removed. Optional.
+   */
+  bulkDeleteMemory?(refs: { ownerGaii: string; key: string }[]): Promise<number>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the

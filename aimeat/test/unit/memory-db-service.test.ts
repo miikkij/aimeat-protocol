@@ -219,6 +219,20 @@ describe('Storage bulk primitives (SQLite)', () => {
     expect(await storage.getMemory(GHII, 'organism.abc.w.ws2.crm.rec0.latest')).not.toBeNull();
     expect(await storage.getMemory(GHII, 'organism.abcd.w.ws.crm.rec0.latest')).not.toBeNull();
   });
+
+  it('bulkDeleteMemory removes exactly the given (owner,key) refs in one unit', async () => {
+    await storage.setMemory(mem(GHII, 'rec.a.latest', {}));
+    await storage.setMemory(mem(`agent0#${OWNER}@${NODE}`, 'rec.a.version.1', {})); // cross-owner family row
+    await storage.setMemory(mem(GHII, 'rec.b.latest', { keep: true }));
+    const removed = await storage.bulkDeleteMemory!([
+      { ownerGaii: GHII, key: 'rec.a.latest' },
+      { ownerGaii: `agent0#${OWNER}@${NODE}`, key: 'rec.a.version.1' },
+      { ownerGaii: GHII, key: 'rec.missing' },
+    ]);
+    expect(removed).toBe(2);
+    expect(await storage.getMemory(GHII, 'rec.b.latest')).not.toBeNull();
+    expect(await storage.getMemory(`agent0#${OWNER}@${NODE}`, 'rec.a.version.1')).toBeNull();
+  });
 });
 
 describe('MemoryRepository.dedupByKey', () => {
