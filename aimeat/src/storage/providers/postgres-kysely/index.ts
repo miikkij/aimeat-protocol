@@ -45,6 +45,13 @@ import { ecosystemMethods } from './methods/ecosystem.js';
 import { patMethods } from './methods/pat.js';
 import { otkMethods } from './methods/otk.js';
 import { federationMethods } from './methods/federation.js';
+import { directMessageMethods } from './methods/direct-message.js';
+import { moderationMethods } from './methods/moderation.js';
+import { marketplaceMethods } from './methods/marketplace.js';
+import { catalogueMethods } from './methods/catalogue.js';
+import { subdomainSiteMethods } from './methods/subdomain-sites.js';
+import { notificationMethods } from './methods/notifications.js';
+import { agentMessageMethods, disputeMethods, invitationMethods } from './methods/agent-msg-dispute-invite.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -105,5 +112,14 @@ Object.assign(
   patMethods,
   otkMethods,
   federationMethods,
+  directMessageMethods,
+  moderationMethods,
+  marketplaceMethods,
+  catalogueMethods,
+  subdomainSiteMethods,
+  notificationMethods,
+  agentMessageMethods,
+  disputeMethods,
+  invitationMethods,
   startupCompatMethods,
 );
