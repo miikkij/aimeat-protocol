@@ -684,11 +684,17 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const refs: { ownerGaii: string; key: string }[] = [];
     const deleted: { id: string; keys: number }[] = [];
     const failed: { id: string; reason: string }[] = [];
+    // ONE value-free (ownerGaii, key) scan of the namespace — the delete needs only addresses, so it
+    // never loads a single value (a per-record listAllMemory scan loaded every record's value, which
+    // dominated the delete cost). Fall back to per-record value scans only if the backend lacks the
+    // key-only primitive. Then filter each requested id's family in memory (own/same-owner + role).
+    const nsPrefix = `${wsRoot}.${namespace}.`;
+    const nsKeys = storage.listMemoryKeysByPrefix
+      ? await storage.listMemoryKeysByPrefix(nsPrefix)
+      : (await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 })).items.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
     for (const rid of ids) {
       const base = `${wsRoot}.${namespace}.${rid}`;
-      const { items } = await storage.listAllMemory({ prefix: base, limit: 5000 });
-      // Only this exact instance's family, only rows owned by the caller's own identity family.
-      const family = items.filter(r =>
+      const family = nsKeys.filter(r =>
         (r.key === base || r.key.startsWith(`${base}.`)) && roleOk(base, r.key)
         && (r.ownerGaii === callerGhii || isSameOwner(r.ownerGaii, callerGhii)));
       if (family.length === 0) { failed.push({ id: rid, reason: 'nothing to delete (or not owned by you)' }); continue; }

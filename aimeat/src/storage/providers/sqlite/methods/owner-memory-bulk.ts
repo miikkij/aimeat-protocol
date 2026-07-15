@@ -82,4 +82,11 @@ export const ownerMemoryBulkMethods = {
     }
     return removed;
   },
+
+  // BULK PRIMITIVE (Phase 2) — value-free (ownerGaii, key) enumeration under a prefix (SELECT projects
+  // only the two columns, never the value). ACTIVE rows only (archived = 0), matching object_delete's
+  // scan — an archived record is not deletable. Backs the batched record delete's addressing scan.
+  async listMemoryKeysByPrefix(this: SqliteStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
+    return this.db.prepare('SELECT ownerGaii, key FROM memory WHERE key LIKE ? AND archived = 0').all(keyPrefix + '%') as { ownerGaii: string; key: string }[];
+  },
 };

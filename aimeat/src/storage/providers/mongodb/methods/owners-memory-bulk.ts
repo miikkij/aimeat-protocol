@@ -86,4 +86,13 @@ export const ownerMemoryBulkMethods = {
         }
         return removed;
     },
+
+    // BULK PRIMITIVE (Phase 2) — value-free (ownerGaii, key) enumeration under a prefix (select projects
+    // only the two columns). ACTIVE rows only (archivedWhere → positive `archived: false`, index-friendly),
+    // matching object_delete's scan. Backs the batched record delete's addressing scan.
+    async listMemoryKeysByPrefix(this: PrismaStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
+        this.ensureReady();
+        const rows = await this.prisma.memory.findMany({ where: { key: { startsWith: keyPrefix }, ...this.archivedWhere(undefined) }, select: { ownerGaii: true, key: true } });
+        return rows.map((r: { ownerGaii: string; key: string }) => ({ ownerGaii: r.ownerGaii, key: r.key }));
+    },
 };

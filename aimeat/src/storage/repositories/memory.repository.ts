@@ -113,6 +113,13 @@ export interface MemoryRepository {
    * the number of rows removed. Optional.
    */
   bulkDeleteMemory?(refs: { ownerGaii: string; key: string }[]): Promise<number>;
+  /**
+   * BULK PRIMITIVE — enumerate the (ownerGaii, key) ADDRESSES of every row under a key prefix, across ALL
+   * owners, WITHOUT loading any value (Phase 2). Backs the batched record delete: it needs only the
+   * addresses to filter (same-owner + role) and delete, so a value-loading `listAllMemory` scan per
+   * record was pure waste (the value bytes dominated the delete cost). Cheap even over a whole namespace.
+   */
+  listMemoryKeysByPrefix?(keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the
