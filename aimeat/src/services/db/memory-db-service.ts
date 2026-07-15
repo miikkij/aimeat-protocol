@@ -128,6 +128,9 @@ export class MemoryDbService {
       if (typeof key !== 'string' || !key) { results.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
       const existing = existingByKey.get(key);
       if (existing && mode === 'skip') { results.push({ key, status: 'skipped' }); continue; }
+      // An archived record is read-only (parity with the single POST /v1/memory, which 409s here) — a
+      // bulk write must not silently overwrite it.
+      if (existing?.archived) { results.push({ key, status: 'failed', reason: 'record is archived (read-only)' }); continue; }
 
       const valueBytes = Buffer.byteLength(JSON.stringify(item.value ?? null), 'utf8');
       if (valueBytes > opts.quota.maxValueSizeBytes) { results.push({ key, status: 'failed', reason: 'value too large' }); continue; }

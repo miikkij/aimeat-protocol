@@ -644,7 +644,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * single object-delete calls (a 549-record CADENCE teardown was 549 round-trips + per-key deletes).
    * Body: { ws?, namespace, ids: [] }. Mirrors aimeat_workspace_object_delete's own/same-owner + role
    * + append-only semantics. ── */
-  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireRole('agent'), requireScope('memory:delete'), async (req, res) => {
     const id = req.params.id as string;
     const body = req.body ?? {};
     const namespace = body.namespace;
