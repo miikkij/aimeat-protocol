@@ -13,6 +13,12 @@
  *   AIMEAT_BENCH_SCALES=agents=10,memories=2000,records=200,versions=3 pnpm perf:bench
  * @version-history
  *   v1.0.0 — 2026-07-15 — Initial harness (write/read/search/usage/publish/delete chains, scaled).
+ *   v1.1.0 — 2026-07-15 — Reset the persistent backend (Mongo/Postgres) between scales — SQLite uses a
+ *     fresh :memory: db per scale, but a persistent db carried scale-1's seed into scale-2 and the owner
+ *     re-insert hit a unique-constraint (bench only completed scale-1). Clears the bench collections
+ *     (keeps indexes → realistic timings) before each scale's seed.
+ *   v1.2.0 — 2026-07-15 — Add the Phase-1 bulk-write comparison chains (import N keys OLD per-item vs NEW
+ *     MemoryDbService.writeMany) + the subtree-delete primitive, to quantify the round-trip reduction.
  */
 process.env.AIMEAT_PERF_TRACE = '1';
 
@@ -23,6 +29,7 @@ import { listOwnerScopeMemory, listOwnerScopeMemoryMeta, getOwnerScopeMemory } f
 import { getOwnerUsageSummary } from '../../src/services/usage-summary.js';
 import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
+import { createMemoryDbService } from '../../src/services/db/index.js';
 import { loadConfig } from '../../src/config.js';
 
 const NODE = 'bench-node';
@@ -82,6 +89,33 @@ async function seed(storage: Storage, sc: Scale): Promise<void> {
 
 const config = { ...loadConfig(), nodeId: NODE } as ReturnType<typeof loadConfig>;
 
+/** Empty the bench's collections on a PERSISTENT backend before a scale seeds, so a prior scale's (or
+ *  a prior run's) rows don't collide on the owner unique-constraint or pollute owner-scoped timings.
+ *  Deletes rows only (indexes are kept, so timings stay realistic). No-op for SQLite (:memory: is
+ *  already fresh each scale). Best-effort — a clear failure is warned, never fatal. */
+async function resetPersistentData(storage: Storage): Promise<void> {
+  const provider = process.env.AIMEAT_BENCH_DB;
+  if (provider !== 'mongodb' && provider !== 'postgresql') return;
+  // Both persistent backends are PrismaStorage; the raw client is reachable for a full-collection wipe.
+  const prisma = (storage as unknown as { prisma?: unknown }).prisma as {
+    $runCommandRaw?: (cmd: Record<string, unknown>) => Promise<unknown>;
+    $executeRawUnsafe?: (sql: string) => Promise<unknown>;
+  } | undefined;
+  if (!prisma) return;
+  const tables = ['Memory', 'MemoryVersion', 'Agent', 'Owner'];
+  try {
+    if (provider === 'mongodb' && prisma.$runCommandRaw) {
+      for (const t of tables) {
+        await prisma.$runCommandRaw({ delete: t, deletes: [{ q: {}, limit: 0 }] }).catch(() => { /* collection may not exist yet */ });
+      }
+    } else if (provider === 'postgresql' && prisma.$executeRawUnsafe) {
+      await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map(t => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`).catch(() => { /* tables may not exist yet */ });
+    }
+  } catch (err) {
+    console.warn(`  (reset skipped: ${(err as { message?: string })?.message ?? err})`);
+  }
+}
+
 async function bench(label: string, fn: () => Promise<unknown>): Promise<void> {
   const { store } = await traceOperation(fn);
   console.log(`  ${label.padEnd(40)} ${formatTrace(store)}`);
@@ -93,6 +127,7 @@ async function runScale(sc: Scale): Promise<void> {
     await createStorage({ provider: (process.env.AIMEAT_BENCH_DB as 'sqlite' | 'mongodb') ?? 'memory', sqlitePath: ':memory:', dbUrl: process.env.AIMEAT_BENCH_URL }),
     true,
   );
+  await resetPersistentData(storage);
   const t0 = process.hrtime.bigint();
   await seed(storage, sc);
   console.log(`  (seeded in ${(Number(process.hrtime.bigint() - t0) / 1e9).toFixed(1)}s)`);
@@ -114,11 +149,40 @@ async function runScale(sc: Scale): Promise<void> {
   await bench('search q=seeded', () => storage.searchText('seeded', { ownerGaiis: [GHII], limit: 50 }));
   await bench('owner/usage summary', () => getOwnerUsageSummary(config, storage, OWNER));
   // CHAIN: delete ONE workspace record's whole family (.latest + .version.1..V) the way it happens today
-  // (single deleteMemory per key) — this is the delete cost the harness exposes.
+  // (single deleteMemory per key) vs the Phase-1 subtree primitive (one statement).
   await bench(`delete 1 record family (${sc.versions + 1} keys, per-key)`, async () => {
-    const base = `${ORG === '' ? '' : ''}organism.${ORG}.w.${WS}.crm.contacts.rec0`;
+    const base = `organism.${ORG}.w.${WS}.crm.contacts.rec0`;
     for (let v = 1; v <= sc.versions; v++) await storage.deleteMemory(GHII, `${base}.version.${v}`);
     await storage.deleteMemory(GHII, `${base}.latest`);
+  });
+  await bench(`delete 1 record family (subtree primitive)`, async () => {
+    const base = `organism.${ORG}.w.${WS}.crm.contacts.rec1`;
+    await storage.deleteMemorySubtree!(GHII, base);
+  });
+
+  // CHAIN: import IMPORT_N brand-new keys. OLD = per-item pipeline (getMemory + countMemory + quota +
+  // schema + setMemory) — what POST /v1/memory/import does today, N× the single-write chain. NEW =
+  // MemoryDbService.writeMany: batched existing-lookup (1) + byte-sum (1) + key-count (1) + N schema
+  // validations (cached) + ONE bulkSetMemory. Watch the q count: OLD grows ~6×N, NEW stays ~3 + N-writes.
+  const IMPORT_N = 100;
+  const memoryDb = createMemoryDbService(storage, config);
+  await bench(`import ${IMPORT_N} keys — OLD per-item`, async () => {
+    for (let i = 0; i < IMPORT_N; i++) {
+      const key = `bench.import.old.${i}`;
+      await storage.getMemory(GHII, key);
+      await storage.countMemory([GHII]);
+      const valueSize = Buffer.byteLength(JSON.stringify({ n: i }), 'utf8');
+      await checkMemoryQuota(config, storage, GHII, valueSize, 0);
+      await validateMemoryWrite(key, { n: i }, storage);
+      await storage.setMemory(mem(GHII, key, { n: i }));
+    }
+  });
+  await bench(`import ${IMPORT_N} keys — NEW writeMany`, async () => {
+    const entries = Array.from({ length: IMPORT_N }, (_, i) => ({ key: `bench.import.new.${i}`, value: { n: i } }));
+    await memoryDb.writeMany(GHII, entries, {
+      quota: { maxKeysPerOwner: 1_000_000, maxValueSizeBytes: 1024 * 1024, totalQuotaBytes: 1024 ** 3 },
+      validate: (key, value) => validateMemoryWrite(key, value, storage).then(r => ({ valid: r.valid })),
+    });
   });
 
   if ('close' in storage && typeof (storage as { close?: () => Promise<void> }).close === 'function') {

@@ -16,6 +16,8 @@
  *   v1.6.0 — 2026-07-03 — POST /v1/memory/bundle (collection ZIP export): happy path returns a real
  *     application/zip attachment containing the memory + file entries and a manifest; failure modes
  *     cover empty items (400), only-not-owned items (404), and missing auth (401).
+ *   v1.7.0 — 2026-07-15 — POST /v1/memory/bulk (Phase 1 batched write): create/update/skip summary,
+ *     organism-prefixed and reserved-key refusal into failed[], and 400/401 guards.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -959,6 +961,61 @@ await test('Bundle of only not-owned items returns 404', async () => {
 await test('Bundle without auth returns 401', async () => {
     const { status } = await json('/v1/memory/bundle', { method: 'POST', body: JSON.stringify({ items: [{ kind: 'memory', key: 'bundle.note' }] }) });
     assert(status === 401, `expected 401, got ${status}`);
+});
+
+// ═══════════════════════════════════════════════════════
+// POST /v1/memory/bulk — batched write (Phase 1 data-access redesign)
+// ═══════════════════════════════════════════════════════
+console.log('\n14. POST /v1/memory/bulk — batched write');
+
+await test('Bulk write creates many entries + reports summary', async () => {
+    const { status, body } = await json('/v1/memory/bulk', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ entries: [
+            { key: 'bulk.one', value: { n: 1 } },
+            { key: 'bulk.two', value: { n: 2 }, visibility: 'private', tags: ['t'] },
+            { key: 'bulk.three', value: { n: 3 } },
+        ] }),
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data.created === 3, `expected 3 created, got ${body.data.created}`);
+    // Written rows are really readable afterward.
+    const read = await json('/v1/memory/bulk.two', { headers: auth1() });
+    assert(read.status === 200 && read.body.data.value.n === 2, 'bulk.two persisted and reads back');
+});
+
+await test('Bulk write updates existing + skips in skip mode', async () => {
+    const overwrite = await json('/v1/memory/bulk', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ entries: [{ key: 'bulk.one', value: { n: 11 } }] }),
+    });
+    assert(overwrite.body.data.updated === 1, `expected 1 updated, got ${overwrite.body.data.updated}`);
+    const skip = await json('/v1/memory/bulk', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ mode: 'skip', entries: [{ key: 'bulk.one', value: { n: 999 } }, { key: 'bulk.fresh', value: { n: 4 } }] }),
+    });
+    assert(skip.body.data.skipped === 1 && skip.body.data.created === 1, `skip summary wrong: ${JSON.stringify(skip.body.data)}`);
+    const read = await json('/v1/memory/bulk.one', { headers: auth1() });
+    assert(read.body.data.value.n === 11, 'skip mode left existing value untouched');
+});
+
+await test('Bulk write refuses organism.* keys (workspace path) and reserved keys', async () => {
+    const { body } = await json('/v1/memory/bulk', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ entries: [
+            { key: 'organism.o1.w.ws.x', value: { a: 1 } },
+            { key: 'ok.key', value: { a: 1 } },
+        ] }),
+    });
+    assert(body.data.created === 1, `expected 1 created, got ${body.data.created}`);
+    assert(Array.isArray(body.data.failed) && body.data.failed.some((f: { key: string }) => f.key === 'organism.o1.w.ws.x'), 'organism.* key rejected into failed[]');
+});
+
+await test('Bulk write rejects missing entries (400) and no auth (401)', async () => {
+    const bad = await json('/v1/memory/bulk', { method: 'POST', headers: auth1(), body: JSON.stringify({}) });
+    assert(bad.status === 400, `expected 400, got ${bad.status}`);
+    const noauth = await json('/v1/memory/bulk', { method: 'POST', body: JSON.stringify({ entries: [{ key: 'x', value: 1 }] }) });
+    assert(noauth.status === 401, `expected 401, got ${noauth.status}`);
 });
 
 // ═══════════════════════════════════════════════════════

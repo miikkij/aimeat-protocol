@@ -76,6 +76,28 @@ export interface MemoryRepository {
   /** Atomically update memory only if the current version matches expectedVersion. Returns null on conflict. */
   setMemoryIfVersion?(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
+  /**
+   * BULK PRIMITIVE — read MANY keys under ONE owner in a single `key IN (…)` query (data-access
+   * redesign, Phase 1). Backs the batched existing-row lookup a bulk write does, replacing one
+   * getMemory per entry (an N-entry import was N serial round-trips just to check existence). Returns
+   * only the keys that exist (live, non-expired); order is not guaranteed — the caller indexes by key.
+   * Optional so a backend without it falls back to the adapter's per-key loop.
+   */
+  getMemoryByKeys?(ownerGaii: string, keys: string[]): Promise<MemoryRecord[]>;
+  /**
+   * BULK PRIMITIVE — upsert MANY rows as ONE unit (Phase 1). Same per-row semantics as
+   * {@link setMemory} (version bump, trackable-history archive, byteSize), but committed together
+   * (SQLite: one transaction) so a bulk import pays one commit instead of N. Optional; the adapter
+   * falls back to a sequential loop when absent.
+   */
+  bulkSetMemory?(records: MemoryRecord[]): Promise<MemoryRecord[]>;
+  /**
+   * BULK PRIMITIVE — delete a record's whole family (`baseKey` itself plus its `baseKey.*` children:
+   * `.draft` / `.latest` / `.version.N`) under one owner in ONE statement (Phase 1), WITHOUT matching a
+   * sibling `baseKeyX`. Replaces the per-key gated deletes a record teardown does today (a 550-record
+   * CADENCE delete was thousands of round-trips). Returns the number of rows removed. Optional.
+   */
+  deleteMemorySubtree?(ownerGaii: string, baseKey: string): Promise<number>;
   listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the

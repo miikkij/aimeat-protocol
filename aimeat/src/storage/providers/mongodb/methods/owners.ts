@@ -11,7 +11,7 @@
 import type {
   OwnerRecord, AgentRecord, MemoryRecord
 } from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
 import { logger } from '../../../../utils/logger.js';
 import type { PrismaStorage, PrismaRow } from '../index.js';
 
@@ -447,24 +447,6 @@ export const ownerMethods = {
         return this.toMemoryRecord(row);
     },
 
-    async listMemoryHistory(this: PrismaStorage, ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]> {
-        this.ensureReady();
-        const rows = await this.prisma.memoryVersion.findMany({
-            where: { ownerGaii, key },
-            orderBy: { version: 'desc' },
-            take: opts?.limit ?? 200,
-        });
-        return rows.map((r: PrismaRow) => ({
-            ownerGaii: r.ownerGaii,
-            key: r.key,
-            version: r.version,
-            value: r.value,
-            actor: r.actor ?? null,
-            event: r.event ?? null,
-            recordedAt: r.recordedAt.toISOString(),
-        }));
-    },
-
     async setMemoryIfVersion(this: PrismaStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
         this.ensureReady();
         // Atomic version-checked update using raw MongoDB $set + version filter
@@ -600,6 +582,7 @@ export const ownerMethods = {
             return true;
         } catch { return false; }
     },
+
 
     async deleteAllMemory(this: PrismaStorage, ownerGaii: string): Promise<number> {
         this.ensureReady();
