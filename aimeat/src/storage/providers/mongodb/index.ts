@@ -153,14 +153,23 @@ export class PrismaStorage {
      */
     private async ensureMemoryTextIndex(): Promise<void> {
         if (!this.prisma || this.backendKind() !== 'mongodb') return;
-        try {
-            await this.prisma.$runCommandRaw({
-                createIndexes: 'Memory',
-                indexes: [{ key: { searchBlob: 'text' }, name: 'searchBlob_text' }],
-            });
-            logger.info('Memory searchBlob $text index ensured');
-        } catch (err) {
-            logger.warn(`Memory $text index not created (searchText uses its scan fallback): ${(err as { message?: string })?.message ?? err}`);
+        // Create the indexes EXPLICITLY via createIndexes rather than relying on `prisma db push` — Prisma's
+        // MongoDB `db push` does not reliably materialise `@@index` entries (the key-prefix scans stayed at
+        // ~110ms with @@index([key]) alone). createIndexes is idempotent (a no-op once present).
+        //   - searchBlob $text: indexed librarian search (Prisma can't express $text at all).
+        //   - key: owner-AGNOSTIC key-prefix lookups (listAllMemory: workspace-access, write-guards,
+        //     publish, catalogue) filter `key` with no ownerGaii; an anchored startsWith uses this btree.
+        const indexes: Array<{ key: Record<string, unknown>; name: string }> = [
+            { key: { searchBlob: 'text' }, name: 'searchBlob_text' },
+            { key: { key: 1 }, name: 'key_1' },
+        ];
+        for (const idx of indexes) {
+            try {
+                await this.prisma.$runCommandRaw({ createIndexes: 'Memory', indexes: [idx] });
+                logger.info(`Memory index ensured: ${idx.name}`);
+            } catch (err) {
+                logger.warn(`Memory index ${idx.name} not created: ${(err as { message?: string })?.message ?? err}`);
+            }
         }
     }
 
