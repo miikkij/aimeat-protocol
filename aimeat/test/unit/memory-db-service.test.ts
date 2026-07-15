@@ -231,6 +231,19 @@ describe('Storage bulk primitives (SQLite)', () => {
     expect(await storage.getMemory(GHII, 'organism.abcd.w.ws.crm.rec0.latest')).not.toBeNull();
   });
 
+  it('listMemoryKeysByPrefix returns value-free addresses, all owners, ACTIVE only', async () => {
+    await storage.setMemory(mem(GHII, 'ns.a.latest', { big: 'value' }));
+    await storage.setMemory(mem(`agent0#${OWNER}@${NODE}`, 'ns.a.version.1', { big: 'value' }));
+    await storage.setMemory(mem(GHII, 'ns.b.latest', {}));
+    await storage.setMemory(mem(GHII, 'other.x', {}));   // different prefix
+    await storage.archiveMemoryByKey('ns.b.latest', { archivedRoot: 'r', archivedBy: OWNER, archivedAt: new Date().toISOString(), match: 'exact' });
+    const rows = await storage.listMemoryKeysByPrefix!('ns.');
+    // value-free shape, active only (ns.b.latest archived → excluded), all owners (GHII + agent).
+    expect(rows.every(r => !('value' in r))).toBe(true);
+    expect(rows.map(r => r.key).sort()).toEqual(['ns.a.latest', 'ns.a.version.1']);
+    expect(rows.find(r => r.key === 'ns.a.version.1')?.ownerGaii).toBe(`agent0#${OWNER}@${NODE}`);
+  });
+
   it('bulkDeleteMemory removes exactly the given (owner,key) refs in one unit', async () => {
     await storage.setMemory(mem(GHII, 'rec.a.latest', {}));
     await storage.setMemory(mem(`agent0#${OWNER}@${NODE}`, 'rec.a.version.1', {})); // cross-owner family row

@@ -30,6 +30,7 @@ import { getOwnerUsageSummary } from '../../src/services/usage-summary.js';
 import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
 import { createMemoryDbService } from '../../src/services/db/index.js';
+import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import { loadConfig } from '../../src/config.js';
 
 const NODE = 'bench-node';
@@ -183,6 +184,47 @@ async function runScale(sc: Scale): Promise<void> {
       quota: { maxKeysPerOwner: 1_000_000, maxValueSizeBytes: 1024 * 1024, totalQuotaBytes: 1024 ** 3 },
       validate: (key, value) => validateMemoryWrite(key, value, storage).then(r => ({ valid: r.valid })),
     });
+  });
+
+  // ── CADENCE workspace ops (Phase 2): the actual publish + delete code paths, old-per-record vs new
+  // batched. Uses the REAL helpers (createOrganismHelpers → publishDraft / publishDraftsBatch), not an
+  // approximation, so the numbers reflect production behaviour. K record families in a fresh namespace. ──
+  const H = createOrganismHelpers(config, storage);
+  const K = 50;
+  const wsRoot = `organism.${ORG}.w.${WS}`;
+  const seedDrafts = async (ns: string, tag: string): Promise<void> => {
+    for (let i = 0; i < K; i++) await storage.setMemory(mem(GHII, `${wsRoot}.${ns}.${tag}${i}.draft`, { id: `${tag}${i}`, title: `Task ${i}`, body: 'cadence record draft' }));
+  };
+  // PUBLISH: OLD = one publishDraft per record (per-record scan + manifest read + 2 writes + draft delete);
+  // NEW = one publishDraftsBatch (ONE namespace scan + ONE manifest read + ONE bulkSetMemory + ONE bulkDelete).
+  await seedDrafts('crm.pubold', 'r');
+  await bench(`CADENCE publish ${K} records — OLD per-record`, async () => {
+    for (let i = 0; i < K; i++) await H.publishDraft(ORG, WS, 'crm.pubold', `r${i}`, GHII);
+  });
+  await seedDrafts('crm.pubnew', 'r');
+  await bench(`CADENCE publish ${K} records — NEW batch`, async () => {
+    await H.publishDraftsBatch(ORG, WS, 'crm.pubnew', Array.from({ length: K }, (_, i) => `r${i}`), GHII);
+  });
+  // DELETE the K record families just published (.latest + .version.1 each). Fair comparison: BOTH paths
+  // scan each record's family (what object_delete does per record) — the difference is OLD fires a
+  // deleteMemory per key (+ in reality one MCP/HTTP round-trip per record), NEW collects every ref and
+  // fires ONE bulkDeleteMemory in ONE request.
+  await bench(`CADENCE delete ${K} record families — OLD per-record (scan+per-key)`, async () => {
+    for (let i = 0; i < K; i++) {
+      const base = `${wsRoot}.crm.pubold.r${i}`;
+      const { items } = await storage.listAllMemory({ prefix: base, limit: 100 });
+      for (const r of items) if (r.key === base || r.key.startsWith(`${base}.`)) await storage.deleteMemory(r.ownerGaii, r.key);
+    }
+  });
+  await bench(`CADENCE delete ${K} record families — NEW batch (1 keys-scan+bulk)`, async () => {
+    // ONE value-free namespace key-scan (no values) + filter + ONE bulkDeleteMemory — the endpoint's path.
+    const nsKeys = await storage.listMemoryKeysByPrefix!(`${wsRoot}.crm.pubnew.`);
+    const refs: { ownerGaii: string; key: string }[] = [];
+    for (let i = 0; i < K; i++) {
+      const base = `${wsRoot}.crm.pubnew.r${i}`;
+      for (const r of nsKeys) if (r.key === base || r.key.startsWith(`${base}.`)) refs.push({ ownerGaii: r.ownerGaii, key: r.key });
+    }
+    await storage.bulkDeleteMemory!(refs);
   });
 
   if ('close' in storage && typeof (storage as { close?: () => Promise<void> }).close === 'function') {
