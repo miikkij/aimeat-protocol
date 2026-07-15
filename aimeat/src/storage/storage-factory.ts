@@ -14,7 +14,7 @@
  */
 import type { Storage } from './interface.js';
 
-export type StorageProvider = 'memory' | 'sqlite' | 'mongodb' | 'postgresql';
+export type StorageProvider = 'memory' | 'sqlite' | 'mongodb' | 'postgresql' | 'postgres-kysely';
 
 export interface StorageOptions {
   provider: StorageProvider;
@@ -53,6 +53,15 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       const pg = new PostgresStorage(opts.dbUrl!);
       await pg.ready;
       return pg;
+    }
+    case 'postgres-kysely': {
+      // The Prisma-free Postgres backend (Phase 5). Cast through unknown: the provider fills the Storage
+      // surface domain-by-domain via the prototype merge, so during the migration it satisfies Storage
+      // structurally only for the domains already landed (an unimplemented method throws when called).
+      const { PostgresKyselyStorage } = await import('./providers/postgres-kysely/index.js');
+      const pgk = new PostgresKyselyStorage(opts.dbUrl!);
+      await pgk.ready;
+      return pgk as unknown as Storage;
     }
     default: {
       try {

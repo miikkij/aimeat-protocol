@@ -76,6 +76,7 @@
     "test:e2e:sqlite": "node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts",
     "test:e2e:mongodb": "node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts",
     "test:e2e:postgresql": "node --env-file=.env.test.postgres --import tsx test/run-e2e-ci.ts",
+    "test:e2e:postgres-kysely": "node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts",
     "test:playwright": "node --env-file=.env.test.memory --import tsx test/run-playwright-ci.ts",
     "test:playwright:memory": "node --env-file=.env.test.memory --import tsx test/run-playwright-ci.ts",
     "test:playwright:sqlite": "node --env-file=.env.test.sqlite --import tsx test/run-playwright-ci.ts",

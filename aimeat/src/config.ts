@@ -205,7 +205,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Accept `postgres` as an alias for `postgresql`.
     storageProvider: ((process.env.AIMEAT_STORAGE ?? 'memory') === 'postgres'
       ? 'postgresql'
-      : (process.env.AIMEAT_STORAGE ?? 'memory')) as 'memory' | 'sqlite' | 'mongodb' | 'postgresql',
+      : (process.env.AIMEAT_STORAGE ?? 'memory')) as 'memory' | 'sqlite' | 'mongodb' | 'postgresql' | 'postgres-kysely',
     sqlitePath: process.env.AIMEAT_SQLITE_PATH ?? './data/aimeat.db',
     adminPassword: process.env.AIMEAT_ADMIN_PASSWORD ?? null,
     devMode: process.env.AIMEAT_DEV_MODE === 'true',

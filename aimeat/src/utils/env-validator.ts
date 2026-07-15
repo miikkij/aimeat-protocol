@@ -78,8 +78,8 @@ export function validateEnv(): ValidationResult[] {
 
   // ── Storage Provider ── ('postgres' is accepted as an alias for 'postgresql')
   const storageProvider = env.AIMEAT_STORAGE === 'postgres' ? 'postgresql' : env.AIMEAT_STORAGE;
-  if (storageProvider && !['memory', 'sqlite', 'mongodb', 'postgresql'].includes(storageProvider)) {
-    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${env.AIMEAT_STORAGE}". Must be one of: memory, sqlite, mongodb, postgresql` });
+  if (storageProvider && !['memory', 'sqlite', 'mongodb', 'postgresql', 'postgres-kysely'].includes(storageProvider)) {
+    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${env.AIMEAT_STORAGE}". Must be one of: memory, sqlite, mongodb, postgresql, postgres-kysely` });
   } else if (storageProvider === 'memory') {
     results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Using in-memory storage — all data will be lost on restart. Use sqlite or mongodb for production.' });
   } else if (!storageProvider) {
@@ -93,7 +93,7 @@ export function validateEnv(): ValidationResult[] {
 
   // ── Database URL ──
   const dbUrl = env.DATABASE_URL;
-  if ((storageProvider === 'mongodb' || storageProvider === 'postgresql') && !dbUrl) {
+  if ((storageProvider === 'mongodb' || storageProvider === 'postgresql' || storageProvider === 'postgres-kysely') && !dbUrl) {
     results.push({ level: 'error', variable: 'DATABASE_URL', message: `Required when AIMEAT_STORAGE=${storageProvider}` });
   } else if (!storageProvider && !dbUrl) {
     results.push({ level: 'warning', variable: 'DATABASE_URL', message: 'Not set. Using in-memory storage — data will not persist across restarts.' });
