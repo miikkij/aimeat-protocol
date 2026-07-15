@@ -31,12 +31,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { normalizeToastType } from '/components/Toast.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
-import { listAgents } from '/js/services/agents.js';
-import { getWallet } from '/js/services/wallet.js';
-import * as memoryService from '/js/services/memory.js';
-import { listMyServices } from '/js/services/catalogue.js';
-import { listInbox } from '/js/services/work.js';
-import { listApps } from '/js/services/apps.js';
+import { apiGet } from '/js/api.js';
 import * as nodesService from '/js/services/nodes.js';
 
 // === Landing page (adaptive dashboard) ===
@@ -191,47 +186,27 @@ export default function Profile({ navigate, locale }) {
 
   useViewCSS('/css/views/profile.css');
 
-  // Load all stats on mount so the stats bar shows counts immediately
+  // Load all stats on mount so the stats bar shows counts immediately. ONE composite call
+  // (GET /v1/owner/home, HomeDashboardService) replaces the old 8-request fan-out — the server
+  // resolves the owner's agent list once and returns every stat count together. Federation node
+  // count stays its own call (a different plane, not in the account-domain composite).
   useEffect(() => {
     if (!session) return;
-    const owner = session.owner;
     Promise.allSettled([
-      listAgents(owner),
-      getWallet(),
-      memoryService.countMemories(),   // cheap count, not the full 4 MB memory dump
-      memoryService.countFiles(),
-      listMyServices(owner),
-      listInbox(),
-      listApps(),
+      apiGet('/v1/owner/home'),
       nodesService.listNodes(),
-    ]).then(([agents, wallet, memories, files, services, work, apps, nodes]) => {
+    ]).then(([home, nodes]) => {
       const s = {};
-      if (agents.status === 'fulfilled') {
-        const list = agents.value;
-        s.agents = Array.isArray(list) ? list.length : 0;
-        s.chatSessions = Array.isArray(list) ? list.filter(a => a.owner === owner && a.name?.startsWith('session-')).length : 0;
-      }
-      if (wallet.status === 'fulfilled') {
-        const w = wallet.value?.data || wallet.value || {};
-        s.balance = w.balance ?? '-';
-      }
-      if (memories.status === 'fulfilled') {
-        s.memory = typeof memories.value === 'number' ? memories.value : 0;
-      }
-      if (files.status === 'fulfilled') {
-        s.files = typeof files.value === 'number' ? files.value : 0;
-      }
-      if (services.status === 'fulfilled') {
-        const list = services.value;
-        s.services = Array.isArray(list) ? list.length : 0;
-      }
-      if (work.status === 'fulfilled') {
-        const list = work.value;
-        s.work = Array.isArray(list) ? list.length : 0;
-      }
-      if (apps.status === 'fulfilled') {
-        const list = apps.value;
-        s.apps = Array.isArray(list) ? list.filter(a => a.owner === owner).length : 0;
+      if (home.status === 'fulfilled') {
+        const st = home.value?.data?.stats || {};
+        s.agents = st.agents ?? 0;
+        s.chatSessions = st.chatSessions ?? 0;
+        s.balance = st.balance ?? '-';
+        s.memory = st.memory ?? 0;
+        s.files = st.files ?? 0;
+        s.services = st.services ?? 0;
+        s.work = st.work ?? 0;
+        s.apps = st.apps ?? 0;
       }
       if (nodes.status === 'fulfilled') {
         const list = nodes.value;
