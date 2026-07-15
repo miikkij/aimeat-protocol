@@ -40,6 +40,7 @@ import { agentUsageMethods } from './methods/agent-usage.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
 import { appMethods } from './methods/apps.js';
+import { appGrantMethods } from './methods/app-grants.js';
 import { oauthMethods } from './methods/oauth.js';
 import { ecosystemMethods } from './methods/ecosystem.js';
 import { patMethods } from './methods/pat.js';
@@ -113,6 +114,7 @@ Object.assign(
   capabilityMethods,
   knowledgeMethods,
   appMethods,
+  appGrantMethods,
   oauthMethods,
   ecosystemMethods,
   patMethods,
