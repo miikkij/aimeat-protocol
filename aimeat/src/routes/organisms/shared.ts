@@ -20,7 +20,7 @@ import { normalizeDocValueImages } from '../../services/doc-images.js';
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
-import { validateMemoryWrite } from '../../services/schema-validator.js';
+import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../services/archive.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
@@ -198,6 +198,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const publishDraftsBatch = async (
     organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,
     expectedVersions?: Record<string, number | null>,
+    // DRAFT-LESS import: when a value is supplied per instance, publish it DIRECTLY (no draft to read or
+    // consume). An import has the final values, so this collapses N draft-writes + N publishes into ONE
+    // request. Interactive edits still use the draft flow (no directValues).
+    directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility'] }>,
   ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const ownerGhii = ownerGhiiOf(publisher);
@@ -206,8 +210,23 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 });
     const mkey = `${wsRoot}.meta.manifest`;
     const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
-    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; requires_expected_version?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
     const versioned = pubOt?.versioned !== false;
+
+    // AMORTISE the per-record validation: the write-guard policy and the applicable schema are the SAME
+    // for every record in one namespace, so resolve them ONCE (was a manifest read + a .latest read + a
+    // schema lookup PER record inside validateMemoryWrite — O(N) storage round-trips that dominated the
+    // publish; the batch already holds each record's existing .latest from the namespace scan above). The
+    // policy comes straight off the objectType we already read — no second manifest scan.
+    const policy = pubOt && (pubOt.create_only === true || pubOt.requires_expected_version === true)
+      ? { createOnly: pubOt.create_only === true, requiresExpectedVersion: pubOt.requires_expected_version === true }
+      : null;
+    const schemaRec = instances.length ? await storage.findApplicableSchema(`${nsPrefix}${instances[0]}.latest`) : null;
+    let schemaToValidate: Record<string, unknown> | null = null;
+    if (schemaRec) {
+      schemaToValidate = { ...(schemaRec.schemaJson as Record<string, unknown>) };
+      if (schemaRec.schemaMode === 'strict' && schemaToValidate.type === 'object') schemaToValidate.additionalProperties = false;
+    }
 
     const now = new Date().toISOString();
     const toUpsert: MemoryRecord[] = [];
@@ -218,12 +237,14 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     for (const instance of instances) {
       const base = `${nsPrefix}${instance}`;
       const items = allRows.filter(r => r.key === base || r.key.startsWith(`${base}.`));
-      const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      // Draft-less import: use the supplied value as the source; else read the record's .draft.
+      const direct = directValues ? directValues[instance] : undefined;
+      const draft = direct
+        ? { value: direct.value, ownerGaii: publisher, visibility: (direct.visibility ?? 'owner') as MemoryRecord['visibility'], tags: [] as string[] }
+        : items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
       if (!draft) { results.push({ instance, ok: false, code: 'NO_DRAFT' }); continue; }
       const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
       const expectedVersion = expectedVersions?.[instance] ?? null;
-      const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
-      if (!validation.valid) { results.push({ instance, ok: false, code: 'INVALID', violations: validation.errors }); continue; }
 
       let maxN = 0;
       const vPrefix = `${base}.version.`;
@@ -234,11 +255,34 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       const vis = draft.visibility;
       const tags = draft.tags ?? [];
 
-      // Change-guard: an unchanged re-publish just consumes the draft (no new version/latest, no side effect).
+      // Change-guard: an unchanged re-publish just consumes the draft (no new version/latest, no side
+      // effect). Runs FIRST — a byte-identical write is never a guard conflict (mirrors checkWriteGuard).
       if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
-        toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });
+        if (!direct) toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });
         results.push({ instance, ok: true, version: maxN, skipped: true });
         continue;
+      }
+      // Write-guard (in-memory, from the ONCE-loaded policy + the already-loaded existingLatest) — same
+      // decisions checkWriteGuard makes, without the per-record manifest + .latest reads.
+      if (policy) {
+        if (policy.createOnly && existingLatest) {
+          results.push({ instance, ok: false, code: 'INVALID', violations: [{ schema_rule: 'write_guard_conflict', message: `record "${instance}" already exists in append-only namespace "${namespace}"`, path: '/' }] });
+          continue;
+        }
+        if (policy.requiresExpectedVersion) {
+          const badNew = !existingLatest && expectedVersion != null && expectedVersion !== 0;
+          const badMissing = existingLatest && expectedVersion == null;
+          const badMismatch = existingLatest && expectedVersion != null && expectedVersion !== existingLatest.version;
+          if (badNew || badMissing || badMismatch) {
+            results.push({ instance, ok: false, code: 'INVALID', violations: [{ schema_rule: badMissing ? 'write_guard_version_required' : 'write_guard_version_mismatch', message: `expected_version does not match for "${instance}" (current ${existingLatest?.version ?? 0})`, path: '/' }] });
+            continue;
+          }
+        }
+      }
+      // Schema (in-memory, from the ONCE-compiled schema) — no per-record findApplicableSchema round-trip.
+      if (schemaToValidate) {
+        const sv = validateValueAgainstSchema(draftValue, schemaToValidate);
+        if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
       }
       const n = maxN + 1;
       if (versioned) toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
@@ -250,7 +294,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
       // Collapse: any pre-existing .latest copy under a DIFFERENT owner is removed (single-owner key).
       for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
-      toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });   // consume the draft
+      if (!direct) toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });   // consume the draft (none for a direct import)
       toEmit.push({ owner: latestOwner, key: `${base}.latest` });
       results.push({ instance, ok: true, version: n });
     }
