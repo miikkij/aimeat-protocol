@@ -27,6 +27,7 @@ import { sessionMethods } from './methods/sessions.js';
 import { schemaMethods } from './methods/schema.js';
 import { agentOnboardingMethods } from './methods/agent-onboarding.js';
 import { fileMethods } from './methods/files.js';
+import { microMemoryMethods } from './methods/micro-memory.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -69,5 +70,6 @@ Object.assign(
   schemaMethods,
   agentOnboardingMethods,
   fileMethods,
+  microMemoryMethods,
   startupCompatMethods,
 );
