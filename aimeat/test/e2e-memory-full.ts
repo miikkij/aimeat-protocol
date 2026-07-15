@@ -18,6 +18,8 @@
  *     cover empty items (400), only-not-owned items (404), and missing auth (401).
  *   v1.7.0 — 2026-07-15 — POST /v1/memory/bulk (Phase 1 batched write): create/update/skip summary,
  *     organism-prefixed and reserved-key refusal into failed[], and 400/401 guards.
+ *   v1.7.1 — 2026-07-15 — Bulk write storage_ref integrity (dangling ref → failed) — guard-parity with
+ *     the single POST /v1/memory.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -1016,6 +1018,18 @@ await test('Bulk write rejects missing entries (400) and no auth (401)', async (
     assert(bad.status === 400, `expected 400, got ${bad.status}`);
     const noauth = await json('/v1/memory/bulk', { method: 'POST', body: JSON.stringify({ entries: [{ key: 'x', value: 1 }] }) });
     assert(noauth.status === 401, `expected 401, got ${noauth.status}`);
+});
+
+await test('Bulk write validates storage_ref integrity (dangling ref → failed, parity with single write)', async () => {
+    const { body } = await json('/v1/memory/bulk', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ entries: [
+            { key: 'ref.bad', value: { _type: 'storage_ref', storage_key: 'does/not/exist.bin' } },
+            { key: 'ref.ok', value: { plain: true } },
+        ] }),
+    });
+    assert(body.data.created === 1, `expected 1 created, got ${body.data.created}`);
+    assert((body.data.failed || []).some((f: { key: string; reason: string }) => f.key === 'ref.bad' && /storage file not found/.test(f.reason)), 'dangling storage_ref rejected');
 });
 
 // ═══════════════════════════════════════════════════════

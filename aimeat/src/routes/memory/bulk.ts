@@ -73,6 +73,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      // storage_ref integrity (parity with the single POST /v1/memory): a value pointing at a stored file
+      // must name an existing one. The getStorageFile lookup runs ONLY for storage_ref entries, so a
+      // normal bulk write (no storage_refs) pays nothing.
+      const val = e.value as { _type?: string; storage_key?: unknown } | undefined;
+      if (val && typeof val === 'object' && val._type === 'storage_ref') {
+        if (!val.storage_key || typeof val.storage_key !== 'string') { preFailed.push({ key, status: 'failed', reason: 'storage_ref requires a valid storage_key string' }); continue; }
+        if (!(await storage.getStorageFile(gaii, val.storage_key))) { preFailed.push({ key, status: 'failed', reason: `referenced storage file not found: ${val.storage_key}` }); continue; }
+      }
       items.push({
         key,
         value: e.value,
@@ -160,7 +168,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // byte-sum + one key-count + one bulk upsert, replacing the old per-entry (getMemory + setMemory) loop
   // and the up-front listMemory().length load-all. Behaviour is preserved: same failure reasons, same
   // summary shape, and (like the prior import) NO total-bytes quota cap — an import restores a backup.
-  router.post('/v1/memory/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  router.post('/v1/memory/import', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), async (req, res) => {
     const body = req.body ?? {};
     const entries = Array.isArray(body.entries) ? body.entries : null;
     const mode = (['skip', 'overwrite', 'rename'].includes(body.mode) ? body.mode : 'skip') as 'skip' | 'overwrite' | 'rename';
