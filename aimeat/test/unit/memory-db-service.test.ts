@@ -158,6 +158,17 @@ describe('MemoryDbService.writeMany — Phase 1 batched write', () => {
     expect(await storage.getMemory(GHII, 'big')).toBeNull();
   });
 
+  it('refuses to overwrite an archived record (read-only parity with single write)', async () => {
+    await storage.archiveMemoryByKey('existing.key', { archivedRoot: 'r', archivedBy: OWNER, archivedAt: new Date().toISOString(), match: 'exact' });
+    const svc = createMemoryDbService(storage, { nodeId: NODE });
+    const res = await svc.writeMany(GHII, [
+      { key: 'existing.key', value: { v: 'attempt' } },
+      { key: 'brand.new', value: { n: 1 } },
+    ], { quota, validate: async () => OK });
+    expect(res.created).toBe(1);
+    expect(res.items.find(i => i.key === 'existing.key')).toMatchObject({ status: 'failed', reason: 'record is archived (read-only)' });
+  });
+
   it('fails entries that would exceed the total-bytes quota', async () => {
     const svc = createMemoryDbService(storage, { nodeId: NODE });
     const res = await svc.writeMany(GHII, [

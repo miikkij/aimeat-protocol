@@ -8,7 +8,7 @@
 import type { Router } from 'express';
 import { ZipArchive } from 'archiver';
 import type { MemoryRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
@@ -29,7 +29,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // POST /v1/memory (overage-morsel charging excluded — an over-quota entry fails). Scope guards: this
   // path is for the caller's OWN flat keyspace — `organism.*` keys (workspace-guarded) and ecosystem
   // principals go through their dedicated guarded paths and are refused here.
-  router.post('/v1/memory/bulk', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  router.post('/v1/memory/bulk', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), async (req, res) => {
     const body = req.body ?? {};
     const rawEntries = Array.isArray(body.entries) ? body.entries : null;
     if (!rawEntries) {
