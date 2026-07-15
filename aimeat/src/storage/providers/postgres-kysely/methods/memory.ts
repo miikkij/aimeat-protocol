@@ -277,6 +277,16 @@ export const memoryMethods = {
     return Number(r.numUpdatedRows ?? 0);
   },
 
+  async unarchiveMemoryByKey(this: PostgresKyselyStorage, keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
+    const match = opts?.match ?? 'subtree';   // default subtree, matching the SQLite repo
+    let q = this.db.updateTable('Memory').set({ archived: false, archivedRoot: null, archivedBy: null, archivedAt: null }).where('archived', '=', true);
+    if (match === 'exact') q = q.where('key', '=', keyOrPrefix);
+    else if (match === 'prefix') q = q.where('key', 'like', keyOrPrefix + '%');
+    else q = q.where(eb => eb.or([eb('key', '=', keyOrPrefix), eb('key', 'like', keyOrPrefix + '.%')]));
+    const r = await q.executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0);
+  },
+
   async countArchivedByKeyPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<number> {
     const r = await this.db.selectFrom('Memory').select(sql<number>`count(*)`.as('n')).where('key', 'like', keyPrefix + '%').where('archived', '=', true).executeTakeFirst();
     return Number(r?.n ?? 0);
