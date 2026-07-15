@@ -203,6 +203,22 @@ describe('Storage bulk primitives (SQLite)', () => {
     expect(removed).toBe(3);
     expect(await storage.getMemory(GHII, `${base}X`)).not.toBeNull();
   });
+
+  it('deleteMemoryByPrefix wipes all owners + active AND archived, but spares sibling containers', async () => {
+    const wsPrefix = 'organism.abc.w.ws.';
+    await storage.setMemory(mem(GHII, `${wsPrefix}crm.rec0.latest`, { a: 1 }));
+    await storage.setMemory(mem(`agent0#${OWNER}@${NODE}`, `${wsPrefix}crm.rec0.version.1`, { a: 1 })); // cross-owner row
+    await storage.setMemory(mem(GHII, `${wsPrefix}crm.rec1.latest`, { a: 2 }));
+    await storage.setMemory(mem(GHII, 'organism.abc.w.ws2.crm.rec0.latest', { other: true })); // sibling ws
+    await storage.setMemory(mem(GHII, 'organism.abcd.w.ws.crm.rec0.latest', { other: true }));  // sibling org
+    // Archive one row — the wipe must still remove it (delete everything under the container).
+    await storage.archiveMemoryByKey(`${wsPrefix}crm.rec1.latest`, { archivedRoot: 'r', archivedBy: OWNER, archivedAt: new Date().toISOString(), match: 'exact' });
+
+    const removed = await storage.deleteMemoryByPrefix!(wsPrefix);
+    expect(removed).toBe(3); // 2 active (rec0.latest, rec0.version.1) + 1 archived (rec1.latest)
+    expect(await storage.getMemory(GHII, 'organism.abc.w.ws2.crm.rec0.latest')).not.toBeNull();
+    expect(await storage.getMemory(GHII, 'organism.abcd.w.ws.crm.rec0.latest')).not.toBeNull();
+  });
 });
 
 describe('MemoryRepository.dedupByKey', () => {
