@@ -15,16 +15,13 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
-import { listOwnerScopeMemory } from '../../services/owner-memory.js';
-import { createMemoryDbService } from '../../services/db/index.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
-  const { config, storage, stats, resolve } = ctx;
-  // Data-access redesign (Phase 1): the batched-write path runs through the Application-DB-Service so a
-  // bulk write is ONE operation (batched reads + one-transaction bulk upsert) instead of N single writes.
-  const memoryDb = createMemoryDbService(storage, config);
+  // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
+  // Application-DB-Service (ctx.memoryDb) so each is ONE operation (batched reads + bulk upsert).
+  const { config, storage, stats, resolve, memoryDb } = ctx;
 
   // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
   // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
@@ -136,7 +133,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     let records: MemoryRecord[];
     if (isOwnerSession && !agentParam) {
-      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix });
+      records = await memoryDb.listOwnerScope(req.auth!.owner, { prefix });
     } else {
       records = await storage.listMemory(gaii, { prefix });
     }
@@ -159,6 +156,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // body: { entries: [{ key, value, visibility?, tags?, ttl_hours? }], mode?, agent? }
   //   mode = 'skip' (default) | 'overwrite' | 'rename' — how to resolve a key that already exists.
   // Per-entry validation/quota/schema mirror POST /v1/memory; one bad entry doesn't abort the run.
+  // Phase 1: the write itself runs through MemoryDbService.writeMany — batched existing-lookup + one
+  // byte-sum + one key-count + one bulk upsert, replacing the old per-entry (getMemory + setMemory) loop
+  // and the up-front listMemory().length load-all. Behaviour is preserved: same failure reasons, same
+  // summary shape, and (like the prior import) NO total-bytes quota cap — an import restores a backup.
   router.post('/v1/memory/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const body = req.body ?? {};
     const entries = Array.isArray(body.entries) ? body.entries : null;
@@ -185,65 +186,71 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       gaii = agentParam;
     }
 
-    const MAX_KEYS_PER_AGENT = config.memoryMaxKeysPerAgent;
-    const MAX_VALUE_SIZE = config.memoryMaxValueSizeKb * 1024;
-    let keyCount = (await storage.listMemory(gaii)).length;
-
-    const summary = { created: 0, updated: 0, skipped: 0, failed: [] as { key: string; reason: string }[] };
-
+    // Per-entry protocol pre-filter (reserved-key + anonymous namespace) — bad entries go straight to
+    // failed[]; the survivors are handed to the service. NOTE: organism.* keys are allowed here (unlike
+    // /v1/memory/bulk) — the injected validate runs the workspace write-guards per entry, exactly as the
+    // old import did, so append-only / create-only manifests are still honoured.
+    const failed: { key: string; reason: string }[] = [];
+    const items: BulkWriteItem[] = [];
+    const renameOf = new Map<string, string>();   // targetKey -> original key (for the summary/events)
+    const survivors: { key: string; entry: Record<string, unknown> }[] = [];
     for (const entry of entries) {
       const key = entry?.key;
-      if (typeof key !== 'string' || !key) { summary.failed.push({ key: String(key), reason: 'missing key' }); continue; }
-      // Reserved-key guard (DNA invariant #2): apps may not import server-trusted owner keys.
-      if (!appMayWriteKey(req.auth!.roles, key)) { summary.failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
-      try {
-        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
-          summary.failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue;
-        }
-        const valueSize = Buffer.byteLength(JSON.stringify(entry.value), 'utf8');
-        if (valueSize > MAX_VALUE_SIZE) { summary.failed.push({ key, reason: 'value too large' }); continue; }
+      if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
+      if (!appMayWriteKey(req.auth!.roles, key)) { failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
+      if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      survivors.push({ key, entry });
+    }
 
-        let targetKey = key;
-        const existing = await storage.getMemory(gaii, key);
-        if (existing) {
-          if (mode === 'skip') { summary.skipped++; continue; }
-          if (mode === 'rename') {
-            let n = 1;
-            while (await storage.getMemory(gaii, `${key}-imported${n > 1 ? '-' + n : ''}`)) n++;
-            targetKey = `${key}-imported${n > 1 ? '-' + n : ''}`;
-          }
-          // mode === 'overwrite' falls through with targetKey === key
-        }
-
-        const isNewKey = targetKey === key ? !existing : true;
-        if (isNewKey && keyCount >= MAX_KEYS_PER_AGENT) { summary.failed.push({ key, reason: 'key quota reached' }); continue; }
-
-        const validation = await validateMemoryWrite(targetKey, entry.value, storage);
-        if (!validation.valid) { summary.failed.push({ key: targetKey, reason: 'schema validation failed' }); continue; }
-
-        const now = new Date().toISOString();
-        const prior = targetKey === key ? existing : null;
-        await storage.setMemory({
-          key: targetKey,
-          ownerGaii: gaii,
-          value: entry.value,
-          visibility: (['private', 'owner', 'group', 'members', 'public'].includes(entry.visibility) ? entry.visibility : 'private') as MemoryRecord['visibility'],
-          tags: Array.isArray(entry.tags) ? entry.tags : [],
-          ttlHours: typeof entry.ttl_hours === 'number' ? entry.ttl_hours : null,
-          version: prior ? prior.version + 1 : 1,
-          createdAt: prior?.createdAt ?? now,
-          updatedAt: now,
-        });
-        if (prior) summary.updated++; else { summary.created++; keyCount++; }
-        emitMemoryWritten(gaii, targetKey, prior ? 'updated' : 'created');
-      } catch (e) {
-        summary.failed.push({ key, reason: String(e instanceof Error ? e.message : e) });
+    // Rename mode: resolve a fresh target key for any entry whose key already exists, so every renamed
+    // entry becomes a NEW key (created). One batched existing-lookup covers the first probe; deeper
+    // collisions fall back to per-candidate reads (rare).
+    if (mode === 'rename' && survivors.length) {
+      const existingKeys = new Set((await storage.getMemoryByKeys!(gaii, survivors.map(s => s.key))).map(r => r.key));
+      for (const s of survivors) {
+        if (!existingKeys.has(s.key)) continue;
+        let n = 1;
+        let candidate = `${s.key}-imported`;
+        while (await storage.getMemory(gaii, candidate)) { n++; candidate = `${s.key}-imported-${n}`; }
+        renameOf.set(candidate, s.key);
+        s.key = candidate;
       }
+    }
+
+    for (const s of survivors) {
+      items.push({
+        key: s.key,
+        value: s.entry.value,
+        visibility: (['private', 'owner', 'group', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
+        tags: Array.isArray(s.entry.tags) ? s.entry.tags as string[] : [],
+        ttlHours: typeof s.entry.ttl_hours === 'number' ? s.entry.ttl_hours : null,
+      });
+    }
+
+    const result = await memoryDb.writeMany(gaii, items, {
+      // Renamed targets are all-new, so 'overwrite' still yields 'created' for them.
+      mode: mode === 'rename' ? 'overwrite' : mode,
+      quota: {
+        maxKeysPerOwner: config.memoryMaxKeysPerAgent,
+        maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
+        totalQuotaBytes: Number.MAX_SAFE_INTEGER,   // preserve prior import behaviour (no total-bytes cap)
+      },
+      validate: (key, value) => validateMemoryWrite(key, value, storage),
+    });
+
+    for (const it of result.items) {
+      if (it.status === 'created' || it.status === 'updated') emitMemoryWritten(gaii, it.key, it.status);
+      if (it.status === 'failed') failed.push({ key: renameOf.get(it.key) ?? it.key, reason: it.reason ?? 'failed' });
     }
 
     emitResourceListChanged(gaii);
     emitChange('memory');
-    res.json(success(config.nodeId, summary));
+    res.json(success(config.nodeId, {
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      failed,
+    }));
   });
 
   // POST /v1/memory/bulk-delete — delete many entries at once by { prefix } and/or { keys }.
@@ -277,7 +284,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // Gather candidate records (owner-scope keeps each record's writer gaii so we delete from the right keyspace).
     const records = (isOwnerSession && !agentParam)
-      ? await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix })
+      ? await memoryDb.listOwnerScope(req.auth!.owner, { prefix })
       : await storage.listMemory(gaii, { prefix });
 
     let deleted = 0;

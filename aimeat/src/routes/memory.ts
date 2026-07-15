@@ -35,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { createMemoryDbService } from '../services/db/index.js';
 import type { StatsCollector } from '../services/stats.js';
 import type { MemoryRouteCtx } from './memory/shared.js';
 import { registerCrudRoutes } from './memory/crud.js';
@@ -52,7 +53,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   /** Resolve effective identity for memory operations — owner sessions use GHII, agents use GAII */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  const ctx: MemoryRouteCtx = { config, storage, stats, onDirectoryChange, peers, resolve, workspaceAccess };
+  // Data-access redesign: the memory Application-DB-Service, built once and shared via ctx. Routes call
+  // its batched whole-operations (owner-scope reads, writeMany) instead of hitting storage directly.
+  const memoryDb = createMemoryDbService(storage, config);
+
+  const ctx: MemoryRouteCtx = { config, storage, memoryDb, stats, onDirectoryChange, peers, resolve, workspaceAccess };
 
   // Registration order is load-bearing (Express matches top-to-bottom): more-specific literal paths
   // (/v1/memory/search, /export, /files, ...) MUST be registered before the /:key and /:gaii/:key
