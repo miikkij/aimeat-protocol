@@ -105,12 +105,17 @@ google*.html
 # Data exports
 *.sql
 *.dump
+# …but the Kysely provider's schema migrations ARE source (checked in), not a data export.
+!aimeat/src/storage/providers/*/migrations/*.sql
 
 # Binary docs (use .md instead)
 *.docx
 
 # Business strategy (private)
 docs/businessfinland/
+
+# Press / behind-the-scenes diaries + screenshots (local only, never commit)
+press/
 
 # Python (added 2026-05-29 with python/aimeat-crewai/ package)
 __pycache__/
