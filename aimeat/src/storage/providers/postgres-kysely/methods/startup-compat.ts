@@ -9,8 +9,9 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: boot placeholders (normalizeAppOwnerNames, mergeForkedAppBuckets, listFederationPeers).
  */
 import type {
-  ActionRecord, CapabilityRecord, CortexExtensionRecord, EcosystemAppRecord, ExtensionRecord, ExtensionInstanceRecord,
-  FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord,
+  ActionRecord, BoardSubscriptionRecord, CapabilityRecord, ConsentRecord, ConsentAuditEntry, CortexExtensionRecord,
+  DisputeRecord, EcosystemAppRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
+  FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord, WorkRecord,
 } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
@@ -41,4 +42,15 @@ export const startupCompatMethods = {
   // Owner-scope identity resolution calls this on every owner-scoped memory op; empty until the
   // ecosystem-apps domain lands (a node with no connected ecosystem apps).
   async getEcosystemAppsByOwner(this: PostgresKyselyStorage, _owner: string): Promise<EcosystemAppRecord[]> { return []; },
+
+  // The DELETE /v1/owners/:name GDPR-export cascade lists across many domains before deleting; empty
+  // until those domains (work / consent / boards / escrow / disputes) land — correct on a node with no
+  // such data. Each is replaced by the real implementation with its domain slice.
+  async listWorkByProvider(this: PostgresKyselyStorage, _gaii: string): Promise<WorkRecord[]> { return []; },
+  async listWorkByRequester(this: PostgresKyselyStorage, _gaii: string): Promise<WorkRecord[]> { return []; },
+  async listConsents(this: PostgresKyselyStorage, _ownerGaii: string, _opts?: unknown): Promise<ConsentRecord[]> { return []; },
+  async listConsentAudit(this: PostgresKyselyStorage, _ownerGaii: string, _opts?: unknown): Promise<ConsentAuditEntry[]> { return []; },
+  async listSubscriptionsByAgent(this: PostgresKyselyStorage, _gaii: string): Promise<BoardSubscriptionRecord[]> { return []; },
+  async listEscrowHolds(this: PostgresKyselyStorage, _fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> { return []; },
+  async listAllDisputes(this: PostgresKyselyStorage, _limit?: number): Promise<DisputeRecord[]> { return []; },
 };

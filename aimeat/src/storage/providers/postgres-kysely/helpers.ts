@@ -20,7 +20,10 @@ export const byteSize = (value: unknown): number => Buffer.byteLength(JSON.strin
  *  space-joined. The DB's GENERATED searchTsv column turns this into the tsvector. Matches the
  *  Mongo/SQLite buildSearchBlob so search recall is comparable across backends. */
 export function buildSearchBlob(record: MemoryRecord): string {
-  const parts: string[] = [record.key, ...(record.tags ?? [])];
+  // Include the key AND its punctuation-split segments so a dotted key like `search.findme` is findable
+  // by `findme` — Postgres' tsvector keeps `search.findme` as one token, whereas SQLite FTS5 / Mongo
+  // $text split on punctuation; emitting the segments matches their recall.
+  const parts: string[] = [record.key, ...record.key.split(/[._:/\-\s]+/).filter(Boolean), ...(record.tags ?? [])];
   const walk = (v: unknown, depth: number): void => {
     if (depth > 6 || v == null) return;
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') { parts.push(String(v)); return; }
