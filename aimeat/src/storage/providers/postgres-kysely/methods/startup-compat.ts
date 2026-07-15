@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: boot placeholders (normalizeAppOwnerNames, mergeForkedAppBuckets, listFederationPeers).
  */
 import type {
-  ActionRecord, BoardSubscriptionRecord, CapabilityRecord, ConsentRecord, ConsentAuditEntry, CortexExtensionRecord,
+  ActionRecord, CapabilityRecord, ConsentRecord, ConsentAuditEntry, CortexExtensionRecord,
   DisputeRecord, EcosystemAppRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
   FederationPeerRecord, GHIIRecord, PersonalNodeRecord, ScheduledJobRecord, WorkRecord,
 } from '../../../interface.js';
@@ -50,7 +50,6 @@ export const startupCompatMethods = {
   async listWorkByRequester(this: PostgresKyselyStorage, _gaii: string): Promise<WorkRecord[]> { return []; },
   async listConsents(this: PostgresKyselyStorage, _ownerGaii: string, _opts?: unknown): Promise<ConsentRecord[]> { return []; },
   async listConsentAudit(this: PostgresKyselyStorage, _ownerGaii: string, _opts?: unknown): Promise<ConsentAuditEntry[]> { return []; },
-  async listSubscriptionsByAgent(this: PostgresKyselyStorage, _gaii: string): Promise<BoardSubscriptionRecord[]> { return []; },
   async listEscrowHolds(this: PostgresKyselyStorage, _fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> { return []; },
   async listAllDisputes(this: PostgresKyselyStorage, _limit?: number): Promise<DisputeRecord[]> { return []; },
 };
