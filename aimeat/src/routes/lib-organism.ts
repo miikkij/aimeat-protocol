@@ -14,6 +14,11 @@
  *   - list() / get(orgId) / workspaces(orgId)
  *   - read(orgId, wsId?) -> { manifest, readme, readmeText, spaces, raw }
  *   - writeDraft(orgId, wsId, namespace, id, value, opts?) / publish / revertToDraft / deleteObject
+ *   - BULK (data-access redesign): publishRecords(orgId, wsId, ns, ids[], expectedVersions?) /
+ *     deleteRecords(orgId, wsId, ns, ids[]) — one batched request replacing a per-record publish/delete
+ *     loop (imports/migrations/teardowns; deleteRecords needs memory:delete). Drafts stay per-record
+ *     (writeDraft) — a workspace-guarded draft key can't go through /v1/memory/bulk, and the draft write
+ *     isn't the bottleneck; the batched publish is (~10× on the prod backend).
  *   - saveReadme(orgId, wsId, readme) / search(orgId, q)
  *   - util: { stripMeta, titleOf, bodyFieldOf, isDocLike, updatedAt, TITLE_FIELDS, BODY_FIELDS }
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
@@ -22,6 +27,9 @@
  *   v1.0.0 — 2026-07-02 — initial: normalized workspace read (objects+drafts merge, value.id
  *     convention, _meta handling), draft/publish/revert/delete/readme/search, extracted from the
  *     AIMEAT Pages app where the raw contract had to be reverse-engineered.
+ *   v1.1.0 — 2026-07-15 — Bulk bridge methods (data-access redesign): publishRecords / deleteRecords,
+ *     so sandboxed cortex/app code can reach the batched endpoints (a 520-record import/migration was
+ *     N single publishes; batch publish is ~10× on the prod backend).
  */
 import type { AimeatConfig } from '../config.js';
 
@@ -277,6 +285,33 @@ var organism = {
       body: JSON.stringify({ ws: wsId || undefined, namespace: namespace, id: id })
     });
     if (res.ok === false) throw fail(res, 'Failed to publish');
+    return res.data !== undefined ? res.data : res;
+  },
+
+  // BULK publish MANY drafts in ONE request (data-access redesign) — ids: [id,...], optional
+  // expectedVersions: { id: version }. Replaces a loop of publish() (each a full server-side scan + 2
+  // writes + draft delete) with one batched operation. Returns { published, skipped, failed, results }.
+  // A create_only namespace 409s; when the publish review gate is on, publish one at a time via publish().
+  async publishRecords(orgId, wsId, namespace, ids, expectedVersions) {
+    var body = { ws: wsId || undefined, namespace: namespace, instances: ids || [] };
+    if (expectedVersions && typeof expectedVersions === 'object') body.expected_versions = expectedVersions;
+    var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspace/records/publish', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (res.ok === false) throw fail(res, 'Failed to publish records');
+    return res.data !== undefined ? res.data : res;
+  },
+
+  // BULK delete MANY record families in ONE request (data-access redesign) — ids: [id,...]. Removes each
+  // record's bare/.draft/.latest/.version.N owned by the caller's own identity in one batched call
+  // (needs memory:delete scope). Replaces a loop of deleteObject() (a scan + per-key delete each).
+  // Returns { deleted:[{id,keys}], failed:[{id,reason}], rows_removed }.
+  async deleteRecords(orgId, wsId, namespace, ids) {
+    var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspace/records/delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ws: wsId || undefined, namespace: namespace, ids: ids || [] })
+    });
+    if (res.ok === false) throw fail(res, 'Failed to delete records');
     return res.data !== undefined ? res.data : res;
   },
 
