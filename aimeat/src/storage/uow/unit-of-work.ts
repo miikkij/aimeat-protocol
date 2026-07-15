@@ -19,6 +19,9 @@
  *   });
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding: UoW over the memory adapter (Transactor seam).
+ *   v1.1.0 — 2026-07-15 — Phase 3: runInReadScope — bind an IdentityMap to the async context for a
+ *     READ composite (a home dashboard fanning across domains) so a shared entity (the owner's agent
+ *     list) is read ONCE and reused, WITHOUT opening a write transaction.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Transactor } from '../adapter/memory-adapter.js';
@@ -74,4 +77,20 @@ export function runWithUow<T>(uow: UnitOfWork, fn: () => Promise<T>): Promise<T>
 export function runInUnitOfWork<T>(transactor: Transactor, fn: (uow: UnitOfWork) => Promise<T>): Promise<T> {
   const uow = new UnitOfWork(transactor);
   return runWithUow(uow, () => uow.run(fn));
+}
+
+/** A transactor that runs the callback directly — no transaction boundary. Used by read scopes, which
+ *  want the IdentityMap's read-once memoisation but never write, so opening a transaction is pointless. */
+const NOOP_TRANSACTOR: Transactor = { withTransaction: fn => fn() };
+
+/**
+ * Bind a fresh {@link UnitOfWork} (its {@link IdentityMap}) to the async context for a READ-only whole
+ * operation, and run `fn` inside it — WITHOUT opening a transaction. A composite that fans across several
+ * domains (e.g. the profile home dashboard) uses this so a shared entity — the owner's agent list, which
+ * ~60 handlers each re-read — is loaded ONCE by the first domain service and served from the map to the
+ * rest. Nested reads reach the map via {@link getCurrentUow}; outside any scope they fall back to a
+ * direct storage read, so the same service code works either way.
+ */
+export function runInReadScope<T>(fn: () => Promise<T>): Promise<T> {
+  return runWithUow(new UnitOfWork(NOOP_TRANSACTOR), fn);
 }

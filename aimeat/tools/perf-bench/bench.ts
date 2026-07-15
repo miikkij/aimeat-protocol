@@ -26,10 +26,10 @@ import type { Storage, MemoryRecord, AgentRecord } from '../../src/storage/inter
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { traceOperation, formatTrace, instrumentStorage } from '../../src/services/perf-trace.js';
 import { listOwnerScopeMemory, listOwnerScopeMemoryMeta, getOwnerScopeMemory } from '../../src/services/owner-memory.js';
-import { getOwnerUsageSummary } from '../../src/services/usage-summary.js';
+import { getOwnerUsageSummary, invalidateOwnerUsage } from '../../src/services/usage-summary.js';
 import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
-import { createMemoryDbService } from '../../src/services/db/index.js';
+import { createMemoryDbService, createHomeDashboardService } from '../../src/services/db/index.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import { loadConfig } from '../../src/config.js';
 
@@ -225,6 +225,26 @@ async function runScale(sc: Scale): Promise<void> {
       for (const r of nsKeys) if (r.key === base || r.key.startsWith(`${base}.`)) refs.push({ ownerGaii: r.ownerGaii, key: r.key });
     }
     await storage.bulkDeleteMemory!(refs);
+  });
+
+  // ── HOME dashboard (Phase 3): the profile Home load. OLD = the stats-bar + cards fan-out, which
+  // re-resolves the owner's agent list once per widget (usage summary, stats-bar agents, Agents card,
+  // work inbox) + a separate balance read. NEW = HomeDashboardService.load — ONE identity resolution
+  // (IdentityMap) shared across usage + agent overview + work. Watch getAgentsByOwner drop 4→1. Usage
+  // cache is invalidated before each variant so both pay the same cold compute (a fair comparison). ──
+  const home = createHomeDashboardService(config, storage);
+  await bench('home dashboard — OLD fan-out (agents re-read per widget)', async () => {
+    invalidateOwnerUsage(OWNER);
+    await getOwnerUsageSummary(config, storage, OWNER);   // UsageCard + most stat counts
+    await storage.getAgentsByOwner(OWNER);                // stats-bar agents + chatSessions
+    await storage.getAgentsByOwner(OWNER);                // Agents card list
+    const ags = await storage.getAgentsByOwner(OWNER);    // work inbox owner fan-out
+    for (const a of ags) await storage.listWorkByProvider(a.gaii);
+    await storage.getGHIIByOwner(OWNER);                  // stats-bar morsel balance
+  });
+  await bench('home dashboard — NEW composite (one identity resolution)', async () => {
+    invalidateOwnerUsage(OWNER);
+    await home.load(OWNER);
   });
 
   if ('close' in storage && typeof (storage as { close?: () => Promise<void> }).close === 'function') {
