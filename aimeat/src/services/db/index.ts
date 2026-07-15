@@ -18,34 +18,24 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter.js';
 import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
-import { MemoryDbService, type OwnerIdentityResolver } from './memory-db-service.js';
+import { MemoryDbService } from './memory-db-service.js';
+import { resolveOwnerIdentities } from './owner-identity.js';
 
 export { MemoryDbService } from './memory-db-service.js';
 export { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
 export { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter.js';
+export { AgentDbService, createAgentDbService } from './agent-db-service.js';
+export { HomeDashboardService, createHomeDashboardService } from './home-dashboard-service.js';
+export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
-/**
- * The owner-scope identity list backed by storage: the owner's GHII first, then each agent's GAII, then
- * each ecosystem app's GEAI — the exact order (and set) services/owner-memory.ts builds, so the
- * GHII-first dedup behaves identically. Kept here (not in the memory service) so the memory domain
- * doesn't reach into the agent/eco domains directly.
- */
-function ownerIdentityResolver(storage: Storage, nodeId: string): OwnerIdentityResolver {
-  return async (ownerName: string): Promise<string[]> => {
-    const [agents, ecoApps] = await Promise.all([
-      storage.getAgentsByOwner(ownerName),
-      storage.getEcosystemAppsByOwner(ownerName),
-    ]);
-    return [`${ownerName}@${nodeId}`, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
-  };
-}
-
-/** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). */
+/** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its
+ *  owner-scope identity resolution is the shared IdentityMap-aware {@link ./owner-identity.js} source —
+ *  the same one AgentDbService and usage-summary use — so the list is built once per operation. */
 export function createMemoryDbService(storage: Storage, config: Pick<AimeatConfig, 'nodeId'>): MemoryDbService {
   const adapter = new LegacyMemoryAdapter(storage);
   const repo = new MemoryRepository(adapter);
   return new MemoryDbService(repo, {
     nodeId: config.nodeId,
-    resolveOwnerIdentities: ownerIdentityResolver(storage, config.nodeId),
+    resolveOwnerIdentities: (ownerName: string) => resolveOwnerIdentities(storage, config.nodeId, ownerName),
   });
 }

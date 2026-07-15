@@ -26,6 +26,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
+import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps
  *  the full-scan byte computations off the request hot path on repeated visits. */
@@ -79,8 +80,11 @@ async function computeOwnerUsageSummary(
   config: AimeatConfig, storage: Storage, ownerName: string,
 ): Promise<OwnerUsageSummary> {
   const ghii = `${ownerName}@${config.nodeId}`;
-  const agents = await storage.getAgentsByOwner(ownerName);
-  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  // Shared IdentityMap-aware loaders: inside a read scope (the home dashboard composite) the agent/eco
+  // lists are already resolved by AgentDbService, so this reuses them instead of a second fetch; a lone
+  // GET /v1/owner/usage call falls back to a direct read. Either way one source, no duplication.
+  const agents = await loadOwnerAgents(storage, ownerName);
+  const ecoApps = await loadOwnerEcoApps(storage, ownerName);
   // Owner-scope identities: the human's GHII + every agent + every ecosystem app. Usage is keyed by
   // the writer, so the owner's true footprint is the union (mirrors GET /v1/memory owner-scope).
   const identities = [ghii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];

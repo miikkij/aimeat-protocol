@@ -9740,6 +9740,60 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/owner/home:
+    get:
+      operationId: getOwnerHome
+      summary: Profile home dashboard (composite)
+      description: >
+        The whole profile Home dashboard in ONE call: the stats-bar counts, the cached usage summary,
+        and the owner's agents list. Composes the per-domain services with the owner's agent list
+        resolved a single time (shared across stats + usage + agents), replacing the shell's multi-request
+        stats-bar fan-out. Owner and agent sessions both resolve to the same owner. Generic account
+        dashboard data — any client can consume it.
+      tags: [Owner]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 'Composite home dashboard'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stats:
+                            type: object
+                            description: The stats-bar counts, each a projection of the loaded data.
+                            properties:
+                              agents: { type: integer }
+                              chatSessions: { type: integer }
+                              balance: { type: number }
+                              memory: { type: integer }
+                              files: { type: integer }
+                              services: { type: integer }
+                              apps: { type: integer }
+                              work: { type: integer }
+                          usage:
+                            type: object
+                            description: The same payload as GET /v1/owner/usage (cached).
+                          agents:
+                            type: array
+                            description: Real (non-session) agents, most-recently-seen first.
+                            items:
+                              type: object
+                              properties:
+                                gaii: { type: string }
+                                name: { type: string }
+                                display_name: { type: string }
+                                last_seen: { type: string, nullable: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/wallet:
     get:
       operationId: getWallet
