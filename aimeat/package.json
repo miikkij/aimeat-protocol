@@ -97,6 +97,7 @@
     "db:push:postgres": "prisma db push --schema prisma/schema.postgres.prisma",
     "db:init": "node --env-file=.env --import tsx scripts/db-init.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
+    "migrate:to-postgres-kysely": "node --env-file=.env --import tsx scripts/migrate-to-postgres-kysely.ts",
     "telemetry:stats": "node --env-file=.env --import tsx scripts/telemetry-prune.ts",
     "telemetry:prune": "node --env-file=.env --import tsx scripts/telemetry-prune.ts",
     "consent-audit:stats": "node --env-file=.env --import tsx scripts/consent-audit-prune.ts",
