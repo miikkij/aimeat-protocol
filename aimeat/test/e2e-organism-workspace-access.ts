@@ -6,6 +6,8 @@
  *   approve → read, and deny → revoke.
  * @version-history
  *   v1.0.0 — 2026-06-08 — Initial: workspace access request/approve/consent flow.
+ *   v1.1.0 — 2026-07-15 — Org-admin auto-access: a promoted admin (D) reads + writes a workspace they
+ *     did not create, with no per-workspace grant; a plain member (B) still cannot (regression guard).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-workspace-access
 
@@ -48,6 +50,7 @@ console.log('\n=== AIMEAT Organism Workspace Access E2E ===\n');
 let A: Awaited<ReturnType<typeof setupOwner>>;
 let B: Awaited<ReturnType<typeof setupOwner>>;
 let C: Awaited<ReturnType<typeof setupOwner>> | undefined;
+let D: Awaited<ReturnType<typeof setupOwner>> | undefined;
 let orgId = '';
 const WS = 'ws-acc1';
 const root = () => `organism.${orgId}.w.${WS}`;
@@ -140,6 +143,46 @@ await test('10. mark read clears the unread count', async () => {
     assert(bn.body.data.unread === 0, `B unread should be 0, got ${bn.body.data.unread}`);
 });
 
+// ─── Phase 1b: ORG-ADMIN auto-access. An organism admin/creator has automatic read+write access to
+//     EVERY workspace under the organism — no per-workspace grant. D joins, A promotes D to admin, and
+//     D then reads + writes workspace WS (created by A) with no access request. A plain member (B, whose
+//     access was revoked in test 8) still cannot — the admin bypass keys on role, not membership alone. ───
+await test('10a. Plain member B (revoked in test 8) still cannot read WS — baseline', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(B.token) });
+    assert(r.body.data.manifest === null, 'revoked member B must NOT read WS (regression guard for the admin bypass)');
+});
+
+await test('10b. D joins as a plain member — cannot read WS yet', async () => {
+    D = await setupOwner('d');
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(D.token), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(D.token) });
+    assert(r.body.data.manifest === null, 'plain member D must NOT read WS before promotion');
+});
+
+await test('10c. A promotes D to admin', async () => {
+    const r = await json(`/v1/organisms/${orgId}/admins`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ target_ghii: D!.name }) });
+    assert(r.status === 200 && r.body.data.role === 'admin', `promote ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('10d. Admin D auto-READS WS content (no access request, no grant)', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(D!.token) });
+    assert(r.status === 200, `read ${r.status}`);
+    assert(r.body.data.manifest && r.body.data.manifest.name === 'Coordination', 'admin reads the manifest with no access request');
+});
+
+await test('10e. Admin D discovery list shows WS access "granted"', async () => {
+    const l = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(D!.token) });
+    assert(l.status === 200, `list ${l.status}`);
+    assert((l.body.data.workspaces || []).find((w: any) => w.id === WS)?.access === 'granted', 'admin sees access=granted');
+});
+
+await test('10f. Admin D auto-WRITES a record into WS (no contributor grant)', async () => {
+    const key = `${root()}.shared.tasks.admin-${Date.now()}.draft`;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(D!.token), body: JSON.stringify({ key, value: { title: 'admin-authored task' }, visibility: 'private' }) });
+    assert(w.status === 201 || w.status === 200, `admin write ${w.status}: ${JSON.stringify(w.body.error)}`);
+});
+
 // ─── Phase 2: workspace-scoped FILE visibility. A file BOUND to this workspace (visibility:'workspace',
 //     workspace_ref="org/ws") is readable by exactly the people who can read the workspace — the creator
 //     and members WITH access — via GET /v1/pub, and nobody else. Same canReadWorkspace gate as the
@@ -199,10 +242,11 @@ await test('17. A file bound to MULTIPLE workspaces is readable via ANY one the 
     }
 });
 
-await test('Cleanup A + B + C', async () => {
+await test('Cleanup A + B + C + D', async () => {
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });
     if (C) await json(`/v1/owners/${C.name}`, { method: 'DELETE', headers: auth(C.token) });
+    if (D) await json(`/v1/owners/${D.name}`, { method: 'DELETE', headers: auth(D.token) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

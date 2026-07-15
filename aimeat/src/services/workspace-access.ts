@@ -19,12 +19,33 @@
  *     so the connector record-push subscription enforces byte-identical access.
  *   v1.1.0 -- 2026-07-02 -- Gate 3: ecosystem (GEAI) reads require a matching 'read' data-area grant
  *     (model A / strict), so a GEAI riding its owner's membership honours the owner-selected read scope.
+ *   v1.2.0 -- 2026-07-15 -- Org managers (creator/admin) automatically pass Gate 2: an organism admin
+ *     reads every workspace under the organism without a per-workspace grant (they already manage its
+ *     access, invites, export + archive). Shared isOrgManager() helper reused by the write middleware +
+ *     the discovery/list surfaces. Gate 3 (GEAI strict) still narrows after — a GEAI never rides this.
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner, isGEAI } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
+
+/**
+ * True when this owner is the organism's creator or an admin. Org managers get automatic read+write
+ * access to EVERY workspace under the organism — they already manage its access grants, invitations,
+ * export and archive, so gating them out of the content itself was the illogical gap. Keyed on the
+ * BARE owner name, exactly like every other membership check (organisms.ts / consent.ts). Never
+ * throws; returns false for a missing owner / non-member / plain member.
+ */
+export async function isOrgManager(
+  storage: Storage,
+  orgId: string,
+  ownerName: string | undefined,
+): Promise<boolean> {
+  if (!ownerName) return false;
+  const m = await storage.getMembership(orgId, ownerName);
+  return !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin');
+}
 
 /**
  * Decide whether the caller may READ the content of one workspace.
@@ -47,21 +68,27 @@ export async function canReadWorkspace(
   callerGaii: string,
   ws: string,
 ): Promise<boolean> {
-  // Gate 1: membership.
+  // Gate 1: membership. The owner's membership row also decides org-manager status (creator/admin),
+  // which grants an automatic pass on Gate 2 below — resolve it in the same lookup.
   let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-  if (!isMember && callerOwner) {
+  let manager = false;
+  if (callerOwner) {
     const m = await storage.getMembership(organism.id, callerOwner);
-    isMember = !!m && m.status === 'active';
+    if (m && m.status === 'active') {
+      isMember = true;
+      manager = m.role === 'creator' || m.role === 'admin';
+    }
   }
   if (!isMember) return false;
 
-  // Gate 2: workspace read (manifest is the single gate record).
+  // Gate 2: workspace read (manifest is the single gate record). An org manager (creator/admin) passes
+  // unconditionally — they own the organism's access, so they read every workspace under it.
   const manKey = `organism.${organism.id}.w.${ws}.meta.manifest`;
   const scan = await storage.listAllMemory({ prefix: manKey, limit: 5 });
   const manRec = scan.items.find(r => r.key === manKey);
   if (!manRec) return false;
   let allowed: boolean;
-  if (manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {
+  if (manager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {
     allowed = true;
   } else {
     const decision = await authorizeRead(storage, config, {

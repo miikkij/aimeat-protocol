@@ -5,6 +5,8 @@
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-15 — Discovery list marks a workspace 'granted' for org managers (creator/admin),
+ *     matching their automatic read access (isOrgManager).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,6 +25,7 @@ import { provisionOwner } from '../../services/owner-provisioning.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
+import { isOrgManager } from '../../services/workspace-access.js';
 import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
@@ -43,6 +46,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const ownerName = req.auth!.owner as string;
+    // An org manager (creator/admin) reads every workspace under the organism → mark them 'granted'
+    // without a per-workspace canReadWs probe (resolved once, not per row).
+    const manager = await isOrgManager(storage, id, ownerName);
     // `include` so an archived organism's registry (cascade-archived with it) still lists workspaces.
     const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000, archived: 'include' });
     const seen = new Map<string, { id: string; name: string; created_by: string; created_at?: string; access: 'owner' | 'granted' | 'none'; archived: boolean }>();
@@ -54,7 +60,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
         let access: 'owner' | 'granted' | 'none' = 'none';
         if (createdBy === ownerName) access = 'owner';
-        else if (await canReadWs(id, w.id, callerGaii)) access = 'granted';
+        else if (manager || await canReadWs(id, w.id, callerGaii)) access = 'granted';
         seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access, archived: w.archived === true });
       }
     }

@@ -5,6 +5,8 @@
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) pass the workspace read gate automatically —
+ *     an org admin reads every workspace under the organism without a per-workspace grant.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -46,13 +48,18 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     }
 
     // Membership gate — an organism agent, or an active member. Memberships are keyed by the
-    // BARE owner name (matches organisms.ts join/leave + consent.ts organism resolution).
+    // BARE owner name (matches organisms.ts join/leave + consent.ts organism resolution). The same
+    // lookup yields org-manager status (creator/admin), which passes the workspace read gate below.
     const callerSub = req.auth!.sub;
     const ownerName = req.auth!.owner;
     let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-    if (!isMember && ownerName) {
+    let isOrgManager = false;
+    if (ownerName) {
       const membership = await storage.getMembership(id, ownerName);
-      isMember = !!membership && membership.status === 'active';
+      if (membership && membership.status === 'active') {
+        isMember = true;
+        isOrgManager = membership.role === 'creator' || membership.role === 'admin';
+      }
     }
     if (!isMember) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
@@ -94,7 +101,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const manRec = items.find(r => r.key === `${nsRoot}meta.manifest`);
     let canReadWorkspace = false;
     if (manRec) {
-      canReadWorkspace = manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
+      canReadWorkspace = isOrgManager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
       if (!canReadWorkspace) {
         const decision = await authorizeRead(storage, config, {
           ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
