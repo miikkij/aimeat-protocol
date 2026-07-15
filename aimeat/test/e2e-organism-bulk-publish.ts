@@ -115,6 +115,19 @@ await test('Unchanged re-publish is change-guard skipped (no new version)', asyn
     assert(draft.body.data.value === null, 't1.draft consumed on skip');
 });
 
+await test('Draft-less import: records:[{id,value}] publishes directly (no draft round-trip)', async () => {
+    const recs = [{ id: 'imp1', value: { id: 'imp1', title: 'Imported 1' } }, { id: 'imp2', value: { id: 'imp2', title: 'Imported 2' } }];
+    const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, records: recs }) });
+    assert(r.status === 200 && r.body.data.published === 2, `draft-less publish ${r.status} ${JSON.stringify(r.body.data)}`);
+    // .version.1 + .latest exist directly, though no draft was ever written.
+    const latest = await readKey(`${base('imp1')}.latest`);
+    assert(latest.body.data.value?.title === 'Imported 1', 'imp1.latest from direct value');
+    const v1 = await readKey(`${base('imp1')}.version.1`);
+    assert(v1.body.data.value?.title === 'Imported 1', 'imp1.version.1 from direct value');
+    const draft = await readKey(`${base('imp1')}.draft`);
+    assert(draft.body.data.value === null, 'no draft was created');
+});
+
 await test('NO_DRAFT for an instance with no draft', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, instances: ['nope'] }) });
     assert(r.status === 200, `status ${r.status}`);

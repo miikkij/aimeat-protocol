@@ -201,13 +201,18 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const role = await memberRole(req, organism, id);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
-    const { namespace, instances, ws, expected_versions: expectedVersions } = req.body ?? {};
+    const { namespace, instances, records, ws, expected_versions: expectedVersions } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
-    if (typeof namespace !== 'string' || !namespace || !Array.isArray(instances) || instances.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace (string) and instances (non-empty array) are required'));
+    // Two shapes: `instances` (draft ids — publish each record's existing draft) OR `records`
+    // ([{id, value, visibility?}] — DRAFT-LESS import: publish the supplied values directly, no draft
+    // round-trip). records is the fast import path (one request for a whole CSV migration).
+    const hasRecords = Array.isArray(records) && records.length > 0;
+    const list: unknown[] = hasRecords ? records : (Array.isArray(instances) ? instances : []);
+    if (typeof namespace !== 'string' || !namespace || list.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace (string) and instances[] or records[] (non-empty) are required'));
       return;
     }
-    if (instances.length > 1000) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 1000 instances per request')); return; }
+    if (list.length > 1000) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 1000 records per request')); return; }
     if (!canWriteNamespace(role, namespace)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
       return;
@@ -226,9 +231,21 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     }
 
     const publisher = resolveIdentity(req.auth!, config.nodeId);
-    const ids = instances.filter((x: unknown): x is string => typeof x === 'string' && !!x);
     const expMap = (expectedVersions && typeof expectedVersions === 'object') ? expectedVersions as Record<string, number | null> : undefined;
-    const { results } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap);
+    let ids: string[];
+    let directValues: Record<string, { value: unknown; visibility?: 'private' | 'owner' | 'group' | 'members' | 'public' | 'workspace' }> | undefined;
+    if (hasRecords) {
+      directValues = {};
+      ids = [];
+      for (const r of records as Array<{ id?: unknown; value?: unknown; visibility?: unknown }>) {
+        if (!r || typeof r.id !== 'string' || !r.id) continue;
+        ids.push(r.id);
+        directValues[r.id] = { value: r.value, visibility: typeof r.visibility === 'string' ? r.visibility as 'private' : undefined };
+      }
+    } else {
+      ids = (instances as unknown[]).filter((x): x is string => typeof x === 'string' && !!x);
+    }
+    const { results } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
 
     const published = results.filter(r => r.ok && !r.skipped);
     if (published.length > 0) {

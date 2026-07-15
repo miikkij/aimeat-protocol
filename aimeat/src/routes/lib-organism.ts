@@ -288,12 +288,16 @@ var organism = {
     return res.data !== undefined ? res.data : res;
   },
 
-  // BULK publish MANY drafts in ONE request (data-access redesign) — ids: [id,...], optional
-  // expectedVersions: { id: version }. Replaces a loop of publish() (each a full server-side scan + 2
-  // writes + draft delete) with one batched operation. Returns { published, skipped, failed, results }.
-  // A create_only namespace 409s; when the publish review gate is on, publish one at a time via publish().
-  async publishRecords(orgId, wsId, namespace, ids, expectedVersions) {
-    var body = { ws: wsId || undefined, namespace: namespace, instances: ids || [] };
+  // BULK publish MANY records in ONE request (data-access redesign). Two shapes:
+  //   • ids: ['id', ...]                → publish each record's existing DRAFT (the edit → publish flow)
+  //   • records: [{ id, value }, ...]   → DRAFT-LESS: publish the supplied values directly (imports —
+  //     one request for a whole CSV migration, no per-record draft write). optional expectedVersions.
+  // Replaces a loop of publish() (each a server-side scan + 2 writes + draft delete). Returns
+  // { published, skipped, failed, results }. create_only 409s; a publish review gate refuses the batch.
+  async publishRecords(orgId, wsId, namespace, idsOrRecords, expectedVersions) {
+    var body = { ws: wsId || undefined, namespace: namespace };
+    var arr = idsOrRecords || [];
+    if (arr.length && typeof arr[0] === 'object') body.records = arr; else body.instances = arr;
     if (expectedVersions && typeof expectedVersions === 'object') body.expected_versions = expectedVersions;
     var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspace/records/publish', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)

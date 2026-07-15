@@ -17884,7 +17884,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [namespace, instances]
+              required: [namespace]
               properties:
                 ws: { type: string, description: Workspace id (omit for an organism-level namespace) }
                 namespace: { type: string, description: The objectType namespace the records live in }
@@ -17892,7 +17892,20 @@ paths:
                   type: array
                   maxItems: 1000
                   items: { type: string }
-                  description: Instance ids whose drafts to publish
+                  description: 'Draft mode: instance ids whose existing drafts to publish. Provide this OR `records`.'
+                records:
+                  type: array
+                  maxItems: 1000
+                  description: >
+                    Draft-less import mode: publish these values DIRECTLY (no per-record draft write) —
+                    one request for a whole CSV migration. Provide this OR `instances`.
+                  items:
+                    type: object
+                    required: [id, value]
+                    properties:
+                      id: { type: string }
+                      value: {}
+                      visibility: { type: string, enum: [private, owner, group, members, public, workspace] }
                 expected_versions:
                   type: object
                   additionalProperties: { type: integer }
