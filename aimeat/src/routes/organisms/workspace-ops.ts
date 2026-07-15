@@ -11,7 +11,7 @@ import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireRoleOrScope, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -644,7 +644,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * single object-delete calls (a 549-record CADENCE teardown was 549 round-trips + per-key deletes).
    * Body: { ws?, namespace, ids: [] }. Mirrors aimeat_workspace_object_delete's own/same-owner + role
    * + append-only semantics. ── */
-  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireRole('agent'), requireScope('memory:delete'), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:delete'), async (req, res) => {
     const id = req.params.id as string;
     const body = req.body ?? {};
     const namespace = body.namespace;
