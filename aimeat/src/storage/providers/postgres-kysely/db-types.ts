@@ -31,7 +31,7 @@ export interface Action {
   displayName: string;
   estimatedTimeSeconds: number | null;
   federate: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   inputSchema: Json;
   maxInputSizeBytes: number | null;
   outputSchema: Json;
@@ -57,7 +57,7 @@ export interface Agent {
   domainCapabilities: Json | null;
   federate: Generated<boolean>;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   languages: Json | null;
   lastSeen: Generated<Timestamp>;
   maxConcurrentTasks: Generated<number>;
@@ -86,7 +86,7 @@ export interface AgentActivity {
   agentGaii: string;
   date: string;
   hour: number;
-  id: string;
+  id: Generated<string>;
   metric: string;
   value: Generated<number>;
 }
@@ -94,7 +94,7 @@ export interface AgentActivity {
 export interface AgentDirective {
   agentGaii: string;
   budgetLimits: Json | null;
-  id: string;
+  id: Generated<string>;
   memoryAreas: Generated<Json>;
   purpose: Generated<string>;
   resources: Generated<Json>;
@@ -107,7 +107,7 @@ export interface AgentMessage {
   content: string;
   createdAt: Generated<Timestamp>;
   direction: string;
-  id: string;
+  id: Generated<string>;
   linkedTaskId: string | null;
   metadata: Json | null;
   processedAt: Timestamp | null;
@@ -122,7 +122,7 @@ export interface AgentOnboarding {
   detectedPlatform: string | null;
   healthComponents: Json | null;
   healthRecalculatedAt: Timestamp | null;
-  id: string;
+  id: Generated<string>;
   installedRuntime: string | null;
   onboardingBaseline: number | null;
   operationalHealth: number | null;
@@ -141,7 +141,7 @@ export interface AgentTask {
   createdAt: Generated<Timestamp>;
   deliverableKey: string | null;
   description: Generated<string>;
-  id: string;
+  id: Generated<string>;
   lastEventAt: Timestamp | null;
   ownerGaii: string;
   parentTaskId: string | null;
@@ -161,7 +161,7 @@ export interface AgentTask {
 
 export interface AgentTaskEvent {
   details: Json | null;
-  id: string;
+  id: Generated<string>;
   message: string;
   taskId: string;
   timestamp: Generated<Timestamp>;
@@ -175,7 +175,7 @@ export interface AgentUsageDaily {
   completionTokens: Generated<number>;
   costUsd: Generated<number>;
   date: string;
-  id: string;
+  id: Generated<string>;
   model: string;
   organismId: Generated<string>;
   ownerGhii: string;
@@ -192,7 +192,7 @@ export interface AgentUsageEvent {
   completionTokens: Generated<number>;
   consumerGhii: string | null;
   costUsd: number | null;
-  id: string;
+  id: Generated<string>;
   model: string;
   organismId: string | null;
   ownerGhii: string;
@@ -211,7 +211,7 @@ export interface App {
   data: Buffer;
   filename: string;
   forkable: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   manifest: Json;
   mimeType: string;
   operatorHidden: Generated<boolean>;
@@ -228,14 +228,14 @@ export interface App {
 export interface AppDownload {
   count: Generated<number>;
   filename: string;
-  id: string;
+  id: Generated<string>;
   ownerGaii: string;
 }
 
 export interface AppDraft {
   data: Buffer;
   filename: string;
-  id: string;
+  id: Generated<string>;
   manifest: Json;
   mimeType: string;
   ownerGaii: string;
@@ -248,7 +248,7 @@ export interface Appeal {
   appealedBy: string;
   createdAt: Generated<Timestamp>;
   flagId: string;
-  id: string;
+  id: Generated<string>;
   reason: string;
   reviewedAt: Timestamp | null;
   reviewedBy: string | null;
@@ -262,7 +262,7 @@ export interface AppFork {
   childOwnerName: string;
   forkedAt: Generated<Timestamp>;
   forkedByGaii: string;
-  id: string;
+  id: Generated<string>;
   sourceFilename: string;
   sourceOwnerGaii: string;
   sourceOwnerName: string;
@@ -276,7 +276,7 @@ export interface AppGrant {
   createdAt: Generated<Timestamp>;
   gaii: string;
   grantId: string;
-  id: string;
+  id: Generated<string>;
   lastUsedAt: Timestamp | null;
   owner: string;
   refreshTokenHash: string | null;
@@ -293,7 +293,7 @@ export interface AppPurchase {
   appVersionNumber: number;
   buyerGaii: string;
   buyerOwner: string;
-  id: string;
+  id: Generated<string>;
   licenseType: string;
   nodeId: string;
   nodePublicKey: string;
@@ -312,7 +312,7 @@ export interface Board {
   createdAt: Generated<Timestamp>;
   description: string | null;
   federate: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   name: string;
   ownerGaii: string;
   visibility: string;
@@ -324,7 +324,7 @@ export interface BoardPost {
   body: string;
   category: string | null;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   postId: string;
   reactions: Generated<Json>;
   replyTo: string | null;
@@ -339,7 +339,7 @@ export interface BoardSubscription {
   createdAt: Generated<Timestamp>;
   filters: Json | null;
   gaii: string;
-  id: string;
+  id: Generated<string>;
 }
 
 export interface Capability {
@@ -351,7 +351,7 @@ export interface Capability {
   deprecationMessage: string | null;
   examples: Generated<Json>;
   exports: Json | null;
-  id: string;
+  id: Generated<string>;
   inputSchema: Json | null;
   name: string;
   operatorOverride: Json | null;
@@ -384,7 +384,7 @@ export interface CapabilityLog {
   capabilityId: string;
   durationMs: Generated<number>;
   error: string | null;
-  id: string;
+  id: Generated<string>;
   input: Generated<Json>;
   status: string;
   timestamp: Generated<Timestamp>;
@@ -394,7 +394,7 @@ export interface CapabilityVouch {
   capabilityId: string;
   comment: string | null;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   userGhii: string;
 }
 
@@ -403,7 +403,7 @@ export interface ChatInstance {
   appName: string;
   createdAt: Generated<Timestamp>;
   ghii: string;
-  id: string;
+  id: Generated<string>;
   isAnonymous: Generated<boolean>;
   lastSeen: Generated<Timestamp>;
   mcpClientId: string | null;
@@ -416,7 +416,7 @@ export interface Consent {
   dataPattern: string;
   expires: Timestamp | null;
   grantedAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   metadata: Json | null;
   ownerGaii: string;
   purpose: string;
@@ -431,7 +431,7 @@ export interface ConsentAudit {
   action: string;
   allowed: boolean;
   consentId: string;
-  id: string;
+  id: Generated<string>;
   memoryKey: string;
   ownerGaii: string;
   timestamp: Generated<Timestamp>;
@@ -441,7 +441,7 @@ export interface ContactConsent {
   contactId: string;
   createdAt: Generated<Timestamp>;
   firstMessageId: string | null;
-  id: string;
+  id: Generated<string>;
   ownerGhii: string;
   state: Generated<string>;
   updatedAt: Generated<Timestamp>;
@@ -455,7 +455,7 @@ export interface CortexExtension {
   author: string;
   components: Json;
   description: string;
-  id: string;
+  id: Generated<string>;
   installedAt: Generated<Timestamp>;
   installedBy: string;
   labels: Json;
@@ -473,14 +473,14 @@ export interface CortexExtension {
 export interface CortexLibFile {
   content: string;
   extName: string;
-  id: string;
+  id: Generated<string>;
   libName: string;
 }
 
 export interface Csm {
   definition: Json;
   federate: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   jsonSchemaKey: string;
   name: string;
   registeredAt: Generated<Timestamp>;
@@ -499,7 +499,7 @@ export interface DeviceAuth {
   deviceCode: string;
   displayName: string | null;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   lastPolledAt: Timestamp | null;
   mode: string | null;
   ownerName: string;
@@ -518,7 +518,7 @@ export interface DirectMessage {
   deliveredAt: Timestamp | null;
   direction: string;
   error: string | null;
-  id: string;
+  id: Generated<string>;
   interactive: Json | null;
   mid: string;
   origin: Generated<string>;
@@ -536,7 +536,7 @@ export interface DirectMessage {
 export interface Dispute {
   createdAt: Generated<Timestamp>;
   disputeId: string;
-  id: string;
+  id: Generated<string>;
   openedBy: string;
   reason: string;
   ruling: Json | null;
@@ -551,7 +551,7 @@ export interface DisputeAudit {
   disputeId: string;
   event: string;
   hash: string;
-  id: string;
+  id: Generated<string>;
   previousHash: string;
   sequence: number;
   timestamp: Timestamp;
@@ -570,7 +570,7 @@ export interface EcoAuth {
   deviceCode: string;
   displayName: string | null;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   lastPolledAt: Timestamp | null;
   ownerName: string;
   pollInterval: Generated<number>;
@@ -588,7 +588,7 @@ export interface EcoAutomationRecipe {
   createdAt: Generated<Timestamp>;
   email: Generated<boolean>;
   enabled: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   organism: string | null;
   owner: string;
   requireApproval: Generated<boolean>;
@@ -606,7 +606,7 @@ export interface EcosystemApp {
   description: string | null;
   displayName: string | null;
   geai: string;
-  id: string;
+  id: Generated<string>;
   lastSeen: Generated<Timestamp>;
   morselBalance: Generated<number>;
   owner: string;
@@ -622,7 +622,7 @@ export interface EmailVerification {
   createdAt: Generated<Timestamp>;
   emailHash: string;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   ownerName: string;
   purpose: string;
   status: Generated<string>;
@@ -635,7 +635,7 @@ export interface EscrowHold {
   extensionName: string;
   fromGaii: string;
   holdId: string;
-  id: string;
+  id: Generated<string>;
   reason: string;
   releasedAt: Timestamp | null;
   releasedTo: string | null;
@@ -649,7 +649,7 @@ export interface ExecutionLog {
   durationMs: Generated<number>;
   errorMessage: string | null;
   extensionName: string | null;
-  id: string;
+  id: Generated<string>;
   jobId: string;
   jobName: string;
   memoryReads: Generated<Json>;
@@ -668,7 +668,7 @@ export interface Extension {
   createdAt: Generated<Timestamp>;
   description: string;
   federation: Json;
-  id: string;
+  id: Generated<string>;
   installedAt: Generated<Timestamp>;
   installedBy: string;
   instances: Json | null;
@@ -686,7 +686,7 @@ export interface ExtensionInstance {
   createdBy: string;
   createdByAgent: string | null;
   extensionName: string;
-  id: string;
+  id: Generated<string>;
   instanceId: string;
   status: Generated<string>;
   translations: Json | null;
@@ -721,7 +721,7 @@ export interface Flag {
   createdAt: Generated<Timestamp>;
   description: string | null;
   flaggedBy: string;
-  id: string;
+  id: Generated<string>;
   reason: string;
   reviewedAt: Timestamp | null;
   reviewedBy: string | null;
@@ -735,7 +735,7 @@ export interface GenesisPeer {
   createdAt: Generated<Timestamp>;
   genesisNodeId: string;
   genesisUrl: string;
-  id: string;
+  id: Generated<string>;
   lastSyncAt: Generated<Timestamp>;
   publicKey: string;
   status: Generated<string>;
@@ -754,7 +754,7 @@ export interface Ghii {
   ftnVerified: Generated<boolean>;
   ghii: string;
   googleSub: string | null;
-  id: string;
+  id: Generated<string>;
   lastLoginAt: string | null;
   locale: string | null;
   loginCount: Generated<number>;
@@ -788,7 +788,7 @@ export interface Invitation {
   email: string;
   emailHash: string;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   invitedBy: string;
   message: string | null;
   organismId: string;
@@ -803,7 +803,7 @@ export interface Invitation {
 export interface JoinRequest {
   createdAt: Generated<Timestamp>;
   ghii: string;
-  id: string;
+  id: Generated<string>;
   message: string | null;
   organismId: string;
   reviewedAt: Timestamp | null;
@@ -813,7 +813,7 @@ export interface JoinRequest {
 
 export interface KnowledgeLink {
   description: string;
-  id: string;
+  id: Generated<string>;
   linkedAt: Generated<Timestamp>;
   linkedBy: string;
   relation: string;
@@ -824,7 +824,7 @@ export interface KnowledgeLink {
 export interface KnowledgeReview {
   action: string;
   customText: string | null;
-  id: string;
+  id: Generated<string>;
   operatorGaii: string;
   packageId: string;
   reason: string;
@@ -838,7 +838,7 @@ export interface Listing {
   createdAt: Generated<Timestamp>;
   description: string;
   flagCount: Generated<number>;
-  id: string;
+  id: Generated<string>;
   images: string[] | null;
   location: Json | null;
   memoryKey: string;
@@ -856,7 +856,7 @@ export interface MailboxItem {
   createdAt: Generated<Timestamp>;
   expiresAt: Timestamp;
   fromGaii: string;
-  id: string;
+  id: Generated<string>;
   payload: string;
   personalNodeId: string;
   retentionDays: number;
@@ -869,7 +869,7 @@ export interface Match {
   breakdown: Json;
   createdAt: Generated<Timestamp>;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   notifiedAt: Timestamp | null;
   profileA: string;
   profileB: string;
@@ -918,7 +918,7 @@ export interface MessageDeliveryLog {
   createdAt: Generated<Timestamp>;
   errorMessage: string | null;
   httpStatus: number | null;
-  id: string;
+  id: Generated<string>;
   latencyMs: Generated<number>;
   messageId: string;
   origin: string;
@@ -930,7 +930,7 @@ export interface MicroMemory {
   accessCode: string | null;
   entries: Json;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   setName: string;
   updatedAt: Timestamp;
   visibility: string;
@@ -942,7 +942,7 @@ export interface Msm {
   category: string;
   definition: Json;
   federate: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   name: string;
   registeredAt: Generated<Timestamp>;
   registeredBy: string;
@@ -950,7 +950,7 @@ export interface Msm {
 }
 
 export interface NodeKey {
-  id: string;
+  id: Generated<string>;
   privateKey: string;
   publicKey: string;
 }
@@ -960,7 +960,7 @@ export interface NotificationPreference {
   cooldownMinutes: Generated<number>;
   email: string | null;
   enabled: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   locale: string | null;
   notifyTypes: string[] | null;
   personalNodeId: string;
@@ -969,7 +969,7 @@ export interface NotificationPreference {
 
 export interface NotificationTemplate {
   fields: Json;
-  id: string;
+  id: Generated<string>;
   locale: string;
   placeholders: string[] | null;
   templateId: string;
@@ -981,7 +981,7 @@ export interface OAuthApproval {
   approvedAt: Generated<Timestamp>;
   clientId: string;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   owner: string;
   scope: Generated<string>;
 }
@@ -991,7 +991,7 @@ export interface OAuthClient {
   clientName: string;
   clientSecret: string;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   redirectUris: string[] | null;
 }
 
@@ -999,7 +999,7 @@ export interface OAuthRefreshToken {
   clientId: string;
   createdAt: Generated<Timestamp>;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   owner: string;
   roles: string[] | null;
   tokenHash: string;
@@ -1015,7 +1015,7 @@ export interface Organism {
   createdAt: Generated<Timestamp>;
   creatorGhii: string;
   description: string;
-  id: string;
+  id: Generated<string>;
   interests: string[] | null;
   joinPolicy: Generated<string>;
   location: Json | null;
@@ -1033,7 +1033,7 @@ export interface Organism {
 
 export interface OrganismMembership {
   ghii: string;
-  id: string;
+  id: Generated<string>;
   invitedBy: string | null;
   joinedAt: Generated<Timestamp>;
   organismId: string;
@@ -1044,7 +1044,7 @@ export interface OrganismMembership {
 export interface OrganismReputation {
   breakdown: Json;
   calculatedAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   organismId: string;
   score: number;
 }
@@ -1053,7 +1053,7 @@ export interface Otk {
   action: string;
   createdAt: Generated<Timestamp>;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   key: string;
   ownerGaii: string;
   params: Json;
@@ -1065,7 +1065,7 @@ export interface Otk {
 export interface Owner {
   createdAt: Generated<Timestamp>;
   displayName: string | null;
-  id: string;
+  id: Generated<string>;
   name: string;
   publicKey: string;
   roles: string[] | null;
@@ -1074,7 +1074,7 @@ export interface Owner {
 export interface OwnerAgentDefault {
   defaultMemoryAreas: Generated<Json>;
   defaultTokenBudget: number | null;
-  id: string;
+  id: Generated<string>;
   ownerGaii: string;
   rules: Generated<Json>;
   updatedAt: Timestamp;
@@ -1088,7 +1088,7 @@ export interface Package {
   components: Json;
   createdAt: Generated<Timestamp>;
   description: Generated<string>;
-  id: string;
+  id: Generated<string>;
   manifest: Generated<string>;
   name: string;
   packageGroupId: string;
@@ -1100,7 +1100,7 @@ export interface Package {
 }
 
 export interface PackageInstance {
-  id: string;
+  id: Generated<string>;
   installedAt: Generated<Timestamp>;
   installedComponents: Json;
   label: Generated<string>;
@@ -1117,7 +1117,7 @@ export interface PeeringRequest {
   createdAt: Generated<Timestamp>;
   fromNodeId: string | null;
   fromNodeUrl: string;
-  id: string;
+  id: Generated<string>;
   message: string | null;
   publicKey: string | null;
   requestId: string;
@@ -1137,7 +1137,7 @@ export interface PendingApproval {
   decidedAt: Timestamp | null;
   decidedBy: string | null;
   flowGateId: string | null;
-  id: string;
+  id: Generated<string>;
   organismId: string;
   prompt: string | null;
   resolutionNote: string | null;
@@ -1153,7 +1153,7 @@ export interface PersonalAccessToken {
   gaii: string;
   grantOperator: Generated<boolean>;
   grantOwner: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   label: string;
   lastUsedAt: Timestamp | null;
   owner: string;
@@ -1167,7 +1167,7 @@ export interface PersonalNode {
   agentGaiis: string[] | null;
   anchorNodeId: string;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   lastSeen: Generated<Timestamp>;
   mailboxQuotaBytes: number;
   mailboxUsedBytes: Generated<number>;
@@ -1182,7 +1182,7 @@ export interface PersonalPushSubscription {
   createdAt: Generated<Timestamp>;
   endpoint: string;
   failureCount: Generated<number>;
-  id: string;
+  id: Generated<string>;
   keys: Json;
   lastUsedAt: Timestamp | null;
   ownerName: string;
@@ -1193,7 +1193,7 @@ export interface Purchase {
   buyerOwner: string;
   completedAt: Timestamp | null;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   listingId: string;
   priceMorsels: number;
   ratingComment: string | null;
@@ -1208,7 +1208,7 @@ export interface Purchase {
 export interface PushSubscription {
   createdAt: Generated<Timestamp>;
   endpoint: string;
-  id: string;
+  id: Generated<string>;
   keys: Json;
   lastUsedAt: Generated<Timestamp>;
   ownerName: string;
@@ -1218,7 +1218,7 @@ export interface RealtimeRoom {
   appType: string;
   createdAt: Generated<Timestamp>;
   createdBy: string;
-  id: string;
+  id: Generated<string>;
   isPublic: Generated<boolean>;
   lastActivityAt: Generated<Timestamp>;
   maxPeers: number;
@@ -1230,7 +1230,7 @@ export interface RealtimeRoom {
 export interface ReplicationQueue {
   attempts: Generated<number>;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   lastAttemptAt: Timestamp | null;
   payload: string | null;
   status: Generated<string>;
@@ -1240,7 +1240,7 @@ export interface ReplicationQueue {
 
 export interface RevokedToken {
   expiresAt: number;
-  id: string;
+  id: Generated<string>;
   tokenHash: string;
 }
 
@@ -1258,7 +1258,7 @@ export interface ScheduledJob {
   displayName: string | null;
   enabled: Generated<boolean>;
   extensionName: string | null;
-  id: string;
+  id: Generated<string>;
   input: Json | null;
   instanceId: string | null;
   lastRunAt: Timestamp | null;
@@ -1277,7 +1277,7 @@ export interface ScheduledJob {
 
 export interface SchemaLock {
   applyTo: string;
-  id: string;
+  id: Generated<string>;
   keyPattern: string;
   lockedBy: string;
   schemaJson: Json;
@@ -1292,7 +1292,7 @@ export interface Session {
   deviceLabel: string | null;
   expiresAt: Timestamp;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   idleExpiresAt: Timestamp | null;
   issuedAt: Timestamp;
   lastUsedAt: Timestamp | null;
@@ -1309,7 +1309,7 @@ export interface SharingGroup {
   createdAt: Generated<Timestamp>;
   defaultPermissions: Generated<Json>;
   description: string | null;
-  id: string;
+  id: Generated<string>;
   members: Generated<Json>;
   name: string;
   ownerGaii: string;
@@ -1320,18 +1320,18 @@ export interface SiteChangeLog {
   action: string;
   changedAt: Generated<Timestamp>;
   changedBy: string;
-  id: string;
+  id: Generated<string>;
   summary: string;
 }
 
 export interface StatsCounter {
-  id: string;
+  id: Generated<string>;
   value: Generated<number>;
 }
 
 export interface StatsDailyHistory {
   date: string;
-  id: string;
+  id: Generated<string>;
   key: string;
   value: Generated<number>;
 }
@@ -1341,7 +1341,7 @@ export interface StorageFile {
   data: Buffer;
   federate: Generated<boolean>;
   groupId: string | null;
-  id: string;
+  id: Generated<string>;
   key: string;
   mimeType: string;
   ownerGaii: string;
@@ -1355,7 +1355,7 @@ export interface SubdomainSite {
   createdAt: Generated<Timestamp>;
   createdBy: string;
   enabled: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   kind: string;
   subdomain: string;
   target: string;
@@ -1367,7 +1367,7 @@ export interface SystemPrompt {
   content: string;
   description: Generated<string>;
   group: string;
-  id: string;
+  id: Generated<string>;
   locales: Json | null;
   name: string;
   updatedAt: Generated<Timestamp>;
@@ -1382,14 +1382,14 @@ export interface SystemPromptVersion {
   changedBy: string;
   changeNote: string | null;
   content: string;
-  id: string;
+  id: Generated<string>;
   locales: Json | null;
   promptId: string;
   version: number;
 }
 
 export interface SystemSetting {
-  id: string;
+  id: Generated<string>;
   key: string;
   value: string;
 }
@@ -1398,7 +1398,7 @@ export interface TelemetryEvent {
   agentGaii: string;
   createdAt: Generated<Timestamp>;
   data: Json;
-  id: string;
+  id: Generated<string>;
   sessionId: string | null;
   taskId: string | null;
   type: string;
@@ -1408,7 +1408,7 @@ export interface TemplateDiscussion {
   authorGhii: string;
   authorName: string;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   listingId: string;
   message: string;
   parentId: string | null;
@@ -1419,7 +1419,7 @@ export interface TemplateListing {
   createdAt: Generated<Timestamp>;
   description: Generated<string>;
   featured: Generated<boolean>;
-  id: string;
+  id: Generated<string>;
   installCount: Generated<number>;
   packageAuthor: string;
   packageGroupId: string;
@@ -1446,7 +1446,7 @@ export interface TemplateReview {
   authorName: string;
   comment: Generated<string>;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   listingId: string;
   rating: number;
 }
@@ -1455,7 +1455,7 @@ export interface Transaction {
   amount: number;
   counterpartyGaii: string | null;
   gaii: string;
-  id: string;
+  id: Generated<string>;
   timestamp: Generated<Timestamp>;
   trackingCode: string | null;
   txId: string;
@@ -1465,7 +1465,7 @@ export interface Transaction {
 export interface TrustedIssuer {
   addedBy: string;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   name: string;
   publicKey: string;
   trusted: Generated<boolean>;
@@ -1476,7 +1476,7 @@ export interface TrustedIssuer {
 export interface VerificationNonce {
   createdAt: Generated<Timestamp>;
   expiresAt: Timestamp;
-  id: string;
+  id: Generated<string>;
   nonce: string;
   owner: string;
   redirectUri: Generated<string>;
@@ -1491,7 +1491,7 @@ export interface WebhookDeliveryLog {
   errorMessage: string | null;
   event: string;
   httpStatus: number | null;
-  id: string;
+  id: Generated<string>;
   latencyMs: number;
   payload: Json;
   status: string;
@@ -1505,7 +1505,7 @@ export interface Work {
   costNetworkFee: number;
   costTotal: number;
   createdAt: Generated<Timestamp>;
-  id: string;
+  id: Generated<string>;
   input: Json;
   output: Json | null;
   providerGaii: string;
