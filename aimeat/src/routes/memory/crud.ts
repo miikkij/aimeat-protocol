@@ -26,12 +26,11 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
-import { listOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../../services/owner-memory.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
-  const { config, storage, stats, onDirectoryChange, peers, resolve, workspaceAccess } = ctx;
+  const { config, storage, memoryDb, stats, onDirectoryChange, peers, resolve, workspaceAccess } = ctx;
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
@@ -303,13 +302,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       let count: number;
       if (ownerScope && !agentParam) {
         const ownerName = req.auth!.owner;
-        const ghii = `${ownerName}@${config.nodeId}`;
-        const ownerAgents = await storage.getAgentsByOwner(ownerName);
-        const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
-        const gaiis = [ghii, ...ownerAgents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+        // Owner-scope DISTINCT-key count through the service (it resolves GHII + agents + eco apps and
+        // runs one countMemory over the union); cached per identity-set + filter (dashboard TTL).
         count = await cached(
           `memcount:owner:${ownerName}:${filterKey}`, TTL.dashboard,
-          () => storage.countMemory(gaiis, { prefix, visibility }),
+          () => memoryDb.countOwnerScope(ownerName, { prefix, visibility }),
           ['domain:memory', `owner:${ownerName}:memory`],
         );
       } else {
@@ -331,7 +328,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // just to omit them from the response and total the bytes in JS.)
     if (metaOnly) {
       const metaRows = (ownerScope && !agentParam)
-        ? await listOwnerScopeMemoryMeta(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
+        ? await memoryDb.listOwnerScopeMeta(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
         : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived });
       if (req.query.count === 'true') {
         res.json(success(config.nodeId, { count: metaRows.length }));
@@ -368,9 +365,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     let records: MemoryRecord[];
     if (ownerScope && !agentParam) {
-      // Owner-scope: GHII + all the owner's agents (deduped, GHII first). Shared helper so the
-      // workflow signal evaluator reads the exact same set (same-owner-access invariant).
-      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
+      // Owner-scope: GHII + all the owner's agents + eco apps (deduped, GHII first) via the service.
+      // (services/owner-memory.ts remains the shared impl the service composes, so the workflow signal
+      // evaluator reads the exact same set — same-owner-access invariant.)
+      records = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
     } else {
       records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
     }
@@ -449,23 +447,12 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const limitParam = (req.query.limit ?? req.query.per_page) as string | undefined;
     const limit = limitParam !== undefined ? Math.min(500, Math.max(1, parseInt(limitParam, 10) || 200)) : 200;
 
-    // Resolve the identity set to search. Owner sessions cover GHII + every agent + every ecosystem app;
-    // an agent/eco session (or ?agent=) searches just that one identity.
-    let ownerGaiis: string[];
-    if (isOwnerSession && !agentParam) {
-      const callerOwner = req.auth!.owner as string;
-      const agents = await storage.getAgentsByOwner(callerOwner);
-      const ecoApps = await storage.getEcosystemAppsByOwner(callerOwner);
-      ownerGaiis = [`${callerOwner}@${config.nodeId}`, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
-    } else {
-      ownerGaiis = [gaii];
-    }
-
-    // ONE indexed query across the whole identity set via the librarian's searchText primitive (SQLite
-    // FTS5 / Mongo searchBlob), instead of a searchMemory call PER identity — each of which loaded every
-    // one of that identity's rows and JSON.stringify'd every value (owner search was 1 + #agents + #eco
-    // full scans; on a fleet of ~100 agents that was ~100× the already-O(n) scan). Ranked best-first.
-    const hits = await storage.searchText(q, { ownerGaiis, keyPrefix: prefix, visibility, maxFlags, limit });
+    // ONE indexed query across the identity set via the librarian's searchText primitive (SQLite FTS5 /
+    // Mongo searchBlob), ranked best-first. Owner sessions cover GHII + every agent + every ecosystem app
+    // (resolved by the service); an agent/eco session (or ?agent=) searches just that one identity.
+    const hits = (isOwnerSession && !agentParam)
+      ? await memoryDb.searchOwnerScope(req.auth!.owner as string, q, { keyPrefix: prefix, visibility, maxFlags, limit })
+      : await storage.searchText(q, { ownerGaiis: [gaii], keyPrefix: prefix, visibility, maxFlags, limit });
     const results: MemoryRecord[] = hits.map(h => h.record);
 
     res.json(success(config.nodeId, {

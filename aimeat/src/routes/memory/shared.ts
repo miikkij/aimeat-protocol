@@ -9,11 +9,15 @@ import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { StatsCollector } from '../../services/stats.js';
+import type { MemoryDbService } from '../../services/db/memory-db-service.js';
 
 /** Context shared by every memory route group module (closed-over deps from memoryRouter). */
 export interface MemoryRouteCtx {
   config: AimeatConfig;
   storage: Storage;
+  /** Application-DB-Service for the memory domain (data-access redesign) — the batched whole-operations
+   *  (owner-scope reads, bulk write) the routes call instead of hitting storage directly. */
+  memoryDb: MemoryDbService;
   stats?: StatsCollector;
   onDirectoryChange?: () => void;
   peers?: Map<string, import('../../services/federation.js').PeerInfo>;

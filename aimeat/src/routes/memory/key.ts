@@ -18,11 +18,10 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
-import { getOwnerScopeMemory } from '../../services/owner-memory.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
-  const { config, storage, stats, peers, resolve, workspaceAccess } = ctx;
+  const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
 
   // GET /v1/memory/:key — read a memory entry
   router.get('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), workspaceAccess, async (req, res) => {
@@ -56,7 +55,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // reading a key an MCP agent wrote.
     const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true') && !agentParam;
     let record = ownerScopeRead
-      ? await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key)
+      ? await memoryDb.getOwnerScope(req.auth!.owner, key)
       : await storage.getMemory(gaii, key);
     // On-read TTL check: if TTL has expired, treat as not found and delete
     if (record && record.ttlHours && record.ttlHours > 0) {
