@@ -30,6 +30,7 @@ import { fileMethods } from './methods/files.js';
 import { microMemoryMethods } from './methods/micro-memory.js';
 import { organismMethods } from './methods/organisms.js';
 import { boardMethods } from './methods/boards.js';
+import { consentMethods } from './methods/consent.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -75,5 +76,6 @@ Object.assign(
   microMemoryMethods,
   organismMethods,
   boardMethods,
+  consentMethods,
   startupCompatMethods,
 );
