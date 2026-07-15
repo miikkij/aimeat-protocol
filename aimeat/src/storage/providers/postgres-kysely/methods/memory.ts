@@ -76,22 +76,53 @@ export const memoryMethods = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).execute();
     } else {
-      await this.db.insertInto('Memory').values({
-        ownerGaii: record.ownerGaii, key: record.key, value: jsonb(record.value), visibility: record.visibility,
-        tags: record.tags ?? [], ttlHours: record.ttlHours, version: record.version, createdAt: new Date(record.createdAt),
-        updatedAt: new Date(record.updatedAt), flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
+      // Upsert (ON CONFLICT DO UPDATE), not a bare INSERT: two concurrent first-writes of the same
+      // (ownerGaii,key) — e.g. parallel OTK replays within the grace window — must not raise a unique
+      // violation. The loser's write folds into an update of the same row instead of 500-ing.
+      const insertCols = {
+        value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
+        version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
+        flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
         trackable, byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         groupId: record.groupId ?? null, workspaceRef: record.workspaceRef ?? null,
+      };
+      await this.db.insertInto('Memory').values({ ownerGaii: record.ownerGaii, key: record.key, ...insertCols } as never)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any).execute();
+        .onConflict(oc => oc.columns(['ownerGaii', 'key']).doUpdateSet(insertCols as any)).execute();
     }
     return record;
   },
 
   async setMemoryIfVersion(this: PostgresKyselyStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
-    const existing = await this._rawMemory(record.ownerGaii, record.key);
-    if (!existing || existing.version !== expectedVersion) return null;
-    return this.setMemory(record);
+    // Atomic compare-and-swap: lock the row FOR UPDATE inside one transaction so two concurrent writers
+    // at the same version are serialised — the first bumps to N+1 and commits, the second re-reads N+1,
+    // sees it no longer equals its expectedVersion, and gets a conflict (null). A plain read-then-write
+    // (as setMemory does) lets both pass the version check and both succeed.
+    return this.db.transaction().execute(async (trx) => {
+      const existing = await trx.selectFrom('Memory').selectAll()
+        .where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).forUpdate().executeTakeFirst();
+      if (!existing || existing.version !== expectedVersion) return null;
+      const trackable = record.trackable ?? existing.trackable ?? false;
+      if (existing.trackable) {
+        await trx.insertInto('MemoryVersion').values({
+          ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version,
+          value: jsonb(existing.value), actor: annotation(existing.value, '_actor'), event: annotation(existing.value, '_event'),
+          recordedAt: existing.updatedAt instanceof Date ? existing.updatedAt : new Date(existing.updatedAt),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any).onConflict(oc => oc.columns(['ownerGaii', 'key', 'version']).doNothing()).execute();
+      }
+      const newVersion = existing.version + 1;
+      await trx.updateTable('Memory').set({
+        value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
+        version: newVersion, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
+        flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
+        byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).where('version', '=', expectedVersion).execute();
+      record.version = newVersion;
+      record.trackable = trackable || undefined;
+      return record;
+    });
   },
 
   async getMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<MemoryRecord | null> {
@@ -228,9 +259,14 @@ export const memoryMethods = {
   },
 
   async searchText(this: PostgresKyselyStorage, query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]> {
+    // Prefix matching, parity with the SQLite FTS5 `token*` behaviour: tokenise to alphanumerics, lowercase,
+    // and OR each token's prefix pattern so "qwopdoc" finds "qwopdocterm". Empty query → no hits.
+    const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu);
+    if (!tokens || tokens.length === 0) return [];
+    const tsquery = tokens.map(t => `${t}:*`).join(' | ');
     let q = this.db.selectFrom('Memory').selectAll()
-      .select(sql<number>`ts_rank("searchTsv", plainto_tsquery('simple', ${query}))`.as('score'))
-      .where(sql<boolean>`"searchTsv" @@ plainto_tsquery('simple', ${query})`);
+      .select(sql<number>`ts_rank("searchTsv", to_tsquery('simple', ${tsquery}))`.as('score'))
+      .where(sql<boolean>`"searchTsv" @@ to_tsquery('simple', ${tsquery})`);
     if (opts?.ownerGaiis?.length) q = q.where('ownerGaii', 'in', opts.ownerGaiis);
     if (opts?.keyPrefix) q = q.where('key', 'like', opts.keyPrefix + '%');
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);

@@ -19,6 +19,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectOrganismGraph, type OrganismGraph } from './structure-graph.js';
+import { stableStringify } from '../utils/stable-json.js';
 
 export function structureKey(orgId: string): string {
   return `organism.${orgId}.meta.structure`;
@@ -78,6 +79,13 @@ function diffSummary(prev: StructureFingerprint | null, next: StructureFingerpri
   return parts.length ? parts.slice(0, 8).join(', ') : 'structure changed';
 }
 
+// Per-organism serialization: updateOrganismStructure is called fire-and-forget from many sites (publish,
+// view safety-net, workspace ops) that overlap in time. Two overlapping runs both read prev=vN and both
+// decide to write, double-archiving (vN+1 then vN+2). The read→compare→write is not atomic at the storage
+// layer, so we serialise per orgId in-process: each call chains after the previous one for the same org.
+// (Single-node best-effort timeline — a cross-node lock isn't warranted for a derived snapshot.)
+const structureLocks = new Map<string, Promise<void>>();
+
 /** Record a structural snapshot for an organism IFF its shape changed since the last one. Best-effort
  *  and idempotent: call it after any structural mutation (or on read as a safety net). The viewer is
  *  the organism creator (full read of their own workspaces) so counts reflect the real structure. */
@@ -86,6 +94,23 @@ export async function updateOrganismStructure(
   config: AimeatConfig,
   orgId: string,
   opts: { event?: string; actor?: string } = {},
+): Promise<void> {
+  const prior = structureLocks.get(orgId) ?? Promise.resolve();
+  const run = prior.catch(() => { /* isolate the previous link's failure */ })
+    .then(() => updateOrganismStructureInner(storage, config, orgId, opts));
+  // Chain tail becomes the new lock (failures swallowed so the chain never breaks). Drop the map entry
+  // once this is still the tail, so idle organisms don't leak entries.
+  const tail = run.catch(() => { /* swallow for the chain */ });
+  structureLocks.set(orgId, tail);
+  void tail.then(() => { if (structureLocks.get(orgId) === tail) structureLocks.delete(orgId); });
+  return run;
+}
+
+async function updateOrganismStructureInner(
+  storage: Storage,
+  config: AimeatConfig,
+  orgId: string,
+  opts: { event?: string; actor?: string },
 ): Promise<void> {
   const org = await storage.getOrganism(orgId);
   if (!org) return;
@@ -100,7 +125,11 @@ export async function updateOrganismStructure(
     ? ((prev.value as { fingerprint?: StructureFingerprint }).fingerprint ?? null)
     : null;
 
-  if (prevFp && JSON.stringify(prevFp) === JSON.stringify(fp)) return;   // no structural change → no churn
+  // Canonical (key-sorted) compare: the stored prevFp round-trips through the storage layer, and a
+  // jsonb backend (Postgres) does not preserve object key order — a naive JSON.stringify would then read
+  // an unchanged structure as changed and churn a new version on every read. stableStringify is order-
+  // insensitive, so dedup holds identically across SQLite/Mongo/Postgres.
+  if (prevFp && stableStringify(prevFp) === stableStringify(fp)) return;   // no structural change → no churn
 
   const diff = diffSummary(prevFp, fp);
   const now = new Date().toISOString();
