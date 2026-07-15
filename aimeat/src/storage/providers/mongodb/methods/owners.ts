@@ -681,7 +681,7 @@ export const ownerMethods = {
                 const arch = opts?.archived;
                 const filter: Record<string, unknown> = {
                     $text: { $search: query },
-                    ...(arch === 'include' ? {} : arch === 'only' ? { archived: true } : { archived: { $ne: true } }),
+                    ...(arch === 'include' ? {} : arch === 'only' ? { archived: true } : { archived: false }),
                 };
                 if (opts?.ownerGaiis?.length) filter.ownerGaii = { $in: opts.ownerGaiis };
                 if (opts?.visibility) filter.visibility = opts.visibility;

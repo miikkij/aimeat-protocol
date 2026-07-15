@@ -220,7 +220,11 @@ export const identityMethods = {
     archivedWhere(this: PrismaStorage, archived?: import('../../../interface.js').ArchiveFilter): Record<string, unknown> {
         if (archived === 'include') return {};
         if (archived === 'only') return { archived: true };
-        return { archived: { not: true } };
+        // POSITIVE equality (`archived: false`), NOT `{ $ne: true }`. `$ne` is non-selective and makes
+        // MongoDB skip the index → every owner-agnostic key-prefix findMany was a ~150ms collection scan
+        // even next to a 2ms indexed findUnique. `backfillArchiveFlag` sets archived=false on every legacy
+        // doc at startup, so `false` matches the full active set without the $ne index-poison.
+        return { archived: false };
     },
 
     /** Read an optional `_actor` / `_event` annotation off a record value (the structure-timeline
