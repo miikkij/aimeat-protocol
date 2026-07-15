@@ -10,7 +10,7 @@
  */
 import type {
   CortexExtensionRecord,
-  DisputeRecord, EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
+  EscrowHoldRecord, ExtensionRecord, ExtensionInstanceRecord,
   GHIIRecord,
 } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -30,5 +30,4 @@ export const startupCompatMethods = {
   // until those domains (work / consent / boards / escrow / disputes) land — correct on a node with no
   // such data. Each is replaced by the real implementation with its domain slice.
   async listEscrowHolds(this: PostgresKyselyStorage, _fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> { return []; },
-  async listAllDisputes(this: PostgresKyselyStorage, _limit?: number): Promise<DisputeRecord[]> { return []; },
 };
