@@ -16,7 +16,7 @@
  */
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
-import type { MemoryRecord, Storage } from '../../interface.js';
+import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
 import { memoryMethods } from './methods/memory.js';
@@ -26,6 +26,7 @@ import { walletMethods } from './methods/wallet.js';
 import { sessionMethods } from './methods/sessions.js';
 import { schemaMethods } from './methods/schema.js';
 import { agentOnboardingMethods } from './methods/agent-onboarding.js';
+import { fileMethods } from './methods/files.js';
 import { startupCompatMethods } from './methods/startup-compat.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
@@ -39,6 +40,8 @@ export class PostgresKyselyStorage {
   readonly pool: pg.Pool;
   /** Resolves once the schema migrations have been applied — awaited by the storage factory. */
   readonly ready: Promise<void>;
+  /** Transient chunked-upload buffer (never persisted), same as the other backends. */
+  readonly chunkedUploads = new Map<string, ChunkedUploadRecord>();
 
   constructor(connectionString: string) {
     this.pool = new pg.Pool({ connectionString, max: 20 });
@@ -65,5 +68,6 @@ Object.assign(
   sessionMethods,
   schemaMethods,
   agentOnboardingMethods,
+  fileMethods,
   startupCompatMethods,
 );

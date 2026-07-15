@@ -175,6 +175,10 @@ export const identityMethods = {
     const r = await this.db.selectFrom('Ghii').selectAll().where('ownerName', '=', ownerName).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;
   },
+  async deleteGHII(this: PostgresKyselyStorage, ghii: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('Ghii').where('ghii', '=', ghii).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
+  },
   async getGHIIByEmailHash(this: PostgresKyselyStorage, emailHash: string): Promise<GHIIRecord | null> {
     const r = await this.db.selectFrom('Ghii').selectAll().where('emailHash', '=', emailHash).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;
