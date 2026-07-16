@@ -18,6 +18,8 @@
  *   v1.4.0 -- 2026-07-07 -- Add aimeat_app_fork (sanctioned, provenance-recording fork behind the
  *     forkable/paid gates); publish carries the forkable flag forward; list/get surface forkable +
  *     forked_from.
+ *   v1.5.0 -- 2026-07-16 -- aimeat_app_list metrics via 2 batch queries (getAppDownloadsForApps +
+ *     countAppForksForApps), was getAppDownloads + countAppForks PER app (Phase 3).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -369,9 +371,15 @@ export function registerAppsTools(
 
             const { apps, total } = await storage.listApps(opts);
 
-            const result = await Promise.all(apps.map(async (app) => {
-                const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
-                const forks = await storage.countAppForks(app.ownerGaii, app.filename);
+            // Per-app metrics in TWO batch queries (was getAppDownloads + countAppForks PER app = 2N).
+            const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
+            const downloadsByApp = await storage.getAppDownloadsForApps(refs);
+            const forksByApp = await storage.countAppForksForApps(refs);
+
+            const result = apps.map((app) => {
+                const metricKey = `${app.ownerGaii} ${app.filename}`;
+                const downloads = downloadsByApp[metricKey] ?? 0;
+                const forks = forksByApp[metricKey] ?? 0;
                 return {
                     owner: app.ownerName,
                     filename: app.filename,
@@ -390,7 +398,7 @@ export function registerAppsTools(
                     download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                     created_at: app.createdAt,
                 };
-            }));
+            });
 
             return {
                 content: [{
