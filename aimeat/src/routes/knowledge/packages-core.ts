@@ -5,6 +5,7 @@
  *   max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — GET /:id public manifest lookup batches owners+agents (was O(owners+agents) scan)
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -217,20 +218,16 @@ export function registerPackagesCoreRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Try public read: scan all owners (GHIIs) and agents for a public manifest
+    // Try public read: one IN query over all owner GHIIs, then (only if none) one over all agent
+    // GAIIs — the public manifest lives under whoever published it. Owners keep priority over agents.
+    // (Was listMemory PER owner AND PER agent = a full O(owners+agents) node-scan.)
     let manifest: import('../../storage/interface.js').MemoryRecord | undefined;
     const allOwners = await storage.listOwners();
-    for (const owner of allOwners) {
-      const ghii = `${owner.name}@${config.nodeId}`;
-      const hits = await storage.listMemory(ghii, { prefix: manifestKey, visibility: 'public' });
-      if (hits.length > 0) { manifest = hits[0]; break; }
-    }
+    const ownerGaiis = allOwners.map(o => `${o.name}@${config.nodeId}`);
+    manifest = (await storage.listMemoryForOwners(ownerGaiis, { prefix: manifestKey, visibility: 'public' }))[0];
     if (!manifest) {
       const allAgents = await storage.listAgents();
-      for (const agent of allAgents) {
-        const hits = await storage.listMemory(agent.gaii, { prefix: manifestKey, visibility: 'public' });
-        if (hits.length > 0) { manifest = hits[0]; break; }
-      }
+      manifest = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
     }
     // If authenticated, also check the caller's own packages (any visibility) via owner scope
     if (!manifest && req.auth?.sub) {
