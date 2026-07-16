@@ -29,6 +29,8 @@
  *     conversations fan-out is now ONE batched read (listConversationsForOwners), behaviour unchanged.
  *   v1.4.0 -- 2026-07-16 -- GET /requests fetches every pending contact's first message in ONE batched
  *     read (getDirectMessagesByIds) instead of getDirectMessage per pending contact.
+ *   v1.5.0 -- 2026-07-16 -- GET /messages/overview: the inbox mount's 6-request fan-out folded into one
+ *     composite (MessagesInboxService, Phase 4). Individual list endpoints stay for interactive re-fetch.
  */
 
 import { Router } from 'express';
@@ -46,11 +48,13 @@ import { sendDirectMessage, mapMessageAttachments } from '../services/message-se
 import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { createMessagingDbService } from '../services/db/messaging-db-service.js';
+import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
   const deliveryCtx = { config, storage, peers };
   const messagingDb = createMessagingDbService(storage);
+  const inboxDb = createMessagesInboxService(storage);
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -242,6 +246,15 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   router.get('/v1/messages/conversations', requireAuth(), requireRole('owner'), async (req, res) => {
     const { conversations } = await messagingDb.ownerConversations(resolve(req), req.auth!.owner as string);
     res.json(success(config.nodeId, { conversations }));
+  });
+
+  /* ── GET /v1/messages/overview — the whole inbox mount in ONE call (requests + conversations +
+   * important-flags + tracked-responses + agents + groups), composed in one read scope by
+   * MessagesInboxService. Owner-scope: requires 'owner' role (the strictest of the six folded endpoints,
+   * so authorization is unchanged). The individual list endpoints stay for interactive re-fetches. ── */
+  router.get('/v1/messages/overview', requireAuth(), requireRole('owner'), async (req, res) => {
+    const data = await inboxDb.overview(resolve(req), req.auth!.owner as string);
+    res.json(success(config.nodeId, data));
   });
 
   /* ── GET /v1/messages/conversations/:conversationId — full thread ── */
