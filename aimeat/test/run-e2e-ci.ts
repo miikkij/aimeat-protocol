@@ -106,6 +106,7 @@ const ALL_SUITES = [
     'test/e2e-organism-overview.ts',
     'test/e2e-organism-structure.ts',
     'test/e2e-organism-decision-cap.ts',
+    'test/e2e-admin-storage-stats.ts',
     'test/e2e-organism-delete-cascade.ts',
     'test/e2e-organism-bulk-delete.ts',
     'test/e2e-organism-bulk-publish.ts',

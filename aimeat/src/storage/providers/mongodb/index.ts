@@ -84,6 +84,7 @@ import { knowledgeMethods } from './methods/knowledge.js';
 import { ecosystemMethods } from './methods/ecosystem.js';
 import { packagesMethods } from './methods/packages.js';
 import { tasksMethods } from './methods/tasks.js';
+import { storageStatsMethods } from './methods/storage-stats.js';
 import { messagingMethods } from './methods/messaging.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma rows are dynamically typed; two generated clients (mongo/postgres) with different shapes, so no single static row type applies.
@@ -306,6 +307,7 @@ Object.assign(
   ecosystemMethods,
   packagesMethods,
   tasksMethods,
+  storageStatsMethods,
   messagingMethods,
 );
 

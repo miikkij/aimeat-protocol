@@ -7,8 +7,10 @@
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: startup/system domain on Postgres+Kysely.
  */
-import type { MaintenanceState } from '../../../interface.js';
+import { sql } from 'kysely';
+import type { MaintenanceState, StorageStatsSnapshot } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import { jsonb } from '../helpers.js';
 
 export const systemMethods = {
   // ── Config persistence (SystemSetting, key `config:<dotPath>`) ──
@@ -92,5 +94,45 @@ export const systemMethods = {
     const out: Record<string, Record<string, number>> = {};
     for (const r of rows) { (out[r.date] ??= {})[r.key] = r.value; }
     return out;
+  },
+
+  // ── Storage-size telemetry (operator DB tab) ──
+  async getTableRowCounts(this: PostgresKyselyStorage): Promise<Record<string, number>> {
+    // Exact count(*) per table in ONE round-trip (a UNION ALL). pg_stat's n_live_tup is instant but an
+    // estimate that reads 0 until autovacuum analyses (e.g. right after a bulk load) — wrong for an
+    // operator's accounting tool. Once an hour, a scan per table is an acceptable price for correct numbers.
+    const tbls = await sql<{ table_name: string }>`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_kysely_migrations'
+    `.execute(this.db);
+    if (tbls.rows.length === 0) return {};
+    const union = tbls.rows
+      .map(r => `SELECT '${r.table_name.replace(/'/g, "''")}' AS t, count(*)::bigint AS n FROM "${r.table_name.replace(/"/g, '""')}"`)
+      .join(' UNION ALL ');
+    const res = await sql<{ t: string; n: string }>`${sql.raw(union)}`.execute(this.db);
+    const counts: Record<string, number> = {};
+    for (const r of res.rows) counts[r.t] = Number(r.n);
+    return counts;
+  },
+  async saveStorageStatsSnapshot(this: PostgresKyselyStorage, s: StorageStatsSnapshot): Promise<void> {
+    await this.db.insertInto('StorageStatsSnapshot').values({
+      id: s.id, capturedAt: new Date(s.capturedAt), counts: jsonb(s.counts), totalRows: s.totalRows,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any).onConflict(oc => oc.column('id').doUpdateSet({ capturedAt: new Date(s.capturedAt), counts: jsonb(s.counts), totalRows: s.totalRows } as never)).execute();
+  },
+  async listStorageStatsSnapshots(this: PostgresKyselyStorage, opts?: { limit?: number; sinceIso?: string }): Promise<StorageStatsSnapshot[]> {
+    let q = this.db.selectFrom('StorageStatsSnapshot').selectAll();
+    if (opts?.sinceIso) q = q.where('capturedAt', '>=', new Date(opts.sinceIso));
+    q = q.orderBy('capturedAt', 'desc');
+    if (opts?.limit) q = q.limit(opts.limit);
+    const rows = await q.execute();
+    return rows.map(r => ({
+      id: r.id, capturedAt: (r.capturedAt instanceof Date ? r.capturedAt : new Date(r.capturedAt)).toISOString(),
+      counts: (r.counts ?? {}) as unknown as Record<string, number>, totalRows: r.totalRows,
+    }));
+  },
+  async pruneStorageStatsSnapshots(this: PostgresKyselyStorage, beforeIso: string): Promise<number> {
+    const r = await this.db.deleteFrom('StorageStatsSnapshot').where('capturedAt', '<', new Date(beforeIso)).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 };

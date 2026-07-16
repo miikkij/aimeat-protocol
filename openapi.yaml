@@ -29502,6 +29502,67 @@ paths:
   # Admin — Agent Tasks & Sharing Groups
   # ============================================================
 
+  /v1/admin/storage-stats:
+    get:
+      operationId: adminStorageStats
+      summary: Live per-table row counts + recent hourly storage-size snapshots (operator DB tab)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 168, minimum: 1, maximum: 1000 }
+          description: Max snapshots to return, newest first
+      responses:
+        '200':
+          description: Current live counts + snapshot timeline
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          current:
+                            type: object
+                            properties:
+                              capturedAt: { type: string, format: date-time }
+                              counts: { type: object, additionalProperties: { type: integer } }
+                              totalRows: { type: integer }
+                              tableCount: { type: integer }
+                          snapshots:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                capturedAt: { type: string, format: date-time }
+                                counts: { type: object, additionalProperties: { type: integer } }
+                                totalRows: { type: integer }
+        '403':
+          description: Operator only
+
+  /v1/admin/storage-stats/snapshot:
+    post:
+      operationId: adminStorageStatsCapture
+      summary: Capture a storage-size snapshot immediately (the hourly job also does this)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The captured snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Operator only
+
   /v1/admin/agent-tasks:
     get:
       operationId: adminListAgentTasks

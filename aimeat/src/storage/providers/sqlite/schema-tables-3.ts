@@ -243,6 +243,15 @@ export function applySchemaTables3(db: Database.Database): void {
       PRIMARY KEY (date, key)
     );
 
+    -- Operator storage-growth telemetry: one row per hourly snapshot; counts = { table: rowCount } JSON.
+    CREATE TABLE IF NOT EXISTS storage_stats_snapshots (
+      id         TEXT PRIMARY KEY,
+      capturedAt TEXT NOT NULL,
+      counts     TEXT NOT NULL,
+      totalRows  INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_storage_stats_capturedAt ON storage_stats_snapshots(capturedAt);
+
     -- ── Agent Tasks ──
     CREATE TABLE IF NOT EXISTS agent_tasks (
       id              TEXT PRIMARY KEY,
