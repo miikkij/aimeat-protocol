@@ -4,6 +4,11 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.37.0 - 2026-07-16 - /v1/libs catalogue is now DERIVED from the library-pack registry
+ *   (src/data/library-packs.ts, Library Acceleration Program Phase 1) instead of a hardcoded
+ *   list — same fields (name/url/description/size_estimate/include/requires), plus a
+ *   packs_index pointer to GET /v1/library-packs (per-lib AI docs + changelogs). Lib routes
+ *   themselves unchanged.
  * v1.36.0 - 2026-07-14 - New library aimeat-agentface.js (Agent Face phase 2): publish the app's
  *   markdown read-surface (the public apps.{filename}.agentface record, served on the app URL for
  *   Accept: text/markdown) in one call — AIMEATAgentFace.publish(markdown | { title, sections }),
@@ -145,12 +150,14 @@ import { aimeatAgentsLib } from './lib-agents.js';
 import { aimeatHeaderLib } from './lib-header.js';
 import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
 import { aimeatOrganismLib } from './lib-organism.js';
+import { aimeatIntakeLib } from './lib-intake.js';
 import { aimeatEditorLib } from './lib-editor.js';
 import { aimeatLiveLib } from './lib-live.js';
 import { aimeatCommerceLib } from './lib-commerce.js';
 import { aimeatWebmcpLib } from './lib-webmcp.js';
 import { aimeatAgentFaceLib } from './lib-agentface.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
+import { buildLibsCatalogue } from '../data/library-packs.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -260,6 +267,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatOrganismLib(config));
   });
 
+  // GET /v1/libs/aimeat-intake.js — Public Intake client (public getForm/submit + owner form management)
+  router.get('/v1/libs/aimeat-intake.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatIntakeLib(config));
+  });
+
   // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)
   router.get('/v1/libs/aimeat-editor.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatEditorLib(config));
@@ -275,158 +287,15 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatCommerceLib(config));
   });
 
-  // GET /v1/libs/ — List available libraries
+  // GET /v1/libs/ — List available libraries. Derived from the library-pack registry
+  // (src/data/library-packs.ts) so this catalogue can never drift from the other AI-facing
+  // surfaces (build-app prompt, bootstrap sdk_libraries, llms.txt). Response shape is
+  // backwards-compatible with the pre-registry hardcoded list.
   router.get('/v1/libs', (_req, res) => {
     res.json({
       ok: true,
-      libraries: [
-        {
-          name: 'aimeat-auth',
-          url: '/v1/libs/aimeat-auth.js',
-          description: 'Identity & session: registration, Ed25519 auth, JWT lifecycle, login UI',
-          size_estimate: '~25KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>`,
-        },
-        {
-          name: 'aimeat-header',
-          url: '/v1/libs/aimeat-header.js',
-          description: 'Canonical site header for standalone pages (custom portal templates): brand + morsels, nav, language switcher, theme toggle, and the live golden login pill. Mounts into #aimeat-header or prepends to <body>.',
-          size_estimate: '~7KB',
-          include: `<div id="aimeat-header"></div>\n<script src="${config.baseUrl}/v1/libs/aimeat-header.js"></script>`,
-        },
-        {
-          name: 'aimeat-data',
-          url: '/v1/libs/aimeat-data.js',
-          description: 'Memory & Micro-Memory: key-value storage, search, public reads, OTK sets',
-          size_estimate: '~8KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-data.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-storage',
-          url: '/v1/libs/aimeat-storage.js',
-          description: 'File storage: upload, download, chunked upload, drag & drop helper',
-          size_estimate: '~8KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-storage.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-social',
-          url: '/v1/libs/aimeat-social.js',
-          description: 'Boards & social: create boards, post, react, reply, subscribe',
-          size_estimate: '~6KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-social.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-wallet',
-          url: '/v1/libs/aimeat-wallet.js',
-          description: 'Morsel economy: balance, transactions, request morsels, UI badge',
-          size_estimate: '~6KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-wallet.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-work',
-          url: '/v1/libs/aimeat-work.js',
-          description: 'Actions & work: catalogue, work requests, inbox, deliver, rate, polling',
-          size_estimate: '~8KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-work.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-tunnel',
-          url: '/v1/libs/aimeat-tunnel.js',
-          description: 'Personal node tunnel: auto-reconnect WebSocket, heartbeat, mailbox sync, request/response',
-          size_estimate: '~10KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-tunnel.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-audio',
-          url: '/v1/libs/aimeat-audio.js',
-          description: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge',
-          size_estimate: '~60KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-audio.js"></script>`,
-        },
-        {
-          name: 'aimeat-capabilities',
-          url: '/v1/libs/aimeat-capabilities.js',
-          description: 'Capability discovery, invoke, and management: list, search, invoke, create, vouch',
-          size_estimate: '~6KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-capabilities.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-speech',
-          url: '/v1/libs/aimeat-speech.js',
-          description: 'Speech: text-to-speech, speech-to-text, voice commands, pluggable providers (ElevenLabs, Whisper, etc.)',
-          size_estimate: '~15KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-speech.js"></script>`,
-        },
-        {
-          name: 'aimeat-ai',
-          url: '/v1/libs/aimeat-ai.js',
-          description: 'AI completion using the user\'s configured OpenRouter key. Per-user daily budget and per-app quotas enforce safe spend.',
-          size_estimate: '~4KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-ai.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-agents',
-          url: '/v1/libs/aimeat-agents.js',
-          description: 'Agents: list, commission tasks (createTask/run), watch progress live (SSE), read deliverables, and the ask-the-user option-prompt loop.',
-          size_estimate: '~7KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-agents.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-markdown',
-          url: '/v1/libs/aimeat-markdown.js',
-          description: 'Markdown rendering: AIMEAT.md.render(text, target) — safe dependency-free GFM subset (returns an ELEMENT; use the target param or renderToString(), never innerHTML = render(...)). AIMEAT.md.renderRich(text, target) upgrades to full GFM (task lists, footnotes, code highlighting, Mermaid diagrams) with sanitization, falling back to the safe subset if CDNs are unreachable. A ```aimeat-memory fenced block (key/view/fields lines) renders as a LIVE table/props/list of that memory key, fetched fresh on every render.',
-          size_estimate: '~12KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>`,
-        },
-        {
-          name: 'aimeat-organism',
-          url: '/v1/libs/aimeat-organism.js',
-          description: 'Organisms & workspaces: list organisms/workspaces, normalized workspace read (published + drafts merged per instance, value.id convention, read-metadata handling), write drafts, publish, revert-to-draft, delete objects, README, search.',
-          size_estimate: '~9KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-organism.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-editor',
-          url: '/v1/libs/aimeat-editor.js',
-          description: 'Markdown editor: CodeMirror 6 (textarea fallback) with a uniform adapter, formatting toolbar, and an editor+live-preview split view rendered through aimeat-markdown.',
-          size_estimate: '~8KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-markdown.js"></script>\n<script src="${config.baseUrl}/v1/libs/aimeat-editor.js"></script>`,
-        },
-        {
-          name: 'aimeat-commerce',
-          url: '/v1/libs/aimeat-commerce.js',
-          description: 'Commerce: open/complete checkout sessions (/v1/commerce), buy an agent offer in one call (buyOffer), read offer + app-tool prices, and format money micro-units ("1.50 EUR" — 1 unit = 1,000,000 micros; morsels stay integers). 402 errors carry the x402-style accepts block (err.paymentRequired, err.accepts). Carries no secrets — seller PSP credentials stay server-side.',
-          size_estimate: '~7KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-commerce.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-agentface',
-          url: '/v1/libs/aimeat-agentface.js',
-          description: 'Agent Face: publish this app\'s markdown read-surface for agents (served on the app URL for Accept: text/markdown with a node-generated affordances footer) in one call — AIMEATAgentFace.publish(markdown) or publish({ title, sections }). Writes the public apps.{filename}.agentface record as the signed-in app owner; pass { app: "file.html" } on subdomain origins.',
-          size_estimate: '~3KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-agentface.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-        {
-          name: 'aimeat-live',
-          url: '/v1/libs/aimeat-live.js',
-          description: 'Realtime live-updates: subscribe to server-pushed change domains (agent-tasks, agents, organisms, notifications, memory, ...) over one shared, owner-scoped SSE connection. Re-fetch only what changed, no polling or F5. AIMEAT.live.subscribe([\'agent-tasks\'], reload).',
-          size_estimate: '~5KB',
-          include: `<script src="${config.baseUrl}/v1/libs/aimeat-live.js"></script>`,
-          requires: 'aimeat-auth',
-        },
-      ],
+      libraries: buildLibsCatalogue(config.baseUrl),
+      packs_index: '/v1/library-packs',
     });
   });
 

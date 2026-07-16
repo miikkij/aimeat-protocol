@@ -116,6 +116,10 @@
       (text-align: justify + text-align-last: center) so a wrapped description reads flush instead
       of showing the ragged "sahalaita" the centered card produced; short single-line sources stay
       centered. Adds overflow-wrap/hyphens so long words no longer spill past the card edge.
+    v2.15.0 — 2026-07-16 — Card layout pass: clamp .app-source to 4 lines (long descriptions no
+      longer overflow), pin .app-actions to the card bottom + always-visible (buttons stop
+      "hyppelehtii"), retire the .st-server badge, add the purple .app-staging-badge pill +
+      .act-staging "Open staging" button styling.
 -->
 <html lang="en">
 <head>
@@ -532,18 +536,28 @@
       text-align-last: center;
       overflow-wrap: break-word;
       hyphens: auto;
+      /* Clamp to a few lines so a long description (e.g. TELETYPE) never spills
+         past the card or shoves the action row around — every card stays uniform
+         and the buttons keep a fixed home at the bottom. */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 100%;
     }
 
+    /* Actions live at the BOTTOM of every card (margin-top:auto) and are always
+       visible — not hover-revealed — so the buttons never jump around or feel
+       "hyppelehtii". flex-wrap keeps the released/staging pair tidy on a narrow card. */
     .app-card .app-actions {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 6px;
-      margin-top: 4px;
-      opacity: 0;
-      transition: opacity var(--transition);
-    }
-
-    .app-card:hover .app-actions {
-      opacity: 1;
+      margin-top: auto;
+      padding-top: 8px;
+      width: 100%;
     }
 
     .app-card .app-actions button {
@@ -2063,9 +2077,46 @@
     }
     .app-status-badge.st-published { color: #0e9f6e; border-color: #0e9f6e55; }
     .app-status-badge.st-parked    { color: #d97706; border-color: #d9770655; }
-    .app-status-badge.st-server    { color: #3b82f6; border-color: #3b82f655; }
     .app-card.server-only .app-icon { background: var(--bg-subtle); }
-  </style>
+
+    /* Staging pill: an owner-only marker that this app has an UNPUBLISHED draft
+       waiting alongside the live version. Purple so it reads as distinct from the
+       green "Listed" / amber "Unlisted" publication-state badges. Sits just under
+       the status badge (top-left, second row). */
+    .app-staging-badge {
+      position: absolute;
+      top: 30px;
+      left: 8px;
+      z-index: 2;
+      font-size: .58rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: color-mix(in srgb, #7c3aed 12%, var(--surface));
+      color: #7c3aed;
+      border: 1px solid #7c3aed55;
+    }
+
+    /* The "Open staging" action mirrors the staging pill's accent so the two read
+       as the same concept. */
+    .app-card .app-actions button.act-staging {
+      color: #7c3aed;
+      border-color: #7c3aed55;
+    }
+    .app-card .app-actions button.act-staging:hover {
+      border-color: #7c3aed;
+      background: color-mix(in srgb, #7c3aed 10%, transparent);
+      color: #7c3aed;
+    }
+  
+/* Prompt-builder capability-pack picker (Library Acceleration Program, Phase 4) */
+.pb-packs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pb-pack-item { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 13px; cursor: pointer; user-select: none; }
+.pb-pack-item:hover { border-color: var(--accent); }
+.pb-pack-item input { accent-color: var(--accent); margin: 0; }
+.pb-pack-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+</style>
 </head>
 <body data-active-view="library">
 
@@ -2567,6 +2618,9 @@
         <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
         <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; <span data-i18n="pb.template">Start from a template (optional)</span></span></label>
         <select id="pb-template" class="modal-input pb-template-select"><option value="">(none &#x2014; build from scratch)</option></select>
+        <div class="pb-ext-toggle"><span>&#x1F9F0; <span data-i18n="pb.packs">Capability packs (optional)</span></span></div>
+        <p class="pb-step-hint" data-i18n="pb.packsHint">Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.</p>
+        <div class="pb-packs" id="pb-packs"></div>
       </div>
 
       <div class="pb-step">
@@ -2619,7 +2673,7 @@
       "help.whereTitle": "Where your apps live",
       "help.where": "Local apps live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, then you can manage it from anywhere. Each app shows as ONE card with a badge saying where it lives.",
       "help.sectionsTitle": "The two views",
-      "help.sections": "Two tabs. Library = your apps (local + on the server), each as one card with a status badge — Local (this browser), Listed (public on the server), Unlisted (on the server but hidden from the catalogue, still usable by you and anyone with the link), or Server only (no local copy). Community = apps other people have published.",
+      "help.sections": "Two tabs. Library = your apps, each as one card whose badge shows its publication state — Listed (published, public in the catalogue), Unlisted (on the server but hidden from the catalogue, still usable by you and anyone with the link), or Local (a draft in this browser, not on the server yet). A purple Staging pill marks an app that also has an unpublished draft waiting. Community = apps other people have published.",
       "help.backupTitle": '"Backup" means two different things',
       "help.backup": "The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.",
       "help.standaloneTitle": "Which node this talks to",
@@ -2656,7 +2710,7 @@
       "sec.parkedBlurb": "Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.",
       "sec.recent": "🕒 Recently Opened",
       "sec.local": "📚 Your apps",
-      "sec.localNote": "One card per app. The badge shows where it lives — Local (this browser), Published (on the server), Parked (hidden from the public catalogue), or Server only (no local copy).",
+      "sec.localNote": "One card per app. The badge shows its publication state — Listed (published, public in the catalogue), Unlisted (on the server but hidden from the public catalogue), or Local (a draft in this browser, not on the server yet). A purple Staging pill marks an app that also has an unpublished draft.",
       "sec.localHint": "💡 Publish a local app to put it on the server — then you can manage it from anywhere.",
       "stats.apps": "apps",
       "stats.stored": "stored",
@@ -2738,6 +2792,8 @@
       "pb.step3": "Add & publish your app",
       "pb.step3hint": "Got the code or HTML file from the AI? Paste it (or upload the file) here — it goes live on your node and you get a shareable link.",
       "pb.template": "Start from a template (optional)",
+      "pb.packs": "Capability packs (optional)",
+      "pb.packsHint": "Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.",
       "pb.noneTemplate": "(none — build from scratch)",
       "pb.promptPreview": "Prompt preview",
       "pb.addBtn": "➕ Add your app — paste it or upload the file",
@@ -2752,6 +2808,12 @@
       "card.view": "Open",
       "card.open": "Open",
       "card.openHint": "Open this app",
+      "card.openReleased": "Open released",
+      "card.openReleasedHint": "Open the published (live) version",
+      "card.openStaging": "Open staging",
+      "card.openStagingHint": "Open the unpublished staging draft to test it — the live app is untouched",
+      "card.stagingBadge": "Staging",
+      "card.stagingHint": "This app has an unpublished staging draft waiting alongside the live version",
       "common.menu": "Menu",
       "status.local": "Local",
       "status.published": "Listed",
@@ -3010,7 +3072,7 @@
       "help.whereTitle": "Missä appisi asuvat",
       "help.where": "Paikalliset appit asuvat vain tässä selaimessa (IndexedDB) — ne eivät seuraa toiseen selaimeen tai laitteeseen. Julkaise appi siirtääksesi sen palvelimelle, minkä jälkeen hallitset sitä mistä tahansa. Jokainen appi näkyy YHTENÄ korttina, jonka merkki kertoo missä se sijaitsee.",
       "help.sectionsTitle": "Kaksi näkymää",
-      "help.sections": "Kaksi välilehteä. Kirjasto = sinun appisi (paikalliset + palvelimella), jokainen yhtenä korttina tilamerkillä — Paikallinen (tämä selain), Listalla (julkinen palvelimella), Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää), tai Vain serverillä (ei paikallista kopiota). Yhteisö = muiden julkaisemat appit.",
+      "help.sections": "Kaksi välilehteä. Kirjasto = sinun appisi, jokainen yhtenä korttina jonka merkki kertoo julkaisutilan — Listalla (julkaistu, näkyy katalogissa), Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää), tai Paikallinen (luonnos tässä selaimessa, ei vielä palvelimella). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos odottamassa. Yhteisö = muiden julkaisemat appit.",
       "help.backupTitle": '"Varmuuskopio" tarkoittaa kahta eri asiaa',
       "help.backup": "💾-valikko (yläpalkki) vie/tuo PALVELIN-appisi + laajennukset .zip-tiedostona. Asetukset → Vie/Tuo JSON varmuuskopioi tämän selaimen PAIKALLISEN katalogin. Ne ovat erillisiä.",
       "help.standaloneTitle": "Mille nodelle tämä puhuu",
@@ -3047,7 +3109,7 @@
       "sec.parkedBlurb": "Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.",
       "sec.recent": "🕒 Viimeksi avatut",
       "sec.local": "📚 Sinun sovelluksesi",
-      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo missä se sijaitsee — Paikallinen (tässä selaimessa), Julkaistu (palvelimella), Parkissa (piilotettu julkisesta katalogista) tai Vain serverillä (ei paikallista kopiota).",
+      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (julkaistu, näkyy katalogissa), Ei listalla (palvelimella mutta piilossa julkisesta katalogista) tai Paikallinen (luonnos tässä selaimessa, ei vielä palvelimella). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
       "sec.localHint": "💡 Julkaise paikallinen sovellus viedäksesi sen palvelimelle — sen jälkeen voit hallita sitä mistä tahansa.",
       "stats.apps": "sovellusta",
       "stats.stored": "tallennettu",
@@ -3129,6 +3191,8 @@
       "pb.step3": "Lisää & julkaise sovelluksesi",
       "pb.step3hint": "Saitko koodin tai HTML-tiedoston tekoälyltä? Liitä se (tai lataa tiedosto) tästä — se tulee live-tilaan solmuusi ja saat jaettavan linkin.",
       "pb.template": "Aloita mallipohjasta (valinnainen)",
+      "pb.packs": "Kyvykkyyspaketit (valinnainen)",
+      "pb.packsHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D… — itse isännöidyt kirjastot, joiden AI-ohjeet leivotaan promptiin. Ideatekstisi esivalitsee sopivat paketit.",
       "pb.noneTemplate": "(ei mitään — rakenna tyhjästä)",
       "pb.promptPreview": "Promptin esikatselu",
       "pb.addBtn": "➕ Lisää sovelluksesi — liitä se tai lataa tiedosto",
@@ -3143,6 +3207,12 @@
       "card.view": "Avaa",
       "card.open": "Avaa",
       "card.openHint": "Avaa tämä sovellus",
+      "card.openReleased": "Avaa julkaistu",
+      "card.openReleasedHint": "Avaa julkaistu (live) versio",
+      "card.openStaging": "Avaa staging",
+      "card.openStagingHint": "Avaa julkaisematon staging-luonnos testattavaksi — live-appi pysyy ennallaan",
+      "card.stagingBadge": "Staging",
+      "card.stagingHint": "Tällä sovelluksella on julkaisematon staging-luonnos odottamassa live-version rinnalla",
       "common.menu": "Valikko",
       "status.local": "Paikallinen",
       "status.published": "Listalla",
@@ -4177,6 +4247,7 @@
     }
     desc.placeholder = t("pb.descPh");
     loadPbTemplates();
+    loadPbPacks();
     loadPbCore();
     overlay.style.display = "flex";
     desc.focus();
@@ -4246,6 +4317,98 @@
     }).catch(function() {
     });
   }
+  var pbPacks = [];
+  var pbPackDocs = {};
+  var pbPackTouched = {};
+  var PB_PACK_CATEGORIES = ["visualization", "diagrams", "canvas", "game", "3d", "realtime"];
+  function pbSelectedPackIds() {
+    return Array.prototype.slice.call(document.querySelectorAll(".pb-pack-cb:checked")).map(function(cb) {
+      return cb.value;
+    });
+  }
+  function loadPbPacks() {
+    var wrap = document.getElementById("pb-packs");
+    if (!wrap) return;
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var base = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
+      return r.json();
+    }).then(function(d) {
+      var all = d.data && d.data.packs || [];
+      pbPacks = all.filter(function(p) {
+        if (p.status === "deprecated") return false;
+        if (p.kind === "vendored" || p.kind === "bundle") return PB_PACK_CATEGORIES.indexOf(p.category) !== -1;
+        if (p.kind === "cortex") return PB_PACK_CATEGORIES.indexOf(p.category) !== -1 && p.id !== "aimeat-charts";
+        return false;
+      });
+      wrap.innerHTML = "";
+      pbPacks.forEach(function(p) {
+        var label = document.createElement("label");
+        label.className = "pb-pack-item";
+        label.title = p.description || "";
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "pb-pack-cb";
+        cb.value = p.id;
+        cb.onchange = function() {
+          pbPackTouched[p.id] = true;
+          if (cb.checked) loadPbPackDoc(base, p.id);
+          else updatePbPreview();
+        };
+        var span = document.createElement("span");
+        span.textContent = p.title;
+        label.appendChild(cb);
+        label.appendChild(span);
+        wrap.appendChild(label);
+      });
+      var desc = document.getElementById("pb-description");
+      if (desc && !desc._pbPackListener) {
+        desc._pbPackListener = true;
+        desc.addEventListener("input", function() {
+          pbMatchPacksToIdea(base);
+        });
+      }
+      pbMatchPacksToIdea(base);
+    }).catch(function() {
+    });
+  }
+  function pbMatchPacksToIdea(base) {
+    var desc = document.getElementById("pb-description");
+    var text = (desc && desc.value || "").toLowerCase();
+    pbPacks.forEach(function(p) {
+      if (pbPackTouched[p.id]) return;
+      var cb = document.querySelector('.pb-pack-cb[value="' + p.id + '"]');
+      if (!cb) return;
+      var hit = (p.interviewTriggers || []).some(function(t2) {
+        var esc = String(t2).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp("(^|[^a-zà-öø-ÿ])" + esc).test(text);
+      });
+      if (hit && !cb.checked) {
+        cb.checked = true;
+        loadPbPackDoc(base, p.id);
+      } else if (!hit && cb.checked) {
+        cb.checked = false;
+        updatePbPreview();
+      }
+    });
+  }
+  function loadPbPackDoc(base, id) {
+    if (pbPackDocs[id]) {
+      updatePbPreview();
+      return;
+    }
+    fetch(base + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
+      return r.json();
+    }).then(function(d) {
+      var pack = d.data && d.data.pack;
+      if (pack) {
+        pbPackDocs[id] = pack;
+        updatePbPreview();
+      }
+    }).catch(function() {
+    });
+  }
   function buildPromptFromBuilder() {
     var config = loadConfig();
     var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "https://your-aimeat-node.example";
@@ -4270,6 +4433,7 @@
       prompt2 += "3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n";
       prompt2 += "4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n";
       prompt2 += "5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n";
+      prompt2 += "6. Does it need any special capabilities? (charts/graphs · editable flow or mindmap diagrams · static text-defined diagrams · a game or heavy 2D animation · generative art / creative canvas · 3D · live multi-user/realtime) — each maps to a capability pack in Step 2; include only what I pick.\n";
       prompt2 += "Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n";
     }
     var core = pbCore[isImprove ? "improve" : "new"];
@@ -4404,6 +4568,19 @@
     }
     if (window.pbTemplate && window.pbTemplate.content) {
       prompt2 += "\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring intact; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n" + window.pbTemplate.content + "\n```\n";
+    }
+    var selectedPacks = pbSelectedPackIds().map(function(id) {
+      return pbPackDocs[id];
+    }).filter(Boolean);
+    if (selectedPacks.length > 0) {
+      prompt2 += "\n## Selected capability packs (self-hosted on my node — use these, never a CDN)\n";
+      selectedPacks.forEach(function(pack) {
+        prompt2 += "\n### Pack: " + pack.id + " — " + (pack.title || "") + "\n";
+        prompt2 += "Include (in order):\n" + (pack.include || []).map(function(l) {
+          return l;
+        }).join("\n") + "\n";
+        if (pack.ai_doc) prompt2 += "Usage:\n" + pack.ai_doc + "\n";
+      });
     }
     return prompt2;
   }
@@ -5574,6 +5751,21 @@
         statusEl.textContent = "✘ " + (err.message || "Draft preview failed");
       }
       return false;
+    });
+  }
+  function openStagingPreview(owner, filename) {
+    if (!getCortexOwnerToken2()) {
+      showNotice(t("detail.draftNeedsSignin"));
+      return;
+    }
+    if (!owner || !filename) {
+      showNotice(t("detail.draftNeedsPublished"));
+      return;
+    }
+    draftApi("POST", owner, filename, "draft/preview-token").then(function(data) {
+      window.open(data.preview_url, "_blank", "noopener");
+    }).catch(function(err) {
+      showNotice(err.message || "Draft preview failed");
     });
   }
   function publishDraftBytes(app, contentB64, statusEl, onDone) {
@@ -7720,7 +7912,6 @@
   var serverAppManifests = {};
   function libStatus(e) {
     if (e.parked) return "parked";
-    if (e.serverOnly) return "server";
     if (e.published) return "published";
     return "local";
   }
@@ -7728,8 +7919,6 @@
     switch (libStatus(e)) {
       case "parked":
         return t("status.parked");
-      case "server":
-        return t("status.serverOnly");
       case "published":
         return t("status.published") + (e.versionNumber ? " v" + e.versionNumber : "");
       default:
@@ -7763,6 +7952,7 @@
         published: !!la.published,
         parked: false,
         serverOnly: false,
+        hasDraft: false,
         filename: la.publishedFilename || null,
         owner: null,
         versionNumber: la.publishedVersionNumber || null,
@@ -7785,6 +7975,7 @@
         m.versionNumber = sa.version_number || m.versionNumber;
         m.forkable = !!sa.forkable;
         m.forks = sa.forks || 0;
+        m.hasDraft = !!sa.has_draft;
         m.protection = prot;
         m.viewUrl = base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
@@ -7806,6 +7997,7 @@
           published: !sa.parked,
           parked: !!sa.parked,
           serverOnly: true,
+          hasDraft: !!sa.has_draft,
           filename: fn,
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
@@ -7910,10 +8102,12 @@
     var idAttr = e.hasLocal ? escapeHtml(e.localId) : "srv:" + escapeHtml(e.filename);
     var detailCall = e.filename ? "window._launcher.openPublishedDetail('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename) + "', '" + jsArg(e.hasLocal ? e.localId : "") + "', " + (e.versionNumber || 0) + ")" : "window._launcher.openDetailView('" + jsArg(e.localId) + "')";
     var openCall = (e.published || e.parked || e.serverOnly) && e.viewUrl ? "window._launcher.viewPublished('" + jsArg(e.viewUrl) + "?mode=inline', '" + jsArg(e.name) + "')" : e.hasLocal ? "window._launcher.launchApp('" + jsArg(e.localId) + "', '" + jsArg(e.openMode || "tab") + "')" : detailCall;
+    var stagingCall = "window._launcher.openStagingPreview('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename || "") + "')";
+    var openBtns = e.hasDraft && e.viewUrl ? `<button onclick="event.stopPropagation(); window._launcher.viewPublished('` + jsArg(e.viewUrl) + "?mode=inline', '" + jsArg(e.name) + `')" title="` + escapeHtml(t("card.openReleasedHint")) + '">▶ ' + escapeHtml(t("card.openReleased")) + '</button><button class="act-staging" onclick="event.stopPropagation(); ' + stagingCall + '" title="' + escapeHtml(t("card.openStagingHint")) + '">⏫ ' + escapeHtml(t("card.openStaging")) + "</button>" : '<button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t("card.openHint")) + '">▶ ' + escapeHtml(t("card.open")) + "</button>";
     var st = libStatus(e);
     var dragAttrs = e.hasLocal ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"' : "";
     var menuBtn = e.hasLocal ? `<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')" title="` + escapeHtml(t("common.menu")) + '">⋮</button>' : "";
-    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions"><button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t("card.openHint")) + '">▶ ' + escapeHtml(t("card.open")) + '</button><button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
+    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
   }
   function renderRecentlyOpened() {
     var section = document.getElementById("recent-section");
@@ -8335,6 +8529,7 @@
     detailAiDiscard,
     detailTestDraftLive,
     detailPublishTestedDraft,
+    openStagingPreview,
     detailEditSource,
     detailImproveExternal,
     detailSharePrompt,

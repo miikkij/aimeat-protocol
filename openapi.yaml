@@ -2374,6 +2374,7 @@ components:
         protected: { type: boolean, description: True when an access code gates downloads }
         parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
         forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
+        has_draft: { type: boolean, description: True when the VIEWER owns this app and it has a pending staging draft awaiting publish. Always false for apps the caller does not own (a draft is owner-private) and for unauthenticated listings. }
         operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
         operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
@@ -6828,6 +6829,113 @@ paths:
       responses:
         '200':
           description: The build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
+
+  /v1/library-packs:
+    get:
+      operationId: listLibraryPacks
+      summary: Library-pack registry index
+      description: >-
+        The data-driven registry of every client-side library an AIMEAT app can include —
+        SDK wrappers (/v1/libs), node-bundled cortex libs (/v1/cortex/<n>/libs) and vendored
+        third-party capability packs (/lib). Compact index (no ai_doc/changelog): id, kind,
+        category, description, rendered include line(s), requires, version, license, apiSurface,
+        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status. Every AI-facing
+        library list (build-app prompt, GET /v1/libs, bootstrap, llms.txt) derives from this
+        registry. Public (CORS *).
+      tags:
+        - Discovery
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [sdk, cortex, vendored, bundle] }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [preview, stable, deprecated] }
+        - name: lang
+          in: query
+          schema: { type: string }
+          description: Localized title/description where a translation exists (e.g. fi)
+      responses:
+        '200':
+          description: The pack index (data.packs)
+
+  /v1/library-packs/{id}:
+    get:
+      operationId: getLibraryPack
+      summary: One library pack with its full AI usage doc
+      description: >-
+        One pack WITH ai_doc (the 10–40 line usage doc an AI reads BEFORE writing code that
+        uses the pack) and changelog (what changed and what it means for existing apps —
+        the conscious-upgrade contract). Include lines are rendered against this node's base
+        URL. Public (CORS *).
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The pack (data.pack with ai_doc + changelog)
+        '404':
+          description: No such pack
+
+  /v1/libs:
+    get:
+      operationId: listClientLibraries
+      summary: Client SDK library catalogue
+      description: >-
+        Catalogue of the browser helper libraries the node serves at /v1/libs/*.js
+        (name, url, description, size_estimate, ready-to-paste include snippet, requires).
+        Derived from the library-pack registry (see /v1/library-packs, which adds per-lib
+        AI docs + changelogs). Public.
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: '{ ok, libraries: [...], packs_index }'
+
+  /v1/app-templates:
+    get:
+      operationId: listAppTemplates
+      summary: Authoring-template registry index
+      description: >-
+        Curated app-building starting points (app shells T1/T2/T3, components, use-case
+        scaffolds) the prompt builders inject so an AI copies from a model instead of building
+        from scratch. Index without template content. Public (CORS *).
+      tags:
+        - Discovery
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [app-shell, component, use-case] }
+        - name: lang
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: The template index (data.templates)
+
+  /v1/app-templates/{id}:
+    get:
+      operationId: getAppTemplate
+      summary: One authoring template with its content
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The template with content (data.template)
+        '404':
+          description: No such template
 
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
@@ -17657,6 +17765,110 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/intake/forms:
+    post:
+      operationId: defineIntakeForm
+      summary: Define or update a public intake form (workspace creator / org admin)
+      description: >-
+        Public Intake — the generic capability for anonymous → owner-space submissions. Binds a public
+        form to an exact destination (org/ws/namespace) + an allow-list of fields, stored server-side in
+        the workspace meta namespace. Only the workspace creator or an org admin may manage forms.
+        `form_id` may be a human slug (guessable, discoverable) or omitted to mint an unguessable `frm_`
+        token. `mode` publish (default) makes a submission live immediately; draft holds it for review.
+      tags: [Public Intake]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organism_id, ws, namespace, allowed_fields]
+              properties:
+                organism_id: { type: string }
+                ws: { type: string }
+                namespace: { type: string, description: Destination records namespace (cannot be meta.*) }
+                form_id: { type: string, description: 'Slug [a-z0-9-] 2-64 chars; omit to mint an unguessable token' }
+                allowed_fields: { type: array, items: { type: string } }
+                required_fields: { type: array, items: { type: string } }
+                defaults: { type: object, additionalProperties: true }
+                mode: { type: string, enum: [publish, draft] }
+                honeypot_field: { type: string }
+                enabled: { type: boolean }
+                max_per_day: { type: integer }
+                title: { type: string }
+                fields: { type: array, items: { type: object } }
+                success_message: { type: string }
+                redirect_url: { type: string }
+      responses:
+        '200': { description: Form defined; returns form_id + submit_url }
+        '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
+        '403': { description: Not the workspace creator / org admin }
+        '404': { description: Organism or workspace not found }
+    get:
+      operationId: listIntakeForms
+      summary: List a workspace's intake forms (owner)
+      tags: [Public Intake]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: organism_id, in: query, required: true, schema: { type: string } }
+        - { name: ws, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The owner's forms in the workspace }
+        '403': { description: Not the workspace creator / org admin }
+    delete:
+      operationId: deleteIntakeForm
+      summary: Delete an intake form — its public link stops working (owner)
+      tags: [Public Intake]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: organism_id, in: query, required: true, schema: { type: string } }
+        - { name: ws, in: query, required: true, schema: { type: string } }
+        - { name: form_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Deleted (or already absent) }
+        '403': { description: Not the workspace creator / org admin }
+  /v1/intake/{org}/{ws}/{formId}:
+    get:
+      operationId: getIntakeFormDescriptor
+      summary: Public form descriptor — what a renderer needs to draw the form (NO auth)
+      description: >-
+        Returns only the public descriptor (title, fields to render, honeypot field name, success
+        message). Never discloses the destination namespace, owner, defaults, or any submitted record.
+      tags: [Public Intake]
+      security: []
+      parameters:
+        - { name: org, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: path, required: true, schema: { type: string } }
+        - { name: formId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Public form descriptor }
+        '404': { description: Form not found or disabled }
+    post:
+      operationId: submitIntakeForm
+      summary: Submit to a public intake form (NO auth, per-IP rate-limited)
+      description: >-
+        Anonymous submission. The node honeypot-screens, per-IP rate-limits, builds the record from the
+        allow-list only, sets the owner server-side (from the form config — never the caller), validates
+        against the destination's locked schema, and writes ONE record (published or draft). Returns only
+        { ok, id, mode } — never any other record.
+      tags: [Public Intake]
+      security: []
+      parameters:
+        - { name: org, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: path, required: true, schema: { type: string } }
+        - { name: formId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: Submitter values (only allow-listed fields are kept) }
+      responses:
+        '200': { description: 'Accepted → { ok, id, mode } (id is null when a honeypot silently dropped it)' }
+        '400': { description: Missing required field / too many or oversized fields }
+        '404': { description: Form not found or disabled }
+        '422': { description: Submission does not match the destination schema }
+        '429': { description: Rate limit exceeded }
   /v1/organisms/{id}/workspaces:
     get:
       operationId: discoverOrganismWorkspaces

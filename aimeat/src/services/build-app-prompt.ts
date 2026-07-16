@@ -12,6 +12,11 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Library sections generated from the library-pack registry
+ *     (src/data/library-packs.ts): SDK groups + Ready-made UI + the NEW "Optional capability
+ *     packs" index (vendored libs with fetch-on-demand docs at GET /v1/library-packs/:id).
+ *     Design Guidelines now name the self-hosted styling stack; improve mode gains the
+ *     conscious-upgrade rule (read the pack changelog, explain, upgrade only with consent).
  *   v1.2.0 — 2026-07-14 — Agent face section (Agent Face phase 3): the three agent surfaces
  *     (read=face, act=WebMCP tools, learn=bound skill), the six face rules, and the
  *     AIMEATAgentFace.publish snippet (aimeat-agentface.js, phase 2)
@@ -25,6 +30,10 @@ import type { AimeatConfig } from '../config.js';
 // The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
 // what the authorize endpoint actually accepts (guessed scope names were an AEB-2 finding).
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
+// The library-pack registry — the prompt's library sections are GENERATED from it so the
+// lists can never drift from /v1/libs, /v1/library-packs, bootstrap or llms.txt (Phase 1
+// of the Library Acceleration Program killed the 4-way hardcoded-list drift).
+import { buildPromptLibrarySections } from '../data/library-packs.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -54,40 +63,10 @@ export function buildAppPrompt(
   body += isImprove ? '## AIMEAT Platform Instructions\n\n' : '## Step 2 — Build it (once I have answered)\n\n';
   body += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
 
-  // Core libraries
-  body += '### Available Client Libraries\n';
-  body += 'Load with <script src> from the node base ' + nodeUrl + '/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n';
-  body += 'Core:\n';
-  body += '- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n';
-  body += '- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n';
-  body += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n';
-  body += '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n';
-  body += 'AI (prompt-driven — see the AI section below):\n';
-  body += "- aimeat-ai.js — LLM completions on the USER's own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n";
-  body += 'Economy & agents:\n';
-  body += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
-  body += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
-  body += "- aimeat-agents.js — commission & watch the owner's AI agents (`AIMEAT.agents`)\n";
-  body += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n';
-  body += '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public priced-offer `feed()`, price reading (`getOffer`, `priceOf`) and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; morsels stay plain integers (`fmtAmount` is currency-aware). A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth.\n\n';
-  body += 'Media & misc:\n';
-  body += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
-  body += '- aimeat-speech.js — text-to-speech / speech helpers\n';
-  body += '- aimeat-markdown.js — render markdown INTO an element: `AIMEAT.md.render(text, target)` (returns an Element — never assign it to innerHTML; use `renderToString(text)` for a string). `await AIMEAT.md.renderRich(text, target)` adds task lists, footnotes, code highlighting, Mermaid diagrams AND live data embeds: a ```aimeat-memory fence (lines `key: <memory key>`, optional `view: table|props|list|value|json`, `fields: a,b`, `title: …`) renders that memory key as a fresh table on every open — perfect for agent-produced data in documents.\n';
-  body += '- aimeat-editor.js — markdown editor: `AIMEAT.editor.mount(el, {value, onChange})`, `AIMEAT.editor.toolbar(adapter)`, `AIMEAT.editor.split(el, {value, onChange})` for editor + live preview (pairs with aimeat-markdown.js)\n';
-  body += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
-  body += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
-
-  // Ready-made UI building blocks (node-bundled cortex)
-  body += 'Ready-made UI (node-bundled — load from ' + nodeUrl + '/v1/cortex/<name>/libs/<name>.js, use only what you need):\n';
-  body += '- aimeat-ui-viewers — sortable/filterable DataTable + viewers (`AIMEAT.ui.viewers`)\n';
-  body += '- aimeat-ui-forms — form builder with validation (`AIMEAT.ui.forms`)\n';
-  body += '- aimeat-ui-layout — responsive layout helpers, master/detail (`AIMEAT.ui.layout`)\n';
-  body += '- aimeat-ui-nav — navbars, tabs, menus (`AIMEAT.ui.nav`)\n';
-  body += '- aimeat-ui-dialogs — modals, toasts, confirms (`AIMEAT.ui.dialogs`)\n';
-  body += '- aimeat-charts — charts / graphs (`AIMEAT.charts`)\n';
-  body += '- aimeat-canvas — drawing / freeform canvas (`AIMEAT.canvas`)\n';
-  body += 'Example: <script src="' + nodeUrl + '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></' + 'script>\n\n';
+  // Libraries: the whole section (SDK groups + Ready-made UI cortex + Optional capability
+  // packs) is generated from the library-pack registry — src/data/library-packs.ts — so this
+  // prompt can never drift from GET /v1/libs, GET /v1/library-packs, bootstrap or llms.txt.
+  body += buildPromptLibrarySections(nodeUrl);
 
   // Auth pattern
   body += '### Auth Pattern\n';
@@ -137,6 +116,25 @@ export function buildAppPrompt(
   body += '```\n';
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
   body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n\n';
+
+  // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's
+  // space. Every other write path requires auth, so lead/contact/feedback/RSVP/survey forms need this.
+  body += '### Collecting input from anonymous visitors (Public Intake)\n';
+  body += 'Published apps render for logged-OUT visitors, but every write path requires auth — so a stranger cannot save anything directly. For public **lead forms, contact forms, feedback, questionnaires, quizzes, RSVP, waitlists, support intake**, use the Public Intake capability (`AIMEAT.intake`, load `/v1/libs/aimeat-intake.js`). The OWNER defines a form once (server-side, pinned to a destination + an allow-list of fields); anyone then submits with NO login. The node honeypot-screens, per-IP rate-limits, resolves the owner server-side, allow-lists fields, validates against the destination schema, and writes ONE owner-owned record — never exposing other data. Submissions are normal records, so the app reads/aggregates them (stats, dashboards) and agents can triage them.\n';
+  body += '```javascript\n';
+  body += '// OWNER (once, logged in): define a form → get a shareable link\n';
+  body += 'const { form_id, submit_url } = await AIMEAT.intake.defineForm({\n';
+  body += '  organism_id, ws, namespace: "crm.contacts",       // destination (a schema-locked workspace namespace)\n';
+  body += '  form_id: "contact-us",                             // omit to get an unguessable frm_ token (private link)\n';
+  body += '  allowed_fields: ["nimi", "email", "viesti"],       // ONLY these may be set by a submitter\n';
+  body += '  required_fields: ["email"], defaults: { tila: "uusi", lahde: "public-form" },\n';
+  body += '  honeypot_field: "company_url", mode: "publish",    // "draft" = owner reviews before it goes live\n';
+  body += '  title: "Contact us", fields: [{ key: "nimi", label: "Name" }, { key: "email", label: "Email" }] });\n';
+  body += '// PUBLIC form page (NO login): render from the descriptor, then submit\n';
+  body += 'const form = await AIMEAT.intake.getForm(organism_id, ws, "contact-us");   // title + fields to draw\n';
+  body += 'await AIMEAT.intake.submit(organism_id, ws, "contact-us", { nimi, email, viesti });   // works anonymously\n';
+  body += '```\n';
+  body += 'The form page can be a generic renderer OR your own branded/custom page (multi-step, quiz logic, thank-you upsell) — both call the same two public methods. Never try to write owner data from an anonymous session any other way.\n\n';
 
   // Images & files — the cross-user display pattern (the #1 storage mistake is base64 embeds)
   body += '### Images & files (cross-user display)\n';
@@ -211,6 +209,7 @@ export function buildAppPrompt(
 
   // Design guidelines
   body += '### Design Guidelines\n';
+  body += 'For rich UIs use the self-hosted styling stack (the same one the app-shell templates use) instead of hand-rolling a CSS framework: the `styling` capability pack — daisyUI v5 components + Tailwind v4 utilities + the AIMEAT theme bridge, all loaded from this node (see the capability packs list above). For minimal pages plain CSS variables are fine.\n';
   body += "Use CSS variables so the app themes cleanly, and RESPECT the user's AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage \"aimeat-theme\" (\"light\"|\"dark\"). Define light as the default and dark under [data-theme=\"dark\"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):\n";
   body += '```css\n';
   body += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
@@ -232,6 +231,12 @@ export function buildAppPrompt(
   body += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
   body += "- Theme with CSS variables; respect the user's AIMEAT light/dark choice (localStorage \"aimeat-theme\") with an OS-preference fallback\n";
   body += '- Include error handling and loading states for API calls\n\n';
+
+  // Conscious-upgrade rule (improve mode): library packs version consciously, never silently.
+  if (isImprove) {
+    body += '### Library packs in the app you are improving\n';
+    body += 'If the app loads a capability pack (a /lib/ or /v1/cortex/ script from the list above), fetch that pack\'s detail first: GET ' + nodeUrl + '/v1/library-packs/<id> — read `ai_doc` (current usage) and `changelog`. If the changelog shows changes since the app was built, EXPLAIN them to the user (what changed and what it means for this app) and upgrade the app\'s usage only with their consent — never silently rewrite working library code to a newer idiom. Major versions ship as NEW files (e.g. chartjs@4.js stays forever when chartjs@5.js appears), so an app that keeps its current include lines keeps working.\n\n';
+  }
 
   // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
@@ -261,6 +266,7 @@ export function buildAppPrompt(
     full += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';
     full += '4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n';
     full += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
+    full += '6. Does it need any special capabilities? (charts/graphs · editable flow or mindmap diagrams · static text-defined diagrams · a game or heavy 2D animation · generative art / creative canvas · 3D · live multi-user/realtime) — each maps to a capability pack in Step 2; include only what I pick.\n';
     full += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
   }
   full += body;

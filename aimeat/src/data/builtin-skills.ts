@@ -9,6 +9,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.3.0 -- 2026-07-16 -- aimeat-game-apps (public): game/creative-canvas apps with the
+ *     phaser/pixi/p5 library packs — engine selection, v8/instance-mode idioms, AIMEAT glue.
  *   v1.2.0 -- 2026-07-14 -- aimeat-node-guide app section: the agent-face paragraph (Accept:
  *     text/markdown on an app URL → the app's markdown read-surface + affordances footer).
  *     Seeding is create-if-missing, so existing nodes need an operator republish to pick this up.
@@ -439,6 +441,58 @@ metadata:
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.
 - Fixes that change the workflow definition go through \`aimeat_workflow_save\` only after the
   owner confirms the diff.
+`,
+  },
+  {
+    name: 'aimeat-game-apps',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-game-apps
+description: Build 2D games and creative-canvas apps on an AIMEAT node with the self-hosted library packs — phaser (full game engine), pixi (fast 2D WebGL rendering) and p5 (creative coding). Covers pack selection, the correct modern API idioms per engine, single-file-app asset strategy, AIMEAT high-score/leaderboard glue, and realtime multiplayer wiring. Use when the owner wants a game, arcade, generative-art or heavy-2D-animation app.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Building game & creative-canvas apps
+
+The node self-hosts three engines as library packs — fetch each pack's live doc before
+coding: \`GET /v1/library-packs/phaser\` (or \`pixi\` / \`p5\`). Never load engines
+from an external CDN; the include line in the pack doc points at this node's /lib/ copy.
+
+## Pick the right engine
+
+- **phaser** — a GAME: scenes, physics, collisions, input, score, sound. The default for games.
+- **pixi** — heavy 2D RENDERING without game logic: particles, dashboards with thousands of
+  moving sprites, visual effects. You write the loop; no physics/input engine. NOTE v8 API:
+  async \`app.init()\`, \`app.canvas\`, Graphics \`shape().fill()\` chain, \`PIXI.Assets.load\`.
+- **p5** — CREATIVE CODING: generative art, sketches, playful interactions. Instance mode only.
+- Plain drawing (brush/undo/save): the \`aimeat-canvas\` cortex is lighter than any of these.
+
+## Single-file-app asset strategy
+
+Published AIMEAT apps are one HTML file — avoid external asset files entirely:
+- Phaser: generate textures from Graphics (\`g.generateTexture('name', w, h)\`).
+- Sound: the \`aimeat-audio\` SDK lib (instruments + synth) instead of audio files.
+- If real images are needed, upload once via \`AIMEAT.storage\` (public) and load by URL.
+
+## AIMEAT glue that makes it a platform app (not just a canvas)
+
+- **High scores / leaderboard**: one PUBLIC memory key per player
+  (\`myapp.highscore\`, \`{ score, by, at }\`) written with aimeat-data; read everyone's with
+  \`AIMEAT.data.search('myapp.highscore')\`. Gate saving on login (aimeat-auth), render a
+  top-10. The comp-phaser-arcade template shows the exact pattern.
+- **Save games**: private memory key per user (\`visibility: 'private'\`).
+- **Multiplayer**: the \`realtime\` pack (AimeatRealtime rooms — WS + WebRTC + Yjs). Broadcast
+  inputs/state deltas, never frames; throttle to ~30ms; register handlers BEFORE connect().
+- **Theme**: read the app CSS variables for colors so the game respects light/dark.
+
+## Checklist before publishing
+
+1. Boots from a cold load while signed OUT (game playable; saving prompts sign-in).
+2. Works at mobile width (Phaser Scale.FIT / p5 windowResized / pixi resizeTo).
+3. Pauses when the tab hides (battery): phaser \`game.loop.sleep()/wake()\`.
+4. High-score write → read back → visible on the leaderboard without a reload.
 `,
   },
 ];

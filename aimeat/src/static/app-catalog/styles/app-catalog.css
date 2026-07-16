@@ -109,6 +109,10 @@
       (text-align: justify + text-align-last: center) so a wrapped description reads flush instead
       of showing the ragged "sahalaita" the centered card produced; short single-line sources stay
       centered. Adds overflow-wrap/hyphens so long words no longer spill past the card edge.
+    v2.15.0 — 2026-07-16 — Card layout pass: clamp .app-source to 4 lines (long descriptions no
+      longer overflow), pin .app-actions to the card bottom + always-visible (buttons stop
+      "hyppelehtii"), retire the .st-server badge, add the purple .app-staging-badge pill +
+      .act-staging "Open staging" button styling.
 -->
 <html lang="en">
 <head>
@@ -525,18 +529,28 @@
       text-align-last: center;
       overflow-wrap: break-word;
       hyphens: auto;
+      /* Clamp to a few lines so a long description (e.g. TELETYPE) never spills
+         past the card or shoves the action row around — every card stays uniform
+         and the buttons keep a fixed home at the bottom. */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 100%;
     }
 
+    /* Actions live at the BOTTOM of every card (margin-top:auto) and are always
+       visible — not hover-revealed — so the buttons never jump around or feel
+       "hyppelehtii". flex-wrap keeps the released/staging pair tidy on a narrow card. */
     .app-card .app-actions {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 6px;
-      margin-top: 4px;
-      opacity: 0;
-      transition: opacity var(--transition);
-    }
-
-    .app-card:hover .app-actions {
-      opacity: 1;
+      margin-top: auto;
+      padding-top: 8px;
+      width: 100%;
     }
 
     .app-card .app-actions button {
@@ -2056,6 +2070,42 @@
     }
     .app-status-badge.st-published { color: #0e9f6e; border-color: #0e9f6e55; }
     .app-status-badge.st-parked    { color: #d97706; border-color: #d9770655; }
-    .app-status-badge.st-server    { color: #3b82f6; border-color: #3b82f655; }
     .app-card.server-only .app-icon { background: var(--bg-subtle); }
+
+    /* Staging pill: an owner-only marker that this app has an UNPUBLISHED draft
+       waiting alongside the live version. Purple so it reads as distinct from the
+       green "Listed" / amber "Unlisted" publication-state badges. Sits just under
+       the status badge (top-left, second row). */
+    .app-staging-badge {
+      position: absolute;
+      top: 30px;
+      left: 8px;
+      z-index: 2;
+      font-size: .58rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: color-mix(in srgb, #7c3aed 12%, var(--surface));
+      color: #7c3aed;
+      border: 1px solid #7c3aed55;
+    }
+
+    /* The "Open staging" action mirrors the staging pill's accent so the two read
+       as the same concept. */
+    .app-card .app-actions button.act-staging {
+      color: #7c3aed;
+      border-color: #7c3aed55;
+    }
+    .app-card .app-actions button.act-staging:hover {
+      border-color: #7c3aed;
+      background: color-mix(in srgb, #7c3aed 10%, transparent);
+      color: #7c3aed;
+    }
   
+/* Prompt-builder capability-pack picker (Library Acceleration Program, Phase 4) */
+.pb-packs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pb-pack-item { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 13px; cursor: pointer; user-select: none; }
+.pb-pack-item:hover { border-color: var(--accent); }
+.pb-pack-item input { accent-color: var(--accent); margin: 0; }
+.pb-pack-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }

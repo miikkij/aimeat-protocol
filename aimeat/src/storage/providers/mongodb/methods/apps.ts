@@ -112,6 +112,12 @@ export const appsMethods = {
         return result.count > 0;
     },
 
+    async listAppDraftFilenames(this: PrismaStorage, ownerGaii: string): Promise<string[]> {
+        this.ensureReady();
+        const rows = await this.prisma.appDraft.findMany({ where: { ownerGaii }, select: { filename: true } });
+        return rows.map((r: { filename: string }) => r.filename);
+    },
+
     async getApp(this: PrismaStorage, ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
         this.ensureReady();
         if (version !== undefined) {

@@ -10,6 +10,9 @@
  * @usage import { initRender, renderApps, renderTags, serverStateByFilename, setServerManifests } from './render.js'; initRender({...})
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 12).
+ *   v1.1.0 — 2026-07-16 — Card badges now reflect PUBLICATION state only (retire the
+ *     "Server only" concept: a published no-local-copy app is "Listed vN", not "server").
+ *     Add a Staging pill + split Open into "Open released" / "Open staging" when has_draft.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -172,17 +175,19 @@ export let serverStateByFilename = {};
 export let ownAppProtection = {};
 export let serverAppManifests = {}; // moved out of server-io: SSOT for the owner-app manifest cache (detail reads via getServerManifests)
 
-// Status of a unified entry, for its badge.
+// Status of a unified entry, for its badge. The badge shows the app's PUBLICATION
+// state on the server — Listed / Unlisted / (browser-only) Local — NOT whether this
+// browser happens to hold a local copy. A published app with no local twin (e.g.
+// pushed via MCP/VSCode) is still "Listed vN", not a separate "server only" state;
+// materialization of a local copy is an implementation detail the badge never surfaces.
 function libStatus(e) {
-  if (e.parked) return 'parked';
-  if (e.serverOnly) return 'server';
-  if (e.published) return 'published';
-  return 'local';
+  if (e.parked) return 'parked';        // on the server, hidden from the public catalogue
+  if (e.published) return 'published';  // on the server, public in the catalogue
+  return 'local';                       // a draft in this browser, not on the server yet
 }
 function libStatusLabel(e) {
   switch (libStatus(e)) {
     case 'parked':    return t('status.parked');
-    case 'server':    return t('status.serverOnly');
     case 'published': return t('status.published') + (e.versionNumber ? ' v' + e.versionNumber : '');
     default:          return t('status.local');
   }
@@ -209,7 +214,7 @@ function buildLibraryEntries(localApps, serverApps) {
       source: la.source, origin: la.origin,
       aimeatOwner: la.aimeatOwner || null, aimeatFilename: la.aimeatFilename || null,
       addedAt: la.addedAt, lastOpenedAt: la.lastOpenedAt, blob: la.blob,
-      published: !!la.published, parked: false, serverOnly: false,
+      published: !!la.published, parked: false, serverOnly: false, hasDraft: false,
       filename: la.publishedFilename || null, owner: null,
       versionNumber: la.publishedVersionNumber || null,
       viewUrl: la.publishedUrl ? (base + la.publishedUrl) : '',
@@ -229,6 +234,7 @@ function buildLibraryEntries(localApps, serverApps) {
       m.owner = sa.owner || m.owner;
       m.versionNumber = sa.version_number || m.versionNumber;
       m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
+      m.hasDraft = !!sa.has_draft;
       m.protection = prot;
       // EXACTLY what the old "View" used: the CONSTRUCTED served URL (aimeatUrl/v1/apps/<owner>/<file>),
       // NOT the local publishedUrl — so Open opens the app top-level on its origin (and it SSOs)
@@ -245,7 +251,7 @@ function buildLibraryEntries(localApps, serverApps) {
         favorite: false, sortOrder: undefined, openMode: 'tab',
         source: 'server', origin: null,
         aimeatOwner: sa.owner || null, aimeatFilename: fn,
-        published: !sa.parked, parked: !!sa.parked, serverOnly: true,
+        published: !sa.parked, parked: !!sa.parked, serverOnly: true, hasDraft: !!sa.has_draft,
         filename: fn, owner: sa.owner || '',
         versionNumber: sa.version_number || null,
         viewUrl: (base && fn) ? (base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn)) : '',
@@ -383,6 +389,14 @@ function libraryCardHtml(e, i) {
     : (e.hasLocal
         ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
         : detailCall);
+  // When a staging draft exists the single "Open" splits into two labelled buttons so the
+  // released version and the unpublished staging draft are never confused. openStagingPreview
+  // mints a short-lived owner-only preview URL for the draft and opens it top-level.
+  var stagingCall = 'window._launcher.openStagingPreview(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename || '') + '\')';
+  var openBtns = (e.hasDraft && e.viewUrl)
+    ? '<button onclick="event.stopPropagation(); window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')" title="' + escapeHtml(t('card.openReleasedHint')) + '">▶ ' + escapeHtml(t('card.openReleased')) + '</button>' +
+      '<button class="act-staging" onclick="event.stopPropagation(); ' + stagingCall + '" title="' + escapeHtml(t('card.openStagingHint')) + '">⏫ ' + escapeHtml(t('card.openStaging')) + '</button>'
+    : '<button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t('card.openHint')) + '">▶ ' + escapeHtml(t('card.open')) + '</button>';
   var st = libStatus(e);
   var dragAttrs = e.hasLocal
     ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"'
@@ -396,6 +410,7 @@ function libraryCardHtml(e, i) {
       (e.hasLocal ? ' oncontextmenu="window._launcher.showContextMenu(event, \'' + jsArg(e.localId) + '\')"' : '') +
       ' style="animation-delay:' + (i * 0.04) + 's">' +
       '<span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + '</span>' +
+      (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t('card.stagingHint')) + '">' + escapeHtml(t('card.stagingBadge')) + '</span>' : '') +
       menuBtn +
       '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
       '<div class="app-name">' + escapeHtml(e.name) +
@@ -404,7 +419,7 @@ function libraryCardHtml(e, i) {
         ? '<div class="app-source">' + escapeHtml(e.description) + '</div>'
         : '<div class="app-source">' + sourceLabel(e.source) + '</div>') +
       '<div class="app-actions">' +
-        '<button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t('card.openHint')) + '">▶ ' + escapeHtml(t('card.open')) + '</button>' +
+        openBtns +
         '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t('ctx.details')) + '</button>' +
       '</div>' +
       (e.favorite ? '<span class="fav-star visible">⭐</span>' : '') +

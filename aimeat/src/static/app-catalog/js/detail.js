@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Add openStagingPreview(owner, filename): mint a preview token for an
+ *     EXISTING staging draft and open it top-level, driving a library card's "Open staging" button.
  *   v1.2.0 — 2026-07-14 — Monetize section (TARGET-034 phase B): own published apps get the
  *     apps.{appId}.tools tool editor (monetize.js) between Skills and Manage-on-server.
  *   v1.1.0 — 2026-07-11 — Own-published apps: "Edit Access Code" in serverMgmtInner + "Attach skill"
@@ -1178,6 +1180,18 @@ function stageDraftAndPreview(app, contentB64, statusEl) {
     });
 }
 
+// Open the EXISTING staging draft of a published app (no re-save). Mints a short-lived,
+// owner-only preview token and opens the draft top-level on the real app origin, so the
+// owner can try the unpublished staging version instead of the live one. Called straight
+// from a library card's "Open staging" button when the listing reported has_draft.
+function openStagingPreview(owner, filename) {
+  if (!getCortexOwnerToken()) { showNotice(t('detail.draftNeedsSignin')); return; }
+  if (!owner || !filename) { showNotice(t('detail.draftNeedsPublished')); return; }
+  draftApi('POST', owner, filename, 'draft/preview-token')
+    .then(function (data) { window.open(data.preview_url, '_blank', 'noopener'); })
+    .catch(function (err) { showNotice(err.message || 'Draft preview failed'); });
+}
+
 // PUT the CURRENT working bytes THEN publish-draft — always promotes exactly these bytes,
 // so there is no stale-slot window (you never publish an older staged version by accident).
 // Confirms first. onDone(data) runs on success.
@@ -1625,6 +1639,7 @@ export {
   detailAiDiscard,
   detailTestDraftLive,
   detailPublishTestedDraft,
+  openStagingPreview,
   sourceTestDraftLive,
   sourcePublishTested,
   detailEditSource,

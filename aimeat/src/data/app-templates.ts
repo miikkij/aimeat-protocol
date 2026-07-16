@@ -21,6 +21,8 @@
  *   v1.7.0 — 2026-06-26 — plain-language app-shell titles (drop T1/T2/T3 jargon): "Standard app",
  *     "Data app", "Connected app" — what a non-technical user gets, not the architecture.
  *   v1.8.0 — 2026-07-13 — template bodies extracted to ./app-templates/{shells,components,use-cases}.ts (max-file-lines).
+ *   v1.9.0 — 2026-07-16 — packs?: string[] field (library-pack deps, Library Acceleration
+ *     Program); components: mermaid-diagram + three-scene (demos for the mermaid/three packs).
  */
 
 import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION } from './app-templates/shells.js';
@@ -37,6 +39,12 @@ import {
   COMP_SEARCH,
   COMP_LIST_DETAIL,
   COMP_MARKDOWN,
+  COMP_MERMAID_DIAGRAM,
+  COMP_THREE_SCENE,
+  COMP_P5_SKETCH,
+  COMP_PIXI_STAGE,
+  COMP_PHASER_ARCADE,
+  COMP_FLOW_EDITOR,
 } from './app-templates/components.js';
 import { USECASE_REALTIME_SOCIAL, USECASE_MARKETPLACE, USECASE_HOMEPAGE } from './app-templates/use-cases.js';
 
@@ -51,6 +59,8 @@ export interface AppTemplate {
   description: string;
   /** Client libs the template loads (for the AI's awareness). */
   libs: string[];
+  /** Library-pack ids the template demonstrates/depends on (see src/data/library-packs.ts). */
+  packs?: string[];
   /** For use-cases: the component/shell ids this scaffold builds on (for the index + matching). */
   composes?: string[];
   /** The model the AI copies from — a skeleton, not a finished app. */
@@ -97,6 +107,12 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-search', kind: 'component', title: 'Search / filter', description: 'Instant client-side filter over a list, or server-side memory search.', libs: ['aimeat-data'], content: COMP_SEARCH },
   { id: 'comp-list-detail', kind: 'component', title: 'List + detail', description: 'Master/detail layout: a list, click an item to show its detail (directories, catalogs).', libs: [], content: COMP_LIST_DETAIL },
   { id: 'comp-markdown', kind: 'component', title: 'Markdown render', description: 'Render safe GFM markdown (AI stories, blog posts, docs) to styled HTML.', libs: ['aimeat-markdown'], content: COMP_MARKDOWN },
+  { id: 'comp-mermaid-diagram', kind: 'component', title: 'Mermaid diagram', description: 'Render flowcharts / sequence / gantt / mindmap diagrams from text definitions (self-hosted mermaid pack), theme-aware, definitions saved to memory.', libs: [], packs: ['mermaid'], content: COMP_MERMAID_DIAGRAM },
+  { id: 'comp-three-scene', kind: 'component', title: '3D scene (three.js)', description: 'A themed, resizable WebGL 3D scene on the self-hosted three.js pack (r128 UMD) — lights, camera, animation loop, theme-aware background.', libs: [], packs: ['three'], content: COMP_THREE_SCENE },
+  { id: 'comp-p5-sketch', kind: 'component', title: 'p5.js sketch', description: 'An instance-mode p5.js creative-coding sketch (generative art, particles) with parameter persistence and image export via AIMEAT.', libs: [], packs: ['p5'], content: COMP_P5_SKETCH },
+  { id: 'comp-pixi-stage', kind: 'component', title: 'PixiJS stage', description: 'A PixiJS v8 WebGL stage (async init, app.canvas, v8 Graphics chain) rendering hundreds of animated sprites.', libs: [], packs: ['pixi'], content: COMP_PIXI_STAGE },
+  { id: 'comp-phaser-arcade', kind: 'component', title: 'Phaser arcade shell', description: 'A Phaser 3 game shell: generated textures (no asset files), FIT scaling, arcade physics, and an AIMEAT public high-score leaderboard.', libs: ['aimeat-auth', 'aimeat-data'], packs: ['phaser'], content: COMP_PHASER_ARCADE },
+  { id: 'comp-flow-editor', kind: 'component', title: 'Flow / mindmap editor', description: 'An editable drag-and-drop flow or mindmap (aimeat-flow cortex): presets, connect, rename-on-dblclick, save/load to flow:* memory.', libs: ['aimeat-auth', 'aimeat-data'], packs: ['aimeat-flow'], content: COMP_FLOW_EDITOR },
   {
     id: 'usecase-realtime-social',
     kind: 'use-case',
