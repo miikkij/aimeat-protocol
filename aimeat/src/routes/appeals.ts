@@ -9,6 +9,7 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — review response reads the related flag once (was getFlag twice in one hint)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -286,9 +287,10 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             reviewedAt: now,
         });
 
+        const relatedFlag = await storage.getFlag(appeal.flagId);
         res.json(success(config.nodeId, updated, [
             { description: 'View all appeals', method: 'GET', url: '/v1/appeals' },
-            { description: 'View the related flag', method: 'GET', url: `/v1/flags/summary/${(await storage.getFlag(appeal.flagId))?.targetType}/${(await storage.getFlag(appeal.flagId))?.targetId}` },
+            { description: 'View the related flag', method: 'GET', url: `/v1/flags/summary/${relatedFlag?.targetType}/${relatedFlag?.targetId}` },
         ]));
         emitChange('appeals');
     });

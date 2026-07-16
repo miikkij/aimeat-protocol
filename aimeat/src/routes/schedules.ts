@@ -25,6 +25,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.1.0 — 2026-07-16 — buildRecordFromBody reuses the loaded agent record (was getAgent twice)
  *   v1.0.0 — 2026-06-03 — Initial: agent/profile recurring schedules
  *   v1.1.0 — 2026-06-15 — Add the `eco-capability` kind: schedule a connected ecosystem app's
  *     capability; validates the app is connected and the capability is declared.
@@ -40,7 +41,7 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Cron } from 'croner';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope, AgentRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -158,10 +159,11 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     );
     const agentName = forcedAgentName ?? bodyAgent;
     let agentGaii: string | undefined;
+    let agentRecord: AgentRecord | null = null;
     if (agentName) {
       agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);
-      const agent = await storage.getAgent(agentGaii);
-      if (!agent) return { status: 404, code: 'AGENT_NOT_FOUND', message: `Agent "${agentName}" not found` };
+      agentRecord = await storage.getAgent(agentGaii);
+      if (!agentRecord) return { status: 404, code: 'AGENT_NOT_FOUND', message: `Agent "${agentName}" not found` };
     }
 
     const now = new Date().toISOString();
@@ -192,9 +194,10 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       runCount: 0,
     };
 
-    // Inherit the agent's default budget guards for any guard the body omits.
+    // Inherit the agent's default budget guards for any guard the body omits (reuse the record
+    // already loaded above — no second getAgent).
     const bodyConstraints = sanitizeConstraints(body.constraints);
-    const agentDefaults = agentGaii ? (await storage.getAgent(agentGaii))?.scheduleConstraintDefaults : undefined;
+    const agentDefaults = agentRecord?.scheduleConstraintDefaults;
     base.constraints = mergeConstraintDefaults(bodyConstraints, agentDefaults);
 
     if (kind === 'extension') {
