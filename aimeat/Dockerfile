@@ -2,23 +2,24 @@ FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 WORKDIR /app
 
-# Build: install all deps, generate BOTH Prisma clients (MongoDB + PostgreSQL),
-# compile TypeScript. `prisma generate` needs the schema files, so prisma/ is copied.
+# Build: install all deps, then compile TypeScript. `pnpm build` no longer runs
+# `prisma generate` (MongoDB + legacy Prisma-PG are deprecated); prisma/ is copied
+# BEFORE install so the @prisma/client postinstall generates the MongoDB client —
+# tsc still compiles the deprecated Prisma providers until they are removed.
 FROM base AS build
 COPY package.json pnpm-lock.yaml ./
+COPY prisma/ prisma/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
-COPY prisma/ prisma/
 COPY src/ src/
 COPY bin/ bin/
 COPY scripts/ scripts/
 RUN pnpm run build
 
-# Production image. Carries the full node_modules from the build stage so that
-# (a) the generated Prisma clients (.prisma/client for MongoDB + the custom-output
-# PostgreSQL client under dist/) are present, and (b) the `prisma` CLI is available
-# for the startup `prisma db push` schema sync. prisma/ is copied so findPrismaSchema()
-# can locate schema.prisma / schema.postgres.prisma at runtime.
+# Production image. Carries the full node_modules from the build stage. The primary
+# backends (postgres-kysely, sqlite) need nothing Prisma-related at runtime; prisma/
+# and the prisma CLI ride along only so the DEPRECATED MongoDB backend (startup
+# `prisma db push` via findPrismaSchema()) keeps limping until it is removed.
 FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules

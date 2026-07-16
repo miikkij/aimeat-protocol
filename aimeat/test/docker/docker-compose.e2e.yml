@@ -8,6 +8,10 @@ services:
     environment:
       AIMEAT_PORT: "3200"
       AIMEAT_NODE_ID: "aimeat-e2e-001-test"
+      # In-memory storage is deprecated — run the e2e container on SQLite
+      # (/data is created writable for the node user in the Dockerfile).
+      AIMEAT_STORAGE: "sqlite"
+      AIMEAT_SQLITE_PATH: "/data/e2e.db"
       AIMEAT_ADMIN_PASSWORD: "e2e-test-password"
       AIMEAT_WELCOME_BONUS: "100"
       AIMEAT_DAILY_ALLOWANCE: "50"

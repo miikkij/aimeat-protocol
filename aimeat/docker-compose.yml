@@ -1,3 +1,7 @@
+# AIMEAT node on PostgreSQL + Kysely — the primary production backend.
+# Schema is created/updated on boot by the node's own SQL migration runner.
+#   docker compose up --build
+# SQLite variant (no external DB): docker-compose.sqlite.yml
 services:
   aimeat:
     build: .
@@ -7,32 +11,33 @@ services:
       - AIMEAT_PORT=40050
       - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-aimeat-local-001-dev}
       - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-changeme}
-      - AIMEAT_STORAGE=mongodb
-      - DATABASE_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME:-dbuser}:${MONGO_INITDB_ROOT_PASSWORD:-dbpassword}@mongo:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin
+      - AIMEAT_STORAGE=postgres-kysely
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-dbuser}:${POSTGRES_PASSWORD:-dbpassword}@postgres:5432/${POSTGRES_DB:-aimeat}
       - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}
       - AIMEAT_DAILY_ALLOWANCE=${AIMEAT_DAILY_ALLOWANCE:-50}
       - AIMEAT_DAILY_ALLOWANCE_CAP=${AIMEAT_DAILY_ALLOWANCE_CAP:-500}
       - AIMEAT_BURN_RATE=${AIMEAT_BURN_RATE:-0.10}
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
-  mongo:
-    image: mongo:7
+  postgres:
+    image: postgres:16
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-dbuser}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-dbpassword}
+      POSTGRES_USER: ${POSTGRES_USER:-dbuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dbpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-aimeat}
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dbuser} -d ${POSTGRES_DB:-aimeat}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
 volumes:
-  mongo_data:
+  postgres_data:
