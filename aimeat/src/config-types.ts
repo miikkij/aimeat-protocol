@@ -443,6 +443,8 @@ export interface AimeatConfig {
   // Scoped Agent Capabilities (REQ-006)
   defaultAgentScopes: string[];
   maxAgentScopes: string[];
+  /** Same-owner device-auth auto-approval (owner or same-owner agent; no cross-owner, no scope escalation). Default true. */
+  sameOwnerAutoApprove: boolean;
   /** F1: enforce per-agent scopes on the /v1/mcp tool surface (default true; false = warn-only). */
   mcpEnforceScopes: boolean;
 

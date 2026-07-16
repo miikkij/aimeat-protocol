@@ -5,6 +5,8 @@
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — Draft save carries the live app's cortex.agents (bundled crew-defs)
+ *     into the draft manifest so a draft-publish never drops them (Agent-Bundled Apps).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -77,6 +79,9 @@ export function registerDraftRoutes(
         if (effectiveIcon) manifest.icon = effectiveIcon;
         const effectiveProtection = sanitizeProtection(protection) ?? base?.protection;
         if (effectiveProtection && Object.values(effectiveProtection).some(Boolean)) manifest.protection = effectiveProtection;
+        // A draft that only changes HTML keeps the live app's bundled crew-defs
+        // (cortex.agents); draft-publish then promotes them unchanged.
+        if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
 
         const now = new Date().toISOString();
         await storage.saveAppDraft({

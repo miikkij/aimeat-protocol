@@ -5,10 +5,14 @@
  *   log, board announcement, and public activity). Extracted from src/routes/apps.ts (max-file-lines).
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — Agent-Bundled Apps Slice 1: accept `cortex.agents` (declarative
+ *     crew-defs) in the publish payload, validated fail-loud against CrewDefSchema — a
+ *     malformed agents[] REJECTS the publish; carried forward on update when omitted.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AppManifest, AppProtection } from '../../storage/interface.js';
+import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../../storage/interface.js';
+import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -39,7 +43,7 @@ export function registerPublishRoutes(
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
             name, description, version: semver, category, tags, icon,
-            uses_cortex, price_morsels, license_type, protection,
+            uses_cortex, cortex, price_morsels, license_type, protection,
         } = req.body ?? {};
 
         if (!filename || typeof filename !== 'string') {
@@ -107,6 +111,26 @@ export function registerPublishRoutes(
 
         const mimeType = typeof mime_type === 'string' ? mime_type : 'text/html';
 
+        // Agent-Bundled Apps (Slice 1): an app may declare its own agent(s) as DECLARATIVE
+        // crew-defs under `cortex.agents`. Validation is the publish gate — a non-conforming
+        // agents[] REJECTS the publish with the real errors, so a malformed crew-def never
+        // reaches a fleet. The node never executes these; it stores data and routes a pointer.
+        let cortexAgents: Record<string, unknown>[] | undefined;
+        if (cortex !== undefined) {
+            if (cortex === null || typeof cortex !== 'object' || Array.isArray(cortex)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cortex must be an object (e.g. { "agents": [ ... ] })'));
+                return;
+            }
+            if ((cortex as Record<string, unknown>).agents !== undefined) {
+                const check = validateCortexAgents((cortex as Record<string, unknown>).agents);
+                if (!check.ok) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_CREW_DEF', check.errors.join('; ')));
+                    return;
+                }
+                cortexAgents = check.agents as unknown as Record<string, unknown>[];
+            }
+        }
+
         const accessCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
         if (accessCode && (accessCode.length < 4 || accessCode.length > 64)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'access_code must be 4-64 characters'));
@@ -153,6 +177,7 @@ export function registerPublishRoutes(
         let carriedCategory: string | undefined;
         let carriedUsesCortex: string[] | undefined;
         let carriedIcon: string | undefined;
+        let carriedCortex: AppManifestCortex | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -165,6 +190,7 @@ export function registerPublishRoutes(
             carriedCategory = existingApp?.manifest?.category;
             carriedUsesCortex = existingApp?.manifest?.usesCortex;
             carriedIcon = existingApp?.manifest?.icon;
+            carriedCortex = existingApp?.manifest?.cortex;
         }
 
         const now = new Date().toISOString();
@@ -179,6 +205,13 @@ export function registerPublishRoutes(
         };
         if (typeof icon === 'string') manifest.icon = icon;
         else if (carriedIcon) manifest.icon = carriedIcon;
+        // cortex.agents: an explicit `cortex` in the payload replaces the section (send
+        // `{ "agents": [] }` to clear it); omitted → carried forward like category/icon.
+        if (cortexAgents !== undefined) {
+            if (cortexAgents.length > 0) manifest.cortex = { agents: cortexAgents };
+        } else if (cortex === undefined && carriedCortex?.agents?.length) {
+            manifest.cortex = carriedCortex;
+        }
         if (typeof price_morsels === 'number' && price_morsels > 0) manifest.priceMorsels = price_morsels;
         if (license_type === 'single' || license_type === 'lifetime') manifest.licenseType = license_type;
         // Opt-in copy-protection: use the body's `protection` when provided, else carry

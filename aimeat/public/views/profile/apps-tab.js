@@ -2,6 +2,9 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.6.0 — 2026-07-16 — Agent-Bundled Apps: My-Apps cards show a "ships an agent" badge for apps
+ *     declaring manifest.cortex.agents, with per-agent Deploy/Undeploy onto the owner's own fleet
+ *     and liveness read from the deploy status endpoint (AppAgents component).
  *   v1.5.0 — 2026-07-06 — Bound skills (2d): each My-Apps card shows the skills that teach agents
  *     this app + an attach/detach picker (rewrites the skill's frontmatter metadata.binding).
  *   v1.4.0 — 2026-06-26 — Add "Edit details" (rename + edit description) to My Apps — updates the
@@ -22,7 +25,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
+import { listApps, uploadApp, deleteApp, patchApp, deployAppAgent, undeployAppAgent, appAgentStatus } from '/js/services/apps.js';
 import * as skillsService from '/js/services/skills.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
@@ -110,6 +113,74 @@ function AppSkills({ owner, filename, showToast }) {
       ` : ''}
     </div>
   `;
+}
+
+/**
+ * Agent-Bundled Apps: the crew-defs this app ships (manifest.cortex.agents), each with
+ * Deploy/Undeploy onto the OWNER'S OWN fleet and liveness from the status endpoint
+ * (agent registration + the agents.<name>.deploy key the fleet writes). Deploy targets
+ * the signed-in owner by construction — the node hard-rejects any other target.
+ */
+function AppAgents({ owner, filename, agents, showToast }) {
+  const [statuses, setStatuses] = useState({});
+  const [busy, setBusy] = useState('');
+
+  const loadStatuses = useCallback(async () => {
+    const next = {};
+    await Promise.all(agents.map(async (def) => {
+      try {
+        const resp = await appAgentStatus(owner, filename, def.agent_name);
+        if (resp?.ok !== false && resp?.data) next[def.agent_name] = resp.data;
+      } catch { /* leave unknown */ }
+    }));
+    setStatuses(next);
+  }, [owner, filename, agents]);
+
+  useEffect(() => {
+    loadStatuses();
+    const handler = () => loadStatuses();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [loadStatuses]);
+
+  async function act(def, deploy) {
+    setBusy(def.agent_name);
+    try {
+      const resp = deploy
+        ? await deployAppAgent(owner, filename, def.agent_name)
+        : await undeployAppAgent(owner, filename, def.agent_name);
+      if (resp?.ok !== false) {
+        const auto = resp?.data?.auto_activated;
+        showToast(deploy
+          ? (auto ? (t('profile.apps.agentDeployStarted') || 'Deploy task started on your fleet') : (t('profile.apps.agentDeployQueued') || 'Deploy task queued — start it from the Tasks tab'))
+          : (t('profile.apps.agentUndeployQueued') || 'Undeploy task sent to your fleet'));
+        setTimeout(loadStatuses, 1500);
+      } else {
+        showToast(resp?.error?.message || (t('profile.apps.agentDeployFailed') || 'Deploy failed'), true);
+      }
+    } catch (err) {
+      showToast((t('profile.apps.agentDeployFailed') || 'Deploy failed') + ': ' + err.message, true);
+    } finally { setBusy(''); }
+  }
+
+  return html`
+    <div class="pf-app-skills">
+      <span class="text-meta">${t('profile.apps.agentsLabel') || 'Bundled agents'}:</span>
+      ${agents.map(def => {
+        const s = statuses[def.agent_name];
+        const live = !!s?.live && s?.deploy_state?.status !== 'undeployed';
+        return html`
+          <span key=${def.agent_name} class="pf-app-skill-chip flex-row">
+            <span class="badge ${live ? 'badge-success' : 'badge-dim'}" title=${s?.deployed_agent_name || ''}>
+              \u{1F916} ${escHtml(def.agent_name)} ${live ? '● ' + (t('profile.apps.agentLive') || 'live') : '○ ' + (t('profile.apps.agentOffline') || 'not deployed')}
+            </span>
+            ${live
+              ? html`<button class="btn-outline btn-sm" disabled=${busy === def.agent_name} onClick=${() => act(def, false)}>${t('profile.apps.agentUndeploy') || 'Undeploy'}</button>`
+              : html`<button class="btn-primary btn-sm" disabled=${busy === def.agent_name} onClick=${() => act(def, true)}>${t('profile.apps.agentDeploy') || 'Deploy to my fleet'}</button>`}
+          </span>`;
+      })}
+      <button class="btn-ghost btn-sm" onClick=${loadStatuses} title=${t('profile.apps.agentRefresh') || 'Refresh status'}>↻</button>
+    </div>`;
 }
 
 export default function AppsTab({ session, showToast, onStats }) {
@@ -266,6 +337,7 @@ export default function AppsTab({ session, showToast, onStats }) {
               <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
               ${a.parked ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('profile.apps.parkedBadge') || 'Parked'}</span>` : ''}
+              ${a.manifest?.cortex?.agents?.length ? html`<span class="badge badge-info" title=${t('profile.apps.agentBadgeHint') || 'This app ships its own agent — deploy it onto your fleet below'}>\u{1F916} ${t('profile.apps.agentBadge') || 'Ships an agent'}</span>` : ''}
               ${a.operator_hidden ? html`<span class="badge badge-danger">\u{1F6AB} ${t('profile.apps.operatorHiddenBadge') || 'Moderated by operator: hidden'}</span>` : ''}
             </div>
           </div>
@@ -291,6 +363,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
           <${AppSkills} owner=${a.owner || session.owner} filename=${a.filename || a.name} showToast=${showToast} />
+          ${a.manifest?.cortex?.agents?.length ? html`<${AppAgents} owner=${a.owner || session.owner} filename=${a.filename || a.name} agents=${a.manifest.cortex.agents} showToast=${showToast} />` : ''}
           ${editingMeta === a.filename ? html`
             <div class="pf-edit-panel">
               <label class="text-meta mb-half">${t('profile.apps.nameLabel') || 'App Name'}</label>
