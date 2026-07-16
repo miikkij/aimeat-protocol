@@ -5,6 +5,8 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Card mount folds schedules + recipe + organisms + advisories into GET
+ *     /v1/ecosystem-apps/:app/automation (getAutomationOverview); agent list stays separate; fallback kept.
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -17,7 +19,7 @@ import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
-import { getAutomationRecipe, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
+import { getAutomationRecipe, getAutomationOverview, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
 import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
 import { listAgents } from '/js/services/agents.js';
@@ -216,16 +218,28 @@ export function EcoAutomationSection({ app, showToast }) {
 
   const load = async () => {
     const ownerName = (currentGhii().split('@')[0]) || '';
-    const [schedList, agentList, recipe, orgResp, advList] = await Promise.all([
-      listAppSchedules(app.app).catch(() => []),
+    // Mount fold: ONE composite (schedules + recipe + organisms + advisories) + the agent list (kept
+    // separate — its domain_capabilities shape drives recipe-agent selection). On composite failure, fall
+    // back to the individual reads.
+    const [ov, agentList] = await Promise.all([
+      getAutomationOverview(app.app),
       listAgents().catch(() => []),
-      getAutomationRecipe(app.app).catch(() => null),
-      (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
-      listPendingAdvisories(app.app).catch(() => null),
     ]);
+    let schedList, recipe, orgs, advList;
+    if (ov) {
+      schedList = ov.schedules; recipe = ov.recipe; orgs = ov.organisms; advList = ov.advisories;
+    } else {
+      const [s, r, orgResp, a] = await Promise.all([
+        listAppSchedules(app.app).catch(() => []),
+        getAutomationRecipe(app.app).catch(() => null),
+        (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
+        listPendingAdvisories(app.app).catch(() => null),
+      ]);
+      schedList = s; recipe = r; orgs = orgResp?.data?.organisms || []; advList = a;
+    }
     setSchedules(schedList);
     setAgents(agentList.filter(a => !a.name?.startsWith('session-')));
-    setOrgs(orgResp?.data?.organisms || []);
+    setOrgs(orgs);
     setAdvisories(advList === null ? [] : advList);
 
     // Reflect the publish schedule into the "Run on a schedule" controls.

@@ -226,6 +226,28 @@ await test('GET /v1/schedules → the new schedule is listed', async () => {
   assert(!!found, `schedule ${scheduleId} should be listed`);
 });
 
+await test('GET /:app/automation folds schedules + recipe + organisms + advisories', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/automation`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const d = body.data;
+  // schedules — this app's eco-capability schedule present (filtered by type + input.app)
+  assert(Array.isArray(d.schedules) && d.schedules.some((s: any) => s.id === scheduleId), `schedule ${scheduleId} in composite: ${JSON.stringify(d.schedules?.map((s: any) => s.id))}`);
+  assert(d.schedules.every((s: any) => s.type === 'eco-capability' && s.input?.app === APP), 'composite schedules are this app\'s eco-capability jobs');
+  // recipe (none set yet → null), organisms + advisories partitions present
+  assert(d.recipe === null || typeof d.recipe === 'object', 'recipe is null or an object');
+  assert(Array.isArray(d.organisms), 'organisms is an array');
+  assert(Array.isArray(d.advisories), 'advisories is an array');
+});
+
+await test('GET /:app/automation for an unconnected app → 404', async () => {
+  const { status } = await json('/v1/ecosystem-apps/never-connected-xyz/automation', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 404, `expected 404, got ${status}`);
+});
+
 // ─── Phase 4: failure modes ───
 console.log('\nPhase 4 — Failure modes');
 
