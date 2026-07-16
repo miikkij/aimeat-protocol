@@ -23,6 +23,9 @@
  *   v1.3.0 — 2026-07-05 — Persist the fresh opt-in + allow built-in {run}/{date} vars undeclared in
  *     key templates (re-run freshness / run-scoped keys).
  *   v1.4.0 — 2026-07-06 — Persist the skip_done opt-in (skip already-done steps on re-run).
+ *   v1.5.0 — 2026-07-16 — human-input steps: validation (no retry, on_timeout='default' needs a valid
+ *     default_option) + synthesized resolved entry (success_signal = nonempty(answer_to_key),
+ *     deliverableKey = answer_to_key) so fresh/skip_done/signals-only/blueprint compose unchanged.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -191,14 +194,35 @@ export async function validateWorkflow(
   const declaredVars = new Set([...input.vars.map(v => v.name), ...BUILTIN_VARS]);
   const resolved: ResolvedStep[] = [];
   for (const step of input.steps) {
-    // export-out / trigger-geai steps don't dispatch an agent offer — they push to / invoke a GEAI.
-    // They carry no offer to resolve; their success is the push-ack / capability-response (+ optional
-    // success_signal). Synthesize a resolved entry from the step's own signals.
+    // export-out / trigger-geai / human-input steps don't dispatch an agent offer. Ecosystem steps
+    // push to / invoke a GEAI; human-input steps park until the owner answers. They carry no offer to
+    // resolve; synthesize a resolved entry from the step's own signals.
     if (step.action && step.action.kind !== 'agent') {
+      const a = step.action;
+      let deliverableKey: string | undefined;
+      if (a.kind === 'human-input') {
+        // The answer key is the step's deliverable: fresh clears it, skip_done greens on an existing
+        // answer without re-asking, signals-only checks it — all via the synthesized success_signal.
+        deliverableKey = a.answer_to_key;
+        if (step.retry) errors.push(`step "${step.id}": a human-input step cannot declare retry — the timeout policy (on_timeout) owns the fallback`);
+        if (a.on_timeout === 'default') {
+          if (!a.default_option) errors.push(`step "${step.id}": on_timeout='default' requires default_option`);
+          else if (!a.question.options.some(o => o.id === a.default_option)) errors.push(`step "${step.id}": default_option "${a.default_option}" is not one of question.options`);
+        }
+        if (a.answer_to_key) {
+          for (const v of collectVarRefs([a.answer_to_key])) {
+            if (!declaredVars.has(v)) errors.push(`step "${step.id}": answer_to_key references undeclared var "{${v}}"`);
+          }
+        }
+      }
+      const humanDefaultSignal: Signal | undefined = a.kind === 'human-input' && a.answer_to_key
+        ? { kind: 'deterministic', key: a.answer_to_key, op: 'nonempty' }
+        : undefined;
       resolved.push({
         stepId: step.id, agents: [], offerId: '',
-        success_signal: step.success_signal,
+        success_signal: step.success_signal ?? humanDefaultSignal,
         required_to_function: step.required_to_function ?? 'none',
+        deliverableKey,
       });
       const keys = [...collectSignalKeys(step.success_signal), ...collectSignalKeys(step.required_to_function === 'none' ? undefined : step.required_to_function)];
       for (const v of collectVarRefs(keys)) {

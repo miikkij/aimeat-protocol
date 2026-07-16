@@ -9,6 +9,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-16 — initial: 8 bundled cortex packs (Library Acceleration Program, Phase 1).
  *   v1.1.0 — 2026-07-16 — aimeat-flow (Wave 1): configuration-first flow/mindmap editor pack.
+ *   v1.2.0 — 2026-07-16 — aimeat-dag (auto-layout DAG canvas with live state layer) +
+ *     aimeat-ui-motion (count-up stat tiles, skeletons, view transitions, stagger, micro-bling) —
+ *     extracted as generic packs while building MISSIONS; first consumer proves them.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -205,6 +208,75 @@ export const CORTEX_PACKS: LibraryPack[] = [
     tierHint: 'T2',
     interviewTriggers: ['flow', 'mindmap', 'process', 'workflow editor', 'node editor', 'prosessi', 'vuokaavio', 'miellekartta'],
     sizeEstimate: '~10KB (+46KB engine)',
+    status: 'preview',
+  },
+  {
+    id: 'aimeat-dag',
+    kind: 'cortex',
+    category: 'diagrams',
+    title: 'DAG / graph canvas',
+    description: 'Directed-acyclic-graph canvas with automatic layered layout, smooth pan/zoom (wheel + pinch + touch), click selection, optional node dragging, and a live state layer (running dash-flow edges, waiting-human pulse, green/red transitions). Zero deps, theme-aware, reduced-motion safe. For workflow blueprints, pipelines, org charts.',
+    url: '/v1/cortex/aimeat-dag/libs/aimeat-dag.js',
+    include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-dag/libs/aimeat-dag.js"></script>'],
+    requires: [],
+    version: '1.0.1',
+    license: 'MIT',
+    apiSurface: 'AIMEAT.dag',
+    aiDoc: [
+      'AIMEAT.dag.Canvas(el, { nodes:[{id,label,sub?,badges?:[{text,tone}],state?,html?}], edges:[{from,to}],',
+      '  renderNode?, direction?: "LR"|"TB", positions?, draggable?, onSelect?, onLayoutChange? }) — the app',
+      'supplies the graph, the canvas does layered auto-layout, pan/zoom (wheel+pinch+touch), selection.',
+      'dag.setData({nodes,edges}) re-renders; dag.setNodeState(id, state) animates live runs:',
+      '  running/dispatched → incoming edges dash-flow; waiting-human → amber pulse; green → success pop;',
+      '  input-red/output-red/timed-out/agent-offline → red; skipped → dimmed.',
+      'dag.fit()/dag.zoomTo(id) — animated camera. Persist dragged positions from onLayoutChange to an app',
+      'memory key and pass back as `positions` on mount. Host element must have a height.',
+      'Feed a workflow blueprint straight in: GET /v1/workflows/:id/blueprint → nodes/edges (map stepId→id);',
+      'mirror run states with setNodeState while AIMEAT.workflows.watchRun ticks.',
+      'READ/INSPECT-oriented (select → inspector panel). Freeform user-drawn diagrams → aimeat-flow instead.',
+    ].join('\n'),
+    changelog: [
+      { version: '1.0.0', date: '2026-07-16', summary: 'Initial release: layered auto-layout (longest-path + barycenter), pointer-events pan/zoom/pinch, selection, node drag with position persistence hook, live state layer, prefers-reduced-motion support.' },
+      { version: '1.0.1', date: '2026-07-16', summary: 'Fix: setPointerCapture is now best-effort (try/catch) — synthetic PointerEvents (tests/automation) and pointers released mid-dispatch threw NotFoundError and swallowed the whole pointerdown, breaking selection.' },
+    ],
+    tierHint: 'T2',
+    interviewTriggers: ['dag', 'graph', 'pipeline', 'workflow canvas', 'org chart', 'blueprint'],
+    sizeEstimate: '~14KB',
+    status: 'preview',
+  },
+  {
+    id: 'aimeat-ui-motion',
+    kind: 'cortex',
+    category: 'ui',
+    title: 'UI motion & stat tiles',
+    description: 'UX polish primitives every dashboard re-implements: count-up numbers, KPI stat-tile row with sparklines, skeleton shimmer loaders, staggered list entrances, view transitions, pulse/glow/confetti micro-bling. All transform/opacity (60fps), theme-aware, prefers-reduced-motion safe.',
+    url: '/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js',
+    include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js"></script>'],
+    requires: [],
+    version: '1.0.0',
+    license: 'MIT',
+    apiSurface: 'AIMEAT.ui.motion',
+    aiDoc: [
+      'AIMEAT.ui.motion — motion primitives for a smooth, alive-feeling app. All CSS transform/opacity',
+      '(compositor-friendly); a global prefers-reduced-motion kill-switch renders final states instantly.',
+      'countUp(el, value, {duration?, format?, decimals?}) — animated number roll (use tabular-nums).',
+      'statTiles(el, [{label, value, icon?, trend?: {value, dir:"up"|"down"|"flat"}, spark?: number[], format?}])',
+      '  → {update(tiles), destroy()} — responsive KPI tile row with count-up values + inline SVG sparklines.',
+      'skeleton(el, {lines?, avatar?, height?}) / unskeleton(el, html?) — shimmer placeholders while loading;',
+      '  ALWAYS prefer skeletons over spinners.',
+      'staggerIn(listEl, {selector?, delay?}) — staggered fade-slide entrance for rows/cards after render.',
+      'viewTransition(container, renderFn) — cross-fade/slide between views (View Transitions API when',
+      '  available, CSS fallback); await it around your route swap.',
+      'pulse(el), glow(el, color?), confettiTick(el) — micro-bling for live updates + success moments; use',
+      '  sparingly (one confetti per user action, not per row).',
+      'highlightRow(el) — brief background flash for an SSE-updated row instead of a full repaint.',
+    ].join('\n'),
+    changelog: [
+      { version: '1.0.0', date: '2026-07-16', summary: 'Initial release: countUp, statTiles (+sparkline, trend badge), skeleton/unskeleton, staggerIn, viewTransition (View Transitions API + fallback), pulse/glow/confettiTick/highlightRow.' },
+    ],
+    tierHint: 'T2',
+    interviewTriggers: ['animation', 'dashboard', 'kpi', 'stat', 'polish', 'skeleton', 'transition'],
+    sizeEstimate: '~11KB',
     status: 'preview',
   },
   {

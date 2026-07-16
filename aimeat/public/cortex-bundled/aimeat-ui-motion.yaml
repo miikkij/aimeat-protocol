@@ -1,0 +1,86 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-motion
+  namespace: aimeat
+  description: "UX polish primitives every dashboard re-implements: animated count-up numbers, KPI stat-tile rows with sparklines, skeleton shimmer loaders, staggered list entrances, view transitions, and tasteful micro-bling (pulse, glow, confetti tick, row highlight). All transform/opacity (60fps), theme-aware, prefers-reduced-motion safe."
+  author: AIMEAT
+  tags: [motion, animation, dashboard, kpi, skeleton, transitions, ui]
+  labels:
+    domain: ui
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: motion-assistant
+      content: |
+        You are a UI-motion assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        The aimeat-ui-motion extension gives an app a smooth, alive "operator console" feel
+        without hand-rolled animation code. Everything is transform/opacity only (60fps) and
+        the whole pack honors prefers-reduced-motion (final states render instantly).
+
+        Include ONE tag:
+        <script src="{{node_url}}/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js"></script>
+
+        API (var M = AIMEAT.ui.motion):
+
+        M.countUp(el, value, { duration?, format?, decimals? })
+          Animated number roll — use font-variant-numeric: tabular-nums on the element.
+
+        M.statTiles(el, [{ label, value, icon?, trend?: { value, dir: 'up'|'down'|'flat' },
+                           spark?: number[], format?, decimals? }]) -> { update(tiles), destroy() }
+          Responsive KPI tile row: count-up values, trend badges, inline SVG sparklines.
+
+        M.skeleton(el, { lines?, avatar?, height? }) / M.unskeleton(el, html?)
+          Shimmer loading placeholders. ALWAYS prefer skeletons over spinners: call skeleton()
+          before the fetch, unskeleton(el, html) with the rendered markup after.
+
+        M.staggerIn(listEl, { selector?, delay?, max? })
+          Staggered fade-slide entrance for table rows / cards — call right after rendering.
+
+        await M.viewTransition(container, () => renderNextView())
+          Cross-fade/slide between views (native View Transitions API when available). Wrap
+          your router's view swap in this.
+
+        M.pulse(el) -> stop()        gentle looping attention pulse ("needs you")
+        M.glow(el, color?)           one-off glow ring (e.g. newly created item)
+        M.highlightRow(el)           brief background flash for an SSE-updated row
+        M.confettiTick(el)           small success burst — ONE per user action, never per row
+
+        Recipes:
+        - Dashboard mount: skeleton() each panel → fetch → unskeleton + staggerIn; statTiles
+          for the KPI row.
+        - Live updates (aimeat-live): on a domain tick, re-fetch, patch the changed row and
+          highlightRow(row) instead of re-rendering the whole table.
+        - Keep bling tasteful: motion supports comprehension (what changed, what needs me);
+          it never decorates every element.
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-motion
+      filename: aimeat-ui-motion.js
+      exports:
+        - countUp
+        - statTiles
+        - skeleton
+        - unskeleton
+        - staggerIn
+        - viewTransition
+        - pulse
+        - glow
+        - highlightRow
+        - confettiTick
+      api_surface: |
+        AIMEAT.ui.motion.countUp(el, value, { duration?, format?, decimals? })
+        AIMEAT.ui.motion.statTiles(el, tiles[]) -> { update(tiles), destroy() }
+        AIMEAT.ui.motion.skeleton(el, { lines?, avatar?, height? }) / unskeleton(el, html?)
+        AIMEAT.ui.motion.staggerIn(listEl, { selector?, delay?, max? })
+        AIMEAT.ui.motion.viewTransition(container, renderFn) -> Promise
+        AIMEAT.ui.motion.pulse(el) -> stop(); glow(el, color?); highlightRow(el); confettiTick(el)
+
+        All transform/opacity, theme via --card/--text/--border/--accent/--bg-dim,
+        prefers-reduced-motion renders final states with no motion. Zero dependencies.

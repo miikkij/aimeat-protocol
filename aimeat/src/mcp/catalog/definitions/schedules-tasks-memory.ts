@@ -95,6 +95,26 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workflow_pending_inputs',
+        description: 'List every workflow step currently WAITING FOR HUMAN INPUT across the owner\'s active runs: the pinned question (prompt + options), when it was asked, and the deadline after which the step\'s timeout policy fires. Use to surface "things waiting on the owner" — then relay the owner\'s decision with aimeat_workflow_answer.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_workflow_answer',
+        description: 'Answer a workflow step that is waiting for human input (state "waiting-human") ON THE OWNER\'S BEHALF — only relay a decision the owner actually made (e.g. from a conversation or an inbox reply); never invent one. Picks are validated against the question pinned at ask time. The answer is written to the step\'s answer_to_key so downstream steps branch on it; the run then advances.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            workflow_id: { type: 'string', required: true, description: 'The workflow id.' },
+            run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
+            step_id: { type: 'string', required: true, description: 'The waiting step id.' },
+            picks: { type: 'array', required: true, description: 'Option ids from the pinned question (may be empty when answering with `other` alone).' },
+            other: { type: 'string', description: 'Free-text answer; only when the question allows it.' },
+        },
+    },
+    {
         name: 'aimeat_task_list',
         description: 'List the tasks assigned TO this agent (paginated; optional status filter such as queued, active, done, failed). Each entry includes title, status, and todo counts. Poll for queued work, then aimeat_task_get for full detail. To assign a task to another same-owner agent, use aimeat_task_create instead.',
         caller: 'agent',

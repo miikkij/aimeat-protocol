@@ -1,10 +1,12 @@
 /**
  * @file src/services/workflow/engine-steps.ts
  * @description Workflow-engine side-effect helpers — step/inspector dispatch (agent + ecosystem),
- *   step-failure + finish notifications, agent-offline heads-up, and fresh-mode output clearing.
- *   Extracted from engine.ts to satisfy max-file-lines.
+ *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
+ *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from engine.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — askHumanInput: deliver a human-input step's question to the owner (in-app
+ *     inbox + push, best-effort) and return the templated question snapshot to pin into the run.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -42,6 +44,8 @@ const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red'
 
 /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
 export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved: ResolvedStep | undefined, onPushTerminal: OnPushTerminal): Promise<string[]> {
+  // human-input steps are parked by tick() BEFORE dispatch (askHumanInput) — they never reach here.
+  if (step.action?.kind === 'human-input') return [];
   // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
   // async onPushTerminal path, never an agent task. They record no task ids.
   if (step.action && step.action.kind !== 'agent') {
@@ -87,7 +91,7 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
  * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
  * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
  */
-export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Exclude<WorkflowStep['action'], undefined | { kind: 'agent' }>, onPushTerminal: OnPushTerminal): void {
+export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Exclude<WorkflowStep['action'], undefined | { kind: 'agent' } | { kind: 'human-input' }>, onPushTerminal: OnPushTerminal): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
   const fire = async (): Promise<boolean> => {
@@ -110,6 +114,34 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
   fire()
     .then(ok => onPushTerminal(ownerGhii, workflowId, runId, stepId, ok))
     .catch(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, false));
+}
+
+/**
+ * Deliver a human-input step's question to the owner and return the human bookkeeping record the
+ * engine pins into the run. The question `prompt` is {var}-templated HERE so what the run stores is
+ * exactly what was asked (same pinning philosophy as the resolved signals). Delivery = in-app inbox
+ * notification (notify: inbox + web-push in one call) plus a direct push when enabled; both are
+ * best-effort — a delivery problem parks the run all the same, and the pending-inputs endpoint /
+ * dashboards still surface the question.
+ */
+export async function askHumanInput(
+  deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep,
+  action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'human-input' }>,
+): Promise<NonNullable<WorkflowRunStep['human']>> {
+  const now = new Date().toISOString();
+  const question = { ...action.question, prompt: template(action.question.prompt, run.vars) };
+  const name = loc(run.defSnapshot.title) || run.workflowId;
+  const title = 'Workflow needs your input';
+  const optionsSummary = question.options.map(o => o.label).join(' / ');
+  const body = `${name}: step "${step.id}" — ${question.prompt} [${optionsSummary}]`;
+  logger.info(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" waiting for human input`);
+  try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows' }); }
+  catch { /* in-app notify best-effort */ }
+  if (deps.pushService?.enabled) {
+    deps.pushService.sendNotification(ownerGhii.split('@')[0], { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
+      .catch(() => { /* push best-effort */ });
+  }
+  return { question, askedAt: now };
 }
 
 /**

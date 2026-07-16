@@ -1529,6 +1529,53 @@ components:
           maxLength: 1000
           description: Optional detailed description
 
+    FeedbackThread:
+      type: object
+      description: |
+        A Node Feedback Channel thread — platform feedback from an authenticated principal to
+        the node operator, with a two-party sender↔operator reply chain and triage status.
+      properties:
+        id:
+          type: string
+          example: fb-a1b2c3d4e5f6a7b8
+        sender:
+          type: string
+          description: Resolved principal id (GHII, GAII, or GEAI)
+        category:
+          type: string
+          enum: [bug, blocker, idea, ux, question, other]
+        title:
+          type: string
+        body:
+          type: string
+        context:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          enum: [new, ack, in_progress, resolved, wont_fix]
+          default: new
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+                enum: [sender, operator]
+              body:
+                type: string
+              at:
+                type: string
+                format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
     FlagRecord:
       type: object
       properties:
@@ -3451,16 +3498,19 @@ components:
         example: { type: string }
     WorkflowStep:
       type: object
-      required: [id, agent, offer, description]
+      required: [id, description]
       properties:
         id: { type: string }
         agent:
-          description: One agent name, or a list (a list runs in parallel within the step).
+          description: >-
+            One agent name, or a list (a list runs in parallel within the step). Required (with
+            `offer`) for the default agent step; absent for export-out / trigger-geai / human-input
+            action steps.
           oneOf:
             - type: string
             - type: array
               items: { type: string }
-        offer: { type: string, description: 'Inherit success_signal + required_to_function from this offer.' }
+        offer: { type: string, description: 'Inherit success_signal + required_to_function from this offer (agent steps).' }
         after: { type: array, items: { type: string }, description: 'Dependency order (DAG).' }
         description: { $ref: '#/components/schemas/LocalizedString' }
         required_to_function:
@@ -3472,10 +3522,54 @@ components:
         success_signal: { $ref: '#/components/schemas/WorkflowSignal' }
         retry:
           type: object
+          description: Not allowed on human-input steps (the timeout policy owns the fallback there).
           properties:
             max: { type: integer }
             backoff_min: { type: number }
-        timeout_min: { type: integer, description: 'Max minutes to wait for this step''s success signal before timed-out. Default 60.' }
+        timeout_min: { type: integer, description: 'Max minutes to wait for this step''s success signal before timed-out. Default 60 (agent/ecosystem steps) / 1440 (human-input steps).' }
+        action:
+          type: object
+          description: >-
+            Absent ⇒ the default agent-dispatch. `export-out` pushes a memory key to a GEAI;
+            `trigger-geai` invokes a GEAI capability (both complete on the tunnel reply).
+            `human-input` parks the run (step state `waiting-human`) and asks the owner a structured
+            question (in-app inbox + push); the run resumes when the owner answers via
+            POST /v1/workflows/{id}/runs/{runId}/steps/{stepId}/answer, or the `on_timeout` policy
+            fires after timeout_min (default 1440 = 24h): fail (timed-out, default) | skip | default
+            (synthesize the answer `default_option`, by "timeout-default"). The answer JSON
+            ({picks, pick, other, answeredAt, by}) is written to `answer_to_key` (templated,
+            sandbox-prefix-honoring) so downstream steps branch on it with deterministic json_field
+            gates — e.g. required_to_function {op: json_field, key: <answer_to_key>, path: pick,
+            equals: approve}.
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input] }
+            geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
+            capability: { type: string, description: 'trigger-geai (required) / export-out (default __deposit__).' }
+            from: { type: string, description: 'export-out: owner memory key whose value is pushed.' }
+            input: { type: object, additionalProperties: true, description: 'trigger-geai: capability input.' }
+            question:
+              type: object
+              description: 'human-input: the structured question (AskUserQuestion-shaped).'
+              required: [prompt, options]
+              properties:
+                header: { type: string, maxLength: 80 }
+                prompt: { type: string, maxLength: 2000, description: '{var}-templated at ask time.' }
+                options:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [id, label]
+                    properties:
+                      id: { type: string }
+                      label: { type: string }
+                multiSelect: { type: boolean }
+                allowOther: { type: boolean }
+            answer_to_key: { type: string, description: 'human-input: memory key template the answer JSON is written to.' }
+            on_timeout: { type: string, enum: [fail, skip, default], description: 'human-input timeout policy (default fail).' }
+            default_option: { type: string, description: 'human-input: required when on_timeout=default; must be one of question.options[].id.' }
     WorkflowTrigger:
       type: object
       required: [kind]
@@ -3594,11 +3688,35 @@ components:
           additionalProperties:
             type: object
             properties:
-              state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped, agent-offline] }
+              state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped, agent-offline, waiting-human] }
               attempt: { type: integer }
               taskIds: { type: array, items: { type: string } }
               reads: { type: array, items: { type: string } }
               writes: { type: array, items: { type: string } }
+              human:
+                type: object
+                description: >-
+                  Human-input bookkeeping: the {var}-templated question pinned at ask time, and the
+                  answer once given. `answer.pick` is the flat first pick (json_field-friendly);
+                  `answer.by` is the answering principal, or "timeout-default".
+                properties:
+                  question:
+                    type: object
+                    properties:
+                      header: { type: string }
+                      prompt: { type: string }
+                      options: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string } } } }
+                      multiSelect: { type: boolean }
+                      allowOther: { type: boolean }
+                  askedAt: { type: string, format: date-time }
+                  answeredAt: { type: string, format: date-time }
+                  answer:
+                    type: object
+                    properties:
+                      picks: { type: array, items: { type: string } }
+                      pick: { type: string }
+                      other: { type: string }
+                      by: { type: string }
               progress:
                 type: object
                 description: >-
@@ -16488,6 +16606,254 @@ paths:
   # Phase 1.5: Data Quality Flags
   # ============================================================
 
+  /v1/feedback:
+    post:
+      operationId: createFeedback
+      summary: Open a platform-feedback thread to the node operator
+      description: |
+        Node Feedback Channel: any authenticated principal (GHII/GAII/GEAI) reports platform
+        bugs, blockers, ideas, UX issues, or questions about the PLATFORM itself to the node
+        operator (for content moderation use /v1/flags instead). The operator triages every
+        thread and can reply back — read replies via GET /v1/feedback/mine. A `blocker`
+        thread additionally notifies the operator (bell + web push). Rate-limited per
+        principal (20 threads / 24 h).
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, title, body]
+              properties:
+                category:
+                  type: string
+                  enum: [bug, blocker, idea, ux, question, other]
+                title:
+                  type: string
+                  maxLength: 200
+                body:
+                  type: string
+                  maxLength: 8000
+                context:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: 'Optional pointers: { app, endpoint, version, url }'
+      responses:
+        '201':
+          description: Feedback thread created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FeedbackThread'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/feedback/mine:
+    get:
+      operationId: listMyFeedback
+      summary: List the caller's own feedback threads + operator replies
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The caller's threads, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          threads:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/FeedbackThread'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/feedback/{id}:
+    get:
+      operationId: getFeedback
+      summary: Read one feedback thread (own; operator reads any)
+      description: A thread belonging to another principal returns 404 (no existence disclosure).
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The thread
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FeedbackThread'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/feedback/{id}/reply:
+    post:
+      operationId: replyFeedback
+      summary: Append a reply to a feedback thread
+      description: |
+        The sender may reply into their own thread; the operator into any. An operator reply
+        on a `new` thread bumps its status to `ack`. Threads cap at 50 messages.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  maxLength: 8000
+      responses:
+        '200':
+          description: Updated thread
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FeedbackThread'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/admin/feedback:
+    get:
+      operationId: adminListFeedback
+      summary: Operator feedback inbox
+      tags: [Feedback, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [new, ack, in_progress, resolved, wont_fix]
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [bug, blocker, idea, ux, question, other]
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Threads, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          threads:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/FeedbackThread'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/feedback/{id}:
+    patch:
+      operationId: adminUpdateFeedback
+      summary: Operator status triage on a feedback thread
+      tags: [Feedback, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [new, ack, in_progress, resolved, wont_fix]
+      responses:
+        '200':
+          description: Updated thread
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FeedbackThread'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/flags:
     post:
       operationId: createFlag
@@ -26165,6 +26531,54 @@ paths:
                           count: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/workflows/pending-inputs:
+    get:
+      operationId: listWorkflowPendingInputs
+      summary: Every waiting-human step across the owner's active runs
+      description: >
+        The "things waiting on you" roster: for each active run parked on a human-input step, the
+        pinned question, when it was asked, and the deadline after which the step's on_timeout
+        policy fires. Answer via POST /v1/workflows/{id}/runs/{runId}/steps/{stepId}/answer.
+        Requires `workflow:read` (owners bypass).
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Pending human inputs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          inputs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                workflowId: { type: string }
+                                runId: { type: string }
+                                stepId: { type: string }
+                                workflowTitle: { $ref: '#/components/schemas/LocalizedString' }
+                                mode: { type: string, enum: [full-live, full-sandbox, signals-only] }
+                                question:
+                                  type: object
+                                  properties:
+                                    header: { type: string }
+                                    prompt: { type: string }
+                                    options: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string } } } }
+                                    multiSelect: { type: boolean }
+                                    allowOther: { type: boolean }
+                                askedAt: { type: string, format: date-time }
+                                deadline: { type: string, format: date-time }
+                          count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /v1/workflows/{id}:
     parameters:
       - name: id
@@ -26465,6 +26879,70 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '409':
           description: Run not found or already finished
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/workflows/{id}/runs/{runId}/steps/{stepId}/answer:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: stepId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: answerWorkflowHumanInput
+      summary: Answer a waiting-human workflow step
+      description: >
+        Resolves a human-input step: picks are validated against the question PINNED at ask time
+        (option ids must exist; single pick unless multiSelect; `other` only when allowOther). The
+        answer JSON ({picks, pick, other, answeredAt, by}) is written to the step's answer_to_key
+        (under the run's sandbox prefix when applicable), the step goes green, and the run advances.
+        Approve/decline branching is downstream: gate the dependent step's required_to_function on
+        the answer key (json_field path=pick). Requires `workflow:write` (owners bypass).
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [picks]
+              properties:
+                picks: { type: array, items: { type: string }, description: 'Option ids from the pinned question (may be empty when answering with `other` alone).' }
+                other: { type: string, maxLength: 2000, description: 'Free-text answer; only when the question allows it.' }
+      responses:
+        '200':
+          description: Answer recorded; the run advanced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          answered: { type: string, description: 'The step id.' }
+                          runId: { type: string }
+        '400':
+          description: Invalid answer (bad body, unknown option id, multi-pick on a single-select, disallowed other)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: WORKFLOW_STEP_NOT_WAITING — the step is not parked on human input
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }

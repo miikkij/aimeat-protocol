@@ -10,11 +10,13 @@
  *   an agent holding `workflow:write`. See docs/plans/2026-06-13-agent-workflows-node-plan.md §8.
  * @structure
  *   - GET    /v1/workflows                      list the owner's workflow defs
+ *   - GET    /v1/workflows/pending-inputs       every waiting-human step across the owner's active runs
  *   - GET    /v1/workflows/:id                  one def
  *   - PUT    /v1/workflows/:id                  create/update (save-time validation)
  *   - DELETE /v1/workflows/:id                  remove def (?withRuns=true also drops its runs)
  *   - POST   /v1/workflows/:id/run              start a run (manual/test: signals-only | full, sandbox|live)
  *   - POST   /v1/workflows/:id/runs/:runId/cancel  abort an in-flight run
+ *   - POST   /v1/workflows/:id/runs/:runId/steps/:stepId/answer  answer a waiting-human step
  *   - GET    /v1/workflows/:id/health           run-health trend over the last N runs
  *   - GET    /v1/workflows/:id/blueprint        derived structural graph (nodes + edges + keys)
  *   - GET    /v1/workflows/:id/runs             list runs
@@ -23,6 +25,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Human-in-the-loop: GET /pending-inputs (registered BEFORE /:id — Express
+ *     param order) + POST .../steps/:stepId/answer → engine.onHumanAnswer (409 when not parked).
  *   v1.0.1 — 2026-06-28 — Doc: the engine + runs have shipped (POST /:id/run + cancel + health); corrected
  *     the stale "engine = Phase 4 / runs empty until the engine ships" wording + listed the run endpoints.
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + blueprint; runs read-only (engine = Phase 4).
@@ -41,8 +45,9 @@ import {
   getWorkflow, listWorkflows, saveWorkflow, deleteWorkflow,
   listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
-import { syncWorkflowTriggers, removeWorkflowTriggers } from '../services/workflow/lifecycle.js';
-import type { WorkflowDef, WorkflowRun } from '../models/workflow-schemas.js';
+import { syncWorkflowTriggers, removeWorkflowTriggers, readActiveRuns } from '../services/workflow/lifecycle.js';
+import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
+import { WorkflowHumanAnswerSchema, type WorkflowDef, type WorkflowRun } from '../models/workflow-schemas.js';
 
 /** Derive a run-health trend from the recent runs (the "did it produce" trend, not just last run). */
 function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
@@ -99,6 +104,31 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       return;
     }
     res.json(success(config.nodeId, { workflows: defs, count: defs.length }));
+  });
+
+  // GET /v1/workflows/pending-inputs — every waiting-human step across this owner's active runs, so a
+  // dashboard can badge "things waiting on you" without walking all runs. Registered BEFORE /:id so
+  // Express doesn't swallow it as a workflow id.
+  router.get('/v1/workflows/pending-inputs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
+    const owner = ownerGhiiOf(req);
+    const active = (await readActiveRuns(storage, config.nodeId)).filter(a => a.ownerGhii === owner);
+    const inputs: Array<Record<string, unknown>> = [];
+    for (const a of active) {
+      const run = await getRun(storage, owner, a.workflowId, a.runId);
+      if (!run) continue;
+      for (const step of run.defSnapshot.steps) {
+        const rs = run.steps[step.id];
+        if (rs?.state !== 'waiting-human' || !rs.human) continue;
+        const deadline = new Date(new Date(rs.human.askedAt).getTime()
+          + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000).toISOString();
+        inputs.push({
+          workflowId: a.workflowId, runId: a.runId, stepId: step.id,
+          workflowTitle: run.defSnapshot.title, mode: run.mode,
+          question: rs.human.question, askedAt: rs.human.askedAt, deadline,
+        });
+      }
+    }
+    res.json(success(config.nodeId, { inputs, count: inputs.length }));
   });
 
   // GET /v1/workflows/:id — one def.
@@ -164,6 +194,33 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     if (!ok) { res.status(409).json(error(config.nodeId, 'RUN_NOT_CANCELLABLE', 'Run not found or already finished')); return; }
     emitChange('workflows');
     res.json(success(config.nodeId, { cancelled: runId }));
+  });
+
+  // POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a waiting-human step.
+  // body: { picks: string[], other?: string }. Validated against the question PINNED at ask time;
+  // 409 when the step isn't parked (unknown / already answered / timed out).
+  router.post('/v1/workflows/:id/runs/:runId/steps/:stepId/answer', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const runId = req.params.runId as string;
+    const stepId = req.params.stepId as string;
+    const parsed = WorkflowHumanAnswerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_ANSWER', 'Invalid answer body', undefined,
+        { errors: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) }));
+      return;
+    }
+    const by = resolveIdentity(req.auth!, config.nodeId);
+    const result = await engine.onHumanAnswer(ownerGhiiOf(req), id, runId, stepId, { ...parsed.data, by });
+    if (!result.ok) {
+      const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'BAD_ANSWER' ? 400 : 409;
+      const code = result.code === 'NOT_WAITING' ? 'WORKFLOW_STEP_NOT_WAITING' : result.code;
+      res.status(status).json(error(config.nodeId, code, result.error));
+      return;
+    }
+    emitChange('workflows');
+    res.json(success(config.nodeId, { answered: stepId, runId }, [
+      { description: 'View the run', method: 'GET', url: `/v1/workflows/${id}/runs/${runId}` },
+    ]));
   });
 
   // GET /v1/workflows/:id/health — run-health trend derived from the last N runs.

@@ -164,6 +164,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workflow_save: { title: 'Save Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workflow_get: { title: 'Get Workflow', readOnlyHint: true },
     aimeat_workflow_run: { title: 'Run Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_workflow_pending_inputs: { title: 'List Pending Workflow Inputs', readOnlyHint: true },
+    aimeat_workflow_answer: { title: 'Answer Workflow Input', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Work queue ──
     aimeat_work_inbox: { title: 'List Work Inbox', readOnlyHint: true },
