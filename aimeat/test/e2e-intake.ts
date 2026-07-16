@@ -51,7 +51,9 @@ const LEADS_MANIFEST = {
 };
 const LEADS_SCHEMAS = {
     'crm.leads': {
-        type: 'object', additionalProperties: false, required: ['id', 'nimi', 'omistaja'],
+        // 'luotu' is REQUIRED — mirrors the real CADENCE contact schema, so the happy path only passes
+        // because the form stamps it via the {{now}} default token (the exact prod scenario).
+        type: 'object', additionalProperties: false, required: ['id', 'nimi', 'omistaja', 'luotu'],
         properties: {
             id: { type: 'string' }, nimi: { type: 'string' }, email: { type: 'string' },
             omistaja: { type: 'string' }, tila: { type: 'string', enum: ['uusi', 'asiakas'] },
@@ -84,7 +86,7 @@ async function main() {
             body: JSON.stringify({
                 organism_id: orgId, ws, namespace: 'crm.leads', form_id: 'contact-us',
                 allowed_fields: ['nimi', 'email', 'tila'], required_fields: ['nimi'],
-                defaults: { omistaja: ownerGhii, tila: 'uusi', lahde: 'public-form' },
+                defaults: { omistaja: ownerGhii, tila: 'uusi', lahde: 'public-form', luotu: '{{now}}' },
                 honeypot_field: 'company_url', mode: 'publish', title: 'Contact us',
             }),
         });
