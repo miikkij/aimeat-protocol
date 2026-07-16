@@ -4,6 +4,46 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-07-16
+
+**A new Prisma-free Postgres storage backend — `postgres-kysely` — reaches full parity with SQLite and
+MongoDB and becomes the fastest way to run a node.** Selected with `AIMEAT_STORAGE=postgres-kysely` +
+`DATABASE_URL`, it drives PostgreSQL directly through the [`pg`](https://node-postgres.com) driver and the
+[Kysely](https://kysely.dev) query builder — no Prisma at runtime. The schema ships as hand-committed SQL
+migrations (`src/storage/providers/postgres-kysely/migrations/*.sql`, generated once from the canonical
+`schema.postgres.prisma`) that the provider applies automatically on first connect and tracks in a
+`_kysely_migrations` ledger, so a fresh node self-provisions its 103 tables with no `prisma db push` step.
+The full `Storage` surface (~558 methods across ~53 repositories) is implemented, translated 1:1 from the
+existing backends with matching semantics: trackable version history, ranked full-text search
+(a `GENERATED` tsvector + GIN index, with SQLite-FTS-parity prefix matching), byte-accurate quota
+aggregates, owner-scoped bulk reads, and atomic morsel-balance mutations.
+
+**It is verified at parity, not asserted.** The complete end-to-end suite — the same 164 test suites the
+runner executes for every backend — passes identically on all three: **3278 passed / 6 failed / 3284 on
+SQLite, MongoDB, and Postgres+Kysely alike** (the 6 are pre-existing, environment-dependent, and fail the
+same way on every backend). The backend is chosen wholesale by config; the test set never varies by store.
+
+**And it is dramatically faster than the Prisma+Mongo backend it can replace.** On the structural memory
+benchmark (`pnpm perf:bench:backends`) at production scale — 100 agents, 12 000 memories — Postgres+Kysely
+beats MongoDB (Prisma) on every operation, from **2.3×** (count) to **247×** (point read), with bulk
+delete **131×**, subtree delete **37×**, text search **19×**, and bulk import **10.5×** faster; it is also
+competitive with — and at scale often faster than — in-memory SQLite. This confirms the benchmark that
+motivated the work.
+
+**A one-shot data migrator makes the cutover a config switch.** `pnpm migrate:to-postgres-kysely` copies
+every table from a source backend into a Postgres target, table by table (the schema is FK-free — relations
+are by logical keys), with column handling driven by the target's live `information_schema`: jsonb/json
+columns JSON-encoded and cast, array columns element-cast, timestamps coerced, generated and identity
+columns skipped, and `INSERT … ON CONFLICT DO NOTHING` for idempotent re-runs. Primary keys and timestamps
+are preserved verbatim; per-table row counts are verified and a mismatch exits non-zero. The source is
+pluggable — `--from mongodb` for the production cutover (read-only against Mongo, which stays intact as the
+rollback path) or `--from postgres-kysely` for a self-verifying Postgres→Postgres round-trip.
+
+Two correctness fixes surfaced by the parity sweep also harden the shared services on **all** backends: the
+organism structure-snapshot dedup now compares canonically (Postgres `jsonb` does not preserve object key
+order, so a naïve stringify churned a spurious version every read), and `updateOrganismStructure`
+serialises per organism so overlapping fire-and-forget snapshot writes no longer double-archive.
+
 ## [1.40.0] - 2026-07-14
 
 **AIMEAT can now sell — agent services, company offerings, and app tools — over the agentic-commerce
