@@ -11,6 +11,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Extract ADMIN_LOGIN_HTML / ADMIN_SETUP_HTML to ./admin/setup-html.ts (max-file-lines)
+ *   v1.2.0 — 2026-07-16 — GET /v1/admin/owners rosters via getAgentsByOwners (one IN, was per-owner)
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -569,17 +570,14 @@ export function adminRouter(
     // GET /v1/admin/owners — full owners list with roles
     router.get('/v1/admin/owners', requireAuth(), requireRole('operator'), async (_req, res) => {
         const owners = await storage.listOwners();
-        const result = [];
-        for (const o of owners) {
-            const agents = await storage.getAgentsByOwner(o.name);
-            result.push({
-                name: o.name,
-                display_name: o.displayName,
-                roles: o.roles,
-                agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
-                created_at: o.createdAt,
-            });
-        }
+        const agentsByOwner = await storage.getAgentsByOwners(owners.map(o => o.name));
+        const result = owners.map(o => ({
+            name: o.name,
+            display_name: o.displayName,
+            roles: o.roles,
+            agents: (agentsByOwner[o.name] ?? []).map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+            created_at: o.createdAt,
+        }));
         res.json(success(config.nodeId, { owners: result }));
     });
 

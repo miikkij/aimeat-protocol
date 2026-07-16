@@ -9,6 +9,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.2.0 — 2026-07-16 — members roster rosters agents via getAgentsByOwners (one IN, was per-member)
  *   v1.x -- 2026-07-02 -- readme param description mentions aimeat-memory live-data blocks (with mermaid).
  *   v1.0.0 — 2026-03-21 — Initial creation: 5 tools + 1 resource for organism management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -389,11 +390,10 @@ export function registerOrganismsTools(
             const canSeeAgents = callerMembership?.status === 'active';
             const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
             if (canSeeAgents) {
-                for (const m of members) {
-                    const ownerName = (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0];
-                    if (!agentsByOwner.has(ownerName)) {
-                        agentsByOwner.set(ownerName, (await storage.getAgentsByOwner(ownerName)).map(a => ({ gaii: a.gaii, name: a.name })));
-                    }
+                const ownerNames = [...new Set(members.map(m => (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]))];
+                const batched = await storage.getAgentsByOwners(ownerNames);
+                for (const name of ownerNames) {
+                    agentsByOwner.set(name, (batched[name] ?? []).map(a => ({ gaii: a.gaii, name: a.name })));
                 }
             }
 
