@@ -11,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive (collapses directory/matching N+1)
  */
 import type { ConsentRecord, ConsentAuditEntry } from '../interface.js';
 
@@ -21,6 +22,15 @@ export interface ConsentRepository {
     status?: 'active' | 'revoked' | 'expired';
     recipient?: string;
   }): Promise<ConsentRecord[]>;
+  /**
+   * Batch variant of listConsents: load consents for MANY owner GAIIs in one query.
+   * Returns a map keyed by ownerGaii (every input gaii present, empty array if none).
+   * Collapses the O(owners×agents) fan-out in directory/matching rebuilds into one IN query.
+   */
+  listConsentsForAgents(ownerGaiis: string[], opts?: {
+    status?: 'active' | 'revoked' | 'expired';
+    recipient?: string;
+  }): Promise<Record<string, ConsentRecord[]>>;
   updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null>;
   deleteConsent(id: string): Promise<boolean>;
   findMatchingConsents(ownerGaii: string, memoryKey: string, accessorGaii: string): Promise<ConsentRecord[]>;

@@ -6,6 +6,7 @@
  *   identical across backends. Translated 1:1 from the Prisma implementation.
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: consent on Postgres+Kysely.
+ *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  */
 import type { Selectable } from 'kysely';
 import type { ConsentAuditEntry, ConsentRecord } from '../../../interface.js';
@@ -46,6 +47,19 @@ export const consentMethods = {
     if (opts?.status) q = q.where('status', '=', opts.status);
     if (opts?.recipient) q = q.where('recipient', '=', opts.recipient);
     return (await q.execute()).map(toConsent);
+  },
+  async listConsentsForAgents(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }): Promise<Record<string, ConsentRecord[]>> {
+    const out: Record<string, ConsentRecord[]> = {};
+    for (const g of ownerGaiis) out[g] = [];
+    if (ownerGaiis.length === 0) return out;
+    let q = this.db.selectFrom('Consent').selectAll().where('ownerGaii', 'in', ownerGaiis);
+    if (opts?.status) q = q.where('status', '=', opts.status);
+    if (opts?.recipient) q = q.where('recipient', '=', opts.recipient);
+    for (const row of await q.execute()) {
+      const c = toConsent(row);
+      (out[c.ownerGaii] ??= []).push(c);
+    }
+    return out;
   },
   async updateConsent(this: PostgresKyselyStorage, id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {
     const data: Record<string, unknown> = {};
