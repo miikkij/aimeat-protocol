@@ -2,6 +2,9 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.7.0 — 2026-07-17 — Agent-Bundled Apps Slice 2: the Deploy action opens a panel with a
+ *     crew-def inspector (crew/tools/tasks) + runner and organism pickers instead of one-click
+ *     defaulting to crew-forge.
  *   v1.6.0 — 2026-07-16 — Agent-Bundled Apps: My-Apps cards show a "ships an agent" badge for apps
  *     declaring manifest.cortex.agents, with per-agent Deploy/Undeploy onto the owner's own fleet
  *     and liveness read from the deploy status endpoint (AppAgents component).
@@ -26,6 +29,8 @@ import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp, deployAppAgent, undeployAppAgent, appAgentStatus } from '/js/services/apps.js';
+import { listAgents } from '/js/services/agents.js';
+import { listOrganisms } from '/js/services/organisms.js';
 import * as skillsService from '/js/services/skills.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
@@ -116,14 +121,20 @@ function AppSkills({ owner, filename, showToast }) {
 }
 
 /**
- * Agent-Bundled Apps: the crew-defs this app ships (manifest.cortex.agents), each with
- * Deploy/Undeploy onto the OWNER'S OWN fleet and liveness from the status endpoint
- * (agent registration + the agents.<name>.deploy key the fleet writes). Deploy targets
- * the signed-in owner by construction — the node hard-rejects any other target.
+ * Agent-Bundled Apps: the crew-defs this app ships (manifest.cortex.agents), each with a
+ * deploy panel (crew-def inspector + runner/organism pickers) targeting the OWNER'S OWN
+ * fleet, Undeploy, and liveness from the status endpoint (agent registration + the
+ * agents.<name>.deploy key the fleet writes). Deploy targets the signed-in owner by
+ * construction — the node hard-rejects any other target.
  */
-function AppAgents({ owner, filename, agents, showToast }) {
+function AppAgents({ owner, filename, agents, showToast, session }) {
   const [statuses, setStatuses] = useState({});
   const [busy, setBusy] = useState('');
+  const [openDef, setOpenDef] = useState(null);   // agent_name whose deploy panel is open
+  const [myAgents, setMyAgents] = useState(null); // runner picker options (lazy)
+  const [myOrgs, setMyOrgs] = useState(null);     // organism picker options (lazy)
+  const [runner, setRunner] = useState('');
+  const [organism, setOrganism] = useState('');
 
   const loadStatuses = useCallback(async () => {
     const next = {};
@@ -143,17 +154,39 @@ function AppAgents({ owner, filename, agents, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadStatuses]);
 
+  async function openPanel(def) {
+    if (openDef === def.agent_name) { setOpenDef(null); return; }
+    setOpenDef(def.agent_name);
+    if (myAgents === null) {
+      try {
+        const list = await listAgents(session.owner);
+        const rank = m => (m === 'task-runner' ? 0 : m === 'autonomous' ? 1 : 2);
+        list.sort((a, b) => rank(a.mode) - rank(b.mode));
+        setMyAgents(list);
+        setRunner(list.some(a => a.name === 'crew-forge') ? 'crew-forge' : (list[0]?.name ?? ''));
+      } catch { setMyAgents([]); }
+      try {
+        const resp = await listOrganisms({ member: session.owner });
+        setMyOrgs(resp?.data?.organisms ?? []);
+      } catch { setMyOrgs([]); }
+    }
+  }
+
   async function act(def, deploy) {
     setBusy(def.agent_name);
     try {
+      const opts = {};
+      if (deploy && runner) opts.runner_agent = runner;
+      if (deploy && organism) opts.organism_id = organism;
       const resp = deploy
-        ? await deployAppAgent(owner, filename, def.agent_name)
-        : await undeployAppAgent(owner, filename, def.agent_name);
+        ? await deployAppAgent(owner, filename, def.agent_name, opts)
+        : await undeployAppAgent(owner, filename, def.agent_name, runner ? { runner_agent: runner } : {});
       if (resp?.ok !== false) {
         const auto = resp?.data?.auto_activated;
         showToast(deploy
           ? (auto ? (t('profile.apps.agentDeployStarted') || 'Deploy task started on your fleet') : (t('profile.apps.agentDeployQueued') || 'Deploy task queued — start it from the Tasks tab'))
           : (t('profile.apps.agentUndeployQueued') || 'Undeploy task sent to your fleet'));
+        if (deploy) setOpenDef(null);
         setTimeout(loadStatuses, 1500);
       } else {
         showToast(resp?.error?.message || (t('profile.apps.agentDeployFailed') || 'Deploy failed'), true);
@@ -176,11 +209,45 @@ function AppAgents({ owner, filename, agents, showToast }) {
             </span>
             ${live
               ? html`<button class="btn-outline btn-sm" disabled=${busy === def.agent_name} onClick=${() => act(def, false)}>${t('profile.apps.agentUndeploy') || 'Undeploy'}</button>`
-              : html`<button class="btn-primary btn-sm" disabled=${busy === def.agent_name} onClick=${() => act(def, true)}>${t('profile.apps.agentDeploy') || 'Deploy to my fleet'}</button>`}
+              : html`<button class="btn-primary btn-sm" onClick=${() => openPanel(def)}>${t('profile.apps.agentDeploy') || 'Deploy to my fleet'}…</button>`}
           </span>`;
       })}
       <button class="btn-ghost btn-sm" onClick=${loadStatuses} title=${t('profile.apps.agentRefresh') || 'Refresh status'}>↻</button>
-    </div>`;
+    </div>
+    ${agents.filter(def => openDef === def.agent_name).map(def => html`
+      <div key=${'panel-' + def.agent_name} class="pf-edit-panel">
+        <div class="text-meta mb-half"><strong>\u{1F916} ${escHtml(def.agent_name)}</strong>${def.llm_profile ? html` <span class="badge badge-dim">${escHtml(def.llm_profile)}</span>` : ''}${def.process ? html` <span class="badge badge-dim">${escHtml(def.process)}</span>` : ''}</div>
+        <div class="text-meta mb-half">${t('profile.apps.agentCrew') || 'Crew'}:</div>
+        ${(def.agents ?? []).map(a => html`
+          <div key=${a.role} class="text-meta-sm mb-half">
+            <strong>${escHtml(a.role)}</strong> — ${escHtml(a.goal || '')}
+            ${(a.tools ?? []).map(x => html` <span class="badge badge-dim">${escHtml(x)}</span>`)}
+            ${(a.skills ?? []).map(x => html` <span class="badge badge-info">${escHtml(x)}</span>`)}
+          </div>`)}
+        <div class="text-meta mb-half">${t('profile.apps.agentTasks') || 'Tasks'}:</div>
+        ${(def.tasks ?? []).map((tk, i) => html`
+          <div key=${tk.id || i} class="text-meta-sm mb-half">• ${escHtml(String(tk.description || '').slice(0, 140))}</div>`)}
+        <div class="flex-row-wrap mb-half">
+          <label class="text-meta">${t('profile.apps.agentRunnerLabel') || 'Runner'}
+            <select class="input-field" value=${runner} onChange=${e => setRunner(e.target.value)}>
+              ${myAgents === null ? html`<option value="">…</option>`
+                : myAgents.length === 0 ? html`<option value="">${t('profile.apps.agentNoRunners') || 'no agents — connect one first'}</option>`
+                : myAgents.map(a => html`<option key=${a.name} value=${a.name}>${a.name}${a.mode === 'task-runner' ? ' · task-runner' : a.mode ? ' · ' + a.mode : ''}</option>`)}
+            </select>
+          </label>
+          <label class="text-meta">${t('profile.apps.agentOrganismLabel') || 'Organism (optional)'}
+            <select class="input-field" value=${organism} onChange=${e => setOrganism(e.target.value)}>
+              <option value="">—</option>
+              ${(myOrgs ?? []).map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
+            </select>
+          </label>
+        </div>
+        <div class="text-meta-sm mb-half">${t('profile.apps.agentDeployHint') || 'Creates a deploy task on YOUR own runner. The fleet reads the crew definition from the manifest and starts the agent under your account.'}</div>
+        <div class="flex-row">
+          <button class="btn-primary btn-sm" disabled=${busy === def.agent_name || !runner} onClick=${() => act(def, true)}>${t('profile.apps.agentDeploy') || 'Deploy to my fleet'}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setOpenDef(null)}>${t('profile.cancel') || 'Cancel'}</button>
+        </div>
+      </div>`)}`;
 }
 
 export default function AppsTab({ session, showToast, onStats }) {
@@ -363,7 +430,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
           <${AppSkills} owner=${a.owner || session.owner} filename=${a.filename || a.name} showToast=${showToast} />
-          ${a.manifest?.cortex?.agents?.length ? html`<${AppAgents} owner=${a.owner || session.owner} filename=${a.filename || a.name} agents=${a.manifest.cortex.agents} showToast=${showToast} />` : ''}
+          ${a.manifest?.cortex?.agents?.length ? html`<${AppAgents} owner=${a.owner || session.owner} filename=${a.filename || a.name} agents=${a.manifest.cortex.agents} showToast=${showToast} session=${session} />` : ''}
           ${editingMeta === a.filename ? html`
             <div class="pf-edit-panel">
               <label class="text-meta mb-half">${t('profile.apps.nameLabel') || 'App Name'}</label>

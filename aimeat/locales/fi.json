@@ -2787,7 +2787,13 @@
       "agentDeployQueued": "Käyttöönottotehtävä jonossa - käynnistä se Tehtävät-välilehdeltä",
       "agentUndeployQueued": "Käytöstäpoistotehtävä lähetetty laivueellesi",
       "agentDeployFailed": "Käyttöönotto epäonnistui",
-      "agentRefresh": "Päivitä tila"
+      "agentRefresh": "Päivitä tila",
+      "agentCrew": "Työryhmä",
+      "agentTasks": "Tehtävät",
+      "agentRunnerLabel": "Ajoagentti",
+      "agentOrganismLabel": "Organismi (valinnainen)",
+      "agentNoRunners": "ei agentteja - yhdistä ensin",
+      "agentDeployHint": "Luo käyttöönottotehtävän OMALLE ajoagentillesi. Laivue lukee crew-määrityksen manifestista ja käynnistää agentin sinun tilisi alle."
     },
     "v8ext": {
       "title": "Palvelinlaajennukset",

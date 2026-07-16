@@ -23,6 +23,7 @@ import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
+import { appManifestAgents } from './app-agents.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -478,8 +479,30 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + '</div>'
     : '';
 
+  // ── BUNDLED AGENTS (Agent-Bundled Apps) — crew-defs this app ships. The section lists the
+  // agent names and opens the shared Bundled-agents modal (inspector + hosted instances with
+  // prices + deploy-your-own). Manifest read from the server-manifest cache.
+  var agentsHtml = '';
+  if (app.published) {
+    var agOwner = detailServerOwner(app);
+    var agFile = app.publishedFilename || '';
+    var agDefs = appManifestAgents(agOwner, agFile);
+    if (agDefs.length) {
+      agentsHtml =
+        '<div class="dtl-section">' +
+          '<h3>\u{1F916} ' + (t('agents.title') || 'Bundled agents') + '</h3>' +
+          '<div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t('agents.declares') || '') + '</div>' +
+          '<div style="margin-bottom:8px">' + agDefs.map(function(d) {
+            return '<span class="aga-chip">' + escapeHtml(d.agent_name || '') + '</span>';
+          }).join(' ') + '</div>' +
+          dtlBtn('\u{1F916} ' + (t('agents.manage') || 'Inspect & deploy'),
+            'window._launcher.showAppAgentsModal(\'' + jsArg(agOwner) + '\', \'' + jsArg(agFile) + '\')') +
+        '</div>';
+    }
+  }
+
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + monetizeHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + mgmtHtml + actionsHtml;
 }
 
 // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.

@@ -2787,7 +2787,13 @@
       "agentDeployQueued": "Deploy task queued - start it from the Tasks tab",
       "agentUndeployQueued": "Undeploy task sent to your fleet",
       "agentDeployFailed": "Deploy failed",
-      "agentRefresh": "Refresh status"
+      "agentRefresh": "Refresh status",
+      "agentCrew": "Crew",
+      "agentTasks": "Tasks",
+      "agentRunnerLabel": "Runner",
+      "agentOrganismLabel": "Organism (optional)",
+      "agentNoRunners": "no agents - connect one first",
+      "agentDeployHint": "Creates a deploy task on YOUR own runner. The fleet reads the crew definition from the manifest and starts the agent under your account."
     },
     "v8ext": {
       "title": "Server Extensions",

@@ -2109,3 +2109,30 @@
 .pb-pack-item:hover { border-color: var(--accent); }
 .pb-pack-item input { accent-color: var(--accent); margin: 0; }
 .pb-pack-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+
+/* ── Bundled-agents modal (Agent-Bundled Apps) — inspector, hosted instances, deploy form ── */
+.aga-app-ref { font-size: .78rem; color: var(--text-muted); font-weight: normal; margin-left: 6px; }
+.aga-body { max-height: 62vh; overflow-y: auto; font-size: .88rem; }
+.aga-intro { font-size: .82rem; color: var(--text-muted); margin-bottom: 10px; }
+.aga-def { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--card); }
+.aga-def h3 { margin: 0 0 8px; font-size: 1rem; }
+.aga-label { font-weight: 600; font-size: .8rem; margin: 10px 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.aga-goal { color: var(--text-muted); font-size: .82rem; }
+.aga-crew-row { margin: 4px 0; }
+.aga-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.aga-chip { display: inline-block; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: .72rem; color: var(--text-muted); background: var(--card); }
+.aga-chip-skill { border-color: var(--accent); color: var(--accent); }
+.aga-tasks { margin: 4px 0 0 18px; padding: 0; }
+.aga-tasks li { margin: 3px 0; }
+.aga-inst { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+.aga-inst-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aga-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex: none; }
+.aga-dot-on { background: #22c55e; }
+.aga-offer { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; font-size: .84rem; flex-wrap: wrap; }
+.aga-price { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.aga-deploy-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin: 6px 0; }
+.aga-deploy-row label { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--text-muted); }
+.aga-select { min-width: 160px; padding: 5px 8px; }
+.aga-deploy-btn { white-space: nowrap; }
+.aga-btn-sm { padding: 2px 10px; font-size: .75rem; margin-left: auto; }
+.published-card-badgerow .pcb-agent { cursor: default; }
