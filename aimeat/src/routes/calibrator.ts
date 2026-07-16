@@ -20,6 +20,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow
+ *   v2.1.0 — 2026-07-16 — GET /:id/detail composite (project + dimensions + versions + current version +
+ *     batches from one prefix scan) — folds the detail-view mount's 4-request waterfall.
  */
 
 import { Router } from 'express';
@@ -30,6 +32,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
 
 const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
 
@@ -223,6 +226,7 @@ interface CalibratorCandidateModel {
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
+  const detailDb = createCalibratorDetailService(storage);
 
   /** Helper: write a calibrator memory key with required MemoryRecord fields */
   async function setCalMemory(gaii: string, key: string, value: unknown, tags: string[]) {
@@ -353,6 +357,39 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         project,
         dimensions: dimRecord?.value ?? [],
       }));
+    }
+  );
+
+  // ── Project detail (composite mount) ──
+  // GET /v1/calibrator/:id/detail — the whole project-detail view mount in ONE prefix scan: project +
+  // dimensions + version summaries + current version + batch summaries. Folds the 4-request waterfall the
+  // detail view fired on open (getProject → listVersions → getVersion → listBatches). The lazy
+  // template-backfill (getProject's behavior) is applied here because the default-template constants and
+  // setCalMemory live in this module. The individual endpoints stay for interactive re-fetches. This is a
+  // 2-segment path (:id/detail) — no collision with /:id or the literal /:id/versions|/batches captures.
+  router.get('/v1/calibrator/:id/detail',
+    requireAuth(), requireRole('owner'),
+    async (req: Request, res: Response) => {
+      const gaii = resolve(req);
+      const id = req.params.id as string;
+      const data = await detailDb.overview(gaii, id);
+      if (!data) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
+      }
+      // Lazy template backfill — identical to GET /v1/calibrator/:id, kept behavior-compatible.
+      const project = data.project;
+      let needsSave = false;
+      const analysisStr = (project.analysisPromptTemplate as string) || '';
+      if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
+        project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; needsSave = true;
+      }
+      if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }
+      if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; needsSave = true; }
+      if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; needsSave = true; }
+      if (needsSave) {
+        await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
+      }
+      res.json(success(config.nodeId, data));
     }
   );
 

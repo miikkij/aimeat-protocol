@@ -448,6 +448,37 @@ await test('List projects shows batchCount=1 and latestAvgScore=50', async () =>
   assert(our.latestAvgScore === 50, `latestAvgScore should be 50, got ${our.latestAvgScore}`);
 });
 
+// ── 19b. Composite detail endpoint == sum of parts ──
+
+await test('GET /:id/detail folds project + dimensions + versions + currentVersion + batches', async () => {
+  const { status, body } = await json(`/v1/calibrator/${projectId}/detail`, { headers: auth() });
+  assert(status === 200, `expected 200, got ${status}`);
+  assert(body.ok === true, `detail failed: ${JSON.stringify(body.error)}`);
+  const d = body.data;
+  // project matches GET /:id
+  const single = await json(`/v1/calibrator/${projectId}`, { headers: auth() });
+  assert(d.project.projectId === single.body.data.project.projectId, 'project id mismatch vs GET /:id');
+  assert(d.project.currentVersion === 2, `currentVersion field should be 2, got ${d.project.currentVersion}`);
+  // dimensions == the 2 auto-discovered (matches GET /:id dimensions)
+  assert(Array.isArray(d.dimensions) && d.dimensions.length === 2, `dimensions should be 2, got ${d.dimensions?.length}`);
+  // versions == 2 summaries sorted ascending, no full prompt body
+  assert(d.versions.length === 2, `versions should be 2, got ${d.versions.length}`);
+  assert(d.versions[0].version === 1 && d.versions[1].version === 2, 'versions should be sorted 1,2');
+  assert(!('prompt' in d.versions[0]), 'version summaries must not carry the full prompt');
+  // currentVersion == full version-2 record (has prompt), matching GET /versions/2
+  assert(d.currentVersion && d.currentVersion.version === 2, `currentVersion should be full v2, got ${d.currentVersion?.version}`);
+  assert(typeof d.currentVersion.prompt === 'string', 'currentVersion should include the full prompt');
+  // batches == 1 summary with scores (matches GET /batches)
+  assert(d.batches.length === 1, `batches should be 1, got ${d.batches.length}`);
+  assert(d.batches[0].batchId === batchId, 'batch id mismatch');
+  assert(d.batches[0].scores?.[0]?.overallScore === 50, `batch score should be 50, got ${d.batches[0].scores?.[0]?.overallScore}`);
+});
+
+await test('GET /:id/detail returns 404 for an unknown project', async () => {
+  const { status } = await json(`/v1/calibrator/does-not-exist-xyz/detail`, { headers: auth() });
+  assert(status === 404, `expected 404, got ${status}`);
+});
+
 // ── 20. Old run endpoints removed ──
 
 await test('Old run endpoints return 404', async () => {

@@ -2,7 +2,7 @@
  * @file calibrator.js
  * @description API service layer for the Prompt Calibrator.
  * @structure
- *   - Project CRUD: listProjects, createProject, getProject, updateProject, deleteProject
+ *   - Project CRUD: listProjects, createProject, getProject, getProjectDetail, updateProject, deleteProject
  *   - Versions: listVersions, getVersion, createVersion
  *   - Batches: listBatches, getBatch, createBatch, updateBatch, deleteBatch
  *   - Templates: getTemplateDefaults
@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v1.0.1 — 2026-03-29 — Fix: access resp.data (AIMEAT envelope)
  *   v2.0.0 — 2026-03-29 — V2: batch functions replace run functions, add template defaults
+ *   v2.1.0 — 2026-07-16 — Add getProjectDetail (composite mount: GET /v1/calibrator/:id/detail)
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
@@ -31,6 +32,18 @@ export async function createProject(name) {
 export async function getProject(id) {
   const resp = await apiGet(`${BASE}/${id}`);
   return resp.data || {};
+}
+
+/**
+ * Composite mount for the project-detail view: project + dimensions + version summaries + current version +
+ * batch summaries in ONE call (folds getProject → listVersions → getVersion → listBatches). Returns null on
+ * 404/error so the caller can fall back to the individual loaders.
+ */
+export async function getProjectDetail(id) {
+  try {
+    const resp = await apiGet(`${BASE}/${id}/detail`);
+    return resp?.data ?? null;
+  } catch { return null; }
 }
 
 export async function updateProject(id, updates) {
