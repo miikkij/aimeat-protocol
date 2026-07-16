@@ -86,12 +86,13 @@ export class HomeDashboardService {
   }
 
   /** Pending work across the owner's agents — the agents list comes from the IdentityMap (0 extra reads),
-   *  then one listWorkByProvider per agent (the same fan-out GET /v1/work/inbox does for an owner). */
+   *  then ONE batched count (providerGaii IN (…) AND status IN (…)) instead of a listWorkByProvider per
+   *  agent. This is the fan-out→IN rule (doc-id925fp §6.5): at 100 agents the Home chain drops from ~100
+   *  work queries to 1. */
   private async pendingWorkCount(owner: string): Promise<number> {
     const agents = await this.agents.listOwnerAgents(owner);
     if (agents.length === 0) return 0;
-    const lists = await Promise.all(agents.map(a => this.storage.listWorkByProvider(a.gaii)));
-    return lists.reduce((n, items) => n + items.filter(w => PENDING_WORK.has(w.status)).length, 0);
+    return this.storage.countPendingWorkByProviders(agents.map(a => a.gaii), [...PENDING_WORK]);
   }
 }
 

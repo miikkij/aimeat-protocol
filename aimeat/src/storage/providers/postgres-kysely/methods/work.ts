@@ -6,6 +6,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: work domain on Postgres+Kysely.
  */
+import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { WorkRecord } from '../../../interface.js';
 import type { Work } from '../db-types.js';
@@ -54,6 +55,12 @@ export const workMethods = {
   },
   async listWorkByRequester(this: PostgresKyselyStorage, gaii: string): Promise<WorkRecord[]> {
     return (await this.db.selectFrom('Work').selectAll().where('requesterGaii', '=', gaii).execute()).map(toWork);
+  },
+  async countPendingWorkByProviders(this: PostgresKyselyStorage, providerGaiis: string[], statuses: string[]): Promise<number> {
+    if (providerGaiis.length === 0 || statuses.length === 0) return 0;
+    const r = await this.db.selectFrom('Work').select(sql<number>`count(*)`.as('n'))
+      .where('providerGaii', 'in', providerGaiis).where('status', 'in', statuses).executeTakeFirst();
+    return Number(r?.n ?? 0);
   },
   async listAllWork(this: PostgresKyselyStorage, limit = 10000): Promise<WorkRecord[]> {
     return (await this.db.selectFrom('Work').selectAll().orderBy('createdAt', 'desc').limit(Math.min(limit, 10000)).execute()).map(toWork);
