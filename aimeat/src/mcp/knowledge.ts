@@ -13,6 +13,7 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 — 2026-07-16 — listOwnerScopeMemory aggregates GHII+agents in one listMemoryForOwners (was N+1)
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -59,20 +60,20 @@ export function registerKnowledgeTools(
         if (!owner) return storage.listMemory(agentGaii, opts);
 
         const ownerGhii = `${owner}@${config.nodeId}`;
+        const agents = await storage.getAgentsByOwner(owner);
+        // GHII + every agent in ONE IN query (was listMemory per identity). Dedup by key keeping the
+        // highest-priority source (GHII first, then agents in order) — same as the old sequential scan.
+        const owners = [ownerGhii, ...agents.map(a => a.gaii)];
+        const priority = new Map(owners.map((g, i) => [g, i]));
+        const rows = await storage.listMemoryForOwners(owners, opts);
+        rows.sort((x, y) => (priority.get(x.ownerGaii) ?? 0) - (priority.get(y.ownerGaii) ?? 0));
+
         const seen = new Set<string>();
         const results: MemoryRecord[] = [];
-
-        for (const rec of await storage.listMemory(ownerGhii, opts)) {
-            seen.add(rec.key);
-            results.push(rec);
-        }
-        const agents = await storage.getAgentsByOwner(owner);
-        for (const agent of agents) {
-            for (const rec of await storage.listMemory(agent.gaii, opts)) {
-                if (!seen.has(rec.key)) {
-                    seen.add(rec.key);
-                    results.push(rec);
-                }
+        for (const rec of rows) {
+            if (!seen.has(rec.key)) {
+                seen.add(rec.key);
+                results.push(rec);
             }
         }
         return results;

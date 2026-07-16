@@ -6,6 +6,7 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -117,9 +118,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
             // resolve to the owner's default agent GAII and retry
             if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
               const agents = await storage.getAgentsByOwner(namespace);
+              // One IN query for `key` across the owner's agents (was getMemory per agent). Pick the
+              // first agent (original order) that has the key — visibility is checked after.
+              const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
+              const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
               for (const agent of agents) {
-                record = await storage.getMemory(agent.gaii, key);
-                if (record) break;
+                const r = byGaii.get(agent.gaii);
+                if (r) { record = r; break; }
               }
             }
             return (record && record.visibility === 'public') ? record.value : null;
@@ -370,9 +375,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
             // resolve to the owner's default agent GAII and retry
             if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
               const agents = await storage.getAgentsByOwner(namespace);
+              // One IN query for `key` across the owner's agents (was getMemory per agent). Pick the
+              // first agent (original order) that has the key — visibility is checked after.
+              const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
+              const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
               for (const agent of agents) {
-                record = await storage.getMemory(agent.gaii, key);
-                if (record) break;
+                const r = byGaii.get(agent.gaii);
+                if (r) { record = r; break; }
               }
             }
             return (record && record.visibility === 'public') ? record.value : null;
