@@ -22,4 +22,8 @@ export interface WorkRepository {
   /** Count work rows across MANY providers whose status is in `statuses`, in ONE query — batches the
    *  owner-agents fan-out the Home dashboard / work inbox would otherwise run as one query per agent. */
   countPendingWorkByProviders(providerGaiis: string[], statuses: string[]): Promise<number>;
+  /** All work rows for MANY providers in ONE `providerGaii IN (…)` query (batches GET /v1/work/inbox). */
+  listWorkByProviders(providerGaiis: string[]): Promise<WorkRecord[]>;
+  /** All work rows for MANY requesters in ONE `requesterGaii IN (…)` query (batches GET /v1/work/sent). */
+  listWorkByRequesters(requesterGaiis: string[]): Promise<WorkRecord[]>;
 }
