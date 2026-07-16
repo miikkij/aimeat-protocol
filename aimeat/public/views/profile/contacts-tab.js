@@ -52,10 +52,10 @@ export default function ContactsTab({ showToast }) {
     setBusy(true);
     try {
       const r = await contactsService.addContact(id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.addFailed') || 'Could not add the contact'));
+      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.addFailed') || 'Could not add the contact'), true);
       else { showToast(t('contacts.added') || 'Contact saved'); setWho(''); setEmailMiss(null); }
       await load();
-    } catch (e) { showToast((e && e.message) || (t('contacts.addFailed') || 'Could not add the contact')); }
+    } catch (e) { showToast((e && e.message) || (t('contacts.addFailed') || 'Could not add the contact'), true); }
     finally { setBusy(false); }
   };
 
@@ -63,10 +63,10 @@ export default function ContactsTab({ showToast }) {
     setBusy(true);
     try {
       const r = await contactsService.removeContact(id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.removeFailed') || 'Could not remove the contact'));
+      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.removeFailed') || 'Could not remove the contact'), true);
       else showToast(t('contacts.removed') || 'Contact removed');
       await load();
-    } catch (e) { showToast((e && e.message) || (t('contacts.removeFailed') || 'Could not remove the contact')); }
+    } catch (e) { showToast((e && e.message) || (t('contacts.removeFailed') || 'Could not remove the contact'), true); }
     finally { setBusy(false); }
   };
 
@@ -99,7 +99,7 @@ export default function ContactsTab({ showToast }) {
       <div class="section-desc">${t('contacts.desc') || 'Your address book: people you trust and people you have messaged. Contacts feed the identity pickers everywhere you grant access — organisms, workspaces, and apps.'}</div>
 
       <div class="pf-ct-addrow">
-        <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${() => add()}
+        <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${() => add()} valueMode="full"
           onEmailUnresolved=${(email) => setEmailMiss(email)}
           placeholder=${t('contacts.addPlaceholder') || 'owner name or email'} disabled=${busy} />
         <button class="btn-primary btn-sm" disabled=${busy || !who.trim()} onClick=${() => add()}>${'+ '}${t('contacts.add') || 'Add'}</button>

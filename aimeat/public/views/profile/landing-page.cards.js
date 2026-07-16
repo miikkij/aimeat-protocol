@@ -2,6 +2,7 @@
  * @file public/views/profile/landing-page.cards.js
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Contacts tab in the Activity sidebar group.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { h } from "preact";
@@ -572,6 +573,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
   ] },
   { titleKey: 'profile.landing.menuActivity', items: [      // communication + events
+    { id: 'contacts', icon: '\u{1F465}', labelKey: 'contacts.tabLabel' },
     { id: 'notifications', icon: '\u{1F514}', labelKey: 'profile.tabs.notifications' },
     { id: 'email', icon: '\u{1F4E7}', labelKey: 'profile.tabs.email' },
     { id: 'chatsessions', icon: '\u{1F4AC}', labelKey: 'profile.tabs.chatSessions' },

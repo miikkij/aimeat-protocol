@@ -11,6 +11,8 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.1.0 — 2026-07-16 — `kinds` prop: hosts narrow suggestions to accepted identity classes
+ *     (member/grant surfaces pass ['ghii'] so agents are never suggested where only owners are valid).
  *   v1.0.0 — 2026-07-16 — Initial: contacts + directory suggestions, email resolve, freeform passthrough.
  */
 import { h } from 'preact';
@@ -29,9 +31,11 @@ const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩' };
  * `onEmailUnresolved(email)` fires when an email lookup finds no account (host may offer an email
  * invitation). `excludeIds` hides ids already chosen/present (e.g. current members). `valueMode`
  * controls what a picked suggestion writes back: 'bare' (default — grant surfaces key on the bare
- * local owner name) or 'full' (messaging surfaces need the full GHII/GAII).
+ * local owner name) or 'full' (messaging surfaces need the full GHII/GAII). `kinds` narrows the
+ * suggestions to identity classes the host accepts (e.g. ['ghii'] on member/grant surfaces where
+ * only humans are valid — suggesting an agent there just produces an OWNER_NOT_FOUND).
  */
-export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolved, placeholder, disabled, excludeIds = [], autofocus, valueMode = 'bare' }) {
+export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolved, placeholder, disabled, excludeIds = [], autofocus, valueMode = 'bare', kinds }) {
   const [contacts, setContacts] = useState(null);     // lazy: null until first focus
   const [dirHits, setDirHits] = useState([]);
   const [open, setOpen] = useState(false);
@@ -70,7 +74,9 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
 
   const q = value.trim().toLowerCase();
   const excluded = new Set((excludeIds || []).map(x => bare(x)));
+  const kindOk = (k) => !kinds || kinds.includes(k);
   const fromContacts = (contacts || [])
+    .filter(c => kindOk(c.kind))
     .filter(c => !excluded.has(bare(c.contact_id)))
     .filter(c => !q || c.contact_id.toLowerCase().includes(q) || (c.display_name || '').toLowerCase().includes(q))
     .slice(0, 8)

@@ -88,7 +88,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
       } else {
         r = await orgService.addMemberDirect(orgId, target, { role, workspaces });
       }
-      if (r?.ok === false) { showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed')); }
+      if (r?.ok === false) { showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed'), true); }
       else {
         if (isEmail) {
           setEmResult({ accept_url: r?.data?.accept_url, email_sent: r?.data?.email_sent });
@@ -100,7 +100,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         if (!isEmail) onClose?.();
       }
       onChanged?.();
-    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed')); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed'), true); }
     finally { setBusy(false); }
   };
 
@@ -118,6 +118,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         <div class="pj-eminvite-field">
           <label>${t('organisms.whoLabel') || 'Owner name or email'}</label>
           <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} autofocus=${true}
+            kinds=${['ghii']}
             placeholder=${t('organisms.whoPlaceholder') || 'owner name or name@example.com'} disabled=${busy} />
         </div>
         <div class="pj-eminvite-field">
@@ -197,10 +198,10 @@ export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, sh
       const r = editing.kind === 'name'
         ? await orgService.updateInvitation(orgId, editing.id, { role: editing.role, workspaces })
         : await orgService.updateEmailInvitation(orgId, editing.id, { orgRole: editing.role, workspaces });
-      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed'));
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed'), true);
       else { showToast(t('organisms.inviteUpdated') || 'Invitation updated'); setEditing(null); }
       onChanged?.();
-    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed')); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed'), true); }
     finally { setBusy(false); }
   };
   const withdraw = async (row) => {
@@ -209,10 +210,10 @@ export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, sh
       const r = row.kind === 'name'
         ? await orgService.cancelInvitation(orgId, row.id)
         : await orgService.cancelEmailInvitation(orgId, row.id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed'));
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.inviteFailed') || 'Failed'), true);
       else showToast(t('organisms.inviteCancelled') || 'Invitation cancelled');
       onChanged?.();
-    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed')); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.inviteFailed') || 'Failed'), true); }
     finally { setBusy(false); }
   };
 

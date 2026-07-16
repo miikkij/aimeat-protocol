@@ -283,6 +283,11 @@ async function assertWorkspacesExist(storage: Storage, orgId: string, grants: In
 async function resolveInvitee(
   storage: Storage, config: AimeatConfig, organismId: string, inviteeRaw: string,
 ): Promise<{ invitee: string; existing: OrganismMembershipRecord | null }> {
+  // Organism members are HUMANS (owners). A GAII/GEAI would fall through to a confusing
+  // OWNER_NOT_FOUND ("No owner named agent#owner") — name the real problem instead.
+  if (inviteeRaw.includes('#') || inviteeRaw.trim().startsWith('eco:')) {
+    throw new InvitationError(400, 'INVALID_INPUT', 'Agents and apps cannot be organism members — invite their owner instead (agents inherit the membership)');
+  }
   const invitee = normalizeInviteeName(inviteeRaw, config.nodeId);
   if (!invitee) throw new InvitationError(400, 'INVALID_INPUT', 'Invitee belongs to another node — name-invites work for local owners only');
   if (!(await storage.getOwner(invitee))) throw new InvitationError(404, 'OWNER_NOT_FOUND', `No owner named "${invitee}" on this node`);
