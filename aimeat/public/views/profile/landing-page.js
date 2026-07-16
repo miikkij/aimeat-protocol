@@ -136,7 +136,7 @@ export function tierLevel(tier) {
 
 /* ───── Main landing page ───── */
 
-export default function LandingPage({ tier, stats, session, showToast, renderTab, getTabLabel }) {
+export default function LandingPage({ tier, stats, homeUsage, homeAgents, session, showToast, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
   const [appsLoaded, setAppsLoaded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -372,12 +372,12 @@ export default function LandingPage({ tier, stats, session, showToast, renderTab
           <${NextSteps} switchTab=${(id) => open(id, 'main')}
             hasApps=${appsLoaded ? apps.length > 0 : undefined} />
           <div class="pf-home-grid">
-            <${UsageCard} switchTab=${(id) => open(id, 'main')} />
+            <${UsageCard} switchTab=${(id) => open(id, 'main')} initialUsage=${homeUsage} />
             <${AiSpendCard} />
             <${AgentLedgerCard} />
             <${CommerceCard} />
             <${ContinueCard} />
-            <${AgentsCard} owner=${owner} />
+            <${AgentsCard} owner=${owner} initialAgents=${homeAgents} />
           </div>
           ${(showPromo && apps.length < 3) ? html`
             <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}

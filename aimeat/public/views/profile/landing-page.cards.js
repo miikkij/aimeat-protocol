@@ -99,15 +99,18 @@ export function ContinueCard() {
 }
 
 /* "Agents" — who has been active today, who is idle, and the next scheduled run. */
-export function AgentsCard({ owner }) {
-  const [agents, setAgents] = useState(null);
+export function AgentsCard({ owner, initialAgents }) {
+  // The Home /v1/owner/home composite already resolves the owner's agent list (initialAgents) — seed from
+  // it and skip the mount /v1/agents fetch (dropping that duplicate). The next-scheduled-job row still
+  // needs the schedules call (not in the composite); live-update refreshes both.
+  const seedAgents = (list) => (Array.isArray(list) ? list : []).filter(a => !String(a.name || '').startsWith('session-'))
+    .slice().sort((a, b) => String(b.last_seen || '').localeCompare(String(a.last_seen || '')));
+  const [agents, setAgents] = useState(initialAgents ? seedAgents(initialAgents) : null);
   const [nextJob, setNextJob] = useState(null);
-  const load = useCallback(async () => {
-    try {
-      const list = (await listAgents(owner)).filter(a => !String(a.name || '').startsWith('session-'));
-      list.sort((a, b) => String(b.last_seen || '').localeCompare(String(a.last_seen || '')));
-      setAgents(list);
-    } catch { setAgents([]); }
+  const loadAgents = useCallback(async () => {
+    try { setAgents(seedAgents(await listAgents(owner))); } catch { setAgents([]); }
+  }, [owner]);
+  const loadSchedules = useCallback(async () => {
     try {
       const r = await listAllSchedules();
       const all = [...(r?.data?.managed || []), ...(r?.data?.extensions || []), ...(r?.data?.agentInternal || [])]
@@ -115,8 +118,10 @@ export function AgentsCard({ owner }) {
         .sort((a, b) => String(a.nextRunAt).localeCompare(String(b.nextRunAt)));
       setNextJob(all[0] || null);
     } catch { /* scheduler row is optional */ }
-  }, [owner]);
-  useEffect(() => { load(); }, [load]);
+  }, []);
+  const load = useCallback(async () => { await Promise.all([loadAgents(), loadSchedules()]); }, [loadAgents, loadSchedules]);
+  useEffect(() => { if (initialAgents) setAgents(seedAgents(initialAgents)); }, [initialAgents]);
+  useEffect(() => { loadSchedules(); }, [loadSchedules]);   // schedules aren't in the composite
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => onLiveUpdate(['agents', 'agent-tasks', 'schedules'], () => liveRef.current()), []);
 
@@ -154,12 +159,15 @@ export function AgentsCard({ owner }) {
  * cached GET /v1/owner/usage endpoint (60s server-side TTL), so it's cheap to refetch on each
  * live-update. Surfaces the same kind of quota bar the Memory tab shows, for the whole account. */
 
-export function UsageCard({ switchTab }) {
-  const [u, setU] = useState(null);
+export function UsageCard({ switchTab, initialUsage }) {
+  // The Home landing is the only place this renders, and its /v1/owner/home composite already carries the
+  // usage summary — so we seed from initialUsage and never mount-fetch /v1/owner/usage (dropping that
+  // duplicate). We still refresh on live-update for freshness after a real change.
+  const [u, setU] = useState(initialUsage ?? null);
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/owner/usage'); setU(r?.data || null); } catch { setU(null); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (initialUsage) setU(initialUsage); }, [initialUsage]);
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => onLiveUpdate(['memory', 'files', 'agents', 'apps', 'organisms'], () => liveRef.current()), []);
 
