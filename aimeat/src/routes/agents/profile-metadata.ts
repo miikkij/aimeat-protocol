@@ -2,6 +2,8 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Engagements enrichment reads all orgs' workspace registries in ONE cross-owner
+ *     key-IN query (getMemoryByKeysAnyOwner) instead of a listAllMemory scan per engagement org (Phase 3).
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -220,20 +222,28 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only view engagements for agents you own')); return;
     }
     const engagements = await listEngagementsByAgent(storage, agent.owner, agent.name);
-    // Enrich with organism + workspace names (one lookup per distinct organism).
+    // Enrich with organism + workspace names.
     const orgIds = [...new Set(engagements.map(e => e.organism_id))];
     const orgNames = new Map<string, string>();
     const wsNames = new Map<string, string>();               // key: `${orgId}::${wsId}`
+    // Workspace names: ALL orgs' registries in ONE cross-owner key-IN read (was a listAllMemory scan per org).
+    const regByKey = new Map(orgIds.map(id => [`organism.${id}.meta.workspaces`, id]));
+    const regRecs = orgIds.length
+      ? (storage.getMemoryByKeysAnyOwner
+          ? await storage.getMemoryByKeysAnyOwner([...regByKey.keys()])
+          : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: `organism.${id}.meta.workspaces`, limit: 1000 }).then(r => r.items)))).flat())
+      : [];
+    for (const rec of regRecs) {
+      const orgId = regByKey.get(rec.key);   // exact-key match
+      if (!orgId) continue;
+      for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [])) {
+        if (w.id) wsNames.set(`${orgId}::${w.id}`, w.name ?? w.id);
+      }
+    }
+    // Organism display names: a point read per distinct org (small N, keyed table).
     for (const orgId of orgIds) {
       const org = await storage.getOrganism(orgId);
       if (org) orgNames.set(orgId, org.name ?? orgId);
-      const { items } = await storage.listAllMemory({ prefix: `organism.${orgId}.meta.workspaces`, limit: 1000 });
-      for (const rec of items) {
-        if (rec.key !== `organism.${orgId}.meta.workspaces`) continue;
-        for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [])) {
-          if (w.id) wsNames.set(`${orgId}::${w.id}`, w.name ?? w.id);
-        }
-      }
     }
     const enriched = engagements.map(e => ({
       ...e,
