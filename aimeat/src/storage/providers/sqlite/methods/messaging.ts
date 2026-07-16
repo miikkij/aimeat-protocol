@@ -2,6 +2,7 @@
  * @file src/storage/providers/sqlite/methods/messaging.ts
  * @description Agent-message, Direct-message, Onboarding, Telemetry, Webhook-log methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Wire getDirectMessagesByIds (Phase 3 batch) through to the repo.
  *   v1.1.0 — 2026-07-16 — Wire listConversationsForOwners (Phase 3 batch) through to the repo.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
@@ -55,6 +56,10 @@ export const messagingMethods = {
 
   async getDirectMessage(this: SqliteStorage, id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
     return directMessageRepo.getDirectMessage(this.db, id, ownerGhii);
+  },
+
+  async getDirectMessagesByIds(this: SqliteStorage, ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]> {
+    return directMessageRepo.getDirectMessagesByIds(this.db, ids, ownerGhii);
   },
 
   async listInbox(this: SqliteStorage, ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {

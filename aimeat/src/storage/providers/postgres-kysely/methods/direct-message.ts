@@ -7,6 +7,7 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 — 2026-07-16 — Add listConversationsForOwners batch (Phase 3): conversations list for many owners
  *     in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
  *   v1.0.0 — 2026-07-15 — Phase 5: direct messages on Postgres+Kysely.
@@ -92,6 +93,13 @@ export const directMessageMethods = {
   async getDirectMessage(this: PostgresKyselyStorage, id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
     const r = await this.db.selectFrom('DirectMessage').selectAll().where('id', '=', dmDocId(id, ownerGhii)).executeTakeFirst();
     return r ? toDirectMessageRecord(r) : null;
+  },
+
+  // BULK (Phase 3) — many messages by id under one owner mailbox in ONE `id IN (…)` query (PG `id` = mid::owner).
+  async getDirectMessagesByIds(this: PostgresKyselyStorage, ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db.selectFrom('DirectMessage').selectAll().where('id', 'in', ids.map(id => dmDocId(id, ownerGhii))).execute();
+    return rows.map(toDirectMessageRecord);
   },
 
   async listInbox(this: PostgresKyselyStorage, ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {

@@ -27,11 +27,13 @@
  *     (ownership-verified) agent. Only this owner's agents — server-derived, no cross-owner leak.
  *   v1.3.0 -- 2026-07-16 -- GET /conversations moved onto MessagingDbService: the owner + per-agent
  *     conversations fan-out is now ONE batched read (listConversationsForOwners), behaviour unchanged.
+ *   v1.4.0 -- 2026-07-16 -- GET /requests fetches every pending contact's first message in ONE batched
+ *     read (getDirectMessagesByIds) instead of getDirectMessage per pending contact.
  */
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -331,15 +333,25 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   router.get('/v1/messages/requests', requireAuth(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const pending = await storage.listContacts(ghii, { state: 'pending' });
-    const requests = await Promise.all(pending.map(async c => {
-      const first = c.firstMessageId ? await storage.getDirectMessage(c.firstMessageId, ghii) : null;
+    // Each request's preview comes from its first message — fetch them all in ONE batched read (was
+    // getDirectMessage per pending contact), indexed by message id.
+    const firstIds = pending.map(c => c.firstMessageId).filter((x): x is string => !!x);
+    const firstById = new Map<string, DirectMessageRecord>();
+    if (firstIds.length) {
+      const msgs = storage.getDirectMessagesByIds
+        ? await storage.getDirectMessagesByIds(firstIds, ghii)
+        : (await Promise.all(firstIds.map(id => storage.getDirectMessage(id, ghii)))).filter((m): m is DirectMessageRecord => !!m);
+      for (const m of msgs) firstById.set(m.id, m);
+    }
+    const requests = pending.map(c => {
+      const first = c.firstMessageId ? firstById.get(c.firstMessageId) ?? null : null;
       return {
         contactId: c.contactId,
         conversationId: first?.conversationId ?? conversationIdFor(ghii, c.contactId),
         preview: messagePreview(first?.body ?? ''),
         createdAt: c.createdAt,
       };
-    }));
+    });
     res.json(success(config.nodeId, { requests }));
   });
 
