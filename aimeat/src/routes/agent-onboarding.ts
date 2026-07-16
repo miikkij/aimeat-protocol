@@ -54,7 +54,7 @@ import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js'
  *                          otherwise true if at least one agents.tag.{tag}.* entry exists
  *   - knowledge_packages_published: count of packages authored by this agent (>0 = true)
  */
-async function buildPostOnboardingChecklist(
+export async function buildPostOnboardingChecklist(
   agentGaii: string,
   agentName: string,
   storage: Storage,

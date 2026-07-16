@@ -38,17 +38,49 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
+import { createAgentDataAccessOverviewService } from '../services/db/agent-data-access-overview-db-service.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
 export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
+  const dataAccessDb = createAgentDataAccessOverviewService(storage, config);
 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
     return buildGAII(agentName, owner, config.nodeId);
   }
+
+  /** Owner-session or the agent itself may read this agent's data-access view (owner-or-self). */
+  function canAccessAgent(req: Express.Request, agentGaii: string): boolean {
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    return isOwnerSession || req.auth!.sub === agentGaii;
+  }
+
+  /* ── GET /v1/agents/:name/data-access/overview -- Data Access subtab composite (mount fold) ──
+   *
+   * The whole Data Access subtab mount in ONE call: directives-derived memory areas + resources, the
+   * agent's memory keys (metadata only), and the agent's skill links. Folds the three reads the subtab
+   * fired in parallel (getDirectives + GET /v1/memory?agent= + GET /skills/links) and drops memory VALUES
+   * (the tab renders only key/visibility/version/dates). Owner-or-self, matching the folded endpoints'
+   * intent. Registered before /directives (a 2-segment path — no shadow with the literal /directives).
+   */
+  router.get('/v1/agents/:name/data-access/overview', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+    if (!canAccessAgent(req, agentGaii)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const data = await dataAccessDb.overview(agentGaii, req.auth!.owner as string, agentName);
+    res.json(success(config.nodeId, data));
+  });
 
   /* ── GET /v1/agents/:name/directives -- Get merged directives ── */
   router.get('/v1/agents/:name/directives', requireAuth(), async (req, res) => {

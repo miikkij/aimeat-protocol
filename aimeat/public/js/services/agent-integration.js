@@ -5,12 +5,27 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add updateSkillBundle function
+ *   v1.2.0 -- 2026-07-16 -- Add getIntegrationOverview (GET /v1/agents/:name/integration/overview) —
+ *     folds the Integration subtab's webhook + delivery-log + onboarding-checklist mount reads into one
+ *     (skill-bundle/version stays separate — it runs the bundle-generation pipeline).
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
 export async function getOnboarding(agentName) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/onboarding`);
+}
+
+/**
+ * Composite mount for the Integration subtab: webhook config + delivery log + post-onboarding checklist
+ * in ONE call. Returns null on error so the caller can fall back to the individual reads. The skill-bundle
+ * version is fetched separately (generation pipeline, not folded).
+ */
+export async function getIntegrationOverview(agentName) {
+  try {
+    const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/integration/overview`);
+    return resp?.data ?? null;
+  } catch { return null; }
 }
 
 export async function startOnboarding(agentName) {

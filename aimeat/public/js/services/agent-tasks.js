@@ -8,6 +8,8 @@
  *   v1.1.0 -- 2026-05-29 -- Add requestChanges() for the owner-asks-agent-to-revise-todos flow.
  *   v1.2.0 -- 2026-05-31 -- Add rateTask() and getAgentStatistics() for the Quality tab.
  *   v1.3.0 -- 2026-06-01 -- listTasks() gains bucket/q/updated_after/before params; add setTaskTriage() for the Recent/Keep/Archive buckets.
+ *   v1.4.0 -- 2026-07-16 -- Add getQualityOverview (GET /v1/agents/:name/quality/overview) — folds the
+ *     Quality subtab's statistics + done-tasks mount reads into one call.
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
 
@@ -72,4 +74,16 @@ export async function rateTask(agentName, taskId, body) {
 /** Quality tab: recomputed performance + per-context review rollups + custom metrics. */
 export async function getAgentStatistics(agentName) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/statistics`);
+}
+
+/**
+ * Composite mount for the Quality subtab: recomputed statistics (performance + reviews + custom) AND the
+ * agent's done tasks in ONE call. Returns null on error so the caller can fall back to the individual
+ * statistics + done-tasks fan-out.
+ */
+export async function getQualityOverview(agentName) {
+  try {
+    const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/quality/overview`);
+    return resp?.data ?? null;
+  } catch { return null; }
 }

@@ -8,7 +8,10 @@
  *   - GET /v1/agents/:name/activity/log  -- event log drill-down (paginated)
  *   - GET /v1/agents/:name/activity      -- stats + history + scheduled jobs
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
+ *   - GET /v1/agents/:name/quality/overview -- Quality subtab composite (statistics + done tasks)
  * @version-history
+ *   v1.3.0 -- 2026-07-16 -- Add GET /quality/overview composite (recomputed statistics + done tasks) folding
+ *     the Quality subtab's two mount reads.
  *   v1.2.0 -- 2026-07-16 -- Add GET /activity/overview composite (activity_stats + event log + directives
  *     budget + webhook + telemetry in one call) folding the Activity subtab's 5 agent-domain mount reads;
  *     ledger stays separate (different auth model). Owner-or-self via canAccess, registered before /activity.
@@ -25,10 +28,12 @@ import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
+import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
 
 export function agentActivityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const activityOverviewDb = createAgentActivityOverviewService(storage);
+  const qualityOverviewDb = createAgentQualityOverviewService(storage);
 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
@@ -255,6 +260,29 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     }, [
       { description: 'Activity stats', method: 'GET', url: `/v1/agents/${agentName}/activity` },
     ]));
+  });
+
+  /* ── GET /v1/agents/:name/quality/overview -- Quality subtab composite (mount fold) ──
+   *
+   * The whole Quality subtab mount in ONE call: the recomputed statistics (performance + reviews + custom
+   * metrics) AND the agent's done tasks. Folds GET /statistics + GET /tasks?status=done. Like /statistics,
+   * this recomputes + caches (a write), so it is a request fold, not a pure read. Owner-or-self via
+   * canAccess, identical to /statistics. Distinct 2-segment path — no shadow with /statistics or /activity.
+   */
+  router.get('/v1/agents/:name/quality/overview', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+    if (!canAccess(req, agentGaii)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const data = await qualityOverviewDb.overview(agentGaii, agent.name, config.nodeId);
+    res.json(success(config.nodeId, data));
   });
 
   return router;

@@ -11,13 +11,15 @@
  * @version-history
  *   v1.0.0 -- 2026-07-11 -- Initial: first consumer of the ledger, closes the "recorded
  *     but nowhere to see it" gap for agent LLM usage.
+ *   v1.1.0 -- 2026-07-16 -- Mount folds the two ledger reads into GET /v1/ledger/usage/overview
+ *     (getLedgerUsageOverview); individual usage + runs reads kept as fallback.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { getLedgerUsage, getLedgerRuns } from '/js/services/ledger.js';
+import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
 
 const html = htm.bind(h);
 
@@ -44,13 +46,22 @@ export default function TabUsage({ agent, agentName }) {
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const [modelResp, runsResp] = await Promise.all([
-        getLedgerUsage(gaii, { groupBy: 'model' }).catch(() => null),
-        getLedgerRuns(gaii, { limit: 50 }).catch(() => null),
-      ]);
-      setTotals(modelResp?.data?.totals || null);
-      setByModel(modelResp?.data?.groups || []);
-      setRuns(runsResp?.data?.runs || []);
+      // Mount fold: ONE composite (model-grouped aggregates + totals + per-run rollups). On failure, fall
+      // back to the individual two-request fan-out.
+      const ov = await getLedgerUsageOverview(gaii, { runsLimit: 50 });
+      if (ov) {
+        setTotals(ov.totals || null);
+        setByModel(ov.groups || []);
+        setRuns(ov.runs || []);
+      } else {
+        const [modelResp, runsResp] = await Promise.all([
+          getLedgerUsage(gaii, { groupBy: 'model' }).catch(() => null),
+          getLedgerRuns(gaii, { limit: 50 }).catch(() => null),
+        ]);
+        setTotals(modelResp?.data?.totals || null);
+        setByModel(modelResp?.data?.groups || []);
+        setRuns(runsResp?.data?.runs || []);
+      }
     } catch {
       setTotals(null);
       setByModel([]);
