@@ -12,6 +12,7 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 — 2026-07-16 — directory reads profile.location/interests in 2 IN queries (was getMemory per owner)
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -123,10 +124,18 @@ export function registerCatalogueTools(
                 interests: string[];
             }> = [];
 
+            // Two IN queries for profile.location + profile.interests across every GHII (was
+            // getMemory per key PER owner). Records carry ownerGaii; same isLive semantics as getMemory.
+            const ghiiGaiis = ghiis.map(g => g.ghii);
+            const locRows = await storage.listMemoryForOwners(ghiiGaiis, { prefix: 'profile.location' });
+            const intRows = await storage.listMemoryForOwners(ghiiGaiis, { prefix: 'profile.interests' });
+            const locByGhii = new Map(locRows.filter(r => r.key === 'profile.location').map(r => [r.ownerGaii, r]));
+            const intByGhii = new Map(intRows.filter(r => r.key === 'profile.interests').map(r => [r.ownerGaii, r]));
+
             for (const ghii of ghiis) {
                 // Read public profile location and interests memory keys
-                const locationRecord = await storage.getMemory(ghii.ghii, 'profile.location');
-                const interestsRecord = await storage.getMemory(ghii.ghii, 'profile.interests');
+                const locationRecord = locByGhii.get(ghii.ghii);
+                const interestsRecord = intByGhii.get(ghii.ghii);
 
                 // Skip profiles that haven't set public location/interests (not opted in to directory)
                 if (!locationRecord && !interestsRecord) continue;
