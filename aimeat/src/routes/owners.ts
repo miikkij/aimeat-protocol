@@ -10,6 +10,8 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-16 — GDPR export hoists owner-invariant reads out of the per-agent loop
+ *     (boards+posts+flags loaded once; per-agent getGHIIByOwner re-fetch dropped) — was O(agents×boards)
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -257,6 +259,15 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     const allWorkTrackingCodes = new Set<string>();
     const agentData: Record<string, unknown>[] = [];
 
+    // Owner-invariant reads hoisted OUT of the per-agent loop (were re-fetched per agent →
+    // O(agents×boards) for posts). Boards + their posts load once; flags load once.
+    const allBoards = await storage.listBoards();
+    const postsByBoard = new Map<string, Awaited<ReturnType<typeof storage.listPosts>>>();
+    for (const board of allBoards) {
+      postsByBoard.set(board.id, await storage.listPosts(board.id, { limit: 10000 }));
+    }
+    const allFlags = await storage.listFlags();
+
     for (const agent of agents) {
       const memories = await storage.listMemory(agent.gaii);
       const providerWork = await storage.listWorkByProvider(agent.gaii);
@@ -266,11 +277,10 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       const transactions = await storage.getTransactions(agent.gaii, 10000);
       const trust = await calculateTrustScore(agent.gaii, storage);
 
-      // Board posts by this agent (scan all boards)
-      const allBoards = await storage.listBoards();
+      // Board posts by this agent (from the pre-loaded per-board posts).
       const agentBoardPosts = [];
       for (const board of allBoards) {
-        const posts = await storage.listPosts(board.id, { limit: 10000 });
+        const posts = postsByBoard.get(board.id) ?? [];
         for (const post of posts) {
           if (post.authorGaii === agent.gaii) {
             agentBoardPosts.push({
@@ -293,8 +303,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       // Consent audit trail for this agent
       const consentAudit = await storage.listConsentAudit(agent.gaii);
 
-      // Flags filed by this agent
-      const allFlags = await storage.listFlags();
+      // Flags filed by this agent (from the pre-loaded flag list)
       const flagsFiled = allFlags.filter(f => f.flaggedBy === agent.gaii).map(f => ({
         id: f.id,
         target_type: f.targetType,
@@ -330,7 +339,9 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       // Escrow holds
       const escrowHolds = await storage.listEscrowHolds(agent.gaii);
 
-      const agentGhii = await storage.getGHIIByOwner(agent.owner);
+      // agent.owner === name for every agent here (all from getAgentsByOwner(name)), so the owner
+      // GHII is the already-loaded ghiiRecord — no per-agent getGHIIByOwner re-fetch. The morsel
+      // balance lives on the owner GHII (agent balances are always 0 in the morsel economy).
       agentData.push({
         gaii: agent.gaii,
         display_name: agent.displayName,
@@ -338,7 +349,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         capabilities: agent.capabilities,
         default_scopes: agent.defaultScopes,
         trust,
-        morsel_balance: agentGhii?.morselBalance ?? 0,
+        morsel_balance: ghiiRecord?.morselBalance ?? 0,
         created_at: agent.createdAt,
         last_seen: agent.lastSeen,
         memories: memories.map(m => ({
