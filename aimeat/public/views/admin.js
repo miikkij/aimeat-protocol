@@ -32,6 +32,7 @@ import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
 import PortalTab       from './admin/portal-tab.js';
 import StatsTab        from './admin/stats-tab.js';
+import DatabaseTab     from './admin/database-tab.js';
 import UsageTab        from './admin/usage-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
 import AgentsTab       from './admin/agents-tab.js';
@@ -80,6 +81,7 @@ const NAV_GROUPS = [
     { id: 'portal',       icon: '\u{1F310}', key: 'dashboard.portal',     component: PortalTab },
     { id: 'subdomains',   icon: '\u{1F517}', key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        icon: '\u{1F4C8}', key: 'dashboard.stats',      component: StatsTab },
+    { id: 'database',     icon: '\u{1F5C3}', key: 'dashboard.database',   component: DatabaseTab },
     { id: 'usage',        icon: '\u{1F4B8}', key: 'dashboard.usage',      component: UsageTab },
     { id: 'prompts',      icon: '\u{1F4DD}', key: 'dashboard.promptsTab', component: PromptsTab },
   ]},
