@@ -6,6 +6,10 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — catalogue listing metrics via 3 batch queries (downloads/forks/screenshots), was 3N
+ *   v1.2.0 — 2026-07-16 — GET /v1/apps carries has_draft for the viewer's OWN apps (one
+ *     batch listAppDraftFilenames query) so the catalogue can badge a pending staging draft
+ *   v1.3.0 — 2026-07-16 — GET /v1/admin/apps moderation metrics via 2 batch queries
+ *     (getAppDownloadsForApps + countAppForksForApps), was getAppDownloads + countAppForks PER app (2N)
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -59,6 +63,11 @@ export function registerCatalogueAdminRoutes(
         const downloadsByApp = await storage.getAppDownloadsForApps(refs);
         const forksByApp = await storage.countAppForksForApps(refs);
         const filesByOwner = await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]);
+        // Which of the VIEWER's own apps have a pending staging draft — one query, owner-only.
+        // Others' apps never expose draft state (a draft is owner-private).
+        const viewerDraftFilenames = viewerGhii
+            ? new Set(await storage.listAppDraftFilenames(viewerGhii))
+            : new Set<string>();
         const screenshotKeys = new Set<string>();
         for (const [gaii, files] of Object.entries(filesByOwner)) {
             for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
@@ -79,6 +88,7 @@ export function registerCatalogueAdminRoutes(
                 protected: !!app.accessCode,
                 parked: !!app.parked,
                 forkable: !!app.forkable,
+                has_draft: viewerGhii ? (app.ownerGaii === viewerGhii && viewerDraftFilenames.has(app.filename)) : false,
                 operator_hidden: !!app.operatorHidden,
                 operator_hide_reason: app.operatorHideReason ?? null,
                 has_screenshot: hasScreenshot,
@@ -141,9 +151,16 @@ export function registerCatalogueAdminRoutes(
         const offset = parseInt(req.query.offset as string) || 0;
         const { apps, total } = await storage.listApps({ adminView: true, limit, offset, sort: 'newest' });
 
-        const result = await Promise.all(apps.map(async (app) => {
-            const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
-            const forks = await storage.countAppForks(app.ownerGaii, app.filename);
+        // Per-app metrics in TWO batch queries (was getAppDownloads + countAppForks PER app = 2N, up to
+        // ~1000 for a full admin page).
+        const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
+        const downloadsByApp = await storage.getAppDownloadsForApps(refs);
+        const forksByApp = await storage.countAppForksForApps(refs);
+
+        const result = apps.map((app) => {
+            const metricKey = `${app.ownerGaii} ${app.filename}`;
+            const downloads = downloadsByApp[metricKey] ?? 0;
+            const forks = forksByApp[metricKey] ?? 0;
             return {
                 owner: app.ownerName,
                 filename: app.filename,
@@ -163,7 +180,7 @@ export function registerCatalogueAdminRoutes(
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                 created_at: app.createdAt,
             };
-        }));
+        });
 
         res.json(success(config.nodeId, { apps: result, total, offset, limit }));
     });
